@@ -1,0 +1,23 @@
+# dependencies
+node_modules/
+
+# IDE
+/.vscode
+/.project
+/.settings 
+
+# build output
+dist
+CHANGELOG.md
+
+# misc
+.DS_Store
+npm-debug.log
+*.tsbuildinfo
+.npmrc
+
+# tests
+/tests
+/coverage
+/.nyc_output
+/logs
