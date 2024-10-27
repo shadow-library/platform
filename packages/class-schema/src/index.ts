@@ -1,19 +1,10 @@
 /**
  * Importing npm packages
  */
+import 'reflect-metadata';
 
 /**
- * Importing user defined packages
+ * exporting modules
  */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-export function main(): void {
-  process.stdout.write('Hello World\n');
-}
+export * from './decorators';
+export * from './types';
