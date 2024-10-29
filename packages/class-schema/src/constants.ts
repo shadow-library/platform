@@ -16,4 +16,5 @@
 
 export const DESIGN_TYPE_METADATA = 'design:type';
 
-export const SCHEMA_METADATA = Symbol('class-schema');
+export const FIELD_TYPE_METADATA = Symbol('field-type');
+export const FIELD_OPTIONS_METADATA = Symbol('field-options');

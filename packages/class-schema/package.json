@@ -58,5 +58,8 @@
     "pnpm": ">= 9",
     "yarn": "please-use-pnpm",
     "npm": "please-use-pnpm"
+  },
+  "dependencies": {
+    "deepmerge": "^4.3.1"
   }
 }
