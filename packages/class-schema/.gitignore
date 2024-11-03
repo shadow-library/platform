@@ -17,7 +17,6 @@ npm-debug.log
 .npmrc
 
 # tests
-/tests
 /coverage
 /.nyc_output
 /logs
