@@ -18,19 +18,22 @@ export type FieldType = Class<any> | Class<any>[];
 
 export type ReturnTypeFunc = (returns?: void) => FieldType;
 
-export type FieldOptions = Partial<JSONSchema>;
+export type FieldOptions<T extends JSONBasicSchema = JSONSchema> = Partial<T> & {
+  /** Whether this field is required. default is `true` */
+  required?: boolean;
+};
 
 /**
  * Declaring the constants
  */
 
 export function Field(options?: FieldOptions): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<String>, options?: Partial<JSONStringSchema>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<Number>, options?: Partial<JSONNumberSchema>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: Partial<JSONBasicSchema>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: Partial<JSONObjectSchema>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: Partial<JSONArraySchema>): PropertyDecorator;
-export function Field(typeOrOptions?: ReturnTypeFunc | FieldOptions, fieldOptions?: FieldOptions): PropertyDecorator {
+export function Field(returnTypeFn: (returns?: void) => Class<String>, options?: FieldOptions<JSONStringSchema>): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<Number>, options?: FieldOptions<JSONNumberSchema>): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: FieldOptions<JSONBasicSchema>): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: FieldOptions<JSONObjectSchema>): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: FieldOptions<JSONArraySchema>): PropertyDecorator;
+export function Field(typeOrOptions?: ReturnTypeFunc | FieldOptions, fieldOptions?: FieldOptions<any>): PropertyDecorator {
   const isTypeFn = typeof typeOrOptions === 'function';
   const options = isTypeFn ? fieldOptions : typeOrOptions;
 

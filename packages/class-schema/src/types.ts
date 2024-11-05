@@ -16,7 +16,6 @@ export type JSONSchemaType = 'string' | 'number' | 'boolean' | 'array' | 'object
 
 export interface JSONBasicSchema {
   /** Basic schema properties */
-  $schema?: string;
   $id?: string;
   $ref?: string;
   type?: JSONSchemaType | JSONSchemaType[];
