@@ -15,9 +15,9 @@ import { JSONSchema } from './types';
 /**
  * Declaring the constants
  */
-const schemas = new Map<Class<unknown>, JSONSchema>();
 
-export function getSchema(identifier: Class<unknown>): JSONSchema {
-  if (schemas.has(identifier)) return schemas.get(identifier)!;
-  return {};
+export class ClassSchema {
+  private readonly schemas = new Map<Class<unknown>, JSONSchema>();
+
+  constructor(private readonly cacheSchema: boolean = true) {}
 }
