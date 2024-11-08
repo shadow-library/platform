@@ -30,5 +30,11 @@ jobs:
       - name: Lint code
         run: pnpm lint
 
+      - name: Build the code
+        run: pnpm build
+
+      - name: Clean build
+        run: pnpm clean
+
       - name: Test the code
         run: pnpm test

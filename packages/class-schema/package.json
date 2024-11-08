@@ -9,6 +9,7 @@
     "prepare": "husky",
     "clean": "rm -rf dist logs coverage CHANGELOG.md packages/**/CHANGELOG.md",
     "lint": "tsx scripts/lint",
+    "build": "tsx scripts/build",
     "test": "jest",
     "test:integration": "jest --config integration/jest.config.ts",
     "prepublishOnly": "pnpm run build"
