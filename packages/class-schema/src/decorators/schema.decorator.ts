@@ -5,8 +5,8 @@
 /**
  * Importing user defined packages
  */
-import { JSONObjectSchema } from '@lib/types';
 import { SCHEMA_OPTIONS_METADATA } from '@lib/constants';
+import { JSONObjectSchema } from '@lib/interfaces';
 
 /**
  * Defining types
@@ -20,8 +20,10 @@ export type SchemaOptions = Partial<JSONObjectSchema>;
 let counter = 0;
 
 export function Schema(options: SchemaOptions = {}): ClassDecorator {
+  options.type = 'object';
+
   return target => {
-    if (!options.$id) options.$id = `class-schema://${target.name}-${counter++}`;
+    if (!options.$id) options.$id = `class-schema:${target.name}-${counter++}`;
     Reflect.defineMetadata(SCHEMA_OPTIONS_METADATA, options, target);
   };
 }

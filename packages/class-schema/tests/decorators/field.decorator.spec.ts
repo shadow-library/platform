@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { describe, expect, it } from '@jest/globals';
-import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA } from '@lib/constants';
+import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA } from '@lib/constants';
 
 /**
  * Importing user defined packages
@@ -58,5 +58,22 @@ describe('@Field', () => {
   it('should set the field schema options', () => {
     const options = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Sample.prototype, 'fieldObject');
     expect(options).toStrictEqual({ patternProperties: {} });
+  });
+
+  it('should set the list of fields', () => {
+    const fields = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, Sample.prototype);
+    expect(fields).toStrictEqual(['fieldString', 'fieldNumber', 'fieldBoolean', 'fieldObject', 'fieldArray', 'fieldCustom', 'fieldCustomArray']);
+  });
+
+  it('should throw error for symbol keys', () => {
+    const symbol = Symbol('key');
+    expect(() => {
+      class ABC {
+        @Field()
+        [symbol]: string;
+      }
+
+      return ABC;
+    }).toThrow(Error);
   });
 });

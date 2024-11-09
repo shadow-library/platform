@@ -80,4 +80,6 @@ export interface JSONSchema
     SchemaWithOutType<JSONArraySchema>,
     SchemaWithOutType<JSONStringSchema>,
     SchemaWithOutType<JSONNumberSchema>,
-    SchemaWithOutType<JSONConditionalSchema> {}
+    SchemaWithOutType<JSONConditionalSchema> {
+  type?: JSONSchemaType;
+}

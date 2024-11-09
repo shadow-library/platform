@@ -7,8 +7,8 @@ import merge from 'deepmerge';
 /**
  * Importing user defined packages
  */
-import { JSONArraySchema, JSONBasicSchema, JSONNumberSchema, JSONObjectSchema, JSONSchema, JSONStringSchema } from '@lib/types';
-import { DESIGN_TYPE_METADATA, FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA } from '@lib/constants';
+import { JSONArraySchema, JSONBasicSchema, JSONNumberSchema, JSONObjectSchema, JSONSchema, JSONStringSchema } from '@lib/interfaces';
+import { DESIGN_TYPE_METADATA, FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA } from '@lib/constants';
 
 /**
  * Defining types
@@ -35,13 +35,16 @@ export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: Fi
 export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: FieldOptions<JSONArraySchema>): PropertyDecorator;
 export function Field(typeOrOptions?: ReturnTypeFunc | FieldOptions, fieldOptions?: FieldOptions<any>): PropertyDecorator {
   const isTypeFn = typeof typeOrOptions === 'function';
-  const options = isTypeFn ? fieldOptions : typeOrOptions;
+  const options = (isTypeFn ? fieldOptions : typeOrOptions) ?? {};
 
   return (target, propertyKey) => {
+    if (typeof propertyKey === 'symbol') throw new Error(`Cannot apply @Field() to symbol ${propertyKey.toString()}`);
     const type = isTypeFn ? typeOrOptions() : Reflect.getMetadata(DESIGN_TYPE_METADATA, target, propertyKey);
     Reflect.defineMetadata(FIELD_TYPE_METADATA, type, target, propertyKey);
 
-    if (!options) return;
+    const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, target) ?? [];
+    Reflect.defineMetadata(SCHEMA_FIELDS_METADATA, fields.concat([propertyKey]), target);
+
     const oldOptions = Reflect.getMetadata(FIELD_OPTIONS_METADATA, target, propertyKey) ?? {};
     const newOptions = merge.all([{}, oldOptions, options]);
     Reflect.defineMetadata(FIELD_OPTIONS_METADATA, newOptions, target, propertyKey);

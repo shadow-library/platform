@@ -7,4 +7,5 @@ import 'reflect-metadata';
  * exporting modules
  */
 export * from './decorators';
-export * from './types';
+export * from './interfaces';
+export * from './class-schema';
