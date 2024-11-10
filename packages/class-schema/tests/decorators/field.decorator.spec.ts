@@ -2,11 +2,11 @@
  * Importing npm packages
  */
 import { describe, expect, it } from '@jest/globals';
-import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA } from '@lib/constants';
 
 /**
  * Importing user defined packages
  */
+import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA } from '@lib/constants';
 import { Field } from '@shadow-library/class-schema';
 
 /**
@@ -18,6 +18,7 @@ import { Field } from '@shadow-library/class-schema';
  */
 
 describe('@Field', () => {
+  /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
   class Custom {}
 
   class Sample {

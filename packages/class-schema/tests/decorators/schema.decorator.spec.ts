@@ -6,8 +6,8 @@ import { describe, expect, it } from '@jest/globals';
 /**
  * Importing user defined packages
  */
-import { Schema } from '@shadow-library/class-schema';
 import { SCHEMA_OPTIONS_METADATA } from '@lib/constants';
+import { Schema } from '@shadow-library/class-schema';
 
 /**
  * Defining types
@@ -20,6 +20,7 @@ import { SCHEMA_OPTIONS_METADATA } from '@lib/constants';
 describe('@Schema', () => {
   it('should decorate the class with schema options', () => {
     @Schema({ $id: 'id', patternProperties: {} })
+    /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
     class Sample {}
 
     const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Sample);
@@ -28,6 +29,7 @@ describe('@Schema', () => {
 
   it('should set the default $id field', () => {
     @Schema()
+    /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
     class Sample {}
 
     const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Sample);
@@ -37,6 +39,7 @@ describe('@Schema', () => {
   it('should set different $id field for schema having same name', () => {
     function getClass() {
       @Schema()
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Sample {}
       return Sample;
     }

@@ -1,14 +1,15 @@
+/* eslint-disable @typescript-eslint/no-invalid-void-type, @typescript-eslint/no-wrapper-object-types */
 /**
  * Importing npm packages
  */
-import { Class } from 'type-fest';
 import merge from 'deepmerge';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
-import { JSONArraySchema, JSONBasicSchema, JSONNumberSchema, JSONObjectSchema, JSONSchema, JSONStringSchema } from '@lib/interfaces';
 import { DESIGN_TYPE_METADATA, FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA } from '@lib/constants';
+import { JSONArraySchema, JSONBasicSchema, JSONNumberSchema, JSONObjectSchema, JSONSchema, JSONStringSchema } from '@lib/interfaces';
 
 /**
  * Defining types

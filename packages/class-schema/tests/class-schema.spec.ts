@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from '@jest/globals';
 /**
  * Importing user defined packages
  */
-import { Schema, Field, ClassSchema } from '@shadow-library/class-schema';
+import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Defining types
@@ -36,10 +36,10 @@ describe('ClassSchema', () => {
     @Field()
     name: string;
 
-    @Field(type => [File])
+    @Field(() => [File])
     files: File;
 
-    @Field(type => [Folder])
+    @Field(() => [Folder])
     folders: Folder;
   }
 

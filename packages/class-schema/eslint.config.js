@@ -16,12 +16,21 @@ import eslintTs from 'typescript-eslint';
  */
 
 export default [
+  eslintJs.configs.recommended,
+  ...eslintTs.configs.strict,
+  ...eslintTs.configs.stylistic,
+  importPlugin.flatConfigs.recommended,
   {
     files: ['**/*.ts'],
     languageOptions: {
       globals: globals.node,
       parserOptions: {
         programs: [tsParser.createProgram('tsconfig.json')],
+      },
+    },
+    settings: {
+      'import/resolver': {
+        typescript: { project: 'tsconfig.json' },
       },
     },
     rules: {
@@ -42,8 +51,4 @@ export default [
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
     },
   },
-  eslintJs.configs.recommended,
-  ...eslintTs.configs.strict,
-  ...eslintTs.configs.stylistic,
-  importPlugin.flatConfigs.recommended,
 ];

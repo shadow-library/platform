@@ -1,16 +1,17 @@
 /**
  * Importing npm packages
  */
-import { Class } from 'type-fest';
+import assert from 'assert';
+
 import merge from 'deepmerge';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
-import { JSONSchema } from './interfaces';
 import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA, SCHEMA_OPTIONS_METADATA } from './constants';
 import { SchemaOptions } from './decorators';
-import assert from 'assert';
+import { JSONSchema } from './interfaces';
 
 /**
  * Defining types
