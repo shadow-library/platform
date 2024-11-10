@@ -8,10 +8,9 @@
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs coverage CHANGELOG.md packages/**/CHANGELOG.md",
-    "lint": "tsx scripts/lint",
-    "build": "tsx scripts/build",
+    "lint": "bun run scripts/lint.ts",
+    "build": "bun run scripts/build.ts",
     "test": "jest",
-    "test:integration": "jest --config integration/jest.config.ts",
     "prepublishOnly": "pnpm run build"
   },
   "repository": {
@@ -47,19 +46,12 @@
     "ts-jest": "^29.2.5",
     "ts-node": "^10.9.2",
     "tsc-alias": "^1.8.10",
-    "tsx": "^4.19.1",
     "type-fest": "^4.26.1",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.11.0"
   },
   "peerDependencies": {
     "reflect-metadata": "^0.2.2"
-  },
-  "engines": {
-    "node": ">= 20",
-    "pnpm": ">= 9",
-    "yarn": "please-use-pnpm",
-    "npm": "please-use-pnpm"
   },
   "dependencies": {
     "deepmerge": "^4.3.1"

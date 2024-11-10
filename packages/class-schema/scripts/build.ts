@@ -34,7 +34,6 @@ const packageJson = JSON.parse(packageJsonString);
 
 /** modifying package.json and saving to 'dist' */
 const distPackageJson = structuredClone(packageJson);
-distPackageJson.engines = { node: distPackageJson.engines.node };
 distPackageJson.main = 'index.js';
 delete distPackageJson.private;
 delete distPackageJson.scripts;
