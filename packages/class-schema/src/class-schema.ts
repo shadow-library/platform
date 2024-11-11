@@ -1,33 +1,54 @@
 /**
  * Importing npm packages
  */
-import assert from 'assert';
-
 import merge from 'deepmerge';
-import { Class } from 'type-fest';
+import { Class, SetRequired } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
 import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA, SCHEMA_OPTIONS_METADATA } from './constants';
-import { SchemaOptions } from './decorators';
+import { FieldOptions, SchemaOptions } from './decorators';
 import { JSONSchema } from './interfaces';
 
 /**
  * Defining types
  */
 
-interface FieldSchema {
-  required: boolean;
-  schema: JSONSchema;
-}
+type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type' | 'properties' | 'required' | 'definitions'>;
 
 /**
  * Declaring the constants
  */
 
 export class ClassSchema {
-  private readonly schemas = new Map<Class<unknown>, JSONSchema>();
+  private readonly schema: ParsedSchema;
+
+  constructor(Class: Class<unknown>) {
+    this.schema = this.getSchema(Class);
+    this.populateSchema(this.schema, Class);
+  }
+
+  private getSchema(Class: Class<unknown>): ParsedSchema {
+    const schema = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as SchemaOptions | undefined;
+    if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
+    return merge<ParsedSchema>(schema, { type: 'object', properties: {}, required: [], definitions: {} });
+  }
+
+  private addDefinition(Class: Class<unknown>): string {
+    const schema = this.getSchema(Class);
+    this.schema.definitions[schema.$id] = schema;
+    this.populateSchema(schema, Class);
+    return schema.$id;
+  }
+
+  private getSchemaId(Class: Class<unknown>): string {
+    const schema = this.getSchema(Class);
+    if (this.schema.$id === schema.$id) return schema.$id;
+    const definition = this.schema.definitions[schema.$id];
+    if (definition) return schema.$id;
+    return this.addDefinition(Class);
+  }
 
   private getFieldType(Class: Class<unknown>, field: string): JSONSchema {
     const fieldType = Reflect.getMetadata(FIELD_TYPE_METADATA, Class.prototype, field);
@@ -36,56 +57,31 @@ export class ClassSchema {
     if (fieldType === String) schema.type = 'string';
     else if (fieldType === Boolean) schema.type = 'boolean';
     else if (fieldType === Number) schema.type = 'number';
-    else if (Array.isArray(fieldType)) {
+    else if (!Array.isArray(fieldType)) schema.$ref ??= this.getSchemaId(fieldType);
+    else {
       const Class = fieldType[0] as Class<unknown>;
       schema.type = 'array';
-      schema.items = { $ref: this.getSchemaId(Class) };
-    } else schema.$ref = this.getSchemaId(fieldType);
+      schema.items ??= { $ref: this.getSchemaId(Class) };
+    }
 
     return schema;
   }
 
-  private getFieldSchema(Class: Class<unknown>, field: string): FieldSchema {
-    const { required, ...schema } = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Class.prototype, field);
-    return { required: required ?? true, schema };
-  }
-
-  // private getChildSchemas(parent: Class<unknown>): Class<unknown>[] {
-  //   return [];
-  // }
-
-  addSchema(Class: Class<unknown>): this {
-    if (this.schemas.has(Class)) return this;
-
-    const schemaOptions = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as SchemaOptions | undefined;
-    if (!schemaOptions) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
-
-    const schema = structuredClone(schemaOptions);
-    this.schemas.set(Class, schema);
-    schema.definitions ??= {};
-    schema.properties ??= {};
-    schema.required ??= [];
-
+  private populateSchema(schema: ParsedSchema, Class: Class<unknown>): void {
     const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, Class.prototype);
     for (const field of fields) {
-      const fieldSchema = this.getFieldSchema(Class, field);
-      if (fieldSchema.required && !schema.required.includes(field)) schema.required.push(field);
-
+      const { required, ...fieldSchema } = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Class.prototype, field) as FieldOptions;
       const type = this.getFieldType(Class, field);
-      schema.properties[field] = merge(type, fieldSchema.schema);
+      schema.properties[field] = merge(type, fieldSchema);
+      if (required !== false) schema.required.push(field);
     }
-
-    return this;
   }
 
-  getSchema(Class: Class<unknown>): JSONSchema {
-    this.addSchema(Class);
-    return this.schemas.get(Class) as JSONSchema;
+  getId(): string {
+    return this.schema.$id;
   }
 
-  getSchemaId(Class: Class<unknown>): string {
-    const schema = this.getSchema(Class);
-    assert(schema.$id, `Unexpected $id not present in class '${Class.name}'`);
-    return schema.$id;
+  getJSONSchema(clone = false): ParsedSchema {
+    return clone ? structuredClone(this.schema) : this.schema;
   }
 }

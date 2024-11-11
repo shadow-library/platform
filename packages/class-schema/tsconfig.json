@@ -29,6 +29,7 @@
       "@shadow-library/class-schema": ["src/index.ts"]
     },
     "resolveJsonModule": true,
+    "types": ["bun"],
 
     /** Interop Constraints */
     "allowSyntheticDefaultImports": true,

@@ -49,8 +49,8 @@ fs.copyFileSync(`${rootDir}/LICENSE`, `${distDir}/LICENSE`);
 /** Building typescript files */
 const tsc = ['tsc', '--outDir', distDir, '--project', 'tsconfig.build.json'];
 const tscAlias = ['tsc-alias', '--outDir', distDir, '--project', 'tsconfig.build.json'];
-let result = spawnSync('pnpm', tsc, { cwd: rootDir, stdio: 'inherit' });
-if (result.status === 0) result = spawnSync('pnpm', tscAlias, { cwd: rootDir, stdio: 'inherit' });
+let result = spawnSync('bunx', tsc, { cwd: rootDir, stdio: 'inherit' });
+if (result.status === 0) result = spawnSync('bunx', tscAlias, { cwd: rootDir, stdio: 'inherit' });
 if (result.status !== 0) error('Build failed');
 
 /** Removing temporary files */

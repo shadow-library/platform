@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -17,8 +17,6 @@ import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
  */
 
 describe('ClassSchema', () => {
-  let classSchema: ClassSchema;
-
   @Schema()
   class File {
     @Field()
@@ -43,30 +41,36 @@ describe('ClassSchema', () => {
     folders: Folder;
   }
 
-  beforeEach(() => {
-    classSchema = new ClassSchema();
-  });
-
   it('should get the JSON schema for primitive types', () => {
-    const schema = classSchema.getSchema(File);
-    expect(schema).toEqual({
+    const schema = new ClassSchema(File);
+    expect(schema.getJSONSchema()).toEqual({
       $id: 'class-schema:File-0',
       type: 'object',
       definitions: {},
       required: ['name', 'size'],
-      properties: {
-        name: { type: 'string' },
-        size: { type: 'number' },
-      },
+      properties: { name: { type: 'string' }, size: { type: 'number' } },
     });
   });
 
+  it('should return the id of the schema', () => {
+    const schema = new ClassSchema(File);
+    expect(schema.getId()).toEqual('class-schema:File-0');
+  });
+
   it('should get the JSON schema for complex types', () => {
-    const schema = classSchema.getSchema(Folder);
-    expect(schema).toEqual({
+    const schema = new ClassSchema(Folder);
+    expect(schema.getJSONSchema()).toEqual({
       type: 'object',
       $id: 'class-schema:Folder-1',
-      definitions: {},
+      definitions: {
+        'class-schema:File-0': {
+          $id: 'class-schema:File-0',
+          type: 'object',
+          definitions: {},
+          required: ['name', 'size'],
+          properties: { name: { type: 'string' }, size: { type: 'number' } },
+        },
+      },
       properties: {
         name: { type: 'string' },
         files: { type: 'array', items: { $ref: 'class-schema:File-0' } },

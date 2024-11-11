@@ -19,7 +19,7 @@ export type FieldType = Class<any> | Class<any>[];
 
 export type ReturnTypeFunc = (returns?: void) => FieldType;
 
-export type FieldOptions<T extends JSONBasicSchema = JSONSchema> = Partial<T> & {
+export type FieldOptions<T extends JSONBasicSchema = Omit<JSONSchema, 'required'>> = Partial<T> & {
   /** Whether this field is required. default is `true` */
   required?: boolean;
 };
