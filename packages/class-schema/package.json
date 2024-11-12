@@ -1,16 +1,14 @@
 {
   "name": "@shadow-library/class-schema",
-  "private": true,
   "type": "module",
   "version": "0.0.1",
   "description": "Decorator-based JSON schema generator at runtime",
   "main": "src/index.ts",
   "scripts": {
     "prepare": "husky",
-    "clean": "rm -rf dist logs coverage CHANGELOG.md packages/**/CHANGELOG.md",
+    "clean": "rm -rf dist logs CHANGELOG.md",
     "lint": "bun run scripts/lint.ts",
-    "build": "bun run scripts/build.ts",
-    "prepublishOnly": "pnpm run build"
+    "build": "bun run scripts/build.ts"
   },
   "repository": {
     "type": "git",
@@ -40,6 +38,7 @@
     "husky": "^9.1.6",
     "prettier": "^3.3.3",
     "reflect-metadata": "^0.2.2",
+    "release-it": "^17.10.0",
     "tsc-alias": "^1.8.10",
     "type-fest": "^4.26.1",
     "typescript": "^5.6.3",
