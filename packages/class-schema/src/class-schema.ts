@@ -51,12 +51,15 @@ export class ClassSchema {
   }
 
   private getFieldType(Class: Class<unknown>, field: string): JSONSchema {
-    const fieldType = Reflect.getMetadata(FIELD_TYPE_METADATA, Class.prototype, field);
+    const getType = Reflect.getMetadata(FIELD_TYPE_METADATA, Class.prototype, field);
+    const fieldType = getType();
     const schema: JSONSchema = {};
 
     if (fieldType === String) schema.type = 'string';
     else if (fieldType === Boolean) schema.type = 'boolean';
     else if (fieldType === Number) schema.type = 'number';
+    else if (fieldType === Object) schema.type = 'object';
+    else if (fieldType === Array) schema.type = 'array';
     else if (!Array.isArray(fieldType)) schema.$ref ??= this.getSchemaId(fieldType);
     else {
       const Class = fieldType[0] as Class<unknown>;
@@ -68,7 +71,7 @@ export class ClassSchema {
   }
 
   private populateSchema(schema: ParsedSchema, Class: Class<unknown>): void {
-    const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, Class.prototype);
+    const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, Class.prototype) ?? [];
     for (const field of fields) {
       const { required, ...fieldSchema } = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Class.prototype, field) as FieldOptions;
       const type = this.getFieldType(Class, field);

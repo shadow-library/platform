@@ -40,8 +40,9 @@ export function Field(typeOrOptions?: ReturnTypeFunc | FieldOptions, fieldOption
 
   return (target, propertyKey) => {
     if (typeof propertyKey === 'symbol') throw new Error(`Cannot apply @Field() to symbol ${propertyKey.toString()}`);
-    const type = isTypeFn ? typeOrOptions() : Reflect.getMetadata(DESIGN_TYPE_METADATA, target, propertyKey);
-    Reflect.defineMetadata(FIELD_TYPE_METADATA, type, target, propertyKey);
+    const reflectedType = Reflect.getMetadata(DESIGN_TYPE_METADATA, target, propertyKey);
+    const getType = isTypeFn ? typeOrOptions : () => reflectedType;
+    Reflect.defineMetadata(FIELD_TYPE_METADATA, getType, target, propertyKey);
 
     const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, target) ?? [];
     Reflect.defineMetadata(SCHEMA_FIELDS_METADATA, fields.concat([propertyKey]), target);

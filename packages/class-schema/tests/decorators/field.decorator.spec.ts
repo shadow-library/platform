@@ -46,14 +46,14 @@ describe('@Field', () => {
 
   [String, Number, Boolean, Object, Array, Custom].forEach(Class => {
     it(`should set the field type as '${Class.name}'`, () => {
-      const fieldType = Reflect.getMetadata(FIELD_TYPE_METADATA, Sample.prototype, `field${Class.name}`);
-      expect(fieldType).toBe(Class);
+      const getType = Reflect.getMetadata(FIELD_TYPE_METADATA, Sample.prototype, `field${Class.name}`);
+      expect(getType()).toBe(Class);
     });
   });
 
   it(`should set the field type as '[${Custom.name}]'`, () => {
-    const fieldType = Reflect.getMetadata(FIELD_TYPE_METADATA, Sample.prototype, 'fieldCustomArray');
-    expect(fieldType).toStrictEqual([Custom]);
+    const getType = Reflect.getMetadata(FIELD_TYPE_METADATA, Sample.prototype, 'fieldCustomArray');
+    expect(getType()).toStrictEqual([Custom]);
   });
 
   it('should set the field schema options', () => {

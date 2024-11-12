@@ -60,6 +60,7 @@ export interface JSONStringSchema extends JSONBasicSchema {
 
 export interface JSONNumberSchema extends JSONBasicSchema {
   type: 'number';
+  format?: string;
   minimum?: number;
   maximum?: number;
   exclusiveMinimum?: number;
