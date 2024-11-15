@@ -14,6 +14,6 @@
   },
   "hooks": {
     "before:init": ["bun test"],
-    "before:bump": ["bun run build"]
+    "before:release": ["bun run build"]
   }
 }
