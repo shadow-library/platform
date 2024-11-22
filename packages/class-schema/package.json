@@ -8,6 +8,7 @@
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
     "lint": "bun run scripts/lint.ts",
+    "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts"
   },
   "repository": {

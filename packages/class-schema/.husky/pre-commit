@@ -1,3 +1,5 @@
 bun lint
 
+bun type-check
+
 bun test

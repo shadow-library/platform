@@ -31,6 +31,9 @@
     "resolveJsonModule": true,
     "types": ["bun"],
 
+    /** Emit */
+    "noEmit": true,
+
     /** Interop Constraints */
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
