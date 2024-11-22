@@ -9,13 +9,13 @@ import { Class, SetRequired } from 'type-fest';
  */
 import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA, SCHEMA_OPTIONS_METADATA } from './constants';
 import { FieldOptions, SchemaOptions } from './decorators';
-import { JSONSchema } from './interfaces';
+import { JSONObjectSchema, JSONSchema } from './interfaces';
 
 /**
  * Defining types
  */
 
-type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type' | 'properties' | 'required' | 'definitions'>;
+type ParsedSchema = SetRequired<JSONObjectSchema, '$id' | 'type' | 'properties' | 'required' | 'definitions'>;
 
 /**
  * Declaring the constants
