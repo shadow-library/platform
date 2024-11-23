@@ -31,10 +31,10 @@ export interface JSONBasicSchema<T> {
   [key: string]: unknown;
 }
 
-export interface JSONObjectSchema extends JSONBasicSchema<object> {
+export interface JSONObjectSchema<IsField extends boolean = false> extends JSONBasicSchema<object> {
   type: 'object';
   properties?: Record<string, JSONSchema>;
-  required?: string[];
+  required?: IsField extends true ? boolean : string[];
   maxProperties?: number;
   minProperties?: number;
   additionalProperties?: boolean | JSONSchema;
@@ -61,7 +61,6 @@ export interface JSONStringSchema extends JSONBasicSchema<string> {
 
 export interface JSONNumberSchema extends JSONBasicSchema<number> {
   type: 'number';
-  format?: string;
   minimum?: number;
   maximum?: number;
   exclusiveMinimum?: number;
@@ -80,4 +79,10 @@ export interface JSONConditionalSchema extends JSONBasicSchema<unknown> {
   else?: JSONSchema;
 }
 
-export type JSONSchema = JSONBasicSchema<any> | JSONObjectSchema | JSONArraySchema | JSONStringSchema | JSONNumberSchema | JSONConditionalSchema;
+export type JSONSchema<IsField extends boolean = false> =
+  | JSONBasicSchema<any>
+  | JSONObjectSchema<IsField>
+  | JSONArraySchema
+  | JSONStringSchema
+  | JSONNumberSchema
+  | JSONConditionalSchema;
