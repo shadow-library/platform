@@ -15,7 +15,7 @@ import { JSONObjectSchema, JSONSchema } from './interfaces';
  * Defining types
  */
 
-type ParsedSchema = SetRequired<JSONObjectSchema, '$id' | 'type' | 'properties' | 'required' | 'definitions'>;
+export type ParsedSchema = SetRequired<JSONObjectSchema, '$id' | 'type' | 'properties' | 'required' | 'definitions'>;
 
 /**
  * Declaring the constants
@@ -27,6 +27,10 @@ export class ClassSchema {
   constructor(Class: Class<unknown>) {
     this.schema = this.getSchema(Class);
     this.populateSchema(this.schema, Class);
+  }
+
+  static generate(Class: Class<unknown>): ParsedSchema {
+    return new ClassSchema(Class).getJSONSchema();
   }
 
   private getSchema(Class: Class<unknown>): ParsedSchema {

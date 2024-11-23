@@ -81,6 +81,24 @@ describe('ClassSchema', () => {
     folders: Folder;
   }
 
+  describe('generate', () => {
+    it('should return ths json schema of the class', () => {
+      expect(ClassSchema.generate(Primitive)).toStrictEqual({
+        $id: 'class-schema:Primitive-1',
+        type: 'object',
+        definitions: {},
+        required: ['str', 'num', 'bool', 'obj', 'arr'],
+        properties: {
+          str: { type: 'string' },
+          num: { type: 'number' },
+          bool: { type: 'boolean' },
+          obj: { type: 'object' },
+          arr: { type: 'array' },
+        },
+      });
+    });
+  });
+
   it('should return the id of the schema', () => {
     const schema = new ClassSchema(Sample);
     expect(schema.getId()).toEqual('class-schema:Sample-0');
