@@ -57,6 +57,12 @@ describe('ClassSchema', () => {
     primitives: Primitive;
   }
 
+  @Schema({ title: 'ExtendedPrimitiveTitle' })
+  class ExtendedPrimitive extends Primitive {
+    @Field({ additionalProperties: true })
+    extended: Record<string, string>;
+  }
+
   @Schema()
   class File {
     @Field()
@@ -121,6 +127,25 @@ describe('ClassSchema', () => {
     });
   });
 
+  it('should get the JSON schema for inherited classes', () => {
+    const schema = new ClassSchema(ExtendedPrimitive);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: 'class-schema:ExtendedPrimitive-3',
+      title: 'ExtendedPrimitiveTitle',
+      type: 'object',
+      definitions: {},
+      required: ['str', 'num', 'bool', 'obj', 'arr', 'extended'],
+      properties: {
+        str: { type: 'string' },
+        num: { type: 'number' },
+        bool: { type: 'boolean' },
+        obj: { type: 'object' },
+        arr: { type: 'array' },
+        extended: { type: 'object', additionalProperties: true },
+      },
+    });
+  });
+
   it('should get the JSON schema for complex types', () => {
     const schema = new ClassSchema(Complex);
     expect(schema.getJSONSchema()).toStrictEqual({
@@ -162,17 +187,17 @@ describe('ClassSchema', () => {
   it('should get the JSON schema for circular types', () => {
     const schema = new ClassSchema(File);
     expect(schema.getJSONSchema()).toStrictEqual({
-      $id: 'class-schema:File-3',
+      $id: 'class-schema:File-4',
       type: 'object',
       definitions: {
-        'class-schema:Folder-4': {
+        'class-schema:Folder-5': {
           type: 'object',
-          $id: 'class-schema:Folder-4',
+          $id: 'class-schema:Folder-5',
           definitions: {},
           properties: {
             name: { type: 'string' },
-            files: { type: 'array', items: { $ref: 'class-schema:File-3' } },
-            folders: { type: 'array', items: { $ref: 'class-schema:Folder-4' } },
+            files: { type: 'array', items: { $ref: 'class-schema:File-4' } },
+            folders: { type: 'array', items: { $ref: 'class-schema:Folder-5' } },
           },
           required: ['name', 'files', 'folders'],
         },
@@ -181,7 +206,7 @@ describe('ClassSchema', () => {
       properties: {
         name: { type: 'string' },
         size: { type: 'number' },
-        parent: { $ref: 'class-schema:Folder-4' },
+        parent: { $ref: 'class-schema:Folder-5' },
       },
     });
   });
