@@ -1,5 +1,6 @@
 {
   "extends": "./tsconfig.json",
+  "tsc-alias": { "resolveFullPaths": true },
   "compilerOptions": {
     /** Emit */
     "noEmit": false,

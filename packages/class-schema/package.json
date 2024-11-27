@@ -3,7 +3,6 @@
   "type": "module",
   "version": "0.0.2",
   "description": "Decorator-based JSON schema generator at runtime",
-  "main": "src/index.ts",
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
