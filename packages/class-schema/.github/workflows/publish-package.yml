@@ -31,8 +31,8 @@ jobs:
 
       - name: Set Git user config
         run: |
-          git config user.name "Shadow Manager"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git config user.name "shadow-manager[bot]"
+          git config user.email "shadow-manager[bot]+190170831@users.noreply.github.com"
 
       - name: Set up Node.js version
         uses: actions/setup-node@v4
@@ -49,9 +49,8 @@ jobs:
       - uses: actions/create-github-app-token@v1
         id: app-token
         with:
-          app-id: ${{ vars.APP_ID }}
-          private-key: ${{ secrets.PRIVATE_KEY }}
-          owner: ${{ github.repository_owner }}
+          app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
+          private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
 
       - name: Bump version
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
