@@ -65,6 +65,6 @@ jobs:
             --field encoding="base64"  \
             --field content="$(base64 -i package.json)" \
             --field message="$(git show -s --format=%s)" \
-            --field sha="$(git rev-parse main:package.json)"
+            --field sha="$(git rev-parse HEAD~1:package.json)"
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
