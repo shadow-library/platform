@@ -32,7 +32,7 @@ jobs:
       - name: Set Git user config
         run: |
           git config user.name "shadow-manager[bot]"
-          git config user.email "shadow-manager[bot]+190170831@users.noreply.github.com"
+          git config user.email "190170831+shadow-manager[bot]@users.noreply.github.com"
 
       - name: Set up Node.js version
         uses: actions/setup-node@v4
@@ -52,11 +52,6 @@ jobs:
           app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
           private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
 
-      - name: Test func
-        run: echo "The secret length is ${#TOKEN}"
-        env:
-          TOKEN: ${{ steps.app-token.outputs.token }}
-
       - name: Bump version
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
         env:
@@ -64,4 +59,12 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push changes
-        run: git push https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git
+        run: |
+          gh api --method PUT /repos/shadow-library/class-schema/contents/package.json \
+            --field branch="main" \
+            --field encoding="base64"  \
+            --field content="$(base64 -i package.json)" \
+            --field message="$(git show -s --format=%s)" \
+            --field sha="$(git rev-parse main:package.json)"
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
