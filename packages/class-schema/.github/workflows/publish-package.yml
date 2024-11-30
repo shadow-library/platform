@@ -29,15 +29,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Release branch
-        run: |
-          git checkout -b release
-          git push --set-upstream origin release
-
       - name: Set Git user config
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "${{ github.actor }}+github-actions[bot]@users.noreply.github.com"
+          git config user.name "Shadow Manager"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
 
       - name: Set up Node.js version
         uses: actions/setup-node@v4
@@ -51,15 +46,15 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.APP_ID }}
+          private-key: ${{ secrets.PRIVATE_KEY }}
+          owner: ${{ github.repository_owner }}
+
       - name: Bump version
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: PR to main
-        run: |
-          gh pr create -f
-          gh pr merge --auto -s
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
