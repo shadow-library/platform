@@ -59,4 +59,4 @@ jobs:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push changes
-        run: git push https://${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git
+        run: git push https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/${{ github.repository }}.git
