@@ -29,10 +29,19 @@ jobs:
         with:
           fetch-depth: 0
 
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
+          private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
+
       - name: Set Git user config
         run: |
-          git config user.name "shadow-manager[bot]"
-          git config user.email "190170831+shadow-manager[bot]@users.noreply.github.com"
+          git config user.name "$APP_SLUG[bot]"
+          git config user.email "$INSTALLATION_ID+$APP_SLUG[bot]@users.noreply.github.com"
+        env:
+          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
+          INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}
 
       - name: Set up Node.js version
         uses: actions/setup-node@v4
@@ -45,12 +54,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
-          private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
 
       - name: Bump version
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
