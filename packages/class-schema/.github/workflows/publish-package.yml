@@ -52,6 +52,11 @@ jobs:
           app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
           private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
 
+      - name: Test func
+        run: echo "The secret length is ${#TOKEN}"
+        env:
+          TOKEN: ${{ steps.app-token.outputs.token }}
+
       - name: Bump version
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
         env:
