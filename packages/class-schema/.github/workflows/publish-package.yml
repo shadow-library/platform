@@ -29,15 +29,10 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Set Release branch
-        run: |
-          git checkout -b release
-          git push --set-upstream origin release
-
       - name: Set Git user config
         run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "${{ github.actor }}+github-actions[bot]@users.noreply.github.com"
+          git config user.name "shadow-manager[bot]"
+          git config user.email "190170831+shadow-manager[bot]@users.noreply.github.com"
 
       - name: Set up Node.js version
         uses: actions/setup-node@v4
@@ -51,15 +46,25 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
+          private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
+
       - name: Bump version
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
-      - name: PR to main
+      - name: Push changes
         run: |
-          gh pr create -f
-          gh pr merge --auto -s
+          gh api --method PUT /repos/shadow-library/class-schema/contents/package.json \
+            --field branch="main" \
+            --field encoding="base64"  \
+            --field content="$(base64 -i package.json)" \
+            --field message="$(git show -s --format=%s)" \
+            --field sha="$(git rev-parse HEAD~1:package.json)"
         env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

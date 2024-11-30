@@ -33,7 +33,7 @@ describe('@Schema', () => {
     class Sample {}
 
     const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Sample);
-    expect(options).toStrictEqual({ $id: expect.stringMatching(/^class-schema:Sample-[0-9]$/), type: 'object' });
+    expect(options).toStrictEqual({ $id: expect.stringMatching(/^class-schema:Sample-[0-9]+$/), type: 'object' });
   });
 
   it('should set different $id field for schema having same name', () => {
