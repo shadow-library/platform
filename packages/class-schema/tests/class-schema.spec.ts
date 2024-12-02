@@ -103,6 +103,12 @@ describe('ClassSchema', () => {
         },
       });
     });
+
+    [String, Number, Boolean, Object, Array].forEach(type => {
+      it(`should return the JSON schema for primitive type '${type.name}'`, () => {
+        expect(ClassSchema.generate(type)).toStrictEqual({ $id: type.name, type: type.name.toLowerCase() as any, definitions: {}, required: [], properties: {} });
+      });
+    });
   });
 
   it('should return the id of the schema', () => {

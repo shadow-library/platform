@@ -20,6 +20,7 @@ export type ParsedSchema = SetRequired<JSONObjectSchema, '$id' | 'type' | 'prope
 /**
  * Declaring the constants
  */
+const primitiveTypes: Class<unknown>[] = [String, Number, Boolean, Object, Array];
 
 export class ClassSchema {
   private readonly schema: ParsedSchema;
@@ -34,9 +35,10 @@ export class ClassSchema {
   }
 
   private getSchema(Class: Class<unknown>): ParsedSchema {
-    const schema = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as SchemaOptions | undefined;
+    let schema = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as SchemaOptions | undefined;
+    if (primitiveTypes.includes(Class)) schema = { $id: Class.name, type: Class.name.toLowerCase() as any };
     if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
-    return merge<ParsedSchema>(schema, { type: 'object', properties: {}, required: [], definitions: {} });
+    return merge<ParsedSchema>({ type: 'object', properties: {}, required: [], definitions: {} }, schema);
   }
 
   private addDefinition(Class: Class<unknown>): string {
