@@ -92,7 +92,6 @@ describe('ClassSchema', () => {
       expect(ClassSchema.generate(Primitive)).toStrictEqual({
         $id: Primitive.name,
         type: 'object',
-        definitions: {},
         required: ['str', 'num', 'bool', 'obj', 'arr'],
         properties: {
           str: { type: 'string' },
@@ -106,7 +105,7 @@ describe('ClassSchema', () => {
 
     [String, Number, Boolean, Object, Array].forEach(type => {
       it(`should return the JSON schema for primitive type '${type.name}'`, () => {
-        expect(ClassSchema.generate(type)).toStrictEqual({ $id: type.name, type: type.name.toLowerCase() as any, definitions: {}, required: [], properties: {} });
+        expect(ClassSchema.generate(type)).toStrictEqual({ $id: type.name, type: type.name.toLowerCase() as any });
       });
     });
   });
@@ -121,7 +120,6 @@ describe('ClassSchema', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: Primitive.name,
       type: 'object',
-      definitions: {},
       required: ['str', 'num', 'bool', 'obj', 'arr'],
       properties: {
         str: { type: 'string' },
@@ -139,7 +137,6 @@ describe('ClassSchema', () => {
       $id: ExtendedPrimitive.name,
       title: 'ExtendedPrimitiveTitle',
       type: 'object',
-      definitions: {},
       required: ['str', 'num', 'bool', 'obj', 'arr', 'extended'],
       properties: {
         str: { type: 'string' },
@@ -161,7 +158,6 @@ describe('ClassSchema', () => {
         [Primitive.name]: {
           $id: Primitive.name,
           type: 'object',
-          definitions: {},
           required: ['str', 'num', 'bool', 'obj', 'arr'],
           properties: {
             str: { type: 'string' },
@@ -174,9 +170,6 @@ describe('ClassSchema', () => {
         [Sample.name]: {
           $id: Sample.name,
           type: 'object',
-          definitions: {},
-          required: [],
-          properties: {},
         },
       },
       required: ['email', 'date', 'age', 'primitive', 'primitives'],
@@ -199,7 +192,6 @@ describe('ClassSchema', () => {
         [Folder.name]: {
           type: 'object',
           $id: Folder.name,
-          definitions: {},
           properties: {
             name: { type: 'string' },
             files: { type: 'array', items: { $ref: File.name } },
@@ -214,6 +206,18 @@ describe('ClassSchema', () => {
         size: { type: 'number' },
         parent: { $ref: Folder.name },
       },
+    });
+  });
+
+  it('should get the JSON schema for array of object', () => {
+    const schema = new ClassSchema([Sample]);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: `[${Sample.name}]`,
+      definitions: {
+        Sample: { $id: 'Sample', type: 'object' },
+      },
+      type: 'array',
+      items: { $ref: Sample.name },
     });
   });
 });

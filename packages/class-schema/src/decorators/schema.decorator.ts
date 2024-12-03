@@ -12,14 +12,12 @@ import { JSONObjectSchema } from '@lib/interfaces';
  * Defining types
  */
 
-export type SchemaOptions = Partial<JSONObjectSchema>;
-
 /**
  * Declaring the constants
  */
 let counter = 0;
 
-export function Schema(options: SchemaOptions = {}): ClassDecorator {
+export function Schema(options: Partial<JSONObjectSchema> = {}): ClassDecorator {
   options.type = 'object';
 
   return target => {
