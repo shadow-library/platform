@@ -212,7 +212,7 @@ describe('ClassSchema', () => {
   it('should get the JSON schema for array of object', () => {
     const schema = new ClassSchema([Sample]);
     expect(schema.getJSONSchema()).toStrictEqual({
-      $id: `[${Sample.name}]`,
+      $id: `${Sample.name}?type=Array`,
       definitions: {
         Sample: { $id: 'Sample', type: 'object' },
       },

@@ -32,7 +32,7 @@ export class ClassSchema {
     if (Array.isArray(Class)) {
       this.schema = this.getSchema(Array);
       const schemaId = this.getSchemaId(Class[0]);
-      this.schema.$id = `[${schemaId}]`;
+      this.schema.$id = `${schemaId}?type=Array`;
       this.schema.items ??= { $ref: schemaId };
       return;
     }
