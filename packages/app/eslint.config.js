@@ -20,14 +20,10 @@ export default [
   ...eslintTs.configs.strict,
   ...eslintTs.configs.stylistic,
   importPlugin.flatConfigs.recommended,
+
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      globals: globals.node,
-      parserOptions: {
-        programs: [tsParser.createProgram('tsconfig.json')],
-      },
-    },
+    languageOptions: { globals: globals.node },
     settings: {
       'import/resolver': {
         typescript: { project: 'tsconfig.json' },
@@ -49,6 +45,14 @@ export default [
       ],
       'no-console': 2,
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
+    },
+  },
+  {
+    files: ['tests/**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/no-extraneous-class': 'off',
+      '@typescript-eslint/no-empty-function': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
     },
   },
 ];

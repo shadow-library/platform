@@ -4,6 +4,7 @@
     "commitMessage": "chore: release v${version}",
     "requireBranch": "main",
     "requireCommits": true,
+    "commitArgs": ["-n"],
     "push": false
   },
   "github": {
@@ -14,7 +15,7 @@
     "publishArgs": ["--access", "public"]
   },
   "hooks": {
-    "before:init": ["bun test"],
+    "before:init": ["bun run test"],
     "before:release": ["bun run build"]
   },
   "plugins": {

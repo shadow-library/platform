@@ -1,19 +1,16 @@
 /**
  * Importing npm packages
  */
+import 'reflect-metadata';
 
 /**
- * Importing user defined packages
+ * exporting modules
  */
+export * from './classes';
+export * from './decorators';
+export { ModuleRef } from './injector';
+export * from './interfaces';
+export * from './utils';
 
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-export function add(a: number, b: number): number {
-  return a + b;
-}
+export * from './shadow-application';
+export * from './shadow-factory';
