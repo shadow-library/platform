@@ -1,5 +1,5 @@
 {
-  "name": "@shadow-library/lib-name",
+  "name": "@shadow-library/common",
   "type": "module",
   "version": "0.0.0",
   "description": "description",
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/lib-name.git"
+    "url": "git+ssh://git@github.com/shadow-library/common.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/lib-name/issues"
+    "url": "https://github.com/shadow-library/common/issues"
   },
-  "homepage": "https://github.com/shadow-library/lib-name#readme",
+  "homepage": "https://github.com/shadow-library/common#readme",
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",

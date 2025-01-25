@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "@shadow-library/lib-name",
+      "name": "@shadow-library/common",
       "dependencies": {
         "@aws-sdk/client-cloudwatch-logs": "^3.734.0",
         "@colors/colors": "^1.6.0",
