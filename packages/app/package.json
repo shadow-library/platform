@@ -1,0 +1,46 @@
+{
+  "name": "@shadow-library/lib-name",
+  "type": "module",
+  "version": "0.0.0",
+  "description": "description",
+  "scripts": {
+    "prepare": "husky",
+    "clean": "rm -rf dist logs CHANGELOG.md",
+    "lint": "bun run scripts/lint.ts",
+    "type-check": "bun run tsc",
+    "build": "bun run scripts/build.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/lib-name.git"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shadow-library/lib-name/issues"
+  },
+  "homepage": "https://github.com/shadow-library/lib-name#readme",
+  "devDependencies": {
+    "@commitlint/cli": "^19.5.0",
+    "@commitlint/config-conventional": "^19.5.0",
+    "@eslint/js": "^9.13.0",
+    "@release-it/conventional-changelog": "^10.0.0",
+    "@types/bun": "^1.1.13",
+    "@typescript-eslint/parser": "^8.11.0",
+    "eslint": "^9.13.0",
+    "eslint-import-resolver-typescript": "^3.6.3",
+    "eslint-plugin-import": "^2.31.0",
+    "globals": "^15.11.0",
+    "husky": "^9.1.6",
+    "prettier": "^3.3.3",
+    "reflect-metadata": "^0.2.2",
+    "release-it": "^17.10.0",
+    "tsc-alias": "^1.8.10",
+    "type-fest": "^4.26.1",
+    "typescript": "^5.6.3",
+    "typescript-eslint": "^8.11.0"
+  },
+  "peerDependencies": {
+    "reflect-metadata": "^0.2.2"
+  }
+}
