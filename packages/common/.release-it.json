@@ -1,0 +1,20 @@
+{
+  "$schema": "node_modules/release-it/schema/release-it.json",
+  "git": {
+    "commitMessage": "chore: release v${version}",
+    "requireBranch": "main",
+    "requireCommits": true,
+    "push": false
+  },
+  "github": {
+    "release": true
+  },
+  "npm": {
+    "publishPath": "./dist",
+    "publishArgs": ["--access", "public"]
+  },
+  "hooks": {
+    "before:init": ["bun test"],
+    "before:release": ["bun run build"]
+  }
+}
