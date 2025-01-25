@@ -35,6 +35,7 @@ export default [
     },
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'error',
+      '@typescript-eslint/no-dynamic-delete': 'off',
       '@typescript-eslint/no-explicit-any': 'off',
       'import/consistent-type-specifier-style': ['error', 'prefer-inline'],
       'import/newline-after-import': ['error', { considerComments: true }],
