@@ -1,19 +1,14 @@
 /**
  * Importing npm packages
  */
+import 'reflect-metadata';
 
 /**
- * Importing user defined packages
+ * exporting modules
  */
-
-/**
- * Defining types
- */
-
-/**
- * Declaring the constants
- */
-
-export function add(a: number, b: number): number {
-  return a + b;
-}
+export * from './classes';
+export * from './decorators';
+export * from './interfaces';
+export * from './module';
+export * from './services';
+export * from './server.error';
