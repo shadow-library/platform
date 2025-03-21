@@ -48,6 +48,18 @@ class ObjectUtils {
     }
     return newObj;
   }
+
+  /**
+   * Returns the object after recursively freezing all the properties.
+   */
+  deepFreeze<T extends object>(obj: T): Readonly<T> {
+    const keys = Object.getOwnPropertyNames(obj);
+    for (const key of keys) {
+      const value = (obj as Record<string, unknown>)[key];
+      if (typeof value === 'object' && value !== null) this.deepFreeze(value);
+    }
+    return Object.freeze(obj);
+  }
 }
 
 export const objectUtils = new ObjectUtils();

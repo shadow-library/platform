@@ -62,4 +62,18 @@ describe('Object Utils', () => {
       expect(result).toStrictEqual({ name: data.name, email: data.email });
     });
   });
+
+  describe('deepFreeze', () => {
+    it('should return the object after recursively freezing all the properties', () => {
+      const data = { name: 'John Doe', age: 30, address: { city: 'New York', country: 'USA' } };
+      const frozenData = utils.object.deepFreeze(data);
+      expect(() => ((frozenData as any).name = 'Jane Doe')).toThrow(TypeError);
+    });
+
+    it('should return the object after recursively freezing all the properties for nested array', () => {
+      const data = { name: 'John Doe', age: 30, address: { city: 'New York', country: 'USA', alias: ['York'] } };
+      const frozenData = utils.object.deepFreeze(data);
+      expect(() => (frozenData as any).address.alias.push('New')).toThrow(TypeError);
+    });
+  });
 });
