@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -42,5 +43,6 @@ export interface ModuleMetadata {
  */
 
 export function Module(metadata: ModuleMetadata): ClassDecorator {
+  utils.object.deepFreeze(metadata);
   return target => Reflect.defineMetadata(MODULE_METADATA, metadata, target);
 }

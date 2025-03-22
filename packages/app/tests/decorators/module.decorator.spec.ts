@@ -27,4 +27,8 @@ describe('@Module', () => {
     const metadata = Reflect.getMetadata(MODULE_METADATA, TestModule);
     expect(metadata).toBe(moduleProps);
   });
+
+  it('should throw error when metadata is modified', () => {
+    expect(() => moduleProps.providers.push('Hello')).toThrowError();
+  });
 });

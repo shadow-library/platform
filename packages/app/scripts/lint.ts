@@ -22,7 +22,7 @@ const options = { cwd, stdio: 'inherit' } satisfies SpawnSyncOptions;
 
 if (isFixEnabled) {
   const prettierResult = spawnSync('bunx', ['prettier', '--write', '--log-level', 'error', fileGlob], options);
-  process.stdout.write('lint fix disabled, due to incorrect fixes\n');
+  process.stdout.write('\x1b[33mlint fix disabled, due to incorrect fixes\n\x1b[0m');
   const eslintResult = spawnSync('bunx', ['eslint', fileGlob], options);
   if (prettierResult.status !== 0 || eslintResult.status !== 0) process.exit(1);
 } else {
