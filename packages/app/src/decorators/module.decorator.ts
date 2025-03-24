@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { utils } from '@shadow-library/common';
+import { InternalError, utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -43,6 +43,10 @@ export interface ModuleMetadata {
  */
 
 export function Module(metadata: ModuleMetadata): ClassDecorator {
-  utils.object.deepFreeze(metadata);
-  return target => Reflect.defineMetadata(MODULE_METADATA, metadata, target);
+  return target => {
+    const oldMetadata = Reflect.getMetadata(MODULE_METADATA, target);
+    if (oldMetadata) throw new InternalError(`Module metadata already declared for ${target.name}`);
+    Reflect.defineMetadata(MODULE_METADATA, metadata, target);
+    utils.object.deepFreeze(metadata);
+  };
 }

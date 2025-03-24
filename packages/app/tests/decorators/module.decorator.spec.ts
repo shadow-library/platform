@@ -31,4 +31,8 @@ describe('@Module', () => {
   it('should throw error when metadata is modified', () => {
     expect(() => moduleProps.providers.push('Hello')).toThrowError();
   });
+
+  it('should throw error when module is defined twice', () => {
+    expect(() => Module({})(TestModule)).toThrowError();
+  });
 });
