@@ -3,7 +3,6 @@
  */
 import { describe, expect, it, jest } from '@jest/globals';
 import { Module } from '@shadow-library/app';
-import { InternalError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -40,11 +39,5 @@ describe('FastifyModule', () => {
 
     expect(createFastifyInstance).toBeCalled();
     expect(config.genReqId()).toHaveLength(36);
-  });
-
-  it('should throw error if forRootAsync is called multiple times', () => {
-    FastifyModule['registered'] = false;
-    FastifyModule.forRoot({});
-    expect(() => FastifyModule.forRoot({})).toThrow(InternalError);
   });
 });

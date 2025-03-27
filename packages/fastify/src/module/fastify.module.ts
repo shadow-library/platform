@@ -3,7 +3,7 @@
  */
 import { Module, Provider, Router } from '@shadow-library/app';
 import { ClassSchema } from '@shadow-library/class-schema';
-import { InternalError, utils } from '@shadow-library/common';
+import { utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
 import { v4 as uuid } from 'uuid';
 
@@ -27,8 +27,6 @@ import { createFastifyInstance } from './fastify.utils';
 
 /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
 export class FastifyModule {
-  private static registered = false;
-
   private static getDefaultConfig(): FastifyConfig {
     const errorResponseSchema = ClassSchema.generate(ErrorResponseDto);
 
@@ -51,9 +49,6 @@ export class FastifyModule {
   }
 
   static forRootAsync(options: FastifyModuleAsyncOptions): Class<FastifyModule> {
-    if (this.registered) throw new InternalError('FastifyModule is already registered');
-    this.registered = true;
-
     const imports = options.imports ?? [];
     const providers: Provider[] = [{ token: Router, useClass: FastifyRouter }];
     providers.push({ token: FASTIFY_CONFIG, useFactory: options.useFactory, inject: options.inject });
