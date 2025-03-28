@@ -15,7 +15,7 @@
     "publishArgs": ["--access", "public"]
   },
   "hooks": {
-    "before:init": ["bun test"],
+    "before:init": ["bun run test"],
     "before:release": ["bun run build"]
   },
   "plugins": {
