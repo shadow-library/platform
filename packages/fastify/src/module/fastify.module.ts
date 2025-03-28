@@ -37,6 +37,7 @@ export class FastifyModule {
       errorHandler: new DefaultErrorHandler(),
 
       ignoreTrailingSlash: true,
+      ignoreDuplicateSlashes: true,
       requestIdLogLabel: 'rid',
       genReqId: () => uuid(),
       ajv: { customOptions: { removeAdditional: true, useDefaults: true, allErrors: true } },

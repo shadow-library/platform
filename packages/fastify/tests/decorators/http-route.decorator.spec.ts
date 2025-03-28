@@ -31,11 +31,11 @@ describe('HTTP Methods Decorators', () => {
     it(`should enhance the method with the request metadata for ${Decorator.name}`, () => {
       const path = '/data';
       class Controller {
-        @Decorator(path)
+        @Decorator('data')
         static execute() {}
       }
 
-      expect(Route).toBeCalledWith({ path, method: Decorator.name.toUpperCase() });
+      expect(Route).toBeCalledWith({ path: '/data', method: Decorator.name.toUpperCase() });
     });
   });
 });

@@ -32,6 +32,7 @@ export interface RouteOptions {
  */
 
 export function HttpRoute(options: RouteOptions): MethodDecorator {
+  if (options.path && options.path.charAt(0) !== '/') options.path = `/${options.path}`;
   return Route(options);
 }
 

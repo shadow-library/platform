@@ -17,5 +17,6 @@ import { HTTP_CONTROLLER_TYPE } from '../constants';
  */
 
 export function HttpController(path = ''): ClassDecorator {
+  if (path.charAt(0) !== '/') path = `/${path}`;
   return target => Controller({ [HTTP_CONTROLLER_TYPE]: 'router', path })(target);
 }
