@@ -61,7 +61,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     this.set('app.env', { envKey: 'NODE_ENV', allowedValues: appEnvs, defaultValue: 'development' });
     this.set('app.name', { defaultValue: defaultAppName });
 
-    this.set('log.level', { allowedValues: logLevels, defaultValue: 'info' });
+    this.set('log.level', { allowedValues: logLevels, defaultValue: this.isDev() ? 'debug' : 'info' });
     this.set('log.dir', { defaultValue: 'logs' });
     this.set('log.buffer.size', { defaultValue: '10000', validateType: 'number' });
 

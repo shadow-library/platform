@@ -17,7 +17,7 @@ import { ConsoleTransport, Logger } from '@shadow-library/common';
  */
 
 describe('Logger Service', () => {
-  const winstonLogger = Logger['getInstance']();
+  const winstonLogger = Logger['logger'];
   const maskedValue = '****';
 
   beforeEach(() => {
@@ -63,5 +63,11 @@ describe('Logger Service', () => {
     Logger.addTransport(transport);
 
     expect(winstonLogger.transports).toHaveLength(1);
+  });
+
+  it('should close the logger', () => {
+    const fn = spyOn(winstonLogger, 'close');
+    Logger.close();
+    expect(fn).toBeCalled();
   });
 });

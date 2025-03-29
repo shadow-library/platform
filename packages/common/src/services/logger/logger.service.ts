@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import fastRedact from 'fast-redact';
-import { Logform, Logger as WinstonLogger, createLogger } from 'winston';
+import { Logform, createLogger } from 'winston';
 import Transport from 'winston-transport';
 
 /**
@@ -31,13 +31,9 @@ export interface Logger {
  * Declaring the constants
  */
 const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescript-eslint/no-empty-function
-const logger = createLogger({ level: Config.get('log.level') });
 
 class LoggerStatic {
-  /** Returns the logger instance */
-  private getInstance(): WinstonLogger {
-    return logger;
-  }
+  private readonly logger = createLogger({ level: Config.get('log.level') });
 
   /** Creates a redactor to remove sensitive fields. This mutates the original value. If no censor is given, the field is removed */
   getRedactor(paths: string[], censor: string | ((value: any) => any) = 'xxxx'): redactFn {
@@ -46,16 +42,16 @@ class LoggerStatic {
 
   /** Adds a transport to the logger */
   addTransport(transport: Transport): this {
-    const index = logger.transports.findIndex(t => t === noop);
-    if (index >= 0) logger.remove(noop);
-    logger.add(transport);
+    const index = this.logger.transports.findIndex(t => t === noop);
+    if (index >= 0) this.logger.remove(noop);
+    this.logger.add(transport);
     return this;
   }
 
   /** Returns a child logger with the provided metadata */
   getLogger(metadata: string | object): Logger {
-    if (logger.transports.length === 0) this.addTransport(noop);
-    return logger.child(typeof metadata === 'string' ? { label: metadata } : metadata);
+    if (this.logger.transports.length === 0) this.addTransport(noop);
+    return this.logger.child(typeof metadata === 'string' ? { label: metadata } : metadata);
   }
 
   /* istanbul ignore next */
@@ -87,6 +83,10 @@ class LoggerStatic {
     }
 
     return this;
+  }
+
+  close(): void {
+    this.logger.close();
   }
 }
 
