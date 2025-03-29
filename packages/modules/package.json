@@ -1,5 +1,5 @@
 {
-  "name": "@shadow-library/lib-name",
+  "name": "@shadow-library/modules",
   "type": "module",
   "version": "0.0.0",
   "description": "description",
@@ -12,14 +12,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/lib-name.git"
+    "url": "git+ssh://git@github.com/shadow-library/modules.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/lib-name/issues"
+    "url": "https://github.com/shadow-library/modules/issues"
   },
-  "homepage": "https://github.com/shadow-library/lib-name#readme",
+  "homepage": "https://github.com/shadow-library/modules#readme",
   "devDependencies": {
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
@@ -42,5 +42,10 @@
   },
   "peerDependencies": {
     "reflect-metadata": "^0.2.2"
+  },
+  "dependencies": {
+    "@shadow-library/app": "^1.0.5",
+    "@shadow-library/class-schema": "^0.0.5",
+    "@shadow-library/fastify": "^0.0.3"
   }
 }
