@@ -13,19 +13,49 @@ import { InstanceWrapper, ModuleRef, ModuleRegistry } from './injector';
  * Defining types
  */
 
+export interface ShadowApplicationOptions {
+  enableShutdownHooks?: false | NodeJS.Signals[];
+}
+
 /**
  * Declaring the constants
  */
+const DEFAULT_OPTIONS: ShadowApplicationOptions = { enableShutdownHooks: ['SIGINT', 'SIGTERM'] };
 
 export class ShadowApplication {
   private readonly logger = Logger.getLogger(ShadowApplication.name);
 
   private readonly main: Class<unknown>;
   private readonly registry: ModuleRegistry;
+  private readonly options: ShadowApplicationOptions;
 
-  constructor(module: Class<unknown>) {
+  constructor(module: Class<unknown>, options: ShadowApplicationOptions = {}) {
     this.main = module;
+    this.options = { ...DEFAULT_OPTIONS, ...options };
     this.registry = new ModuleRegistry(module);
+  }
+
+  private enableGracefulShutdown(): void {
+    const signals = this.options.enableShutdownHooks;
+    if (!signals || signals.length === 0) return;
+
+    this.logger.debug(`Graceful shutdown enabled for signals: ${signals.join(', ')}`);
+    let receivedSignal = false;
+    for (const signal of signals) {
+      const cleanup = async () => {
+        if (receivedSignal) return;
+        receivedSignal = true;
+
+        this.logger.debug(`Received ${signal}, shutting down application`);
+        await this.stop();
+        this.logger.info('Application stopped');
+        Logger.close();
+        signals.forEach(sig => process.removeListener(sig, cleanup));
+        process.kill(process.pid, signal);
+      };
+
+      process.on(signal, cleanup);
+    }
   }
 
   isInited(): boolean {
@@ -45,7 +75,8 @@ export class ShadowApplication {
     const modules = this.registry.get();
     const start = modules.map(module => module.start());
     await Promise.all(start);
-    this.logger.debug('Application started');
+    this.logger.info('Application started');
+    this.enableGracefulShutdown();
     return this;
   }
 
@@ -53,7 +84,7 @@ export class ShadowApplication {
     if (!this.isInited()) return this;
     this.logger.debug('Stopping application');
     await this.registry.terminate();
-    this.logger.debug('Application stopped');
+    this.logger.info('Application stopped');
     return this;
   }
 

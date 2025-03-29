@@ -4,7 +4,7 @@
     "": {
       "name": "@shadow-library/app",
       "dependencies": {
-        "@shadow-library/common": "^1.0.1",
+        "@shadow-library/common": "^1.0.2",
         "deepmerge": "^4.3.1",
         "type-fest": "^4.33.0",
       },
@@ -316,7 +316,7 @@
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, "sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g=="],
 
-    "@shadow-library/common": ["@shadow-library/common@1.0.1", "", { "dependencies": { "@aws-sdk/client-cloudwatch-logs": "^3.734.0", "@colors/colors": "^1.6.0", "fast-redact": "^3.5.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-hyrjJxi90Z5+XO0N8qtSfuMvXVn2ASURE04QlwI4IoBQDgyxGe8j1jeqC91R9oMfytFMclrhbepHIyG1LCJMyg=="],
+    "@shadow-library/common": ["@shadow-library/common@1.0.2", "", { "dependencies": { "@aws-sdk/client-cloudwatch-logs": "^3.734.0", "@colors/colors": "^1.6.0", "fast-redact": "^3.5.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-VEgCFG4LmBOdUiDtxUpkjOLvpa/9cARp+6ZMgAOCEBCCtBPP4H3bJC+Ba2T+65rNv7/cJRAU0HKIaUQUztiAAA=="],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.27.8", "", {}, "sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA=="],
 

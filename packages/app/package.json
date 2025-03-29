@@ -47,7 +47,7 @@
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {
-    "@shadow-library/common": "^1.0.1",
+    "@shadow-library/common": "^1.0.2",
     "deepmerge": "^4.3.1",
     "type-fest": "^4.33.0"
   }

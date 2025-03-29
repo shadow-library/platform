@@ -238,7 +238,7 @@ export class Module {
     for (const provider of transientProviders) await provider.loadAllInstances();
     this.loadExports(true);
 
-    this.logger.debug(`Module '${this.metatype.name}' initialized`);
+    this.logger.info(`Module '${this.metatype.name}' initialized`);
   }
 
   private getControllerRouteMetadata(controller: InstanceWrapper<Controller>): ControllerRouteMetadata {

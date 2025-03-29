@@ -76,6 +76,42 @@ describe('ShadowApplication', () => {
       await app.stop();
       expect(app['registry'].terminate).not.toBeCalled();
     });
+
+    it('should stop the application when signal is received', async () => {
+      jest.spyOn(app, 'isInited').mockReturnValue(true);
+      jest.spyOn(process, 'kill').mockResolvedValue(null as never);
+      jest.spyOn(process, 'removeListener').mockReturnThis();
+      const stop = jest.spyOn(app, 'stop').mockReturnThis();
+
+      await app.start();
+      const listeners = process.listeners('SIGINT');
+      listeners[2]?.('SIGINT');
+
+      expect(listeners.length).toBeGreaterThanOrEqual(1);
+      expect(stop).toBeCalledTimes(1);
+    });
+
+    it('should stop the application only once when signal is received', async () => {
+      jest.spyOn(app, 'isInited').mockReturnValue(true);
+      jest.spyOn(process, 'kill').mockResolvedValue(null as never);
+      const stop = jest.spyOn(app, 'stop').mockReturnThis();
+
+      await app.start();
+      const listeners = process.listeners('SIGINT');
+      listeners[3]?.('SIGINT');
+      listeners[3]?.('SIGINT');
+
+      expect(stop).toBeCalledTimes(1);
+    });
+
+    it('should not enable graceful shutdown if no signals are provided', async () => {
+      jest.spyOn(app, 'isInited').mockReturnValue(true);
+      const onSignal = jest.spyOn(process, 'on').mockReturnThis();
+      app['options'].enableShutdownHooks = false;
+
+      await app.start();
+      expect(onSignal).not.toBeCalled();
+    });
   });
 
   describe('select', () => {
