@@ -225,6 +225,8 @@ export class FastifyRouter extends Router {
     await this.instance.close();
   }
 
+  mockRequest(): MockRequestChain;
+  mockRequest(options: MockRequestOptions): Promise<MockResponse>;
   mockRequest(options?: MockRequestOptions): MockRequestChain | Promise<MockResponse> {
     return options ? this.instance.inject(options) : this.instance.inject();
   }
