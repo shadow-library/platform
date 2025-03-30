@@ -22,6 +22,7 @@
   },
   "homepage": "https://github.com/shadow-library/fastify#readme",
   "dependencies": {
+    "@fastify/middie": "^9.0.3",
     "@shadow-library/class-schema": "^0.0.5",
     "deepmerge": "^4.3.1",
     "fastify": "^5.2.1",

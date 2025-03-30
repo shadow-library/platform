@@ -25,7 +25,6 @@ import { createFastifyInstance } from './fastify.utils';
  * Declaring the constants
  */
 
-/* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
 export class FastifyModule {
   private static getDefaultConfig(): FastifyConfig {
     const errorResponseSchema = ClassSchema.generate(ErrorResponseDto);

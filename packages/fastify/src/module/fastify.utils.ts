@@ -1,7 +1,6 @@
 /**
  * Importing npm packages
  */
-
 import { ValidationError, throwError, utils } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 import { FastifySchemaValidationError, SchemaErrorDataVar } from 'fastify/types/schema';

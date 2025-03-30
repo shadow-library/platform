@@ -4,6 +4,7 @@
     "": {
       "name": "@shadow-library/fastify",
       "dependencies": {
+        "@fastify/middie": "^9.0.3",
         "@shadow-library/class-schema": "^0.0.5",
         "deepmerge": "^4.3.1",
         "fastify": "^5.2.1",
@@ -37,7 +38,7 @@
       },
       "peerDependencies": {
         "@fastify/view": "^10.0.0",
-        "@shadow-library/app": "^1.0.5",
+        "@shadow-library/app": "^1.0.4",
         "@shadow-library/common": "^1.0.0",
         "reflect-metadata": "^0.2.2",
       },
@@ -238,6 +239,8 @@
     "@fastify/forwarded": ["@fastify/forwarded@3.0.0", "", {}, "sha512-kJExsp4JCms7ipzg7SJ3y8DwmePaELHxKYtg+tZow+k0znUTf3cb+npgyqm8+ATZOdmfgfydIebPDWM172wfyA=="],
 
     "@fastify/merge-json-schemas": ["@fastify/merge-json-schemas@0.2.1", "", { "dependencies": { "dequal": "^2.0.3" } }, "sha512-OA3KGBCy6KtIvLf8DINC5880o5iBlDX4SxzLQS8HorJAbqluzLRn80UXU0bxZn7UOFhFgpRJDasfwn9nG4FG4A=="],
+
+    "@fastify/middie": ["@fastify/middie@9.0.3", "", { "dependencies": { "@fastify/error": "^4.0.0", "fastify-plugin": "^5.0.0", "path-to-regexp": "^8.1.0", "reusify": "^1.0.4" } }, "sha512-7OYovKXp9UKYeVMcjcFLMcSpoMkmcZmfnG+eAvtdiatN35W7c+r9y1dRfpA+pfFVNuHGGqI3W+vDTmjvcfLcMA=="],
 
     "@fastify/proxy-addr": ["@fastify/proxy-addr@5.0.0", "", { "dependencies": { "@fastify/forwarded": "^3.0.0", "ipaddr.js": "^2.1.0" } }, "sha512-37qVVA1qZ5sgH7KpHkkC4z9SK6StIsIcOmpjvMPXNb3vx2GQxhZocogVYbr2PbbeLCQxYIPDok307xEvRZOzGA=="],
 
@@ -1366,6 +1369,8 @@
     "path-key": ["path-key@3.1.1", "", {}, "sha512-ojmeN0qd+y0jszEtoY48r0Peq5dwMEkIlCOu6Q5f41lfkswXuKtYrhgoTpLnyIcHm24Uhqx+5Tqm2InSwLhE6Q=="],
 
     "path-parse": ["path-parse@1.0.7", "", {}, "sha512-LDJzPVEEEPR+y48z93A0Ed0yXb8pAByGWo/k5YYdYgpY2/2EsOsksJrq7lOHxryrVOn1ejG6oAp8ahvOIQD8sw=="],
+
+    "path-to-regexp": ["path-to-regexp@8.2.0", "", {}, "sha512-TdrF7fW9Rphjq4RjrW0Kp2AW0Ahwu9sRGTkS6bvDi0SCwZlEZYmcfDbEsTz8RVk0EHIS/Vd1bv3JhG+1xZuAyQ=="],
 
     "path-type": ["path-type@5.0.0", "", {}, "sha512-5HviZNaZcfqP95rwpv+1HDgUamezbqdSYTyzjTvwtJSnIH+3vnbmWsItli8OFEndS984VT55M3jduxZbX351gg=="],
 

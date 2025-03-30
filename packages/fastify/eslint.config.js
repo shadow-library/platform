@@ -2,7 +2,6 @@
  * Importing npm packages.
  */
 import eslintJs from '@eslint/js';
-import tsParser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
 import globals from 'globals';
 import eslintTs from 'typescript-eslint';
@@ -23,14 +22,11 @@ export default [
   {
     files: ['**/*.ts'],
     languageOptions: { globals: globals.node },
-    settings: {
-      'import/resolver': {
-        typescript: { project: 'tsconfig.json' },
-      },
-    },
+    settings: { 'import/resolver': { typescript: { project: 'tsconfig.json' } } },
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true, allowStaticOnly: true }],
       'import/consistent-type-specifier-style': ['error', 'prefer-inline'],
       'import/newline-after-import': ['error', { considerComments: true }],
       'import/no-unresolved': 'error',

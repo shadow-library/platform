@@ -3,14 +3,14 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
-import { InternalError, withThis } from '@shadow-library/common';
+import { InternalError, Logger, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
+import { Context, FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -26,13 +26,14 @@ describe('FastifyRouter', () => {
   const config = FastifyModule['getDefaultConfig']();
   const Class = class {};
   const classInstance = new Class();
+  const context = new Context();
   const handler = jest.fn();
   const handlerName = handler.name;
 
   beforeEach(() => {
     jest.clearAllMocks();
     instance = fastify();
-    router = new FastifyRouter(config, instance);
+    router = new FastifyRouter(config, instance, context);
   });
 
   it('should return the fastify intance', () => {
@@ -322,6 +323,66 @@ describe('FastifyRouter', () => {
       route.metadata.schemas = { query: { type: 'object' } as any };
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ schema: { querystring: { type: 'object' }, response: {} } }));
+    });
+  });
+
+  describe('getRequestLogger', () => {
+    let httpLogger: jest.Spied<Logger['http']>;
+    let contextSpy: jest.Spied<Context['get']>;
+
+    beforeEach(() => {
+      httpLogger = jest.spyOn(router['logger'], 'http').mockReturnValue();
+      contextSpy = jest.spyOn(context, 'get').mockImplementation((key: string | symbol) => (key.toString() === 'Symbol(rid)' ? 'test-rid' : null));
+    });
+
+    it('should log request metadata when logging is enabled', () => {
+      const req = {
+        url: '/test',
+        method: 'GET',
+        socket: { remoteAddress: '127.0.0.1' },
+        headers: { 'x-service': 'test-service', 'content-length': '123' },
+        query: { key: 'value' },
+        body: { data: 'test' },
+      } as any;
+      const res = {
+        statusCode: 200,
+        raw: { on: jest.fn((_, callback: () => void) => callback()) },
+        getHeader: jest.fn().mockReturnValue('456'),
+      } as any;
+
+      const done = jest.fn() as any;
+      const logger = router['getRequestLogger']();
+      logger.call({} as any, req, res, done);
+
+      expect(done).toHaveBeenCalled();
+      expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
+      expect(httpLogger).toHaveBeenCalledWith('http', {
+        rid: 'test-rid',
+        url: '/test',
+        method: 'GET',
+        status: 200,
+        service: 'test-service',
+        reqLen: '123',
+        reqIp: '127.0.0.1',
+        resLen: '456',
+        timeTaken: expect.any(String),
+        query: { key: 'value' },
+        body: { data: 'test' },
+      });
+    });
+
+    it('should not log request metadata when logging is disabled', () => {
+      contextSpy.mockReturnValueOnce(true);
+      const req = {} as any;
+      const res = { raw: { on: jest.fn((_, callback: () => void) => callback()) } } as any;
+
+      const done = jest.fn();
+      const logger = router['getRequestLogger']();
+      logger.call({} as any, req, res, done);
+
+      expect(done).toHaveBeenCalled();
+      expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
+      expect(httpLogger).not.toHaveBeenCalled();
     });
   });
 });

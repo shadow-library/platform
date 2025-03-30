@@ -6,7 +6,7 @@ import assert from 'assert';
 import { ControllerRouteMetadata, Inject, Injectable, Router } from '@shadow-library/app';
 import { InternalError, Logger, utils } from '@shadow-library/common';
 import merge from 'deepmerge';
-import { type FastifyInstance, RouteOptions } from 'fastify';
+import { type FastifyInstance, RouteOptions, onRequestHookHandler } from 'fastify';
 import { Chain as MockRequestChain, InjectOptions as MockRequestOptions, Response as MockResponse } from 'light-my-request';
 import { Class, JsonObject } from 'type-fest';
 
@@ -16,6 +16,7 @@ import { Class, JsonObject } from 'type-fest';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE } from '../constants';
 import { HttpMethod, MiddlewareMetadata } from '../decorators';
 import { HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
+import { Context } from '../services';
 import { type FastifyConfig } from './fastify-module.interface';
 
 /**
@@ -56,6 +57,25 @@ interface ParsedControllers {
   routes: ParsedController<ServerMetadata>[];
 }
 
+export interface RequestMetadata {
+  /** request id */
+  rid?: string;
+  /** Service request id */
+  srid?: string;
+  method?: string;
+  url?: string;
+  status?: number;
+  reqLen?: string;
+  reqIp?: string;
+  resLen?: string;
+  /** Time taken to process the request */
+  timeTaken?: string;
+  body?: any;
+  query?: object;
+  service?: string;
+  [key: string]: any;
+}
+
 /**
  * Declaring the constants
  */
@@ -68,6 +88,7 @@ export class FastifyRouter extends Router {
   constructor(
     @Inject(FASTIFY_CONFIG) private readonly config: FastifyConfig,
     @Inject(FASTIFY_INSTANCE) private readonly instance: FastifyInstance,
+    private readonly context: Context,
   ) {
     super();
   }
@@ -84,6 +105,34 @@ export class FastifyRouter extends Router {
       if (metadata.rawBody) req.rawBody = body;
       return parser(req, body.toString(), done);
     });
+  }
+
+  private getRequestLogger(): onRequestHookHandler {
+    return (req, res, done) => {
+      const startTime = process.hrtime();
+
+      res.raw.on('finish', () => {
+        const isLoggingDisabled = this.context.get('DISABLE_REQUEST_LOGGING') ?? false;
+        if (isLoggingDisabled) return done();
+
+        const metadata: RequestMetadata = {};
+        metadata.rid = this.context.getRID();
+        metadata.url = req.url;
+        metadata.method = req.method;
+        metadata.status = res.statusCode;
+        metadata.service = req.headers['x-service'] as string | undefined;
+        metadata.reqLen = req.headers['content-length'];
+        metadata.reqIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
+        metadata.resLen = res.getHeader('content-length') as string;
+        const resTime = process.hrtime(startTime);
+        metadata.timeTaken = (resTime[0] * 1e3 + resTime[1] * 1e-6).toFixed(3); // Converting time to milliseconds
+        if (req.query) metadata.query = req.query;
+        if (req.body) metadata.body = req.body;
+        this.logger.http('http', metadata);
+      });
+
+      return done();
+    };
   }
 
   private parseControllers(controllers: ControllerRouteMetadata[]): ParsedControllers {
@@ -176,6 +225,11 @@ export class FastifyRouter extends Router {
     const hasRawBody = routes.some(r => r.metadata.rawBody);
     if (hasRawBody) this.registerRawBody();
 
+    this.logger.debug('Registering the global middlewares');
+    this.instance.addHook('onRequest', this.context.init());
+    this.instance.addHook('onRequest', this.getRequestLogger());
+    this.logger.info('Registered global middlewares');
+
     for (const route of routes) {
       const metadata = route.metadata;
       assert(metadata.path, 'Route path is required');
@@ -221,8 +275,9 @@ export class FastifyRouter extends Router {
   }
 
   async stop(): Promise<void> {
-    this.logger.info('stopping server');
+    this.logger.debug('stopping server');
     await this.instance.close();
+    this.logger.info('server stopped');
   }
 
   mockRequest(): MockRequestChain;
