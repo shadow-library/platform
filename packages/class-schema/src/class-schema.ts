@@ -19,6 +19,11 @@ export type ParsedSchema = SetRequired<JSONSchema<false>, '$id' | 'type'>;
 
 export type SchemaClass = Class<unknown> | [Class<unknown>];
 
+export interface SchemaOptions {
+  shallow?: boolean;
+  dependencies?: Set<Class<unknown>>;
+}
+
 /**
  * Declaring the constants
  */
@@ -27,8 +32,11 @@ const isJSONObjectSchema = (schema: JSONSchema): schema is JSONObjectSchema<fals
 
 export class ClassSchema {
   private readonly schema: ParsedSchema;
+  private readonly options: SchemaOptions;
 
-  constructor(Class: SchemaClass) {
+  constructor(Class: SchemaClass, options: SchemaOptions = {}) {
+    this.options = options;
+
     if (Array.isArray(Class)) {
       this.schema = this.getSchema(Array);
       const schemaId = this.getSchemaId(Class[0]);
@@ -65,6 +73,8 @@ export class ClassSchema {
     if (this.schema.$id === schema.$id) return schema.$id;
     const definition = this.schema.definitions?.[schema.$id];
     if (definition) return schema.$id;
+    this.options.dependencies?.add(Class);
+    if (this.options.shallow) return schema.$id;
     return this.addDefinition(Class);
   }
 

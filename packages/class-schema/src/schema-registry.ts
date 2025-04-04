@@ -31,7 +31,11 @@ export class SchemaRegistry {
 
   addSchema(Class: Class<unknown>): this {
     const id = this.getSchemaId(Class);
-    if (!this.schemas.has(id)) this.schemas.set(id, new ClassSchema(Class));
+    if (!this.schemas.has(id)) {
+      const dependencies = new Set<Class<unknown>>();
+      this.schemas.set(id, new ClassSchema(Class, { shallow: true, dependencies }));
+      dependencies.forEach(dep => this.addSchema(dep));
+    }
     return this;
   }
 

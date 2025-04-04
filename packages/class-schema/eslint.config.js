@@ -22,16 +22,10 @@ export default [
   importPlugin.flatConfigs.recommended,
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      globals: globals.node,
-      parserOptions: {
-        programs: [tsParser.createProgram('tsconfig.json')],
-      },
-    },
+    languageOptions: { globals: globals.node },
     settings: {
-      'import/resolver': {
-        typescript: { project: 'tsconfig.json' },
-      },
+      'import/core-modules': ['bun:test'],
+      'import/resolver': { typescript: { project: 'tsconfig.json' } },
     },
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'error',

@@ -3,6 +3,8 @@
  */
 import { describe, expect, it } from 'bun:test';
 
+import { Class } from 'type-fest';
+
 /**
  * Importing user defined packages
  */
@@ -218,6 +220,27 @@ describe('ClassSchema', () => {
       },
       type: 'array',
       items: { $ref: Sample.name },
+    });
+  });
+
+  it('should add the dependencies to set for a schema', () => {
+    const dependencies = new Set<Class<unknown>>();
+    new ClassSchema(File, { dependencies });
+    expect(dependencies.size).toBe(1);
+    expect(dependencies.has(Folder)).toBe(true);
+  });
+
+  it('should return the schema for only the class members', () => {
+    const schema = new ClassSchema(File, { shallow: true });
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: File.name,
+      type: 'object',
+      required: ['name', 'size', 'parent'],
+      properties: {
+        name: { type: 'string' },
+        size: { type: 'number' },
+        parent: { $ref: Folder.name },
+      },
     });
   });
 });
