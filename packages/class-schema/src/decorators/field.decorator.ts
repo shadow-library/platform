@@ -3,38 +3,31 @@
  * Importing npm packages
  */
 import merge from 'deepmerge';
-import { Class, IfAny } from 'type-fest';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
-import { DESIGN_TYPE_METADATA, FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA } from '@lib/constants';
-import { JSONArraySchema, JSONBasicSchema, JSONNumberSchema, JSONObjectSchema, JSONSchema, JSONStringSchema } from '@lib/interfaces';
+import { DESIGN_TYPE_METADATA, FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, Integer, SCHEMA_FIELDS_METADATA } from '@lib/constants';
+import { ArrayFieldSchema, BooleanFieldSchema, FieldSchema, NumberFieldSchema, ObjectFieldSchema, StringFieldSchema } from '@lib/interfaces';
 
 /**
  * Defining types
  */
 
-export type FieldType = Class<any> | Class<any>[];
-
-export type ReturnTypeFunc = (returns?: void) => FieldType;
-
-export type FieldOptions<T extends JSONBasicSchema<unknown> = any> = IfAny<T, JSONSchema<true>, Partial<T>> & {
-  /** Whether this field is required. default is `true` */
-  required?: boolean;
-};
+export type ReturnTypeFunc = (returns?: void) => Class<any> | Class<any>[];
 
 /**
  * Declaring the constants
  */
 
-export function Field(options?: FieldOptions): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<String>, options?: FieldOptions<JSONStringSchema>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<Number>, options?: FieldOptions<JSONNumberSchema>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: FieldOptions<JSONBasicSchema<boolean>>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: FieldOptions<JSONObjectSchema<true>>): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: FieldOptions<JSONArraySchema>): PropertyDecorator;
-export function Field(typeOrOptions?: ReturnTypeFunc | FieldOptions, fieldOptions?: FieldOptions<any>): PropertyDecorator {
+export function Field(options?: FieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<String>, options?: StringFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<Number | Integer>, options?: NumberFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: BooleanFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: ObjectFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: ArrayFieldSchema): PropertyDecorator;
+export function Field(typeOrOptions?: ReturnTypeFunc | FieldSchema, fieldOptions?: FieldSchema): PropertyDecorator {
   const isTypeFn = typeof typeOrOptions === 'function';
   const options = (isTypeFn ? fieldOptions : typeOrOptions) ?? {};
 

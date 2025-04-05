@@ -8,7 +8,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
+import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schema';
 
 /**
  * Defining types
@@ -49,7 +49,7 @@ describe('ClassSchema', () => {
     @Field(() => String, { format: 'date-time' })
     date: string;
 
-    @Field(() => Number, { format: 'int32' })
+    @Field(() => Integer, { minimum: 18 })
     age: number;
 
     @Field(() => Sample)
@@ -59,10 +59,23 @@ describe('ClassSchema', () => {
     primitives: Primitive;
   }
 
+  @Schema({ $id: AdditionalProperties.name, additionalProperties: String })
+  class AdditionalProperties {
+    [key: string]: string;
+  }
+
+  @Schema({ $id: PatternProperties.name, patternProperties: { '^[a-zA-Z]{3,32}$': Boolean } })
+  class PatternProperties {
+    [key: string]: boolean;
+  }
+
   @Schema({ $id: ExtendedPrimitive.name, title: 'ExtendedPrimitiveTitle' })
   class ExtendedPrimitive extends Primitive {
-    @Field({ additionalProperties: true })
-    extended: Record<string, string>;
+    @Field()
+    extended: AdditionalProperties;
+
+    @Field()
+    patternProperties: PatternProperties;
   }
 
   @Schema({ $id: File.name })
@@ -70,11 +83,14 @@ describe('ClassSchema', () => {
     @Field()
     name: string;
 
-    @Field()
+    @Field({ optional: true })
     size: number;
 
     @Field(() => Folder)
     parent: object;
+
+    @Field({ requiredIf: 'size' })
+    unit: string;
   }
 
   @Schema({ $id: Folder.name })
@@ -139,14 +155,27 @@ describe('ClassSchema', () => {
       $id: ExtendedPrimitive.name,
       title: 'ExtendedPrimitiveTitle',
       type: 'object',
-      required: ['str', 'num', 'bool', 'obj', 'arr', 'extended'],
+      required: ['str', 'num', 'bool', 'obj', 'arr', 'extended', 'patternProperties'],
       properties: {
         str: { type: 'string' },
         num: { type: 'number' },
         bool: { type: 'boolean' },
         obj: { type: 'object' },
         arr: { type: 'array' },
-        extended: { type: 'object', additionalProperties: true },
+        extended: { $ref: AdditionalProperties.name },
+        patternProperties: { $ref: PatternProperties.name },
+      },
+      definitions: {
+        [AdditionalProperties.name]: {
+          $id: AdditionalProperties.name,
+          type: 'object',
+          additionalProperties: { type: 'string' },
+        },
+        [PatternProperties.name]: {
+          $id: PatternProperties.name,
+          type: 'object',
+          patternProperties: { '^[a-zA-Z]{3,32}$': { type: 'boolean' } },
+        },
       },
     });
   });
@@ -178,7 +207,7 @@ describe('ClassSchema', () => {
       properties: {
         email: { type: 'string', format: 'email' },
         date: { type: 'string', format: 'date-time' },
-        age: { type: 'number', format: 'int32' },
+        age: { type: 'integer', minimum: 18 },
         primitive: { $ref: Sample.name },
         primitives: { type: 'array', items: { $ref: Primitive.name } },
       },
@@ -202,12 +231,14 @@ describe('ClassSchema', () => {
           required: ['name', 'files', 'folders'],
         },
       },
-      required: ['name', 'size', 'parent'],
+      required: ['name', 'parent'],
       properties: {
         name: { type: 'string' },
         size: { type: 'number' },
         parent: { $ref: Folder.name },
+        unit: { type: 'string' },
       },
+      dependencies: { size: ['unit'] },
     });
   });
 
@@ -235,12 +266,14 @@ describe('ClassSchema', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: File.name,
       type: 'object',
-      required: ['name', 'size', 'parent'],
+      required: ['name', 'parent'],
       properties: {
         name: { type: 'string' },
         size: { type: 'number' },
         parent: { $ref: Folder.name },
+        unit: { type: 'string' },
       },
+      dependencies: { size: ['unit'] },
     });
   });
 });

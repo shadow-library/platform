@@ -7,19 +7,19 @@ import { Class, SetRequired } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, SCHEMA_FIELDS_METADATA, SCHEMA_OPTIONS_METADATA } from './constants';
-import { FieldOptions } from './decorators';
-import { JSONObjectSchema, JSONSchema } from './interfaces';
+import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, Integer, SCHEMA_EXTRA_PROPERTIES_METADATA, SCHEMA_FIELDS_METADATA, SCHEMA_OPTIONS_METADATA } from './constants';
+import { SchemaOptions } from './decorators';
+import { AnyFieldSchema, JSONSchema } from './interfaces';
 
 /**
  * Defining types
  */
 
-export type ParsedSchema = SetRequired<JSONSchema<false>, '$id' | 'type'>;
+export type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type'>;
 
 export type SchemaClass = Class<unknown> | [Class<unknown>];
 
-export interface SchemaOptions {
+export interface ClassSchemaOptions {
   shallow?: boolean;
   dependencies?: Set<Class<unknown>>;
 }
@@ -28,13 +28,12 @@ export interface SchemaOptions {
  * Declaring the constants
  */
 const primitiveTypes: Class<unknown>[] = [String, Number, Boolean, Object, Array];
-const isJSONObjectSchema = (schema: JSONSchema): schema is JSONObjectSchema<false> => schema.type === 'object';
 
-export class ClassSchema {
+export class ClassSchema<T extends SchemaClass = SchemaClass> {
   private readonly schema: ParsedSchema;
-  private readonly options: SchemaOptions;
+  private readonly options: ClassSchemaOptions;
 
-  constructor(Class: SchemaClass, options: SchemaOptions = {}) {
+  constructor(Class: T, options: ClassSchemaOptions = {}) {
     this.options = options;
 
     if (Array.isArray(Class)) {
@@ -54,8 +53,8 @@ export class ClassSchema {
   }
 
   private getSchema(Class: Class<unknown>): ParsedSchema {
-    let schema = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as ParsedSchema | undefined;
-    if (primitiveTypes.includes(Class)) schema = { $id: Class.name, type: Class.name.toLowerCase() as any };
+    if (primitiveTypes.includes(Class)) return { $id: Class.name, type: Class.name.toLowerCase() as any };
+    const schema = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as ParsedSchema | undefined;
     if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
     return structuredClone(schema);
   }
@@ -78,14 +77,18 @@ export class ClassSchema {
     return this.addDefinition(Class);
   }
 
-  private getFieldType(Class: Class<unknown>, field: string): JSONSchema {
-    const getType = Reflect.getMetadata(FIELD_TYPE_METADATA, Class.prototype, field);
-    const fieldType = getType();
+  private getFieldSchema(Class: Class<unknown>, field?: string): JSONSchema {
+    let fieldType = Class;
     const schema: JSONSchema = {};
+    if (field) {
+      const getType = Reflect.getMetadata(FIELD_TYPE_METADATA, Class.prototype, field);
+      fieldType = getType();
+    }
 
     if (fieldType === String) schema.type = 'string';
     else if (fieldType === Boolean) schema.type = 'boolean';
     else if (fieldType === Number) schema.type = 'number';
+    else if (fieldType === Integer) schema.type = 'integer';
     else if (fieldType === Object) schema.type = 'object';
     else if (fieldType === Array) schema.type = 'array';
     else if (!Array.isArray(fieldType)) schema.$ref ??= this.getSchemaId(fieldType);
@@ -99,16 +102,43 @@ export class ClassSchema {
   }
 
   private populateSchema(schema: ParsedSchema, Class: Class<unknown>): void {
-    if (!isJSONObjectSchema(schema)) return;
+    if (schema.type !== 'object') return;
+
+    /** Adding the extra properties to the schema */
+    const extraProperties = Reflect.getMetadata(SCHEMA_EXTRA_PROPERTIES_METADATA, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'>;
+    if (extraProperties) {
+      const { additionalProperties, patternProperties } = extraProperties;
+      if (typeof additionalProperties === 'boolean') schema.additionalProperties = additionalProperties;
+      else if (additionalProperties) schema.additionalProperties = this.getFieldSchema(additionalProperties);
+
+      if (patternProperties) {
+        schema.patternProperties ??= {};
+        for (const pattern in patternProperties) {
+          const Class = patternProperties[pattern] as Class<unknown>;
+          const patternSchema = this.getFieldSchema(Class);
+          schema.patternProperties[pattern] = patternSchema;
+        }
+      }
+    }
+
+    /** Adding the object properties to the schema */
     const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, Class.prototype) ?? [];
     for (const field of fields) {
-      const { required, ...fieldSchema } = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Class.prototype, field) as FieldOptions;
-      const type = this.getFieldType(Class, field);
+      const fieldMetadata = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Class.prototype, field) as AnyFieldSchema;
+      const { optional, requiredIf, ...fieldSchema } = fieldMetadata;
+
+      const derivedSchema = this.getFieldSchema(Class, field);
       if (!schema.properties) schema.properties = {};
-      schema.properties[field] = merge(type, fieldSchema);
-      if (required !== false) {
-        if (!schema.required) schema.required = [];
-        schema.required.push(field);
+      schema.properties[field] = merge(derivedSchema, fieldSchema);
+
+      if (!schema.required) schema.required = [];
+      if (!optional && !requiredIf) schema.required.push(field);
+
+      if (requiredIf) {
+        schema.dependencies ??= {};
+        const dependencies = schema.dependencies[requiredIf] ?? [];
+        dependencies.push(field);
+        schema.dependencies[requiredIf] = dependencies;
       }
     }
   }

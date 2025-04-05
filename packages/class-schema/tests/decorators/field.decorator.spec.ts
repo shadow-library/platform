@@ -22,7 +22,7 @@ describe('@Field', () => {
   class Custom {}
 
   class Sample {
-    @Field()
+    @Field({ minLength: 1, maxLength: 10 })
     fieldString: string;
 
     @Field()
@@ -31,7 +31,7 @@ describe('@Field', () => {
     @Field()
     fieldBoolean: boolean;
 
-    @Field({ patternProperties: {} })
+    @Field()
     fieldObject: Record<string, number>;
 
     @Field()
@@ -57,8 +57,8 @@ describe('@Field', () => {
   });
 
   it('should set the field schema options', () => {
-    const options = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Sample.prototype, 'fieldObject');
-    expect(options).toStrictEqual({ patternProperties: {} });
+    const options = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Sample.prototype, 'fieldString');
+    expect(options).toStrictEqual({ minLength: 1, maxLength: 10 });
   });
 
   it('should set the list of fields', () => {

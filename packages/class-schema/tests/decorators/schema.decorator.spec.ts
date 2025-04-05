@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { SCHEMA_OPTIONS_METADATA } from '@lib/constants';
+import { SCHEMA_EXTRA_PROPERTIES_METADATA, SCHEMA_OPTIONS_METADATA } from '@lib/constants';
 import { Schema } from '@shadow-library/class-schema';
 
 /**
@@ -19,12 +19,12 @@ import { Schema } from '@shadow-library/class-schema';
 
 describe('@Schema', () => {
   it('should decorate the class with schema options', () => {
-    @Schema({ $id: 'id', patternProperties: {} })
+    @Schema({ $id: 'id', description: 'description' })
     /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
     class Sample {}
 
     const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Sample);
-    expect(options).toStrictEqual({ $id: 'id', type: 'object', patternProperties: {} });
+    expect(options).toStrictEqual({ $id: 'id', type: 'object', description: 'description' });
   });
 
   it('should set the default $id field', () => {
@@ -49,5 +49,14 @@ describe('@Schema', () => {
     const classOneOptions = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, ClassOne);
     const classTwoOptions = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, ClassTwo);
     expect(classOneOptions.$id).not.toBe(classTwoOptions.$id);
+  });
+
+  it('should set the extra properties', () => {
+    @Schema({ additionalProperties: true })
+    /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+    class Sample {}
+
+    const options = Reflect.getMetadata(SCHEMA_EXTRA_PROPERTIES_METADATA, Sample);
+    expect(options).toStrictEqual({ additionalProperties: true });
   });
 });
