@@ -64,6 +64,10 @@ export interface JSONSchema {
   if?: JSONSchema;
   then?: JSONSchema;
   else?: JSONSchema;
+  discriminator?: {
+    propertyName: string;
+    mapping?: Record<string, string>;
+  };
 
   /** Other possible fields */
   [key: string]: unknown;

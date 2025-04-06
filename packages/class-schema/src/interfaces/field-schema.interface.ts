@@ -29,6 +29,9 @@ export interface BaseFieldSchema<T> {
 
   /** Description about this field */
   description?: string;
+
+  /** Constant value of the field */
+  const?: T;
 }
 
 export interface ArrayFieldSchema extends BaseFieldSchema<any[]> {

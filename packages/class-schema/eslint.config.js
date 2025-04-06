@@ -30,6 +30,7 @@ export default [
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true, allowStaticOnly: true }],
       'import/consistent-type-specifier-style': ['error', 'prefer-inline'],
       'import/newline-after-import': ['error', { considerComments: true }],
       'import/no-unresolved': 'error',

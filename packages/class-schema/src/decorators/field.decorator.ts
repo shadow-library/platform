@@ -8,7 +8,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { DESIGN_TYPE_METADATA, FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, Integer, SCHEMA_FIELDS_METADATA } from '@lib/constants';
+import { Integer, METADATA_KEYS } from '@lib/constants';
 import { ArrayFieldSchema, BooleanFieldSchema, FieldSchema, NumberFieldSchema, ObjectFieldSchema, StringFieldSchema } from '@lib/interfaces';
 
 /**
@@ -33,15 +33,15 @@ export function Field(typeOrOptions?: ReturnTypeFunc | FieldSchema, fieldOptions
 
   return (target, propertyKey) => {
     if (typeof propertyKey === 'symbol') throw new Error(`Cannot apply @Field() to symbol ${propertyKey.toString()}`);
-    const reflectedType = Reflect.getMetadata(DESIGN_TYPE_METADATA, target, propertyKey);
+    const reflectedType = Reflect.getMetadata(METADATA_KEYS.DESIGN_TYPE, target, propertyKey);
     const getType = isTypeFn ? typeOrOptions : () => reflectedType;
-    Reflect.defineMetadata(FIELD_TYPE_METADATA, getType, target, propertyKey);
+    Reflect.defineMetadata(METADATA_KEYS.FIELD_TYPE, getType, target, propertyKey);
 
-    const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, target) ?? [];
-    Reflect.defineMetadata(SCHEMA_FIELDS_METADATA, fields.concat([propertyKey]), target);
+    const fields: string[] = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, target) ?? [];
+    Reflect.defineMetadata(METADATA_KEYS.SCHEMA_FIELDS, fields.concat([propertyKey]), target);
 
-    const oldOptions = Reflect.getMetadata(FIELD_OPTIONS_METADATA, target, propertyKey) ?? {};
+    const oldOptions = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, target, propertyKey) ?? {};
     const newOptions = merge.all([{}, oldOptions, options]);
-    Reflect.defineMetadata(FIELD_OPTIONS_METADATA, newOptions, target, propertyKey);
+    Reflect.defineMetadata(METADATA_KEYS.FIELD_OPTIONS, newOptions, target, propertyKey);
   };
 }

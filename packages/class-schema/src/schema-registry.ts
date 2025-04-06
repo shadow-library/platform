@@ -7,7 +7,7 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { ClassSchema } from './class-schema';
-import { SCHEMA_OPTIONS_METADATA } from './constants';
+import { METADATA_KEYS } from './constants';
 
 /**
  * Defining types
@@ -25,7 +25,7 @@ export class SchemaRegistry {
   }
 
   private getSchemaId(Class: Class<unknown>): string {
-    const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) ?? {};
+    const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Class) ?? {};
     return options.$id ?? Class.name;
   }
 

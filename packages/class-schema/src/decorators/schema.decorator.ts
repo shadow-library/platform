@@ -6,7 +6,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { SCHEMA_EXTRA_PROPERTIES_METADATA, SCHEMA_OPTIONS_METADATA } from '@lib/constants';
+import { METADATA_KEYS } from '@lib/constants';
 import { JSONSchema } from '@lib/interfaces';
 
 /**
@@ -51,7 +51,7 @@ export function Schema(options: SchemaOptions = {}): ClassDecorator {
 
   return target => {
     if (!schema.$id) schema.$id = `class-schema:${target.name}-${counter++}`;
-    Reflect.defineMetadata(SCHEMA_OPTIONS_METADATA, schema, target);
-    if (Object.keys(metadata).length) Reflect.defineMetadata(SCHEMA_EXTRA_PROPERTIES_METADATA, metadata, target);
+    Reflect.defineMetadata(METADATA_KEYS.SCHEMA_OPTIONS, schema, target);
+    if (Object.keys(metadata).length) Reflect.defineMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, metadata, target);
   };
 }

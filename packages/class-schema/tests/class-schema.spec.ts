@@ -20,7 +20,6 @@ import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schem
 
 describe('ClassSchema', () => {
   @Schema({ $id: Sample.name })
-  /* eslint-disable @typescript-eslint/no-extraneous-class */
   class Sample {}
 
   @Schema({ $id: Primitive.name })

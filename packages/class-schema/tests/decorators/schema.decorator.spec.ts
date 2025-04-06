@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { SCHEMA_EXTRA_PROPERTIES_METADATA, SCHEMA_OPTIONS_METADATA } from '@lib/constants';
+import { METADATA_KEYS } from '@lib/constants';
 import { Schema } from '@shadow-library/class-schema';
 
 /**
@@ -20,43 +20,39 @@ import { Schema } from '@shadow-library/class-schema';
 describe('@Schema', () => {
   it('should decorate the class with schema options', () => {
     @Schema({ $id: 'id', description: 'description' })
-    /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
     class Sample {}
 
-    const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Sample);
+    const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Sample);
     expect(options).toStrictEqual({ $id: 'id', type: 'object', description: 'description' });
   });
 
   it('should set the default $id field', () => {
     @Schema()
-    /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
     class Sample {}
 
-    const options = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Sample);
+    const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Sample);
     expect(options).toStrictEqual({ $id: expect.stringMatching(/^class-schema:Sample-[0-9]+$/), type: 'object' });
   });
 
   it('should set different $id field for schema having same name', () => {
     function getClass() {
       @Schema()
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Sample {}
       return Sample;
     }
 
     const ClassOne = getClass();
     const ClassTwo = getClass();
-    const classOneOptions = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, ClassOne);
-    const classTwoOptions = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, ClassTwo);
+    const classOneOptions = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, ClassOne);
+    const classTwoOptions = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, ClassTwo);
     expect(classOneOptions.$id).not.toBe(classTwoOptions.$id);
   });
 
   it('should set the extra properties', () => {
     @Schema({ additionalProperties: true })
-    /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
     class Sample {}
 
-    const options = Reflect.getMetadata(SCHEMA_EXTRA_PROPERTIES_METADATA, Sample);
+    const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Sample);
     expect(options).toStrictEqual({ additionalProperties: true });
   });
 });

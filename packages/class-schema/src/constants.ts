@@ -17,11 +17,14 @@
 /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
 export class Integer {}
 
-export const DESIGN_TYPE_METADATA = 'design:type';
+export const METADATA_KEYS = {
+  DESIGN_TYPE: 'design:type',
 
-export const FIELD_TYPE_METADATA = Symbol('field-type');
-export const FIELD_OPTIONS_METADATA = Symbol('field-options');
+  FIELD_TYPE: Symbol('field-type'),
+  FIELD_OPTIONS: Symbol('field-options'),
 
-export const SCHEMA_OPTIONS_METADATA = Symbol('schema-options');
-export const SCHEMA_FIELDS_METADATA = Symbol('schema-fields');
-export const SCHEMA_EXTRA_PROPERTIES_METADATA = Symbol('schema-object');
+  SCHEMA_OPTIONS: Symbol('schema-options'),
+  SCHEMA_FIELDS: Symbol('schema-fields'),
+  SCHEMA_EXTRA_PROPERTIES: Symbol('schema-object'),
+  COMPOSED_CLASS: Symbol('composed-class'),
+} as const satisfies Record<string, string | symbol>;

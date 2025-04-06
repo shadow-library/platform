@@ -7,9 +7,10 @@ import { Class, SetRequired } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { FIELD_OPTIONS_METADATA, FIELD_TYPE_METADATA, Integer, SCHEMA_EXTRA_PROPERTIES_METADATA, SCHEMA_FIELDS_METADATA, SCHEMA_OPTIONS_METADATA } from './constants';
+import { Integer, METADATA_KEYS } from './constants';
 import { SchemaOptions } from './decorators';
 import { AnyFieldSchema, JSONSchema } from './interfaces';
+import { SchemaComposerMetadata } from './internal.types';
 
 /**
  * Defining types
@@ -54,7 +55,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
 
   private getSchema(Class: Class<unknown>): ParsedSchema {
     if (primitiveTypes.includes(Class)) return { $id: Class.name, type: Class.name.toLowerCase() as any };
-    const schema = Reflect.getMetadata(SCHEMA_OPTIONS_METADATA, Class) as ParsedSchema | undefined;
+    const schema = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Class) as ParsedSchema | undefined;
     if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
     return structuredClone(schema);
   }
@@ -81,7 +82,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     let fieldType = Class;
     const schema: JSONSchema = {};
     if (field) {
-      const getType = Reflect.getMetadata(FIELD_TYPE_METADATA, Class.prototype, field);
+      const getType = Reflect.getMetadata(METADATA_KEYS.FIELD_TYPE, Class.prototype, field);
       fieldType = getType();
     }
 
@@ -105,7 +106,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     if (schema.type !== 'object') return;
 
     /** Adding the extra properties to the schema */
-    const extraProperties = Reflect.getMetadata(SCHEMA_EXTRA_PROPERTIES_METADATA, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'>;
+    const extraProperties = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'>;
     if (extraProperties) {
       const { additionalProperties, patternProperties } = extraProperties;
       if (typeof additionalProperties === 'boolean') schema.additionalProperties = additionalProperties;
@@ -121,10 +122,17 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
       }
     }
 
+    /** Adding the composed classes to the schema */
+    const composedMetadata = Reflect.getMetadata(METADATA_KEYS.COMPOSED_CLASS, Class) as SchemaComposerMetadata;
+    if (composedMetadata) {
+      schema[composedMetadata.op] = composedMetadata.classes.map(cls => ({ $ref: this.getSchemaId(cls) }));
+      if (composedMetadata.discriminatorKey) schema.discriminator = { propertyName: composedMetadata.discriminatorKey };
+    }
+
     /** Adding the object properties to the schema */
-    const fields: string[] = Reflect.getMetadata(SCHEMA_FIELDS_METADATA, Class.prototype) ?? [];
+    const fields: string[] = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, Class.prototype) ?? [];
     for (const field of fields) {
-      const fieldMetadata = Reflect.getMetadata(FIELD_OPTIONS_METADATA, Class.prototype, field) as AnyFieldSchema;
+      const fieldMetadata = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, Class.prototype, field) as AnyFieldSchema;
       const { optional, requiredIf, ...fieldSchema } = fieldMetadata;
 
       const derivedSchema = this.getFieldSchema(Class, field);
