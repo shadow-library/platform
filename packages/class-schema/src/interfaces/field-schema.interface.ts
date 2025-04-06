@@ -32,6 +32,9 @@ export interface BaseFieldSchema<T> {
 
   /** Constant value of the field */
   const?: T;
+
+  /** Whether null is allowed */
+  nullable?: boolean;
 }
 
 export interface ArrayFieldSchema extends BaseFieldSchema<any[]> {

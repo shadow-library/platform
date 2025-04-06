@@ -9,7 +9,7 @@ import { Class, SetRequired } from 'type-fest';
  */
 import { Integer, METADATA_KEYS } from './constants';
 import { SchemaOptions } from './decorators';
-import { AnyFieldSchema, JSONSchema } from './interfaces';
+import { AnyFieldSchema, JSONSchema, JSONSchemaType } from './interfaces';
 import { SchemaComposerMetadata } from './internal.types';
 
 /**
@@ -133,10 +133,11 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     const fields: string[] = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, Class.prototype) ?? [];
     for (const field of fields) {
       const fieldMetadata = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, Class.prototype, field) as AnyFieldSchema;
-      const { optional, requiredIf, ...fieldSchema } = fieldMetadata;
+      const { optional, requiredIf, nullable, ...fieldSchema } = fieldMetadata;
 
       const derivedSchema = this.getFieldSchema(Class, field);
       if (!schema.properties) schema.properties = {};
+      if (nullable) derivedSchema.type = [derivedSchema.type as JSONSchemaType, 'null'];
       schema.properties[field] = merge(derivedSchema, fieldSchema);
 
       if (!schema.required) schema.required = [];
