@@ -104,6 +104,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
 
   private populateSchema(schema: ParsedSchema, Class: Class<unknown>): void {
     if (schema.type !== 'object') return;
+    const instance = new Class();
 
     /** Adding the extra properties to the schema */
     const extraProperties = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'>;
@@ -135,9 +136,11 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
       const fieldMetadata = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, Class.prototype, field) as AnyFieldSchema;
       const { optional, requiredIf, nullable, ...fieldSchema } = fieldMetadata;
 
+      const instanceValue = (instance as Record<string, unknown>)[field];
       const derivedSchema = this.getFieldSchema(Class, field);
       if (!schema.properties) schema.properties = {};
       if (nullable) derivedSchema.type = [derivedSchema.type as JSONSchemaType, 'null'];
+      if (instanceValue !== undefined) derivedSchema.default = instanceValue;
       schema.properties[field] = merge(derivedSchema, fieldSchema);
 
       if (!schema.required) schema.required = [];

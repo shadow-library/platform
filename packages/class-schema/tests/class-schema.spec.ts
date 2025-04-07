@@ -46,7 +46,7 @@ describe('ClassSchema', () => {
     email: string;
 
     @Field(() => String, { format: 'date-time', nullable: true })
-    date: string;
+    date = '2000-01-01T00:00:00Z';
 
     @Field(() => Integer, { minimum: 18 })
     age: number;
@@ -55,7 +55,7 @@ describe('ClassSchema', () => {
     primitive: Sample;
 
     @Field(() => [Primitive])
-    primitives: Primitive;
+    primitives: Primitive[] = [];
   }
 
   @Schema({ $id: AdditionalProperties.name, additionalProperties: String })
@@ -205,10 +205,10 @@ describe('ClassSchema', () => {
       required: ['email', 'date', 'age', 'primitive', 'primitives'],
       properties: {
         email: { type: 'string', format: 'email' },
-        date: { type: ['string', 'null'], format: 'date-time' },
+        date: { type: ['string', 'null'], format: 'date-time', default: '2000-01-01T00:00:00Z' },
         age: { type: 'integer', minimum: 18 },
         primitive: { $ref: Sample.name },
-        primitives: { type: 'array', items: { $ref: Primitive.name } },
+        primitives: { type: 'array', items: { $ref: Primitive.name }, default: [] },
       },
     });
   });
