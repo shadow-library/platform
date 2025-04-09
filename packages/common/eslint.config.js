@@ -22,20 +22,15 @@ export default [
   importPlugin.flatConfigs.recommended,
   {
     files: ['**/*.ts'],
-    languageOptions: {
-      globals: globals.node,
-      parserOptions: {
-        programs: [tsParser.createProgram('tsconfig.json')],
-      },
-    },
+    languageOptions: { globals: globals.node },
     settings: {
-      'import/resolver': {
-        typescript: { project: 'tsconfig.json' },
-      },
+      'import/core-modules': ['bun:test'],
+      'import/resolver': { typescript: { project: 'tsconfig.json' } },
     },
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@typescript-eslint/no-dynamic-delete': 'off',
+      '@typescript-eslint/no-extraneous-class': ['error', { allowWithDecorator: true, allowStaticOnly: true }],
       '@typescript-eslint/no-explicit-any': 'off',
       'import/consistent-type-specifier-style': ['error', 'prefer-inline'],
       'import/newline-after-import': ['error', { considerComments: true }],
