@@ -18,6 +18,20 @@ type MetadataKey = string | symbol;
  */
 
 class ReflectorService {
+  decorate = Reflect.decorate;
+  metadata = Reflect.metadata;
+
+  getMetadataKeys = Reflect.getMetadataKeys;
+  getOwnMetadataKeys = Reflect.getOwnMetadataKeys;
+
+  hasMetadata = Reflect.hasMetadata;
+  hasOwnMetadata = Reflect.hasOwnMetadata;
+  getMetadata = Reflect.getMetadata;
+  getOwnMetadata = Reflect.getOwnMetadata;
+  defineMetadata = Reflect.defineMetadata;
+
+  deleteMetadata = Reflect.deleteMetadata;
+
   updateMetadata<T extends object = object>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
     const oldMetadata = Reflect.getMetadata(key, target, propertyKey as string | symbol);
     const newMetadata = typeof oldMetadata === 'object' && oldMetadata !== null ? merge([oldMetadata, value]) : value;
