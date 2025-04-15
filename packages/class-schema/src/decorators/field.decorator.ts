@@ -2,7 +2,7 @@
 /**
  * Importing npm packages
  */
-import merge from 'deepmerge';
+import { Reflector } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -39,9 +39,6 @@ export function Field(typeOrOptions?: ReturnTypeFunc | FieldSchema, fieldOptions
 
     const fields: string[] = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, target) ?? [];
     Reflect.defineMetadata(METADATA_KEYS.SCHEMA_FIELDS, fields.concat([propertyKey]), target);
-
-    const oldOptions = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, target, propertyKey) ?? {};
-    const newOptions = merge.all([{}, oldOptions, options]);
-    Reflect.defineMetadata(METADATA_KEYS.FIELD_OPTIONS, newOptions, target, propertyKey);
+    Reflector.updateMetadata(METADATA_KEYS.FIELD_OPTIONS, options, target, propertyKey);
   };
 }

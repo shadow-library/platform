@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { Reflector } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -51,7 +52,7 @@ export function Schema(options: SchemaOptions = {}): ClassDecorator {
 
   return target => {
     if (!schema.$id) schema.$id = `class-schema:${target.name}-${counter++}`;
-    Reflect.defineMetadata(METADATA_KEYS.SCHEMA_OPTIONS, schema, target);
-    if (Object.keys(metadata).length) Reflect.defineMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, metadata, target);
+    Reflector.updateMetadata(METADATA_KEYS.SCHEMA_OPTIONS, schema, target);
+    if (Object.keys(metadata).length) Reflector.updateMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, metadata, target);
   };
 }
