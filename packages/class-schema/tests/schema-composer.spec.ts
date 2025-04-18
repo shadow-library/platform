@@ -42,6 +42,18 @@ describe('Schema Composer', () => {
     provider: string;
   }
 
+  @Schema({ $id: Account.name })
+  class Account {
+    @Field()
+    id: string;
+
+    @Field(() => SchemaComposer.oneOf(NativeUser, OAuthUser))
+    admin: NativeUser | OAuthUser;
+
+    @Field(() => [SchemaComposer.discriminator('type', NativeUser, OAuthUser)])
+    users: (NativeUser | OAuthUser)[];
+  }
+
   const nativeUserSchema = {
     $id: NativeUser.name,
     type: 'object',
@@ -94,6 +106,53 @@ describe('Schema Composer', () => {
       oneOf: [{ $ref: NativeUser.name }, { $ref: OAuthUser.name }],
       discriminator: { propertyName: 'type' },
       definitions: { [NativeUser.name]: nativeUserSchema, [OAuthUser.name]: oauthUserSchema },
+    });
+  });
+
+  it('should generate the schema for discriminator in a nested field', () => {
+    const schema = new ClassSchema(Account);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: Account.name,
+      type: 'object',
+      properties: {
+        id: { type: 'string' },
+        admin: { $ref: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser' },
+        users: { type: 'array', items: { $ref: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type' } },
+      },
+      required: ['id', 'admin', 'users'],
+      definitions: {
+        'class-schema:oneOf?Classes=NativeUser%2COAuthUser': {
+          $id: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser',
+          type: 'object',
+          oneOf: [{ $ref: 'NativeUser' }, { $ref: 'OAuthUser' }],
+        },
+        'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type': {
+          $id: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type',
+          type: 'object',
+          discriminator: { propertyName: 'type' },
+          oneOf: [{ $ref: 'NativeUser' }, { $ref: 'OAuthUser' }],
+        },
+        NativeUser: {
+          $id: 'NativeUser',
+          type: 'object',
+          required: ['type', 'username', 'password'],
+          properties: {
+            type: { type: 'string', const: 'native' },
+            username: { type: 'string' },
+            password: { type: 'string' },
+          },
+        },
+        OAuthUser: {
+          $id: 'OAuthUser',
+          type: 'object',
+          required: ['type', 'username', 'provider'],
+          properties: {
+            type: { type: 'string', const: 'oauth' },
+            username: { type: 'string' },
+            provider: { type: 'string' },
+          },
+        },
+      },
     });
   });
 });

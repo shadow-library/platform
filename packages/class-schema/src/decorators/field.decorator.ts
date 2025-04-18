@@ -23,10 +23,11 @@ export type ReturnTypeFunc = (returns?: void) => Class<any> | Class<any>[];
 
 export function Field(options?: FieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<String>, options?: StringFieldSchema): PropertyDecorator;
-export function Field(returnTypeFn: (returns?: void) => Class<Number | Integer>, options?: NumberFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: BooleanFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<Number>, options?: NumberFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<any>, options?: ObjectFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<any>[], options?: ArrayFieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => Class<Integer>, options?: NumberFieldSchema): PropertyDecorator; // eslint-disable-line @typescript-eslint/unified-signatures
 export function Field(typeOrOptions?: ReturnTypeFunc | FieldSchema, fieldOptions?: FieldSchema): PropertyDecorator {
   const isTypeFn = typeof typeOrOptions === 'function';
   const options = (isTypeFn ? fieldOptions : typeOrOptions) ?? {};
