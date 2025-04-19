@@ -39,7 +39,6 @@ export class FastifyModule {
       ignoreDuplicateSlashes: true,
       requestIdLogLabel: 'rid',
       genReqId: () => uuid(),
-      ajv: { customOptions: { removeAdditional: true, useDefaults: true, allErrors: true } },
     };
   }
 

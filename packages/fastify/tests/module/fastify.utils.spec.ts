@@ -8,7 +8,7 @@ import { FastifyInstance } from 'fastify';
 /**
  * Importing user defined packages
  */
-import { createFastifyInstance, formatSchemaErrors, notFoundHandler } from '@lib/module/fastify.utils';
+import { compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } from '@lib/module/fastify.utils';
 import { ServerError } from '@shadow-library/fastify';
 
 /**
@@ -24,6 +24,7 @@ jest.mock('fastify', () => ({
     setNotFoundHandler: jest.fn(),
     setErrorHandler: jest.fn(),
     setSchemaErrorFormatter: jest.fn(),
+    setValidatorCompiler: jest.fn(),
 
     getDefaultJsonParser: jest.fn(),
     addContentTypeParser: jest.fn(),
@@ -39,6 +40,16 @@ describe('Create Fastify Instance', () => {
   let instance: FastifyInstance;
   const fastifyFactory = jest.fn((instance: FastifyInstance) => instance);
   const errorHandler = { handle: jest.fn() };
+  const schema = {
+    type: 'object',
+    properties: {
+      orderBy: { type: 'string', enum: ['name', 'createdAt'] },
+      active: { type: 'boolean' },
+      limit: { type: 'number', default: 20, minimum: 1 },
+      offset: { type: 'number', default: 0, minimum: 0 },
+      order: { type: 'string', default: 'asc', enum: ['asc', 'desc'] },
+    },
+  };
 
   beforeEach(async () => {
     jest.clearAllMocks();
@@ -79,5 +90,23 @@ describe('Create Fastify Instance', () => {
       { field: 'body.email', msg: 'Field validation failed' },
       { field: 'body.gender', msg: 'must be one of: Male, Female' },
     ]);
+  });
+
+  it('should validate query schema and transform it to valid data without throwing errors for invalid data', () => {
+    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' });
+    const result = validate({ orderBy: 'rand', active: 'false', limit: '-10', offset: '20', order: 'asc' });
+    expect(result).toStrictEqual({ value: { active: false, limit: 20, offset: 20, order: 'asc' } });
+  });
+
+  it('should validate query schema and return same data for valid data', () => {
+    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' });
+    const result = validate({ orderBy: 'name', active: true, limit: 10, offset: 20, order: 'asc' });
+    expect(result).toStrictEqual({ value: { orderBy: 'name', active: true, limit: 10, offset: 20, order: 'asc' } });
+  });
+
+  it('should throw error for body schema validation', () => {
+    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'body' });
+    const result = validate({ orderBy: 'rand', active: 'false', limit: '-10', offset: '20', order: 'asc' });
+    expect(result).toBe(false);
   });
 });
