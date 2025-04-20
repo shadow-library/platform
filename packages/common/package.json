@@ -36,7 +36,6 @@
     "reflect-metadata": "^0.2.2",
     "release-it": "^17.10.0",
     "tsc-alias": "^1.8.10",
-    "type-fest": "^4.26.1",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.11.0"
   },
@@ -48,6 +47,7 @@
     "@colors/colors": "^1.6.0",
     "deepmerge": "^4.3.1",
     "fast-redact": "^3.5.0",
+    "type-fest": "^4.40.0",
     "winston": "^3.17.0",
     "winston-transport": "^4.9.0"
   }
