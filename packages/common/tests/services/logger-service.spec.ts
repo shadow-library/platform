@@ -60,9 +60,9 @@ describe('Logger Service', () => {
 
   it('should add a transport and remove dummy transports', () => {
     const transport = new ConsoleTransport();
+    winstonLogger.add = jest.fn();
     Logger.addTransport(transport);
-
-    expect(winstonLogger.transports).toHaveLength(1);
+    expect(winstonLogger.add).toBeCalledWith(transport);
   });
 
   it('should close the logger', () => {

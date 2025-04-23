@@ -8,6 +8,7 @@ import { Promisable } from 'type-fest';
  */
 import { InternalError } from '@lib/errors';
 import { Fn } from '@lib/interfaces';
+import { Logger } from '@lib/services';
 
 /**
  * Defining types
@@ -21,7 +22,10 @@ export type RollbackFn<T> = (data: T) => Promisable<unknown>;
  * Declaring the constants
  */
 
-export class TaskExecutor<T> {
+export class Task<T> {
+  private static readonly logger = Logger.getLogger(Task.name);
+
+  private taskName = '';
   private retries = 3;
   private delayMs = 1000;
   private backoffFactor = 1;
@@ -30,15 +34,22 @@ export class TaskExecutor<T> {
   private retryCallback?: RetryCallback;
   private rollbackFn?: RollbackFn<T>;
 
-  private constructor(private readonly fn: Fn<T>) {}
+  private constructor(private readonly fn: Fn<T>) {
+    this.taskName = fn.name ?? 'Unnamed Task';
+  }
 
-  static create<T>(fn: Fn<T>): TaskExecutor<T> {
-    return new TaskExecutor(fn);
+  static create<T>(fn: Fn<T>): Task<T> {
+    return new Task(fn);
   }
 
   /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
   protected shouldRetry(_error: unknown, _attempt: number): Promisable<boolean> {
     return true;
+  }
+
+  name(name: string): this {
+    this.taskName = name;
+    return this;
   }
 
   retry(retries: number): this {
@@ -61,6 +72,10 @@ export class TaskExecutor<T> {
     return this;
   }
 
+  hasRollback(): boolean {
+    return !!this.rollbackFn;
+  }
+
   rollback(rollbackFn: RollbackFn<T>): this {
     this.rollbackFn = rollbackFn;
     return this;
@@ -69,17 +84,31 @@ export class TaskExecutor<T> {
   async execute(): Promise<T> {
     let attempt = 1;
     let delay = this.delayMs;
+    const logger = Task.logger;
 
     while (attempt <= this.retries) {
       try {
+        logger.debug(`Executing task: ${this.taskName} (Attempt ${attempt})`);
         this.result = await this.fn();
+        logger.debug(`Task executed successfully: ${this.taskName} (Attempt ${attempt})`);
         return this.result;
       } catch (error) {
-        if (attempt === this.retries) throw error;
+        logger.warn(`Task failed: ${this.taskName} (Attempt ${attempt})`, error);
+
+        if (attempt === this.retries) {
+          logger.error(`Task failed: ${this.taskName}, Max retries reached`);
+          throw error;
+        }
+
         const shouldRetry = await this.shouldRetry(error, attempt);
-        if (!shouldRetry) throw error;
+        if (!shouldRetry) {
+          logger.debug(`Task will not be retried: ${this.taskName} (Attempt ${attempt})`);
+          throw error;
+        }
 
         if (this.retryCallback) await this.retryCallback(error, attempt);
+
+        logger.debug(`Waiting for ${delay}ms before retrying task: ${this.taskName}`);
         await new Promise(resolve => setTimeout(resolve, delay));
         delay *= this.backoffFactor;
         attempt++;
@@ -93,5 +122,6 @@ export class TaskExecutor<T> {
     if (!this.result) throw new InternalError('No result to rollback');
     if (!this.rollbackFn) throw new InternalError('No rollback function provided');
     await this.rollbackFn(this.result);
+    Task.logger.debug(`Rollback executed for task: ${this.taskName}`);
   }
 }
