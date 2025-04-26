@@ -32,7 +32,7 @@ class ReflectorService {
 
   deleteMetadata = Reflect.deleteMetadata;
 
-  appendMetadata<T extends object = object>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
+  appendMetadata<T>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
     const oldMetadata = Reflect.getMetadata(key, target, propertyKey as string | symbol);
     const newMetadata = Array.isArray(oldMetadata) ? [...oldMetadata, value] : [value];
     Reflect.defineMetadata(key, newMetadata, target, propertyKey as string | symbol);
