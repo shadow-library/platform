@@ -19,6 +19,58 @@ import { Reflector } from '@shadow-library/common';
 const METADATA_KEYS = { ROUTE: 'route', INJECTABLE: Symbol('injectable'), PARAM_TYPES: 'design:paramtypes' };
 
 describe('ReflectorService', () => {
+  describe('appendMetadata', () => {
+    it('should define metadata when none exists', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const value = { info: 'first' };
+
+      Reflector.appendMetadata(METADATA_KEYS.INJECTABLE, value, Example);
+
+      const result = Reflect.getMetadata(METADATA_KEYS.INJECTABLE, Example);
+      expect(result).toStrictEqual([value]);
+    });
+
+    it('should append metadata when metadata already exists', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const value1 = { info: 'first' };
+      const value2 = { info: 'second' };
+
+      Reflector.defineMetadata(METADATA_KEYS.ROUTE, [value1], Example);
+      Reflector.appendMetadata(METADATA_KEYS.ROUTE, value2, Example);
+
+      const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, Example);
+      expect(result).toStrictEqual([value1, value2]);
+    });
+
+    it('should append metadata to a method (with propertyKey)', () => {
+      const value1 = { type: 'method-level' };
+      class Example {
+        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
+        method() {}
+      }
+
+      Reflector.appendMetadata(METADATA_KEYS.PARAM_TYPES, value1, Example.prototype, 'method');
+
+      const result = Reflect.getMetadata(METADATA_KEYS.PARAM_TYPES, Example.prototype, 'method');
+      expect(result).toStrictEqual([value1]);
+    });
+
+    it('should not modify original array reference', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const initial = [{ msg: 'a' }];
+      Reflector.defineMetadata(METADATA_KEYS.INJECTABLE, initial, Example);
+
+      Reflector.appendMetadata(METADATA_KEYS.INJECTABLE, { msg: 'b' }, Example);
+
+      const result = Reflector.getMetadata(METADATA_KEYS.INJECTABLE, Example);
+      expect(result).toStrictEqual([{ msg: 'a' }, { msg: 'b' }]);
+      expect(result).not.toBe(initial);
+    });
+  });
+
   describe('updateMetadata', () => {
     it('should set metadata when no previous metadata exists', () => {
       const target = {};
