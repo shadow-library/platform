@@ -109,4 +109,11 @@ describe('Create Fastify Instance', () => {
     const result = validate({ orderBy: 'rand', active: 'false', limit: '-10', offset: '20', order: 'asc' });
     expect(result).toBe(false);
   });
+
+  it('should throw error for params schema validation', () => {
+    const schema = { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{12}$' } }, required: ['id'] };
+    const validate = compileValidator({ schema, method: 'get', url: '/user/:id', httpPart: 'params' });
+    const result = validate({ id: '123' });
+    expect(result).toBe(false);
+  });
 });

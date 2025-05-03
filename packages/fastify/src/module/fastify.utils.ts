@@ -30,14 +30,14 @@ export const notFoundHandler = (): never => throwError(notFoundError);
 
 export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
-  if (routeSchema.httpPart === 'body') return strictValidator.compile(routeSchema.schema);
+  if (routeSchema.httpPart !== 'querystring') return strictValidator.compile(routeSchema.schema);
 
   const validate = lenientValidator.compile(routeSchema.schema);
   return (data: Record<string, unknown>) => {
     validate(data);
 
     for (const error of validate.errors ?? []) {
-      /** Since this schema is for querystring and params there won't be any nested objects so we are directly accessing the path */
+      /** Since this schema is for querystring there won't be any nested objects so we are directly accessing the path */
       const path = error.instancePath.substring(1);
       const defaultValue = routeSchema.schema.properties?.[path]?.default;
       if (defaultValue !== undefined) data[path] = defaultValue;
