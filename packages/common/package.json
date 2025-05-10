@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/common",
   "type": "module",
-  "version": "1.0.9",
+  "version": "1.0.10",
   "description": "description",
   "scripts": {
     "prepare": "husky",
