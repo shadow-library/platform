@@ -9,7 +9,7 @@ import { FastifyModule, FastifyRouter } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
-import { HealthModule } from '@lib/health';
+import { HealthModule } from '@lib/common/health';
 
 /**
  * Defining types
