@@ -25,7 +25,8 @@
     "module": "ES2022",
     "moduleResolution": "node",
     "paths": {
-      "@lib/*": ["src/*"]
+      "@lib/*": ["src/*"],
+      "@shadow-library/module": ["src/index.ts"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],

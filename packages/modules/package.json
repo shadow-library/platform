@@ -2,7 +2,8 @@
   "name": "@shadow-library/modules",
   "type": "module",
   "version": "0.0.1",
-  "description": "description",
+  "sideEffects": false,
+  "description": " A collection of shared modules for the Shadow Apps ecosystem, providing reusable components for configuration management, authentication, cloud access, email, notifications, and other essential services. Designed for seamless integration across all Node.js applications following the Shadow Library architecture.",
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
