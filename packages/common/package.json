@@ -3,6 +3,7 @@
   "type": "module",
   "version": "1.0.10",
   "description": "description",
+  "sideEffects": false,
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
