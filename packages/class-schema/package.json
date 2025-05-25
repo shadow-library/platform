@@ -2,6 +2,7 @@
   "name": "@shadow-library/class-schema",
   "type": "module",
   "version": "0.0.7",
+  "sideEffects": false,
   "description": "Decorator-based JSON schema generator at runtime",
   "scripts": {
     "prepare": "husky",
