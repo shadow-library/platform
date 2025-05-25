@@ -2,7 +2,8 @@
   "name": "@shadow-library/app",
   "type": "module",
   "version": "1.0.6",
-  "description": "description",
+  "sideEffects": false,
+  "description": " A progressive Node.js framework for building efficient, scalable, and enterprise-grade applications using SOLID principles ",
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
@@ -25,6 +26,7 @@
     "@commitlint/cli": "^19.5.0",
     "@commitlint/config-conventional": "^19.5.0",
     "@eslint/js": "^9.13.0",
+    "@shadow-library/common": "^1.0.2",
     "@release-it/conventional-changelog": "^10.0.0",
     "@types/bun": "^1.2.0",
     "@typescript-eslint/parser": "^8.11.0",
@@ -44,10 +46,10 @@
     "typescript-eslint": "^8.11.0"
   },
   "peerDependencies": {
+    "@shadow-library/common": "^1.0.2",
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {
-    "@shadow-library/common": "^1.0.2",
     "deepmerge": "^4.3.1",
     "type-fest": "^4.33.0"
   }
