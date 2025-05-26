@@ -35,6 +35,11 @@ const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescrip
 class LoggerStatic {
   private readonly logger = createLogger({ level: Config.get('log.level') });
 
+  setDefaultMetadata(metadata: object): this {
+    this.logger.defaultMeta = metadata;
+    return this;
+  }
+
   /** Creates a redactor to remove sensitive fields. This mutates the original value. If no censor is given, the field is removed */
   getRedactor(paths: string[], censor: string | ((value: any) => any) = 'xxxx'): redactFn {
     return fastRedact({ paths, serialize: false, censor });
@@ -51,6 +56,8 @@ class LoggerStatic {
   /** Returns a child logger with the provided metadata */
   getLogger(metadata: string | object): Logger {
     if (this.logger.transports.length === 0) this.addTransport(noop);
+    /** Remove trailing numbers after alphabets in the label to handle the class name change in built code */
+    if (typeof metadata === 'string') metadata = metadata.replace(/(?<=[a-zA-Z])\d+$/, '');
     return this.logger.child(typeof metadata === 'string' ? { label: metadata } : metadata);
   }
 

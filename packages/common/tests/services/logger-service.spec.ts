@@ -42,6 +42,12 @@ describe('Logger Service', () => {
     expect(data).toStrictEqual({ username: 'username', password: maskedValue });
   });
 
+  it('should set default metadata', () => {
+    const metadata = { service: 'test' };
+    Logger.setDefaultMetadata(metadata);
+    expect(winstonLogger.defaultMeta).toBe(metadata);
+  });
+
   it('should return the logger', () => {
     const fn = spyOn(winstonLogger, 'child');
     Logger.getLogger('test');
@@ -52,6 +58,12 @@ describe('Logger Service', () => {
     const fn = spyOn(winstonLogger, 'child');
     Logger.getLogger({ name: 'test' });
     expect(fn).toBeCalledWith({ name: 'test' });
+  });
+
+  it('should remove trailing numbers from the label', () => {
+    const fn = spyOn(winstonLogger, 'child');
+    Logger.getLogger('Test123');
+    expect(fn).toBeCalledWith({ label: 'Test' });
   });
 
   it('should add a dummy transport if no transport is provided', () => {
