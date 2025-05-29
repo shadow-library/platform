@@ -24,7 +24,6 @@
   "homepage": "https://github.com/shadow-library/fastify#readme",
   "dependencies": {
     "@fastify/middie": "^9.0.3",
-    "@shadow-library/class-schema": "^0.0.5",
     "ajv": "^8.17.1",
     "deepmerge": "^4.3.1",
     "fastify": "^5.2.1",
@@ -39,6 +38,7 @@
     "@fastify/view": "^10.0.2",
     "@release-it/conventional-changelog": "^10.0.0",
     "@shadow-library/app": "^1.0.5",
+    "@shadow-library/class-schema": "^0.0.5",
     "@shadow-library/common": "^1.0.0",
     "@types/bun": "^1.1.13",
     "@typescript-eslint/parser": "^8.11.0",
@@ -59,6 +59,7 @@
   "peerDependencies": {
     "@fastify/view": "^10.0.0",
     "@shadow-library/app": "^1.0.4",
+    "@shadow-library/class-schema": "^0.0.5",
     "@shadow-library/common": "^1.0.0",
     "reflect-metadata": "^0.2.2"
   },
