@@ -6,6 +6,7 @@ import assert from 'assert';
 /**
  * Importing user defined packages
  */
+import { NAMESPACE } from '@lib/constants';
 import { Fn } from '@lib/interfaces';
 import { Logger } from '@lib/services';
 
@@ -27,7 +28,7 @@ export type ITask = Task<any> | Fn;
  */
 
 export class TaskManager {
-  private static readonly logger = Logger.getLogger(TaskManager.name);
+  private static readonly logger = Logger.getLogger(NAMESPACE, 'TaskManager');
 
   private readonly tasks: ITask[] = [];
   private readonly results = new Map<ITask, any>();

@@ -50,20 +50,14 @@ describe('Logger Service', () => {
 
   it('should return the logger', () => {
     const fn = spyOn(winstonLogger, 'child');
-    Logger.getLogger('test');
-    expect(fn).toBeCalledWith({ label: 'test' });
+    Logger.getLogger('unit-test', 'UserService');
+    expect(fn).toBeCalledWith({ label: 'UserService', namespace: 'unit-test' });
   });
 
   it('should return the logger with metadata', () => {
     const fn = spyOn(winstonLogger, 'child');
     Logger.getLogger({ name: 'test' });
     expect(fn).toBeCalledWith({ name: 'test' });
-  });
-
-  it('should remove trailing numbers from the label', () => {
-    const fn = spyOn(winstonLogger, 'child');
-    Logger.getLogger('Test123');
-    expect(fn).toBeCalledWith({ label: 'Test' });
   });
 
   it('should add a dummy transport if no transport is provided', () => {

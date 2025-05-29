@@ -54,11 +54,11 @@ class LoggerStatic {
   }
 
   /** Returns a child logger with the provided metadata */
-  getLogger(metadata: string | object): Logger {
+  getLogger(namespace: string, label: string): Logger;
+  getLogger(metadata: object): Logger;
+  getLogger(metadata: string | object, label?: string): Logger {
     if (this.logger.transports.length === 0) this.addTransport(noop);
-    /** Remove trailing numbers after alphabets in the label to handle the class name change in built code */
-    if (typeof metadata === 'string') metadata = metadata.replace(/(?<=[a-zA-Z])\d+$/, '');
-    return this.logger.child(typeof metadata === 'string' ? { label: metadata } : metadata);
+    return this.logger.child(typeof metadata === 'string' ? { namespace: metadata, label } : metadata);
   }
 
   /* istanbul ignore next */

@@ -6,6 +6,7 @@ import { Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { NAMESPACE } from '@lib/constants';
 import { InternalError } from '@lib/errors';
 import { Fn } from '@lib/interfaces';
 import { Logger } from '@lib/services';
@@ -23,7 +24,7 @@ export type RollbackFn<T> = (data: T) => Promisable<unknown>;
  */
 
 export class Task<T> {
-  private static readonly logger = Logger.getLogger(Task.name);
+  private static readonly logger = Logger.getLogger(NAMESPACE, 'Task');
 
   private taskName = '';
   private retries = 3;
