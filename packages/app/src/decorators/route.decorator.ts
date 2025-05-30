@@ -15,7 +15,7 @@ import { ROUTE_METADATA } from '../constants';
  */
 
 /* eslint-disable-next-line @typescript-eslint/no-empty-object-type */
-export interface RouteMetdata extends Record<string | symbol, any> {}
+export interface RouteMetadata extends Record<string | symbol, any> {}
 
 export type RouteDecorator = ClassDecorator & MethodDecorator;
 
@@ -23,7 +23,7 @@ export type RouteDecorator = ClassDecorator & MethodDecorator;
  * Declaring the constants
  */
 
-export function Route(metadata: RouteMetdata = {}): RouteDecorator {
+export function Route(metadata: RouteMetadata = {}): RouteDecorator {
   return (target: object, _propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<any>): void => {
     const object = descriptor ? descriptor.value : target;
     assert(object, 'Route decorator can only be applied to class or method');

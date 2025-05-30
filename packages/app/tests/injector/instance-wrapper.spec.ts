@@ -165,8 +165,8 @@ describe('InstanceWrapper', () => {
     });
 
     it('should throw an error of undefined dependency', () => {
-      const invalidPovider = { ...provider, inject: [...provider.inject, undefined] } as any;
-      expect(() => new InstanceWrapper(invalidPovider)).toThrowError(InternalError);
+      const invalidProvider = { ...provider, inject: [...provider.inject, undefined] } as any;
+      expect(() => new InstanceWrapper(invalidProvider)).toThrowError(InternalError);
     });
 
     it('should identify the dependencies', () => {
@@ -261,7 +261,7 @@ describe('InstanceWrapper', () => {
 
     it('should return all the instances', async () => {
       await instanceWrapper.loadInstance();
-      const instances = instanceWrapper['dependecies'][1]?.getAllInstances();
+      const instances = instanceWrapper['dependencies'][1]?.getAllInstances();
       expect(instances).toHaveLength(2);
     });
 
@@ -323,7 +323,7 @@ describe('InstanceWrapper', () => {
     });
 
     it('should throw an error if the dependencies are not set', async () => {
-      instanceWrapper['dependecies'].pop();
+      instanceWrapper['dependencies'].pop();
       await expect(() => instanceWrapper.loadInstance()).rejects.toThrowError(NeverError);
     });
 

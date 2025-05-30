@@ -58,19 +58,19 @@ export class ShadowApplication {
     }
   }
 
-  isInited(): boolean {
+  isInitiated(): boolean {
     const main = this.registry.get(this.main);
-    return main.isInited();
+    return main.isInitiated();
   }
 
   async init(): Promise<this> {
-    if (this.isInited()) return this;
+    if (this.isInitiated()) return this;
     await this.registry.init();
     return this;
   }
 
   async start(): Promise<this> {
-    if (!this.isInited()) await this.init();
+    if (!this.isInitiated()) await this.init();
     this.logger.debug('Starting application');
     const modules = this.registry.get();
     const start = modules.map(module => module.start());
@@ -81,7 +81,7 @@ export class ShadowApplication {
   }
 
   async stop(): Promise<this> {
-    if (!this.isInited()) return this;
+    if (!this.isInitiated()) return this;
     this.logger.debug('Stopping application');
     await this.registry.terminate();
     this.logger.info('Application stopped');
@@ -95,7 +95,7 @@ export class ShadowApplication {
   }
 
   get<TInput = any, TResult = TInput>(provider: Class<TInput> | AbstractClass<TInput> | string | symbol): TResult {
-    if (!this.isInited()) throw new InternalError(`Application not yet initialized`);
+    if (!this.isInitiated()) throw new InternalError(`Application not yet initialized`);
     const modules = this.registry.get();
     for (const module of modules) {
       const result = tryCatch(() => module.getProvider(provider));

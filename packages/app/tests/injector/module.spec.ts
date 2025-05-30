@@ -80,7 +80,7 @@ describe('Module', () => {
   });
 
   describe('module creation', () => {
-    it('should throw an error if the controller is not anotated', () => {
+    it('should throw an error if the controller is not annotated', () => {
       class InvalidController {}
       @Module({ controllers: [InvalidController] })
       class InvalidModule {}
@@ -183,9 +183,9 @@ describe('Module', () => {
     });
 
     it('should return the init status', () => {
-      expect(module.isInited()).toBe(false);
+      expect(module.isInitiated()).toBe(false);
       module['instance'].isResolved = jest.fn(() => true);
-      expect(module.isInited()).toBe(true);
+      expect(module.isInitiated()).toBe(true);
     });
   });
 
@@ -249,7 +249,7 @@ describe('Module', () => {
       const isProvidersResolved = Array.from(module['providers'].values()).every(provider => provider.isResolved());
       const isControllersResolved = Array.from(module['controllers'].values()).every(controller => controller.isResolved());
 
-      expect(module.isInited()).toBe(true);
+      expect(module.isInitiated()).toBe(true);
       expect(isProvidersResolved).toBe(true);
       expect(isControllersResolved).toBe(true);
     });
@@ -263,7 +263,7 @@ describe('Module', () => {
       const isProvidersResolved = Array.from(module['providers'].values()).every(provider => provider.isResolved());
       const isControllersResolved = Array.from(module['controllers'].values()).every(controller => controller.isResolved());
 
-      expect(module.isInited()).toBe(true);
+      expect(module.isInitiated()).toBe(true);
       expect(isProvidersResolved).toBe(true);
       expect(isControllersResolved).toBe(true);
     });

@@ -15,7 +15,7 @@ import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
 import { ControllerRouteMetadata, Router } from '../classes';
 import { CONTROLLER_METADATA, MODULE_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
-import { ModuleMetadata, RouteMetdata } from '../decorators';
+import { ModuleMetadata, RouteMetadata } from '../decorators';
 import { InjectionToken, Provider, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 
@@ -195,7 +195,7 @@ export class Module {
     return this;
   }
 
-  isInited(): boolean {
+  isInitiated(): boolean {
     return this.instance.isResolved();
   }
 
@@ -213,7 +213,7 @@ export class Module {
   }
 
   async init(): Promise<void> {
-    this.logger.debug(`Initializing module '${this.metatype.name}'`);
+    this.logger.debug(`Initializing module '${this.instance.getTokenName()}'`);
     this.detectCircularTransients();
 
     /**
@@ -238,7 +238,7 @@ export class Module {
     for (const provider of transientProviders) await provider.loadAllInstances();
     this.loadExports(true);
 
-    this.logger.info(`Module '${this.metatype.name}' initialized`);
+    this.logger.info(`Module '${this.instance.getTokenName()}' initialized`);
   }
 
   private getControllerRouteMetadata(controller: InstanceWrapper<Controller>): ControllerRouteMetadata {
@@ -262,7 +262,7 @@ export class Module {
     for (const method of methods) {
       const handlerName = method.name;
       const routeMetadata = Reflect.getMetadata(ROUTE_METADATA, method);
-      const metadata = merge<RouteMetdata>(controllerRouteMetadata, routeMetadata);
+      const metadata = merge<RouteMetadata>(controllerRouteMetadata, routeMetadata);
       const paramtypes = Reflect.getMetadata(PARAMTYPES_METADATA, instance, handlerName);
       const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, instance, handlerName);
       routes.push({ metadata, handler: method.bind(instance), paramtypes, returnType, handlerName });

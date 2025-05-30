@@ -6,14 +6,14 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { ControllerMetdata, Injectable, RouteMetdata } from '../decorators';
+import { ControllerMetadata, Injectable, RouteMetadata } from '../decorators';
 
 /**
  * Defining types
  */
 
 export interface RouteController {
-  metadata: RouteMetdata;
+  metadata: RouteMetadata;
   handlerName: string;
   handler: (...args: any[]) => any | Promise<any>;
   paramtypes: Class<unknown>[];
@@ -22,7 +22,7 @@ export interface RouteController {
 
 export interface ControllerRouteMetadata {
   metatype: Class<unknown>;
-  metadata: ControllerMetdata;
+  metadata: ControllerMetadata;
   instance: object;
   routes: RouteController[];
 }

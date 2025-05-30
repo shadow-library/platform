@@ -42,7 +42,7 @@ export class InstanceWrapper<T extends object = any> {
   private readonly token: InjectionToken;
   private readonly inject: InjectionMetadata[];
   private readonly metatype?: Class<T> | Factory<T>;
-  private readonly dependecies: (InstanceWrapper | undefined)[];
+  private readonly dependencies: (InstanceWrapper | undefined)[];
   private readonly instances = new Map<ContextId, InstancePerContext<T>>();
 
   private readonly transient: boolean = false;
@@ -51,7 +51,7 @@ export class InstanceWrapper<T extends object = any> {
   constructor(provider: Provider, injectable?: boolean) {
     if (isValueProvider(provider)) {
       this.inject = [];
-      this.dependecies = [];
+      this.dependencies = [];
       this.token = provider.token;
       this.instances.set(STATIC_CONTEXT, { instance: provider.useValue, resolved: true });
       this.logger.debug(`Instance '${this.getTokenName()}' created`);
@@ -63,7 +63,7 @@ export class InstanceWrapper<T extends object = any> {
       this.token = provider.token;
       this.metatype = provider.useFactory;
       this.inject = this.getFactoryDependencies(provider.inject);
-      this.dependecies = new Array(this.inject.length);
+      this.dependencies = new Array(this.inject.length);
       return;
     }
 
@@ -76,7 +76,7 @@ export class InstanceWrapper<T extends object = any> {
     this.token = token;
     this.metatype = Class;
     this.inject = this.getClassDependencies(Class);
-    this.dependecies = new Array(this.inject.length);
+    this.dependencies = new Array(this.inject.length);
     this.transient = Reflect.getMetadata(INJECTABLE_METADATA, Class)?.transient ?? false;
     if (!this.transient) {
       const instance = Object.create(Class.prototype);
@@ -138,14 +138,14 @@ export class InstanceWrapper<T extends object = any> {
   }
 
   setDependency(index: number, provider: InstanceWrapper): this {
-    this.dependecies[index] = provider;
+    this.dependencies[index] = provider;
     return this;
   }
 
   isResolvable(): boolean {
     for (let index = 0; index < this.inject.length; index++) {
       const metadata = this.inject[index] as InjectionMetadata;
-      const dependency = this.dependecies[index];
+      const dependency = this.dependencies[index];
       if (!dependency && !metadata.optional) return false;
     }
 
@@ -193,7 +193,7 @@ export class InstanceWrapper<T extends object = any> {
 
   private async resolveDependency(index: number): Promise<unknown | undefined> {
     const metadata = this.inject[index] as InjectionMetadata;
-    const dependency = this.dependecies[index];
+    const dependency = this.dependencies[index];
 
     if (!dependency) {
       if (metadata.optional) return;
@@ -221,15 +221,15 @@ export class InstanceWrapper<T extends object = any> {
 
     this.logger.debug(`Loading instance of '${this.getTokenName()}'`);
 
-    const dependecies = [];
+    const dependencies = [];
     for (let index = 0; index < this.inject.length; index++) {
       const dependency = await this.resolveDependency(index);
-      dependecies.push(dependency);
+      dependencies.push(dependency);
     }
 
     let instance: T;
-    if (this.isFactory) instance = await (this.metatype as Factory<T>)(...dependecies);
-    else instance = new (this.metatype as Class<T>)(...dependecies);
+    if (this.isFactory) instance = await (this.metatype as Factory<T>)(...dependencies);
+    else instance = new (this.metatype as Class<T>)(...dependencies);
     if (instancePerContext) instance = Object.assign(instancePerContext.instance, instance);
     this.instances.set(contextId, { instance, resolved: true });
     this.logger.debug(`Instance '${this.getTokenName()}' loaded`);

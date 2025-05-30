@@ -13,7 +13,7 @@ import { INJECTABLE_METADATA } from '../constants';
 
 export interface InjectableOptions {
   /**
-   * Whether to initate a new private instance of the provider for every use
+   * Whether to initiate a new private instance of the provider for every use
    */
   transient?: boolean;
 }
