@@ -14,7 +14,7 @@ import { DIErrors, DependencyGraph } from './helpers';
 import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
 import { ControllerRouteMetadata, Router } from '../classes';
-import { CONTROLLER_METADATA, MODULE_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
+import { CONTROLLER_METADATA, MODULE_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
 import { ModuleMetadata, RouteMetadata } from '../decorators';
 import { InjectionToken, Provider, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
@@ -37,7 +37,7 @@ export enum HookTypes {
  */
 
 export class Module {
-  private readonly logger = Logger.getLogger(Module.name);
+  private readonly logger = Logger.getLogger(NAMESPACE, 'Module');
 
   private readonly imports = [] as Module[];
   private readonly controllers = new Set<InstanceWrapper<Controller>>();

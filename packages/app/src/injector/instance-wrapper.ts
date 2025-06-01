@@ -10,7 +10,7 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { DIErrors, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
-import { INJECTABLE_METADATA, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
+import { INJECTABLE_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
 import { InjectMetadata } from '../decorators';
 import { FactoryDependency, FactoryProvider, InjectionToken, Provider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
@@ -37,7 +37,7 @@ export interface InstancePerContext<T extends object> {
 const STATIC_CONTEXT: ContextId = Object.freeze({ id: 0 });
 
 export class InstanceWrapper<T extends object = any> {
-  private readonly logger = Logger.getLogger(InstanceWrapper.name);
+  private readonly logger = Logger.getLogger(NAMESPACE, 'InstanceWrapper');
 
   private readonly token: InjectionToken;
   private readonly inject: InjectionMetadata[];

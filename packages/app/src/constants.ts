@@ -14,6 +14,8 @@
  * Declaring the constants
  */
 
+export const NAMESPACE = '@shadow-library/app';
+
 export const RETURN_TYPE_METADATA = 'design:returntype';
 export const PARAMTYPES_METADATA = 'design:paramtypes';
 export const OPTIONAL_DEPS_METADATA = 'optional:paramtypes';

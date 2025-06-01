@@ -9,7 +9,7 @@ import { Class } from 'type-fest';
  */
 import { DIErrors, DependencyGraph } from './helpers';
 import { HookTypes, Module } from './module';
-import { MODULE_METADATA } from '../constants';
+import { MODULE_METADATA, NAMESPACE } from '../constants';
 import { ModuleMetadata } from '../decorators';
 import { ForwardReference } from '../utils';
 
@@ -26,7 +26,7 @@ type Import = Class<unknown> | ForwardReference<Class<unknown>>;
  */
 
 export class ModuleRegistry {
-  private readonly logger = Logger.getLogger(ModuleRegistry.name);
+  private readonly logger = Logger.getLogger(NAMESPACE, 'ModuleRegistry');
   private readonly modules = new Map<TModule, Module>();
 
   constructor(root: TModule) {

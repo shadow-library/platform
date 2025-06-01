@@ -7,6 +7,7 @@ import { AbstractClass, Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { NAMESPACE } from './constants';
 import { InstanceWrapper, ModuleRef, ModuleRegistry } from './injector';
 
 /**
@@ -23,7 +24,7 @@ export interface ShadowApplicationOptions {
 const DEFAULT_OPTIONS: ShadowApplicationOptions = { enableShutdownHooks: ['SIGINT', 'SIGTERM'] };
 
 export class ShadowApplication {
-  private readonly logger = Logger.getLogger(ShadowApplication.name);
+  private readonly logger = Logger.getLogger(NAMESPACE, 'ShadowApplication');
 
   private readonly main: Class<unknown>;
   private readonly registry: ModuleRegistry;
