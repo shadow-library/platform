@@ -7,6 +7,8 @@ import { FastifyError } from 'fastify';
 /**
  * Importing user defined packages
  */
+import { NAMESPACE } from '@lib/constants';
+
 import { ErrorHandler, HttpRequest, HttpResponse } from '../interfaces';
 import { ServerError, ServerErrorCode } from '../server.error';
 
@@ -26,19 +28,11 @@ const unexpectedError = new ServerError(ServerErrorCode.S001);
 const validationError = new ServerError(ServerErrorCode.S003);
 
 export class DefaultErrorHandler implements ErrorHandler {
-  private readonly logger = Logger.getLogger(DefaultErrorHandler.name);
+  private readonly logger = Logger.getLogger(NAMESPACE, 'DefaultErrorHandler');
 
   protected parseFastifyError(err: FastifyError): ParsedFastifyError {
     if (err.statusCode === 500) return { statusCode: 500, error: unexpectedError.toObject() };
-
-    return {
-      statusCode: err.statusCode as number,
-      error: {
-        code: err.code,
-        type: ErrorType.CLIENT_ERROR,
-        message: err.message,
-      },
-    };
+    return { statusCode: err.statusCode as number, error: { code: err.code, type: ErrorType.CLIENT_ERROR, message: err.message } };
   }
 
   handle(err: Error, _req: HttpRequest, res: HttpResponse): HttpResponse {

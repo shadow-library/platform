@@ -13,6 +13,8 @@
 /**
  * Declaring the constants
  */
+export const NAMESPACE = '@shadow-library/fastify';
+
 export const PARAMTYPES_METADATA = 'design:paramtypes';
 
 export const FASTIFY_CONFIG = Symbol('fastify-config');

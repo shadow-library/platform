@@ -13,7 +13,7 @@ import { Class, JsonObject } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE } from '../constants';
+import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata } from '../decorators';
 import { HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
 import { Context } from '../services';
@@ -83,7 +83,7 @@ const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) 
 
 @Injectable()
 export class FastifyRouter extends Router {
-  private readonly logger = Logger.getLogger(FastifyRouter.name);
+  private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
 
   constructor(
     @Inject(FASTIFY_CONFIG) private readonly config: FastifyConfig,
