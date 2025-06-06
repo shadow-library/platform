@@ -12,6 +12,7 @@ import { v4 as uuid } from 'uuid';
  */
 import { DefaultErrorHandler } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '../constants';
+import { ContextService } from '../services';
 import { ErrorResponseDto } from './error-response.dto';
 import { FastifyConfig, FastifyModuleAsyncOptions, FastifyModuleOptions } from './fastify-module.interface';
 import { FastifyRouter } from './fastify-router';
@@ -49,12 +50,12 @@ export class FastifyModule {
 
   static forRootAsync(options: FastifyModuleAsyncOptions): Class<FastifyModule> {
     const imports = options.imports ?? [];
-    const providers: Provider[] = [{ token: Router, useClass: FastifyRouter }];
+    const providers: Provider[] = [{ token: Router, useClass: FastifyRouter }, ContextService];
     providers.push({ token: FASTIFY_CONFIG, useFactory: options.useFactory, inject: options.inject });
     const fastifyFactory = (config: FastifyConfig) => createFastifyInstance(config, options.fastifyFactory);
     providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
 
-    Module({ imports, providers, exports: [Router] })(FastifyModule);
+    Module({ imports, providers, exports: [Router, ContextService] })(FastifyModule);
     return FastifyModule;
   }
 }

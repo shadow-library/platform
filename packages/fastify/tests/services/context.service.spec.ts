@@ -7,7 +7,7 @@ import { InternalError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { Context } from '@shadow-library/fastify';
+import { ContextService } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -18,14 +18,14 @@ import { Context } from '@shadow-library/fastify';
  */
 
 describe('Context', () => {
-  let context: Context;
+  let context: ContextService;
   const data = { req: { id: 1 }, res: {}, get: 'GET', set: 'SET' };
   const store = { get: jest.fn().mockReturnValue(data.get), set: jest.fn().mockReturnValue(data.set) };
   const storage = { enterWith: jest.fn(), getStore: jest.fn().mockReturnValue(store) };
 
   beforeEach(() => {
     jest.clearAllMocks();
-    context = new Context();
+    context = new ContextService();
     // @ts-expect-error setting private readonly storage
     context['storage'] = storage;
   });

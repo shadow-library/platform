@@ -1,14 +1,13 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it, jest } from '@jest/globals';
-import { Module } from '@shadow-library/app';
+import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
+import { Module, Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
-import { createFastifyInstance } from '@lib/module/fastify.utils';
-import { FastifyModule } from '@shadow-library/fastify';
+import { FastifyModule, FastifyRouter, Get, HttpController } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -18,26 +17,31 @@ import { FastifyModule } from '@shadow-library/fastify';
  * Declaring the constants
  */
 
-const decorator = jest.fn();
-jest.mock('@lib/module/fastify.utils', () => ({ createFastifyInstance: jest.fn() }));
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Module: jest.fn(() => decorator) };
-});
-
 describe('FastifyModule', () => {
-  it('should setup the module for static config', () => {
-    const module = FastifyModule.forRoot({});
-    const metadata = jest.mocked(Module).mock.calls[0]?.[0] as any;
-    metadata.providers[2]?.useFactory?.();
-    const config = metadata.providers[1]?.useFactory?.();
+  let app: ShadowApplication;
+  @HttpController('/hello')
+  class HelloController {
+    @Get()
+    getHello() {
+      return { message: 'Hello, World!' };
+    }
+  }
 
-    expect(module).toBe(FastifyModule);
-    expect(metadata.imports).toStrictEqual([]);
-    expect(metadata.providers).toHaveLength(3);
-    expect(metadata.exports).toHaveLength(1);
+  @Module({ controllers: [HelloController] })
+  class App {}
+  const appModule = FastifyModule.forRoot({ imports: [App] });
 
-    expect(createFastifyInstance).toBeCalled();
-    expect(config.genReqId()).toHaveLength(36);
+  beforeEach(() => ShadowFactory.create(appModule).then(application => (app = application)));
+  afterEach(() => app.stop());
+
+  it('should start the application', async () => {
+    await expect(app.start()).resolves.toBeTruthy();
+  });
+
+  it('should respond to GET /hello', async () => {
+    const router: FastifyRouter = app.get(Router);
+    const response = await router.mockRequest().get('/hello');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ message: 'Hello, World!' });
   });
 });

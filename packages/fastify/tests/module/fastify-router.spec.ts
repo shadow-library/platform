@@ -10,7 +10,7 @@ import { FastifyInstance, fastify } from 'fastify';
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { Context, FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
+import { ContextService, FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -26,7 +26,7 @@ describe('FastifyRouter', () => {
   const config = FastifyModule['getDefaultConfig']();
   const Class = class {};
   const classInstance = new Class();
-  const context = new Context();
+  const context = new ContextService();
   const handler = jest.fn();
   const handlerName = handler.name;
 
@@ -328,7 +328,7 @@ describe('FastifyRouter', () => {
 
   describe('getRequestLogger', () => {
     let httpLogger: jest.Spied<Logger['http']>;
-    let contextSpy: jest.Spied<Context['get']>;
+    let contextSpy: jest.Spied<ContextService['get']>;
 
     beforeEach(() => {
       httpLogger = jest.spyOn(router['logger'], 'http').mockReturnValue();

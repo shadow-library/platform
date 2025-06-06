@@ -16,7 +16,7 @@ import { Class, JsonObject } from 'type-fest';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata } from '../decorators';
 import { HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
-import { Context } from '../services';
+import { ContextService } from '../services';
 import { type FastifyConfig } from './fastify-module.interface';
 
 /**
@@ -88,7 +88,7 @@ export class FastifyRouter extends Router {
   constructor(
     @Inject(FASTIFY_CONFIG) private readonly config: FastifyConfig,
     @Inject(FASTIFY_INSTANCE) private readonly instance: FastifyInstance,
-    private readonly context: Context,
+    private readonly context: ContextService,
   ) {
     super();
   }
