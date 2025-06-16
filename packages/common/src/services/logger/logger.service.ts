@@ -35,6 +35,10 @@ const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescrip
 class LoggerStatic {
   private readonly logger = createLogger({ level: Config.get('log.level') });
 
+  isDebugEnabled(): boolean {
+    return this.logger.isDebugEnabled();
+  }
+
   setDefaultMetadata(metadata: object): this {
     this.logger.defaultMeta = metadata;
     return this;
