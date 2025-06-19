@@ -26,6 +26,8 @@ const RID = Symbol('rid');
 
 @Injectable()
 export class ContextService {
+  static readonly name = 'ContextService';
+
   private readonly storage = new AsyncLocalStorage<Map<Key, unknown>>();
 
   init(): MiddlewareHandler {

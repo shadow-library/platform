@@ -83,6 +83,8 @@ const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) 
 
 @Injectable()
 export class FastifyRouter extends Router {
+  static override readonly name = 'FastifyRouter';
+
   private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
 
   constructor(

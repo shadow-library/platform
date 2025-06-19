@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { RouteMetdata } from '@shadow-library/app';
+import { RouteMetadata } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
 import { RouteShorthandOptions } from 'fastify';
 
@@ -16,12 +16,13 @@ import { HttpMethod, RouteInputSchemas } from '../decorators';
  */
 
 declare module '@shadow-library/app' {
-  export interface RouteMetdata extends Omit<RouteShorthandOptions, 'config'> {
+  export interface RouteMetadata extends Omit<RouteShorthandOptions, 'config'> {
     method?: HttpMethod;
     path?: string;
     schemas?: RouteInputSchemas & { response?: Record<number | string, JSONSchema> };
 
     rawBody?: boolean;
+    silentValidation?: boolean;
 
     status?: number;
     headers?: Record<string, string | (() => string)>;
@@ -29,10 +30,10 @@ declare module '@shadow-library/app' {
     render?: string | true;
   }
 
-  export interface ControllerMetdata {
+  export interface ControllerMetadata {
     [HTTP_CONTROLLER_TYPE]?: 'router' | 'middleware';
     path?: string;
   }
 }
 
-export type ServerMetadata = RouteMetdata;
+export type ServerMetadata = RouteMetadata;

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { RouteMetdata } from '@shadow-library/app';
+import { RouteMetadata } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -15,7 +15,7 @@ import { HttpRequest, HttpResponse } from './route-handler.interface';
 export type MiddlewareHandler = (request: HttpRequest, response: HttpResponse) => Promise<any>;
 
 export interface MiddlewareGenerator {
-  generate(metadata: RouteMetdata): MiddlewareHandler | undefined | Promise<MiddlewareHandler | undefined>;
+  generate(metadata: RouteMetadata): MiddlewareHandler | undefined | Promise<MiddlewareHandler | undefined>;
 }
 
 export interface HttpMiddleware {
