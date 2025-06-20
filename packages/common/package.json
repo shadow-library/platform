@@ -11,6 +11,9 @@
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts"
   },
+  "engines": {
+    "node": ">=23.0.0"
+  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/shadow-library/common.git"
@@ -31,6 +34,7 @@
     "eslint": "^9.13.0",
     "eslint-import-resolver-typescript": "^3.6.3",
     "eslint-plugin-import": "^2.31.0",
+    "eslint-plugin-n": "^17.20.0",
     "globals": "^15.11.0",
     "husky": "^9.1.6",
     "prettier": "^3.3.3",

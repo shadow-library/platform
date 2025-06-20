@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import qs from 'querystring';
+import qs from 'node:querystring';
 
 import deepmerge from 'deepmerge';
 import { JsonObject, JsonValue } from 'type-fest';

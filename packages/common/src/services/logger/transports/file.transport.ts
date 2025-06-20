@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import fs from 'fs';
+import fs from 'node:fs';
 
 import { Logform, format, transports } from 'winston';
 
