@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { SpawnSyncOptions, spawnSync } from 'child_process';
-import { join } from 'path';
+import { SpawnSyncOptions, spawnSync } from 'node:child_process';
+import { join } from 'node:path';
 
 /**
  * Importing user defined packages
