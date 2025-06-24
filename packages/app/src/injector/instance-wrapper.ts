@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import assert from 'assert';
+import assert from 'node:assert';
 
 import { InternalError, Logger } from '@shadow-library/common';
 import { Class } from 'type-fest';

@@ -2,8 +2,8 @@
  * Importing npm packages.
  */
 import eslintJs from '@eslint/js';
-import tsParser from '@typescript-eslint/parser';
 import importPlugin from 'eslint-plugin-import';
+import nodePlugin from 'eslint-plugin-n';
 import globals from 'globals';
 import eslintTs from 'typescript-eslint';
 
@@ -29,6 +29,7 @@ export default [
         typescript: { project: 'tsconfig.json' },
       },
     },
+    plugins: { n: nodePlugin },
     rules: {
       '@typescript-eslint/explicit-module-boundary-types': 'error',
       '@typescript-eslint/no-explicit-any': 'off',
@@ -44,6 +45,7 @@ export default [
         },
       ],
       'no-console': 2,
+      'n/prefer-node-protocol': ['error', { version: '>=23.0.0' }],
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
     },
   },
