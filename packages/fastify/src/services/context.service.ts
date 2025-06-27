@@ -23,6 +23,9 @@ type Key = string | symbol;
 const REQUEST = Symbol('request');
 const RESPONSE = Symbol('response');
 const RID = Symbol('rid');
+const PARENT_CONTEXT = Symbol('parent-context');
+const CHILD_RID_COUNTER = Symbol('child-rid-counter');
+const CHILD_REQUEST = Symbol('child-request');
 
 @Injectable()
 export class ContextService {
@@ -40,16 +43,52 @@ export class ContextService {
     };
   }
 
+  initChild(): MiddlewareHandler {
+    return async req => {
+      const parentStore = this.storage.getStore();
+      if (!parentStore) throw new InternalError('Parent context not initialized');
+      const isChildContext = parentStore.has(PARENT_CONTEXT);
+      if (isChildContext) throw new InternalError('Cannot create a child context within an existing child context');
+
+      const childRIDCounter = (this.get<number>(CHILD_RID_COUNTER) ?? 0) + 1;
+      this.set(CHILD_RID_COUNTER, childRIDCounter);
+      const childRID = `${this.getRID()}-${childRIDCounter}`;
+
+      const store = new Map<Key, unknown>();
+      store.set(RID, childRID);
+      store.set(CHILD_REQUEST, req);
+      store.set(PARENT_CONTEXT, parentStore);
+      this.storage.enterWith(store);
+    };
+  }
+
   get<T>(key: Key, throwOnMissing: true): T;
-  get<T>(key: Key, throwOnMissing?: false): T | null;
+  get<T>(key: Key, throwOnMissing?: boolean): T | null;
   get<T>(key: Key, throwOnMissing?: boolean): T | null {
     const store = this.storage.getStore();
     if (!store) throw new InternalError('Context not yet initialized');
     const value = store.get(key) as T | undefined;
-    if (throwOnMissing && value === undefined) {
-      throw new InternalError(`Key '${key.toString()}' not found in the context`);
-    }
+    if (throwOnMissing && value === undefined) throw new InternalError(`Key '${key.toString()}' not found in the context`);
     return value ?? null;
+  }
+
+  getFromParent<T>(key: Key, throwOnMissing: true): T;
+  getFromParent<T>(key: Key, throwOnMissing?: boolean): T | null;
+  getFromParent<T>(key: Key, throwOnMissing?: boolean): T | null {
+    if (!this.isChildContext()) return this.get<T>(key, throwOnMissing);
+    const parentStore = this.get<Map<Key, unknown>>(PARENT_CONTEXT, true);
+    const value = parentStore.get(key) as T | undefined;
+    if (throwOnMissing && value === undefined) throw new InternalError(`Key '${key.toString()}' not found in the parent context`);
+    return value ?? null;
+  }
+
+  resolve<T>(key: Key, throwOnMissing: true): T;
+  resolve<T>(key: Key, throwOnMissing?: boolean): T | null;
+  resolve<T>(key: Key, throwOnMissing?: boolean): T | null {
+    const isChild = this.isChildContext();
+    const value = this.get<T>(key, !isChild);
+    if (value !== undefined) return value;
+    return this.get<T>(key, throwOnMissing);
   }
 
   set<T>(key: Key, value: T): this {
@@ -59,12 +98,28 @@ export class ContextService {
     return this;
   }
 
+  setInParent<T>(key: Key, value: T): this {
+    if (!this.isChildContext()) return this.set(key, value);
+    const parentStore = this.get<Map<Key, unknown>>(PARENT_CONTEXT, true);
+    parentStore.set(key, value);
+    return this;
+  }
+
+  isChildContext(): boolean {
+    const parentStore = this.get<Map<Key, unknown>>(PARENT_CONTEXT);
+    return parentStore !== null;
+  }
+
   getRequest(): Request {
-    return this.get<Request>(REQUEST, true);
+    return this.resolve<Request>(REQUEST, true);
+  }
+
+  getChildRequest(): Request | null {
+    return this.resolve<Request>(CHILD_REQUEST, false);
   }
 
   getResponse(): Response {
-    return this.get<Response>(RESPONSE, true);
+    return this.resolve<Response>(RESPONSE, true);
   }
 
   getRID(): string {
