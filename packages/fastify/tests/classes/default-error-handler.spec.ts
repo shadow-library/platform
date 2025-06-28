@@ -82,7 +82,7 @@ describe('DefaultErrorHandler', () => {
     const error = new AppError(ServerErrorCode.S001).setCause(new Error('Test Cause'));
     const fn = jest.spyOn(errorHandler['logger'], 'warn');
     errorHandler.handle(error, request, response);
-    expect(fn).toHaveBeenCalledWith('Caused by:', error.getCause());
+    expect(fn).toHaveBeenCalledWith('Caused by', error.getCause());
   });
 
   it('should handle unknown error of type Error', () => {

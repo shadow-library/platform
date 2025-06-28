@@ -271,7 +271,7 @@ describe('FastifyRouter', () => {
 
     it('should apply the middleware if generator returns a function', async () => {
       handler.mockReturnValue(jest.fn());
-      const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler } as any;
+      const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance: {} } as any;
       jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ preHandler: [expect.any(Function)] }));
@@ -279,7 +279,7 @@ describe('FastifyRouter', () => {
 
     it('should not apply the middleware if generator returns false', async () => {
       handler.mockReturnValue(false);
-      const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler } as any;
+      const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance: {} } as any;
       jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.not.objectContaining({ preHandler: expect.anything() }));
@@ -299,6 +299,16 @@ describe('FastifyRouter', () => {
       jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ preHandler: [expect.any(Function), expect.any(Function)] }));
+    });
+
+    it('should apply the cached middleware for the same key', async () => {
+      const instance = { cacheKey: () => 'test-key' };
+      handler.mockReturnValue(() => {});
+      const middleware1 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance } as any;
+      const middleware2 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance } as any;
+      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
+      await router.register([]);
+      expect(handler).toBeCalledTimes(1);
     });
 
     it('should apply the response schema', async () => {

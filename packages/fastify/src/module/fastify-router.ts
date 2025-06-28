@@ -3,10 +3,11 @@
  */
 import assert from 'assert';
 
-import { ControllerRouteMetadata, Inject, Injectable, Router } from '@shadow-library/app';
+import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
 import { InternalError, Logger, utils } from '@shadow-library/common';
 import merge from 'deepmerge';
 import { type FastifyInstance, RouteOptions, onRequestHookHandler } from 'fastify';
+import stringify from 'json-stable-stringify';
 import { Chain as MockRequestChain, InjectOptions as MockRequestOptions, Response as MockResponse } from 'light-my-request';
 import { Class, JsonObject } from 'type-fest';
 
@@ -76,6 +77,8 @@ export interface RequestMetadata {
   [key: string]: any;
 }
 
+type MiddlewareHandler = ParsedController<MiddlewareMetadata>['handler'];
+
 /**
  * Declaring the constants
  */
@@ -86,6 +89,7 @@ export class FastifyRouter extends Router {
   static override readonly name = 'FastifyRouter';
 
   private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
+  private readonly cachedDynamicMiddlewares = new Map<string, MiddlewareHandler>();
 
   constructor(
     @Inject(FASTIFY_CONFIG) private readonly config: FastifyConfig,
@@ -220,6 +224,21 @@ export class FastifyRouter extends Router {
     };
   }
 
+  private async getMiddlewareHandler(middleware: ParsedController<MiddlewareMetadata>, metadata: RouteMetadata): Promise<MiddlewareHandler | undefined> {
+    if (!middleware.metadata.generates) return middleware.handler.bind(middleware.instance);
+
+    /** Generating the cache key and getting the cached middleware */
+    const genCacheKey = 'cacheKey' in middleware.instance && typeof middleware.instance.cacheKey === 'function' ? middleware.instance.cacheKey : stringify;
+    const cacheKey = genCacheKey(metadata);
+    const cachedMiddleware = this.cachedDynamicMiddlewares.get(cacheKey);
+    if (cachedMiddleware) return cachedMiddleware;
+
+    /** Generating the middleware handler */
+    const handler = await middleware.handler.apply(middleware.instance, [metadata]);
+    this.cachedDynamicMiddlewares.set(cacheKey, handler);
+    return handler;
+  }
+
   async register(controllers: ControllerRouteMetadata[]): Promise<void> {
     const { middlewares, routes } = this.parseControllers(controllers);
     const defaultResponseSchemas = this.config.responseSchema ?? {};
@@ -247,8 +266,8 @@ export class FastifyRouter extends Router {
       /** Applying middlewares */
       for (const middleware of middlewares) {
         const name = middleware.metatype.name;
-        const { generates, type } = middleware.metadata;
-        const handler = generates ? await middleware.handler(metadata) : middleware.handler.bind(middleware);
+        const { type } = middleware.metadata;
+        const handler = await this.getMiddlewareHandler(middleware, metadata);
         if (typeof handler === 'function') {
           this.logger.debug(`applying '${type}' middleware '${name}'`);
           const middlewareHandler = routeOptions[type] as RouteHandler[];

@@ -15,6 +15,7 @@ import { HttpRequest, HttpResponse } from './route-handler.interface';
 export type MiddlewareHandler = (request: HttpRequest, response: HttpResponse) => Promise<any>;
 
 export interface MiddlewareGenerator {
+  cacheKey?: (metadata: RouteMetadata) => string;
   generate(metadata: RouteMetadata): MiddlewareHandler | undefined | Promise<MiddlewareHandler | undefined>;
 }
 

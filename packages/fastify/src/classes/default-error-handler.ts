@@ -37,7 +37,7 @@ export class DefaultErrorHandler implements ErrorHandler {
 
   handle(err: Error, _req: HttpRequest, res: HttpResponse): HttpResponse {
     this.logger.warn('Handling error', err);
-    if (err.cause) this.logger.warn('Caused by:', err.cause);
+    if (err.cause) this.logger.warn('Caused by', err.cause);
     if (err instanceof ServerError) return res.status(err.getStatusCode()).send(err.toObject());
     else if (err instanceof ValidationError) return res.status(400).send({ ...err.toObject(), code: validationError.getCode() });
     else if (err instanceof AppError) return res.status(500).send(err.toObject());
@@ -46,7 +46,7 @@ export class DefaultErrorHandler implements ErrorHandler {
       return res.status(statusCode).send(error);
     }
 
-    this.logger.error('Unhandler error has occurred:', err);
+    this.logger.error('Unhandled error has occurred', err);
     return res.status(500).send(unexpectedError.toObject());
   }
 }
