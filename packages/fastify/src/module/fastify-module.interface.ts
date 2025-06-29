@@ -39,6 +39,13 @@ export interface FastifyConfig extends FastifyServerOptions {
    * @default { '4xx': errorResponseSchema, '5xx': errorResponseSchema }
    */
   responseSchema?: Record<string | number, JSONSchema>;
+
+  /**
+   * Enables internal execution of child routes (e.g., for SSR data fetching) without making actual HTTP requests.
+   * Useful for loading data while reusing middleware logic and shared context.
+   * @default false
+   */
+  enableChildRoutes?: boolean;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {

@@ -9,7 +9,8 @@ import { InternalError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { MiddlewareHandler } from '../interfaces';
+import { HttpRequest, HttpResponse, MiddlewareHandler } from '../interfaces';
+import { ChildRouteRequest } from '../module';
 
 /**
  * Defining types
@@ -43,7 +44,7 @@ export class ContextService {
     };
   }
 
-  initChild(): MiddlewareHandler {
+  initChild(): (request: ChildRouteRequest) => Promise<void> {
     return async req => {
       const parentStore = this.storage.getStore();
       if (!parentStore) throw new InternalError('Parent context not initialized');
@@ -88,7 +89,7 @@ export class ContextService {
     const isChild = this.isChildContext();
     const value = this.get<T>(key, !isChild);
     if (value !== undefined) return value;
-    return this.get<T>(key, throwOnMissing);
+    return this.getFromParent<T>(key, throwOnMissing);
   }
 
   set<T>(key: Key, value: T): this {
@@ -110,16 +111,16 @@ export class ContextService {
     return parentStore !== null;
   }
 
-  getRequest(): Request {
-    return this.resolve<Request>(REQUEST, true);
+  getRequest(): HttpRequest {
+    return this.resolve<HttpRequest>(REQUEST, true);
   }
 
-  getChildRequest(): Request | null {
-    return this.resolve<Request>(CHILD_REQUEST, false);
+  getChildRequest(): ChildRouteRequest | null {
+    return this.resolve<ChildRouteRequest>(CHILD_REQUEST, false);
   }
 
-  getResponse(): Response {
-    return this.resolve<Response>(RESPONSE, true);
+  getResponse(): HttpResponse {
+    return this.resolve<HttpResponse>(RESPONSE, true);
   }
 
   getRID(): string {

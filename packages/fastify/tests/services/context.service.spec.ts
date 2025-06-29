@@ -87,13 +87,13 @@ describe('Context', () => {
 
     it('should throw if parent context is not initialized', async () => {
       storage.getStore.mockReturnValueOnce(undefined);
-      await expect(context.initChild()(req as any, {} as any)).rejects.toThrow(InternalError);
+      await expect(context.initChild()(req as any)).rejects.toThrow(InternalError);
     });
 
     it('should throw if already in a child context', async () => {
       parentStore.has = jest.fn(() => true);
       storage.getStore.mockReturnValueOnce(parentStore);
-      await expect(context.initChild()(req as any, {} as any)).rejects.toThrow(InternalError);
+      await expect(context.initChild()(req as any)).rejects.toThrow(InternalError);
     });
 
     it('should set up child context with incremented child RID and parent context', async () => {
@@ -104,7 +104,7 @@ describe('Context', () => {
         if (key.toString() === 'Symbol(rid)') return 'parent-rid';
         return originalGet.call(parentStore, key);
       });
-      await context.initChild()(req as any, {} as any);
+      await context.initChild()(req as any);
 
       expect(storage.enterWith).toHaveBeenCalledWith(expect.any(Map));
       expect(Array.from(parentStore.values())).toStrictEqual([1]);

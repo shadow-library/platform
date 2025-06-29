@@ -3,14 +3,14 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
-import { InternalError, Logger, withThis } from '@shadow-library/common';
+import { InternalError, Logger, ValidationError, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { ContextService, FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
+import { ChildRouteResponse, ContextService, FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -36,7 +36,7 @@ describe('FastifyRouter', () => {
     router = new FastifyRouter(config, instance, context);
   });
 
-  it('should return the fastify intance', () => {
+  it('should return the fastify instance', () => {
     expect(router.getInstance()).toBe(instance);
   });
 
@@ -336,6 +336,76 @@ describe('FastifyRouter', () => {
     });
   });
 
+  describe('child routes', () => {
+    const handler = jest.fn<() => Promise<any>>();
+
+    beforeEach(() => {
+      router = new FastifyRouter({ ...config, enableChildRoutes: true }, instance, context);
+      router['generateRouteHandler'] = jest.fn().mockReturnValue(handler) as any;
+    });
+
+    it('should throw error if child routes are not enabled', async () => {
+      const nonChildRouter = new FastifyRouter({ ...config, enableChildRoutes: false }, instance, context);
+      await expect(nonChildRouter.resolveChildRoute('/child')).rejects.toThrow(InternalError);
+    });
+
+    it('should throw error if the router is not found', async () => {
+      await expect(router.resolveChildRoute('/non-existent')).rejects.toThrow(InternalError);
+    });
+
+    it('should execute child routes without making actual HTTP requests', async () => {
+      const route = { metadata: { path: '/child', method: HttpMethod.GET }, handler, instance } as any;
+      const context = jest.fn();
+      const requestLogger = jest.fn();
+      router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
+      router['context'].initChild = jest.fn().mockReturnValue(context) as any;
+      router['getRequestLogger'] = jest.fn().mockReturnValue(requestLogger) as any;
+
+      await router.register([]);
+      await router.resolveChildRoute('/child');
+
+      expect(context).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} });
+      expect(requestLogger).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse));
+      expect(handler).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse));
+    });
+
+    it('should validate child route parameters', async () => {
+      const paramsSchema = { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9]+$' } }, required: ['id'] };
+      const querySchema = { type: 'object', properties: { search: { type: 'string' } } };
+      const route = { metadata: { path: '/child/:id', method: HttpMethod.GET, schemas: { params: paramsSchema, query: querySchema } } } as any;
+      router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
+
+      await router.register([]);
+      await router.resolveChildRoute('/child/123?search=test');
+
+      expect(handler).toHaveBeenCalledWith({ url: '/child/123', method: 'GET', query: { search: 'test' }, params: { id: '123' } }, expect.any(ChildRouteResponse));
+    });
+
+    it('should throw error for invalid child route parameters', async () => {
+      const paramsSchema = { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9]+$' } }, required: ['id'] };
+      const route = { metadata: { path: '/child/:id', method: HttpMethod.GET, schemas: { params: paramsSchema } } } as any;
+      router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
+
+      await router.register([]);
+      await expect(router.resolveChildRoute('/child/abc')).rejects.toThrow(ValidationError);
+
+      expect(handler).not.toHaveBeenCalled();
+    });
+
+    it('should handle errors in child routes', async () => {
+      const middleware = { metatype: Class, metadata: { type: 'onError', generates: false }, handler: jest.fn() } as any;
+      const route = { metadata: { path: '/child', method: HttpMethod.GET } } as any;
+      const error = new Error('Test error');
+      handler.mockRejectedValue(error);
+      router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [middleware] }) as any;
+
+      await router.register([]);
+      await router.resolveChildRoute('/child');
+
+      expect(middleware.handler).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse), error);
+    });
+  });
+
   describe('getRequestLogger', () => {
     let httpLogger: jest.Spied<Logger['http']>;
     let contextSpy: jest.Spied<ContextService['get']>;
@@ -360,11 +430,9 @@ describe('FastifyRouter', () => {
         getHeader: jest.fn().mockReturnValue('456'),
       } as any;
 
-      const done = jest.fn() as any;
       const logger = router['getRequestLogger']();
-      logger.call({} as any, req, res, done);
+      logger.call({} as any, req, res);
 
-      expect(done).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
       expect(httpLogger).toHaveBeenCalledWith('http', {
         rid: 'test-rid',
@@ -386,11 +454,9 @@ describe('FastifyRouter', () => {
       const req = {} as any;
       const res = { raw: { on: jest.fn((_, callback: () => void) => callback()) } } as any;
 
-      const done = jest.fn();
       const logger = router['getRequestLogger']();
-      logger.call({} as any, req, res, done);
+      logger.call({} as any, req, res);
 
-      expect(done).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
       expect(httpLogger).not.toHaveBeenCalled();
     });

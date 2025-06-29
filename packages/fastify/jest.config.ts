@@ -25,7 +25,7 @@ const config: Config = {
   moduleNameMapper: { '@lib/(.*)': '<rootDir>/src/$1', '@shadow-library/fastify': '<rootDir>/src' },
 
   collectCoverage: true,
-  coverageReporters: process.env.CI ? ['text'] : ['text-summary', 'html-spa'],
+  coverageReporters: process.env.CI ? ['text'] : ['text-summary', 'html'],
   coverageThreshold: { global: { lines: 95, branches: 95, functions: 95, statements: 95 } },
   coveragePathIgnorePatterns: ['node_modules'],
 };
