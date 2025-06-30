@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import assert from 'assert';
+import assert from 'node:assert';
 
 import { Controller } from '@shadow-library/app';
 

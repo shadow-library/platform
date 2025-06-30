@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import assert from 'assert';
+import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
 import { InternalError, Logger, tryCatch, utils } from '@shadow-library/common';

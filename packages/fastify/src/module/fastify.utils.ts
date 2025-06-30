@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import assert from 'assert';
+import assert from 'node:assert';
 
 import { ValidationError, throwError, utils } from '@shadow-library/common';
 import Ajv, { SchemaObject } from 'ajv';

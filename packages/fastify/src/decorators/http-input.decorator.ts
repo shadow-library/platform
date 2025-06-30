@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import assert from 'assert';
+import assert from 'node:assert';
 
 import { Route } from '@shadow-library/app';
 import { ClassSchema, JSONSchema } from '@shadow-library/class-schema';

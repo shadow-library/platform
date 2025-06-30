@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { AsyncLocalStorage } from 'async_hooks';
+import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { Injectable } from '@shadow-library/app';
 import { InternalError } from '@shadow-library/common';
