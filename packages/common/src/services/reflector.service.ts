@@ -38,6 +38,12 @@ class ReflectorService {
     Reflect.defineMetadata(key, newMetadata, target, propertyKey as string | symbol);
   }
 
+  prependMetadata<T>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
+    const oldMetadata = Reflect.getMetadata(key, target, propertyKey as string | symbol);
+    const newMetadata = Array.isArray(oldMetadata) ? [value, ...oldMetadata] : [value];
+    Reflect.defineMetadata(key, newMetadata, target, propertyKey as string | symbol);
+  }
+
   updateMetadata<T extends object = object>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
     const oldMetadata = Reflect.getMetadata(key, target, propertyKey as string | symbol);
     const newMetadata = typeof oldMetadata === 'object' && oldMetadata !== null ? merge([oldMetadata, value]) : value;

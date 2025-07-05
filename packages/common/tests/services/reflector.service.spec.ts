@@ -71,6 +71,73 @@ describe('ReflectorService', () => {
     });
   });
 
+  describe('prependMetadata', () => {
+    it('should define metadata when none exists', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const value = { info: 'first' };
+
+      Reflector.prependMetadata(METADATA_KEYS.INJECTABLE, value, Example);
+
+      const result = Reflect.getMetadata(METADATA_KEYS.INJECTABLE, Example);
+      expect(result).toStrictEqual([value]);
+    });
+
+    it('should prepend metadata when metadata already exists', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const value1 = { info: 'first' };
+      const value2 = { info: 'second' };
+
+      Reflector.defineMetadata(METADATA_KEYS.ROUTE, [value1], Example);
+      Reflector.prependMetadata(METADATA_KEYS.ROUTE, value2, Example);
+
+      const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, Example);
+      expect(result).toStrictEqual([value2, value1]);
+    });
+
+    it('should prepend metadata to a method (with propertyKey)', () => {
+      const value1 = { type: 'method-level' };
+      class Example {
+        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
+        method() {}
+      }
+
+      Reflector.prependMetadata(METADATA_KEYS.PARAM_TYPES, value1, Example.prototype, 'method');
+
+      const result = Reflect.getMetadata(METADATA_KEYS.PARAM_TYPES, Example.prototype, 'method');
+      expect(result).toStrictEqual([value1]);
+    });
+
+    it('should not modify original array reference', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const initial = [{ msg: 'a' }];
+      Reflector.defineMetadata(METADATA_KEYS.INJECTABLE, initial, Example);
+
+      Reflector.prependMetadata(METADATA_KEYS.INJECTABLE, { msg: 'b' }, Example);
+
+      const result = Reflector.getMetadata(METADATA_KEYS.INJECTABLE, Example);
+      expect(result).toStrictEqual([{ msg: 'b' }, { msg: 'a' }]);
+      expect(result).not.toBe(initial);
+    });
+
+    it('should handle multiple prepends correctly', () => {
+      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
+      class Example {}
+      const value1 = { order: 1 };
+      const value2 = { order: 2 };
+      const value3 = { order: 3 };
+
+      Reflector.appendMetadata(METADATA_KEYS.ROUTE, value1, Example);
+      Reflector.prependMetadata(METADATA_KEYS.ROUTE, value2, Example);
+      Reflector.prependMetadata(METADATA_KEYS.ROUTE, value3, Example);
+
+      const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, Example);
+      expect(result).toStrictEqual([value3, value2, value1]);
+    });
+  });
+
   describe('updateMetadata', () => {
     it('should set metadata when no previous metadata exists', () => {
       const target = {};
