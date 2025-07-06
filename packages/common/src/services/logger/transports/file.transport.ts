@@ -13,7 +13,7 @@ import { Logform, format, transports } from 'winston';
  * Defining types
  */
 
-export interface FileTransportOptions {
+export interface FileTransportOptions extends transports.FileTransportOptions {
   dirname: string;
   filename: string;
 }
@@ -27,7 +27,7 @@ export class FileTransport extends transports.File {
   constructor(options: FileTransportOptions) {
     FileTransport.rotateLogFiles(options.dirname, options.filename);
     const filename = `${options.dirname}/${options.filename}-0.log`;
-    super({ filename });
+    super({ ...options, filename });
   }
 
   private static getFileIndex(filename: string): number {

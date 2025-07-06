@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import fastRedact from 'fast-redact';
-import { Logform, createLogger } from 'winston';
+import { Logform, createLogger, format as customFormat } from 'winston';
 import Transport from 'winston-transport';
 
 /**
@@ -34,6 +34,7 @@ const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescrip
 
 class LoggerStatic {
   private readonly logger = createLogger({ level: Config.get('log.level') });
+  private getLogMetadata: () => object = () => ({});
 
   isDebugEnabled(): boolean {
     return this.logger.isDebugEnabled();
@@ -41,6 +42,11 @@ class LoggerStatic {
 
   setDefaultMetadata(metadata: object): this {
     this.logger.defaultMeta = metadata;
+    return this;
+  }
+
+  setLogMetadataProvider(getLogMetadata: () => object): this {
+    this.getLogMetadata = getLogMetadata;
     return this;
   }
 
@@ -68,18 +74,19 @@ class LoggerStatic {
   /* istanbul ignore next */
   addDefaultTransports(format?: Logform.Format): this {
     const env = Config.get('app.env');
-    const baseFormats = [formats.errors({ stack: true })];
+    const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata()));
+    const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
     if (format) baseFormats.unshift(format);
 
     if (env === 'development') {
       const format = formats.combine(...baseFormats, formats.colorize(), formats.brief());
-      const transport = new ConsoleTransport().addFormat(format);
+      const transport = new ConsoleTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
       this.addTransport(transport);
     }
 
     if (env === 'production') {
       const format = formats.combine(...baseFormats);
-      const transport = new CloudWatchTransport().addFormat(format);
+      const transport = new CloudWatchTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
       this.addTransport(transport);
     }
 
@@ -89,7 +96,7 @@ class LoggerStatic {
       const dirname = Config.get('log.dir');
       const filename = Config.get('app.name');
       const format = formats.combine(...baseFormats, formats.json());
-      const transport = new FileTransport({ dirname, filename }).addFormat(format);
+      const transport = new FileTransport({ dirname, filename, handleExceptions: true, handleRejections: true }).addFormat(format);
       this.addTransport(transport);
     }
 
