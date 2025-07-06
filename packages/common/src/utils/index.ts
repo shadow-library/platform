@@ -7,6 +7,7 @@
  */
 import { objectUtils } from './object';
 import { stringUtils } from './string';
+import { temporalUtils } from './temporal';
 
 /**
  * Defining types
@@ -19,6 +20,7 @@ import { stringUtils } from './string';
 class Utils {
   readonly object = objectUtils;
   readonly string = stringUtils;
+  readonly temporal = temporalUtils;
 
   /**
    * Validates the object.
