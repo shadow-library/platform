@@ -6,3 +6,4 @@ export * from './module.decorator';
 export * from './optional.decorator';
 export * from './route.decorator';
 export * from './set-metadata.decorator';
+export * from './use-interceptors.decorator';
