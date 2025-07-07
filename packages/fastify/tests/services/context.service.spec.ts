@@ -21,7 +21,7 @@ describe('Context', () => {
   let context: ContextService;
   const data = { req: { id: 1 }, res: {}, get: 'GET', set: 'SET' };
   const store = { get: jest.fn().mockReturnValue(data.get), set: jest.fn().mockReturnValue(data.set) };
-  const storage = { enterWith: jest.fn(), getStore: jest.fn().mockReturnValue(store) };
+  const storage = { run: jest.fn(), getStore: jest.fn().mockReturnValue(store) };
 
   beforeEach(() => {
     jest.clearAllMocks();
@@ -31,14 +31,14 @@ describe('Context', () => {
   });
 
   it('should initialize the context', () => {
-    const middleware = context.init();
-    middleware(data.req as any, data.res as any);
-
-    expect(storage.enterWith).toHaveBeenCalledWith(expect.any(Map));
+    const callback = () => {};
+    const middleware = context.init() as (...args: any[]) => void;
+    middleware(data.req, data.res, callback);
+    expect(storage.run).toHaveBeenCalledWith(expect.any(Map), callback);
   });
 
   describe('set()', () => {
-    it('should throw an error if context is not inited', () => {
+    it('should throw an error if context is not initiated', () => {
       storage.getStore.mockReturnValueOnce(undefined);
       expect(() => context['set']('key', 'value')).toThrowError(InternalError);
     });
@@ -56,7 +56,7 @@ describe('Context', () => {
       expect(req).toBe(data.get);
     });
 
-    it('should throw an error if context is not inited', () => {
+    it('should throw an error if context is not initiated', () => {
       storage.getStore.mockReturnValueOnce(undefined);
       expect(() => context.getResponse()).toThrowError(InternalError);
     });

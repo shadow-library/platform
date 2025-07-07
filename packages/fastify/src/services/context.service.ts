@@ -5,11 +5,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { Injectable } from '@shadow-library/app';
 import { InternalError } from '@shadow-library/common';
+import { onRequestHookHandler } from 'fastify';
 
 /**
  * Importing user defined packages
  */
-import { HttpRequest, HttpResponse, MiddlewareHandler } from '../interfaces';
+import { HttpRequest, HttpResponse } from '../interfaces';
 import { ChildRouteRequest } from '../module';
 
 /**
@@ -34,13 +35,13 @@ export class ContextService {
 
   private readonly storage = new AsyncLocalStorage<Map<Key, unknown>>();
 
-  init(): MiddlewareHandler {
-    return async (req, res) => {
+  init(): onRequestHookHandler {
+    return (req, res, done) => {
       const store = new Map<Key, unknown>();
       store.set(REQUEST, req);
       store.set(RESPONSE, res);
       store.set(RID, req.id);
-      this.storage.enterWith(store);
+      this.storage.run(store, done);
     };
   }
 
