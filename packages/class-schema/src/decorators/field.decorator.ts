@@ -2,6 +2,8 @@
 /**
  * Importing npm packages
  */
+import assert from 'node:assert';
+
 import { Reflector } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
@@ -33,7 +35,7 @@ export function Field(typeOrOptions?: ReturnTypeFunc | FieldSchema, fieldOptions
   const options = (isTypeFn ? fieldOptions : typeOrOptions) ?? {};
 
   return (target, propertyKey) => {
-    if (typeof propertyKey === 'symbol') throw new Error(`Cannot apply @Field() to symbol ${propertyKey.toString()}`);
+    assert(typeof propertyKey === 'string', `Cannot apply @Field() to symbol ${propertyKey.toString()}`);
     const reflectedType = Reflect.getMetadata(METADATA_KEYS.DESIGN_TYPE, target, propertyKey);
     const getType = isTypeFn ? typeOrOptions : () => reflectedType;
     Reflect.defineMetadata(METADATA_KEYS.FIELD_TYPE, getType, target, propertyKey);
