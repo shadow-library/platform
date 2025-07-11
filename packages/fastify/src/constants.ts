@@ -22,5 +22,3 @@ export const FASTIFY_INSTANCE = Symbol('fastify-instance');
 
 export const HTTP_CONTROLLER_TYPE = Symbol('http-controller-type');
 export const HTTP_CONTROLLER_INPUTS = Symbol('http-controller-inputs');
-
-export const SENSITIVE_FIELDS_METADATA = Symbol('sensitive-fields');

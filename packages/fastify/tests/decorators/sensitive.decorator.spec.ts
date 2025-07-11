@@ -2,11 +2,11 @@
  * Importing npm packages
  */
 import { describe, expect, it } from '@jest/globals';
+import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
-import { SENSITIVE_FIELDS_METADATA } from '@lib/constants';
 import { Sensitive } from '@shadow-library/fastify';
 
 /**
@@ -18,56 +18,84 @@ import { Sensitive } from '@shadow-library/fastify';
  */
 
 describe('@Sensitive', () => {
-  it('should add sensitive field to class metadata', () => {
+  it('should add sensitive metadata to a field', () => {
+    @Schema()
     class TestClass {
+      @Field()
       @Sensitive()
       sensitiveField: string;
     }
 
-    const sensitiveFields = Reflect.getMetadata(SENSITIVE_FIELDS_METADATA, TestClass);
-    expect(sensitiveFields).toStrictEqual(['sensitiveField']);
+    const schema = ClassSchema.generate(TestClass);
+
+    expect(schema).toEqual({
+      $id: expect.any(String),
+      type: 'object',
+      required: ['sensitiveField'],
+      properties: {
+        sensitiveField: {
+          type: 'string',
+          'x-fastify': { sensitive: true },
+        },
+      },
+    });
   });
 
-  it('should add multiple sensitive fields to class metadata', () => {
+  it('should add sensitive metadata to multiple fields', () => {
+    @Schema()
     class TestClass {
+      @Field()
       @Sensitive()
       password: string;
 
+      @Field()
       @Sensitive()
       apiKey: string;
 
+      @Field()
       regularField: string;
     }
 
-    const sensitiveFields = Reflect.getMetadata(SENSITIVE_FIELDS_METADATA, TestClass);
-    expect(sensitiveFields).toStrictEqual(['password', 'apiKey']);
+    const schema = ClassSchema.generate(TestClass);
+
+    expect(schema).toEqual({
+      $id: expect.any(String),
+      type: 'object',
+      required: ['password', 'apiKey', 'regularField'],
+      properties: {
+        password: {
+          type: 'string',
+          'x-fastify': { sensitive: true },
+        },
+        apiKey: {
+          type: 'string',
+          'x-fastify': { sensitive: true },
+        },
+        regularField: {
+          type: 'string',
+        },
+      },
+    });
   });
 
-  it('should work with inheritance', () => {
-    class BaseClass {
-      @Sensitive()
-      baseSecret: string;
-    }
-
-    class DerivedClass extends BaseClass {
-      @Sensitive()
-      derivedSecret: string;
-
-      normalField: string;
-    }
-
-    const baseSensitiveFields = Reflect.getMetadata(SENSITIVE_FIELDS_METADATA, BaseClass);
-    const derivedSensitiveFields = Reflect.getMetadata(SENSITIVE_FIELDS_METADATA, DerivedClass);
-    expect(baseSensitiveFields).toStrictEqual(['baseSecret']);
-    expect(derivedSensitiveFields).toStrictEqual(['baseSecret', 'derivedSecret']);
-  });
-
-  it('should handle empty class with no sensitive fields', () => {
+  it('should not add sensitive metadata if not specified', () => {
+    @Schema()
     class TestClass {
+      @Field()
       regularField: string;
     }
 
-    const sensitiveFields = Reflect.getMetadata(SENSITIVE_FIELDS_METADATA, TestClass);
-    expect(sensitiveFields).toBeUndefined();
+    const schema = ClassSchema.generate(TestClass);
+
+    expect(schema).toEqual({
+      $id: expect.any(String),
+      type: 'object',
+      required: ['regularField'],
+      properties: {
+        regularField: {
+          type: 'string',
+        },
+      },
+    });
   });
 });

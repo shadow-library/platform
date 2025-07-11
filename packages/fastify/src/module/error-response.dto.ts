@@ -35,6 +35,6 @@ export class ErrorResponseDto {
   @Field()
   message: string;
 
-  @Field(() => [ErrorFieldDto], { required: false })
-  fields: ErrorFieldDto[];
+  @Field(() => [ErrorFieldDto], { optional: true })
+  fields?: ErrorFieldDto[];
 }
