@@ -19,14 +19,13 @@ import { INTERCEPTOR_METADATA } from '../constants';
  * Declaring the constants
  */
 
-export function UseInterceptors(...interceptors: Class<unknown>[]): ClassDecorator & MethodDecorator {
-  return (target: object, _propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<any>): void => {
-    const object = descriptor ? descriptor.value : target;
-    assert(object, 'UseInterceptors decorator can only be applied to class or method');
+export function UseInterceptors(...interceptors: Class<unknown>[]): MethodDecorator {
+  return (_target: object, _propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<any>): void => {
+    assert(typeof descriptor.value === 'function', 'UseInterceptors decorator can only be applied to method');
     assert(interceptors.length > 0, 'UseInterceptors decorator requires at least one interceptor class');
     for (let index = interceptors.length - 1; index >= 0; index--) {
       const interceptor = interceptors[index];
-      Reflector.appendMetadata(INTERCEPTOR_METADATA, interceptor, object);
+      Reflector.appendMetadata(INTERCEPTOR_METADATA, interceptor, descriptor.value);
     }
   };
 }

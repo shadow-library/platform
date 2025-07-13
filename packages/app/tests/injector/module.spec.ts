@@ -222,14 +222,18 @@ describe('Module', () => {
 
     it('should resolve the transient provider', async () => {
       const mock = jest.fn(async () => ({}) as any);
-      module['providers'].get(CatService)!.loadInstance = mock;
+      const service = module['providers'].get(CatService)!;
+      service.loadInstance = mock;
+      service.applyInterceptors = mock;
       await moduleRef.resolve(CatService);
-      expect(mock).toBeCalledTimes(1);
+      expect(mock).toBeCalledTimes(2);
     });
 
     it('should resolve the provider exported from the imported module', async () => {
       const mock = jest.fn(async () => 'RESULT' as any);
-      module['providers'].get(CatService)!.loadInstance = mock;
+      const service = module['providers'].get(CatService)!;
+      service.loadInstance = mock;
+      service.applyInterceptors = mock;
 
       @Module({ imports: [CatModule] })
       class NewModule {}
@@ -238,7 +242,7 @@ describe('Module', () => {
       const moduleRef = newModule['getInternalProvider'](ModuleRef).getInstance() as any;
       const instance = await moduleRef.resolve(CatService);
 
-      expect(mock).toBeCalledTimes(1);
+      expect(mock).toBeCalledTimes(2);
       expect(instance).toBe('RESULT');
     });
   });

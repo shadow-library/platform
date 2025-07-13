@@ -16,7 +16,7 @@ import { ModuleRef } from './module-ref';
 import { ControllerRouteMetadata, Router } from '../classes';
 import { CONTROLLER_METADATA, MODULE_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
 import { ModuleMetadata, RouteMetadata } from '../decorators';
-import { InjectionToken, Provider, ValueProvider } from '../interfaces';
+import { InjectionToken, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 
 /**
@@ -41,7 +41,7 @@ export class Module {
 
   private readonly imports = [] as Module[];
   private readonly controllers = new Set<InstanceWrapper<Controller>>();
-  private readonly providers = new Map<InjectionToken, InstanceWrapper<Provider>>();
+  private readonly providers = new Map<InjectionToken, InstanceWrapper>();
   private readonly exports = new Set<InjectionToken>();
 
   private readonly instance: InstanceWrapper;
@@ -70,7 +70,9 @@ export class Module {
         const provider = self.getInternalProvider(typeOrToken) as InstanceWrapper;
         if (!provider.isTransient()) throw new InternalError(`The provider '${provider.getTokenName()}' is not transient`);
         if (!contextId) contextId = createContextId();
-        return await provider.loadInstance(contextId);
+        const instance = await provider.loadInstance(contextId);
+        await provider.applyInterceptors(this, contextId);
+        return instance;
       }
     };
 
@@ -81,12 +83,12 @@ export class Module {
 
   private loadProviders() {
     const providers = this.metadata.providers ?? [];
-    const providerMap = new Map<InjectionToken, InstanceWrapper<Provider>>();
+    const providerMap = new Map<InjectionToken, InstanceWrapper>();
     const graph = new DependencyGraph();
 
     /** Create instance wrapper for all the providers */
     for (const provider of providers) {
-      const instance = new InstanceWrapper<Provider>(provider, true);
+      const instance = new InstanceWrapper(provider, true);
       const token = instance.getToken();
       if (providerMap.has(token)) throw new InternalError(`Duplicate provider '${token.toString()}' in module '${this.metatype.name}'`);
       providerMap.set(token, instance);
@@ -143,9 +145,9 @@ export class Module {
     return modules;
   }
 
-  private getInternalProvider(token: InjectionToken): InstanceWrapper<Provider>;
-  private getInternalProvider(token: InjectionToken, optional: boolean): InstanceWrapper<Provider> | undefined;
-  private getInternalProvider(token: InjectionToken, optional?: boolean): InstanceWrapper<Provider> | undefined {
+  private getInternalProvider<T extends object = object>(token: InjectionToken): InstanceWrapper<T>;
+  private getInternalProvider<T extends object = object>(token: InjectionToken, optional: boolean): InstanceWrapper<T> | undefined;
+  private getInternalProvider<T extends object = object>(token: InjectionToken, optional?: boolean): InstanceWrapper<T> | undefined {
     const provider = this.providers.get(token);
     if (provider) return provider;
 
@@ -178,9 +180,9 @@ export class Module {
     return this.metatype;
   }
 
-  getProvider(token: InjectionToken): InstanceWrapper<Provider>;
-  getProvider(token: InjectionToken, optional: boolean): InstanceWrapper<Provider> | undefined;
-  getProvider(token: InjectionToken, optional?: boolean): InstanceWrapper<Provider> | undefined {
+  getProvider(token: InjectionToken): InstanceWrapper;
+  getProvider(token: InjectionToken, optional: boolean): InstanceWrapper | undefined;
+  getProvider(token: InjectionToken, optional?: boolean): InstanceWrapper | undefined {
     const isExported = this.exports.has(token);
     if (!isExported) {
       if (optional) return;
@@ -222,7 +224,8 @@ export class Module {
      * This is to ensure that the transient provider instances are created only when they are needed.
      */
     const transientProviders: InstanceWrapper[] = [];
-    for (const provider of this.getAllInstances()) {
+    const instances = this.getAllInstances();
+    for (const provider of instances) {
       const dependencies = provider.getDependencies();
       for (let index = 0; index < dependencies.length; index++) {
         const dependency = dependencies[index];
@@ -234,6 +237,11 @@ export class Module {
       if (provider.isTransient()) transientProviders.unshift(provider);
       else await provider.loadInstance();
     }
+
+    /** Setting up the interceptors */
+    const moduleRefProvider = this.getInternalProvider<ModuleRef>(ModuleRef);
+    const moduleRef = moduleRefProvider.getInstance();
+    for (const provider of instances) provider.applyInterceptorsToAllInstances(moduleRef);
 
     for (const provider of transientProviders) await provider.loadAllInstances();
     this.loadExports(true);

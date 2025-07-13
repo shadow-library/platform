@@ -1,14 +1,15 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { InternalError, NeverError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { InstanceWrapper } from '@lib/injector';
-import { Inject, Injectable, Optional, createContextId, forwardRef } from '@shadow-library/app';
+import { CallHandler, Interceptor, InterceptorContext } from '@lib/interfaces';
+import { Inject, Injectable, Optional, UseInterceptors, createContextId, forwardRef } from '@shadow-library/app';
 
 /**
  * Importing npm packages
@@ -20,6 +21,11 @@ import { Inject, Injectable, Optional, createContextId, forwardRef } from '@shad
 
 describe('InstanceWrapper', () => {
   let instanceWrapper: InstanceWrapper;
+
+  beforeEach(() => {
+    jest.resetAllMocks();
+    jest.restoreAllMocks();
+  });
 
   describe('Value Provider', () => {
     const provider = { token: 'CONFIG', useValue: 'CONFIG_VALUE' };
@@ -344,6 +350,268 @@ describe('InstanceWrapper', () => {
       await instanceWrapper.loadInstance(contextId);
       instanceWrapper.clearInstance(contextId);
       expect(instanceWrapper['instances']).toHaveProperty('size', 1);
+    });
+  });
+
+  describe('applyInterceptors', () => {
+    const moduleRef = { get: jest.fn() } as any;
+    const interceptor = jest.fn();
+
+    class InvalidInterceptor {
+      intercept = 'Hello, World!';
+    }
+
+    class TestInterceptor implements Interceptor {
+      intercept(_context: InterceptorContext, next: CallHandler): any {
+        interceptor('Test:Before');
+        const result = next.handle();
+        interceptor('Test:After');
+        return result;
+      }
+    }
+
+    class SecondTestInterceptor implements Interceptor {
+      intercept(_context: InterceptorContext, next: CallHandler): any {
+        interceptor('SecondTest:Before');
+        const result = next.handle();
+        interceptor('SecondTest:After');
+        return result;
+      }
+    }
+
+    it('should skip interceptor application for non-class instances', async () => {
+      const valueProvider = { token: 'CONFIG', useValue: 'CONFIG_VALUE' };
+      const instanceWrapper = new InstanceWrapper(valueProvider);
+      instanceWrapper['instances'].get = jest.fn() as any;
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      expect(instanceWrapper['instances'].get).not.toHaveBeenCalled();
+    });
+
+    it('should skip interceptor application for factory providers', async () => {
+      const factoryProvider = { token: 'FACTORY', useFactory: () => ({ testMethod: () => 'result' }) };
+      const instanceWrapper = new InstanceWrapper(factoryProvider);
+      instanceWrapper['instances'].get = jest.fn() as any;
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      expect(instanceWrapper['instances'].get).not.toHaveBeenCalled();
+    });
+
+    it('should skip if interceptors already applied to the context', async () => {
+      @Injectable()
+      class TestClass {
+        testMethod() {
+          return 'original';
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      instanceWrapper['instances'].get = jest.fn().mockReturnValue({ intercepted: true }) as any;
+      jest.spyOn(Reflect, 'getMetadata').mockReturnValue([]);
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      expect(Reflect.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should apply interceptor to decorated method', async () => {
+      @Injectable()
+      class TestClass {
+        @UseInterceptors(TestInterceptor)
+        testMethod() {
+          return 'original';
+        }
+      }
+
+      const testInterceptor = new TestInterceptor();
+      const spy = jest.spyOn(testInterceptor, 'intercept');
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      const instance = await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(testInterceptor);
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      const result = instance.testMethod();
+      expect(result).toBe('original');
+      expect(spy).toHaveBeenCalledTimes(1);
+      expect(interceptor).toHaveBeenCalledWith('Test:Before');
+      expect(interceptor).toHaveBeenCalledWith('Test:After');
+    });
+
+    it('should apply multiple interceptors', async () => {
+      @Injectable()
+      class TestClass {
+        @UseInterceptors(TestInterceptor, SecondTestInterceptor)
+        testMethod() {
+          return 'original';
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      const instance = await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(new TestInterceptor()).mockReturnValueOnce(new SecondTestInterceptor());
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      const result = instance.testMethod();
+      expect(result).toBe('original');
+      expect(interceptor).toHaveBeenCalledWith('Test:Before');
+      expect(interceptor).toHaveBeenCalledWith('SecondTest:Before');
+      expect(interceptor).toHaveBeenCalledWith('SecondTest:After');
+      expect(interceptor).toHaveBeenCalledWith('Test:After');
+    });
+
+    it('should skip non-function properties', async () => {
+      @Injectable()
+      class TestClass {
+        propertyValue = 'not a function';
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      await instanceWrapper.loadInstance();
+      jest.spyOn(Reflect, 'getMetadata').mockReturnValue([]);
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+      expect(Reflect.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should skip methods without interceptor metadata', async () => {
+      @Injectable()
+      class TestClass {
+        plainMethod() {
+          return 'plain';
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      await instanceWrapper.loadInstance();
+      jest.spyOn(Reflect, 'getMetadata').mockReturnValue([]);
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+      expect(Reflect.getMetadata).not.toHaveBeenCalled();
+    });
+
+    it('should throw error for invalid interceptor without intercept method', async () => {
+      @Injectable()
+      class TestClass {
+        @UseInterceptors(InvalidInterceptor)
+        testMethod() {
+          return 'original';
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(new InvalidInterceptor());
+
+      await expect(instanceWrapper.applyInterceptors(moduleRef)).rejects.toThrowError(InternalError);
+    });
+
+    it('should call the interceptor with the correct context', async () => {
+      @Injectable()
+      class TestClass {
+        @UseInterceptors(TestInterceptor)
+        testMethod() {
+          return 'original';
+        }
+      }
+
+      const testInterceptor = new TestInterceptor();
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      const instance = await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(testInterceptor);
+      testInterceptor.intercept = jest.fn().mockImplementation((context: any, next: any) => {
+        expect(context.getClass()).toBe(TestClass);
+        expect(context.getMethodName()).toBe('testMethod');
+        expect(context.isPromise()).toBe(false);
+        return next.handle();
+      });
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      instance.testMethod();
+    });
+
+    it('should preserve method binding when intercepted', async () => {
+      @Injectable()
+      class TestClass {
+        private readonly msg = 'Hello, World!';
+
+        @UseInterceptors(TestInterceptor)
+        testMethod() {
+          return this.msg;
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      const instance = await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(new TestInterceptor());
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      const result = instance.testMethod();
+      expect(result).toBe('Hello, World!');
+      expect(interceptor).toHaveBeenCalledWith('Test:Before');
+      expect(interceptor).toHaveBeenCalledWith('Test:After');
+    });
+
+    it('should handle interceptor chain execution order', async () => {
+      @Injectable()
+      class TestClass {
+        @UseInterceptors(TestInterceptor, SecondTestInterceptor)
+        testMethod() {
+          return 'original';
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(TestClass);
+      const instance = await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(new TestInterceptor()).mockReturnValueOnce(new SecondTestInterceptor());
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      const result = instance.testMethod();
+      expect(result).toBe('original');
+      expect(interceptor).toHaveBeenNthCalledWith(1, 'Test:Before');
+      expect(interceptor).toHaveBeenNthCalledWith(2, 'SecondTest:Before');
+      expect(interceptor).toHaveBeenNthCalledWith(3, 'SecondTest:After');
+      expect(interceptor).toHaveBeenNthCalledWith(4, 'Test:After');
+    });
+
+    it('should handle interceptors for inherited methods', async () => {
+      @Injectable()
+      class BaseClass {
+        @UseInterceptors(TestInterceptor)
+        baseMethod() {
+          return 'base';
+        }
+      }
+
+      @Injectable()
+      class DerivedClass extends BaseClass {
+        derivedMethod() {
+          return 'derived';
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(DerivedClass);
+      const instance = await instanceWrapper.loadInstance();
+      moduleRef.get.mockReturnValueOnce(new TestInterceptor());
+
+      await instanceWrapper.applyInterceptors(moduleRef);
+
+      const baseResult = instance.baseMethod();
+      expect(baseResult).toBe('base');
+      expect(interceptor).toHaveBeenCalledWith('Test:Before');
+      expect(interceptor).toHaveBeenCalledWith('Test:After');
+
+      interceptor.mockReset();
+      const derivedResult = instance.derivedMethod();
+      expect(derivedResult).toBe('derived');
+      expect(interceptor).not.toHaveBeenCalledWith('Test:Before');
+      expect(interceptor).not.toHaveBeenCalledWith('Test:After');
     });
   });
 });

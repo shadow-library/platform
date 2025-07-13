@@ -3,17 +3,18 @@
  */
 import assert from 'node:assert';
 
-import { InternalError, Logger } from '@shadow-library/common';
+import { Fn, InternalError, Logger } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
 import { DIErrors, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
-import { INJECTABLE_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
+import { INJECTABLE_METADATA, INTERCEPTOR_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
 import { InjectMetadata } from '../decorators';
-import { FactoryDependency, FactoryProvider, InjectionToken, Provider } from '../interfaces';
+import { FactoryDependency, FactoryProvider, InjectionToken, Interceptor, InterceptorContext, Provider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
+import { ModuleRef } from './module-ref';
 
 /**
  * Defining types
@@ -29,6 +30,7 @@ export type Factory<T extends object> = (...args: any[]) => T | Promise<T>;
 export interface InstancePerContext<T extends object> {
   instance: T;
   resolved: boolean;
+  intercepted?: boolean;
 }
 
 /**
@@ -47,6 +49,7 @@ export class InstanceWrapper<T extends object = any> {
 
   private readonly transient: boolean = false;
   private readonly isFactory: boolean = false;
+  private readonly isClass: boolean = false;
 
   constructor(provider: Provider, injectable?: boolean) {
     if (isValueProvider(provider)) {
@@ -73,6 +76,7 @@ export class InstanceWrapper<T extends object = any> {
       if (!injectable) throw new InternalError(`Class '${Class.name}' is not an injectable provider`);
     }
 
+    this.isClass = true;
     this.token = token;
     this.metatype = Class;
     this.inject = this.getClassDependencies(Class);
@@ -235,5 +239,60 @@ export class InstanceWrapper<T extends object = any> {
     this.logger.debug(`Instance '${this.getTokenName()}' loaded`);
 
     return instance;
+  }
+
+  async applyInterceptors(moduleRef: ModuleRef, contextId: ContextId = STATIC_CONTEXT): Promise<void> {
+    if (!this.isClass) {
+      this.logger.debug(`Instance '${this.getTokenName()}' is not a class, skipping interceptor application`);
+      return;
+    }
+
+    const instancePerContext = this.instances.get(contextId);
+    assert(instancePerContext, `Instance of '${this.getTokenName()}' not found for context ID ${contextId.id}`);
+    if (instancePerContext.intercepted) return;
+
+    /** Extracting all the intercepted methods from the class instance */
+    const Class = this.metatype as Class<T>;
+    const instance = instancePerContext?.instance as Record<string, unknown>;
+    const methods = new Set<Fn>();
+    let prototype = instance;
+    do {
+      for (const propertyName of Object.getOwnPropertyNames(prototype)) {
+        const method = instance[propertyName];
+        const isInterceptor = typeof method === 'function' && Reflect.hasMetadata(INTERCEPTOR_METADATA, method);
+        if (isInterceptor) methods.add(method as Fn);
+      }
+    } while ((prototype = Object.getPrototypeOf(prototype)));
+
+    for (const method of methods) {
+      /** resolve the interceptors and validate the interceptors */
+      const Interceptors: Class<unknown>[] = Reflect.getMetadata(INTERCEPTOR_METADATA, method);
+      const interceptors = Interceptors.map(i => moduleRef.get<Interceptor>(i));
+      const invalidInterceptor = interceptors.find(i => typeof i.intercept !== 'function');
+      if (invalidInterceptor) throw new InternalError(`Interceptor '${invalidInterceptor.constructor.name}' does not implement 'intercept' method`);
+
+      /** create the interceptor context and intercept the original method */
+      const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, method);
+      const isPromise = returnType === Promise || method.constructor.name === 'AsyncFunction';
+      const context: InterceptorContext = { getClass: () => Class, getMethodName: () => method.name, isPromise: () => isPromise };
+      instance[method.name] = function (...args: any[]) {
+        const handler = () => method.apply(this, args);
+        const executor = interceptors.reduceRight((handle, interceptor) => () => interceptor.intercept(context, { handle }), handler);
+        return executor();
+      };
+
+      instancePerContext.intercepted = true;
+      this.logger.debug(`Applied interceptors to '${this.getTokenName()}.${method.name}()'`, { contextId });
+    }
+  }
+
+  async applyInterceptorsToAllInstances(moduleRef: ModuleRef): Promise<void> {
+    if (!this.isClass) {
+      this.logger.debug(`Instance '${this.getTokenName()}' is not a class, skipping interceptor application`);
+      return;
+    }
+
+    for (const contextId of this.instances.keys()) await this.applyInterceptors(moduleRef, contextId);
+    this.logger.debug(`Applied interceptors to all instances of '${this.getTokenName()}'`);
   }
 }
