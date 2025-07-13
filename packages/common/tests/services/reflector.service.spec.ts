@@ -21,7 +21,6 @@ const METADATA_KEYS = { ROUTE: 'route', INJECTABLE: Symbol('injectable'), PARAM_
 describe('ReflectorService', () => {
   describe('appendMetadata', () => {
     it('should define metadata when none exists', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const value = { info: 'first' };
 
@@ -32,7 +31,6 @@ describe('ReflectorService', () => {
     });
 
     it('should append metadata when metadata already exists', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const value1 = { info: 'first' };
       const value2 = { info: 'second' };
@@ -47,7 +45,6 @@ describe('ReflectorService', () => {
     it('should append metadata to a method (with propertyKey)', () => {
       const value1 = { type: 'method-level' };
       class Example {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
 
@@ -58,7 +55,6 @@ describe('ReflectorService', () => {
     });
 
     it('should not modify original array reference', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const initial = [{ msg: 'a' }];
       Reflector.defineMetadata(METADATA_KEYS.INJECTABLE, initial, Example);
@@ -73,7 +69,6 @@ describe('ReflectorService', () => {
 
   describe('prependMetadata', () => {
     it('should define metadata when none exists', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const value = { info: 'first' };
 
@@ -84,7 +79,6 @@ describe('ReflectorService', () => {
     });
 
     it('should prepend metadata when metadata already exists', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const value1 = { info: 'first' };
       const value2 = { info: 'second' };
@@ -99,7 +93,6 @@ describe('ReflectorService', () => {
     it('should prepend metadata to a method (with propertyKey)', () => {
       const value1 = { type: 'method-level' };
       class Example {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
 
@@ -110,7 +103,6 @@ describe('ReflectorService', () => {
     });
 
     it('should not modify original array reference', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const initial = [{ msg: 'a' }];
       Reflector.defineMetadata(METADATA_KEYS.INJECTABLE, initial, Example);
@@ -123,7 +115,6 @@ describe('ReflectorService', () => {
     });
 
     it('should handle multiple prepends correctly', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Example {}
       const value1 = { order: 1 };
       const value2 = { order: 2 };
@@ -166,7 +157,6 @@ describe('ReflectorService', () => {
 
     it('should update metadata for specific property key', () => {
       class TestClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
       const value = { roles: ['admin'] };
@@ -202,12 +192,10 @@ describe('ReflectorService', () => {
 
     it('should clone metadata for same property key', () => {
       class SourceClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
 
       class TargetClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
 
@@ -220,12 +208,10 @@ describe('ReflectorService', () => {
 
     it('should clone metadata from different property key', () => {
       class SourceClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         sourceMethod() {}
       }
 
       class TargetClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         targetMethod() {}
       }
 
@@ -253,12 +239,10 @@ describe('ReflectorService', () => {
 
     it('should clone multiple metadata keys from source to target for specific properties', () => {
       class SourceClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
 
       class TargetClass {
-        /* eslint-disable-next-line @typescript-eslint/no-empty-function */
         method() {}
       }
 

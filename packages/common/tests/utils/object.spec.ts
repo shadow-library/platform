@@ -246,7 +246,6 @@ describe('Object Utils', () => {
     });
 
     it('should handle inherited descriptors with different attributes', () => {
-      /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
       class Base {
         constructor() {
           Object.defineProperty(this, 'baseReadOnly', { value: 'base readonly', writable: false, enumerable: true, configurable: true });

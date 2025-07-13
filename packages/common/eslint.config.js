@@ -49,4 +49,16 @@ export default [
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
     },
   },
+  {
+    files: ['tests/**/*.spec.ts'],
+    rules: {
+      '@typescript-eslint/ban-ts-comment': 'off',
+      '@typescript-eslint/explicit-function-return-type': 'off',
+      '@typescript-eslint/no-explicit-any': 'off',
+      '@typescript-eslint/no-extraneous-class': 'off',
+      '@typescript-eslint/no-empty-function': 'off',
+      '@typescript-eslint/no-non-null-assertion': 'off',
+      '@typescript-eslint/no-unused-vars': ['error', { varsIgnorePattern: '^_' }],
+    },
+  },
 ];
