@@ -50,7 +50,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 ### 🛠️ **Utility Functions**
 
 - **String interpolation** with object path resolution
-- **Object manipulation** (pick, omit, deep freeze, path access)
+- **Object manipulation** (pick, omit, deep freeze, path access, plain object detection)
 - **Temporal utilities** with time unit support
 - **Reflection utilities** with metadata management
 - **Functional programming helpers** (tryCatch, withThis, throwError)
@@ -380,6 +380,13 @@ const profile = utils.object.pickKeys(user, ['profile']);
 const withoutSettings = utils.object.omitKeys(user, ['settings']);
 // Result: { profile: { name: 'John', email: 'john@example.com' } }
 
+// Check if object is a plain object
+const isPlain1 = utils.object.isPlainObject({}); // true
+const isPlain2 = utils.object.isPlainObject({ name: 'John' }); // true
+const isPlain3 = utils.object.isPlainObject(new Date()); // false
+const isPlain4 = utils.object.isPlainObject([]); // false
+const isPlain5 = utils.object.isPlainObject(null); // false
+
 // Deep freeze objects
 const frozen = utils.object.deepFreeze(user);
 
@@ -615,6 +622,9 @@ The package uses environment variables for configuration. Below are the key vari
 - `utils.object.pickKeys(obj, keys)` - Pick specific keys
 - `utils.object.omitKeys(obj, keys)` - Omit specific keys
 - `utils.object.deepFreeze(obj)` - Recursively freeze object
+- `utils.object.isPlainObject(obj)` - Check if object is a plain object
+- `utils.object.getAllPropertyNames(target, filter?)` - Get all property names including inherited
+- `utils.object.getAllPropertyDescriptors(target, filter?)` - Get all property descriptors including inherited
 
 #### Temporal Utils
 

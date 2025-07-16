@@ -263,4 +263,68 @@ describe('Object Utils', () => {
       expect(descriptors).toHaveProperty('derivedProp', expect.objectContaining({ writable: true }));
     });
   });
+
+  describe('isPlainObject', () => {
+    it('should return true for plain objects', () => {
+      expect(utils.object.isPlainObject({})).toBe(true);
+      expect(utils.object.isPlainObject({ name: 'John', age: 30 })).toBe(true);
+      expect(utils.object.isPlainObject(Object.create(null))).toBe(true);
+      expect(utils.object.isPlainObject(new Object())).toBe(true);
+    });
+
+    it('should return false for null and undefined', () => {
+      expect(utils.object.isPlainObject(null)).toBe(false);
+      expect(utils.object.isPlainObject(undefined)).toBe(false);
+    });
+
+    it('should return false for primitives', () => {
+      expect(utils.object.isPlainObject('string')).toBe(false);
+      expect(utils.object.isPlainObject(123)).toBe(false);
+      expect(utils.object.isPlainObject(true)).toBe(false);
+      expect(utils.object.isPlainObject(false)).toBe(false);
+      expect(utils.object.isPlainObject(Symbol('test'))).toBe(false);
+      expect(utils.object.isPlainObject(BigInt(123))).toBe(false);
+    });
+
+    it('should return false for arrays', () => {
+      expect(utils.object.isPlainObject([])).toBe(false);
+      expect(utils.object.isPlainObject([1, 2, 3])).toBe(false);
+      expect(utils.object.isPlainObject(new Array(5))).toBe(false);
+    });
+
+    it('should return false for functions', () => {
+      expect(utils.object.isPlainObject(function () {})).toBe(false);
+      expect(utils.object.isPlainObject(() => {})).toBe(false);
+      expect(utils.object.isPlainObject(async function () {})).toBe(false);
+      expect(utils.object.isPlainObject(function* generator() {})).toBe(false);
+    });
+
+    it('should return false for built-in objects', () => {
+      expect(utils.object.isPlainObject(new Date())).toBe(false);
+      expect(utils.object.isPlainObject(new RegExp('test'))).toBe(false);
+      expect(utils.object.isPlainObject(new Error('test'))).toBe(false);
+      expect(utils.object.isPlainObject(new Map())).toBe(false);
+      expect(utils.object.isPlainObject(new Set())).toBe(false);
+      expect(utils.object.isPlainObject(new WeakMap())).toBe(false);
+      expect(utils.object.isPlainObject(new WeakSet())).toBe(false);
+      expect(utils.object.isPlainObject(new Promise(() => {}))).toBe(false);
+    });
+
+    it('should return false for class instances', () => {
+      class TestClass {}
+
+      expect(utils.object.isPlainObject(new TestClass())).toBe(false);
+    });
+
+    it('should return false for objects with custom prototypes', () => {
+      const customProto = { customMethod() {} };
+      const obj = Object.create(customProto);
+      expect(utils.object.isPlainObject(obj)).toBe(false);
+    });
+
+    it('should return true for objects created with Object.create(Object.prototype)', () => {
+      const obj = Object.create(Object.prototype);
+      expect(utils.object.isPlainObject(obj)).toBe(true);
+    });
+  });
 });

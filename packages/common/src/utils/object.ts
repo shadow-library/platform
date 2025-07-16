@@ -18,6 +18,15 @@ export type PropertyFilter<T = string> = (key: string | T, desc: PropertyDescrip
 
 class ObjectUtils {
   /**
+   * Checks if the given object is a plain object.
+   * A plain object is an object created by the Object constructor or one with a null prototype.
+   */
+  isPlainObject(obj: any): boolean {
+    if (typeof obj !== 'object' || obj === null) return false;
+    return Object.getPrototypeOf(obj) === Object.prototype || Object.getPrototypeOf(obj) === null;
+  }
+
+  /**
    * Returns the value of the given path in the object
    */
   getByPath<T = any>(obj: Record<string, any>, path: string): T | undefined {
