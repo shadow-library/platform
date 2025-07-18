@@ -12,7 +12,7 @@ import { Class } from 'type-fest';
 import { DIErrors, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
 import { INJECTABLE_METADATA, INTERCEPTOR_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
 import { InjectMetadata } from '../decorators';
-import { FactoryDependency, FactoryProvider, InjectionToken, Interceptor, InterceptorContext, Provider } from '../interfaces';
+import { FactoryDependency, FactoryProvider, InjectionToken, Interceptor, InterceptorConfig, InterceptorContext, Provider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 import { ModuleRef } from './module-ref';
 
@@ -31,6 +31,12 @@ export interface InstancePerContext<T extends object> {
   instance: T;
   resolved: boolean;
   intercepted?: boolean;
+}
+
+interface InterceptorInvocation {
+  interceptor: Interceptor;
+  options?: any;
+  context: InterceptorContext;
 }
 
 /**
@@ -266,18 +272,26 @@ export class InstanceWrapper<T extends object = any> {
 
     for (const method of methods) {
       /** resolve the interceptors and validate the interceptors */
-      const Interceptors: Class<unknown>[] = Reflect.getMetadata(INTERCEPTOR_METADATA, method);
-      const interceptors = Interceptors.map(i => moduleRef.get<Interceptor>(i));
+      const Interceptors: InterceptorConfig[] = Reflect.getMetadata(INTERCEPTOR_METADATA, method);
+      const interceptors = Interceptors.map(i => moduleRef.get<Interceptor>(i.token));
       const invalidInterceptor = interceptors.find(i => typeof i.intercept !== 'function');
       if (invalidInterceptor) throw new InternalError(`Interceptor '${invalidInterceptor.constructor.name}' does not implement 'intercept' method`);
 
       /** create the interceptor context and intercept the original method */
       const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, method);
       const isPromise = returnType === Promise || method.constructor.name === 'AsyncFunction';
-      const context: InterceptorContext = { getClass: () => Class, getMethodName: () => method.name, isPromise: () => isPromise };
+      const interceptorInvocations: InterceptorInvocation[] = [];
+      const invoker = (invocation: InterceptorInvocation, handle: Fn) => invocation.interceptor.intercept(invocation.context, { handle });
+      for (let index = 0; index < interceptors.length; index++) {
+        const interceptor = interceptors[index] as Interceptor;
+        const options = Interceptors[index]?.options;
+        const context: InterceptorContext = { getClass: () => Class, getMethodName: () => method.name, isPromise: () => isPromise, getOptions: () => options };
+        interceptorInvocations.push({ interceptor, options, context });
+      }
+
       instance[method.name] = function (...args: any[]) {
         const handler = () => method.apply(this, args);
-        const executor = interceptors.reduceRight((handle, interceptor) => () => interceptor.intercept(context, { handle }), handler);
+        const executor = interceptorInvocations.reduceRight((handle, invocation) => () => invoker(invocation, handle), handler);
         return executor();
       };
 

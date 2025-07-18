@@ -9,7 +9,7 @@ import { InternalError, NeverError } from '@shadow-library/common';
  */
 import { InstanceWrapper } from '@lib/injector';
 import { CallHandler, Interceptor, InterceptorContext } from '@lib/interfaces';
-import { Inject, Injectable, Optional, UseInterceptors, createContextId, forwardRef } from '@shadow-library/app';
+import { Inject, Injectable, Optional, UseInterceptor, UseInterceptors, createContextId, forwardRef } from '@shadow-library/app';
 
 /**
  * Importing npm packages
@@ -512,7 +512,7 @@ describe('InstanceWrapper', () => {
     it('should call the interceptor with the correct context', async () => {
       @Injectable()
       class TestClass {
-        @UseInterceptors(TestInterceptor)
+        @UseInterceptor(TestInterceptor, { some: 'option' })
         testMethod() {
           return 'original';
         }
@@ -526,6 +526,7 @@ describe('InstanceWrapper', () => {
         expect(context.getClass()).toBe(TestClass);
         expect(context.getMethodName()).toBe('testMethod');
         expect(context.isPromise()).toBe(false);
+        expect(context.getOptions()).toEqual({ some: 'option' });
         return next.handle();
       });
 

@@ -6,10 +6,19 @@ import { Class, Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { InjectionToken } from './provider.interface';
 
 /**
  * Defining types
  */
+
+export interface InterceptorConfig<T = any> {
+  /** The interceptor token to be resolved from the dependency injection container */
+  token: InjectionToken;
+
+  /** Optional configuration options for the interceptor */
+  options?: T;
+}
 
 /**
  * Declaring the constants
@@ -24,6 +33,9 @@ export interface InterceptorContext {
 
   /** Denotes whether the intercepted method is a promise */
   isPromise(): boolean;
+
+  /** Get the interceptor options if any */
+  getOptions<T = any>(): T | undefined;
 }
 
 export interface CallHandler<T = unknown> {
