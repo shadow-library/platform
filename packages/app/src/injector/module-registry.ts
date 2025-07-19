@@ -55,14 +55,13 @@ export class ModuleRegistry {
 
     const scanModule = (module: TModule): Module => {
       if (modules.has(module)) return modules.get(module) as Module;
+      graph.addNode(module);
 
       this.logger.debug(`Scanning module '${module.name}'`);
       const imports: TModule[] = [];
       for (const mod of this.reflectImports(module)) {
-        if ('forwardRef' in mod) {
-          graph.addNode(mod.forwardRef());
-          imports.push(mod.forwardRef());
-        } else {
+        if ('forwardRef' in mod) imports.push(mod.forwardRef());
+        else {
           graph.addDependency(module, mod);
           imports.push(mod);
         }

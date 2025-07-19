@@ -81,6 +81,15 @@ describe('ModuleRegistry', () => {
       const modules = Array.from(moduleRegistry['modules'].values()).map(m => m.getMetatype());
       expect(modules).toStrictEqual([SheepModule, CatModule, DogModule, AnimalModule, AppModule]);
     });
+
+    it('should register the module with no imports', () => {
+      @Module({})
+      class EmptyModule {}
+
+      const emptyModuleRegistry = new ModuleRegistry(EmptyModule);
+      const modules = Array.from(emptyModuleRegistry['modules'].values()).map(m => m.getMetatype());
+      expect(modules).toStrictEqual([EmptyModule]);
+    });
   });
 
   describe('initiation and termination', () => {
