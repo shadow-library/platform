@@ -15,6 +15,7 @@ export type PropertyFilter<T = string> = (key: string | T, desc: PropertyDescrip
 /**
  * Declaring the constants
  */
+const IS_CLASS_REGEX = /^class\s/;
 
 class ObjectUtils {
   /**
@@ -24,6 +25,14 @@ class ObjectUtils {
   isPlainObject(obj: any): boolean {
     if (typeof obj !== 'object' || obj === null) return false;
     return Object.getPrototypeOf(obj) === Object.prototype || Object.getPrototypeOf(obj) === null;
+  }
+
+  /**
+   * Checks if the given object is a class.
+   * A class is a function that starts with the keyword 'class'.
+   */
+  isClass(Class: any): boolean {
+    return typeof Class === 'function' && IS_CLASS_REGEX.test(Class.toString());
   }
 
   /**

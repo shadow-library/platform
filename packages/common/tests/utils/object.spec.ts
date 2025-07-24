@@ -264,6 +264,105 @@ describe('Object Utils', () => {
     });
   });
 
+  describe('isClass', () => {
+    it('should return true for ES6 classes', () => {
+      class TestClass {}
+      class TestClassWithConstructor {
+        readonly property: string;
+        constructor() {
+          this.property = 'value';
+        }
+      }
+      abstract class TestClassWithMethods {
+        abstract method(): void;
+      }
+      class ExtendedClass extends TestClass {}
+
+      expect(utils.object.isClass(TestClass)).toBe(true);
+      expect(utils.object.isClass(TestClassWithConstructor)).toBe(true);
+      expect(utils.object.isClass(TestClassWithMethods)).toBe(true);
+      expect(utils.object.isClass(ExtendedClass)).toBe(true);
+    });
+
+    it('should return false for regular functions', () => {
+      function regularFunction() {}
+      const arrowFunction = () => {};
+      const asyncFunction = async function () {};
+      const generatorFunction = function* () {};
+
+      expect(utils.object.isClass(regularFunction)).toBe(false);
+      expect(utils.object.isClass(arrowFunction)).toBe(false);
+      expect(utils.object.isClass(asyncFunction)).toBe(false);
+      expect(utils.object.isClass(generatorFunction)).toBe(false);
+    });
+
+    it('should return false for constructor functions', () => {
+      function ConstructorFunction(this: any) {
+        this.property = 'value';
+      }
+
+      expect(utils.object.isClass(ConstructorFunction)).toBe(false);
+    });
+
+    it('should return false for built-in constructors', () => {
+      expect(utils.object.isClass(Object)).toBe(false);
+      expect(utils.object.isClass(Array)).toBe(false);
+      expect(utils.object.isClass(Date)).toBe(false);
+      expect(utils.object.isClass(RegExp)).toBe(false);
+      expect(utils.object.isClass(Error)).toBe(false);
+      expect(utils.object.isClass(Map)).toBe(false);
+      expect(utils.object.isClass(Set)).toBe(false);
+      expect(utils.object.isClass(Promise)).toBe(false);
+    });
+
+    it('should return false for non-function values', () => {
+      expect(utils.object.isClass(null)).toBe(false);
+      expect(utils.object.isClass(undefined)).toBe(false);
+      expect(utils.object.isClass({})).toBe(false);
+      expect(utils.object.isClass([])).toBe(false);
+      expect(utils.object.isClass('string')).toBe(false);
+      expect(utils.object.isClass(123)).toBe(false);
+      expect(utils.object.isClass(true)).toBe(false);
+      expect(utils.object.isClass(Symbol('test'))).toBe(false);
+      expect(utils.object.isClass(BigInt(123))).toBe(false);
+    });
+
+    it('should return false for class instances', () => {
+      class TestClass {}
+      const instance = new TestClass();
+
+      expect(utils.object.isClass(instance)).toBe(false);
+    });
+
+    it('should return true for anonymous classes', () => {
+      const AnonymousClass = class {};
+      const AnonymousClassWithName = class NamedAnonymous {};
+
+      expect(utils.object.isClass(AnonymousClass)).toBe(true);
+      expect(utils.object.isClass(AnonymousClassWithName)).toBe(true);
+    });
+
+    it('should return true for classes with static methods', () => {
+      class ClassWithStatic {
+        static staticMethod() {}
+      }
+
+      expect(utils.object.isClass(ClassWithStatic)).toBe(true);
+    });
+
+    it('should return true for abstract-like classes', () => {
+      class AbstractLike {
+        constructor() {
+          if (this.constructor === AbstractLike) {
+            throw new Error('Cannot instantiate abstract class');
+          }
+        }
+      }
+
+      expect(utils.object.isClass(AbstractLike)).toBe(true);
+    });
+  });
+
   describe('isPlainObject', () => {
     it('should return true for plain objects', () => {
       expect(utils.object.isPlainObject({})).toBe(true);
