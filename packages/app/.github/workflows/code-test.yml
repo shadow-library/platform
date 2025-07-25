@@ -22,8 +22,11 @@ jobs:
       - name: Lint code
         run: bun lint
 
-      - name: Test the code
+      - name: Unit tests
         run: bun run test
+
+      - name: End-to-end tests
+        run: bun test:e2e
 
       - name: Build the code
         run: bun run build

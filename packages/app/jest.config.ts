@@ -17,6 +17,7 @@ import type { Config } from 'jest';
 
 const config: Config = {
   testEnvironment: 'node',
+  testPathIgnorePatterns: ['e2e'],
   testRegex: '.spec.ts$',
   detectOpenHandles: true,
 
@@ -28,7 +29,8 @@ const config: Config = {
   },
 
   collectCoverage: true,
-  coverageReporters: process.env.CI ? ['text'] : ['text-summary', 'html-spa'],
+  collectCoverageFrom: ['src/**/*.ts'],
+  coverageReporters: process.env.CI ? ['text'] : ['text-summary', 'html'],
   coverageThreshold: { global: { lines: 100, branches: 100, functions: 100, statements: 100 } },
   coveragePathIgnorePatterns: ['node_modules'],
 };
