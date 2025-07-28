@@ -83,7 +83,7 @@ describe('ClassSchema', () => {
     name: string;
 
     @Field({ optional: true })
-    size: number;
+    size?: number;
 
     @Field(() => Folder)
     parent: object;

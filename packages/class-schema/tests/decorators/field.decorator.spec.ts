@@ -18,7 +18,6 @@ import { Field } from '@shadow-library/class-schema';
  */
 
 describe('@Field', () => {
-  /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
   class Custom {}
 
   class Sample {
