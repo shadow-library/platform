@@ -149,6 +149,20 @@ describe('Module', () => {
       expect(emptyModule['providers'].size).toBe(1); // ModuleRef
       expect(emptyModule['controllers'].size).toBe(0);
     });
+
+    it('should load only the providers from the imports', () => {
+      @Injectable()
+      class AnimalService {
+        constructor(private readonly catService: CatService) {}
+      }
+
+      @Module({ imports: [CatModule], providers: [AnimalService] })
+      class AnimalModule {}
+
+      const module = new ModuleWrapper(AnimalModule);
+      expect(module['providers'].size).toBe(2);
+      expect(module['providers'].get(AnimalService)).toBeDefined();
+    });
   });
 
   describe('General methods', () => {

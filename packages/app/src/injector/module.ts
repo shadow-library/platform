@@ -99,7 +99,7 @@ export class Module {
     for (const provider of providerMap.values()) {
       if (provider.isResolved()) continue;
       for (const dependency of provider.getDependencies()) {
-        if (dependency.optional && !providerMap.has(dependency.token)) continue;
+        if (!providerMap.has(dependency.token)) continue;
         else if (!dependency.forwardRef) graph.addDependency(provider.getToken(), dependency.token);
       }
     }
