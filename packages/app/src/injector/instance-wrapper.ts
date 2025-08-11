@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import { Fn, InternalError, Logger } from '@shadow-library/common';
+import { Fn, InternalError, Logger, utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -11,7 +11,7 @@ import { Class } from 'type-fest';
  */
 import { DIErrors, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
 import { INJECTABLE_METADATA, INTERCEPTOR_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
-import { InjectMetadata } from '../decorators';
+import { InjectMetadata, InjectableOptions } from '../decorators';
 import { FactoryDependency, FactoryProvider, InjectionToken, Interceptor, InterceptorConfig, InterceptorContext, Provider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 import { ModuleRef } from './module-ref';
@@ -113,16 +113,26 @@ export class InstanceWrapper<T extends object = any> {
 
   private getClassDependencies(Class: Class<unknown>): InjectionMetadata[] {
     const dependencies = [] as InjectionMetadata[];
+
     const paramtypes: Class<unknown>[] = Reflect.getMetadata(PARAMTYPES_METADATA, Class) ?? [];
-    const selfDependencies: InjectMetadata[] = Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, Class) ?? [];
-    const optionalDependencies: number[] = Reflect.getMetadata(OPTIONAL_DEPS_METADATA, Class) ?? [];
     for (const dependency of paramtypes) dependencies.push({ token: dependency, optional: false });
+
+    const selfDependencies: InjectMetadata[] = Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, Class) ?? [];
     for (const dependency of selfDependencies) dependencies[dependency.index] = this.getInjectedToken(dependency);
+
+    const optionalDependencies: number[] = Reflect.getMetadata(OPTIONAL_DEPS_METADATA, Class) ?? [];
     for (const index of optionalDependencies) {
       const dependency = dependencies[index];
       assert(dependency, `Dependency at index ${index} of '${this.getTokenName()}' is undefined`);
       dependency.optional = true;
     }
+
+    for (const dependency of dependencies) {
+      if (!utils.object.isClass(dependency.token)) continue;
+      const metadata: InjectableOptions = Reflect.getMetadata(INJECTABLE_METADATA, dependency.token) ?? {};
+      if (metadata.transient) dependency.contextId = createContextId();
+    }
+
     return dependencies;
   }
 
@@ -210,7 +220,6 @@ export class InstanceWrapper<T extends object = any> {
       return DIErrors.unexpected(`The dependency at index ${index} of '${this.getTokenName()}' is undefined`);
     }
 
-    if (dependency.isTransient()) metadata.contextId = createContextId();
     if (!dependency.isResolvable()) return await dependency.loadPrototype(metadata.contextId);
     return await dependency.loadInstance(metadata.contextId);
   }

@@ -214,6 +214,20 @@ export class Module {
     return router?.getInstance();
   }
 
+  loadDependencies(): void {
+    const instances = this.getAllInstances();
+    for (const provider of instances) {
+      const dependencies = provider.getDependencies();
+      for (let index = 0; index < dependencies.length; index++) {
+        const dependency = dependencies[index];
+        assert(dependency, `Unexpected dependency not found at index ${index}`);
+        const instanceWrapper = this.getInternalProvider(dependency.token, dependency.optional);
+        if (instanceWrapper) provider.setDependency(index, instanceWrapper);
+        if (instanceWrapper?.isTransient() && dependency.contextId) instanceWrapper.loadPrototype(dependency.contextId);
+      }
+    }
+  }
+
   async init(): Promise<void> {
     this.logger.debug(`Initializing module '${this.instance.getTokenName()}'`);
     this.detectCircularTransients();
@@ -223,18 +237,10 @@ export class Module {
      * If a provider is transient, it will be loaded after all other providers.
      * This is to ensure that the transient provider instances are created only when they are needed.
      */
-    const transientProviders: InstanceWrapper[] = [];
+
     const instances = this.getAllInstances();
     for (const provider of instances) {
-      const dependencies = provider.getDependencies();
-      for (let index = 0; index < dependencies.length; index++) {
-        const dependency = dependencies[index];
-        assert(dependency, `Unexpected dependency not found at index ${index}`);
-        const instanceWrapper = this.getInternalProvider(dependency.token, dependency.optional);
-        if (instanceWrapper) provider.setDependency(index, instanceWrapper);
-      }
-
-      if (provider.isTransient()) transientProviders.unshift(provider);
+      if (provider.isTransient()) await provider.loadAllInstances();
       else await provider.loadInstance();
     }
 
@@ -243,9 +249,8 @@ export class Module {
     const moduleRef = moduleRefProvider.getInstance();
     for (const provider of instances) provider.applyInterceptorsToAllInstances(moduleRef);
 
-    for (const provider of transientProviders) await provider.loadAllInstances();
     this.loadExports(true);
-
+    await this.callHook(HookTypes.ON_MODULE_INIT);
     this.logger.info(`Module '${this.instance.getTokenName()}' initialized`);
   }
 
@@ -310,12 +315,8 @@ export class Module {
 
   async terminate(): Promise<void> {
     this.logger.debug(`Terminating module '${this.metatype.name}'`);
-    for (const provider of this.getAllInstances().reverse()) {
-      const instance = provider.getAllInstances();
-      const promises = instance.map(instance => typeof instance.onModuleDestroy === 'function' && instance.onModuleDestroy());
-      await Promise.all(promises);
-      provider.clearInstance();
-    }
+    await this.callHook(HookTypes.ON_MODULE_DESTROY);
+    for (const provider of this.getAllInstances().reverse()) provider.clearInstance();
     this.logger.debug(`Module '${this.metatype.name}' terminated`);
   }
 

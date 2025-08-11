@@ -7,7 +7,7 @@ import { InternalError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { HookTypes, ModuleRegistry } from '@lib/injector';
+import { HookTypes, InstanceWrapper, ModuleRegistry } from '@lib/injector';
 import { Controller, Injectable, Module, Route, forwardRef } from '@shadow-library/app';
 
 /**
@@ -82,6 +82,14 @@ describe('ModuleRegistry', () => {
       expect(modules).toStrictEqual([SheepModule, CatModule, DogModule, AnimalModule, AppModule]);
     });
 
+    it('should load all the dependencies', () => {
+      const dependencies = Array.from(moduleRegistry['modules'].values()).flatMap(m => m['getAllInstances']());
+      const instances = dependencies.flatMap(dep => dep['dependencies']);
+
+      expect(instances).toHaveLength(2);
+      instances.forEach(instance => expect(instance).toBeInstanceOf(InstanceWrapper));
+    });
+
     it('should register the module with no imports', () => {
       @Module({})
       class EmptyModule {}
@@ -101,9 +109,8 @@ describe('ModuleRegistry', () => {
       await moduleRegistry.init();
 
       expect(mock).toBeCalledTimes(5);
-      expect(hook).toBeCalledTimes(10);
-      new Array(5).forEach((_, index) => expect(hook).toHaveBeenNthCalledWith(index + 1, HookTypes.ON_MODULE_INIT));
-      new Array(5).forEach((_, index) => expect(hook).toHaveBeenNthCalledWith(index + 6, HookTypes.ON_APPLICATION_READY));
+      expect(hook).toBeCalledTimes(5);
+      new Array(5).forEach((_, index) => expect(hook).toHaveBeenNthCalledWith(index + 1, HookTypes.ON_APPLICATION_READY));
     });
 
     it('should terminate the modules', async () => {

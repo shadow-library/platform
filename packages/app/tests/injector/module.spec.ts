@@ -77,6 +77,7 @@ describe('Module', () => {
   beforeEach(() => {
     jest.resetAllMocks();
     module = new ModuleWrapper(CatModule);
+    module.loadDependencies();
   });
 
   describe('module creation', () => {
@@ -323,7 +324,6 @@ describe('Module', () => {
     beforeEach(() => module.init());
 
     it('should execute the hook for static instance', async () => {
-      await module.callHook(HookTypes.ON_MODULE_INIT);
       expect(onModuleInitMock).toBeCalledTimes(2);
     });
 
@@ -365,6 +365,7 @@ describe('Module', () => {
       jest.spyOn(dogModule as any, 'getRouter').mockReturnValue(router);
 
       dogModule.addImport(module);
+      dogModule.loadDependencies();
       await dogModule.init();
       await dogModule.registerRoutes();
 
@@ -408,6 +409,8 @@ describe('Module', () => {
       animalModule.addImport(dogModule);
 
       jest.spyOn(dogModule as any, 'getRouter').mockReturnValue(router);
+      dogModule.loadDependencies();
+      animalModule.loadDependencies();
       await dogModule.init();
       await dogModule.registerRoutes();
 
