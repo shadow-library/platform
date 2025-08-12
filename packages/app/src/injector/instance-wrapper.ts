@@ -162,16 +162,6 @@ export class InstanceWrapper<T extends object = any> {
     return this;
   }
 
-  isResolvable(): boolean {
-    for (let index = 0; index < this.inject.length; index++) {
-      const metadata = this.inject[index] as InjectionMetadata;
-      const dependency = this.dependencies[index];
-      if (!dependency && !metadata.optional) return false;
-    }
-
-    return true;
-  }
-
   clearInstance(contextId?: ContextId): void {
     if (contextId) this.instances.delete(contextId);
     else this.instances.clear();
@@ -220,7 +210,7 @@ export class InstanceWrapper<T extends object = any> {
       return DIErrors.unexpected(`The dependency at index ${index} of '${this.getTokenName()}' is undefined`);
     }
 
-    if (!dependency.isResolvable()) return await dependency.loadPrototype(metadata.contextId);
+    if (!dependency.isResolved()) return await dependency.loadPrototype(metadata.contextId);
     return await dependency.loadInstance(metadata.contextId);
   }
 

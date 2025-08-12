@@ -265,12 +265,6 @@ describe('InstanceWrapper', () => {
       expect(instances).toStrictEqual([{ instance: expect.any(TransientProvider), resolved: true }]);
     });
 
-    it('should return all the instances', async () => {
-      await instanceWrapper.loadInstance();
-      const instances = instanceWrapper['dependencies'][1]?.getAllInstances();
-      expect(instances).toHaveLength(2);
-    });
-
     it('should create a new instance for each context', async () => {
       const instanceOne = await instanceWrapper.loadInstance(createContextId());
       const instanceTwo = await instanceWrapper.loadInstance(createContextId());
@@ -350,6 +344,36 @@ describe('InstanceWrapper', () => {
       await instanceWrapper.loadInstance(contextId);
       instanceWrapper.clearInstance(contextId);
       expect(instanceWrapper['instances']).toHaveProperty('size', 1);
+    });
+
+    it('should load the dependency instance if the dependency is already resolved', async () => {
+      class DependencyOne {}
+      class Provider {}
+      const dependencyOne = new InstanceWrapper(DependencyOne);
+      const provider = new InstanceWrapper(Provider);
+      provider['inject'].push({ token: DependencyOne, optional: false });
+      provider.setDependency(0, dependencyOne);
+      dependencyOne.isResolved = jest.fn(() => true);
+      dependencyOne.loadInstance = jest.fn(() => ({}) as any);
+
+      await provider.loadInstance();
+
+      expect(dependencyOne.loadInstance).toHaveBeenCalled();
+    });
+
+    it('should load the dependency prototype instance if the dependency is not yet resolved', async () => {
+      class DependencyOne {}
+      class Provider {}
+      const dependencyOne = new InstanceWrapper(DependencyOne);
+      const provider = new InstanceWrapper(Provider);
+      provider['inject'].push({ token: DependencyOne, optional: false });
+      provider.setDependency(0, dependencyOne);
+      dependencyOne.isResolved = jest.fn(() => false);
+      dependencyOne.loadPrototype = jest.fn(() => ({}) as any);
+
+      await provider.loadInstance();
+
+      expect(dependencyOne.loadPrototype).toHaveBeenCalled();
     });
   });
 
