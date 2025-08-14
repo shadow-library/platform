@@ -14,6 +14,8 @@ export interface ForwardReference<T> {
   forwardRef: () => T;
 }
 
+export type ForwardRef<T extends object> = T;
+
 /**
  * Declaring the constants
  */
