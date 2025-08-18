@@ -6,6 +6,7 @@ import { Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { SyncValue } from './value.interface';
 
 /**
  * Defining types
@@ -17,6 +18,6 @@ import { Promisable } from 'type-fest';
 
 export type Fn<T = any, U = any> = (...args: U[]) => Promisable<T>;
 
-export type SyncFn<T = any> = (...args: any[]) => T;
+export type SyncFn<T = any> = (...args: any[]) => SyncValue<T>;
 
 export type AsyncFn<T = any> = (...args: any[]) => Promise<T>;
