@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { FastifyReply, FastifyRequest } from 'fastify';
+import { DoneFuncWithErrOrRes, FastifyReply, FastifyRequest } from 'fastify';
+import { Promisable } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -19,4 +20,10 @@ export type HttpRequest = FastifyRequest;
 
 export type HttpResponse = FastifyReply;
 
-export type RouteHandler = (req: HttpRequest, res: HttpResponse) => unknown | Promise<unknown>;
+export type HttpCallback = DoneFuncWithErrOrRes;
+
+export type CallbackRouteHandler = (request: HttpRequest, response: HttpResponse, done: HttpCallback) => unknown;
+
+export type AwaitableRouteHandler = (request: HttpRequest, response: HttpResponse) => Promisable<unknown>;
+
+export type RouteHandler<T extends (...args: any[]) => any = any> = ReturnType<T> extends Promise<any> ? AwaitableRouteHandler : AwaitableRouteHandler;

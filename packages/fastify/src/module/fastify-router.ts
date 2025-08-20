@@ -10,7 +10,7 @@ import { type FastifyInstance, RouteOptions } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
 import stringify from 'json-stable-stringify';
 import { Chain as MockRequestChain, InjectOptions as MockRequestOptions, Response as MockResponse } from 'light-my-request';
-import { Class, JsonObject } from 'type-fest';
+import { Class, JsonObject, Promisable } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -18,7 +18,7 @@ import { Class, JsonObject } from 'type-fest';
 import { ChildRouteResponse, ChildRouteResult } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata } from '../decorators';
-import { HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
+import { AwaitableRouteHandler, HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
 import { ContextService } from '../services';
 import { type FastifyConfig } from './fastify-module.interface';
 import { compileValidator, formatSchemaErrors } from './fastify.utils';
@@ -52,7 +52,7 @@ interface ParsedController<T> {
   returnType?: Class<unknown>;
 
   metadata: T;
-  handler: (...args: any[]) => any | Promise<any>;
+  handler: (...args: any[]) => Promisable<any>;
   handlerName: string;
 }
 
@@ -206,7 +206,7 @@ export class FastifyRouter extends Router {
     return metadata.method === HttpMethod.POST ? 201 : 200;
   }
 
-  private generateRouteHandler(route: ParsedController<ServerMetadata>): RouteHandler {
+  private generateRouteHandler(route: ParsedController<ServerMetadata>): AwaitableRouteHandler {
     const metadata = route.metadata;
     const statusCode = this.getStatusCode(metadata);
     const argsOrder = (Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, route.instance, route.handlerName) as (keyof RequestContext | undefined)[]) ?? [];
