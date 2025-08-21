@@ -18,7 +18,7 @@ import { Class, JsonObject, Promisable } from 'type-fest';
 import { ChildRouteResponse, ChildRouteResult } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata } from '../decorators';
-import { AwaitableRouteHandler, HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
+import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
 import { ContextService } from '../services';
 import { type FastifyConfig } from './fastify-module.interface';
 import { compileValidator, formatSchemaErrors } from './fastify.utils';
@@ -130,8 +130,8 @@ export class FastifyRouter extends Router {
     });
   }
 
-  private getRequestLogger(): RouteHandler {
-    return async (req, res) => {
+  private getRequestLogger(): CallbackRouteHandler {
+    return (req, res, done) => {
       const startTime = process.hrtime();
 
       res.raw.on('finish', () => {
@@ -158,6 +158,8 @@ export class FastifyRouter extends Router {
         if (req.body) metadata.body = req.body;
         this.logger.http('http', metadata);
       });
+
+      done();
     };
   }
 
@@ -206,7 +208,7 @@ export class FastifyRouter extends Router {
     return metadata.method === HttpMethod.POST ? 201 : 200;
   }
 
-  private generateRouteHandler(route: ParsedController<ServerMetadata>): AwaitableRouteHandler {
+  private generateRouteHandler(route: ParsedController<ServerMetadata>): AsyncRouteHandler {
     const metadata = route.metadata;
     const statusCode = this.getStatusCode(metadata);
     const argsOrder = (Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, route.instance, route.handlerName) as (keyof RequestContext | undefined)[]) ?? [];
@@ -260,7 +262,7 @@ export class FastifyRouter extends Router {
 
     return async (request, response) => {
       await context(request);
-      await requestLogger(request as any, response as any);
+      await new Promise(resolve => requestLogger(request as any, response as any, () => resolve(void 0)));
 
       if (paramsValidator) {
         paramsValidator(request.params) as { value: Record<string, string> };

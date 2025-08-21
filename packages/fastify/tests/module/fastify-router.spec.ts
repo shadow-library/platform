@@ -3,7 +3,7 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
-import { InternalError, Logger, ValidationError, withThis } from '@shadow-library/common';
+import { Fn, InternalError, Logger, ValidationError, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
@@ -356,7 +356,7 @@ describe('FastifyRouter', () => {
     it('should execute child routes without making actual HTTP requests', async () => {
       const route = { metadata: { path: '/child', method: HttpMethod.GET }, handler, instance } as any;
       const context = jest.fn();
-      const requestLogger = jest.fn();
+      const requestLogger = jest.fn((_req, _res, cb: Fn) => cb());
       router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
       router['context'].initChild = jest.fn().mockReturnValue(context) as any;
       router['getRequestLogger'] = jest.fn().mockReturnValue(requestLogger) as any;
@@ -365,7 +365,7 @@ describe('FastifyRouter', () => {
       await router.resolveChildRoute('/child');
 
       expect(context).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} });
-      expect(requestLogger).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse));
+      expect(requestLogger).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse), expect.any(Function));
       expect(handler).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse));
     });
 
@@ -423,16 +423,19 @@ describe('FastifyRouter', () => {
         headers: { 'x-service': 'test-service', 'content-length': '123' },
         query: { key: 'value' },
         body: { data: 'test' },
+        routeOptions: { url: '/test' },
       } as any;
       const res = {
         statusCode: 200,
         raw: { on: jest.fn((_, callback: () => void) => callback()) },
         getHeader: jest.fn().mockReturnValue('456'),
       } as any;
+      const cb = jest.fn();
 
       const logger = router['getRequestLogger']();
-      logger.call({} as any, req, res);
+      logger.call({} as any, req, res, cb);
 
+      expect(cb).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
       expect(httpLogger).toHaveBeenCalledWith('http', {
         rid: 'test-rid',
@@ -453,10 +456,12 @@ describe('FastifyRouter', () => {
       contextSpy.mockReturnValueOnce(true);
       const req = {} as any;
       const res = { raw: { on: jest.fn((_, callback: () => void) => callback()) } } as any;
+      const cb = jest.fn();
 
       const logger = router['getRequestLogger']();
-      logger.call({} as any, req, res);
+      logger.call({} as any, req, res, cb);
 
+      expect(cb).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
       expect(httpLogger).not.toHaveBeenCalled();
     });
