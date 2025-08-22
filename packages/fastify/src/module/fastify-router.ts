@@ -4,24 +4,22 @@
 import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
-import { InternalError, Logger, tryCatch, utils } from '@shadow-library/common';
+import { InternalError, Logger, utils } from '@shadow-library/common';
 import merge from 'deepmerge';
 import { type FastifyInstance, RouteOptions } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
 import stringify from 'json-stable-stringify';
 import { Chain as MockRequestChain, InjectOptions as MockRequestOptions, Response as MockResponse } from 'light-my-request';
-import { Class, JsonObject, Promisable } from 'type-fest';
+import { Class, JsonObject, JsonValue, Promisable } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
-import { ChildRouteResponse, ChildRouteResult } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
 import { HttpMethod, MiddlewareMetadata } from '../decorators';
 import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
 import { ContextService } from '../services';
 import { type FastifyConfig } from './fastify-module.interface';
-import { compileValidator, formatSchemaErrors } from './fastify.utils';
 
 /**
  * Defining types
@@ -89,8 +87,6 @@ export interface ChildRouteRequest {
 
 type MiddlewareHandler = ParsedController<MiddlewareMetadata>['handler'];
 
-type ChildRequestHandler = (request: ChildRouteRequest, response: ChildRouteResponse) => Promise<any> | any;
-
 /**
  * Declaring the constants
  */
@@ -143,14 +139,10 @@ export class FastifyRouter extends Router {
         metadata.url = req.url;
         metadata.method = req.method;
         metadata.status = res.statusCode;
-
-        if (this.context.isChildContext()) metadata.service = 'internal-child-route';
-        else {
-          metadata.service = req.headers['x-service'] as string | undefined;
-          metadata.reqLen = req.headers['content-length'];
-          metadata.reqIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
-          metadata.resLen = res.getHeader('content-length') as string;
-        }
+        metadata.service = req.headers['x-service'] as string | undefined;
+        metadata.reqLen = req.headers['content-length'];
+        metadata.reqIp = (req.headers['x-forwarded-for'] as string) || req.socket.remoteAddress;
+        metadata.resLen = res.getHeader('content-length') as string;
 
         const resTime = process.hrtime(startTime);
         metadata.timeTaken = (resTime[0] * 1e3 + resTime[1] * 1e-6).toFixed(3); // Converting time to milliseconds
@@ -246,53 +238,6 @@ export class FastifyRouter extends Router {
     };
   }
 
-  public generateChildRouteHandler(route: RouteOptions): ChildRequestHandler {
-    const context = this.context.initChild();
-    const requestLogger = this.getRequestLogger();
-
-    const { schema, url } = route;
-    const method = HttpMethod.GET;
-    const paramsValidator = schema?.params ? compileValidator({ method, schema: schema.params, url, httpPart: 'params' }) : null;
-    const queryValidator = schema?.querystring ? compileValidator({ method, schema: schema.querystring, url, httpPart: 'querystring' }) : null;
-
-    assert(typeof route.preHandler !== 'function' && typeof route.onError !== 'function', 'handlers must be an array');
-    const preHandlers = route.preHandler ?? [];
-    const errorHandlers = route.onError ?? [];
-    const handlers = [...preHandlers, route.handler];
-
-    return async (request, response) => {
-      await context(request);
-      await new Promise(resolve => requestLogger(request as any, response as any, () => resolve(void 0)));
-
-      if (paramsValidator) {
-        paramsValidator(request.params) as { value: Record<string, string> };
-        if (paramsValidator.errors) throw formatSchemaErrors(paramsValidator.errors, 'params');
-      }
-
-      if (queryValidator) {
-        const validationResult = queryValidator(request.query) as { value: Record<string, string> };
-        request.query = validationResult.value;
-      }
-
-      try {
-        /** Executing the pre-handlers and the handler */
-        for (const handler of handlers) {
-          await handler.apply({} as any, [request, response] as any);
-          if (response.sent) return;
-        }
-      } catch (err) {
-        /** Executing all the error handlers */
-        for (const errorHandler of errorHandlers) {
-          const result = await tryCatch(() => errorHandler.apply({} as any, [request, response, err] as any));
-          if (!result.success) break;
-        }
-
-        /** Executing the default error handler */
-        await this.config.errorHandler.handle(err as Error, request as any, response as any);
-      }
-    };
-  }
-
   private async getMiddlewareHandler(middleware: ParsedController<MiddlewareMetadata>, metadata: RouteMetadata): Promise<MiddlewareHandler | undefined> {
     if (!middleware.metadata.generates) return middleware.handler.bind(middleware.instance);
 
@@ -355,11 +300,6 @@ export class FastifyRouter extends Router {
 
       this.instance.route(routeOptions);
       this.logger.info(`registered route ${metadata.method} ${routeOptions.url}`);
-      if (this.childRouter && metadata.method === HttpMethod.GET) {
-        const handler = this.generateChildRouteHandler(routeOptions);
-        this.childRouter.on('GET', routeOptions.url, handler as any);
-        this.logger.info(`registered child route ${metadata.method} ${routeOptions.url}`);
-      }
     }
   }
 
@@ -380,20 +320,10 @@ export class FastifyRouter extends Router {
    * during SSR. Automatically reuses middleware results from the parent context to avoid
    * redundant execution and ensures correct context isolation for nested route data fetching.
    */
-  async resolveChildRoute(url: string): Promise<ChildRouteResult> {
+  async resolveChildRoute<T extends JsonValue = JsonObject>(url: string): Promise<T> {
     if (!this.childRouter) throw new InternalError('Child routes are not enabled');
-
-    const handler = this.childRouter.find('GET', url);
-    if (!handler) throw new InternalError(`Child route not found for URL: ${url}`);
-
-    const queryIndex = url.indexOf('?');
-    const path = queryIndex === -1 ? url : url.substring(0, queryIndex);
-    const params = handler.params as Record<string, string>;
-
-    const request: ChildRouteRequest = { method: HttpMethod.GET, url: path, params, query: handler.searchParams };
-    const response = new ChildRouteResponse();
-    await handler.handler(request as any, response as any, params, {}, handler.searchParams);
-    return response.getResult();
+    const response = await this.instance.inject({ method: 'GET', url, headers: { 'x-service': 'internal-child-route' } });
+    return response.json() as T;
   }
 
   mockRequest(): MockRequestChain;

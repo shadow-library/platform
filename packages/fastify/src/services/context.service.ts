@@ -11,7 +11,6 @@ import { onRequestHookHandler } from 'fastify';
  * Importing user defined packages
  */
 import { HttpRequest, HttpResponse } from '../interfaces';
-import { ChildRouteRequest } from '../module';
 
 /**
  * Defining types
@@ -27,7 +26,6 @@ const RESPONSE = Symbol('response');
 const RID = Symbol('rid');
 const PARENT_CONTEXT = Symbol('parent-context');
 const CHILD_RID_COUNTER = Symbol('child-rid-counter');
-const CHILD_REQUEST = Symbol('child-request');
 
 @Injectable()
 export class ContextService {
@@ -37,30 +35,23 @@ export class ContextService {
 
   init(): onRequestHookHandler {
     return (req, res, done) => {
+      const parentStore = this.storage.getStore();
       const store = new Map<Key, unknown>();
+
+      if (parentStore) {
+        const isChildContext = parentStore.has(PARENT_CONTEXT);
+        if (isChildContext) throw new InternalError('Cannot create a child context within an existing child context');
+
+        const childRIDCounter = (this.get<number>(CHILD_RID_COUNTER) ?? 0) + 1;
+        this.set(CHILD_RID_COUNTER, childRIDCounter);
+        req.id = `${this.getRID()}-${childRIDCounter}`;
+        store.set(PARENT_CONTEXT, parentStore);
+      }
+
       store.set(REQUEST, req);
       store.set(RESPONSE, res);
       store.set(RID, req.id);
       this.storage.run(store, done);
-    };
-  }
-
-  initChild(): (request: ChildRouteRequest) => Promise<void> {
-    return async req => {
-      const parentStore = this.storage.getStore();
-      if (!parentStore) throw new InternalError('Parent context not initialized');
-      const isChildContext = parentStore.has(PARENT_CONTEXT);
-      if (isChildContext) throw new InternalError('Cannot create a child context within an existing child context');
-
-      const childRIDCounter = (this.get<number>(CHILD_RID_COUNTER) ?? 0) + 1;
-      this.set(CHILD_RID_COUNTER, childRIDCounter);
-      const childRID = `${this.getRID()}-${childRIDCounter}`;
-
-      const store = new Map<Key, unknown>();
-      store.set(RID, childRID);
-      store.set(CHILD_REQUEST, req);
-      store.set(PARENT_CONTEXT, parentStore);
-      this.storage.enterWith(store);
     };
   }
 
@@ -89,7 +80,7 @@ export class ContextService {
   resolve<T>(key: Key, throwOnMissing?: boolean): T | null {
     const isChild = this.isChildContext();
     const value = this.get<T>(key, !isChild);
-    if (value !== undefined) return value;
+    if (value !== null || !isChild) return value;
     return this.getFromParent<T>(key, throwOnMissing);
   }
 
@@ -113,15 +104,11 @@ export class ContextService {
   }
 
   getRequest(): HttpRequest {
-    return this.resolve<HttpRequest>(REQUEST, true);
-  }
-
-  getChildRequest(): ChildRouteRequest | null {
-    return this.resolve<ChildRouteRequest>(CHILD_REQUEST, false);
+    return this.get<HttpRequest>(REQUEST, true);
   }
 
   getResponse(): HttpResponse {
-    return this.resolve<HttpResponse>(RESPONSE, true);
+    return this.get<HttpResponse>(RESPONSE, true);
   }
 
   getRID(): string {
