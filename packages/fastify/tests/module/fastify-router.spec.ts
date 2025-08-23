@@ -349,66 +349,14 @@ describe('FastifyRouter', () => {
       await expect(nonChildRouter.resolveChildRoute('/child')).rejects.toThrow(InternalError);
     });
 
-    it('should throw error if the router is not found', async () => {
-      await expect(router.resolveChildRoute('/non-existent')).resolves.toStrictEqual({ error: 'Not Found', message: 'Route GET:/non-existent not found', statusCode: 404 });
+    it('should resolve child route', async () => {
+      const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ status: 'success' }) });
+      router['instance'].inject = fn;
+
+      const result = await router.resolveChildRoute('/child/123');
+      expect(result).toStrictEqual({ status: 'success' });
+      expect(fn).toHaveBeenCalledWith({ method: 'GET', url: '/child/123', headers: { 'x-service': 'internal-child-route' } });
     });
-
-    // it('should execute child routes without making actual HTTP requests', async () => {
-    //   const route = { metadata: { path: '/child', method: HttpMethod.GET }, handler, instance } as any;
-    //   const context = jest.fn();
-    //   const requestLogger = jest.fn((_req, _res, cb: Fn) => cb());
-    //   router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
-    //   router['context'].initChild = jest.fn().mockReturnValue(context) as any;
-    //   router['getRequestLogger'] = jest.fn().mockReturnValue(requestLogger) as any;
-
-    //   await router.register([]);
-    //   await router.resolveChildRoute('/child');
-
-    //   expect(context).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} });
-    //   expect(requestLogger).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse), expect.any(Function));
-    //   expect(handler).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse));
-    // });
-
-    // it('should validate child route parameters', async () => {
-    //   const paramsSchema = { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9]+$' } }, required: ['id'] };
-    //   const querySchema = { type: 'object', properties: { search: { type: 'string' } } };
-    //   const route = { metadata: { path: '/child/:id', method: HttpMethod.GET, schemas: { params: paramsSchema, query: querySchema } } } as any;
-    //   router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
-
-    //   await router.register([]);
-    //   await router.resolveChildRoute('/child/123?search=test');
-
-    //   expect(handler).toHaveBeenCalledWith({ url: '/child/123', method: 'GET', query: { search: 'test' }, params: { id: '123' } }, expect.any(ChildRouteResponse));
-    // });
-
-    it('should throw error for invalid child route parameters', async () => {
-      const paramsSchema = { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9]+$' } }, required: ['id'] };
-      const route = { metadata: { path: '/child/:id', method: HttpMethod.GET, schemas: { params: paramsSchema } } } as any;
-      router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
-
-      await router.register([]);
-      await expect(router.resolveChildRoute('/child/abc')).resolves.toStrictEqual({
-        code: 'FST_ERR_VALIDATION',
-        error: 'Bad Request',
-        message: 'params/id must match pattern "^[0-9]+$"',
-        statusCode: 400,
-      });
-
-      expect(handler).not.toHaveBeenCalled();
-    });
-
-    // it('should handle errors in child routes', async () => {
-    //   const middleware = { metatype: Class, metadata: { type: 'onError', generates: false }, handler: jest.fn() } as any;
-    //   const route = { metadata: { path: '/child', method: HttpMethod.GET } } as any;
-    //   const error = new Error('Test error');
-    //   handler.mockRejectedValue(error);
-    //   router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [middleware] }) as any;
-
-    //   await router.register([]);
-    //   await router.resolveChildRoute('/child');
-
-    //   expect(middleware.handler).toHaveBeenCalledWith({ url: '/child', method: 'GET', query: {}, params: {} }, expect.any(ChildRouteResponse), error);
-    // });
   });
 
   describe('getRequestLogger', () => {

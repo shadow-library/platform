@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { SyncValue } from '@shadow-library/common';
 import { DoneFuncWithErrOrRes, FastifyReply, FastifyRequest } from 'fastify';
 
 /**
@@ -21,7 +22,7 @@ export type HttpResponse = FastifyReply;
 
 export type HttpCallback = DoneFuncWithErrOrRes;
 
-export type CallbackRouteHandler = (request: HttpRequest, response: HttpResponse, done: HttpCallback) => unknown;
+export type CallbackRouteHandler = (request: HttpRequest, response: HttpResponse, done: HttpCallback) => SyncValue<unknown>;
 
 export type AsyncRouteHandler = (request: HttpRequest, response: HttpResponse) => Promise<unknown>;
 
