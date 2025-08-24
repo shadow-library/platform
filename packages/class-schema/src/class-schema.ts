@@ -7,7 +7,7 @@ import { Class, SetRequired } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { Integer, METADATA_KEYS } from './constants';
+import { BRAND, Integer, METADATA_KEYS } from './constants';
 import { SchemaOptions } from './decorators';
 import { AnyFieldSchema, JSONSchema, JSONSchemaType } from './interfaces';
 import { SchemaComposerMetadata } from './internal.types';
@@ -47,10 +47,17 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
 
     this.schema = this.getSchema(Class);
     this.populateSchema(this.schema, Class);
+    this.brand(this.schema);
   }
 
   static generate(Class: SchemaClass): ParsedSchema {
     return new ClassSchema(Class).getJSONSchema();
+  }
+
+  private brand(schema: ParsedSchema): ParsedSchema {
+    Object.defineProperty(schema, BRAND, { value: true, enumerable: false });
+    Object.freeze(schema);
+    return schema;
   }
 
   private getSchema(Class: Class<unknown>): ParsedSchema {
@@ -160,6 +167,6 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
   }
 
   getJSONSchema(clone = false): ParsedSchema {
-    return clone ? structuredClone(this.schema) : this.schema;
+    return clone ? this.brand(structuredClone(this.schema)) : this.schema;
   }
 }

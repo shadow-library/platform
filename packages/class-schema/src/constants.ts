@@ -28,3 +28,5 @@ export const METADATA_KEYS = {
   SCHEMA_EXTRA_PROPERTIES: Symbol('schema-object'),
   COMPOSED_CLASS: Symbol('composed-class'),
 } as const satisfies Record<string, string | symbol>;
+
+export const BRAND = Symbol('brand');

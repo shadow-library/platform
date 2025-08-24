@@ -8,6 +8,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { BRAND } from '@lib/constants';
 import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schema';
 
 /**
@@ -274,5 +275,15 @@ describe('ClassSchema', () => {
       },
       dependencies: { size: ['unit'] },
     });
+  });
+
+  it('should brand the original json schema', () => {
+    const schema = new ClassSchema(File).getJSONSchema();
+    expect((schema as any)[BRAND]).toBe(true);
+  });
+
+  it('should brand the cloned json schema', () => {
+    const schema = new ClassSchema(File).getJSONSchema(true);
+    expect((schema as any)[BRAND]).toBe(true);
   });
 });
