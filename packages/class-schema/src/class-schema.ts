@@ -16,7 +16,7 @@ import { SchemaComposerMetadata } from './internal.types';
  * Defining types
  */
 
-export type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type'>;
+export type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type'> & { definitions?: Record<string, ParsedSchema> };
 
 export type SchemaClass = Class<unknown> | [Class<unknown>];
 

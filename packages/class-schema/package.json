@@ -47,10 +47,10 @@
     "typescript-eslint": "^8.29.1"
   },
   "peerDependencies": {
+    "@shadow-library/common": "^1.0.18",
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {
-    "@shadow-library/common": "^1.0.4",
     "deepmerge": "^4.3.1"
   }
 }

@@ -37,7 +37,7 @@ export interface JSONSchema {
   dependencies?: Record<string, string[]>;
 
   /** Array properties */
-  items?: JSONSchema | JSONSchema[];
+  items?: JSONSchema;
   additionalItems?: boolean | JSONSchema;
   minItems?: number;
   maxItems?: number;
