@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it } from 'bun:test';
+import { describe, expect, it, mock } from 'bun:test';
 
 import { InternalError } from '@shadow-library/common';
 
@@ -30,7 +30,6 @@ describe('TransformerFactory', () => {
     const schema = {
       [BRAND]: true,
       $id: 'ExtendedPrimitive',
-      title: 'ExtendedPrimitiveTitle',
       type: 'object',
       required: ['str', 'bool', 'obj'],
       properties: {
@@ -122,6 +121,39 @@ describe('TransformerFactory', () => {
         files: 'xxx',
         folders: [{ name: 'xxx', files: 'xxx', folders: [{ name: 'xxx', files: 'xxx', folders: [] }] }],
       },
+    });
+  });
+
+  it('should call the action with the correct params', () => {
+    const data = { str: 'string', obj: { val: 'object' }, arr: ['array'], arrObj: [{ val: 'array-object' }] };
+    const schema = {
+      [BRAND]: true,
+      $id: 'Custom',
+      type: 'object',
+      required: ['str', 'obj'],
+      definitions: { CustomObject: { $id: 'CustomObject', type: 'object', properties: { val: { type: 'string', tagged: true } } } },
+      properties: {
+        str: { type: 'string', tagged: true },
+        arr: { type: 'array', items: { type: 'string' }, tagged: true },
+        obj: { $ref: 'CustomObject' },
+        arrObj: { type: 'array', items: { $ref: 'CustomObject' } },
+      },
+    };
+
+    const factory = new TransformerFactory(schema => !!schema.tagged);
+    const transformer = factory.compile(schema as any);
+    const fn = mock(() => 'xxx');
+    transformer(data, fn);
+
+    expect(fn).toHaveBeenCalledTimes(4);
+    expect(fn).toHaveBeenNthCalledWith(1, 'string', schema.properties.str, { parent: data, root: data, field: 'str', path: 'str' });
+    expect(fn).toHaveBeenNthCalledWith(2, ['array'], schema.properties.arr, { parent: data, root: data, field: 'arr', path: 'arr' });
+    expect(fn).toHaveBeenNthCalledWith(3, 'object', schema.definitions.CustomObject.properties.val, { parent: data.obj, root: data, field: 'val', path: 'obj.val' });
+    expect(fn).toHaveBeenNthCalledWith(4, 'array-object', schema.definitions.CustomObject.properties.val, {
+      parent: data.arrObj[0],
+      root: data,
+      field: 'val',
+      path: 'arrObj.0.val',
     });
   });
 });
