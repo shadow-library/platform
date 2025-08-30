@@ -50,6 +50,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 ### 🛠️ **Utility Functions**
 
 - **String interpolation** with object path resolution
+- **Data masking utilities** for emails, numbers, words, and flexible text masking
 - **Object manipulation** (pick, omit, deep freeze, path access, plain object detection)
 - **Temporal utilities** with time unit support
 - **Reflection utilities** with metadata management
@@ -356,6 +357,40 @@ const result = utils.string.interpolate(template, data);
 // Escape interpolation
 const escaped = utils.string.interpolate('Price: \\{notInterpolated}', {});
 // Result: 'Price: {notInterpolated}'
+
+// Email masking
+const maskedEmail = utils.string.maskEmail('user@example.com');
+// Result: 'u**r@e******.com'
+
+// Number masking with configurable keep values
+const maskedNumber = utils.string.maskNumber('1234567890', 2, 2);
+const maskedNumber = utils.string.maskNumber(1234567890, 2, 2);
+// Result: '12****7890'
+
+const maskedCard = utils.string.maskNumber('1234 5678 9012 3456', 4, 4);
+// Result: '1234 **** **** 3456'
+
+// Word masking (preserves first and last character of each word)
+const maskedWords = utils.string.maskWords('hello world');
+// Result: 'h***o w***d'
+
+// Advanced masking with customizable options
+const maskedText = utils.string.mask('sensitive-data@domain.com', {
+  keepStart: 2,
+  keepEnd: 4,
+  maskChar: 'X',
+  preserveSeparators: ['@', '.', '-'],
+});
+// Result: 'seXXXXXXX-XXXX@XXXXXX.com'
+
+// Flexible masking with minimum mask requirements
+const masked = utils.string.mask('abc', {
+  keepStart: 1,
+  keepEnd: 1,
+  minMask: 3,
+  preserveSpaces: true,
+});
+// Result: '***' (ensures minimum masking by decreasing the keep start and end)
 ```
 
 #### Object Utilities
@@ -615,6 +650,16 @@ The package uses environment variables for configuration. Below are the key vari
 #### String Utils
 
 - `utils.string.interpolate(template, data)` - Interpolate string with object
+- `utils.string.maskEmail(email)` - Mask email address preserving structure
+- `utils.string.maskNumber(number, keepStart?, keepEnd?)` - Mask number preserving start/end digits
+- `utils.string.maskWords(input)` - Mask words preserving first/last characters
+- `utils.string.mask(input, options?)` - Flexible masking with customizable options
+  - `options.maskChar` - Character to use for masking (default: '\*')
+  - `options.keepStart` - Characters to keep at start (default: 1)
+  - `options.keepEnd` - Characters to keep at end (default: 1)
+  - `options.preserveSpaces` - Preserve spaces (default: true)
+  - `options.preserveSeparators` - Preserve separators (default: false)
+  - `options.minMask` - Minimum characters to mask (default: 0)
 
 #### Object Utils
 
@@ -650,6 +695,34 @@ The package uses environment variables for configuration. Below are the key vari
 type NodeEnv = 'development' | 'production' | 'test';
 type LogLevel = 'silly' | 'debug' | 'http' | 'info' | 'warn' | 'error';
 type TimeUnit = 'ms' | 's' | 'm' | 'h';
+```
+
+### Masking Types
+
+```ts
+interface MaskOptions {
+  /** Character to use for masking. Default: '*' */
+  maskChar?: string;
+
+  /** How many characters to keep at the start and end (of the whole string). */
+  keepStart?: number; // Default: 1
+  keepEnd?: number; // Default: 1
+
+  /** Preserve spaces literally? Default: true */
+  preserveSpaces?: boolean;
+
+  /**
+   * Preserve "separators" (non-alphanumeric punctuation like .-_/() etc)?
+   * - true  → preserve all non-alphanumeric chars (except space, which is controlled by preserveSpaces)
+   * - false → do not preserve (mask like normal)
+   * - RegExp | string[] → only preserve matches of the regex or chars in the list
+   * Default: false
+   */
+  preserveSeparators?: boolean | RegExp | string[];
+
+  /** Ensure at least this many masked chars (helps with very short strings). Default: 0 */
+  minMask?: number;
+}
 ```
 
 ### Result Types
