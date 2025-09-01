@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/common",
   "type": "module",
-  "version": "1.0.19",
+  "version": "1.0.20",
   "description": "description",
   "sideEffects": false,
   "scripts": {
