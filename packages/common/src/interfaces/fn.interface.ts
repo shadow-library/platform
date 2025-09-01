@@ -12,10 +12,6 @@ import { SyncValue } from './value.interface';
  * Defining types
  */
 
-/**
- * Declaring the constants
- */
-
 export type Fn<T = any, U = any> = (...args: U[]) => Promisable<T>;
 
 export type SyncFn<T = any> = (...args: any[]) => SyncValue<T>;

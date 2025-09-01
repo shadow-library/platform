@@ -10,10 +10,6 @@
  * Defining types
  */
 
-/**
- * Declaring the constants
- */
-
 export type PrimitiveValue = string | number | boolean | bigint | symbol;
 
 export type MaybeArray<T> = T | T[];

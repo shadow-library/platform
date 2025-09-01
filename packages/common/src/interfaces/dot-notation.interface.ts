@@ -10,10 +10,6 @@
  * Defining types
  */
 
-/**
- * Declaring the constants
- */
-
 type Prev = [never, 0, 1, 2, 3, 4, 5, ...0[]]; // supports depth up to 5
 
 export type DotNotation<T, Prefix extends string = '', D extends number = 5> = [D] extends [never]
