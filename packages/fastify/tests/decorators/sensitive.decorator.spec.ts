@@ -35,7 +35,53 @@ describe('@Sensitive', () => {
       properties: {
         sensitiveField: {
           type: 'string',
-          'x-fastify': { sensitive: true },
+          'x-fastify': { sensitive: true, type: 'secret' },
+        },
+      },
+    });
+  });
+
+  it('should add sensitive email metadata to a field', () => {
+    @Schema()
+    class TestClass {
+      @Field()
+      @Sensitive('email')
+      email: string;
+    }
+
+    const schema = ClassSchema.generate(TestClass);
+
+    expect(schema).toEqual({
+      $id: expect.any(String),
+      type: 'object',
+      required: ['email'],
+      properties: {
+        email: {
+          type: 'string',
+          'x-fastify': { sensitive: true, type: 'email' },
+        },
+      },
+    });
+  });
+
+  it('should add sensitive mask options metadata to a field', () => {
+    @Schema()
+    class TestClass {
+      @Field()
+      @Sensitive({ keepEnd: 3, keepStart: 2, maskChar: 'x', minMask: 5, preserveSeparators: true })
+      sensitiveField: string;
+    }
+
+    const schema = ClassSchema.generate(TestClass);
+
+    expect(schema).toEqual({
+      $id: expect.any(String),
+      type: 'object',
+      required: ['sensitiveField'],
+      properties: {
+        sensitiveField: {
+          type: 'string',
+          'x-fastify': { sensitive: true, maskOptions: { keepEnd: 3, keepStart: 2, maskChar: 'x', minMask: 5, preserveSeparators: true } },
         },
       },
     });
@@ -49,8 +95,8 @@ describe('@Sensitive', () => {
       password: string;
 
       @Field()
-      @Sensitive()
-      apiKey: string;
+      @Sensitive('email')
+      email: string;
 
       @Field()
       regularField: string;
@@ -61,15 +107,15 @@ describe('@Sensitive', () => {
     expect(schema).toEqual({
       $id: expect.any(String),
       type: 'object',
-      required: ['password', 'apiKey', 'regularField'],
+      required: ['password', 'email', 'regularField'],
       properties: {
         password: {
           type: 'string',
-          'x-fastify': { sensitive: true },
+          'x-fastify': { sensitive: true, type: 'secret' },
         },
-        apiKey: {
+        email: {
           type: 'string',
-          'x-fastify': { sensitive: true },
+          'x-fastify': { sensitive: true, type: 'email' },
         },
         regularField: {
           type: 'string',

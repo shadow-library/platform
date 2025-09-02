@@ -41,7 +41,7 @@
     "@release-it/conventional-changelog": "^10.0.1",
     "@shadow-library/app": "^1.0.10",
     "@shadow-library/class-schema": "^0.0.9",
-    "@shadow-library/common": "^1.0.18",
+    "@shadow-library/common": "^1.0.20",
     "@types/bun": "^1.2.20",
     "@typescript-eslint/parser": "^8.40.0",
     "eslint": "^9.34.0",

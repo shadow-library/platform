@@ -22,7 +22,7 @@
         "@release-it/conventional-changelog": "^10.0.1",
         "@shadow-library/app": "^1.0.10",
         "@shadow-library/class-schema": "^0.0.9",
-        "@shadow-library/common": "^1.0.18",
+        "@shadow-library/common": "^1.0.20",
         "@types/bun": "^1.2.20",
         "@typescript-eslint/parser": "^8.40.0",
         "eslint": "^9.34.0",
@@ -44,7 +44,7 @@
         "@fastify/view": "^10.0.0",
         "@shadow-library/app": "^1.0.7",
         "@shadow-library/class-schema": "^0.0.9",
-        "@shadow-library/common": "^1.0.18",
+        "@shadow-library/common": "^1.0.20",
         "reflect-metadata": "^0.2.2",
       },
       "optionalPeers": [
@@ -365,7 +365,7 @@
 
     "@shadow-library/class-schema": ["@shadow-library/class-schema@0.0.9", "", { "dependencies": { "@shadow-library/common": "^1.0.4", "deepmerge": "^4.3.1" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-tf2ze05i6rXoy8E759tU2QWGY1bmJtRKr8uumuhw8h/472FegOtF9cSMgXUWu7sAQ4wTcIVVVrdspRouoDF9MA=="],
 
-    "@shadow-library/common": ["@shadow-library/common@1.0.18", "", { "dependencies": { "@aws-sdk/client-cloudwatch-logs": "^3.734.0", "@colors/colors": "^1.6.0", "deepmerge": "^4.3.1", "fast-redact": "^3.5.0", "type-fest": "^4.40.0", "undici": "^7.10.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-haTy3PceB64R5Zm3bKPWuIBkrxEUCwZ85D+UjT2InnWgVsdR+vKBAY0KA+DzZyQPaJ417nfQFC6ApcEc9fJgsQ=="],
+    "@shadow-library/common": ["@shadow-library/common@1.0.20", "", { "dependencies": { "@aws-sdk/client-cloudwatch-logs": "^3.734.0", "@colors/colors": "^1.6.0", "deepmerge": "^4.3.1", "fast-redact": "^3.5.0", "type-fest": "^4.40.0", "undici": "^7.10.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-gBChT1tGbUGlad5ww9EbfC0AeMV3WySPmUsPVxgiiIqKCP+oNCAX2eKs+j/n5WLi5r0g9Fl4YpXUHrLdWMYGFQ=="],
 
     "@sinclair/typebox": ["@sinclair/typebox@0.27.8", "", {}, "sha512-+Fj43pSMwJs4KRrH/938Uf+uAELIgVBmQzg/q1YG10djyfA3TnrU8N8XzqCh/okZdszqBQTZf96idMfE5lnwTA=="],
 
