@@ -70,5 +70,5 @@ export interface JSONSchema {
   };
 
   /** Other possible fields */
-  [key: string]: unknown;
+  [key: string]: any;
 }
