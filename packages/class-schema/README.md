@@ -366,7 +366,11 @@ const jsonSchema = userSchema.getJSONSchema();
 
 ## Data Transformation
 
-Transform data using the transformer factory:
+The `TransformerFactory` provides powerful data transformation capabilities with two main methods: `compile` and `maybeCompile`.
+
+### Basic Transformation with `compile`
+
+The `compile` method always returns a transformer function. If no fields match the filter, it returns a no-op function that passes data through unchanged:
 
 ```typescript
 import { TransformerFactory } from '@shadow-library/class-schema';
@@ -396,7 +400,87 @@ const data = {
 
 // Transform date strings to Date objects
 const transformed = transformer(data, value => new Date(value));
+console.log(transformed.createdAt instanceof Date); // true
 ```
+
+### Conditional Transformation with `maybeCompile`
+
+The `maybeCompile` method returns `null` if no fields match the filter, allowing you to optimize performance by skipping transformation entirely:
+
+```typescript
+@Schema()
+class User {
+  @Field()
+  id: string;
+
+  @Field()
+  name: string;
+
+  @Field()
+  email: string;
+}
+
+const schema = ClassSchema.generate(User);
+
+// Try to create transformer for date fields (none exist in this schema)
+const factory = new TransformerFactory(fieldSchema => fieldSchema.format === 'date-time');
+const transformer = factory.maybeCompile(schema);
+
+if (transformer) {
+  // Only transform if there are matching fields
+  const transformed = transformer(userData, value => new Date(value));
+} else {
+  // No transformation needed - use original data
+  console.log('No date fields found, skipping transformation');
+}
+```
+
+### Performance Optimization Example
+
+Use `maybeCompile` to avoid unnecessary transformations:
+
+```typescript
+class DataProcessor {
+  private dateTransformer: ((data: any, action: any) => any) | null;
+  private sensitiveTransformer: ((data: any, action: any) => any) | null;
+
+  constructor(schema: ParsedSchema) {
+    // Only create transformers if needed
+    const dateFactory = new TransformerFactory(field => field.format === 'date-time');
+    this.dateTransformer = dateFactory.maybeCompile(schema);
+
+    const sensitiveFactory = new TransformerFactory(field => (field as any).sensitive === true);
+    this.sensitiveTransformer = sensitiveFactory.maybeCompile(schema);
+  }
+
+  processData(data: any) {
+    let result = data;
+
+    // Transform dates only if schema has date fields
+    if (this.dateTransformer) {
+      result = this.dateTransformer(result, value => new Date(value as string));
+    }
+
+    // Mask sensitive data only if schema has sensitive fields
+    if (this.sensitiveTransformer) {
+      result = this.sensitiveTransformer(result, () => '[REDACTED]');
+    }
+
+    return result;
+  }
+}
+
+// Usage
+const processor = new DataProcessor(userSchema);
+const processedData = processor.processData(rawUserData);
+```
+
+### Method Comparison
+
+| Method                 | Return Type           | Use Case                                                          |
+| ---------------------- | --------------------- | ----------------------------------------------------------------- |
+| `compile(schema)`      | `Transformer`         | Always returns a function, use when you always want to transform  |
+| `maybeCompile(schema)` | `Transformer \| null` | Returns null if no fields match, use for performance optimization |
 
 ### Masking Sensitive Data for Logging
 
