@@ -25,6 +25,23 @@ describe('TransformerFactory', () => {
     expect(() => transformer.compile({ $id: 'test', type: 'object', properties: {} })).toThrow(InternalError);
   });
 
+  it('should create transforms for only required schema', () => {
+    const schema = {
+      [BRAND]: true,
+      $id: 'ExtendedPrimitive',
+      type: 'object',
+      required: ['str', 'bool', 'obj'],
+      definitions: { ObjectSchema: { $id: 'ObjectSchema', type: 'object', properties: { val: { type: 'string' } } } },
+      properties: { str: { type: 'string', tagged: true }, obj: { $ref: 'ObjectSchema' } },
+    };
+
+    const factory = new TransformerFactory(schema => !!schema.tagged);
+    const transformer = factory.compile(schema as any);
+
+    expect(transformer).toBeInstanceOf(Function);
+    expect(factory['context'].transformers).toEqual({ ExtendedPrimitive: expect.any(Function), ObjectSchema: null });
+  });
+
   it('should transform data with basic schema', () => {
     const data = { str: 'test', num: 123, bool: true, obj: {}, arr: [] };
     const schema = {
@@ -46,6 +63,34 @@ describe('TransformerFactory', () => {
 
     expect(transformer).toBeInstanceOf(Function);
     expect(transformer(data, () => 'xxx')).toEqual({ str: 'xxx', num: 123, bool: 'xxx', obj: {}, arr: 'xxx' });
+  });
+
+  it('should return null for nothing to transform in maybeCompile', () => {
+    const schema = {
+      [BRAND]: true,
+      $id: 'ExtendedPrimitive',
+      type: 'object',
+      properties: { num: { type: 'number' } },
+    };
+
+    const factory = new TransformerFactory(schema => !!schema.tagged);
+    const transformer = factory.maybeCompile(schema as any);
+
+    expect(transformer).toBeNull();
+  });
+
+  it('should return noop for nothing to transform in compile', () => {
+    const schema = {
+      [BRAND]: true,
+      $id: 'ExtendedPrimitive',
+      type: 'object',
+      properties: { num: { type: 'number' } },
+    };
+
+    const factory = new TransformerFactory(schema => !!schema.tagged);
+    const transformer = factory.compile(schema as any);
+
+    expect(transformer.name).toBe('noop');
   });
 
   it('should transform data with array schema', () => {
