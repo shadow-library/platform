@@ -105,8 +105,24 @@ describe('ClassSchema', () => {
     folders: Folder;
   }
 
+  describe('isBranded', () => {
+    it('should return true for branded schema', () => {
+      const schema = new ClassSchema(Sample).getJSONSchema();
+      expect(ClassSchema.isBranded(schema)).toBe(true);
+    });
+
+    it('should return true for branded clone schema', () => {
+      const schema = new ClassSchema(Sample).getJSONSchema(true);
+      expect(ClassSchema.isBranded(schema)).toBe(true);
+    });
+
+    it('should return false for non-branded schema', () => {
+      expect(ClassSchema.isBranded({ type: 'object' })).toBe(false);
+    });
+  });
+
   describe('generate', () => {
-    it('should return ths json schema of the class', () => {
+    it('should return the json schema of the class', () => {
       expect(ClassSchema.generate(Primitive)).toStrictEqual({
         $id: Primitive.name,
         type: 'object',

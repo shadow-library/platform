@@ -54,6 +54,10 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     return new ClassSchema(Class).getJSONSchema();
   }
 
+  static isBranded(schema: JSONSchema): boolean {
+    return (schema as Record<symbol, boolean>)[BRAND] ?? false;
+  }
+
   private brand(schema: ParsedSchema): ParsedSchema {
     Object.defineProperty(schema, BRAND, { value: true, enumerable: false });
     Object.freeze(schema);

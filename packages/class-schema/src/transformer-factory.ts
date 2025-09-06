@@ -6,8 +6,7 @@ import { InternalError, MaybeNull } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { ParsedSchema } from './class-schema';
-import { BRAND } from './constants';
+import { ClassSchema, ParsedSchema } from './class-schema';
 import { JSONSchema } from './interfaces';
 
 /**
@@ -147,7 +146,7 @@ export class TransformerFactory {
   }
 
   maybeCompile(schema: ParsedSchema): MaybeNull<Transformer> {
-    if (!(schema as Record<symbol, boolean>)[BRAND]) throw new InternalError('Invalid schema: only schemas built with this package are supported');
+    if (!ClassSchema.isBranded(schema)) throw new InternalError('Invalid schema: only schemas built with this package are supported');
 
     const clonedSchema = structuredClone(schema);
     Object.values(clonedSchema.definitions || {}).forEach(def => this.generateTransformer(def));
