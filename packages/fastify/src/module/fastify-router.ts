@@ -4,7 +4,8 @@
 import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
-import { InternalError, Logger, utils } from '@shadow-library/common';
+import { ClassSchema, JSONSchema, ParsedSchema, TransformerFactory } from '@shadow-library/class-schema';
+import { InternalError, Logger, MaybeUndefined, utils } from '@shadow-library/common';
 import merge from 'deepmerge';
 import { type FastifyInstance, RouteOptions } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
@@ -16,7 +17,7 @@ import { Class, JsonObject, JsonValue, Promisable } from 'type-fest';
  * Importing user defined packages
  */
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
-import { HttpMethod, MiddlewareMetadata } from '../decorators';
+import { HttpMethod, MiddlewareMetadata, SensitiveDataType } from '../decorators';
 import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
 import { ContextService } from '../services';
 import { type FastifyConfig } from './fastify-module.interface';
@@ -32,6 +33,7 @@ declare module 'fastify' {
 
   interface FastifyContextConfig {
     metadata: ServerMetadata;
+    artifacts: RouteArtifacts;
   }
 }
 
@@ -87,6 +89,14 @@ export interface ChildRouteRequest {
 
 type MiddlewareHandler = ParsedController<MiddlewareMetadata>['handler'];
 
+interface RouteArtifacts {
+  transforms: {
+    maskBody?(body: object): object;
+    maskQuery?(query: object): object;
+    maskParams?(params: object): object;
+  };
+}
+
 /**
  * Declaring the constants
  */
@@ -99,6 +109,7 @@ export class FastifyRouter extends Router {
   private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
   private readonly cachedDynamicMiddlewares = new Map<string, MiddlewareHandler>();
   private readonly childRouter: ChildRouter<HTTPVersion.V1> | null = null;
+  private readonly sensitiveTransformer = new TransformerFactory(s => s['x-fastify']?.sensitive === true);
 
   constructor(
     @Inject(FASTIFY_CONFIG) private readonly config: FastifyConfig,
@@ -126,6 +137,15 @@ export class FastifyRouter extends Router {
     });
   }
 
+  private maskField(value: unknown, schema: JSONSchema): string {
+    const type = schema['x-fastify']?.type as MaybeUndefined<SensitiveDataType>;
+    const stringified = typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value) : String(value);
+    if (type === 'email') return utils.string.maskEmail(stringified);
+    if (type === 'number') return utils.string.maskNumber(stringified);
+    if (type === 'words') return utils.string.maskWords(stringified);
+    return '****';
+  }
+
   private getRequestLogger(): CallbackRouteHandler {
     return (req, res, done) => {
       const startTime = process.hrtime();
@@ -134,9 +154,11 @@ export class FastifyRouter extends Router {
         const isLoggingDisabled = this.context.get('DISABLE_REQUEST_LOGGING') ?? false;
         if (isLoggingDisabled) return;
 
+        const { url, config } = req.routeOptions;
+        const { transforms } = config.artifacts;
         const metadata: RequestMetadata = {};
         metadata.rid = this.context.getRID();
-        metadata.url = req.url;
+        metadata.url = url;
         metadata.method = req.method;
         metadata.status = res.statusCode;
         metadata.service = req.headers['x-service'] as string | undefined;
@@ -146,8 +168,9 @@ export class FastifyRouter extends Router {
 
         const resTime = process.hrtime(startTime);
         metadata.timeTaken = (resTime[0] * 1e3 + resTime[1] * 1e-6).toFixed(3); // Converting time to milliseconds
-        if (req.query) metadata.query = req.query;
-        if (req.body) metadata.body = req.body;
+        if (req.body) metadata.body = transforms.maskBody ? transforms.maskBody(structuredClone(req.body)) : req.body;
+        if (req.query) metadata.query = transforms.maskQuery ? transforms.maskQuery(structuredClone(req.query)) : req.query;
+        if (req.params) metadata.params = transforms.maskParams ? transforms.maskParams(structuredClone(req.params)) : req.params;
         this.logger.http('http', metadata);
       });
 
@@ -272,7 +295,8 @@ export class FastifyRouter extends Router {
       this.logger.debug(`registering route ${metadata.method} ${metadata.path}`);
 
       const fastifyRouteOptions = utils.object.omitKeys(metadata, ['path', 'method', 'schemas', 'rawBody', 'status', 'headers', 'redirect', 'render']);
-      const routeOptions = { ...fastifyRouteOptions, config: { metadata } } as RouteOptions;
+      const artifacts: RouteArtifacts = { transforms: {} };
+      const routeOptions = { ...fastifyRouteOptions, config: { metadata, artifacts } } as RouteOptions;
       routeOptions.url = metadata.path;
       routeOptions.method = metadata.method === HttpMethod.ALL ? httpMethods : [metadata.method];
       routeOptions.handler = this.generateRouteHandler(route);
@@ -293,9 +317,28 @@ export class FastifyRouter extends Router {
       routeOptions.schema = {};
       routeOptions.attachValidation = metadata.silentValidation ?? false;
       routeOptions.schema.response = merge(metadata.schemas?.response ?? {}, defaultResponseSchemas);
-      if (metadata.schemas?.body) routeOptions.schema.body = metadata.schemas.body;
-      if (metadata.schemas?.params) routeOptions.schema.params = metadata.schemas.params;
-      if (metadata.schemas?.query) routeOptions.schema.querystring = metadata.schemas.query;
+      const { body: bodySchema, params: paramsSchema, query: querySchema } = metadata.schemas ?? {};
+      if (bodySchema) {
+        routeOptions.schema.body = bodySchema;
+        if (ClassSchema.isBranded(bodySchema)) {
+          const transformer = this.sensitiveTransformer.maybeCompile(bodySchema as ParsedSchema);
+          if (transformer) artifacts.transforms.maskBody = obj => transformer(obj, this.maskField);
+        }
+      }
+      if (paramsSchema) {
+        routeOptions.schema.params = paramsSchema;
+        if (ClassSchema.isBranded(paramsSchema)) {
+          const transformer = this.sensitiveTransformer.maybeCompile(paramsSchema as ParsedSchema);
+          if (transformer) artifacts.transforms.maskParams = obj => transformer(obj, this.maskField);
+        }
+      }
+      if (querySchema) {
+        routeOptions.schema.querystring = querySchema;
+        if (ClassSchema.isBranded(querySchema)) {
+          const transformer = this.sensitiveTransformer.maybeCompile(querySchema as ParsedSchema);
+          if (transformer) artifacts.transforms.maskQuery = obj => transformer(obj, this.maskField);
+        }
+      }
       this.logger.debug('route options', { options: routeOptions });
 
       this.instance.route(routeOptions);

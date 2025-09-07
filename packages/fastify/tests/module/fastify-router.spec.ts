@@ -3,14 +3,15 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
-import { Fn, InternalError, Logger, ValidationError, withThis } from '@shadow-library/common';
+import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
+import { InternalError, Logger, utils, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { ContextService, FastifyModule, FastifyRouter, HttpMethod, ServerMetadata } from '@shadow-library/fastify';
+import { ContextService, FastifyModule, FastifyRouter, HttpMethod, Sensitive, ServerMetadata } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -32,6 +33,7 @@ describe('FastifyRouter', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
+    jest.restoreAllMocks();
     instance = fastify();
     router = new FastifyRouter(config, instance, context);
   });
@@ -68,6 +70,40 @@ describe('FastifyRouter', () => {
     expect(addContentTypeParser).toHaveBeenCalledWith('application/json', { parseAs: 'buffer' }, expect.any(Function));
     expect(parser).toHaveBeenCalledWith(request, buffer.toString(), done);
     expect(request.rawBody).toBe(buffer);
+  });
+
+  describe('maskField', () => {
+    it('should mask field type email', () => {
+      jest.spyOn(utils.string, 'maskEmail').mockReturnValue('****@example.com');
+
+      const result = router['maskField']('test@example.com', { 'x-fastify': { type: 'email' } });
+
+      expect(result).toBe('****@example.com');
+      expect(utils.string.maskEmail).toBeCalledWith('test@example.com');
+    });
+
+    it('should mask field type number', () => {
+      jest.spyOn(utils.string, 'maskNumber').mockReturnValue('****');
+
+      const result = router['maskField'](1234567890, { 'x-fastify': { type: 'number' } });
+
+      expect(result).toBe('****');
+      expect(utils.string.maskNumber).toBeCalledWith('1234567890');
+    });
+
+    it('should mask field type words', () => {
+      jest.spyOn(utils.string, 'maskWords').mockReturnValue('****');
+
+      const result = router['maskField']('some sensitive information', { 'x-fastify': { type: 'words' } });
+
+      expect(result).toBe('****');
+      expect(utils.string.maskWords).toBeCalledWith('some sensitive information');
+    });
+
+    it('should mask field type secrets', () => {
+      const result = router['maskField']({ obj: 'value' }, {});
+      expect(result).toBe('****');
+    });
   });
 
   describe('mockRequest', () => {
@@ -204,7 +240,7 @@ describe('FastifyRouter', () => {
     });
 
     it('should call the handler with the correct arguments', async () => {
-      Reflect.getMetadata = jest.fn().mockReturnValue(['params', 'request', class {}, 'query', Object, 'response', 'body']);
+      jest.spyOn(Reflect, 'getMetadata').mockReturnValue(['params', 'request', class {}, 'query', Object, 'response', 'body']);
       const routeHandler = generateRouteHandler({});
       await routeHandler(request, response);
       expect(handler).toBeCalledWith(request.params, request, undefined, request.query, undefined, response, request.body);
@@ -235,10 +271,11 @@ describe('FastifyRouter', () => {
   });
 
   describe('register', () => {
-    const route = { metadata: { path: '/', method: HttpMethod.GET, rawBody: true } } as any;
+    let route: any;
 
     beforeEach(() => {
       config.responseSchema = undefined;
+      route = { metadata: { path: '/', method: HttpMethod.GET, rawBody: true } };
       router['parseControllers'] = jest.fn().mockReturnValue({ routes: [route], middlewares: [] }) as any;
       router['generateRouteHandler'] = jest.fn().mockReturnValue(jest.fn()) as any;
       instance.route = jest.fn().mockReturnThis() as any;
@@ -253,7 +290,7 @@ describe('FastifyRouter', () => {
     it('should register single method route', async () => {
       await router.register([]);
       expect(instance.route).toBeCalledWith({
-        config: { metadata: route.metadata },
+        config: { metadata: route.metadata, artifacts: { transforms: {} } },
         attachValidation: false,
         handler: expect.any(Function),
         method: ['GET'],
@@ -263,10 +300,33 @@ describe('FastifyRouter', () => {
     });
 
     it('should register multiple method route', async () => {
-      const route = { metadata: { path: '/', method: HttpMethod.ALL } } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [] });
+      route.metadata = { path: '/', method: HttpMethod.ALL };
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ method: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS', 'HEAD'] }));
+    });
+
+    it('should generate the artifacts for sensitive data masking', async () => {
+      @Schema()
+      class SensitiveClass {
+        @Sensitive()
+        @Field()
+        password: string;
+      }
+
+      const schema = ClassSchema.generate(SensitiveClass);
+      route.metadata.schemas = { body: schema, params: schema, query: schema };
+      await router.register([]);
+      expect(instance.route).toBeCalledWith({
+        config: { metadata: route.metadata, artifacts: { transforms: { maskBody: expect.any(Function), maskParams: expect.any(Function), maskQuery: expect.any(Function) } } },
+        attachValidation: false,
+        handler: expect.any(Function),
+        method: ['GET'],
+        url: '/',
+        schema: { response: {}, body: schema, params: schema, querystring: schema },
+      });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts.transforms.maskBody?.({ password: 'secret' })).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts.transforms.maskParams?.({ password: 'secret' })).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts.transforms.maskQuery?.({ password: 'secret' })).toEqual({ password: '****' });
     });
 
     it('should apply the middleware if generator returns a function', async () => {
@@ -376,7 +436,7 @@ describe('FastifyRouter', () => {
         headers: { 'x-service': 'test-service', 'content-length': '123' },
         query: { key: 'value' },
         body: { data: 'test' },
-        routeOptions: { url: '/test' },
+        routeOptions: { url: '/test', config: { metadata: {}, artifacts: { transforms: {} } } },
       } as any;
       const res = {
         statusCode: 200,
@@ -402,6 +462,46 @@ describe('FastifyRouter', () => {
         timeTaken: expect.any(String),
         query: { key: 'value' },
         body: { data: 'test' },
+      });
+    });
+
+    it('should log masked request metadata when logging is enabled', () => {
+      const mask = jest.fn(() => '***');
+      const req = {
+        url: '/test',
+        method: 'GET',
+        socket: { remoteAddress: '127.0.0.1' },
+        headers: { 'x-service': 'test-service', 'content-length': '123' },
+        query: { key: 'value' },
+        body: { data: 'test' },
+        params: { id: '789' },
+        routeOptions: { url: '/test', config: { metadata: {}, artifacts: { transforms: { maskBody: mask, maskParams: mask, maskQuery: mask } } } },
+      } as any;
+      const res = {
+        statusCode: 200,
+        raw: { on: jest.fn((_, callback: () => void) => callback()) },
+        getHeader: jest.fn().mockReturnValue('456'),
+      } as any;
+      const cb = jest.fn();
+
+      const logger = router['getRequestLogger']();
+      logger.call({} as any, req, res, cb);
+
+      expect(cb).toHaveBeenCalled();
+      expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
+      expect(httpLogger).toHaveBeenCalledWith('http', {
+        rid: 'test-rid',
+        url: '/test',
+        method: 'GET',
+        status: 200,
+        service: 'test-service',
+        reqLen: '123',
+        reqIp: '127.0.0.1',
+        resLen: '456',
+        timeTaken: expect.any(String),
+        query: '***',
+        body: '***',
+        params: '***',
       });
     });
 

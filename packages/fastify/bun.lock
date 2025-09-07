@@ -21,7 +21,7 @@
         "@fastify/view": "^10.0.2",
         "@release-it/conventional-changelog": "^10.0.1",
         "@shadow-library/app": "^1.0.10",
-        "@shadow-library/class-schema": "^0.0.9",
+        "@shadow-library/class-schema": "^0.0.12",
         "@shadow-library/common": "^1.0.20",
         "@types/bun": "^1.2.20",
         "@typescript-eslint/parser": "^8.40.0",
@@ -43,8 +43,8 @@
       "peerDependencies": {
         "@fastify/view": "^10.0.0",
         "@shadow-library/app": "^1.0.7",
-        "@shadow-library/class-schema": "^0.0.9",
-        "@shadow-library/common": "^1.0.20",
+        "@shadow-library/class-schema": "^0.0.12",
+        "@shadow-library/common": "^1.0.18",
         "reflect-metadata": "^0.2.2",
       },
       "optionalPeers": [
@@ -363,7 +363,7 @@
 
     "@shadow-library/app": ["@shadow-library/app@1.0.10", "", { "dependencies": { "deepmerge": "^4.3.1", "type-fest": "^4.41.0" }, "peerDependencies": { "@shadow-library/common": "^1.0.16", "reflect-metadata": "^0.2.2" } }, "sha512-KXbdI0c061eBqZy09lWZzIJo5iHYjxOM9Ah3R5saE0tcllVsF5R2vLXRgnOD5ppVWO6/HwXYQRXZct7ZqR9sIg=="],
 
-    "@shadow-library/class-schema": ["@shadow-library/class-schema@0.0.9", "", { "dependencies": { "@shadow-library/common": "^1.0.4", "deepmerge": "^4.3.1" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-tf2ze05i6rXoy8E759tU2QWGY1bmJtRKr8uumuhw8h/472FegOtF9cSMgXUWu7sAQ4wTcIVVVrdspRouoDF9MA=="],
+    "@shadow-library/class-schema": ["@shadow-library/class-schema@0.0.12", "", { "dependencies": { "deepmerge": "^4.3.1" }, "peerDependencies": { "@shadow-library/common": "^1.0.18", "reflect-metadata": "^0.2.2" } }, "sha512-KpKwa/4Dp4Gy5xmCbSna0hxYpWg2tF/GwqYyCnmST+/tTFCDy5Blj+dykjpHsj0HNlR3t3m06ee/vQ3PPgK/XA=="],
 
     "@shadow-library/common": ["@shadow-library/common@1.0.20", "", { "dependencies": { "@aws-sdk/client-cloudwatch-logs": "^3.734.0", "@colors/colors": "^1.6.0", "deepmerge": "^4.3.1", "fast-redact": "^3.5.0", "type-fest": "^4.40.0", "undici": "^7.10.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-gBChT1tGbUGlad5ww9EbfC0AeMV3WySPmUsPVxgiiIqKCP+oNCAX2eKs+j/n5WLi5r0g9Fl4YpXUHrLdWMYGFQ=="],
 
@@ -1866,8 +1866,6 @@
     "@jest/transform/slash": ["slash@3.0.0", "", {}, "sha512-g9Q1haeby36OSStwb4ntCGGGaKsaVSjQ68fBxoQcutl5fS1vuY18H3wSt3jFyFtrkx+Kz0V1G85A4MyAdDMi2Q=="],
 
     "@pnpm/network.ca-file/graceful-fs": ["graceful-fs@4.2.10", "", {}, "sha512-9ByhssR2fPVsNZj478qUUbKfmL0+t5BDVyjShtyZZLiK7ZDAArFFfopyOTj0M05wE2tJPisA4iTnnXl2YoPvOA=="],
-
-    "@shadow-library/class-schema/@shadow-library/common": ["@shadow-library/common@1.0.14", "", { "dependencies": { "@aws-sdk/client-cloudwatch-logs": "^3.734.0", "@colors/colors": "^1.6.0", "deepmerge": "^4.3.1", "fast-redact": "^3.5.0", "type-fest": "^4.40.0", "undici": "^7.10.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-B+JTZavGnYAaq1oh+eHeTs6LZLo2gxhughkhJtJJ8LbX8NWk6Z10+ALoCcN8mYUZUls4uzlDbIqtcYBGrF/E5A=="],
 
     "@smithy/middleware-retry/uuid": ["uuid@9.0.1", "", { "bin": { "uuid": "dist/bin/uuid" } }, "sha512-b+1eJOlsR9K8HJpow9Ok3fiWOWSIcIzXodvv0rQjVoOVNpWMpxf1wZNpt4y9h10odCNrqnYp1OBzRktckBe3sA=="],
 
