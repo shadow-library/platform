@@ -36,10 +36,12 @@ export class FastifyModule {
       responseSchema: { '4xx': errorResponseSchema, '5xx': errorResponseSchema },
       errorHandler: new DefaultErrorHandler(),
 
-      ignoreTrailingSlash: true,
-      ignoreDuplicateSlashes: true,
       requestIdLogLabel: 'rid',
       genReqId: () => uuid(),
+      routerOptions: {
+        ignoreTrailingSlash: true,
+        ignoreDuplicateSlashes: true,
+      },
     };
   }
 
