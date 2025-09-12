@@ -47,17 +47,27 @@ export class FastifyModule {
 
   static forRoot(options: FastifyModuleOptions): Class<FastifyModule> {
     const config = Object.assign({}, this.getDefaultConfig(), utils.object.omitKeys(options, ['imports', 'fastifyFactory']));
-    return this.forRootAsync({ imports: options.imports, useFactory: () => config, fastifyFactory: options.fastifyFactory });
+    return this.forRootAsync({
+      imports: options.imports,
+      controllers: options.controllers,
+      providers: options.providers,
+      exports: options.exports,
+      useFactory: () => config,
+      fastifyFactory: options.fastifyFactory,
+    });
   }
 
   static forRootAsync(options: FastifyModuleAsyncOptions): Class<FastifyModule> {
     const imports = options.imports ?? [];
+    const controllers = options.controllers ?? [];
+    const exports = options.exports ?? [];
     const providers: Provider[] = [{ token: Router, useClass: FastifyRouter }, ContextService];
+    if (options.providers) providers.push(...options.providers);
     providers.push({ token: FASTIFY_CONFIG, useFactory: options.useFactory, inject: options.inject });
     const fastifyFactory = (config: FastifyConfig) => createFastifyInstance(config, options.fastifyFactory);
     providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
 
-    Module({ imports, providers, exports: [Router, ContextService] })(FastifyModule);
+    Module({ imports, controllers, providers, exports: [Router, ContextService, ...exports] })(FastifyModule);
     return FastifyModule;
   }
 }

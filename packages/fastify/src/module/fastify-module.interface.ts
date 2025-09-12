@@ -58,9 +58,24 @@ export interface FastifyModuleOptions extends Partial<FastifyConfig> {
    * Factory function to modify the Fastify instance before it is used to register the controllers
    */
   fastifyFactory?: (instance: FastifyInstance) => Promisable<FastifyInstance>;
+
+  /**
+   * The list of controllers to be registered in the Fastify instance
+   */
+  controllers?: ModuleMetadata['controllers'];
+
+  /**
+   * The list of providers to be registered in the Fastify instance
+   */
+  providers?: ModuleMetadata['providers'];
+
+  /**
+   * The list of providers to be exported by the Fastify module
+   */
+  exports?: ModuleMetadata['exports'];
 }
 
-export interface FastifyModuleAsyncOptions extends Pick<FastifyModuleOptions, 'imports' | 'fastifyFactory'> {
+export interface FastifyModuleAsyncOptions extends Pick<FastifyModuleOptions, 'imports' | 'controllers' | 'providers' | 'exports' | 'fastifyFactory'> {
   /**
    * Factory function to create the FastifyModuleOptions
    */

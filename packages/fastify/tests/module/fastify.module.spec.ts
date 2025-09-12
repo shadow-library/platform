@@ -1,13 +1,14 @@
 /**
  * Importing npm packages
  */
-import { afterEach, beforeEach, describe, expect, it } from '@jest/globals';
-import { Module, Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { describe, expect, it, jest } from '@jest/globals';
+import { Module, Router } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
-import { FastifyModule, FastifyRouter, Get, HttpController } from '@shadow-library/fastify';
+import { FASTIFY_CONFIG } from '@lib/constants';
+import { ContextService, FastifyModule, FastifyRouter, HttpController } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -16,32 +17,85 @@ import { FastifyModule, FastifyRouter, Get, HttpController } from '@shadow-libra
 /**
  * Declaring the constants
  */
+const target = jest.fn();
+
+jest.mock('@shadow-library/app', () => {
+  const originalModule: object = jest.requireActual('@shadow-library/app');
+  return { ...originalModule, Module: jest.fn().mockImplementation(() => target) };
+});
 
 describe('FastifyModule', () => {
-  let app: ShadowApplication;
-  @HttpController('/hello')
-  class HelloController {
-    @Get()
-    getHello() {
-      return { message: 'Hello, World!' };
-    }
-  }
+  describe('forRoot', () => {
+    it('should create the application with controllers', async () => {
+      @HttpController()
+      class Controller {}
 
-  @Module({ controllers: [HelloController] })
-  class App {}
-  const appModule = FastifyModule.forRoot({ imports: [App] });
+      FastifyModule.forRoot({ controllers: [Controller] });
 
-  beforeEach(() => ShadowFactory.create(appModule).then(application => (app = application)));
-  afterEach(() => app.stop());
+      expect(target).toHaveBeenCalledWith(FastifyModule);
+      expect(Module).toHaveBeenCalledWith({
+        imports: [],
+        controllers: [Controller],
+        providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
+        exports: [Router, ContextService],
+      });
+    });
 
-  it('should start the application', async () => {
-    await expect(app.start()).resolves.toBeTruthy();
+    it('should append custom providers', async () => {
+      class Provider {}
+
+      FastifyModule.forRoot({ providers: [Provider] });
+
+      expect(Module).toHaveBeenCalledWith({
+        imports: [],
+        controllers: [],
+        providers: expect.arrayContaining([Provider]),
+        exports: [Router, ContextService],
+      });
+    });
   });
 
-  it('should respond to GET /hello', async () => {
-    const router: FastifyRouter = app.get(Router);
-    const response = await router.mockRequest().get('/hello');
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toEqual({ message: 'Hello, World!' });
+  describe('forRootAsync', () => {
+    it('should create the application with controllers', async () => {
+      @HttpController()
+      class Controller {}
+
+      const useFactory = () => ({}) as any;
+      FastifyModule.forRootAsync({ controllers: [Controller], useFactory });
+
+      expect(target).toHaveBeenCalledWith(FastifyModule);
+      expect(Module).toHaveBeenCalledWith({
+        imports: [],
+        controllers: [Controller],
+        providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory }]),
+        exports: [Router, ContextService],
+      });
+    });
+
+    it('should append custom providers', async () => {
+      class Provider {}
+
+      FastifyModule.forRootAsync({ providers: [Provider], useFactory: () => ({}) as any });
+
+      expect(Module).toHaveBeenCalledWith({
+        imports: [],
+        controllers: [],
+        providers: expect.arrayContaining([Provider]),
+        exports: [Router, ContextService],
+      });
+    });
+
+    it('should append custom imports', async () => {
+      class Import {}
+
+      FastifyModule.forRootAsync({ imports: [Import], useFactory: () => ({}) as any });
+
+      expect(Module).toHaveBeenCalledWith({
+        imports: [Import],
+        controllers: [],
+        providers: expect.arrayContaining([]),
+        exports: [Router, ContextService],
+      });
+    });
   });
 });
