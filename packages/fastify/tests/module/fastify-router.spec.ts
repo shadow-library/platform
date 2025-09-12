@@ -450,7 +450,7 @@ describe('FastifyRouter', () => {
 
       expect(cb).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
-      expect(httpLogger).toHaveBeenCalledWith('http', {
+      expect(httpLogger).toHaveBeenCalledWith(expect.stringMatching(/^GET \/test -> 200 \(0\.[0-9]{3}ms\)$/), {
         rid: 'test-rid',
         url: '/test',
         method: 'GET',
@@ -468,14 +468,14 @@ describe('FastifyRouter', () => {
     it('should log masked request metadata when logging is enabled', () => {
       const mask = jest.fn(() => '***');
       const req = {
-        url: '/test',
-        method: 'GET',
+        url: '/api/test',
+        method: 'POST',
         socket: { remoteAddress: '127.0.0.1' },
         headers: { 'x-service': 'test-service', 'content-length': '123' },
         query: { key: 'value' },
         body: { data: 'test' },
         params: { id: '789' },
-        routeOptions: { url: '/test', config: { metadata: {}, artifacts: { transforms: { maskBody: mask, maskParams: mask, maskQuery: mask } } } },
+        routeOptions: { url: '/api/test', config: { metadata: {}, artifacts: { transforms: { maskBody: mask, maskParams: mask, maskQuery: mask } } } },
       } as any;
       const res = {
         statusCode: 200,
@@ -489,10 +489,10 @@ describe('FastifyRouter', () => {
 
       expect(cb).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
-      expect(httpLogger).toHaveBeenCalledWith('http', {
+      expect(httpLogger).toHaveBeenCalledWith(expect.stringMatching(/^POST \/api\/test -> 200 \(0\.[0-9]{3}ms\)$/), {
         rid: 'test-rid',
-        url: '/test',
-        method: 'GET',
+        url: '/api/test',
+        method: 'POST',
         status: 200,
         service: 'test-service',
         reqLen: '123',

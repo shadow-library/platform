@@ -171,7 +171,7 @@ export class FastifyRouter extends Router {
         if (req.body) metadata.body = transforms.maskBody ? transforms.maskBody(structuredClone(req.body)) : req.body;
         if (req.query) metadata.query = transforms.maskQuery ? transforms.maskQuery(structuredClone(req.query)) : req.query;
         if (req.params) metadata.params = transforms.maskParams ? transforms.maskParams(structuredClone(req.params)) : req.params;
-        this.logger.http('http', metadata);
+        this.logger.http(`${req.method} ${url} -> ${res.statusCode} (${metadata.timeTaken}ms)`, metadata);
       });
 
       done();
