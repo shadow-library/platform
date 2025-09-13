@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { AppError, AppErrorObject, ErrorType, Logger, ValidationError } from '@shadow-library/common';
+import { AppError, AppErrorObject, Logger, ValidationError } from '@shadow-library/common';
 import { FastifyError } from 'fastify';
 
 /**
@@ -26,13 +26,14 @@ export interface ParsedFastifyError {
  */
 const unexpectedError = new ServerError(ServerErrorCode.S001);
 const validationError = new ServerError(ServerErrorCode.S003);
+const invalidRequestError = new ServerError(ServerErrorCode.S006);
 
 export class DefaultErrorHandler implements ErrorHandler {
   private readonly logger = Logger.getLogger(NAMESPACE, 'DefaultErrorHandler');
 
   protected parseFastifyError(err: FastifyError): ParsedFastifyError {
     if (err.statusCode === 500) return { statusCode: 500, error: unexpectedError.toObject() };
-    return { statusCode: err.statusCode as number, error: { code: err.code, type: ErrorType.CLIENT_ERROR, message: err.message } };
+    return { statusCode: err.statusCode as number, error: { ...invalidRequestError.toObject(), message: err.message } };
   }
 
   handle(err: Error, _req: HttpRequest, res: HttpResponse): HttpResponse {

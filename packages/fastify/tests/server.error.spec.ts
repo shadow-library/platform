@@ -18,8 +18,8 @@ import { ServerError, ServerErrorCode } from '@shadow-library/fastify';
 
 describe('ServerError', () => {
   it('should return the custom status code', () => {
-    const error = new ServerError(ServerErrorCode.S004);
-    expect(error.getStatusCode()).toBe(413);
+    const error = new ServerError(ServerErrorCode.S007);
+    expect(error.getStatusCode()).toBe(429);
   });
 
   it('should return the default status code', () => {

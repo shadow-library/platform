@@ -65,7 +65,7 @@ describe('DefaultErrorHandler', () => {
     expect(response.status).toHaveBeenCalledWith(415);
     expect(response.send).toHaveBeenCalledWith({
       type: 'CLIENT_ERROR',
-      code: 'FST_ERR_CTP_INVALID_MEDIA_TYPE',
+      code: 'S006',
       message: 'Unsupported Media Type: application/unknown',
     });
   });
@@ -75,7 +75,7 @@ describe('DefaultErrorHandler', () => {
     errorHandler.handle(error, request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
-    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'Unexpected Server Error', type: 'SERVER_ERROR' });
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
   });
 
   it('should log the cause of the error', () => {
@@ -90,7 +90,7 @@ describe('DefaultErrorHandler', () => {
     errorHandler.handle(error, request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
-    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'Unexpected Server Error', type: 'SERVER_ERROR' });
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
   });
 
   it('should handle unknown error of type unknown', () => {
@@ -98,6 +98,6 @@ describe('DefaultErrorHandler', () => {
     errorHandler.handle(error, request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
-    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'Unexpected Server Error', type: 'SERVER_ERROR' });
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
   });
 });
