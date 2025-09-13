@@ -32,8 +32,8 @@ declare module 'fastify' {
   }
 
   interface FastifyContextConfig {
-    metadata: ServerMetadata;
-    artifacts: RouteArtifacts;
+    metadata?: ServerMetadata;
+    artifacts?: RouteArtifacts;
   }
 }
 
@@ -101,6 +101,7 @@ interface RouteArtifacts {
  * Declaring the constants
  */
 const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) as Exclude<HttpMethod, HttpMethod.ALL>[];
+const DEFAULT_ARTIFACTS: RouteArtifacts = { transforms: {} };
 
 @Injectable()
 export class FastifyRouter extends Router {
@@ -132,7 +133,7 @@ export class FastifyRouter extends Router {
     const parser = this.instance.getDefaultJsonParser('error', 'error');
     this.instance.addContentTypeParser<Buffer>('application/json', opts, (req, body, done) => {
       const { metadata } = req.routeOptions.config;
-      if (metadata.rawBody) req.rawBody = body;
+      if (metadata?.rawBody) req.rawBody = body;
       return parser(req, body.toString(), done);
     });
   }
@@ -155,10 +156,10 @@ export class FastifyRouter extends Router {
         if (isLoggingDisabled) return;
 
         const { url, config } = req.routeOptions;
-        const { transforms } = config.artifacts;
+        const { transforms } = config.artifacts ?? DEFAULT_ARTIFACTS;
         const metadata: RequestMetadata = {};
         metadata.rid = this.context.getRID();
-        metadata.url = url;
+        metadata.url = url ?? req.raw.url;
         metadata.method = req.method;
         metadata.status = res.statusCode;
         metadata.service = req.headers['x-service'] as string | undefined;
@@ -171,7 +172,7 @@ export class FastifyRouter extends Router {
         if (req.body) metadata.body = transforms.maskBody ? transforms.maskBody(structuredClone(req.body)) : req.body;
         if (req.query) metadata.query = transforms.maskQuery ? transforms.maskQuery(structuredClone(req.query)) : req.query;
         if (req.params) metadata.params = transforms.maskParams ? transforms.maskParams(structuredClone(req.params)) : req.params;
-        this.logger.http(`${req.method} ${url} -> ${res.statusCode} (${metadata.timeTaken}ms)`, metadata);
+        this.logger.http(`${req.method} ${metadata.url} -> ${res.statusCode} (${metadata.timeTaken}ms)`, metadata);
       });
 
       done();

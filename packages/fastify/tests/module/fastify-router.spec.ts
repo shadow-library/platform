@@ -324,9 +324,9 @@ describe('FastifyRouter', () => {
         url: '/',
         schema: { response: {}, body: schema, params: schema, querystring: schema },
       });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts.transforms.maskBody?.({ password: 'secret' })).toEqual({ password: '****' });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts.transforms.maskParams?.({ password: 'secret' })).toEqual({ password: '****' });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts.transforms.maskQuery?.({ password: 'secret' })).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transforms.maskBody?.({ password: 'secret' })).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transforms.maskParams?.({ password: 'secret' })).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transforms.maskQuery?.({ password: 'secret' })).toEqual({ password: '****' });
     });
 
     it('should apply the middleware if generator returns a function', async () => {
@@ -462,6 +462,38 @@ describe('FastifyRouter', () => {
         timeTaken: expect.any(String),
         query: { key: 'value' },
         body: { data: 'test' },
+      });
+    });
+
+    it('should log request metadata for unknown requests', () => {
+      const req = {
+        url: '/unknown',
+        method: 'GET',
+        socket: { remoteAddress: '127.0.0.1' },
+        headers: {},
+        raw: { url: '/unknown' },
+        routeOptions: { config: {} },
+      } as any;
+      const res = {
+        statusCode: 404,
+        raw: { on: jest.fn((_, callback: () => void) => callback()) },
+        getHeader: jest.fn().mockReturnValue('456'),
+      } as any;
+      const cb = jest.fn();
+
+      const logger = router['getRequestLogger']();
+      logger.call({} as any, req, res, cb);
+
+      expect(cb).toHaveBeenCalled();
+      expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
+      expect(httpLogger).toHaveBeenCalledWith(expect.stringMatching(/^GET \/unknown -> 404 \(0\.[0-9]{3}ms\)$/), {
+        rid: 'test-rid',
+        url: '/unknown',
+        method: 'GET',
+        status: 404,
+        reqIp: '127.0.0.1',
+        resLen: '456',
+        timeTaken: expect.any(String),
       });
     });
 
