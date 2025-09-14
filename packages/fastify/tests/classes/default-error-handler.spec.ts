@@ -41,11 +41,11 @@ describe('DefaultErrorHandler', () => {
     const error = new ValidationError('name', 'Invalid Name');
     errorHandler.handle(error, request, response);
 
-    expect(response.status).toHaveBeenCalledWith(400);
+    expect(response.status).toHaveBeenCalledWith(422);
     expect(response.send).toHaveBeenCalledWith({
       code: 'S003',
       type: 'VALIDATION_ERROR',
-      message: 'Validation Error',
+      message: 'The provided input data is invalid or does not meet validation requirements',
       fields: [{ field: 'name', msg: 'Invalid Name' }],
     });
   });

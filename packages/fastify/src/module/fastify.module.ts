@@ -46,7 +46,7 @@ export class FastifyModule {
   }
 
   static forRoot(options: FastifyModuleOptions): Class<FastifyModule> {
-    const config = Object.assign({}, this.getDefaultConfig(), utils.object.omitKeys(options, ['imports', 'fastifyFactory']));
+    const config = Object.assign({}, this.getDefaultConfig(), utils.object.omitKeys(options, ['imports', 'controllers', 'providers', 'exports', 'fastifyFactory']));
     return this.forRootAsync({
       imports: options.imports,
       controllers: options.controllers,
