@@ -10,7 +10,9 @@
     "lint": "bun run scripts/lint.ts",
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts",
-    "test": "jest"
+    "test": "bun test:unit && bun test:integration",
+    "test:unit": "jest",
+    "test:integration": "bun test ./tests/integration"
   },
   "repository": {
     "type": "git",

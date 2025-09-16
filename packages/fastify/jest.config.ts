@@ -18,6 +18,7 @@ import type { Config } from 'jest';
 const config: Config = {
   testEnvironment: 'node',
   testRegex: '.spec.ts$',
+  testPathIgnorePatterns: ['integration'],
   detectOpenHandles: true,
 
   setupFiles: ['reflect-metadata'],

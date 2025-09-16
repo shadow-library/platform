@@ -26,7 +26,8 @@
     "moduleResolution": "node",
     "paths": {
       "@lib/*": ["src/*"],
-      "@shadow-library/fastify": ["src/index.ts"]
+      "@shadow-library/fastify": ["src/index.ts"],
+      "@examples/*": ["examples/*"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
@@ -43,5 +44,5 @@
     /** Completeness */
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
 }
