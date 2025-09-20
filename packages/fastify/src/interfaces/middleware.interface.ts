@@ -6,7 +6,7 @@ import { RouteMetadata } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { RouteHandler } from './route-handler.interface';
+import { HttpCallback, HttpRequest, HttpResponse, RouteHandler } from './route-handler.interface';
 
 /**
  * Defining types
@@ -17,6 +17,10 @@ export interface MiddlewareGenerator {
   generate(metadata: RouteMetadata): RouteHandler | undefined | Promise<RouteHandler | undefined>;
 }
 
-export interface HttpMiddleware {
-  use: RouteHandler;
+export interface AsyncHttpMiddleware {
+  use(request: HttpRequest, response: HttpResponse): Promise<unknown>;
+}
+
+export interface CallbackHttpMiddleware {
+  use(request: HttpRequest, response: HttpResponse, done: HttpCallback): void;
 }
