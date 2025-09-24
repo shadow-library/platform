@@ -12,9 +12,9 @@ What kind of change does this PR introduce?
 
 - [ ] Bugfix
 - [ ] Feature
-- [ ] Refactoring and Code style update
-- [ ] Build and CI related changes
-- [ ] Documentation and Examples
+- [ ] Performance or Refactoring
+- [ ] Build, CI related changes or Documentation
+- [ ] Tests and Examples
 - [ ] Other...
 
 If Other Please describe:
@@ -30,4 +30,4 @@ Issue Number: N/A
 - [ ] Yes
 - [ ] No
 
-## Other information
+## Notes for Reviewers
