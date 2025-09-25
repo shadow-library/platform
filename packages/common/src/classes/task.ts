@@ -19,6 +19,8 @@ export type RetryCallback = (error: unknown, attempt: number) => Promisable<unkn
 
 export type RollbackFn<T> = (data: T) => Promisable<unknown>;
 
+export type ShouldRetryFn = (error: unknown, attempt: number) => Promisable<boolean>;
+
 /**
  * Declaring the constants
  */
@@ -34,6 +36,7 @@ export class Task<T> {
   private result?: T;
   private retryCallback?: RetryCallback;
   private rollbackFn?: RollbackFn<T>;
+  private shouldRetryFn?: ShouldRetryFn;
 
   private constructor(private readonly fn: Fn<T>) {
     this.taskName = fn.name ?? 'Unnamed Task';
@@ -41,11 +44,6 @@ export class Task<T> {
 
   static create<T>(fn: Fn<T>): Task<T> {
     return new Task(fn);
-  }
-
-  /* eslint-disable-next-line @typescript-eslint/no-unused-vars */
-  protected shouldRetry(_error: unknown, _attempt: number): Promisable<boolean> {
-    return true;
   }
 
   name(name: string): this {
@@ -82,6 +80,11 @@ export class Task<T> {
     return this;
   }
 
+  shouldRetry(fn: ShouldRetryFn): this {
+    this.shouldRetryFn = fn;
+    return this;
+  }
+
   async execute(): Promise<T> {
     let attempt = 1;
     let delay = this.delayMs;
@@ -101,7 +104,7 @@ export class Task<T> {
           throw error;
         }
 
-        const shouldRetry = await this.shouldRetry(error, attempt);
+        const shouldRetry = this.shouldRetryFn ? await this.shouldRetryFn(error, attempt) : true;
         if (!shouldRetry) {
           logger.debug(`Task will not be retried: ${this.taskName} (Attempt ${attempt})`);
           throw error;

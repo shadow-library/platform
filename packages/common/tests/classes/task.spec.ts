@@ -17,14 +17,14 @@ import { InternalError, Task } from '@shadow-library/common';
  */
 
 describe('Task', () => {
-  it('executes successfully without retry', async () => {
+  it('should execute successfully without retry', async () => {
     const fn = jest.fn().mockResolvedValue('done');
     const result = await Task.create(fn).name('Mock').delay(10).execute();
     expect(result).toBe('done');
     expect(fn).toHaveBeenCalledTimes(1);
   });
 
-  it('retries once then succeeds', async () => {
+  it('should retry once then succeed', async () => {
     const error = new Error('fail');
     const onRetry = jest.fn();
     const fn = jest.fn().mockRejectedValueOnce(error).mockResolvedValueOnce('success');
@@ -35,13 +35,13 @@ describe('Task', () => {
     expect(onRetry).toHaveBeenCalledWith(error, 1);
   });
 
-  it('fails after all retries', async () => {
+  it('should fail after all retries', async () => {
     const fn = jest.fn().mockRejectedValue(new Error('fail'));
     await expect(Task.create(fn).delay(10).retry(2).execute()).rejects.toThrow('fail');
     expect(fn).toHaveBeenCalledTimes(2);
   });
 
-  it('executes rollback after success', async () => {
+  it('should execute rollback after success', async () => {
     const fn = jest.fn().mockResolvedValue('data');
     const rollback = jest.fn();
     const task = Task.create(fn).rollback(rollback);
@@ -50,7 +50,18 @@ describe('Task', () => {
     expect(rollback).toHaveBeenCalledWith('data');
   });
 
-  it('throws error if rollback is called with no result', async () => {
+  it('should not retry if shouldRetry returns false', async () => {
+    const error = new Error('fail');
+    const fn = jest.fn().mockRejectedValue(error);
+    const shouldRetryFn = jest.fn().mockResolvedValue(false);
+    const task = Task.create(fn).delay(10).retry(3).shouldRetry(shouldRetryFn).execute();
+
+    await expect(task).rejects.toThrow('fail');
+    expect(fn).toHaveBeenCalledTimes(1);
+    expect(shouldRetryFn).toHaveBeenCalledWith(error, 1);
+  });
+
+  it('should throw error if rollback is called with no result', async () => {
     const fn = jest.fn().mockRejectedValue(new Error('fail'));
     const rollback = jest.fn();
     const task = Task.create(fn).delay(10).rollback(rollback);
@@ -58,7 +69,7 @@ describe('Task', () => {
     await expect(task.executeRollback()).rejects.toThrow(InternalError);
   });
 
-  it('throws error if rollback is missing and rollback is called', async () => {
+  it('should throw error if rollback is missing and rollback is called', async () => {
     const fn = jest.fn().mockResolvedValue('data');
     const task = Task.create(fn);
     await task.execute();

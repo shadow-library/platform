@@ -116,6 +116,48 @@ if (task.hasRollback()) {
 }
 ```
 
+#### Custom Retry Logic
+
+```ts
+import { Task } from '@shadow-library/common';
+
+// Only retry for specific error types
+const networkTask = Task.create(() => makeNetworkRequest())
+  .name('Network Operation')
+  .retry(5)
+  .shouldRetry((error, attempt) => {
+    // Only retry for network errors, not for authentication errors
+    return error.code === 'NETWORK_ERROR' || error.code === 'TIMEOUT';
+  });
+
+// Conditional retry based on attempt count and error type
+const complexTask = Task.create(() => processData())
+  .name('Complex Processing')
+  .retry(3)
+  .shouldRetry((error, attempt) => {
+    // Retry transient errors for first 2 attempts only
+    if (attempt <= 2 && error.type === 'TRANSIENT') return true;
+
+    // Always retry rate limit errors
+    if (error.code === 'RATE_LIMITED') return true;
+
+    // Don't retry validation errors
+    if (error.type === 'VALIDATION') return false;
+
+    return false;
+  });
+
+// Async retry logic with external checks
+const smartTask = Task.create(() => performOperation())
+  .name('Smart Retry')
+  .retry(3)
+  .shouldRetry(async (error, attempt) => {
+    // Check service health before retrying
+    const isServiceHealthy = await checkServiceHealth();
+    return isServiceHealthy && attempt <= 2;
+  });
+```
+
 #### Task Orchestration with TaskManager
 
 ```ts
@@ -552,6 +594,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `.delay(number)` - Set delay between retries in ms
 - `.backoff(number)` - Set exponential backoff factor
 - `.onRetry(callback)` - Set retry callback
+- `.shouldRetry(fn)` - Set custom retry condition function
 - `.rollback(fn)` - Set rollback function
 - `.execute()` - Execute the task
 - `.executeRollback()` - Execute rollback
@@ -743,6 +786,7 @@ interface APIResponse<T = any> {
 type Fn<T = any, U = any> = (...args: U[]) => Promisable<T>;
 type RetryCallback = (error: unknown, attempt: number) => Promisable<unknown>;
 type RollbackFn<T> = (data: T) => Promisable<unknown>;
+type ShouldRetryFn = (error: unknown, attempt: number) => Promisable<boolean>;
 ```
 
 ---
