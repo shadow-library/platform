@@ -19,6 +19,13 @@ interface LogEvent {
   message: string;
 }
 
+export interface CloudWatchTransportOptions extends TransportStreamOptions {
+  logGroupName?: string;
+  logStreamName?: string;
+  uploadRate?: number;
+  bufferSize?: number;
+}
+
 /**
  * Declaring the constants
  */
@@ -35,13 +42,13 @@ export class CloudWatchTransport extends Transport {
   private logEvents: LogEvent[] = [];
   private isStreamPresent = false;
 
-  constructor(opts?: TransportStreamOptions) {
+  constructor(opts?: CloudWatchTransportOptions) {
     super(opts);
     this.cloudWatchLogs = new CloudWatchLogs({ region: Config.get('aws.region') });
-    this.logGroupName = Config.get('aws.cloudwatch.log-group');
-    this.logStreamName = Config.get('aws.cloudwatch.log-stream');
-    this.uploadRate = Config.get('aws.cloudwatch.upload-rate');
-    this.bufferSize = Config.get('log.buffer.size');
+    this.logGroupName = opts?.logGroupName ?? Config.get('aws.cloudwatch.log-group');
+    this.logStreamName = opts?.logStreamName ?? Config.get('aws.cloudwatch.log-stream');
+    this.uploadRate = opts?.uploadRate ?? Config.get('aws.cloudwatch.upload-rate');
+    this.bufferSize = opts?.bufferSize ?? Config.get('log.buffer.size');
   }
 
   private add(log: any): void {

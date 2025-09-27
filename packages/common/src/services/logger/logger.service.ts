@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import { hostname } from 'node:os';
+
 import fastRedact from 'fast-redact';
 import { Logform, createLogger, format as customFormat } from 'winston';
 import Transport from 'winston-transport';
@@ -17,6 +19,8 @@ import { Config } from '../config.service';
  */
 
 export type redactFn = <T>(input: T) => string | T;
+
+export type AttachableTransports = 'pretty-console' | 'structured-file' | 'structured-cloudwatch';
 
 export interface Logger {
   verbose(message: string, ...meta: any[]): void;
@@ -60,6 +64,41 @@ class LoggerStatic {
     const index = this.logger.transports.findIndex(t => t === noop);
     if (index >= 0) this.logger.remove(noop);
     this.logger.add(transport);
+    return this;
+  }
+
+  /* istanbul ignore next */
+  attachTransport(type: AttachableTransports): this {
+    let transport: Transport | null = null;
+    const appName = Config.get('app.name');
+    const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata()));
+    const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
+
+    switch (type) {
+      case 'pretty-console': {
+        const format = formats.combine(...baseFormats, formats.colorize(), formats.brief());
+        transport = new ConsoleTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
+        break;
+      }
+
+      case 'structured-file': {
+        const filename = appName;
+        const dirname = Config.get('log.dir');
+        const format = formats.combine(...baseFormats, formats.json());
+        transport = new FileTransport({ dirname, filename, handleExceptions: true, handleRejections: true }).addFormat(format);
+        break;
+      }
+
+      case 'structured-cloudwatch': {
+        const format = formats.combine(...baseFormats);
+        const definedLogStreamName = Config.get('aws.cloudwatch.log-stream');
+        const logStreamName = definedLogStreamName === appName ? hostname() : definedLogStreamName;
+        transport = new CloudWatchTransport({ handleExceptions: true, handleRejections: true, logStreamName }).addFormat(format);
+        break;
+      }
+    }
+
+    if (transport) this.addTransport(transport);
     return this;
   }
 

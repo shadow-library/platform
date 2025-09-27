@@ -352,6 +352,14 @@ const safeData = redactor({ user: 'john', password: 'secret123' });
 
 // Add custom transport
 Logger.addTransport(customTransport);
+
+// Attach predefined transport types
+Logger.attachTransport('pretty-console'); // Console with colors and brief format
+Logger.attachTransport('structured-file'); // File logging with JSON format
+Logger.attachTransport('structured-cloudwatch'); // CloudWatch logging
+
+// Chain multiple transports
+Logger.attachTransport('pretty-console').attachTransport('structured-file');
 ```
 
 ### 🚨 **Error Handling**
@@ -678,6 +686,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `Logger.setDefaultMetadata(metadata)` - Set default metadata
 - `Logger.getRedactor(paths, censor?)` - Create data redactor
 - `Logger.addTransport(transport)` - Add log transport
+- `Logger.attachTransport(type)` - Attach predefined transport type
 - `Logger.isDebugEnabled()` - Check if debug logging enabled
 
 #### Reflector
@@ -738,6 +747,7 @@ The package uses environment variables for configuration. Below are the key vari
 type NodeEnv = 'development' | 'production' | 'test';
 type LogLevel = 'silly' | 'debug' | 'http' | 'info' | 'warn' | 'error';
 type TimeUnit = 'ms' | 's' | 'm' | 'h';
+type AttachableTransports = 'pretty-console' | 'structured-file' | 'structured-cloudwatch';
 ```
 
 ### Masking Types
