@@ -10,6 +10,8 @@ import Transport from 'winston-transport';
 /**
  * Importing user defined packages
  */
+import { InternalError } from '@lib/errors';
+
 import { format as formats } from './formats';
 import { CloudWatchTransport, ConsoleTransport, FileTransport } from './transports';
 import { Config } from '../config.service';
@@ -20,7 +22,7 @@ import { Config } from '../config.service';
 
 export type redactFn = <T>(input: T) => string | T;
 
-export type AttachableTransports = 'pretty-console' | 'structured-file' | 'structured-cloudwatch';
+export type AttachableTransports = 'console:pretty' | 'console:json' | 'file:json' | 'cloudwatch:json';
 
 export interface Logger {
   verbose(message: string, ...meta: any[]): void;
@@ -75,13 +77,19 @@ class LoggerStatic {
     const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
 
     switch (type) {
-      case 'pretty-console': {
+      case 'console:pretty': {
         const format = formats.combine(...baseFormats, formats.colorize(), formats.brief());
         transport = new ConsoleTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
         break;
       }
 
-      case 'structured-file': {
+      case 'console:json': {
+        const format = formats.combine(...baseFormats, formats.json());
+        transport = new ConsoleTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
+        break;
+      }
+
+      case 'file:json': {
         const filename = appName;
         const dirname = Config.get('log.dir');
         const format = formats.combine(...baseFormats, formats.json());
@@ -89,12 +97,16 @@ class LoggerStatic {
         break;
       }
 
-      case 'structured-cloudwatch': {
+      case 'cloudwatch:json': {
         const format = formats.combine(...baseFormats);
         const definedLogStreamName = Config.get('aws.cloudwatch.log-stream');
         const logStreamName = definedLogStreamName === appName ? hostname() : definedLogStreamName;
         transport = new CloudWatchTransport({ handleExceptions: true, handleRejections: true, logStreamName }).addFormat(format);
         break;
+      }
+
+      default: {
+        throw new InternalError(`Unknown transport type '${type}'`);
       }
     }
 
