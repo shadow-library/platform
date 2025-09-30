@@ -22,6 +22,10 @@ interface CustomConfigRecords extends ConfigRecords {
   'boolean.key': boolean;
   'enum.key': 'value1' | 'value2';
   'invalid.key': string;
+  'test.sample.one': string;
+  'test.sample.two'?: number;
+  'test.sample.three': string[];
+  'test.sample.four': string[];
 }
 
 /**
@@ -29,12 +33,19 @@ interface CustomConfigRecords extends ConfigRecords {
  */
 
 describe('Config Service', () => {
+  process.env.TEST_SAMPLE_ONE = 'test-value-one';
+  process.env.TEST_SAMPLE_FOUR = 'value1,value2,value3';
+
   class CustomConfig extends ConfigService<CustomConfigRecords> {
     constructor() {
       super({ 'app.name': 'test-app' });
       this.set('optional.key');
       this.set('boolean.key', { defaultValue: 'true', validateType: 'boolean' });
       this.set('transform.key', { defaultValue: 'abc', transform: (value: string) => value.toUpperCase() });
+      this.set('test.sample.one', { defaultValue: 'default-one' });
+      this.set('test.sample.two');
+      this.set('test.sample.three', { defaultValue: '', isArray: true });
+      this.set('test.sample.four', { isArray: true });
     }
   }
 
@@ -54,6 +65,10 @@ describe('Config Service', () => {
       expect(config.get('app.name')).toBe('test-app');
       expect(config.get('transform.key')).toBe('ABC');
       expect(config.get('optional.key')).toBeUndefined();
+      expect(config.get('test.sample.one')).toBe('test-value-one');
+      expect(config.get('test.sample.two')).toBeUndefined();
+      expect(config.get('test.sample.three')).toStrictEqual([]);
+      expect(config.get('test.sample.four')).toStrictEqual(['value1', 'value2', 'value3']);
     });
 
     it("should return the 'undefined' if the key is not found", () => {

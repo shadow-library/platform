@@ -28,6 +28,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 
 - **Type-safe configuration** with environment variable validation
 - **Built-in validation** for numbers, booleans, and allowed values
+- **Array environment variables** with comma-separated value parsing
 - **Custom transformers** and validators
 - **Environment detection** (development, production, test)
 - **Production-required configurations** with automatic validation
@@ -314,6 +315,10 @@ class MyConfigService extends ConfigService<CustomConfig> {
     this.set('feature.enabled', {
       defaultValue: 'false',
       validateType: 'boolean',
+    });
+    this.set('features.enabled', {
+      defaultValue: '',
+      isArray: true,
     });
   }
 }
@@ -958,6 +963,9 @@ class CacheManager {
 - Use validation for critical configuration values
 - Set appropriate defaults for development
 - Mark production-required configurations
+- Use array configuration for lists (comma-separated in env vars)
+- Validate array elements individually with custom validators
+- Apply transformations consistently across array items
 
 ### Logging
 

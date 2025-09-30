@@ -16,6 +16,7 @@ export interface ConfigOptions<T = any> {
   isProdRequired?: boolean;
   validateType?: 'number' | 'boolean';
   validator?: (value: string) => boolean;
+  isArray?: boolean;
   defaultValue?: string;
   allowedValues?: string[];
   transform?: (value: string) => T;
@@ -73,33 +74,37 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
   protected set(name: keyof Configs, opts: ConfigOptions = {}): void {
     if (this.cache.has(name)) return;
+    if (opts.validateType === 'boolean') opts = { ...opts, allowedValues: ['true', 'false'], transform: val => val === 'true' };
+    if (opts.validateType === 'number') opts = { ...opts, validator: val => !isNaN(Number(val)), transform: val => Number(val) };
+
     const envKey = opts.envKey ?? (name as string).toUpperCase().replace(/[.-]/g, '_');
     let value = process.env[envKey]?.trim();
     if (!value) {
       if (this.isProd() && opts.isProdRequired) Utils.exit(`Environment Variable '${envKey}' not set`);
-      else if (opts.defaultValue) value = opts.defaultValue;
+      else if (opts.defaultValue !== undefined) value = opts.defaultValue;
+      else return;
     }
-    if (!value) return;
+    const values = opts.isArray ? value.split(',').filter(val => val !== '') : [value];
 
-    if (opts.allowedValues && !opts.allowedValues.includes(value)) {
-      const allowedValues = opts.allowedValues.map(val => `'${val}'`).join(', ');
-      Utils.exit(`Environment Variable '${envKey}' is invalid, must be one of [${allowedValues}]`);
-    }
-    if (opts.validator && !opts.validator(value)) Utils.exit(`Environment Variable '${envKey}' is invalid, validator failed`);
-    if (!opts.validateType) {
-      this.cache.set(name, opts.transform ? opts.transform(value) : value);
-      return;
+    /** Allowed values validation */
+    if (opts.allowedValues) {
+      for (const val of values) {
+        if (!opts.allowedValues.includes(val)) {
+          const allowedValues = opts.allowedValues.map(v => `'${v}'`).join(', ');
+          Utils.exit(`Environment Variable '${envKey}' has invalid value '${val}', must be one of [${allowedValues}]`);
+        }
+      }
     }
 
-    let typedValue: number | boolean;
-    if (opts.validateType === 'number') {
-      typedValue = Number(value);
-      if (isNaN(typedValue)) Utils.exit(`Environment Variable '${envKey}' is invalid, must be a number`);
-    } else {
-      if (!['true', 'false'].includes(value)) Utils.exit(`Environment Variable '${envKey}' is invalid, must be a boolean`);
-      typedValue = value === 'true';
+    /** Custom validation */
+    if (opts.validator) {
+      for (const val of values) {
+        if (!opts.validator(val)) Utils.exit(`Environment Variable '${envKey}' has invalid value '${val}', validation failed`);
+      }
     }
-    this.cache.set(name, typedValue);
+
+    const transformedValues = values.map(val => (opts.transform ? opts.transform(val) : val));
+    this.cache.set(name, opts.isArray ? transformedValues : transformedValues[0]);
   }
 
   isProd(): boolean {

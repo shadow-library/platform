@@ -17,7 +17,7 @@ import colors from '@colors/colors';
 
 /* istanbul ignore next */
 class InternalUtils {
-  public exit(message: string): void {
+  public exit(message: string): never {
     console.error(colors.red(message)); // eslint-disable-line no-console
     process.exit(1);
   }
