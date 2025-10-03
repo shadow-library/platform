@@ -319,24 +319,30 @@ export class FastifyRouter extends Router {
       routeOptions.attachValidation = metadata.silentValidation ?? false;
       routeOptions.schema.response = merge(metadata.schemas?.response ?? {}, defaultResponseSchemas);
       const { body: bodySchema, params: paramsSchema, query: querySchema } = metadata.schemas ?? {};
+
       if (bodySchema) {
-        routeOptions.schema.body = bodySchema;
-        if (ClassSchema.isBranded(bodySchema)) {
-          const transformer = this.sensitiveTransformer.maybeCompile(bodySchema as ParsedSchema);
+        const schema = typeof bodySchema === 'function' ? ClassSchema.generate(bodySchema) : bodySchema;
+        routeOptions.schema.body = schema;
+        if (ClassSchema.isBranded(schema)) {
+          const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
           if (transformer) artifacts.transforms.maskBody = obj => transformer(obj, this.maskField);
         }
       }
+
       if (paramsSchema) {
-        routeOptions.schema.params = paramsSchema;
-        if (ClassSchema.isBranded(paramsSchema)) {
-          const transformer = this.sensitiveTransformer.maybeCompile(paramsSchema as ParsedSchema);
+        const schema = typeof paramsSchema === 'function' ? ClassSchema.generate(paramsSchema) : paramsSchema;
+        routeOptions.schema.params = schema;
+        if (ClassSchema.isBranded(schema)) {
+          const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
           if (transformer) artifacts.transforms.maskParams = obj => transformer(obj, this.maskField);
         }
       }
+
       if (querySchema) {
-        routeOptions.schema.querystring = querySchema;
-        if (ClassSchema.isBranded(querySchema)) {
-          const transformer = this.sensitiveTransformer.maybeCompile(querySchema as ParsedSchema);
+        const schema = typeof querySchema === 'function' ? ClassSchema.generate(querySchema) : querySchema;
+        routeOptions.schema.querystring = schema;
+        if (ClassSchema.isBranded(schema)) {
+          const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
           if (transformer) artifacts.transforms.maskQuery = obj => transformer(obj, this.maskField);
         }
       }

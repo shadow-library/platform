@@ -41,6 +41,7 @@ describe('Create Fastify Instance', () => {
   const fastifyFactory = jest.fn((instance: FastifyInstance) => instance);
   const errorHandler = { handle: jest.fn() };
   const schema = {
+    $id: 'TestSchema',
     type: 'object',
     properties: {
       orderBy: { type: 'string', enum: ['name', 'createdAt'] },

@@ -3,8 +3,9 @@
  */
 import assert from 'node:assert';
 
+import { JSONSchema } from '@shadow-library/class-schema';
 import { ValidationError, throwError, utils } from '@shadow-library/common';
-import Ajv, { SchemaObject } from 'ajv';
+import Ajv, { SchemaObject, ValidateFunction } from 'ajv';
 import { FastifyInstance, fastify } from 'fastify';
 import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationResult, SchemaErrorDataVar } from 'fastify/types/schema';
 
@@ -21,18 +22,30 @@ import { FastifyConfig, FastifyModuleOptions } from './fastify-module.interface'
 /**
  * Declaring the constants
  */
+const keywords = ['x-fastify'];
 const allowedHttpParts = ['body', 'params', 'querystring'];
-const strictValidator = new Ajv({ allErrors: true, useDefaults: true, removeAdditional: true, strict: true });
-const lenientValidator = new Ajv({ allErrors: true, coerceTypes: true, useDefaults: true, removeAdditional: true, strict: true });
+const strictValidator = new Ajv({ allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords });
+const lenientValidator = new Ajv({ allErrors: true, coerceTypes: true, useDefaults: true, removeAdditional: true, strict: true, keywords });
 const notFoundError = new ServerError(ServerErrorCode.S002);
 
 export const notFoundHandler = (): never => throwError(notFoundError);
 
+function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> {
+  if (!schema.$id) return ajv.compile(schema);
+
+  const schemas: JSONSchema[] = [utils.object.omitKeys(schema, ['definitions']), ...Object.values(schema.definitions ?? {})];
+  for (const schema of schemas) {
+    if (schema.$id && !ajv.getSchema(schema.$id)) ajv.addSchema(schema, schema.$id);
+  }
+
+  return ajv.getSchema(schema.$id) as ValidateFunction<unknown>;
+}
+
 export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
-  if (routeSchema.httpPart !== 'querystring') return strictValidator.compile(routeSchema.schema);
+  if (routeSchema.httpPart !== 'querystring') return compileSchema(strictValidator, routeSchema.schema);
 
-  const validate = lenientValidator.compile(routeSchema.schema);
+  const validate = compileSchema(lenientValidator, routeSchema.schema);
   return (data: Record<string, unknown>) => {
     validate(data);
 

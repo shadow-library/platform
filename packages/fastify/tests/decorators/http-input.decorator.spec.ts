@@ -65,19 +65,7 @@ describe('HTTP Input Decorators', () => {
 
     const paramtypes = Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, Controller, 'body');
     expect(paramtypes).toStrictEqual([, 'body']); // eslint-disable-line no-sparse-arrays
-    expect(Route).toBeCalledWith({
-      schemas: {
-        body: {
-          $id: expect.stringContaining(Input.name),
-          type: 'object',
-          required: ['username', 'password'],
-          properties: {
-            username: { type: 'string' },
-            password: { type: 'string' },
-          },
-        },
-      },
-    });
+    expect(Route).toBeCalledWith({ schemas: { body: Input } });
   });
 
   it(`should enhance the method with the Params input metadata`, () => {
@@ -92,7 +80,7 @@ describe('HTTP Input Decorators', () => {
 
     const paramtypes = Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, Controller, 'query');
     expect(paramtypes).toStrictEqual(['query']);
-    expect(Route).toBeCalledWith({ schemas: { query: { $id: 'Object', type: 'object' } } });
+    expect(Route).toBeCalledWith({ schemas: { query: Object } });
   });
 
   it(`should enhance the method with the request input metadata`, () => {
@@ -113,6 +101,6 @@ describe('HTTP Input Decorators', () => {
     const paramtypes = Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, Controller, 'multiple');
     expect(paramtypes).toStrictEqual(['body', , 'params']); // eslint-disable-line no-sparse-arrays
     expect(Route).toHaveBeenNthCalledWith(1, { schemas: { params: schema } });
-    expect(Route).toHaveBeenNthCalledWith(2, { schemas: { body: { $id: 'Object', type: 'object' } } });
+    expect(Route).toHaveBeenNthCalledWith(2, { schemas: { body: Object } });
   });
 });

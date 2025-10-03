@@ -4,7 +4,8 @@
 import assert from 'node:assert';
 
 import { Route } from '@shadow-library/app';
-import { ClassSchema, JSONSchema } from '@shadow-library/class-schema';
+import { JSONSchema } from '@shadow-library/class-schema';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -23,7 +24,7 @@ export enum RouteInputType {
   RESPONSE = 'response',
 }
 
-export type RouteInputSchemas = Partial<Record<'body' | 'params' | 'query', JSONSchema>>;
+export type RouteInputSchemas = Partial<Record<'body' | 'params' | 'query', JSONSchema | Class<unknown>>>;
 
 /**
  * Declaring the constants
@@ -39,7 +40,7 @@ export function HttpInput(type: RouteInputType, schema?: JSONSchema): ParameterD
 
     if (!schema) {
       const paramTypes = Reflect.getMetadata(PARAMTYPES_METADATA, target, propertyKey);
-      schema = ClassSchema.generate(paramTypes[index]);
+      schema = paramTypes[index];
     }
 
     const descriptor = Reflect.getOwnPropertyDescriptor(target, propertyKey);
