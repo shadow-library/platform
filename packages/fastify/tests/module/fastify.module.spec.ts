@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { Module, Router } from '@shadow-library/app';
 
 /**
@@ -25,6 +25,10 @@ jest.mock('@shadow-library/app', () => {
 });
 
 describe('FastifyModule', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+  });
+
   describe('forRoot', () => {
     it('should create the application with controllers', async () => {
       @HttpController()
@@ -32,7 +36,8 @@ describe('FastifyModule', () => {
 
       FastifyModule.forRoot({ controllers: [Controller] });
 
-      expect(target).toHaveBeenCalledWith(FastifyModule);
+      expect(target).toHaveBeenCalledWith(expect.any(Function));
+      expect((target.mock.calls[0]?.[0] as any)?.prototype).toBeInstanceOf(FastifyModule);
       expect(Module).toHaveBeenCalledWith({
         imports: [],
         controllers: [Controller],
@@ -63,7 +68,8 @@ describe('FastifyModule', () => {
       const useFactory = () => ({}) as any;
       FastifyModule.forRootAsync({ controllers: [Controller], useFactory });
 
-      expect(target).toHaveBeenCalledWith(FastifyModule);
+      expect(target).toHaveBeenCalledWith(expect.any(Function));
+      expect((target.mock.calls[0]?.[0] as any)?.prototype).toBeInstanceOf(FastifyModule);
       expect(Module).toHaveBeenCalledWith({
         imports: [],
         controllers: [Controller],

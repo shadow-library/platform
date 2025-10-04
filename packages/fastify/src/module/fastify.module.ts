@@ -68,7 +68,9 @@ export class FastifyModule {
     const fastifyFactory = (config: FastifyConfig) => createFastifyInstance(config, options.fastifyFactory);
     providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
 
-    Module({ imports, controllers, providers, exports: [Router, ContextService, ...exports] })(FastifyModule);
-    return FastifyModule;
+    const Class = class extends FastifyModule {};
+    Object.defineProperty(Class, 'name', { value: FastifyModule.name });
+    Module({ imports, controllers, providers, exports: [Router, ContextService, ...exports] })(Class);
+    return Class;
   }
 }
