@@ -3,7 +3,7 @@
  */
 import { Module, Provider, Router } from '@shadow-library/app';
 import { ClassSchema } from '@shadow-library/class-schema';
-import { utils } from '@shadow-library/common';
+import { Config, utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
 import { v4 as uuid } from 'uuid';
 
@@ -35,6 +35,7 @@ export class FastifyModule {
       port: 8080,
       responseSchema: { '4xx': errorResponseSchema, '5xx': errorResponseSchema },
       errorHandler: new DefaultErrorHandler(),
+      maskSensitiveData: Config.isProd(),
 
       requestIdLogLabel: 'rid',
       genReqId: () => uuid(),

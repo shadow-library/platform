@@ -315,6 +315,7 @@ describe('FastifyRouter', () => {
 
       const schema = ClassSchema.generate(SensitiveClass);
       route.metadata.schemas = { body: schema, params: schema, query: schema };
+      router['config'].maskSensitiveData = true;
       await router.register([]);
       expect(instance.route).toBeCalledWith({
         config: { metadata: route.metadata, artifacts: { transforms: { maskBody: expect.any(Function), maskParams: expect.any(Function), maskQuery: expect.any(Function) } } },

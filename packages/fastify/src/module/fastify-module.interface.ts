@@ -46,6 +46,12 @@ export interface FastifyConfig extends FastifyServerOptions {
    * @default false
    */
   enableChildRoutes?: boolean;
+
+  /**
+   * Masks fields marked as sensitive in API inputs (body, query, and URL params) when written to logs.
+   * @default true
+   */
+  maskSensitiveData?: boolean;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {

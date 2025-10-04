@@ -319,11 +319,12 @@ export class FastifyRouter extends Router {
       routeOptions.attachValidation = metadata.silentValidation ?? false;
       routeOptions.schema.response = merge(metadata.schemas?.response ?? {}, defaultResponseSchemas);
       const { body: bodySchema, params: paramsSchema, query: querySchema } = metadata.schemas ?? {};
+      const isMaskEnabled = this.config.maskSensitiveData ?? true;
 
       if (bodySchema) {
         const schema = typeof bodySchema === 'function' ? ClassSchema.generate(bodySchema) : bodySchema;
         routeOptions.schema.body = schema;
-        if (ClassSchema.isBranded(schema)) {
+        if (ClassSchema.isBranded(schema) && isMaskEnabled) {
           const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
           if (transformer) artifacts.transforms.maskBody = obj => transformer(obj, this.maskField);
         }
@@ -332,7 +333,7 @@ export class FastifyRouter extends Router {
       if (paramsSchema) {
         const schema = typeof paramsSchema === 'function' ? ClassSchema.generate(paramsSchema) : paramsSchema;
         routeOptions.schema.params = schema;
-        if (ClassSchema.isBranded(schema)) {
+        if (ClassSchema.isBranded(schema) && isMaskEnabled) {
           const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
           if (transformer) artifacts.transforms.maskParams = obj => transformer(obj, this.maskField);
         }
@@ -341,7 +342,7 @@ export class FastifyRouter extends Router {
       if (querySchema) {
         const schema = typeof querySchema === 'function' ? ClassSchema.generate(querySchema) : querySchema;
         routeOptions.schema.querystring = schema;
-        if (ClassSchema.isBranded(schema)) {
+        if (ClassSchema.isBranded(schema) && isMaskEnabled) {
           const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
           if (transformer) artifacts.transforms.maskQuery = obj => transformer(obj, this.maskField);
         }

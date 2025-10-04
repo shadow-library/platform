@@ -43,7 +43,8 @@ function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> 
 
 export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
-  if (routeSchema.httpPart !== 'querystring') return compileSchema(strictValidator, routeSchema.schema);
+  if (routeSchema.httpPart === 'body') return compileSchema(strictValidator, routeSchema.schema);
+  if (routeSchema.httpPart === 'params') return compileSchema(lenientValidator, routeSchema.schema);
 
   const validate = compileSchema(lenientValidator, routeSchema.schema);
   return (data: Record<string, unknown>) => {
