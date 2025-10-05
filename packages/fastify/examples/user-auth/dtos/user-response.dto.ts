@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, OmitType, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -17,7 +17,7 @@ import { CreateUserBody } from './create-user-body.dto';
  */
 
 @Schema()
-export class UserResponse extends CreateUserBody {
+export class UserResponse extends OmitType(CreateUserBody, ['password']) {
   @Field(() => Number, { description: 'ID of the user' })
   id: number;
 }

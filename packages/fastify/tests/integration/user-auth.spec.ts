@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { utils } from '@shadow-library/common';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 /**
@@ -58,10 +59,10 @@ describe('User Auth', () => {
       const response = await router.mockRequest().get('/api/users').headers({ 'x-user-id': '3' });
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual([
-        { id: 0, email: 'admin@example.com', name: 'Admin', password: 'Password@123', accessLevel: 10 },
-        { id: 1, email: 'alice@example.com', name: 'Alice', password: 'password1', accessLevel: 1 },
-        { id: 2, email: 'bob@example.com', name: 'Bob', password: 'password2', accessLevel: 4 },
-        { id: 3, email: 'charlie@example.com', name: 'Charlie', password: 'password3', accessLevel: 7 },
+        { id: 0, email: 'admin@example.com', name: 'Admin', accessLevel: 10 },
+        { id: 1, email: 'alice@example.com', name: 'Alice', accessLevel: 1 },
+        { id: 2, email: 'bob@example.com', name: 'Bob', accessLevel: 4 },
+        { id: 3, email: 'charlie@example.com', name: 'Charlie', accessLevel: 7 },
       ]);
     });
   });
@@ -92,7 +93,7 @@ describe('User Auth', () => {
     it('should return 201 for users with sufficient access level', async () => {
       const response = await router.mockRequest().post('/api/users').headers({ 'x-user-id': '0' }).body(newUser);
       expect(response.statusCode).toBe(201);
-      expect(response.json()).toStrictEqual({ id: 4, ...newUser });
+      expect(response.json()).toStrictEqual({ id: 4, ...utils.object.omitKeys(newUser, ['password']) });
     });
   });
 
@@ -122,7 +123,7 @@ describe('User Auth', () => {
     it('should return 201 for users with sufficient access level', async () => {
       const response = await router.mockRequest().patch('/api/users/1').headers({ 'x-user-id': '2' }).body(updateUser);
       expect(response.statusCode).toBe(201);
-      expect(response.json()).toStrictEqual({ id: 1, email: 'alice@example.com', ...updateUser, password: 'password1' });
+      expect(response.json()).toStrictEqual({ id: 1, email: 'alice@example.com', ...updateUser });
     });
   });
 
