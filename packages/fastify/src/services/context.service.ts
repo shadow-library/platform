@@ -103,15 +103,21 @@ export class ContextService {
     return parentStore !== null;
   }
 
-  getRequest(): HttpRequest {
-    return this.get<HttpRequest>(REQUEST, true);
+  getRequest(): HttpRequest;
+  getRequest(throwOnMissing: false): HttpRequest | null;
+  getRequest(throwOnMissing = true): HttpRequest | null {
+    return this.get<HttpRequest>(REQUEST, throwOnMissing);
   }
 
-  getResponse(): HttpResponse {
-    return this.get<HttpResponse>(RESPONSE, true);
+  getResponse(): HttpResponse;
+  getResponse(throwOnMissing: false): HttpResponse | null;
+  getResponse(throwOnMissing = true): HttpResponse | null {
+    return this.get<HttpResponse>(RESPONSE, throwOnMissing);
   }
 
-  getRID(): string {
-    return this.get<string>(RID, true);
+  getRID(): string;
+  getRID(throwOnMissing: false): string | null;
+  getRID(throwOnMissing = true): string | null {
+    return this.get<string>(RID, throwOnMissing);
   }
 }
