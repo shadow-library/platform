@@ -170,4 +170,15 @@ describe('Context', () => {
       expect(context.getFromParent).not.toHaveBeenCalled();
     });
   });
+
+  describe('isInitialized()', () => {
+    it('should return true if context is initialized', () => {
+      expect(context.isInitialized()).toBe(true);
+    });
+
+    it('should return false if context is not initialized', () => {
+      storage.getStore.mockReturnValueOnce(undefined);
+      expect(context.isInitialized()).toBe(false);
+    });
+  });
 });

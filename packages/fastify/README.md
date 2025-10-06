@@ -444,6 +444,257 @@ export class ProductController {
 }
 ```
 
+## Context Service
+
+The `ContextService` provides request-scoped context management using Node.js AsyncLocalStorage. It allows you to access request-specific data from anywhere in your application without explicitly passing it through function parameters.
+
+**Important**: Context is automatically initialized for all HTTP requests and is always available within the request-response lifecycle (controllers, middleware, guards, services called during request processing). The `isInitialized()` method is primarily useful for methods that might be called both within and outside the request-response scope, such as during application startup, migrations, or background tasks.
+
+### Accessing Context Service
+
+```typescript
+import { ContextService } from '@shadow-library/fastify';
+
+@HttpController('/api')
+export class ExampleController {
+  constructor(private readonly contextService: ContextService) {}
+
+  @Get('/current-request')
+  getCurrentRequestInfo() {
+    const request = this.contextService.getRequest();
+    const rid = this.contextService.getRID();
+
+    return {
+      method: request.method,
+      url: request.url,
+      requestId: rid,
+      userAgent: request.headers['user-agent'],
+    };
+  }
+}
+```
+
+### Core Methods
+
+#### Context State Management
+
+```typescript
+// Check if context is initialized
+// Useful for methods that may be called outside request-response scope
+// (e.g., during migrations, startup tasks, background jobs)
+contextService.isInitialized(): boolean
+
+// Check if running in a child context (for nested operations)
+contextService.isChildContext(): boolean
+```
+
+#### Request/Response Access
+
+```typescript
+// Get the current HTTP request object
+contextService.getRequest(): FastifyRequest
+contextService.getRequest(false): FastifyRequest | null
+
+// Get the current HTTP response object
+contextService.getResponse(): FastifyReply
+contextService.getResponse(false): FastifyReply | null
+
+// Get the current request ID
+contextService.getRID(): string
+contextService.getRID(false): string | null
+```
+
+#### Data Storage
+
+```typescript
+// Store data in current context
+contextService.set('user', userData);
+contextService.set('startTime', Date.now());
+
+// Retrieve data from current context
+const user = contextService.get('user');
+const startTime = contextService.get('startTime', true); // throws if missing
+
+// Store data in parent context (when in child context)
+contextService.setInParent('sharedData', value);
+
+// Get data from parent context
+const parentData = contextService.getFromParent('sharedData');
+
+// Resolve data (checks current context first, then parent)
+const resolvedData = contextService.resolve('someKey');
+```
+
+### Practical Examples
+
+#### Service Used in Multiple Contexts
+
+```typescript
+@Injectable()
+export class UserService {
+  constructor(private readonly contextService: ContextService) {}
+
+  async getUserInfo(userId: string) {
+    // This service method might be called during HTTP requests
+    // OR during migrations/background tasks
+    if (this.contextService.isInitialized()) {
+      // We're in a request context - can access request-specific data
+      const requestId = this.contextService.getRID();
+      console.log(`Fetching user ${userId} for request ${requestId}`);
+
+      // Maybe add audit trail with request context
+      const request = this.contextService.getRequest();
+      await this.auditLog.log({
+        action: 'getUserInfo',
+        userId,
+        requestId,
+        userAgent: request.headers['user-agent'],
+        ip: request.ip,
+      });
+    } else {
+      // We're outside request context (migration, background task, etc.)
+      console.log(`Fetching user ${userId} outside request context`);
+    }
+
+    return this.database.findUser(userId);
+  }
+}
+```
+
+#### Migration Script Example
+
+```typescript
+// During migrations, context is not initialized
+class UserMigration {
+  constructor(private readonly userService: UserService) {}
+
+  async migrateBulkUsers() {
+    // Context is NOT initialized here
+    console.log('Context initialized:', this.contextService.isInitialized()); // false
+
+    const users = await this.userService.getAllUsers(); // Works fine
+    // Process users...
+  }
+}
+```
+
+#### Request Logging Middleware
+
+```typescript
+@Middleware({ type: 'onRequest', weight: 100 })
+export class RequestLoggerMiddleware {
+  constructor(private readonly contextService: ContextService) {}
+
+  use(request: FastifyRequest, reply: FastifyReply, done: Function) {
+    // Context is ALWAYS initialized in middleware during requests
+    // No need to check isInitialized() here
+    this.contextService.set('startTime', Date.now());
+    this.contextService.set('userIP', request.ip);
+    done();
+  }
+}
+
+@Middleware({ type: 'onResponse', weight: 100 })
+export class ResponseLoggerMiddleware {
+  constructor(private readonly contextService: ContextService) {}
+
+  use(request: FastifyRequest, reply: FastifyReply, done: Function) {
+    // Context is ALWAYS initialized in middleware during requests
+    const startTime = this.contextService.get<number>('startTime');
+    const duration = startTime ? Date.now() - startTime : 0;
+
+    console.log({
+      requestId: this.contextService.getRID(),
+      method: request.method,
+      url: request.url,
+      statusCode: reply.statusCode,
+      duration: `${duration}ms`,
+      userIP: this.contextService.get('userIP')
+    });
+    done();
+  }
+}
+
+      console.log({
+        requestId: this.contextService.getRID(),
+        method: request.method,
+        url: request.url,
+        statusCode: reply.statusCode,
+        duration: `${duration}ms`,
+        userIP: this.contextService.get('userIP'),
+      });
+    }
+    done();
+  }
+}
+```
+
+#### Authentication Context
+
+```typescript
+@Middleware({ type: 'preHandler', weight: 90 })
+export class AuthMiddleware {
+  constructor(private readonly contextService: ContextService) {}
+
+  async use(request: FastifyRequest, reply: FastifyReply) {
+    const token = request.headers.authorization?.replace('Bearer ', '');
+
+    if (token) {
+      // Context is always available in middleware during requests
+      const user = await this.validateToken(token);
+      if (user) {
+        // Store authenticated user in context
+        this.contextService.set('currentUser', user);
+        this.contextService.set('isAuthenticated', true);
+      }
+    }
+  }
+}
+
+// Use in any controller or service
+@HttpController('/api/profile')
+export class ProfileController {
+  constructor(private readonly contextService: ContextService) {}
+
+  @Get()
+  getProfile() {
+    // Context is always available in controllers during requests
+    const isAuthenticated = this.contextService.get<boolean>('isAuthenticated');
+    if (!isAuthenticated) {
+      throw new ServerError(ServerErrorCode.UNAUTHORIZED);
+    }
+
+    const currentUser = this.contextService.get('currentUser');
+    return { user: currentUser };
+  }
+}
+```
+
+#### Child Context Usage
+
+```typescript
+@HttpController('/api')
+export class DataController {
+  constructor(
+    private readonly contextService: ContextService,
+    @Inject(Router) private readonly fastifyRouter: FastifyRouter,
+  ) {}
+
+  @Get('/aggregate')
+  async getAggregateData() {
+    const results = [];
+
+    // Each child route call creates a new child context
+    for (const endpoint of ['/users', '/posts', '/comments']) {
+      const result = await this.fastifyRouter.resolveChildRoute(endpoint);
+      results.push(result);
+    }
+
+    return { aggregated: results };
+  }
+}
+```
+
 ## Examples
 
 Check out the [examples](./examples) directory for complete working examples:

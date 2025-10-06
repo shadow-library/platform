@@ -55,6 +55,10 @@ export class ContextService {
     };
   }
 
+  isInitialized(): boolean {
+    return this.storage.getStore() !== undefined;
+  }
+
   get<T>(key: Key, throwOnMissing: true): T;
   get<T>(key: Key, throwOnMissing?: boolean): T | null;
   get<T>(key: Key, throwOnMissing?: boolean): T | null {
