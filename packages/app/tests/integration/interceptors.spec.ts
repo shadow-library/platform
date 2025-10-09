@@ -3,14 +3,13 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-import { ShadowApplication, ShadowFactory } from '@shadow-library/app';
-
 /**
  * Importing user defined packages
  */
-import { AppModule } from './app/app.module';
-import { CacheService } from './app/cache.service';
-import { CatService } from './app/cat.service';
+import { AppModule } from '@examples/interceptors/app.module';
+import { CacheService } from '@examples/interceptors/cache.service';
+import { CatService } from '@examples/interceptors/cat.service';
+import { ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
 /**
  * Defining types

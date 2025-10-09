@@ -11,7 +11,7 @@
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts",
     "test": "jest",
-    "test:e2e": "bun test ./tests/e2e/**/*.e2e-spec.ts"
+    "test:integration": "bun test ./tests/integration"
   },
   "repository": {
     "type": "git",

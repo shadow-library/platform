@@ -4,4 +4,4 @@ bun type-check
 
 bun run test
 
-bun test:e2e
+bun test:integration

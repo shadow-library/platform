@@ -3,18 +3,17 @@
  */
 import { beforeEach, describe, expect, it, jest } from 'bun:test';
 
-import { ShadowApplication, ShadowFactory } from '@shadow-library/app';
-
 /**
  * Importing user defined packages
  */
-import { AppModule } from './app/app.module';
-import { CatInternalService } from './app/cat/cat-internal.service';
-import { CatModule } from './app/cat/cat.module';
-import { CatService } from './app/cat/cat.service';
-import { OutputService } from './app/common/output.service';
-import { DogModule } from './app/dog/dog.module';
-import { DogService } from './app/dog/dog.service';
+import { AppModule } from '@examples/di-and-lifecycle/app.module';
+import { CatInternalService } from '@examples/di-and-lifecycle/cat/cat-internal.service';
+import { CatModule } from '@examples/di-and-lifecycle/cat/cat.module';
+import { CatService } from '@examples/di-and-lifecycle/cat/cat.service';
+import { OutputService } from '@examples/di-and-lifecycle/common/output.service';
+import { DogModule } from '@examples/di-and-lifecycle/dog/dog.module';
+import { DogService } from '@examples/di-and-lifecycle/dog/dog.service';
+import { ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
 /**
  * Defining types

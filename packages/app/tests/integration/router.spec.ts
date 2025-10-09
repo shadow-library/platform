@@ -1,17 +1,16 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it } from '@jest/globals';
-
-import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { beforeEach, describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
-import { AppModule } from './app/app.module';
-import { CommandRouter } from './app/command-router';
-import { OutputService } from './app/output.service';
-import { StorageService } from './app/storage.service';
+import { AppModule } from '@examples/router/app.module';
+import { CommandRouter } from '@examples/router/command-router';
+import { OutputService } from '@examples/router/output.service';
+import { StorageService } from '@examples/router/storage.service';
+import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
 /**
  * Defining types
