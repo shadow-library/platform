@@ -18,6 +18,9 @@ import { HttpRequest, HttpResponse } from '../interfaces';
 
 type Key = string | symbol;
 
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type */
+export interface ContextExtension {}
+
 /**
  * Declaring the constants
  */
@@ -28,7 +31,7 @@ const PARENT_CONTEXT = Symbol('parent-context');
 const CHILD_RID_COUNTER = Symbol('child-rid-counter');
 
 @Injectable()
-export class ContextService {
+export class ContextService implements ContextExtension {
   static readonly name = 'ContextService';
 
   private readonly storage = new AsyncLocalStorage<Map<Key, unknown>>();
@@ -123,5 +126,9 @@ export class ContextService {
   getRID(throwOnMissing: false): string | null;
   getRID(throwOnMissing = true): string | null {
     return this.get<string>(RID, throwOnMissing);
+  }
+
+  extend<T extends ContextExtension = ContextExtension>(extension: T & ThisType<this & T>): this {
+    return Object.assign(this, extension);
   }
 }

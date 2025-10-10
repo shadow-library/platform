@@ -181,4 +181,21 @@ describe('Context', () => {
       expect(context.isInitialized()).toBe(false);
     });
   });
+
+  describe('extend()', () => {
+    it('should extend the context with new methods', () => {
+      store.get.mockReturnValue(100);
+      context.extend({
+        getCurrentUserId(): string | null {
+          return this.get<string | null>('current-user-id', false);
+        },
+        setCurrentUserId(userId: string) {
+          return this.set('current-user-id', userId);
+        },
+      });
+
+      expect((context as any).getCurrentUserId()).toBe(100);
+      expect((context as any).setCurrentUserId('user-123')).toBe(context);
+    });
+  });
 });

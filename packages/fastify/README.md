@@ -695,6 +695,64 @@ export class DataController {
 }
 ```
 
+### Extending Context Service
+
+The `ContextService` can be extended with custom methods to add application-specific functionality while maintaining type safety and method chaining capabilities.
+
+```typescript
+import { contextService } from '@shadow-library/fastify';
+
+declare module '@shadow-library/fastify' {
+  export interface ContextExtension {
+    setUserRole(role: string): ContextService;
+    getUserRole(): string;
+    setCurrentUserId(userId: string): ContextService;
+    getCurrentUserId(): string;
+  }
+}
+
+// Extend the context service with custom methods
+contextService.extend({
+  setUserRole(role: string) {
+    return this.set('user-role', role);
+  },
+  getUserRole() {
+    return this.get<string>('user-role', false);
+  },
+  setCurrentUserId(userId: string) {
+    return this.set('current-user-id', userId);
+  },
+  getCurrentUserId() {
+    return this.get<string>('current-user-id', false);
+  },
+});
+
+// Use in controllers with method chaining
+@HttpController('/api')
+export class UserController {
+  constructor(private readonly contextService: ContextService) {}
+
+  @Post('/login')
+  async login(@Body() loginDto: LoginDto) {
+    const user = await this.authService.validateUser(loginDto);
+
+    // Chain extended methods
+    this.contextService.setCurrentUserId(user.id).setUserRole(user.role);
+
+    return { message: 'Login successful' };
+  }
+
+  @Get('/profile')
+  getProfile() {
+    return {
+      userId: this.contextService.getCurrentUserId(),
+      role: this.contextService.getUserRole(),
+      requestId: this.contextService.getRID(),
+    };
+  }
+}
+```
+
 ## Examples
 
 Check out the [examples](./examples) directory for complete working examples:
