@@ -39,13 +39,13 @@ describe('Config Service', () => {
   class CustomConfig extends ConfigService<CustomConfigRecords> {
     constructor() {
       super({ 'app.name': 'test-app' });
-      this.set('optional.key');
-      this.set('boolean.key', { defaultValue: 'true', validateType: 'boolean' });
-      this.set('transform.key', { defaultValue: 'abc', transform: (value: string) => value.toUpperCase() });
-      this.set('test.sample.one', { defaultValue: 'default-one' });
-      this.set('test.sample.two');
-      this.set('test.sample.three', { defaultValue: '', isArray: true });
-      this.set('test.sample.four', { isArray: true });
+      this.load('optional.key');
+      this.load('boolean.key', { defaultValue: 'true', validateType: 'boolean' });
+      this.load('transform.key', { defaultValue: 'abc', transform: (value: string) => value.toUpperCase() });
+      this.load('test.sample.one', { defaultValue: 'default-one' });
+      this.load('test.sample.two');
+      this.load('test.sample.three', { defaultValue: '', isArray: true });
+      this.load('test.sample.four', { isArray: true });
     }
   }
 
@@ -54,6 +54,13 @@ describe('Config Service', () => {
   beforeEach(() => {
     Utils.exit = (err: string | Error) => throwError(err instanceof Error ? err : new Error(err));
     config = new CustomConfig();
+  });
+
+  describe('load', () => {
+    it('should load and validate the configurations correctly', () => {
+      expect(config.load('custom.key', { defaultValue: 'random-value' })).toBe(config);
+      expect(config.get('custom.key')).toBe('random-value');
+    });
   });
 
   describe('get', () => {
@@ -94,7 +101,7 @@ describe('Config Service', () => {
       class CustomConfigService extends ConfigService<CustomConfigRecords> {
         constructor() {
           super();
-          this.set('custom.key', { defaultValue: 'value', isProdRequired: true });
+          this.load('custom.key', { defaultValue: 'value', isProdRequired: true });
         }
       }
       expect(() => new CustomConfigService()).toThrow();
@@ -104,7 +111,7 @@ describe('Config Service', () => {
       class CustomConfigService extends ConfigService<CustomConfigRecords> {
         constructor() {
           super();
-          this.set('number.key', { defaultValue: 'abc', validateType: 'number' });
+          this.load('number.key', { defaultValue: 'abc', validateType: 'number' });
         }
       }
       expect(() => new CustomConfigService()).toThrow();
@@ -114,7 +121,7 @@ describe('Config Service', () => {
       class CustomConfigService extends ConfigService<CustomConfigRecords> {
         constructor() {
           super();
-          this.set('boolean.key', { defaultValue: 'abc', validateType: 'boolean' });
+          this.load('boolean.key', { defaultValue: 'abc', validateType: 'boolean' });
         }
       }
       expect(() => new CustomConfigService()).toThrow();
@@ -124,7 +131,7 @@ describe('Config Service', () => {
       class CustomConfigService extends ConfigService<CustomConfigRecords> {
         constructor() {
           super();
-          this.set('enum.key', { defaultValue: 'value3', allowedValues: ['value1', 'value2'] });
+          this.load('enum.key', { defaultValue: 'value3', allowedValues: ['value1', 'value2'] });
         }
       }
       expect(() => new CustomConfigService()).toThrow();
@@ -134,7 +141,7 @@ describe('Config Service', () => {
       class CustomConfigService extends ConfigService<CustomConfigRecords> {
         constructor() {
           super();
-          this.set('invalid.key', { defaultValue: 'value', validator: value => value === 'invalid' });
+          this.load('invalid.key', { defaultValue: 'value', validator: value => value === 'invalid' });
         }
       }
       expect(() => new CustomConfigService()).toThrow();

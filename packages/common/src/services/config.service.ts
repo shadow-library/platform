@@ -59,21 +59,21 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     const appEnvs = ['development', 'production', 'test'];
     const logLevels = ['silly', 'debug', 'http', 'info', 'warn', 'error'];
 
-    this.set('app.env', { envKey: 'NODE_ENV', allowedValues: appEnvs, defaultValue: 'development' });
-    this.set('app.name', { defaultValue: defaultAppName });
+    this.load('app.env', { envKey: 'NODE_ENV', allowedValues: appEnvs, defaultValue: 'development' });
+    this.load('app.name', { defaultValue: defaultAppName });
 
-    this.set('log.level', { allowedValues: logLevels, defaultValue: this.isDev() ? 'debug' : 'info' });
-    this.set('log.dir', { defaultValue: 'logs' });
-    this.set('log.buffer.size', { defaultValue: '10000', validateType: 'number' });
+    this.load('log.level', { allowedValues: logLevels, defaultValue: this.isDev() ? 'debug' : 'info' });
+    this.load('log.dir', { defaultValue: 'logs' });
+    this.load('log.buffer.size', { defaultValue: '10000', validateType: 'number' });
 
-    this.set('aws.region', { defaultValue: 'ap-south-1' });
-    this.set('aws.cloudwatch.log-group', { defaultValue: defaultAppName });
-    this.set('aws.cloudwatch.log-stream', { defaultValue: defaultAppName });
-    this.set('aws.cloudwatch.upload-rate', { defaultValue: '2000', validateType: 'number' });
+    this.load('aws.region', { defaultValue: 'ap-south-1' });
+    this.load('aws.cloudwatch.log-group', { defaultValue: defaultAppName });
+    this.load('aws.cloudwatch.log-stream', { defaultValue: defaultAppName });
+    this.load('aws.cloudwatch.upload-rate', { defaultValue: '2000', validateType: 'number' });
   }
 
-  protected set(name: keyof Configs, opts: ConfigOptions = {}): void {
-    if (this.cache.has(name)) return;
+  load(name: keyof Configs, opts: ConfigOptions = {}): this {
+    if (this.cache.has(name)) return this;
     if (opts.validateType === 'boolean') opts = { ...opts, allowedValues: ['true', 'false'], transform: val => val === 'true' };
     if (opts.validateType === 'number') opts = { ...opts, validator: val => !isNaN(Number(val)), transform: val => Number(val) };
 
@@ -82,7 +82,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     if (!value) {
       if (this.isProd() && opts.isProdRequired) Utils.exit(`Environment Variable '${envKey}' not set`);
       else if (opts.defaultValue !== undefined) value = opts.defaultValue;
-      else return;
+      else return this;
     }
     const values = opts.isArray ? value.split(',').filter(val => val !== '') : [value];
 
@@ -105,6 +105,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
     const transformedValues = values.map(val => (opts.transform ? opts.transform(val) : val));
     this.cache.set(name, opts.isArray ? transformedValues : transformedValues[0]);
+    return this;
   }
 
   isProd(): boolean {

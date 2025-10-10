@@ -285,7 +285,7 @@ cache.clear();
 
 #### Type-Safe Configuration
 
-```ts
+````ts
 import { Config, ConfigService } from '@shadow-library/common';
 
 // Using global config
@@ -304,19 +304,19 @@ interface CustomConfig extends ConfigRecords {
 class MyConfigService extends ConfigService<CustomConfig> {
   constructor() {
     super();
-    this.set('api.baseUrl', {
+    this.load('api.baseUrl', {
       defaultValue: 'http://localhost:3000',
       isProdRequired: true,
     });
-    this.set('api.timeout', {
+    this.load('api.timeout', {
       defaultValue: '5000',
       validateType: 'number',
     });
-    this.set('feature.enabled', {
+    this.load('feature.enabled', {
       defaultValue: 'false',
       validateType: 'boolean',
     });
-    this.set('features.enabled', {
+    this.load('features.enabled', {
       defaultValue: '',
       isArray: true,
     });
@@ -326,7 +326,64 @@ class MyConfigService extends ConfigService<CustomConfig> {
 const myConfig = new MyConfigService();
 const apiUrl = myConfig.get('api.baseUrl');
 const timeout = myConfig.getOrThrow('api.timeout'); // Throws if undefined
-```
+
+#### Dynamic Configuration Loading
+
+The `load()` method is exposed to allow developers to dynamically load environment variables into the singleton ConfigService instance. This ensures all configuration is managed in one place without creating multiple instances.
+
+```ts
+import { Config } from '@shadow-library/common';
+
+// Load custom configurations into the global singleton
+Config.load('custom.api.url', {
+  envKey: 'API_URL',
+  defaultValue: 'https://api.example.com'
+});
+
+Config.load('custom.port', {
+  envKey: 'PORT',
+  validateType: 'number',
+  defaultValue: '3000'
+});
+
+Config.load('custom.features', {
+  envKey: 'ENABLED_FEATURES',
+  isArray: true,
+  defaultValue: 'feature1,feature2'
+});
+
+Config.load('custom.debug.enabled', {
+  envKey: 'DEBUG_ENABLED',
+  validateType: 'boolean',
+  defaultValue: 'false'
+});
+
+// Access the loaded configurations
+const apiUrl = Config.get('custom.api.url');
+const port = Config.get('custom.port');
+const features = Config.get('custom.features'); // Array of strings
+const debugEnabled = Config.get('custom.debug.enabled'); // Boolean
+
+// Use validation and required values for production
+Config.load('database.url', {
+  envKey: 'DATABASE_URL',
+  isProdRequired: true, // Will exit if not set in production
+  validator: (value) => value.startsWith('postgresql://') // Custom validation
+});
+````
+
+**Configuration Options:**
+
+- `envKey`: Environment variable name (auto-generated from config key if not provided)
+- `defaultValue`: Default value if environment variable is not set
+- `isProdRequired`: Require the value in production environment
+- `validateType`: Built-in validation for `'number'` or `'boolean'` types
+- `validator`: Custom validation function
+- `isArray`: Parse comma-separated values as an array
+- `allowedValues`: Restrict to specific allowed values
+- `transform`: Custom transformation function for the value
+
+````
 
 ### 📝 **Logging**
 
@@ -365,7 +422,7 @@ Logger.attachTransport('structured-cloudwatch'); // CloudWatch logging
 
 // Chain multiple transports
 Logger.attachTransport('pretty-console').attachTransport('structured-file');
-```
+````
 
 ### 🚨 **Error Handling**
 
@@ -681,6 +738,7 @@ The package uses environment variables for configuration. Below are the key vari
 
 - `Config.get(key)` - Get configuration value
 - `Config.getOrThrow(key)` - Get value or throw
+- `Config.load(key, options)` - Load configuration from environment variables
 - `Config.isDev()` - Check if development environment
 - `Config.isProd()` - Check if production environment
 - `Config.isTest()` - Check if test environment
