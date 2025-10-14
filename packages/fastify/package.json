@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/fastify",
   "type": "module",
-  "version": "0.0.11",
+  "version": "0.0.12",
   "sideEffects": false,
   "description": "A Fastify wrapper featuring decorator-based routing, middleware and error handling",
   "scripts": {
