@@ -65,4 +65,6 @@ export class ServerErrorCode extends ErrorCode {
   static readonly S008 = new ServerErrorCode('S008', ErrorType.CONFLICT, 'Resource conflict as the requested operation conflicts with existing data');
   /** The requested resource could not be found */
   static readonly S009 = new ServerErrorCode('S009', ErrorType.NOT_FOUND, 'The requested resource could not be found');
+  /** Access blocked due to security policy restrictions */
+  static readonly S010 = new ServerErrorCode('S010', ErrorType.UNAUTHORIZED, 'Access blocked due to security policy restrictions');
 }
