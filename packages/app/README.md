@@ -1,4 +1,4 @@
-# Shadow Application
+# @shadow-library/app
 
 This TypeScript package is a framework for building efficient, scalable Node.js applications, emphasizing SOLID principles. It offers unparalleled flexibility through a meticulously crafted modular architecture, serving as a robust, elegant, and well-structured foundation for various applications. The framework introduces SOLID design patterns and well-established solutions to the Node.js landscape, enhancing testability with a sophisticated dependency injection system.
 
