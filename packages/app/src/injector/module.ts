@@ -15,8 +15,8 @@ import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
 import { ControllerRouteMetadata, Router } from '../classes';
 import { CONTROLLER_METADATA, MODULE_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
-import { ModuleMetadata, RouteMetadata } from '../decorators';
-import { InjectionToken, ValueProvider } from '../interfaces';
+import { RouteMetadata } from '../decorators';
+import { InjectionToken, ModuleMetadata, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 
 /**
@@ -47,9 +47,12 @@ export class Module {
   private readonly instance: InstanceWrapper;
   private readonly metadata: ModuleMetadata;
 
-  constructor(private readonly metatype: Class<unknown>) {
+  constructor(
+    private readonly metatype: Class<unknown>,
+    metadata?: ModuleMetadata,
+  ) {
     this.instance = new InstanceWrapper(metatype);
-    this.metadata = Reflect.getMetadata(MODULE_METADATA, metatype);
+    this.metadata = metadata ?? Reflect.getMetadata(MODULE_METADATA, metatype);
 
     this.addModuleRef();
     this.loadProviders();
@@ -239,6 +242,7 @@ export class Module {
      */
 
     const instances = this.getAllInstances();
+    this.logger.debug(`Module '${this.instance.getTokenName()}' Provider initialization order: ${instances.map(i => i.getTokenName()).join(', ')}`);
     for (const provider of instances) {
       if (provider.isTransient()) await provider.loadAllInstances();
       else await provider.loadInstance();

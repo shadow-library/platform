@@ -98,6 +98,36 @@ describe('ModuleRegistry', () => {
       const modules = Array.from(emptyModuleRegistry['modules'].values()).map(m => m.getMetatype());
       expect(modules).toStrictEqual([EmptyModule]);
     });
+
+    it('should register the module with dynamic imports', () => {
+      @Module({})
+      class DynamicModule {
+        static forRoot() {
+          return { module: DynamicModule };
+        }
+      }
+
+      @Module({ imports: [DynamicModule.forRoot()] })
+      class AppModule {}
+
+      const dynamicModuleRegistry = new ModuleRegistry(AppModule);
+      const modules = Array.from(dynamicModuleRegistry['modules'].values()).map(m => m.getMetatype());
+      expect(modules).toStrictEqual([DynamicModule, AppModule]);
+    });
+
+    it('should throw an error if a dynamic module is configured more than once', () => {
+      @Module({})
+      class DynamicModule {
+        static forRoot() {
+          return { module: DynamicModule };
+        }
+      }
+
+      @Module({ imports: [DynamicModule.forRoot(), DynamicModule.forRoot()] })
+      class AppModule {}
+
+      expect(() => new ModuleRegistry(AppModule)).toThrow(InternalError);
+    });
   });
 
   describe('initiation and termination', () => {

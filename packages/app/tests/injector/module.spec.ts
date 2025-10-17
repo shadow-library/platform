@@ -164,6 +164,15 @@ describe('Module', () => {
       expect(module['providers'].size).toBe(2);
       expect(module['providers'].get(AnimalService)).toBeDefined();
     });
+
+    it('should use metadata provided in constructor', () => {
+      const module = new ModuleWrapper(CatModule, { providers: [{ token: 'TEST', useValue: 123 }] });
+      expect(module['imports'].length).toBe(0);
+      expect(module['controllers'].size).toBe(0);
+      expect(module['providers'].size).toBe(2);
+      expect(module['exports'].size).toBe(0);
+      expect(module['providers'].get('TEST')).toBeDefined();
+    });
   });
 
   describe('General methods', () => {

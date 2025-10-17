@@ -10,8 +10,7 @@ import { Class } from 'type-fest';
 import { DIErrors, DependencyGraph } from './helpers';
 import { HookTypes, Module } from './module';
 import { MODULE_METADATA, NAMESPACE } from '../constants';
-import { ModuleMetadata } from '../decorators';
-import { ForwardReference } from '../utils';
+import { Import, ModuleMetadata } from '../interfaces';
 
 /**
  * Defining types
@@ -19,7 +18,10 @@ import { ForwardReference } from '../utils';
 
 type TModule = Class<unknown>;
 
-type Import = Class<unknown> | ForwardReference<Class<unknown>>;
+interface ParsedImport {
+  module: TModule;
+  metadata?: ModuleMetadata;
+}
 
 /**
  * Declaring the constants
@@ -42,8 +44,9 @@ export class ModuleRegistry {
 
     const modules = imports.map(m => ('forwardRef' in m ? m.forwardRef() : m));
     for (const mod of modules) {
-      const isModule = Reflect.hasMetadata(MODULE_METADATA, mod);
-      if (!isModule) throw new InternalError(`Class '${mod.name}' is not a module, but is imported by '${module.name}'`);
+      const ModuleClass = 'module' in mod ? mod.module : mod;
+      const isModule = Reflect.hasMetadata(MODULE_METADATA, ModuleClass);
+      if (!isModule) throw new InternalError(`Class '${ModuleClass.name}' is not a module, but is imported by '${module.name}'`);
     }
 
     return imports;
@@ -53,23 +56,31 @@ export class ModuleRegistry {
     const graph = new DependencyGraph<TModule>();
     const modules = new Map<TModule, Module>();
 
-    const scanModule = (module: TModule): Module => {
+    const scanModule = (module: TModule, metadata?: ModuleMetadata): Module => {
+      if (modules.has(module) && metadata) {
+        throw new InternalError(
+          `Module '${module.name}' with dynamic configuration has already been registered. Dynamic modules must be imported only once with their metadata configuration. To reuse this module elsewhere, import the module class directly in the module's imports array.`,
+        );
+      }
+
       if (modules.has(module)) return modules.get(module) as Module;
       graph.addNode(module);
 
       this.logger.debug(`Scanning module '${module.name}'`);
-      const imports: TModule[] = [];
-      for (const mod of this.reflectImports(module)) {
-        if ('forwardRef' in mod) imports.push(mod.forwardRef());
+      const imports: ParsedImport[] = [];
+      const deps = metadata ? (metadata.imports ?? []) : this.reflectImports(module);
+      for (const mod of deps) {
+        if ('forwardRef' in mod) imports.push({ module: mod.forwardRef() });
         else {
-          graph.addDependency(module, mod);
-          imports.push(mod);
+          const parsedModule: ParsedImport = 'module' in mod ? { module: mod.module, metadata: mod } : { module: mod };
+          graph.addDependency(module, parsedModule.module);
+          imports.push(parsedModule);
         }
       }
 
-      const instance = new Module(module);
+      const instance = new Module(module, metadata);
       modules.set(module, instance);
-      const dependencies = imports.map(m => scanModule(m));
+      const dependencies = imports.map(m => scanModule(m.module, m.metadata));
       dependencies.forEach(d => instance.addImport(d));
       instance.loadDependencies();
 
@@ -80,6 +91,7 @@ export class ModuleRegistry {
 
     scanModule(module);
     const initOrder = graph.getInitOrder();
+    this.logger.debug(`Module initialization order: ${initOrder.map(m => m.name).join(', ')}`);
     return initOrder.map(m => modules.get(m) as Module);
   }
 

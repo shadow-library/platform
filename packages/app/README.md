@@ -366,6 +366,66 @@ Handle circular dependencies between modules:
 class PostModule {}
 ```
 
+## Dynamic Modules
+
+Dynamic modules allow you to create configurable, reusable modules that can be customized with options when imported. This is useful for modules that need different configurations for different use cases.
+
+### Creating a Dynamic Module
+
+A dynamic module implements a static method that returns a `DynamicModule` object:
+
+```ts
+import { DynamicModule, Module } from '@shadow-library/app';
+
+export interface ConfigModuleOptions {
+  folder: string;
+}
+
+@Module({})
+export class ConfigModule {
+  static register(options: ConfigModuleOptions): DynamicModule {
+    return {
+      module: ConfigModule,
+      providers: [{ token: 'CONFIG_OPTIONS', useValue: options }, ConfigService],
+      exports: [ConfigService],
+    };
+  }
+}
+```
+
+### Using Dynamic Modules
+
+Import and configure dynamic modules in your application:
+
+```ts
+@Module({
+  imports: [ConfigModule.register({ folder: './config' })],
+  providers: [AppService],
+})
+export class AppModule {}
+```
+
+### Usage in Services
+
+Inject the dynamic module's providers into your services:
+
+```ts
+@Injectable()
+export class AppService {
+  constructor(private configService: ConfigService) {}
+
+  getHello(): string {
+    return this.configService.get('HELLO_MESSAGE');
+  }
+}
+```
+
+### Common Patterns
+
+- **`forRoot`**: Global module configuration (once per application)
+- **`register`**: Instance configuration (can be used multiple times)
+- **`forFeature`**: Feature-specific registration within a configured module
+
 ## Custom Router Implementation
 
 Shadow Application provides a `Router` abstract class that you can extend to implement your own routing logic:
