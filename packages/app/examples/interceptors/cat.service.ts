@@ -35,12 +35,12 @@ export class CatService {
     ];
   }
 
-  @UseInterceptor(CacheInterceptor, { key: 'cat_by_id', ttl: 1000 })
+  @UseInterceptor(CacheInterceptor, { key: (id: string) => `cat_by_id_${id}`, ttl: 1000 })
   getCat(id: string): Cat | undefined {
     return this.cats.find(cat => cat.id === id);
   }
 
-  @UseInterceptor(CacheInterceptor, { key: 'cat_by_name', ttl: 1000 })
+  @UseInterceptor(CacheInterceptor, { key: (name: string) => `cat_by_name_${name}`, ttl: 10 })
   async getCatByName(name: string): Promise<Cat | undefined> {
     await Bun.sleep(10);
     return this.cats.find(cat => cat.name === name);

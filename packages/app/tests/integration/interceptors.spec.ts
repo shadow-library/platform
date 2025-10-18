@@ -48,7 +48,7 @@ describe('Interceptor', () => {
     const result = await catService.getCatByName('Tom');
 
     expect(cacheService['cache'].size).toBe(1);
-    expect(Array.from(cacheService['cache'].keys())).toEqual(['cat_by_name']);
+    expect(Array.from(cacheService['cache'].keys())).toEqual(['cat_by_name_Tom']);
     expect(result).toEqual({ id: '2', name: 'Tom', age: 5 });
   });
 
@@ -66,7 +66,7 @@ describe('Interceptor', () => {
   it('should return the cached result of async function', async () => {
     const cacheService = app.select(AppModule).get(CacheService);
     const catService = app.get(CatService);
-    cacheService['cache'].set('cat_by_name', { id: '1', name: 'Tom', age: 7 });
+    cacheService['cache'].set('cat_by_name_Tom', { id: '1', name: 'Tom', age: 7 });
 
     const result = await catService.getCatByName('Tom');
 

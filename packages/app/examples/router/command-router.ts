@@ -1,7 +1,9 @@
 /**
  * Importing npm packages
  */
-import { ControllerRouteMetadata, Router } from '@shadow-library/app';
+import { createInterface } from 'node:readline/promises';
+
+import { ControllerRouteMetadata, Injectable, Router } from '@shadow-library/app';
 
 import { OutputService } from './output.service';
 
@@ -24,6 +26,7 @@ export interface Command {
  * Declaring the constants
  */
 
+@Injectable()
 export class CommandRouter extends Router {
   private readonly commands: Command[] = [];
 
@@ -51,8 +54,29 @@ export class CommandRouter extends Router {
     }
   }
 
-  start(): void {
-    this.outputService.print('Command Router started');
+  async start(): Promise<void> {
+    const reader = createInterface({ input: process.stdin, output: process.stdout });
+
+    while (true) {
+      const input = await reader.question('$ ');
+      if (input.toLowerCase() === 'exit' || input.toLowerCase() === 'quit') break;
+
+      const args = input.split(' ').filter(arg => arg.trim() !== '');
+      const command = args.filter(arg => !arg.startsWith('--')).join(' ');
+      const options: Record<string, string> = {};
+      for (const arg of args) {
+        if (!arg.startsWith('--')) continue;
+        const [key, value] = arg.split('=');
+        if (!key || !value) continue;
+        const name = key.replace('--', '');
+        options[name] = value;
+      }
+
+      await this.handleCommand(command, options);
+    }
+
+    reader.close();
+    this.stop();
   }
 
   stop(): void {

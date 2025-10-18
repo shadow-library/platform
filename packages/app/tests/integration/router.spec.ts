@@ -68,10 +68,10 @@ describe('Router', () => {
       expect(output).toStrictEqual(['Blog Post', 'id: 0', 'title: Test Blog', 'content: This is a test blog.']);
     });
 
-    it('should handle non-existent blog post', () => {
+    it('should handle non-existent blog post', async () => {
       storage.blogs = [];
-      expect(() => router.handleCommand('blog get', { id: '999' })).toThrow('Post not found');
-      expect(output).toStrictEqual([]);
+      await router.handleCommand('blog get', { id: '999' });
+      expect(output).toStrictEqual(['Post not found']);
     });
 
     it('should handle invalid command', () => {

@@ -30,6 +30,7 @@ export class UserController {
   @Route({ cmd: 'list' })
   async listUsers(): Promise<void> {
     await utils.temporal.sleep(10);
+    if (this.storageService.users.length === 0) this.outputService.printWarning('No users available.');
     this.outputService.printData('User List', this.storageService.users);
   }
 
@@ -45,7 +46,7 @@ export class UserController {
   async deleteUser(options: { id: string }): Promise<void> {
     await utils.temporal.sleep(10);
     const userIndex = this.storageService.users.findIndex(user => user.id === options.id);
-    if (userIndex === -1) throw new Error('User not found');
+    if (userIndex === -1) return this.outputService.printWarning('User not found');
     this.storageService.users.splice(userIndex, 1);
     this.outputService.printData('Deleted User', { id: options.id });
   }

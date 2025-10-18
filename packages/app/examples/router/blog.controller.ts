@@ -46,7 +46,7 @@ export class BlogController {
   async deletePost(options: { id: string }): Promise<void> {
     await utils.temporal.sleep(10);
     const postIndex = this.storageService.blogs.findIndex(post => post.id === options.id);
-    if (postIndex === -1) throw new Error('Post not found');
+    if (postIndex === -1) return this.outputService.printWarning('Post not found');
     this.storageService.blogs.splice(postIndex, 1);
     this.outputService.printData('Deleted Blog Post', { id: options.id });
   }
@@ -55,7 +55,7 @@ export class BlogController {
   async updatePost(options: BlogPost): Promise<void> {
     await utils.temporal.sleep(10);
     const postIndex = this.storageService.blogs.findIndex(post => post.id === options.id);
-    if (postIndex === -1) throw new Error('Post not found');
+    if (postIndex === -1) return this.outputService.printWarning('Post not found');
     this.storageService.blogs[postIndex] = { id: options.id, title: options.title, content: options.content };
     this.outputService.printData('Updated Blog Post', this.storageService.blogs[postIndex]);
   }
@@ -63,7 +63,7 @@ export class BlogController {
   @Route({ cmd: 'get' })
   getPost(options: { id: string }): void {
     const post = this.storageService.blogs.find(post => post.id === options.id);
-    if (!post) throw new Error('Post not found');
+    if (!post) return this.outputService.printWarning('Post not found');
     this.outputService.printData('Blog Post', post);
   }
 
