@@ -67,6 +67,24 @@ describe('User Auth', () => {
     });
   });
 
+  describe('GET /api/users/me', () => {
+    it('should return 401 for unauthenticated users', async () => {
+      const response = await router.mockRequest().get('/api/users/me');
+      expect(response.statusCode).toBe(401);
+      expect(response.json()).toStrictEqual({
+        code: 'S004',
+        type: 'UNAUTHENTICATED',
+        message: 'Authentication credentials are required to access this resource',
+      });
+    });
+
+    it('should return 200 for users with sufficient access level', async () => {
+      const response = await router.mockRequest().get('/api/users/me').headers({ 'x-user-id': '1' });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({ id: 1, email: 'alice@example.com', name: 'Alice', accessLevel: 1 });
+    });
+  });
+
   describe('POST /api/users', () => {
     const newUser = { email: 'dave@example.com', name: 'Dave', password: 'password1', accessLevel: 1 };
 

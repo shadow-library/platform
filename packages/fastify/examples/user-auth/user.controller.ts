@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { HttpController, Get, Post, Body, Patch, Delete, Params, RespondFor } from '@shadow-library/fastify';
+import { HttpController, Get, Post, Body, Patch, Delete, Params, RespondFor, ContextService } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -23,13 +23,23 @@ import { AuthGuard } from './decorators/auth-guard.decorator';
 
 @HttpController('/api/users')
 export class UserController {
-  constructor(private readonly userService: UserService) {}
+  constructor(
+    private readonly userService: UserService,
+    private readonly contextService: ContextService,
+  ) {}
 
   @Get()
   @AuthGuard({ accessLevel: 1 })
   @RespondFor(200, [UserResponse])
   async listUsers() {
     return this.userService.getAllUsers();
+  }
+
+  @Get('/me')
+  @AuthGuard({ accessLevel: 0 })
+  @RespondFor(200, UserResponse)
+  async getMyProfile() {
+    return this.contextService.get('CURRENT_USER');
   }
 
   @Post()
