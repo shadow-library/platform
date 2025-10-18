@@ -537,8 +537,8 @@ describe('InstanceWrapper', () => {
       @Injectable()
       class TestClass {
         @UseInterceptor(TestInterceptor, { some: 'option' })
-        testMethod() {
-          return 'original';
+        testMethod(name: string) {
+          return `Hello, ${name}!`;
         }
       }
 
@@ -551,12 +551,14 @@ describe('InstanceWrapper', () => {
         expect(context.getMethodName()).toBe('testMethod');
         expect(context.isPromise()).toBe(false);
         expect(context.getOptions()).toEqual({ some: 'option' });
+        expect(context.getArgs()).toEqual(['World']);
         return next.handle();
       });
 
       await instanceWrapper.applyInterceptors(moduleRef);
 
-      instance.testMethod();
+      const result = instance.testMethod('World');
+      expect(result).toBe('Hello, World!');
     });
 
     it('should preserve method binding when intercepted', async () => {

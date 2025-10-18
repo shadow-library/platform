@@ -496,6 +496,7 @@ class LoggingInterceptor implements Interceptor {
 
 - `getClass()`: Returns the class whose method is being intercepted
 - `getMethodName()`: Returns the name of the method being intercepted
+- `getArgs()`: Returns the arguments passed to the intercepted method as an array
 - `isPromise()`: Returns `true` if the original method returns a Promise, `false` for synchronous methods
 
 ### Important Caveats
@@ -553,7 +554,11 @@ class SmartCacheInterceptor implements Interceptor {
   constructor(@Inject('REDIS_CLIENT') private redisClient: RedisClient) {}
 
   private async interceptAsync(context: InterceptorContext, next: CallHandler) {
-    const key = `${context.getClass().name}:${context.getMethodName()}`;
+    const className = context.getClass().name;
+    const methodName = context.getMethodName();
+    const args = context.getArgs();
+    const key = `${className}:${methodName}:${JSON.stringify(args)}`;
+
     const redisValue = await this.redisClient.get(key);
     if (redisValue) {
       const parsedValue = JSON.parse(redisValue);
@@ -567,7 +572,10 @@ class SmartCacheInterceptor implements Interceptor {
   }
 
   intercept(context: InterceptorContext, next: CallHandler) {
-    const key = `${context.getClass().name}:${context.getMethodName()}`;
+    const className = context.getClass().name;
+    const methodName = context.getMethodName();
+    const args = context.getArgs();
+    const key = `${className}:${methodName}:${JSON.stringify(args)}`;
     const isAsync = context.isPromise();
 
     // Check memory cache first (available for both sync and async)
@@ -577,7 +585,7 @@ class SmartCacheInterceptor implements Interceptor {
 
     const handleResult = data => this.memoryCache.set(key, data);
     const result = isAsync ? this.interceptAsync(context, next) : next.handle();
-    if (isAsync) result.then(data => handleResult(data));
+    if (isAsync) return result.then(data => handleResult(data));
     else handleResult(result);
 
     return result;
@@ -588,20 +596,20 @@ class SmartCacheInterceptor implements Interceptor {
 class UserService {
   @UseInterceptors(SmartCacheInterceptor)
   getUserName(id: string): string {
-    // Sync method - cached in memory only
+    // Cache key will be: "UserService:getUserName:["123"]"
     return `User ${id}`;
   }
 
   @UseInterceptors(SmartCacheInterceptor)
   async findExpensiveData(id: string): Promise<any> {
-    // Async method - cached in both memory and Redis
+    // Cache key will be: "UserService:findExpensiveData:["123"]"
     return await this.performExpensiveOperation(id);
   }
 
   @UseInterceptors(SmartCacheInterceptor)
-  async getUserProfile(id: string): Promise<UserProfile> {
-    // Async method - cached in both memory and Redis
-    return await this.database.findUserProfile(id);
+  async getUserProfile(id: string, includeDetails: boolean): Promise<UserProfile> {
+    // Cache key will be: "UserService:getUserProfile:["123",true]"
+    return await this.database.findUserProfile(id, includeDetails);
   }
 }
 ```

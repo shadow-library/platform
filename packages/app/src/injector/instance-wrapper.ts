@@ -36,7 +36,7 @@ export interface InstancePerContext<T extends object> {
 interface InterceptorInvocation {
   interceptor: Interceptor;
   options?: any;
-  context: InterceptorContext;
+  context: Omit<InterceptorContext, 'getArgs'>;
 }
 
 /**
@@ -280,17 +280,25 @@ export class InstanceWrapper<T extends object = any> {
       const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, method);
       const isPromise = returnType === Promise || method.constructor.name === 'AsyncFunction';
       const interceptorInvocations: InterceptorInvocation[] = [];
-      const invoker = (invocation: InterceptorInvocation, handle: Fn) => invocation.interceptor.intercept(invocation.context, { handle });
+      const invoker = (invocation: InterceptorInvocation, args: unknown[], handle: Fn) => {
+        const context = { ...invocation.context, getArgs: () => args } as InterceptorContext;
+        return invocation.interceptor.intercept(context, { handle });
+      };
       for (let index = 0; index < interceptors.length; index++) {
         const interceptor = interceptors[index] as Interceptor;
         const options = Interceptors[index]?.options;
-        const context: InterceptorContext = { getClass: () => Class, getMethodName: () => method.name, isPromise: () => isPromise, getOptions: () => options };
+        const context: Omit<InterceptorContext, 'getArgs'> = {
+          getClass: () => Class as Class<any>,
+          getMethodName: () => method.name,
+          isPromise: () => isPromise,
+          getOptions: () => options,
+        };
         interceptorInvocations.push({ interceptor, options, context });
       }
 
       instance[method.name] = function (...args: any[]) {
         const handler = () => method.apply(this, args);
-        const executor = interceptorInvocations.reduceRight((handle, invocation) => () => invoker(invocation, handle), handler);
+        const executor = interceptorInvocations.reduceRight((handle, invocation) => () => invoker(invocation, args, handle), handler);
         return executor();
       };
 

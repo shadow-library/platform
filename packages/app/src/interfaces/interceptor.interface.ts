@@ -26,7 +26,7 @@ export interface InterceptorConfig<T = any> {
 
 export interface InterceptorContext {
   /** Class whose method is being intercepted */
-  getClass(): Class<unknown>;
+  getClass<T extends object = any>(): Class<T>;
 
   /** Name of the method which is being intercepted */
   getMethodName(): string;
@@ -36,6 +36,9 @@ export interface InterceptorContext {
 
   /** Get the interceptor options if any */
   getOptions<T = any>(): T | undefined;
+
+  /** Get the arguments passed to the intercepted method */
+  getArgs<Args extends any[] = any[]>(): Args;
 }
 
 export interface CallHandler<T = unknown> {
