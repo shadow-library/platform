@@ -7,7 +7,7 @@ import { Router } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { FASTIFY_CONFIG } from '@lib/constants';
+import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '@lib/constants';
 import { ContextService, FastifyModule, FastifyRouter, HttpController } from '@shadow-library/fastify';
 
 /**
@@ -34,7 +34,7 @@ describe('FastifyModule', () => {
         module: FastifyModule,
         controllers: [Controller],
         providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
-        exports: [Router, ContextService],
+        exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -46,7 +46,7 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         providers: expect.arrayContaining([Provider]),
-        exports: [Router, ContextService],
+        exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });
   });
@@ -63,7 +63,7 @@ describe('FastifyModule', () => {
         module: FastifyModule,
         controllers: [Controller],
         providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory }]),
-        exports: [Router, ContextService],
+        exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -75,7 +75,7 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         providers: expect.arrayContaining([Provider]),
-        exports: [Router, ContextService],
+        exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -88,7 +88,7 @@ describe('FastifyModule', () => {
         module: FastifyModule,
         imports: [Import],
         providers: expect.arrayContaining([]),
-        exports: [Router, ContextService],
+        exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });
   });

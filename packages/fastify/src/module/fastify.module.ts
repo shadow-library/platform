@@ -66,7 +66,7 @@ export class FastifyModule {
     providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
     if (options.providers) providers.push(...options.providers);
 
-    const exports: InjectionToken[] = [Router, ContextService];
+    const exports: InjectionToken[] = [Router, ContextService, FASTIFY_INSTANCE];
     if (options.exports) exports.push(...options.exports);
 
     const Module: DynamicModule = { module: FastifyModule, providers, exports };
