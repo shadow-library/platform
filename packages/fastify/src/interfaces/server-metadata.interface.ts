@@ -3,7 +3,7 @@
  */
 import { RouteMetadata } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
-import { RouteShorthandOptions } from 'fastify';
+import { FastifyInstance, RouteShorthandOptions } from 'fastify';
 
 /**
  * Importing user defined packages
@@ -37,3 +37,5 @@ declare module '@shadow-library/app' {
 }
 
 export type ServerMetadata = RouteMetadata;
+
+export type ServerInstance = FastifyInstance;
