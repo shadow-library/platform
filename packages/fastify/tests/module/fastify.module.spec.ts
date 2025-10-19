@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Module, Router } from '@shadow-library/app';
+import { Router } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -17,12 +17,6 @@ import { ContextService, FastifyModule, FastifyRouter, HttpController } from '@s
 /**
  * Declaring the constants
  */
-const target = jest.fn();
-
-jest.mock('@shadow-library/app', () => {
-  const originalModule: object = jest.requireActual('@shadow-library/app');
-  return { ...originalModule, Module: jest.fn().mockImplementation(() => target) };
-});
 
 describe('FastifyModule', () => {
   beforeEach(() => {
@@ -34,12 +28,10 @@ describe('FastifyModule', () => {
       @HttpController()
       class Controller {}
 
-      FastifyModule.forRoot({ controllers: [Controller] });
+      const Module = FastifyModule.forRoot({ controllers: [Controller] });
 
-      expect(target).toHaveBeenCalledWith(expect.any(Function));
-      expect((target.mock.calls[0]?.[0] as any)?.prototype).toBeInstanceOf(FastifyModule);
-      expect(Module).toHaveBeenCalledWith({
-        imports: [],
+      expect(Module).toStrictEqual({
+        module: FastifyModule,
         controllers: [Controller],
         providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
         exports: [Router, ContextService],
@@ -49,11 +41,10 @@ describe('FastifyModule', () => {
     it('should append custom providers', async () => {
       class Provider {}
 
-      FastifyModule.forRoot({ providers: [Provider] });
+      const Module = FastifyModule.forRoot({ providers: [Provider] });
 
-      expect(Module).toHaveBeenCalledWith({
-        imports: [],
-        controllers: [],
+      expect(Module).toStrictEqual({
+        module: FastifyModule,
         providers: expect.arrayContaining([Provider]),
         exports: [Router, ContextService],
       });
@@ -66,12 +57,10 @@ describe('FastifyModule', () => {
       class Controller {}
 
       const useFactory = () => ({}) as any;
-      FastifyModule.forRootAsync({ controllers: [Controller], useFactory });
+      const Module = FastifyModule.forRootAsync({ controllers: [Controller], useFactory });
 
-      expect(target).toHaveBeenCalledWith(expect.any(Function));
-      expect((target.mock.calls[0]?.[0] as any)?.prototype).toBeInstanceOf(FastifyModule);
-      expect(Module).toHaveBeenCalledWith({
-        imports: [],
+      expect(Module).toStrictEqual({
+        module: FastifyModule,
         controllers: [Controller],
         providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory }]),
         exports: [Router, ContextService],
@@ -81,11 +70,10 @@ describe('FastifyModule', () => {
     it('should append custom providers', async () => {
       class Provider {}
 
-      FastifyModule.forRootAsync({ providers: [Provider], useFactory: () => ({}) as any });
+      const Module = FastifyModule.forRootAsync({ providers: [Provider], useFactory: () => ({}) as any });
 
-      expect(Module).toHaveBeenCalledWith({
-        imports: [],
-        controllers: [],
+      expect(Module).toStrictEqual({
+        module: FastifyModule,
         providers: expect.arrayContaining([Provider]),
         exports: [Router, ContextService],
       });
@@ -94,11 +82,11 @@ describe('FastifyModule', () => {
     it('should append custom imports', async () => {
       class Import {}
 
-      FastifyModule.forRootAsync({ imports: [Import], useFactory: () => ({}) as any });
+      const Module = FastifyModule.forRootAsync({ imports: [Import], useFactory: () => ({}) as any });
 
-      expect(Module).toHaveBeenCalledWith({
+      expect(Module).toStrictEqual({
+        module: FastifyModule,
         imports: [Import],
-        controllers: [],
         providers: expect.arrayContaining([]),
         exports: [Router, ContextService],
       });

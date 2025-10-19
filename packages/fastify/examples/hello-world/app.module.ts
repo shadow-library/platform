@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
 
 /**
@@ -16,6 +17,11 @@ import { HelloController } from './hello.controller';
  * Declaring the constants
  */
 
-export const AppModule = FastifyModule.forRoot({
-  controllers: [HelloController],
-});
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [HelloController],
+    }),
+  ],
+})
+export class AppModule {}

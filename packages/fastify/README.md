@@ -13,6 +13,7 @@ A powerful TypeScript-first Fastify wrapper featuring decorator-based routing, a
 - 🔄 **Middleware Support**: Flexible middleware system with lifecycle hooks
 - 📊 **Type Safety**: Full TypeScript support with schema generation
 - 🎨 **Templating Ready**: Built-in support for templating engines
+- ⚡ **Dynamic Module**: Configurable module with `forRoot()` and `forRootAsync()` methods
 
 ## Installation
 
@@ -78,15 +79,23 @@ export class UserController {
 
 ### 2. Create a Module
 
+`FastifyModule` is a dynamic module that provides both synchronous and asynchronous configuration methods.
+
 ```typescript
+import { Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
 import { UserController } from './user.controller';
 
-export const AppModule = FastifyModule.forRoot({
-  controllers: [UserController],
-  port: 3000,
-  host: '0.0.0.0',
-});
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController],
+      port: 3000,
+      host: '0.0.0.0',
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
 ### 3. Bootstrap Your Application
@@ -216,136 +225,168 @@ export class RoutesController {
 
 ## Configuration
 
-### Module Configuration
+### Dynamic Module Configuration
+
+`FastifyModule` is a **dynamic module** that configures itself based on the options you provide. Unlike static modules, dynamic modules return a module configuration object at runtime, allowing for flexible dependency injection and configuration.
+
+The module provides two configuration methods:
+
+#### Synchronous Configuration (forRoot)
 
 ```typescript
-const AppModule = FastifyModule.forRoot({
-  // Basic server configuration
-  host: 'localhost',
-  port: 8080,
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      // Basic server configuration
+      host: 'localhost',
+      port: 8080,
 
-  // Controllers to register
-  controllers: [UserController, AuthController],
+      // Controllers to register
+      controllers: [UserController, AuthController],
 
-  // Additional providers
-  providers: [UserService, AuthService],
+      // Additional providers
+      providers: [UserService, AuthService],
 
-  // Error handling
-  errorHandler: new CustomErrorHandler(),
+      // Error handling
+      errorHandler: new CustomErrorHandler(),
 
-  // Security
-  maskSensitiveData: true,
+      // Security
+      maskSensitiveData: true,
 
-  // Request ID generation
-  requestIdLogLabel: 'rid',
-  genReqId: () => uuid(),
+      // Request ID generation
+      requestIdLogLabel: 'rid',
+      genReqId: () => uuid(),
 
-  // Router options
-  routerOptions: {
-    ignoreTrailingSlash: true,
-    ignoreDuplicateSlashes: true,
-  },
+      // Router options
+      routerOptions: {
+        ignoreTrailingSlash: true,
+        ignoreDuplicateSlashes: true,
+      },
 
-  // Response schemas for error handling
-  responseSchema: {
-    '4xx': ErrorResponseSchema,
-    '5xx': ErrorResponseSchema,
-  },
+      // Response schemas for error handling
+      responseSchema: {
+        '4xx': ErrorResponseSchema,
+        '5xx': ErrorResponseSchema,
+      },
 
-  // Extend Fastify instance before registering controllers
-  fastifyFactory: async fastify => {
-    // Register plugins, add hooks, or configure Fastify
-    await fastify.register(require('@fastify/cors'), {
-      origin: true,
-    });
+      // Extend Fastify instance before registering controllers
+      fastifyFactory: async fastify => {
+        // Register plugins, add hooks, or configure Fastify
+        await fastify.register(require('@fastify/cors'), {
+          origin: true,
+        });
 
-    fastify.addHook('onRequest', async (request, reply) => {
-      console.log(`Incoming request: ${request.method} ${request.url}`);
-    });
+        fastify.addHook('onRequest', async (request, reply) => {
+          console.log(`Incoming request: ${request.method} ${request.url}`);
+        });
 
-    return fastify;
-  },
-});
+        return fastify;
+      },
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
-### Async Configuration
+#### Asynchronous Configuration (forRootAsync)
+
+Use `forRootAsync` when you need to inject dependencies or load configuration dynamically:
 
 ```typescript
-const AppModule = FastifyModule.forRootAsync({
-  useFactory: async (configService: ConfigService) => ({
-    host: configService.get('HOST'),
-    port: configService.get('PORT'),
-    controllers: [UserController],
-  }),
-  inject: [ConfigService],
-});
+@Module({
+  imports: [
+    FastifyModule.forRootAsync({
+      useFactory: async (configService: ConfigService) => ({
+        host: configService.get('HOST'),
+        port: configService.get('PORT'),
+        controllers: [UserController],
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+})
+export class AppModule {}
 ```
+
+#### Dynamic Module Benefits
+
+- **Flexible Configuration**: Configure the module differently for different environments
+- **Dependency Injection**: Inject services into the module configuration
+- **Runtime Configuration**: Load configuration from external sources (databases, config files, etc.)
+- **Type Safety**: Full TypeScript support for all configuration options
+- **Modular Design**: Easy to compose with other modules in your application
 
 ### Extending Fastify Instance
 
 Use the `fastifyFactory` option to customize the Fastify instance before controllers are registered. This is perfect for adding plugins, global hooks, or custom configurations:
 
 ```typescript
+import { Module } from '@shadow-library/app';
 import cors from '@fastify/cors';
 import helmet from '@fastify/helmet';
 import rateLimit from '@fastify/rate-limit';
 
-const AppModule = FastifyModule.forRoot({
-  controllers: [UserController],
-  fastifyFactory: async fastify => {
-    // Register security plugins
-    await fastify.register(helmet, {
-      contentSecurityPolicy: {
-        directives: {
-          defaultSrc: ["'self'"],
-          styleSrc: ["'self'", "'unsafe-inline'"],
-        },
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController],
+      fastifyFactory: async fastify => {
+        // Register security plugins
+        await fastify.register(helmet, {
+          contentSecurityPolicy: {
+            directives: {
+              defaultSrc: ["'self'"],
+              styleSrc: ["'self'", "'unsafe-inline'"],
+            },
+          },
+        });
+
+        // Add CORS support
+        await fastify.register(cors, {
+          origin: (origin, callback) => {
+            const allowedOrigins = ['http://localhost:3000', 'https://myapp.com'];
+            if (!origin || allowedOrigins.includes(origin)) {
+              callback(null, true);
+            } else {
+              callback(new Error('Not allowed by CORS'), false);
+            }
+          },
+          credentials: true,
+        });
+
+        // Add rate limiting
+        await fastify.register(rateLimit, {
+          max: 100,
+          timeWindow: '1 minute',
+        });
+
+        // Add global hooks
+        fastify.addHook('onRequest', async (request, reply) => {
+          console.log(`[${new Date().toISOString()}] ${request.method} ${request.url}`);
+        });
+
+        fastify.addHook('onResponse', async (request, reply) => {
+          const responseTime = reply.elapsedTime;
+          console.log(`Response sent in ${responseTime}ms`);
+        });
+
+        // Add custom context or decorators
+        fastify.decorate('config', {
+          apiVersion: 'v1',
+          environment: process.env.NODE_ENV,
+        });
+
+        // Register custom content type parsers
+        fastify.addContentTypeParser('text/plain', { parseAs: 'string' }, (req, body, done) => {
+          done(null, body);
+        });
+
+        return fastify;
       },
-    });
-
-    // Add CORS support
-    await fastify.register(cors, {
-      origin: (origin, callback) => {
-        const allowedOrigins = ['http://localhost:3000', 'https://myapp.com'];
-        if (!origin || allowedOrigins.includes(origin)) {
-          callback(null, true);
-        } else {
-          callback(new Error('Not allowed by CORS'), false);
-        }
-      },
-      credentials: true,
-    });
-
-    // Add rate limiting
-    await fastify.register(rateLimit, {
-      max: 100,
-      timeWindow: '1 minute',
-    });
-
-    // Add global hooks
-    fastify.addHook('onRequest', async (request, reply) => {
-      console.log(`[${new Date().toISOString()}] ${request.method} ${request.url}`);
-    });
-
-    fastify.addHook('onResponse', async (request, reply) => {
-      const responseTime = reply.elapsedTime;
-      console.log(`Response sent in ${responseTime}ms`);
-    });
-
-    // Add custom context or decorators
-    fastify.decorate('config', {
-      apiVersion: 'v1',
-      environment: process.env.NODE_ENV,
-    });
-
-    // Register custom content type parsers
-    fastify.addContentTypeParser('text/plain', { parseAs: 'string' }, (req, body, done) => {
-      done(null, body);
-    });
-
-    return fastify;
-  },
-});
+    }),
+  ],
+})
+export class AppModule {}
 ```
 
 #### Common Use Cases for fastifyFactory:
