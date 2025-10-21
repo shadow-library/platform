@@ -3,12 +3,13 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { InternalError } from '@shadow-library/common';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
 import { HookTypes, InstanceWrapper, ModuleRegistry } from '@lib/injector';
-import { Controller, Injectable, Module, Route, forwardRef } from '@shadow-library/app';
+import { Controller, DynamicModule, Injectable, Module, Route, forwardRef } from '@shadow-library/app';
 
 /**
  * Defining types
@@ -113,6 +114,27 @@ describe('ModuleRegistry', () => {
       const dynamicModuleRegistry = new ModuleRegistry(AppModule);
       const modules = Array.from(dynamicModuleRegistry['modules'].values()).map(m => m.getMetatype());
       expect(modules).toStrictEqual([DynamicModule, AppModule]);
+    });
+
+    it('should register dynamic modules with circular dependencies', () => {
+      @Module({})
+      class DynamicModuleA {
+        static forRoot(imports: Class<any>[]): DynamicModule {
+          return { module: DynamicModuleA, imports };
+        }
+      }
+
+      @Module({
+        imports: [DynamicModuleA],
+      })
+      class ModuleA {}
+
+      @Module({ imports: [DynamicModuleA.forRoot([ModuleA])] })
+      class AppModule {}
+
+      const dynamicModuleRegistry = new ModuleRegistry(AppModule);
+      const modules = Array.from(dynamicModuleRegistry['modules'].values()).map(m => m.getMetatype());
+      expect(modules).toStrictEqual([DynamicModuleA, AppModule, ModuleA]);
     });
 
     it('should throw an error if a dynamic module is configured more than once', () => {

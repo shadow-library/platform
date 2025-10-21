@@ -73,7 +73,7 @@ export class ModuleRegistry {
         if ('forwardRef' in mod) imports.push({ module: mod.forwardRef() });
         else {
           const parsedModule: ParsedImport = 'module' in mod ? { module: mod.module, metadata: mod } : { module: mod };
-          graph.addDependency(module, parsedModule.module);
+          if (!metadata) graph.addDependency(module, parsedModule.module);
           imports.push(parsedModule);
         }
       }

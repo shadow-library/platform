@@ -18,13 +18,17 @@ import { InjectionToken } from '../../interfaces';
  */
 
 export class DIErrorsStatic {
+  private getTokenName(token: InjectionToken): string {
+    return typeof token === 'function' ? token.name : token.toString();
+  }
+
   unexpected(message: string): never {
     message += `\n\nThis is most likely a bug. Please, report it to the Shadow Library team.`;
     throw new NeverError(message);
   }
 
   circularDependency(circularDeps: InjectionToken[][], transient = false): never {
-    const paths = circularDeps.map(deps => deps.map(dep => dep.toString()));
+    const paths = circularDeps.map(deps => deps.map(dep => this.getTokenName(dep)));
     let message = `A circular dependency has been detected at the following path:\n\n`;
     message += paths.map(path => `  ${path.join(' -> ')}\n`);
     if (transient) message += `\n\nThis is a transient dependency, which means it is not safe to resolve it. Refactor your providers to avoid this circular dependency`;
@@ -34,7 +38,7 @@ export class DIErrorsStatic {
   }
 
   undefinedDependency(parent: InjectionToken, index: number): never {
-    parent = parent.toString();
+    parent = this.getTokenName(parent);
     let message = `Cannot resolve dependencies of ${parent}.`;
     message += ` The dependency at index ${index} cannot be resolved.`;
     message += `This might be due to circular dependency. Use forwardRef() to avoid it.`;
@@ -42,14 +46,14 @@ export class DIErrorsStatic {
   }
 
   unknownExport(token: InjectionToken, module: Class<unknown>): never {
-    token = token.toString();
+    token = this.getTokenName(token);
     let message = `You cannot export a provider that is not a part of the currently processed module (${module.name}).`;
     message += `Please verify whether the exported ${token} is available in this particular context.`;
     throw new InternalError(message);
   }
 
   notFound(token: InjectionToken, module: Class<unknown>): never {
-    const tokenName = (token as any).name ?? token.toString();
+    const tokenName = this.getTokenName(token);
     let message = `Provider '${tokenName}' not found or exported in module '${module.name}'.`;
     message += ` Make sure that it is part of the providers array of the current module.`;
     throw new InternalError(message);
