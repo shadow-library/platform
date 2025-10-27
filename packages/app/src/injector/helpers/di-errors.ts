@@ -22,19 +22,9 @@ export class DIErrorsStatic {
     return typeof token === 'function' ? token.name : token.toString();
   }
 
-  unexpected(message: string): never {
+  unexpected(message: string): NeverError {
     message += `\n\nThis is most likely a bug. Please, report it to the Shadow Library team.`;
-    throw new NeverError(message);
-  }
-
-  circularDependency(circularDeps: InjectionToken[][], transient = false): never {
-    const paths = circularDeps.map(deps => deps.map(dep => this.getTokenName(dep)));
-    let message = `A circular dependency has been detected at the following path:\n\n`;
-    message += paths.map(path => `  ${path.join(' -> ')}\n`);
-    if (transient) message += `\n\nThis is a transient dependency, which means it is not safe to resolve it. Refactor your providers to avoid this circular dependency`;
-    else message += `\n\nPlease, make sure that each side of a bidirectional relationships are decorated with "forwardRef()".`;
-    message += `\nNote that circular relationships between custom providers (e.g., factories) are not supported since functions cannot be called more than once.`;
-    throw new InternalError(message);
+    return new NeverError(message);
   }
 
   undefinedDependency(parent: InjectionToken, index: number): never {
@@ -56,6 +46,13 @@ export class DIErrorsStatic {
     const tokenName = this.getTokenName(token);
     let message = `Provider '${tokenName}' not found or exported in module '${module.name}'.`;
     message += ` Make sure that it is part of the providers array of the current module.`;
+    throw new InternalError(message);
+  }
+
+  duplicateDynamicModule(module: Class<unknown>): never {
+    let message = `Module '${module.name}' with dynamic configuration has already been registered.\n`;
+    message += ` Dynamic modules must be imported only once with their metadata configuration.`;
+    message += ` To reuse this module elsewhere, import the module class directly in the module's imports array.`;
     throw new InternalError(message);
   }
 }

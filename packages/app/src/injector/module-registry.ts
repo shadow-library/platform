@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import assert from 'node:assert';
+
 import { InternalError, Logger } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
@@ -10,7 +12,7 @@ import { Class } from 'type-fest';
 import { DIErrors, DependencyGraph } from './helpers';
 import { HookTypes, Module } from './module';
 import { MODULE_METADATA, NAMESPACE } from '../constants';
-import { Import, ModuleMetadata } from '../interfaces';
+import { DynamicModule, ModuleMetadata } from '../interfaces';
 
 /**
  * Defining types
@@ -18,14 +20,20 @@ import { Import, ModuleMetadata } from '../interfaces';
 
 type TModule = Class<unknown>;
 
-interface ParsedImport {
+type TParsedModule = TModule | DynamicModule;
+
+interface ParsedModuleMetadata extends ModuleMetadata {
+  isNoop?: boolean;
+  isDynamic?: boolean;
   module: TModule;
-  metadata?: ModuleMetadata;
+  imports?: TParsedModule[];
 }
 
 /**
  * Declaring the constants
  */
+const getModuleClass = (module: TParsedModule): TModule => ('module' in module ? module.module : module);
+const isDynamicModule = (module: TParsedModule): module is DynamicModule => 'module' in module;
 
 export class ModuleRegistry {
   private readonly logger = Logger.getLogger(NAMESPACE, 'ModuleRegistry');
@@ -36,60 +44,57 @@ export class ModuleRegistry {
     for (const module of modules) this.modules.set(module.getMetatype(), module);
   }
 
-  private reflectImports(module: TModule): Import[] {
-    const metadata: ModuleMetadata = Reflect.getMetadata(MODULE_METADATA, module);
+  private extractMetadata(module: TParsedModule): ParsedModuleMetadata {
+    const Class = getModuleClass(module);
+    const metadata: ModuleMetadata = 'module' in module ? module : Reflect.getMetadata(MODULE_METADATA, module);
+    if (Object.keys(metadata).length === 0) return { module: Class, isNoop: true };
+
     const imports = metadata.imports ?? [];
     const index = imports.findIndex(m => m === undefined);
-    if (index !== -1) return DIErrors.undefinedDependency(module, index);
+    if (index !== -1) return DIErrors.undefinedDependency(Class, index);
 
     const modules = imports.map(m => ('forwardRef' in m ? m.forwardRef() : m));
     for (const mod of modules) {
-      const ModuleClass = 'module' in mod ? mod.module : mod;
+      const ModuleClass = getModuleClass(mod);
       const isModule = Reflect.hasMetadata(MODULE_METADATA, ModuleClass);
-      if (!isModule) throw new InternalError(`Class '${ModuleClass.name}' is not a module, but is imported by '${module.name}'`);
+      if (!isModule) throw new InternalError(`Class '${ModuleClass.name}' is not a module, but is imported by '${Class.name}'`);
     }
 
-    return imports;
+    return { ...metadata, module: Class, imports: modules };
   }
 
   private scan(module: TModule): Module[] {
     const graph = new DependencyGraph<TModule>();
     const modules = new Map<TModule, Module>();
+    const moduleMetadata = new Map<TModule, ParsedModuleMetadata>();
 
-    const scanModule = (module: TModule, metadata?: ModuleMetadata): Module => {
-      if (modules.has(module) && metadata) {
-        throw new InternalError(
-          `Module '${module.name}' with dynamic configuration has already been registered. Dynamic modules must be imported only once with their metadata configuration. To reuse this module elsewhere, import the module class directly in the module's imports array.`,
-        );
-      }
-
-      if (modules.has(module)) return modules.get(module) as Module;
-      graph.addNode(module);
-
-      this.logger.debug(`Scanning module '${module.name}'`);
-      const imports: ParsedImport[] = [];
-      const deps = metadata ? (metadata.imports ?? []) : this.reflectImports(module);
-      for (const mod of deps) {
-        if ('forwardRef' in mod) imports.push({ module: mod.forwardRef() });
-        else {
-          const parsedModule: ParsedImport = 'module' in mod ? { module: mod.module, metadata: mod } : { module: mod };
-          if (!metadata) graph.addDependency(module, parsedModule.module);
-          imports.push(parsedModule);
-        }
-      }
-
-      const instance = new Module(module, metadata);
-      modules.set(module, instance);
-      const dependencies = imports.map(m => scanModule(m.module, m.metadata));
-      dependencies.forEach(d => instance.addImport(d));
-      instance.loadDependencies();
-
-      this.logger.debug(`Module '${module.name}' scanned`);
-
-      return instance;
+    /** Scan all the imports to find all the modules, especially dynamic ones which could be configured later */
+    const scanModule = (module: TParsedModule): void => {
+      const isDynamic = isDynamicModule(module);
+      const metadata = this.extractMetadata(module);
+      const existingMetadata = moduleMetadata.get(metadata.module);
+      if (existingMetadata && !isDynamic) return;
+      if (existingMetadata && !existingMetadata.isNoop) DIErrors.duplicateDynamicModule(metadata.module);
+      modules.set(metadata.module, new Module(metadata.module, metadata));
+      moduleMetadata.set(metadata.module, { ...metadata, isDynamic });
+      metadata.imports?.forEach(imp => scanModule(imp));
     };
 
     scanModule(module);
+    for (const [ModuleClass, metadata] of moduleMetadata.entries()) {
+      const module = modules.get(ModuleClass);
+      graph.addNode(ModuleClass);
+      assert(module, DIErrors.unexpected(`Module '${ModuleClass.name}' not found in registry while processing its dependencies`));
+      for (const dependency of metadata.imports ?? []) {
+        const Class = getModuleClass(dependency);
+        const dependencyModule = modules.get(Class);
+        assert(dependencyModule, DIErrors.unexpected(`Dependency module '${Class.name}' not found while processing module '${ModuleClass.name}'`));
+        module.addImport(dependencyModule);
+        graph.addDependency(ModuleClass, Class);
+      }
+      module.loadDependencies();
+    }
+
     const initOrder = graph.getInitOrder();
     this.logger.debug(`Module initialization order: ${initOrder.map(m => m.name).join(', ')}`);
     return initOrder.map(m => modules.get(m) as Module);

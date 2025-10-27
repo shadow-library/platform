@@ -5,14 +5,14 @@
 /**
  * Importing user defined packages
  */
-import { DIErrors } from './di-errors';
 import { InjectionToken } from '../../interfaces';
 
 /**
  * Defining types
  */
 
-interface NodeMetadata {
+interface NodeMetadata<T = unknown> {
+  node: T;
   distance: number;
   dependsOn: number;
   requiredBy: number;
@@ -22,42 +22,14 @@ interface NodeMetadata {
  * Declaring the constants
  */
 
+function tieBreakerSort(a: NodeMetadata, b: NodeMetadata): number {
+  if (a.dependsOn !== b.dependsOn) return a.dependsOn - b.dependsOn;
+  if (a.requiredBy !== b.requiredBy) return b.requiredBy - a.requiredBy;
+  return 0;
+}
+
 export class DependencyGraph<T extends InjectionToken> {
   private readonly nodeMap = new Map<T, Set<T>>();
-
-  private constructMetadata(): Map<T, NodeMetadata> {
-    const metadata = new Map<T, NodeMetadata>();
-    const queue: T[] = [];
-
-    /** add the node, dependsOn and requiredBy data */
-    for (const [node, deps] of this.nodeMap.entries()) {
-      if (deps.size == 0) queue.push(node);
-      const nodeMetadata = metadata.get(node);
-      if (nodeMetadata) nodeMetadata.dependsOn = deps.size;
-      else metadata.set(node, { distance: 0, dependsOn: deps.size, requiredBy: 0 });
-      for (const dep of deps) {
-        const depMetadata = metadata.get(dep);
-        if (depMetadata) depMetadata.requiredBy++;
-        else metadata.set(dep, { distance: 0, dependsOn: 0, requiredBy: 1 });
-      }
-    }
-
-    /** calculate the distance of each node from the leaves */
-    while (queue.length > 0) {
-      const current = queue.shift() as T;
-      const currentMetadata = metadata.get(current) as NodeMetadata;
-
-      for (const [node, deps] of this.nodeMap.entries()) {
-        if (!deps.has(current)) continue;
-        const nodeMetadata = metadata.get(node) as NodeMetadata;
-        const newDistance = currentMetadata.distance + 1;
-        if (newDistance > nodeMetadata.distance) nodeMetadata.distance = newDistance;
-        if (--nodeMetadata.dependsOn === 0) queue.push(node);
-      }
-    }
-
-    return metadata;
-  }
 
   getNodes(): T[] {
     return Array.from(this.nodeMap.keys());
@@ -80,66 +52,46 @@ export class DependencyGraph<T extends InjectionToken> {
     return this;
   }
 
-  determineCircularDependencies(): T[][] {
-    const circularDeps = [] as T[][];
-    const nodes = this.getNodes();
-    const visited = new Set<T>();
-    const visiting = new Set<T>();
-    const stack = new Array<T>();
-
-    const visitNode = (node: T) => {
-      if (visited.has(node)) return;
-
-      if (visiting.has(node)) {
-        const circularArr = [...visiting, node];
-        const circularPath = circularArr.slice(circularArr.indexOf(node));
-        circularDeps.push(circularPath);
-        return;
-      }
-
-      visiting.add(node);
-      this.getDependencies(node).forEach(visitNode);
-
-      visiting.delete(node);
-      visited.add(node);
-      stack.push(node);
-    };
-
-    nodes.forEach(visitNode);
-
-    return circularDeps;
-  }
-
   getInitOrder(): T[] {
-    const metadata = this.constructMetadata();
-    const nodes: T[] = [];
+    const metadata = new Map<T, NodeMetadata<T>>();
     const queue: T[] = [];
 
-    /** Initialize queue with nodes having no dependencies (zero in-degree) */
-    for (const [node, nodeMetadata] of metadata.entries()) {
-      if (nodeMetadata.requiredBy === 0) queue.push(node);
-    }
-
-    /** Perform BFS-like processing to generate the topological order */
-    while (queue.length > 0) {
-      const node = queue.shift() as T;
-      nodes.push(node);
-
-      const dependencies = this.getDependencies(node);
-      for (const dependency of dependencies) {
-        const dependencyMetadata = metadata.get(dependency) as NodeMetadata;
-        if (--dependencyMetadata.requiredBy === 0) queue.push(dependency);
+    /** add the node, dependsOn and requiredBy data */
+    for (const [node, deps] of this.nodeMap.entries()) {
+      if (deps.size == 0) queue.push(node);
+      const nodeMetadata = metadata.get(node);
+      if (nodeMetadata) nodeMetadata.dependsOn = deps.size;
+      else metadata.set(node, { node, distance: 0, dependsOn: deps.size, requiredBy: 0 });
+      for (const dep of deps) {
+        const depMetadata = metadata.get(dep);
+        if (depMetadata) depMetadata.requiredBy++;
+        else metadata.set(dep, { node: dep, distance: 0, dependsOn: 0, requiredBy: 1 });
       }
     }
 
-    /** If all nodes are not present, then there's a cycle (circular dependency) */
-    if (nodes.length !== this.nodeMap.size) {
-      const circularDeps = this.determineCircularDependencies();
-      return DIErrors.circularDependency(circularDeps);
+    let current: T | null = null;
+    const orderedNodes = new Set<T>();
+    while ((current = getNextNode()) !== null) {
+      const currentMetadata = metadata.get(current) as NodeMetadata;
+      orderedNodes.add(current);
+
+      for (const [node, deps] of this.nodeMap.entries()) {
+        if (!deps.has(current)) continue;
+        const nodeMetadata = metadata.get(node) as NodeMetadata;
+        const newDistance = currentMetadata.distance + 1;
+        if (newDistance > nodeMetadata.distance) nodeMetadata.distance = newDistance;
+        if (--nodeMetadata.dependsOn === 0 && !orderedNodes.has(node)) queue.push(node);
+      }
     }
 
-    const getDistance = (node: T) => (metadata.get(node) as NodeMetadata).distance;
-    const sortedNodes = nodes.sort((a, b) => getDistance(a) - getDistance(b));
-    return sortedNodes;
+    return Array.from(orderedNodes);
+
+    function getNextNode(): T | null {
+      if (queue.length > 0) return queue.shift() as T;
+      const remainingNodes = Array.from(metadata.values()).filter(m => m.dependsOn > 0);
+      if (remainingNodes.length === 0) return null;
+      const values = remainingNodes.sort(tieBreakerSort);
+      return (values[0] as NodeMetadata<T>).node;
+    }
   }
 }

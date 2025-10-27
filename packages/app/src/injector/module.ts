@@ -14,7 +14,7 @@ import { DIErrors, DependencyGraph } from './helpers';
 import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
 import { ControllerRouteMetadata, Router } from '../classes';
-import { CONTROLLER_METADATA, MODULE_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
+import { CONTROLLER_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
 import { RouteMetadata } from '../decorators';
 import { InjectionToken, ModuleMetadata, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
@@ -45,14 +45,12 @@ export class Module {
   private readonly exports = new Set<InjectionToken>();
 
   private readonly instance: InstanceWrapper;
-  private readonly metadata: ModuleMetadata;
 
   constructor(
     private readonly metatype: Class<unknown>,
-    metadata?: ModuleMetadata,
+    private readonly metadata: ModuleMetadata,
   ) {
     this.instance = new InstanceWrapper(metatype);
-    this.metadata = metadata ?? Reflect.getMetadata(MODULE_METADATA, metatype);
 
     this.addModuleRef();
     this.loadProviders();
@@ -103,7 +101,7 @@ export class Module {
       if (provider.isResolved()) continue;
       for (const dependency of provider.getDependencies()) {
         if (!providerMap.has(dependency.token)) continue;
-        else if (!dependency.forwardRef) graph.addDependency(provider.getToken(), dependency.token);
+        else graph.addDependency(provider.getToken(), dependency.token);
       }
     }
 
@@ -154,29 +152,13 @@ export class Module {
     const provider = this.providers.get(token);
     if (provider) return provider;
 
-    for (const module of this.getChildModules()) {
+    for (const module of this.imports) {
       const provider = module.getProvider(token, true);
       if (provider) return provider;
     }
 
     if (!optional) DIErrors.notFound(token, this.metatype);
     return;
-  }
-
-  private detectCircularTransients() {
-    const transientGraph = new DependencyGraph();
-
-    for (const provider of this.providers.values()) {
-      if (provider.isTransient()) {
-        for (const dependency of provider.getDependencies()) {
-          const dependencyInstance = this.getInternalProvider(dependency.token, dependency.optional);
-          if (dependencyInstance && dependencyInstance.isTransient()) transientGraph.addDependency(provider.getToken(), dependency.token);
-        }
-      }
-    }
-
-    const circularPaths = transientGraph.determineCircularDependencies();
-    if (circularPaths.length > 0) DIErrors.circularDependency(circularPaths, true);
   }
 
   getMetatype(): Class<unknown> {
@@ -233,7 +215,6 @@ export class Module {
 
   async init(): Promise<void> {
     this.logger.debug(`Initializing module '${this.instance.getTokenName()}'`);
-    this.detectCircularTransients();
 
     /**
      * Loading the providers and controllers.

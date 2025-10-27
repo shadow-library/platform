@@ -57,7 +57,7 @@ describe('Module', () => {
     }
   }
 
-  @Module({
+  const catModuleMetadata = {
     providers: [
       CatService,
       { token: 'CONFIG', useValue: 'CONFIG_VALUE' },
@@ -68,7 +68,8 @@ describe('Module', () => {
     ],
     controllers: [CatController],
     exports: [CatService, 'MOCK_CAT'],
-  })
+  };
+  @Module(catModuleMetadata)
   class CatModule implements OnModuleDestroy {
     constructor(public catService: CatService) {}
     onModuleDestroy = onModuleDestroyMock;
@@ -76,46 +77,26 @@ describe('Module', () => {
 
   beforeEach(() => {
     jest.resetAllMocks();
-    module = new ModuleWrapper(CatModule);
+    module = new ModuleWrapper(CatModule, catModuleMetadata);
     module.loadDependencies();
   });
 
   describe('module creation', () => {
     it('should throw an error if the controller is not annotated', () => {
       class InvalidController {}
-      @Module({ controllers: [InvalidController] })
+      const metadata = { controllers: [InvalidController] };
+      @Module(metadata)
       class InvalidModule {}
 
-      expect(() => new ModuleWrapper(InvalidModule)).toThrow(InternalError);
+      expect(() => new ModuleWrapper(InvalidModule, metadata)).toThrow(InternalError);
     });
 
     it('should throw an error for duplicate providers', () => {
-      @Module({ providers: [MockCatService, { token: MockCatService, useClass: CatSubService }] })
+      const metadata = { providers: [MockCatService, { token: MockCatService, useClass: CatSubService }] };
+      @Module(metadata)
       class DuplicateModule {}
 
-      expect(() => new ModuleWrapper(DuplicateModule)).toThrow(InternalError);
-    });
-
-    it('should detect circular dependencies', async () => {
-      @Injectable()
-      class ServiceA {
-        constructor(@Inject('SERVICE_B') public serviceB: any) {}
-      }
-
-      @Injectable()
-      class ServiceB {
-        constructor(@Inject('SERVICE_A') public serviceA: any) {}
-      }
-
-      @Module({
-        providers: [
-          { token: 'SERVICE_A', useClass: ServiceA },
-          { token: 'SERVICE_B', useClass: ServiceB },
-        ],
-      })
-      class CircularModule {}
-
-      expect(() => new ModuleWrapper(CircularModule)).toThrow(InternalError);
+      expect(() => new ModuleWrapper(DuplicateModule, metadata)).toThrow(InternalError);
     });
 
     it('should add the module ref provider', () => {
@@ -146,7 +127,7 @@ describe('Module', () => {
       @Module({})
       class EmptyModule {}
 
-      const emptyModule = new ModuleWrapper(EmptyModule);
+      const emptyModule = new ModuleWrapper(EmptyModule, {});
       expect(emptyModule['providers'].size).toBe(1); // ModuleRef
       expect(emptyModule['controllers'].size).toBe(0);
     });
@@ -157,10 +138,11 @@ describe('Module', () => {
         constructor(private readonly catService: CatService) {}
       }
 
-      @Module({ imports: [CatModule], providers: [AnimalService] })
+      const metadata = { imports: [CatModule], providers: [AnimalService] };
+      @Module(metadata)
       class AnimalModule {}
 
-      const module = new ModuleWrapper(AnimalModule);
+      const module = new ModuleWrapper(AnimalModule, metadata);
       expect(module['providers'].size).toBe(2);
       expect(module['providers'].get(AnimalService)).toBeDefined();
     });
@@ -199,7 +181,7 @@ describe('Module', () => {
       @Module({})
       class NewModule {}
 
-      const importModule = new ModuleWrapper(NewModule);
+      const importModule = new ModuleWrapper(NewModule, {});
       module.addImport(importModule);
 
       expect(module['imports']).toHaveLength(1);
@@ -225,10 +207,11 @@ describe('Module', () => {
     });
 
     it('should throw error if provider is not exported from the imported module', () => {
-      @Module({ imports: [CatModule] })
+      const metadata = { imports: [CatModule] };
+      @Module(metadata)
       class NewModule {}
 
-      const newModule = new ModuleWrapper(NewModule).addImport(module);
+      const newModule = new ModuleWrapper(NewModule, metadata).addImport(module);
       const moduleRef = newModule['getInternalProvider'](ModuleRef).getInstance() as any;
 
       expect(() => moduleRef.get(CatSubService)).toThrow(InternalError);
@@ -259,10 +242,11 @@ describe('Module', () => {
       service.loadInstance = mock;
       service.applyInterceptors = mock;
 
-      @Module({ imports: [CatModule] })
+      const metadata = { imports: [CatModule] };
+      @Module(metadata)
       class NewModule {}
 
-      const newModule = new ModuleWrapper(NewModule).addImport(module);
+      const newModule = new ModuleWrapper(NewModule, metadata).addImport(module);
       const moduleRef = newModule['getInternalProvider'](ModuleRef).getInstance() as any;
       const instance = await moduleRef.resolve(CatService);
 
@@ -283,9 +267,10 @@ describe('Module', () => {
     });
 
     it('should initialize the module when optional provider is not provided', async () => {
-      @Module({ providers: [MockCatService] })
+      const metadata = { providers: [MockCatService] };
+      @Module(metadata)
       class OptionalModule {}
-      const module = new ModuleWrapper(OptionalModule);
+      const module = new ModuleWrapper(OptionalModule, metadata);
 
       await module.init();
       const isProvidersResolved = Array.from(module['providers'].values()).every(provider => provider.isResolved());
@@ -296,29 +281,12 @@ describe('Module', () => {
       expect(isControllersResolved).toBe(true);
     });
 
-    it('should throw an error if there is a circular dependency between transient providers', async () => {
-      @Injectable({ transient: true })
-      class CircularServiceA {
-        constructor(@Inject(forwardRef(() => CircularServiceB)) public serviceB: object) {}
-      }
-
-      @Injectable({ transient: true })
-      class CircularServiceB {
-        constructor(@Inject(forwardRef(() => CircularServiceA)) public serviceA: CircularServiceA) {}
-      }
-
-      @Module({ providers: [CircularServiceA, CircularServiceB] })
-      class CircularModule {}
-
-      const module = new ModuleWrapper(CircularModule);
-      await expect(module.init()).rejects.toThrowError(InternalError);
-    });
-
     it('should throw an error if an unknown provider is exported', async () => {
-      @Module({ exports: ['UNKNOWN_PROVIDER'] })
+      const metadata = { exports: ['UNKNOWN_PROVIDER'] };
+      @Module(metadata)
       class InvalidModule {}
 
-      const module = new ModuleWrapper(InvalidModule);
+      const module = new ModuleWrapper(InvalidModule, metadata);
       await expect(module.init()).rejects.toThrowError(InternalError);
     });
 
@@ -357,8 +325,10 @@ describe('Module', () => {
     @Module({ imports: [CatModule, forwardRef(() => AnimalModule)], controllers: [DogController] })
     class DogModule {}
 
-    @Module({ imports: [DogModule] })
+    const animalModuleMetadata = { imports: [DogModule] };
+    @Module(animalModuleMetadata)
     class AnimalModule {}
+    const dogModuleMetadata = { imports: [CatModule, AnimalModule], controllers: [DogController] };
 
     beforeEach(() => module.init());
 
@@ -370,7 +340,7 @@ describe('Module', () => {
     });
 
     it('should register the routes for all the controllers', async () => {
-      const dogModule = new ModuleWrapper(DogModule);
+      const dogModule = new ModuleWrapper(DogModule, dogModuleMetadata);
       jest.spyOn(dogModule as any, 'getRouter').mockReturnValue(router);
 
       dogModule.addImport(module);
@@ -412,8 +382,8 @@ describe('Module', () => {
     });
 
     it('should register controllers only once for cyclic dependent modules', async () => {
-      const dogModule = new ModuleWrapper(DogModule);
-      const animalModule = new ModuleWrapper(AnimalModule);
+      const dogModule = new ModuleWrapper(DogModule, dogModuleMetadata);
+      const animalModule = new ModuleWrapper(AnimalModule, animalModuleMetadata);
       dogModule.addImport(animalModule).addImport(module);
       animalModule.addImport(dogModule);
 

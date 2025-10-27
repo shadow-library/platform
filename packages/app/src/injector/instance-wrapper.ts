@@ -207,7 +207,7 @@ export class InstanceWrapper<T extends object = any> {
 
     if (!dependency) {
       if (metadata.optional) return;
-      return DIErrors.unexpected(`The dependency at index ${index} of '${this.getTokenName()}' is undefined`);
+      throw DIErrors.unexpected(`The dependency at index ${index} of '${this.getTokenName()}' is undefined`);
     }
 
     if (!dependency.isResolved()) return await dependency.loadPrototype(metadata.contextId);
