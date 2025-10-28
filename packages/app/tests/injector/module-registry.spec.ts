@@ -80,7 +80,7 @@ describe('ModuleRegistry', () => {
 
     it('should register all the modules in the correct order', () => {
       const modules = Array.from(moduleRegistry['modules'].values()).map(m => m.getMetatype());
-      expect(modules).toStrictEqual([SheepModule, CatModule, DogModule, AnimalModule, AppModule]);
+      expect(modules).toStrictEqual([SheepModule, DogModule, CatModule, AnimalModule, AppModule]);
     });
 
     it('should load all the dependencies', () => {
@@ -134,7 +134,7 @@ describe('ModuleRegistry', () => {
 
       const dynamicModuleRegistry = new ModuleRegistry(AppModule);
       const modules = Array.from(dynamicModuleRegistry['modules'].values()).map(m => m.getMetatype());
-      expect(modules).toStrictEqual([DynamicModuleA, AppModule, ModuleA]);
+      expect(modules).toStrictEqual([DynamicModuleA, ModuleA, AppModule]);
     });
 
     it('should throw an error if a dynamic module is configured more than once', () => {
@@ -182,7 +182,7 @@ describe('ModuleRegistry', () => {
 
     it('should list all the modules', () => {
       const modules = moduleRegistry.get().map(m => m.getMetatype());
-      expect(modules).toStrictEqual([SheepModule, CatModule, DogModule, AnimalModule, AppModule]);
+      expect(modules).toStrictEqual([SheepModule, DogModule, CatModule, AnimalModule, AppModule]);
     });
 
     it('should throw an error if the module is not found', () => {

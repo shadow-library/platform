@@ -223,7 +223,7 @@ export class Module {
      */
 
     const instances = this.getAllInstances();
-    this.logger.debug(`Module '${this.instance.getTokenName()}' Provider initialization order: ${instances.map(i => i.getTokenName()).join(', ')}`);
+    this.logger.debug(`Module '${this.instance.getTokenName()}' Provider initialization order: ${instances.map(i => i.getTokenName()).join(' -> ')}`);
     for (const provider of instances) {
       if (provider.isTransient()) await provider.loadAllInstances();
       else await provider.loadInstance();

@@ -79,9 +79,11 @@ export class ModuleRegistry {
       moduleMetadata.set(metadata.module, { ...metadata, isDynamic });
       metadata.imports?.forEach(imp => scanModule(imp));
     };
-
     scanModule(module);
-    for (const [ModuleClass, metadata] of moduleMetadata.entries()) {
+
+    /** This ensures that the module initialized first will be loaded last since loading from root, while initialization should be from leaves */
+    const orderedMetadata = Array.from(moduleMetadata.entries()).reverse();
+    for (const [ModuleClass, metadata] of orderedMetadata) {
       const module = modules.get(ModuleClass);
       graph.addNode(ModuleClass);
       assert(module, DIErrors.unexpected(`Module '${ModuleClass.name}' not found in registry while processing its dependencies`));
@@ -96,7 +98,7 @@ export class ModuleRegistry {
     }
 
     const initOrder = graph.getInitOrder();
-    this.logger.debug(`Module initialization order: ${initOrder.map(m => m.name).join(', ')}`);
+    this.logger.debug(`Module initialization order: ${initOrder.map(m => m.name).join(' -> ')}`);
     return initOrder.map(m => modules.get(m) as Module);
   }
 
