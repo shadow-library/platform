@@ -13,6 +13,7 @@ import { AsyncHttpMiddleware, HttpRequest, HttpResponse, Middleware } from '@sha
 
 declare module 'fastify' {
   interface FastifyRequest {
+    /** Correlation ID */
     cid: string;
   }
 }
