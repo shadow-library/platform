@@ -20,9 +20,18 @@ import { Config } from '../config.service';
  * Defining types
  */
 
+export type LogData = Record<string | number | symbol, unknown>;
+
 export type redactFn = <T>(input: T) => string | T;
 
 export type AttachableTransports = 'console:pretty' | 'console:json' | 'file:json' | 'cloudwatch:json';
+
+export type ContextProvider = () => LogData;
+
+interface ContextProviderConfig {
+  namespace: string;
+  provider: ContextProvider;
+}
 
 export interface Logger {
   verbose(message: string, ...meta: any[]): void;
@@ -41,6 +50,17 @@ const noop = new Transport({ log: () => {} }); // eslint-disable-line @typescrip
 class LoggerStatic {
   private readonly logger = createLogger({ level: Config.get('log.level') });
   private getLogMetadata: () => object = () => ({});
+  private readonly contextProviders: ContextProviderConfig[] = [];
+
+  private getLogContext(): LogData {
+    const context: LogData = {};
+    for (const { namespace, provider } of this.contextProviders) {
+      context[namespace] ??= {};
+      const contextData = provider();
+      Object.assign(context[namespace] as LogData, contextData);
+    }
+    return context;
+  }
 
   isDebugEnabled(): boolean {
     return this.logger.isDebugEnabled();
@@ -53,6 +73,11 @@ class LoggerStatic {
 
   setLogMetadataProvider(getLogMetadata: () => object): this {
     this.getLogMetadata = getLogMetadata;
+    return this;
+  }
+
+  addContextProvider(namespace: string, provider: ContextProvider): this {
+    this.contextProviders.push({ namespace, provider });
     return this;
   }
 
@@ -73,7 +98,7 @@ class LoggerStatic {
   attachTransport(type: AttachableTransports): this {
     let transport: Transport | null = null;
     const appName = Config.get('app.name');
-    const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata()));
+    const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata(), this.getLogContext()));
     const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
 
     switch (type) {

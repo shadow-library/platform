@@ -76,4 +76,80 @@ describe('Logger Service', () => {
     Logger.close();
     expect(fn).toBeCalled();
   });
+
+  describe('Context Providers', () => {
+    beforeEach(() => {
+      Logger['contextProviders'].length = 0;
+    });
+
+    it('should add a context provider with namespace', () => {
+      const provider = () => ({ requestId: '123' });
+      Logger.addContextProvider('http', provider);
+
+      expect(Logger['contextProviders']).toHaveLength(1);
+      expect(Logger['contextProviders'][0]).toStrictEqual({ namespace: 'http', provider });
+    });
+
+    it('should add multiple context providers', () => {
+      const httpProvider = () => ({ requestId: '123' });
+      const dbProvider = () => ({ transactionId: 'tx-456' });
+
+      Logger.addContextProvider('http', httpProvider);
+      Logger.addContextProvider('db', dbProvider);
+
+      expect(Logger['contextProviders']).toHaveLength(2);
+    });
+
+    it('should include context from provider when getting log context', () => {
+      const provider = () => ({ requestId: '123', method: 'GET' });
+      Logger.addContextProvider('http', provider);
+
+      const context = Logger['getLogContext']();
+
+      expect(context).toStrictEqual({ http: { requestId: '123', method: 'GET' } });
+    });
+
+    it('should merge context from multiple providers with different namespaces', () => {
+      const httpProvider = () => ({ requestId: '123', method: 'GET' });
+      const dbProvider = () => ({ transactionId: 'tx-456' });
+      const authProvider = () => ({ userId: 'user-789' });
+
+      Logger.addContextProvider('http', httpProvider);
+      Logger.addContextProvider('db', dbProvider);
+      Logger.addContextProvider('auth', authProvider);
+
+      const context = Logger['getLogContext']();
+
+      expect(context).toStrictEqual({
+        http: { requestId: '123', method: 'GET' },
+        db: { transactionId: 'tx-456' },
+        auth: { userId: 'user-789' },
+      });
+    });
+
+    it('should merge context from multiple providers with same namespace', () => {
+      const provider1 = () => ({ requestId: '123' });
+      const provider2 = () => ({ method: 'GET' });
+
+      Logger.addContextProvider('http', provider1);
+      Logger.addContextProvider('http', provider2);
+
+      const context = Logger['getLogContext']();
+
+      expect(context).toStrictEqual({ http: { requestId: '123', method: 'GET' } });
+    });
+
+    it('should allow same namespace to be overwritten by later provider', () => {
+      const provider1 = () => ({ requestId: '123', method: 'GET' });
+      const provider2 = () => ({ requestId: '456', url: '/api' });
+
+      Logger.addContextProvider('http', provider1);
+      Logger.addContextProvider('http', provider2);
+
+      const context = Logger['getLogContext']();
+
+      // Last provider wins for conflicting keys, but merges non-conflicting keys
+      expect(context).toStrictEqual({ http: { requestId: '456', method: 'GET', url: '/api' } });
+    });
+  });
 });

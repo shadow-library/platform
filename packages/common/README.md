@@ -38,6 +38,8 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 - **Multi-transport logging** (Console, File, CloudWatch)
 - **Configurable log levels** and formats
 - **Metadata injection** and structured logging
+- **Dynamic context providers** for automatic metadata injection
+- **Namespace support** to prevent context key conflicts
 - **Sensitive data redaction** with fast-redact integration
 - **Environment-specific transport configuration**
 
@@ -285,7 +287,7 @@ cache.clear();
 
 #### Type-Safe Configuration
 
-````ts
+```ts
 import { Config, ConfigService } from '@shadow-library/common';
 
 // Using global config
@@ -326,6 +328,7 @@ class MyConfigService extends ConfigService<CustomConfig> {
 const myConfig = new MyConfigService();
 const apiUrl = myConfig.get('api.baseUrl');
 const timeout = myConfig.getOrThrow('api.timeout'); // Throws if undefined
+```
 
 #### Dynamic Configuration Loading
 
@@ -337,25 +340,25 @@ import { Config } from '@shadow-library/common';
 // Load custom configurations into the global singleton
 Config.load('custom.api.url', {
   envKey: 'API_URL',
-  defaultValue: 'https://api.example.com'
+  defaultValue: 'https://api.example.com',
 });
 
 Config.load('custom.port', {
   envKey: 'PORT',
   validateType: 'number',
-  defaultValue: '3000'
+  defaultValue: '3000',
 });
 
 Config.load('custom.features', {
   envKey: 'ENABLED_FEATURES',
   isArray: true,
-  defaultValue: 'feature1,feature2'
+  defaultValue: 'feature1,feature2',
 });
 
 Config.load('custom.debug.enabled', {
   envKey: 'DEBUG_ENABLED',
   validateType: 'boolean',
-  defaultValue: 'false'
+  defaultValue: 'false',
 });
 
 // Access the loaded configurations
@@ -368,9 +371,9 @@ const debugEnabled = Config.get('custom.debug.enabled'); // Boolean
 Config.load('database.url', {
   envKey: 'DATABASE_URL',
   isProdRequired: true, // Will exit if not set in production
-  validator: (value) => value.startsWith('postgresql://') // Custom validation
+  validator: value => value.startsWith('postgresql://'), // Custom validation
 });
-````
+```
 
 **Configuration Options:**
 
@@ -382,8 +385,6 @@ Config.load('database.url', {
 - `isArray`: Parse comma-separated values as an array
 - `allowedValues`: Restrict to specific allowed values
 - `transform`: Custom transformation function for the value
-
-````
 
 ### 📝 **Logging**
 
@@ -416,13 +417,60 @@ const safeData = redactor({ user: 'john', password: 'secret123' });
 Logger.addTransport(customTransport);
 
 // Attach predefined transport types
-Logger.attachTransport('pretty-console'); // Console with colors and brief format
-Logger.attachTransport('structured-file'); // File logging with JSON format
-Logger.attachTransport('structured-cloudwatch'); // CloudWatch logging
+Logger.attachTransport('console:pretty'); // Console with colors and brief format
+Logger.attachTransport('file:json'); // File logging with JSON format
+Logger.attachTransport('cloudwatch:json'); // CloudWatch logging
 
 // Chain multiple transports
-Logger.attachTransport('pretty-console').attachTransport('structured-file');
-````
+Logger.attachTransport('console:pretty').attachTransport('file:json');
+```
+
+#### Dynamic Context Providers
+
+Add context providers that automatically inject metadata into every log. This is especially useful for packages that want to add contextual information (like request IDs, trace IDs) without requiring manual setup by end users.
+
+```ts
+import { Logger } from '@shadow-library/common';
+import { AsyncLocalStorage } from 'node:async_hooks';
+
+// For packages: Add namespaced context to avoid conflicts
+Logger.addContextProvider('http', () => ({
+  requestId: getCurrentRequestId(),
+  method: getCurrentMethod(),
+  url: getCurrentUrl(),
+}));
+
+Logger.addContextProvider('db', () => ({
+  transactionId: getCurrentTransactionId(),
+  queryCount: getQueryCount(),
+}));
+
+// Example with AsyncLocalStorage for request-scoped context
+const requestContext = new AsyncLocalStorage();
+
+Logger.addContextProvider('request', () => {
+  const context = requestContext.getStore();
+  return context || {};
+});
+
+// In your HTTP framework (e.g., Fastify, Express)
+app.use((req, res, next) => {
+  requestContext.run({ requestId: req.id, method: req.method }, next);
+});
+
+// All logs automatically include the context:
+logger.info('Processing request');
+// Output:
+// {
+//   message: 'Processing request',
+//   http: { requestId: 'req-456', method: 'GET', url: '/api/users' },
+//   db: { transactionId: 'tx-789', queryCount: 3 },
+//   request: { requestId: 'req-456', method: 'GET' }
+// }
+
+// Clear all context providers if needed
+Logger.clearContextProviders();
+```
 
 ### 🚨 **Error Handling**
 
