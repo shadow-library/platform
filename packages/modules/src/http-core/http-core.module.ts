@@ -5,8 +5,8 @@ import { type FastifyCompressOptions } from '@fastify/compress';
 import { fastifyCookie } from '@fastify/cookie';
 import { type FastifyHelmetOptions } from '@fastify/helmet';
 import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
-import { Config } from '@shadow-library/common';
-import { FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
+import { Config, LogData, Logger } from '@shadow-library/common';
+import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
 import deepmerge from 'deepmerge';
 import { OpenAPIV3 } from 'openapi-types';
 import { PartialDeep } from 'type-fest';
@@ -16,8 +16,7 @@ import { PartialDeep } from 'type-fest';
  */
 import { HTTP_CORE_CONFIGS } from './constants';
 import { HealthController } from './controllers/health.controller';
-import { CSRFOptions, CsrfProtectionMiddleware } from './middlewares/csrf-protection.middleware';
-import { RequestInitializerMiddleware } from './middlewares/request-initializer.middleware';
+import { CSRFOptions, CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
 
 /**
  * Defining types
@@ -76,10 +75,21 @@ export class HttpCoreModule implements OnModuleInit {
   constructor(
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ServerInstance,
+    private readonly contextService: ContextService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.fastify.register(fastifyCookie);
+
+    Logger.addContextProvider('http', () => {
+      if (!this.contextService.isInitialized()) return;
+
+      const request = this.contextService.getRequest();
+      const context: LogData = {};
+      context.rid = request.id;
+      context.cid = request.cid;
+      return context;
+    });
 
     if (Config.isDev()) {
       const fastifySwagger = await import('@fastify/swagger');
