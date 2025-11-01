@@ -11,6 +11,7 @@ import Transport from 'winston-transport';
  * Importing user defined packages
  */
 import { InternalError } from '@lib/errors';
+import { MaybeUndefined } from '@lib/interfaces';
 
 import { format as formats } from './formats';
 import { CloudWatchTransport, ConsoleTransport, FileTransport } from './transports';
@@ -26,7 +27,7 @@ export type redactFn = <T>(input: T) => string | T;
 
 export type AttachableTransports = 'console:pretty' | 'console:json' | 'file:json' | 'cloudwatch:json';
 
-export type ContextProvider = () => LogData;
+export type ContextProvider = () => MaybeUndefined<LogData>;
 
 interface ContextProviderConfig {
   namespace: string;
@@ -55,9 +56,11 @@ class LoggerStatic {
   private getLogContext(): LogData {
     const context: LogData = {};
     for (const { namespace, provider } of this.contextProviders) {
-      context[namespace] ??= {};
       const contextData = provider();
-      Object.assign(context[namespace] as LogData, contextData);
+      if (contextData !== undefined) {
+        context[namespace] ??= {};
+        Object.assign(context[namespace] as LogData, contextData);
+      }
     }
     return context;
   }

@@ -151,5 +151,14 @@ describe('Logger Service', () => {
       // Last provider wins for conflicting keys, but merges non-conflicting keys
       expect(context).toStrictEqual({ http: { requestId: '456', method: 'GET', url: '/api' } });
     });
+
+    it('should handle provider returning undefined', () => {
+      const provider = () => undefined;
+      Logger.addContextProvider('http', provider);
+
+      const context = Logger['getLogContext']();
+
+      expect(context).toStrictEqual({});
+    });
   });
 });
