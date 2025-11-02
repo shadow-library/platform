@@ -371,9 +371,11 @@ export class FastifyRouter extends Router {
    * during SSR. Automatically reuses middleware results from the parent context to avoid
    * redundant execution and ensures correct context isolation for nested route data fetching.
    */
-  async resolveChildRoute<T extends JsonValue = JsonObject>(url: string): Promise<T> {
+  async resolveChildRoute<T extends JsonValue = JsonObject>(url: string, headers: Record<string, string> = {}): Promise<T> {
     if (!this.childRouter) throw new InternalError('Child routes are not enabled');
-    const response = await this.instance.inject({ method: 'GET', url, headers: { 'x-service': 'internal-child-route' } });
+    const childHeaders = this.config.childRouteHeaders?.(this.context) ?? {};
+    Object.assign(headers, childHeaders, { 'x-service': 'internal-child-route' });
+    const response = await this.instance.inject({ method: 'GET', url, headers });
     return response.json() as T;
   }
 

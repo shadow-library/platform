@@ -223,6 +223,89 @@ export class RoutesController {
 }
 ```
 
+#### Child Routes Configuration
+
+Child routes enable server-side route resolution, commonly used for SSR (Server-Side Rendering) and internal API composition. When enabled, you can make internal HTTP requests to your own routes without going through the network layer.
+
+**Basic Setup:**
+
+```typescript
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController, DataController],
+
+      // Enable child routes functionality
+      enableChildRoutes: true,
+
+      // Optional: Provide custom headers for child route requests
+      childRouteHeaders: () => ({
+        'x-correlation-id': '123',
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+**Usage in Controllers:**
+
+```typescript
+@HttpController('/api')
+export class DataAggregatorController {
+  constructor(@Inject(Router) private readonly fastifyRouter: FastifyRouter) {}
+
+  @Get('/dashboard')
+  async getDashboardData() {
+    // Make internal requests to other routes
+    const [users, posts, analytics] = await Promise.all([
+      this.fastifyRouter.resolveChildRoute('/api/users'),
+      this.fastifyRouter.resolveChildRoute('/api/posts?limit=10'),
+      this.fastifyRouter.resolveChildRoute('/api/analytics/summary'),
+    ]);
+
+    return {
+      dashboard: {
+        users,
+        posts,
+        analytics,
+        timestamp: new Date().toISOString(),
+      },
+    };
+  }
+}
+```
+
+**Custom Headers Function:**
+
+The `childRouteHeaders` function is called for each child route request, allowing you to:
+
+- Pass authentication context from the parent request
+- Include tenant/user-specific information
+- Add tracing or correlation IDs
+- Set internal service flags
+
+```typescript
+// Dynamic headers based on current request context
+childRouteHeaders: (contextService) => {
+  const request = contextService.getRequest();
+  return {
+    'x-user-id': contextService.get('currentUserId'),
+    'x-request-id': contextService.getRID(),
+    'x-forwarded-from': 'internal-aggregator',
+    'x-correlation-id': request.headers['x-correlation-id'],
+  };
+},
+```
+
+**Important Notes:**
+
+- Child routes always include the header `x-service: 'internal-child-route'`
+- Custom headers are merged with the default service header
+- If you provide an `x-service` header, it will be overridden with the default value
+- Child routes create isolated contexts, preventing middleware conflicts
+- Enable only when needed, as it adds routing overhead
+
 ## Configuration
 
 ### Dynamic Module Configuration
@@ -268,6 +351,12 @@ The module provides two configuration methods:
         '4xx': ErrorResponseSchema,
         '5xx': ErrorResponseSchema,
       },
+
+      // Child routes configuration (for SSR and internal route resolution)
+      enableChildRoutes: true,
+      childRouteHeaders: contextService => ({
+        'x-correlation-id': contextService.getRequest().headers['x-correlation-id'],
+      }),
 
       // Extend Fastify instance before registering controllers
       fastifyFactory: async fastify => {
@@ -800,7 +889,7 @@ Check out the [examples](./examples) directory for complete working examples:
 
 - **hello-world**: Basic HTTP controller with GET/POST routes
 - **user-auth**: Advanced example with authentication guards
-- **child-routes**: Route resolution and unified endpoints
+- **child-routes**: Route resolution, unified endpoints, and custom headers for SSR
 
 ## Contributing
 

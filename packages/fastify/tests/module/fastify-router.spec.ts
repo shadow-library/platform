@@ -410,13 +410,109 @@ describe('FastifyRouter', () => {
       await expect(nonChildRouter.resolveChildRoute('/child')).rejects.toThrow(InternalError);
     });
 
-    it('should resolve child route', async () => {
+    it('should resolve child route with default headers only', async () => {
       const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ status: 'success' }) });
       router['instance'].inject = fn;
 
       const result = await router.resolveChildRoute('/child/123');
       expect(result).toStrictEqual({ status: 'success' });
       expect(fn).toHaveBeenCalledWith({ method: 'GET', url: '/child/123', headers: { 'x-service': 'internal-child-route' } });
+    });
+
+    it('should resolve child route with custom headers from config', async () => {
+      const customHeaders = { 'x-user-id': '12345', authorization: 'Bearer token123' };
+      const customConfig = { ...config, enableChildRoutes: true, childRouteHeaders: () => customHeaders };
+      const customRouter = new FastifyRouter(customConfig, instance, context);
+
+      const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ data: 'custom' }) });
+      customRouter['instance'].inject = fn;
+
+      const result = await customRouter.resolveChildRoute('/api/users');
+      expect(result).toStrictEqual({ data: 'custom' });
+      expect(fn).toHaveBeenCalledWith({
+        method: 'GET',
+        url: '/api/users',
+        headers: {
+          'x-user-id': '12345',
+          authorization: 'Bearer token123',
+          'x-service': 'internal-child-route',
+        },
+      });
+    });
+
+    it('should override custom x-service header with default', async () => {
+      const customHeaders = { 'x-service': 'custom-service', 'x-trace-id': 'trace-789' };
+      const customConfig = { ...config, enableChildRoutes: true, childRouteHeaders: () => customHeaders };
+      const customRouter = new FastifyRouter(customConfig, instance, context);
+
+      const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ overridden: true }) });
+      customRouter['instance'].inject = fn;
+
+      const result = await customRouter.resolveChildRoute('/override/test');
+      expect(result).toStrictEqual({ overridden: true });
+      expect(fn).toHaveBeenCalledWith({
+        method: 'GET',
+        url: '/override/test',
+        headers: {
+          'x-trace-id': 'trace-789',
+          'x-service': 'internal-child-route', // Should always be this value
+        },
+      });
+    });
+
+    it('should merge request headers with child route headers', async () => {
+      const customConfig = { ...config, enableChildRoutes: true, childRouteHeaders: () => ({ 'x-request-id': 'req-456' }) };
+      const customRouter = new FastifyRouter(customConfig, instance, context);
+
+      const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ custom: true }) });
+      customRouter['instance'].inject = fn;
+
+      const result = await customRouter.resolveChildRoute('/headers', { 'x-comment': 'test-header' });
+      expect(result).toStrictEqual({ custom: true });
+      expect(fn).toHaveBeenCalledWith({
+        method: 'GET',
+        url: '/headers',
+        headers: {
+          'x-request-id': 'req-456',
+          'x-service': 'internal-child-route',
+          'x-comment': 'test-header',
+        },
+      });
+    });
+
+    it('should handle undefined childRouteHeaders function', async () => {
+      const customConfig = { ...config, enableChildRoutes: true, childRouteHeaders: undefined };
+      const customRouter = new FastifyRouter(customConfig, instance, context);
+
+      const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ undefined: true }) });
+      customRouter['instance'].inject = fn;
+
+      const result = await customRouter.resolveChildRoute('/undefined/headers');
+      expect(result).toStrictEqual({ undefined: true });
+      expect(fn).toHaveBeenCalledWith({
+        method: 'GET',
+        url: '/undefined/headers',
+        headers: { 'x-service': 'internal-child-route' },
+      });
+    });
+
+    it('should call childRouteHeaders function for each request', async () => {
+      const childRouteHeadersMock = jest.fn(() => ({ 'x-call-count': Date.now().toString() }));
+      const customConfig = { ...config, enableChildRoutes: true, childRouteHeaders: childRouteHeadersMock };
+      const customRouter = new FastifyRouter(customConfig, instance, context);
+
+      const fn = jest.fn<any>().mockResolvedValue({ json: () => ({ called: true }) });
+      customRouter['instance'].inject = fn;
+
+      // Make multiple requests
+      await customRouter.resolveChildRoute('/call/1');
+      await customRouter.resolveChildRoute('/call/2');
+      await customRouter.resolveChildRoute('/call/3');
+
+      // Verify the function was called for each request
+      expect(childRouteHeadersMock).toHaveBeenCalledTimes(3);
+      expect(childRouteHeadersMock).toHaveBeenCalledWith(context);
+      expect(fn).toHaveBeenCalledTimes(3);
     });
   });
 
