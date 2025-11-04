@@ -17,7 +17,7 @@ import { ModuleMetadata } from '../interfaces';
  * Declaring the constants
  */
 
-export function Module(metadata: ModuleMetadata): ClassDecorator {
+export function Module(metadata: ModuleMetadata = {}): ClassDecorator {
   return target => {
     const oldMetadata = Reflect.getMetadata(MODULE_METADATA, target);
     if (oldMetadata) throw new InternalError(`Module metadata already declared for ${target.name}`);
