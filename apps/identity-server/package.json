@@ -1,5 +1,5 @@
 {
-  "name": "@shadow-library/service-name",
+  "name": "@shadow-library/identity",
   "type": "module",
   "version": "0.0.0",
   "description": "description",
@@ -9,18 +9,20 @@
     "lint": "bun run scripts/lint.ts",
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts",
-    "dev": "bun run --watch src/main.ts"
+    "dev": "bun run --watch src/main.ts",
+    "db:generate": "drizzle-kit generate:pg --schema ./src/database/schemas --out=./src/database/migrations",
+    "db:migrate": "bun run ./src/database/migrate.ts"
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/service-name.git"
+    "url": "git+ssh://git@github.com/shadow-library/identity.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/service-name/issues"
+    "url": "https://github.com/shadow-library/identity/issues"
   },
-  "homepage": "https://github.com/shadow-library/service-name#readme",
+  "homepage": "https://github.com/shadow-library/identity#readme",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",

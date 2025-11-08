@@ -2,7 +2,7 @@
   "lockfileVersion": 1,
   "workspaces": {
     "": {
-      "name": "@shadow-library/service-name",
+      "name": "@shadow-library/identity",
       "dependencies": {
         "@shadow-library/app": "^1.1.1",
         "@shadow-library/class-schema": "^0.0.12",
