@@ -18,7 +18,7 @@ declare module '@shadow-library/common' {
     'server.host': string;
 
     /** Database configs */
-    'db.uri': string;
+    'db.primary.url': string;
   }
 }
 
@@ -27,4 +27,4 @@ declare module '@shadow-library/common' {
  */
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
-Config.load('db.uri', { defaultValue: 'mongodb://localhost/shadow-library' });
+Config.load('db.primary.url', { envKey: 'PRIMARY_DATABASE_URL', defaultValue: 'postgresql://admin:password@localhost/shadow_identity' });
