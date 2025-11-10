@@ -1,7 +1,7 @@
 CREATE TYPE "public"."gender" AS ENUM('MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED');--> statement-breakpoint
-CREATE TYPE "public"."password_algorithm" AS ENUM('BCRYPT', 'ARGON2');--> statement-breakpoint
+CREATE TYPE "public"."password_algorithm" AS ENUM('BCRYPT', 'ARGON2ID');--> statement-breakpoint
 CREATE TYPE "public"."user_auth_provider" AS ENUM('PASSWORD', 'OTP', 'TOTP', 'GOOGLE', 'MICROSOFT');--> statement-breakpoint
-CREATE TYPE "public"."user_status" AS ENUM('ACTIVE', 'INACTIVE', 'SUSPENDED', 'CLOSED');--> statement-breakpoint
+CREATE TYPE "public"."user_status" AS ENUM('ACTIVE', 'INACTIVE', 'DISABLED', 'SUSPENDED', 'CLOSED');--> statement-breakpoint
 CREATE TABLE "user_auth_identities" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"user_id" bigint NOT NULL,
@@ -13,11 +13,11 @@ CREATE TABLE "user_auth_identities" (
 CREATE TABLE "user_emails" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"user_id" bigint NOT NULL,
-	"email" varchar(255) NOT NULL,
+	"email_id" varchar(255) NOT NULL,
 	"is_primary" boolean DEFAULT false NOT NULL,
 	"is_verified" boolean DEFAULT false NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "user_emails_email_unique" UNIQUE("email")
+	CONSTRAINT "user_emails_email_id_unique" UNIQUE("email_id")
 );
 --> statement-breakpoint
 CREATE TABLE "user_passwords" (
@@ -40,9 +40,9 @@ CREATE TABLE "user_phones" (
 --> statement-breakpoint
 CREATE TABLE "user_profiles" (
 	"user_id" bigint PRIMARY KEY NOT NULL,
-	"first_name" varchar(64) NOT NULL,
-	"last_name" varchar(64) NOT NULL,
-	"display_name" varchar(64) NOT NULL,
+	"first_name" varchar(64),
+	"last_name" varchar(64),
+	"display_name" varchar(64),
 	"gender" "gender" DEFAULT 'UNSPECIFIED' NOT NULL,
 	"date_of_birth" date,
 	"avatar_url" text
@@ -50,8 +50,8 @@ CREATE TABLE "user_profiles" (
 --> statement-breakpoint
 CREATE TABLE "users" (
 	"id" bigserial PRIMARY KEY NOT NULL,
-	"username" varchar(32) NOT NULL,
-	"status" "user_status" DEFAULT 'ACTIVE' NOT NULL,
+	"username" varchar(32),
+	"status" "user_status" DEFAULT 'INACTIVE' NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "users_username_unique" UNIQUE("username")

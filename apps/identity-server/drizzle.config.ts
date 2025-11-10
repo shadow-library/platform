@@ -20,6 +20,6 @@ const url = process.env.PRIMARY_DATABASE_URL ?? 'postgresql://admin:password@loc
 export default defineConfig({
   out: './generated/drizzle',
   dialect: 'postgresql',
-  schema: './src/database/schemas/index.ts',
+  schema: './src/modules/database/schemas/index.ts',
   dbCredentials: { url },
 });

@@ -1,5 +1,5 @@
 {
-  "id": "10f21979-5576-4557-b0bd-c16003e23c92",
+  "id": "0a33e00a-5998-403c-b08d-2cbd2461f3a2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -79,8 +79,8 @@
           "primaryKey": false,
           "notNull": true
         },
-        "email": {
-          "name": "email",
+        "email_id": {
+          "name": "email_id",
           "type": "varchar(255)",
           "primaryKey": false,
           "notNull": true
@@ -125,11 +125,11 @@
       },
       "compositePrimaryKeys": {},
       "uniqueConstraints": {
-        "user_emails_email_unique": {
-          "name": "user_emails_email_unique",
+        "user_emails_email_id_unique": {
+          "name": "user_emails_email_id_unique",
           "nullsNotDistinct": false,
           "columns": [
-            "email"
+            "email_id"
           ]
         }
       },
@@ -286,19 +286,19 @@
           "name": "first_name",
           "type": "varchar(64)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "last_name": {
           "name": "last_name",
           "type": "varchar(64)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "display_name": {
           "name": "display_name",
           "type": "varchar(64)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "gender": {
           "name": "gender",
@@ -357,7 +357,7 @@
           "name": "username",
           "type": "varchar(32)",
           "primaryKey": false,
-          "notNull": true
+          "notNull": false
         },
         "status": {
           "name": "status",
@@ -365,7 +365,7 @@
           "typeSchema": "public",
           "primaryKey": false,
           "notNull": true,
-          "default": "'ACTIVE'"
+          "default": "'INACTIVE'"
         },
         "created_at": {
           "name": "created_at",
@@ -415,7 +415,7 @@
       "schema": "public",
       "values": [
         "BCRYPT",
-        "ARGON2"
+        "ARGON2ID"
       ]
     },
     "public.user_auth_provider": {
@@ -435,6 +435,7 @@
       "values": [
         "ACTIVE",
         "INACTIVE",
+        "DISABLED",
         "SUSPENDED",
         "CLOSED"
       ]
