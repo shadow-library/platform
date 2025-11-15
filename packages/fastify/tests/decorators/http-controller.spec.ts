@@ -37,12 +37,6 @@ describe('@HttpController', () => {
   it(`should enhance the class with the default path metadata`, () => {
     @HttpController()
     class TestController {}
-    expect(Controller).toBeCalledWith({ path: '/', [HTTP_CONTROLLER_TYPE]: 'router' });
-  });
-
-  it('should add leading slash to the path', () => {
-    @HttpController('test')
-    class TestController {}
-    expect(Controller).toBeCalledWith({ path: '/test', [HTTP_CONTROLLER_TYPE]: 'router' });
+    expect(Controller).toBeCalledWith({ path: '', [HTTP_CONTROLLER_TYPE]: 'router' });
   });
 });

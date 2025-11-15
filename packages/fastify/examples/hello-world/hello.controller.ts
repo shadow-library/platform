@@ -17,7 +17,7 @@ import { HelloResponse } from './hello-response.dto';
  * Declaring the constants
  */
 
-@HttpController('/api')
+@HttpController()
 export class HelloController {
   @Get('/hello')
   @RespondFor(200, HelloResponse)

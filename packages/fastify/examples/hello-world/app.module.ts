@@ -21,6 +21,7 @@ import { HelloController } from './hello.controller';
   imports: [
     FastifyModule.forRoot({
       controllers: [HelloController],
+      routePrefix: 'api',
     }),
   ],
 })

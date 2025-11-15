@@ -384,6 +384,160 @@ FastifyModule.forRoot({
 // Routes will be: GET /api/users (no version prefix)
 ```
 
+### Global Route Prefix
+
+The `routePrefix` configuration option allows you to add a global prefix to all routes in your application. This is useful for:
+
+- **API Namespacing**: Prefix all routes with `/api` to clearly distinguish API endpoints from other routes
+- **Multi-tenant Applications**: Add tenant-specific prefixes
+- **Microservices**: Namespace your service routes (e.g., `/user-service`, `/payment-service`)
+- **API Gateways**: Organize routes by domain or service boundaries
+
+#### Basic Usage
+
+```typescript
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController, ProductController],
+      routePrefix: 'api',
+      port: 3000,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+**Example Controllers:**
+
+```typescript
+@HttpController('/users')
+export class UserController {
+  @Get()
+  async getUsers() {
+    return [];
+  }
+
+  @Get('/:id')
+  async getUser(@Params() params: { id: string }) {
+    return { id: params.id };
+  }
+}
+
+@HttpController('/products')
+export class ProductController {
+  @Get()
+  async getProducts() {
+    return [];
+  }
+}
+```
+
+**Result**:
+
+- `GET /api/users`
+- `GET /api/users/:id`
+- `GET /api/products`
+
+#### Combining with Versioning
+
+You can use `routePrefix` together with `prefixVersioning` for a well-organized API structure:
+
+```typescript
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserV1Controller, UserV2Controller],
+      routePrefix: 'api',
+      prefixVersioning: true,
+      port: 3000,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+**Result**:
+
+- `GET /api/v1/users`
+- `GET /api/v2/users`
+
+The order is always: `/{routePrefix}/{version}/{controller-path}/{route-path}`
+
+#### Multi-Service Example
+
+```typescript
+// User Service Module
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController, AuthController],
+      routePrefix: 'user-service',
+      port: 3001,
+    }),
+  ],
+})
+export class UserServiceModule {}
+
+// Payment Service Module
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [PaymentController, InvoiceController],
+      routePrefix: 'payment-service',
+      port: 3002,
+    }),
+  ],
+})
+export class PaymentServiceModule {}
+```
+
+**Result**:
+
+- User Service: `POST /user-service/auth/login`, `GET /user-service/users`
+- Payment Service: `POST /payment-service/payments`, `GET /payment-service/invoices`
+
+#### Dynamic Route Prefix
+
+You can also set the prefix dynamically using `forRootAsync`:
+
+```typescript
+@Module({
+  imports: [
+    FastifyModule.forRootAsync({
+      useFactory: (configService: ConfigService) => ({
+        controllers: [UserController],
+        routePrefix: configService.get('API_PREFIX'), // e.g., 'api/v1'
+        port: configService.get('PORT'),
+      }),
+      inject: [ConfigService],
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+#### Best Practices
+
+1. **Use Consistent Prefixes**: Keep your route prefix consistent across your application
+2. **Avoid Deep Nesting**: Keep prefixes shallow for better readability (prefer `/api` over `/api/v1/public`)
+3. **Combine with Versioning**: Use `routePrefix` for namespace and `prefixVersioning` for versions
+4. **Document Your Routes**: Clearly document the prefix structure for API consumers
+5. **Environment-based Prefixes**: Consider different prefixes for different environments if needed
+
+#### Without Route Prefix
+
+If you don't need a global prefix, simply omit the `routePrefix` option:
+
+```typescript
+FastifyModule.forRoot({
+  controllers: [UserController],
+  // No routePrefix specified
+  port: 3000,
+});
+// Routes will be: GET /users (no prefix)
+```
+
 ### Error Handling
 
 ```typescript
@@ -536,6 +690,9 @@ The module provides two configuration methods:
 
       // Security
       maskSensitiveData: true,
+
+      // Global route prefix
+      routePrefix: 'api',
 
       // API Versioning
       prefixVersioning: true,

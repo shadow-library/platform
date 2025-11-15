@@ -128,6 +128,15 @@ export class FastifyRouter extends Router {
     return this.instance;
   }
 
+  private joinPaths(...parts: MaybeUndefined<string>[]): string {
+    const path = parts
+      .filter(p => typeof p === 'string')
+      .map(p => p.replace(/^\/+|\/+$/g, ''))
+      .filter(Boolean)
+      .join('/');
+    return `/${path}`;
+  }
+
   private registerRawBody(): void {
     const opts = { parseAs: 'buffer' as const };
     const parser = this.instance.getDefaultJsonParser('error', 'error');
@@ -185,18 +194,10 @@ export class FastifyRouter extends Router {
       switch (controller.metadata[HTTP_CONTROLLER_TYPE]) {
         case 'router': {
           const { instance, metadata, metatype } = controller;
-
-          const basePath = metadata.path ?? '/';
           for (const route of controller.routes) {
-            /** Prepare path with versioning if enabled */
-            const routePath = route.metadata.path ?? '';
-            let path = basePath + routePath;
-            if (this.config.prefixVersioning) {
-              const version = route.metadata.version ?? 1;
-              const connector = path.startsWith('/') ? '' : '/';
-              path = '/v' + version + connector + path;
-            }
-
+            const version = route.metadata.version ?? 1;
+            const versionPrefix = this.config.prefixVersioning ? `/v${version}` : '';
+            const path = this.joinPaths(this.config.routePrefix, versionPrefix, metadata.path, route.metadata.path);
             const parsedController: ParsedController<ServerMetadata> = { ...route, instance, metatype };
             parsedController.metadata.path = path;
             parsedControllers.routes.push(parsedController);

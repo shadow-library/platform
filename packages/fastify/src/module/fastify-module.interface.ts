@@ -65,6 +65,11 @@ export interface FastifyConfig extends FastifyServerOptions {
    * @default false
    */
   prefixVersioning?: boolean;
+
+  /**
+   * The global route prefix for all routes in the Fastify instance
+   */
+  routePrefix?: string;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {
