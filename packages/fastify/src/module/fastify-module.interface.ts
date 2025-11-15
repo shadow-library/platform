@@ -59,6 +59,12 @@ export interface FastifyConfig extends FastifyServerOptions {
    * @default true
    */
   maskSensitiveData?: boolean;
+
+  /**
+   * Enables prefix-based versioning for all routes in the Fastify instance.
+   * @default false
+   */
+  prefixVersioning?: boolean;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {

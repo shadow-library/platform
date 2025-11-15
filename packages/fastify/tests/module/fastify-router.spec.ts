@@ -151,6 +151,26 @@ describe('FastifyRouter', () => {
       expect(parsedControllers.routes[0]?.metadata).toStrictEqual({ path: '/' });
     });
 
+    it('should add default version prefix if versioning is enabled', () => {
+      router['config'].prefixVersioning = true;
+      const metadata = { [HTTP_CONTROLLER_TYPE]: 'router', path: '/api' } as const;
+      const parsedControllers = parseControllers([
+        { metadata, metatype: Class, instance: classInstance, routes: [{ metadata: { path: '/users' }, handler, handlerName, paramtypes: [] }] },
+      ]);
+
+      expect(parsedControllers.routes[0]?.metadata).toStrictEqual({ path: '/v1/api/users' });
+    });
+
+    it('should set version prefix if versioning is enabled', () => {
+      router['config'].prefixVersioning = true;
+      const metadata = { [HTTP_CONTROLLER_TYPE]: 'router', path: '/api' } as const;
+      const parsedControllers = parseControllers([
+        { metadata, metatype: Class, instance: classInstance, routes: [{ metadata: { path: '/users', version: 3 }, handler, handlerName, paramtypes: [] }] },
+      ]);
+
+      expect(parsedControllers.routes[0]?.metadata).toStrictEqual({ path: '/v3/api/users', version: 3 });
+    });
+
     it('should parse generate middleware controller', () => {
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'middleware', type: 'preHandler', generates: true, weight: 0 } as const;
       const parsedControllers = parseControllers([{ metadata, metatype: Middleware, instance: middleware, routes: [] }]);

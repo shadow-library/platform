@@ -24,6 +24,7 @@ import { HealthController } from './health.controller';
 @Module({
   imports: [
     FastifyModule.forRoot({
+      prefixVersioning: true,
       controllers: [HealthController, UserController, AuthMiddleware, AccessMiddleware],
       providers: [UserService],
     }),

@@ -91,5 +91,17 @@ describe('FastifyModule', () => {
         exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });
+
+    it('should append custom exports', async () => {
+      class Export {}
+
+      const Module = FastifyModule.forRootAsync({ exports: [Export], useFactory: () => ({}) as any });
+
+      expect(Module).toStrictEqual({
+        module: FastifyModule,
+        providers: expect.arrayContaining([]),
+        exports: [Router, ContextService, FASTIFY_INSTANCE, Export],
+      });
+    });
   });
 });

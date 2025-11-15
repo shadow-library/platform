@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { HttpController, Get, Post, Body, Patch, Delete, Params, RespondFor, ContextService } from '@shadow-library/fastify';
+import { HttpController, Get, Post, Body, Patch, Delete, Params, RespondFor, ContextService, Version } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -10,6 +10,7 @@ import { CreateUserBody } from './dtos/create-user-body.dto';
 import { UserService } from './user.service';
 import { UpdateUserBody } from './dtos/update-user-body.dto';
 import { UserParams } from './dtos/user-params.dto';
+import { UserRaResponse } from './dtos/user-raw-response.dto';
 import { UserResponse } from './dtos/user-response.dto';
 import { AuthGuard } from './decorators/auth-guard.decorator';
 
@@ -32,6 +33,14 @@ export class UserController {
   @AuthGuard({ accessLevel: 1 })
   @RespondFor(200, [UserResponse])
   async listUsers() {
+    return this.userService.getAllUsers();
+  }
+
+  @Get()
+  @Version(2)
+  @AuthGuard({ accessLevel: 1 })
+  @RespondFor(200, [UserRaResponse])
+  async listUsersRaw() {
     return this.userService.getAllUsers();
   }
 

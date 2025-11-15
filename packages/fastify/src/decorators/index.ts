@@ -4,3 +4,4 @@ export * from './http-output.decorator';
 export * from './http-route.decorator';
 export * from './middleware.decorator';
 export * from './sensitive.decorator';
+export * from './version.decorator';

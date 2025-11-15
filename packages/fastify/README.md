@@ -14,6 +14,7 @@ A powerful TypeScript-first Fastify wrapper featuring decorator-based routing, a
 - 📊 **Type Safety**: Full TypeScript support with schema generation
 - 🎨 **Templating Ready**: Built-in support for templating engines
 - ⚡ **Dynamic Module**: Configurable module with `forRoot()` and `forRootAsync()` methods
+- 🔢 **API Versioning**: Built-in support for prefix-based API versioning
 
 ## Installation
 
@@ -129,6 +130,7 @@ bootstrap();
 @Delete(path?: string)     // DELETE requests
 @Options(path?: string)    // OPTIONS requests
 @Head(path?: string)       // HEAD requests
+@Version(version: number)  // Set API version for the route
 ```
 
 #### Parameter Decorators
@@ -181,6 +183,205 @@ export class ProtectedController {
     return req.user;
   }
 }
+```
+
+### API Versioning
+
+The framework provides a powerful versioning system that allows you to version your APIs using URL path prefixes. This is useful for maintaining multiple versions of your API simultaneously.
+
+#### Enabling Versioning
+
+To enable versioning, set `prefixVersioning: true` in your module configuration:
+
+```typescript
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController],
+      port: 3000,
+
+      // Enable prefix-based versioning
+      prefixVersioning: true,
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+#### Using the @Version Decorator
+
+Use the `@Version` decorator on your controllers to specify the API version:
+
+```typescript
+import { HttpController, Get, Post, Version, Body } from '@shadow-library/fastify';
+
+@HttpController('/api/users')
+@Version(1)
+export class UserV1Controller {
+  @Get()
+  async getUsers() {
+    return [{ id: 1, name: 'John Doe' }];
+  }
+}
+
+@HttpController('/api/users')
+@Version(2)
+export class UserV2Controller {
+  @Get()
+  async getUsers() {
+    // v2 with additional fields
+    return [{ id: 1, name: 'John Doe', email: 'john@example.com', createdAt: new Date() }];
+  }
+
+  @Post()
+  async createUser(@Body() userData: CreateUserDto) {
+    // New features in v2
+    return { id: 2, ...userData };
+  }
+}
+```
+
+**Result**:
+
+- v1 endpoints: `GET /v1/api/users`
+- v2 endpoints: `GET /v2/api/users`, `POST /v2/api/users`
+
+#### Default Version
+
+If versioning is enabled but no `@Version` decorator is specified, routes default to `v1`:
+
+```typescript
+@HttpController('/api/products')
+export class ProductController {
+  @Get()
+  async getProducts() {
+    return [];
+  }
+}
+// Results in: GET /v1/api/products
+```
+
+#### Method-Level Versioning
+
+You can also apply versioning at the method level for more granular control:
+
+```typescript
+@HttpController('/api/data')
+export class DataController {
+  @Get('/stats')
+  @Version(1)
+  async getStatsV1() {
+    return { totalUsers: 100 };
+  }
+
+  @Get('/stats')
+  @Version(2)
+  async getStatsV2() {
+    return { totalUsers: 100, activeUsers: 75, newUsers: 10 };
+  }
+
+  @Get('/info')
+  async getInfo() {
+    // This defaults to v1 when versioning is enabled
+    return { version: 'v1' };
+  }
+}
+```
+
+**Result**:
+
+- `GET /v1/api/data/stats` → `getStatsV1()`
+- `GET /v2/api/data/stats` → `getStatsV2()`
+- `GET /v1/api/data/info` → `getInfo()`
+
+#### Versioning Best Practices
+
+1. **Maintain Backward Compatibility**: Keep older versions running while you migrate clients to newer versions
+2. **Version Breaking Changes**: Only increment versions for breaking changes in your API
+3. **Document Version Differences**: Clearly document what changes between versions
+4. **Deprecation Strategy**: Communicate deprecation timelines for older API versions
+5. **Consistent Versioning**: Use consistent version numbers across related endpoints
+
+#### Example: Complete Versioned API
+
+```typescript
+import { Module } from '@shadow-library/app';
+import { FastifyModule, HttpController, Get, Post, Version } from '@shadow-library/fastify';
+
+// Version 1 Controllers
+@HttpController('/api/users')
+@Version(1)
+class UserV1Controller {
+  @Get()
+  async list() {
+    return [{ id: 1, name: 'John' }];
+  }
+}
+
+@HttpController('/api/posts')
+@Version(1)
+class PostV1Controller {
+  @Get()
+  async list() {
+    return [{ id: 1, title: 'Hello' }];
+  }
+}
+
+// Version 2 Controllers - with enhanced features
+@HttpController('/api/users')
+@Version(2)
+class UserV2Controller {
+  @Get()
+  async list() {
+    return [{ id: 1, name: 'John', email: 'john@example.com', role: 'admin' }];
+  }
+
+  @Post('/bulk')
+  async bulkCreate(@Body() users: CreateUserDto[]) {
+    // New feature in v2
+    return { created: users.length };
+  }
+}
+
+@HttpController('/api/posts')
+@Version(2)
+class PostV2Controller {
+  @Get()
+  async list() {
+    return [{ id: 1, title: 'Hello', content: 'World', tags: ['news'] }];
+  }
+}
+
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserV1Controller, UserV2Controller, PostV1Controller, PostV2Controller],
+      prefixVersioning: true,
+      port: 3000,
+    }),
+  ],
+})
+export class AppModule {}
+
+// Available endpoints:
+// GET  /v1/api/users
+// GET  /v1/api/posts
+// GET  /v2/api/users
+// POST /v2/api/users/bulk  (new in v2)
+// GET  /v2/api/posts
+```
+
+#### Disabling Versioning
+
+If you don't need versioning, simply omit the `prefixVersioning` option or set it to `false`:
+
+```typescript
+FastifyModule.forRoot({
+  controllers: [UserController],
+  prefixVersioning: false, // or omit entirely
+  port: 3000,
+});
+// Routes will be: GET /api/users (no version prefix)
 ```
 
 ### Error Handling
@@ -335,6 +536,9 @@ The module provides two configuration methods:
 
       // Security
       maskSensitiveData: true,
+
+      // API Versioning
+      prefixVersioning: true,
 
       // Request ID generation
       requestIdLogLabel: 'rid',

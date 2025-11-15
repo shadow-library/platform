@@ -19,6 +19,7 @@ declare module '@shadow-library/app' {
   export interface RouteMetadata extends Omit<RouteShorthandOptions, 'config'> {
     method?: HttpMethod;
     path?: string;
+    version?: number;
     schemas?: RouteInputSchemas & { response?: Record<number | string, JSONSchema> };
 
     rawBody?: boolean;
