@@ -50,6 +50,10 @@ export const organisationMembers = pgTable(
   t => [primaryKey({ columns: [t.organisationId, t.userId] })],
 );
 
+/**
+ * Declaring the relations
+ */
+
 export const organisationRelations = relations(organisations, ({ many }) => ({
   members: many(organisationMembers),
 }));

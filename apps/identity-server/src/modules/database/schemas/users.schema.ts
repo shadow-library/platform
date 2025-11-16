@@ -84,7 +84,7 @@ export const userAuthIdentities = pgTable(
     providerKey: varchar('provider_key', { length: 128 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [unique('user_provider_unique').on(t.userId, t.provider), unique('provider_key_unique').on(t.provider, t.providerKey)],
+  t => [unique('user_auth_identities_user_provider_unique').on(t.userId, t.provider), unique('user_auth_identities_provider_key_unique').on(t.provider, t.providerKey)],
 );
 
 export const userPasswords = pgTable('user_passwords', {
