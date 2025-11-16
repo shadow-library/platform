@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, date, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, date, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Defining the types
@@ -73,15 +73,19 @@ export const userPhones = pgTable('user_phones', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
 
-export const userAuthIdentities = pgTable('user_auth_identities', {
-  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-  userId: bigint('user_id', { mode: 'bigint' })
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  provider: userAuthProvider('provider').notNull(),
-  providerKey: varchar('provider_key', { length: 128 }).notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export const userAuthIdentities = pgTable(
+  'user_auth_identities',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    userId: bigint('user_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    provider: userAuthProvider('provider').notNull(),
+    providerKey: varchar('provider_key', { length: 128 }),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [unique('user_provider_unique').on(t.userId, t.provider), unique('provider_key_unique').on(t.provider, t.providerKey)],
+);
 
 export const userPasswords = pgTable('user_passwords', {
   userAuthIdentityId: bigint('user_auth_identity_id', { mode: 'bigint' })
