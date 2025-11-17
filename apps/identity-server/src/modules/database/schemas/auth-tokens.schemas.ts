@@ -7,7 +7,7 @@ import { bigint, bigserial, boolean, index, pgEnum, pgTable, text, timestamp, un
 /**
  * Importing user defined packages
  */
-import { services } from './services.schema';
+import { applications } from './applications.schema';
 import { userAuthIdentities, users } from './users.schema';
 
 /**
@@ -60,9 +60,9 @@ export const userSessionTokens = pgTable(
     sessionId: bigint('session_id', { mode: 'bigint' })
       .notNull()
       .references(() => userSessions.id, { onDelete: 'cascade' }),
-    serviceId: bigint('service_id', { mode: 'bigint' })
+    applicationId: bigint('application_id', { mode: 'bigint' })
       .notNull()
-      .references(() => services.id, { onDelete: 'cascade' }),
+      .references(() => applications.id, { onDelete: 'cascade' }),
 
     tokenHash: varchar('token_hash', { length: 512 }).notNull(),
 
@@ -74,7 +74,7 @@ export const userSessionTokens = pgTable(
     ipCountry: varchar('ip_country', { length: 2 }),
     previousTokenId: bigint('previous_token_id', { mode: 'bigint' }),
   },
-  t => [unique('user_session_tokens_session_id_service_id_unique').on(t.sessionId, t.serviceId), unique('user_session_tokens_token_hash_unique').on(t.tokenHash)],
+  t => [unique('user_session_tokens_session_id_application_id_unique').on(t.sessionId, t.applicationId), unique('user_session_tokens_token_hash_unique').on(t.tokenHash)],
 );
 
 export const userSignInEvents = pgTable(
@@ -84,9 +84,7 @@ export const userSignInEvents = pgTable(
     userId: bigint('user_id', { mode: 'bigint' })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    userAuthIdentityId: bigint('user_auth_identity_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => userAuthIdentities.id, { onDelete: 'set null' }),
+    userAuthIdentityId: bigint('user_auth_identity_id', { mode: 'bigint' }).references(() => userAuthIdentities.id, { onDelete: 'set null' }),
     sessionId: bigint('session_id', { mode: 'bigint' }).references(() => userSessions.id, { onDelete: 'set null' }),
 
     successful: boolean('successful').notNull().default(false),
@@ -112,7 +110,7 @@ export const userSessionRelations = relations(userSessions, ({ many, one }) => (
 
 export const userSessionTokenRelations = relations(userSessionTokens, ({ one }) => ({
   session: one(userSessions, { fields: [userSessionTokens.sessionId], references: [userSessions.id] }),
-  service: one(services, { fields: [userSessionTokens.serviceId], references: [services.id] }),
+  application: one(applications, { fields: [userSessionTokens.applicationId], references: [applications.id] }),
 }));
 
 export const userSignInEventRelations = relations(userSignInEvents, ({ one }) => ({

@@ -12,8 +12,6 @@ import { DatabaseService } from './database.service';
  * Defining types
  */
 
-export type ID = string | bigint;
-
 /**
  * Declaring the constants
  */

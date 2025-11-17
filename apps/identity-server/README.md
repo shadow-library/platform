@@ -106,8 +106,14 @@ This endpoint lists all REST routes, authentication methods, and response schema
 Use **Drizzle ORM** for schema management and migrations:
 
 ```bash
+# Generate Migrations
 bunx drizzle-kit generate
+
+# Execute Migrations
 bunx drizzle-kit migrate
+
+# View DB
+bunx drizzle-kit studio
 ```
 
 ---
