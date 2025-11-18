@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, boolean, index, pgEnum, pgTable, primaryKey, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { boolean, index, integer, pgEnum, pgTable, primaryKey, serial, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -45,7 +45,7 @@ export const applicationKeys = pgTable(
   {
     id: serial('id').primaryKey(),
     name: varchar('name', { length: 255 }).notNull(),
-    applicationId: bigint('application_id', { mode: 'bigint' })
+    applicationId: integer('application_id')
       .notNull()
       .references(() => applications.id, { onDelete: 'cascade' }),
     publicKey: text('public_key').notNull(),
@@ -60,7 +60,7 @@ export const applicationKeys = pgTable(
 export const applicationConfigurations = pgTable(
   'application_configurations',
   {
-    applicationId: bigint('application_id', { mode: 'bigint' })
+    applicationId: integer('application_id')
       .notNull()
       .references(() => applications.id, { onDelete: 'cascade' }),
     configName: varchar('config_name', { length: 255 }).notNull(),
@@ -75,7 +75,7 @@ export const applicationRoles = pgTable(
   'application_roles',
   {
     id: serial('id').primaryKey(),
-    applicationId: bigint('application_id', { mode: 'bigint' })
+    applicationId: integer('application_id')
       .notNull()
       .references(() => applications.id, { onDelete: 'cascade' }),
     roleName: varchar('role_name', { length: 255 }).notNull(),

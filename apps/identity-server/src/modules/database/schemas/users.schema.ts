@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, date, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, date, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Defining the types
@@ -51,27 +51,33 @@ export const userProfiles = pgTable('user_profiles', {
   avatarUrl: text('avatar_url'),
 });
 
-export const userEmails = pgTable('user_emails', {
-  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-  userId: bigint('user_id', { mode: 'bigint' })
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  emailId: varchar('email_id', { length: 255 }).notNull().unique(),
-  isPrimary: boolean('is_primary').notNull().default(false),
-  isVerified: boolean('is_verified').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export const userEmails = pgTable(
+  'user_emails',
+  {
+    userId: bigint('user_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    emailId: varchar('email_id', { length: 255 }).notNull().unique(),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    isVerified: boolean('is_verified').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [primaryKey({ columns: [t.userId, t.emailId] })],
+);
 
-export const userPhones = pgTable('user_phones', {
-  id: bigserial('id', { mode: 'bigint' }).primaryKey(),
-  userId: bigint('user_id', { mode: 'bigint' })
-    .notNull()
-    .references(() => users.id, { onDelete: 'cascade' }),
-  phoneNumber: varchar('phone_number', { length: 15 }).notNull().unique(),
-  isPrimary: boolean('is_primary').notNull().default(false),
-  isVerified: boolean('is_verified').notNull().default(false),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-});
+export const userPhones = pgTable(
+  'user_phones',
+  {
+    userId: bigint('user_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    phoneNumber: varchar('phone_number', { length: 15 }).notNull().unique(),
+    isPrimary: boolean('is_primary').notNull().default(false),
+    isVerified: boolean('is_verified').notNull().default(false),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [primaryKey({ columns: [t.userId, t.phoneNumber] })],
+);
 
 export const userAuthIdentities = pgTable(
   'user_auth_identities',

@@ -2,15 +2,17 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
-import { Logger as QueryLogger } from 'drizzle-orm';
+import { Config, InternalError, Logger } from '@shadow-library/common';
+import { DrizzleQueryError, Logger as QueryLogger } from 'drizzle-orm';
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
 
 /**
  * Importing user defined packages
  */
-import { NAMESPACE } from '@server/constants';
+import { APP_NAME } from '@server/constants';
 
+import { constraintErrorMap } from './database.constants';
+import { PostgresError } from './database.types';
 import * as schema from './schemas';
 
 /**
@@ -25,7 +27,7 @@ export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
 
 @Injectable()
 export class DatabaseService {
-  private readonly logger = Logger.getLogger(NAMESPACE, DatabaseService.name);
+  private readonly logger = Logger.getLogger(APP_NAME, DatabaseService.name);
   private readonly primaryDB: PrimaryDatabase;
 
   constructor() {
@@ -47,7 +49,21 @@ export class DatabaseService {
     };
   }
 
+  private isPostgresError(error: any): error is PostgresError {
+    return error.code === 'ERR_POSTGRES_SERVER_ERROR';
+  }
+
   getPrimaryDatabase(): PrimaryDatabase {
     return this.primaryDB;
+  }
+
+  translateError(error: unknown): never {
+    if (error instanceof DrizzleQueryError && this.isPostgresError(error.cause)) {
+      const appError = constraintErrorMap[error.cause.constraint];
+      if (appError) throw appError;
+    }
+
+    this.logger.error('Unknown database error', { error });
+    throw new InternalError('Unknown database error occurred');
   }
 }
