@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/common",
   "type": "module",
-  "version": "1.1.1",
+  "version": "1.2.0",
   "description": "Essential TypeScript utilities for task management, HTTP clients, caching, logging, configuration, and error handling in the Shadow Library ecosystem",
   "sideEffects": false,
   "scripts": {
