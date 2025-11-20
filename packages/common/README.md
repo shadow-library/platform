@@ -8,6 +8,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 
 - **Task Class**: Robust task execution with retry logic, exponential backoff, and rollback capabilities
 - **TaskManager**: Orchestrate multiple tasks with automatic rollback on failure
+- **FlowManager**: Type-safe state machine for complex workflows with conditional transitions
 - **Configurable retry strategies** with custom retry callbacks
 
 ### 🌐 **HTTP Client & API Management**
@@ -182,6 +183,246 @@ try {
 } catch (error) {
   console.error('Pipeline failed, rollback completed:', error);
 }
+```
+
+#### State Management with FlowManager
+
+FlowManager provides a type-safe state machine for managing complex workflows with conditional transitions based on context. It's ideal for authentication flows, order processing, approval workflows, and any scenario requiring controlled state transitions.
+
+```ts
+import { FlowManager } from '@shadow-library/common';
+import type { FlowDefinition } from '@shadow-library/common';
+
+// Define authentication states and context
+type AuthState = 'initial' | 'credentials' | 'mfa_required' | 'mfa_verify' | 'authenticated' | 'failed';
+
+interface AuthContext {
+  userId?: string;
+  email: string;
+  requiresMFA: boolean;
+  mfaMethod?: '2fa' | 'sms' | 'email';
+  loginAttempts: number;
+  maxAttempts: number;
+  sessionToken?: string;
+}
+
+// Define the authentication flow with conditional transitions
+const authFlowDefinition: FlowDefinition<AuthState, AuthContext> = {
+  name: 'AuthenticationFlow',
+  startState: 'initial',
+  states: {
+    initial: {
+      getNextStates: () => ['credentials'],
+    },
+    credentials: {
+      // Transition based on user's MFA settings
+      getNextStates: state => {
+        if (state.context.requiresMFA) {
+          return ['mfa_required', 'failed'];
+        }
+        return ['authenticated', 'failed'];
+      },
+    },
+    mfa_required: {
+      getNextStates: () => ['mfa_verify', 'failed'],
+    },
+    mfa_verify: {
+      // Allow retry or final authentication
+      getNextStates: state => {
+        const canRetry = state.context.loginAttempts < state.context.maxAttempts;
+        return canRetry ? ['authenticated', 'mfa_verify', 'failed'] : ['failed'];
+      },
+    },
+    authenticated: {
+      isFinal: true,
+    },
+    failed: {
+      isFinal: true,
+    },
+  },
+};
+
+// Example: User with 2FA enabled
+async function authenticateUser(email: string, password: string) {
+  // Create flow with initial context
+  const authFlow = FlowManager.create<AuthState, AuthContext>(authFlowDefinition, {
+    email,
+    requiresMFA: false, // Will be determined after credential check
+    loginAttempts: 0,
+    maxAttempts: 3,
+  });
+
+  // Step 1: Start authentication
+  authFlow.transitionTo('credentials');
+
+  // Verify credentials
+  const user = await verifyCredentials(email, password);
+  if (!user) {
+    authFlow.transitionTo('failed');
+    throw new Error('Invalid credentials');
+  }
+
+  // Update context with user info
+  authFlow.updateContext({
+    userId: user.id,
+    requiresMFA: user.mfaEnabled,
+    mfaMethod: user.mfaMethod,
+  });
+
+  // Step 2: Check if MFA is required
+  if (authFlow.canTransitionTo('mfa_required')) {
+    authFlow.transitionTo('mfa_required');
+    console.log(`MFA required via ${user.mfaMethod}`);
+
+    // Send MFA code
+    await sendMFACode(user.id, user.mfaMethod);
+    authFlow.transitionTo('mfa_verify');
+
+    // Step 3: Verify MFA (with retry logic)
+    let mfaVerified = false;
+    while (authFlow.canTransitionTo('mfa_verify') && !mfaVerified) {
+      const code = await promptForMFACode();
+      mfaVerified = await verifyMFACode(user.id, code);
+
+      if (mfaVerified) {
+        const sessionToken = await createSession(user.id);
+        authFlow.transitionTo('authenticated', { sessionToken });
+      } else {
+        authFlow.updateContext({
+          loginAttempts: authFlow.getContext().loginAttempts + 1,
+        });
+
+        if (authFlow.getContext().loginAttempts >= authFlow.getContext().maxAttempts) {
+          authFlow.transitionTo('failed');
+          throw new Error('Maximum MFA attempts exceeded');
+        }
+
+        // Stay in mfa_verify for retry
+        console.log(`Invalid code. ${authFlow.getContext().maxAttempts - authFlow.getContext().loginAttempts} attempts remaining`);
+      }
+    }
+  } else {
+    // No MFA required - direct authentication
+    const sessionToken = await createSession(user.id);
+    authFlow.transitionTo('authenticated', { sessionToken });
+  }
+
+  // Check final status
+  const status = authFlow.getStatus();
+  console.log('Authentication flow completed:', {
+    state: status.currentState,
+    isComplete: status.isComplete,
+    history: status.history,
+  });
+
+  if (status.currentState === 'authenticated') {
+    return authFlow.getContext().sessionToken;
+  }
+
+  throw new Error('Authentication failed');
+}
+
+// Restore flow from snapshot (useful for long-running processes)
+const snapshot = authFlow.toSnapshot();
+// ... later or in different process
+const restoredFlow = FlowManager.from<AuthState, AuthContext>(authFlowDefinition, snapshot);
+restoredFlow.transitionTo('authenticated');
+```
+
+#### Centralized Flow Management with FlowRegistry
+
+For applications with multiple flows, use `FlowRegistry` to manage flow definitions centrally and enable dynamic flow restoration. This is particularly useful for APIs that handle multiple flow types.
+
+```ts
+import { FlowRegistry, FlowDefinition } from '@shadow-library/common';
+
+// Define your flows
+const authFlowDefinition: FlowDefinition<AuthState, AuthContext> = {
+  name: 'auth',
+  startState: 'start',
+  states: {
+    start: { getNextStates: () => ['credentials-verified', 'failed'] },
+    'credentials-verified': {
+      getNextStates: state => (state.context.requiresMFA ? ['mfa-pending'] : ['authenticated']),
+    },
+    'mfa-pending': { getNextStates: () => ['mfa-verified', 'failed'] },
+    'mfa-verified': { getNextStates: () => ['authenticated'] },
+    authenticated: { isFinal: true },
+    failed: { isFinal: true },
+  },
+};
+
+const approvalFlowDefinition: FlowDefinition<ApprovalState, ApprovalContext> = {
+  name: 'approval',
+  startState: 'pending',
+  states: {
+    pending: { getNextStates: () => ['approved', 'rejected'] },
+    approved: { isFinal: true },
+    rejected: { isFinal: true },
+  },
+};
+
+// 1. Bootstrap - Register all flows at application startup
+const flowRegistry = new FlowRegistry();
+flowRegistry.registerAll([authFlowDefinition, approvalFlowDefinition]);
+
+// 2. Create new flows by name
+const authFlow = flowRegistry.create<AuthState, AuthContext>('auth', {
+  userId: 'user123',
+  requiresMFA: true,
+});
+
+// 3. Save flow state to Redis/database
+const flowId = crypto.randomUUID();
+await redis.set(flowId, authFlow.toSnapshot(), 'EX', 300);
+
+// 4. Restore flow from snapshot - automatically resolves flow definition
+async function verifyEndpoint(flowId: string, code: string) {
+  const snapshot = await redis.get(flowId);
+  if (!snapshot) throw new Error('Flow not found');
+
+  // Registry automatically resolves the correct flow definition
+  const flow = flowRegistry.restore<AuthState, AuthContext>(snapshot);
+
+  if (flow.canTransitionTo('mfa-verified')) {
+    flow.updateContext({ verificationCode: code }).transitionTo('mfa-verified');
+
+    // Save updated state
+    await redis.set(flowId, flow.toSnapshot(), 'EX', 300);
+  }
+
+  return flow.getStatus();
+}
+
+// 5. Use with dependency injection for clean architecture
+class AuthService {
+  constructor(
+    private readonly flowRegistry: FlowRegistry,
+    private readonly redis: RedisClient,
+  ) {}
+
+  async startAuth(userId: string, requiresMFA: boolean): Promise<string> {
+    const flow = this.flowRegistry.create('auth', { userId, requiresMFA });
+    const flowId = crypto.randomUUID();
+    await this.redis.set(flowId, flow.toSnapshot(), 'EX', 300);
+    return flowId;
+  }
+
+  async verify(flowId: string, code: string): Promise<void> {
+    const snapshot = await this.redis.get(flowId);
+    const flow = this.flowRegistry.restore(snapshot);
+
+    // Continue flow execution...
+    if (flow.canTransitionTo('mfa-verified')) {
+      flow.transitionTo('mfa-verified', { verificationCode: code });
+      await this.redis.set(flowId, flow.toSnapshot(), 'EX', 300);
+    }
+  }
+}
+
+// 6. Extract flow type without full parsing (for routing/logging)
+const flowName = flowRegistry.getFlowName(snapshot); // Uses regex, no JSON parse
+console.log(`Processing ${flowName} flow`);
 ```
 
 ### 🌐 **HTTP Client & API Requests**
@@ -723,6 +964,37 @@ The package uses environment variables for configuration. Below are the key vari
 - `.addTask(task|fn)` - Add task to execution queue
 - `.getResult(task)` - Get result of specific task
 - `.execute()` - Execute all tasks
+
+#### FlowManager
+
+- `FlowManager.create(definition, context?)` - Create new flow with initial state
+- `FlowManager.from(definition, snapshot)` - Restore flow from snapshot with explicit definition
+- `FlowManager.from(definition, state)` - Create flow from definition and state object
+- `.toSnapshot()` - Serialize flow to JSON string (includes flowName for registry resolution)
+- `.getCurrentState()` - Get current state name
+- `.getDefinition()` - Get flow definition
+- `.getHistory()` - Get state transition history
+- `.getContext()` - Get flow context
+- `.updateContext(updates)` - Update context (chainable)
+- `.getAvailableTransitions()` - Get valid next states
+- `.canTransitionTo(state)` - Check if transition is valid
+- `.transitionTo(state, contextUpdates?)` - Transition to new state (chainable)
+- `.isComplete()` - Check if flow is in final state
+- `.getStatus()` - Get complete flow status
+
+#### FlowRegistry
+
+- `new FlowRegistry()` - Create flow registry instance
+- `.register(definition)` - Register a flow definition (chainable)
+- `.registerAll(definitions[])` - Register multiple flow definitions (chainable)
+- `.unregister(flowName)` - Remove a flow definition
+- `.clear()` - Remove all flow definitions
+- `.has(flowName)` - Check if flow is registered
+- `.get(flowName)` - Get registered flow definition
+- `.getRegisteredFlows()` - Get array of registered flow names
+- `.create(flowName, context?)` - Create new flow instance by name
+- `.restore(snapshot)` - Restore flow from snapshot (auto-resolves definition)
+- `.getFlowName(snapshot)` - Extract flow name from snapshot without parsing JSON
 
 #### APIRequest
 
