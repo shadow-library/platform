@@ -505,16 +505,22 @@ GlobalStore.set('app:config', { theme: 'dark' });
 ```ts
 import { LRUCache } from '@shadow-library/common';
 
+// Basic usage
 const cache = new LRUCache(100); // Capacity of 100 items
+
+// Usage with TTL (Time To Live)
+const ttlCache = new LRUCache(100, { ttl: 5000 }); // Items expire after 5 seconds
 
 cache.set('key1', 'value1');
 cache.set('key2', 'value2');
 
 // Check existence without affecting order
+// Returns false if item exists but has expired
 const exists = cache.has('key1');
 const value = cache.peek('key1'); // Doesn't update access time
 
 // Get with LRU update
+// Returns undefined if item has expired
 const recentValue = cache.get('key1'); // Moves to top
 
 // Remove specific item
@@ -1013,11 +1019,11 @@ The package uses environment variables for configuration. Below are the key vari
 
 #### LRUCache
 
-- `new LRUCache(capacity)` - Create cache with capacity
-- `.set(key, value)` - Store value
-- `.get(key)` - Retrieve and mark as recently used
-- `.peek(key)` - Retrieve without updating access
-- `.has(key)` - Check if key exists
+- `new LRUCache(capacity, options?)` - Create cache with capacity and optional TTL
+- `.set(key, value)` - Store value (resets TTL if enabled)
+- `.get(key)` - Retrieve and mark as recently used (returns undefined if expired)
+- `.peek(key)` - Retrieve without updating access (returns undefined if expired)
+- `.has(key)` - Check if key exists (returns false if expired)
 - `.remove(key)` - Remove specific key
 - `.clear()` - Clear all items
 

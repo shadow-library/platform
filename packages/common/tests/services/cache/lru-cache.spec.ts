@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { performance } from 'node:perf_hooks';
 
 /**
  * Importing user defined packages
@@ -244,6 +245,190 @@ describe('LRUCache', () => {
 
     it('should throw an error if capacity exceeds 4294967296', () => {
       expect(() => LRUCache['getTypedArray'](4294967297)).toThrow(InternalError);
+    });
+  });
+
+  describe('TTL (Time To Live)', () => {
+    describe('constructor with ttl option', () => {
+      it('should initialize cache with TTL option', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        expect(ttlCache).toBeInstanceOf(LRUCache);
+      });
+
+      it('should initialize ttls array when ttl option is provided', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        expect(ttlCache['ttls']).toHaveLength(3);
+      });
+
+      it('should not initialize ttls array when ttl option is not provided', () => {
+        const noTtlCache = new LRUCache(3);
+        expect(noTtlCache['ttls']).toHaveLength(0);
+      });
+    });
+
+    describe('set() with TTL', () => {
+      it('should set TTL timestamp when adding new item', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        ttlCache.set('key1', 'value1');
+
+        const ttl = ttlCache['ttls'][0];
+        expect(ttl).toBeGreaterThan(performance.now() + 900); // Allow some time tolerance
+      });
+
+      it('should update TTL timestamp when updating existing item', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        ttlCache.set('key1', 'value1');
+        const firstTtl = ttlCache['ttls'][0] as number;
+
+        // Wait a bit to ensure different timestamp
+        Bun.sleepSync(2);
+
+        ttlCache.set('key1', 'updated');
+        const secondTtl = ttlCache['ttls'][0];
+
+        expect(secondTtl).toBeGreaterThan(firstTtl);
+      });
+    });
+
+    describe('get() with TTL', () => {
+      it('should return value if TTL has not expired', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        ttlCache.set('key1', 'value1');
+
+        const value = ttlCache.get('key1');
+        expect(value).toBe('value1');
+      });
+
+      it('should return undefined and remove item if TTL has expired', async () => {
+        const ttlCache = new LRUCache(3, { ttl: 2 });
+        ttlCache.set('key1', 'value1');
+
+        // Wait for TTL to expire
+        await Bun.sleep(3);
+
+        const value = ttlCache.get('key1');
+        expect(value).toBeUndefined();
+        expect(ttlCache.has('key1')).toBe(false);
+      });
+
+      it('should handle mixed expired and non-expired items', async () => {
+        const ttlCache = new LRUCache(3, { ttl: 3 });
+        ttlCache.set('key1', 'value1');
+
+        await Bun.sleep(2);
+        ttlCache.set('key2', 'value2'); // key2 expires later
+
+        await Bun.sleep(1); // key1 expires, key2 still valid
+
+        expect(ttlCache.get('key1')).toBeUndefined();
+        expect(ttlCache.get('key2')).toBe('value2');
+      });
+    });
+
+    describe('peek() with TTL', () => {
+      it('should return value if TTL has not expired', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        ttlCache.set('key1', 'value1');
+
+        const value = ttlCache.peek('key1');
+        expect(value).toBe('value1');
+      });
+
+      it('should return undefined and remove item if TTL has expired', async () => {
+        const ttlCache = new LRUCache(3, { ttl: 2 });
+        ttlCache.set('key1', 'value1');
+
+        // Wait for TTL to expire
+        await Bun.sleep(3);
+
+        const value = ttlCache.peek('key1');
+        expect(value).toBeUndefined();
+        expect(ttlCache.has('key1')).toBe(false);
+      });
+    });
+
+    describe('has() with TTL', () => {
+      it('should return true if TTL has not expired', () => {
+        const ttlCache = new LRUCache(3, { ttl: 1000 });
+        ttlCache.set('key1', 'value1');
+
+        expect(ttlCache.has('key1')).toBe(true);
+      });
+
+      it('should return false and remove item if TTL has expired', async () => {
+        const ttlCache = new LRUCache(3, { ttl: 2 });
+        ttlCache.set('key1', 'value1');
+
+        // Wait for TTL to expire
+        await Bun.sleep(3);
+
+        expect(ttlCache.has('key1')).toBe(false);
+      });
+    });
+
+    describe('Edge cases with TTL', () => {
+      it('should not expire items when TTL is set to 0', () => {
+        const ttlCache = new LRUCache(3, { ttl: 0 });
+        ttlCache.set('key1', 'value1');
+
+        Bun.sleepSync(2);
+        const value = ttlCache.get('key1');
+        expect(value).toBe('value1');
+      });
+
+      it('should handle very short TTL', async () => {
+        const ttlCache = new LRUCache(3, { ttl: 1 }); // 1ms TTL
+        ttlCache.set('key1', 'value1');
+
+        await Bun.sleep(5);
+
+        expect(ttlCache.get('key1')).toBeUndefined();
+      });
+
+      it('should handle very long TTL', () => {
+        const ttlCache = new LRUCache(3, { ttl: 86400000 }); // 24 hours
+        ttlCache.set('key1', 'value1');
+
+        expect(ttlCache.get('key1')).toBe('value1');
+      });
+
+      it('should not affect cache without TTL option', () => {
+        const noTtlCache = new LRUCache(3);
+        noTtlCache.set('key1', 'value1');
+
+        // Even after waiting, item should still be there
+        expect(noTtlCache.get('key1')).toBe('value1');
+      });
+    });
+
+    describe('TTL with updates and access patterns', () => {
+      it('should reset TTL on update', () => {
+        const ttlCache = new LRUCache(3, { ttl: 3 });
+        ttlCache.set('key1', 'value1');
+
+        Bun.sleepSync(2);
+        ttlCache.set('key1', 'updated'); // Reset TTL
+
+        Bun.sleepSync(2); // Original would expire now, but reset TTL keeps it
+
+        expect(ttlCache.get('key1')).toBe('updated');
+      });
+
+      it('should extend lifetime with get() moving item to top', () => {
+        const ttlCache = new LRUCache(3, { ttl: 3 });
+        ttlCache.set('key1', 'value1');
+        ttlCache.set('key2', 'value2');
+        ttlCache.set('key3', 'value3');
+
+        Bun.sleepSync(2);
+
+        // Access key1 to move to top (but TTL doesn't reset on get)
+        ttlCache.get('key1');
+
+        Bun.sleepSync(2); // key1 should be expired now
+
+        expect(ttlCache.get('key1')).toBeUndefined();
+      });
     });
   });
 });

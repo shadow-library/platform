@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { performance } from 'node:perf_hooks';
 
 /**
  * Importing user defined packages
@@ -14,6 +15,11 @@ import { InternalError } from '../../errors';
 type UintArray = Uint8Array | Uint16Array | Uint32Array;
 
 type UintArrayConstructor = Uint8ArrayConstructor | Uint16ArrayConstructor | Uint32ArrayConstructor;
+
+export interface LRUCacheOptions {
+  /** Time to live in milliseconds, must be a non-zero positive number */
+  ttl?: number;
+}
 
 /**
  * Declaring the constants
@@ -42,10 +48,14 @@ export class LRUCache {
 
   private size = 0;
   private keys: string[];
+  private ttls: number[];
   private values: any[];
   private items: Record<string, number> = {};
 
-  constructor(private readonly capacity: number) {
+  constructor(
+    private readonly capacity: number,
+    private readonly options: LRUCacheOptions = {},
+  ) {
     if (capacity <= 0) throw new InternalError('Cache capacity must be a positive number greater than 0');
 
     const TypedArray = LRUCache.getTypedArray(capacity);
@@ -55,6 +65,7 @@ export class LRUCache {
 
     this.keys = new Array(capacity);
     this.values = new Array(capacity);
+    this.ttls = this.options.ttl ? new Array(capacity) : [];
   }
 
   private static getTypedArray(capacity: number): UintArrayConstructor {
@@ -83,6 +94,14 @@ export class LRUCache {
     return this;
   }
 
+  private validateTTL(key: string): void {
+    if (!this.options.ttl) return;
+    const pointer = this.items[key];
+    if (typeof pointer === 'undefined') return;
+    const ttl = this.ttls[pointer];
+    if (ttl && ttl < performance.now()) this.remove(key);
+  }
+
   clear(): void {
     this.top = 0;
     this.bottom = 0;
@@ -104,6 +123,7 @@ export class LRUCache {
     if (typeof pointer !== 'undefined') {
       this.splayOnTop(pointer);
       this.values[pointer] = value;
+      if (this.options.ttl) this.ttls[pointer] = performance.now() + this.options.ttl;
       return this;
     }
 
@@ -122,6 +142,7 @@ export class LRUCache {
     this.items[key] = pointer;
     this.keys[pointer] = key;
     this.values[pointer] = value;
+    if (this.options.ttl) this.ttls[pointer] = performance.now() + this.options.ttl;
 
     /** Updating the pointers */
     this.downward[pointer] = this.top;
@@ -132,10 +153,12 @@ export class LRUCache {
   }
 
   has(key: string): boolean {
+    this.validateTTL(key);
     return key in this.items;
   }
 
   get<T>(key: string): T | undefined {
+    this.validateTTL(key);
     const pointer = this.items[key];
     if (typeof pointer === 'undefined') return;
     this.splayOnTop(pointer);
@@ -143,6 +166,7 @@ export class LRUCache {
   }
 
   peek<T>(key: string): T | undefined {
+    this.validateTTL(key);
     const pointer = this.items[key];
     if (typeof pointer === 'undefined') return;
     return this.values[pointer];
