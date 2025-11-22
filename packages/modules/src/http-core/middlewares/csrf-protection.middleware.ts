@@ -11,7 +11,7 @@ import { DateTime, DurationLike } from 'luxon';
 /**
  * Importing user defined packages
  */
-import { HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../constants';
+import { HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 import { type HttpCoreModuleOptions } from '../http-core.module';
 
 /**

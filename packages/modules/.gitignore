@@ -20,3 +20,8 @@ npm-debug.log
 /coverage
 /.nyc_output
 /logs
+
+# environment variables
+.env
+.env.local
+.env.*.local

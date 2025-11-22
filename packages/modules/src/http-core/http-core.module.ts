@@ -14,8 +14,8 @@ import { PartialDeep } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { HTTP_CORE_CONFIGS } from './constants';
 import { HealthController } from './controllers/health.controller';
+import { HTTP_CORE_CONFIGS } from './http-core.constants';
 import { CSRFOptions, CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
 
 /**
@@ -70,7 +70,7 @@ const DEFAULT_HTTP_CORE_CONFIGS: HttpCoreModuleOptions = {
   },
 };
 
-@Module({})
+@Module()
 export class HttpCoreModule implements OnModuleInit {
   constructor(
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,

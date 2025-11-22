@@ -18,6 +18,7 @@ import path from 'node:path';
  */
 const rootDir = path.join(import.meta.dirname, '..');
 const distDir = path.join(rootDir, 'dist');
+const subPathExports = ['http-core', 'cache'];
 
 const formatTime = (time: number) => (time < 1000 ? `${time.toFixed(0)}ms` : `${(time / 1000).toFixed(3)}s`);
 const success = (message: string) => console.log('\x1b[32m%s\x1b[0m', message); // eslint-disable-line no-console
@@ -38,6 +39,7 @@ distPackageJson.main = './cjs/index.js';
 distPackageJson.module = './esm/index.js';
 distPackageJson.types = './esm/index.d.ts';
 distPackageJson.exports = { '.': { import: './esm/index.js', require: './cjs/index.js' } };
+for (const subPath of subPathExports) distPackageJson.exports[`./${subPath}`] = { import: `./esm/${subPath}/index.js`, require: `./cjs/${subPath}/index.js` };
 delete distPackageJson.scripts;
 delete distPackageJson.devDependencies;
 
