@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -16,9 +17,5 @@ import { OPTIONAL_DEPS_METADATA } from '../constants';
  */
 
 export function Optional(): ParameterDecorator {
-  return (target, _key, index) => {
-    let args = Reflect.getMetadata(OPTIONAL_DEPS_METADATA, target) ?? [];
-    args = [...args, index];
-    Reflect.defineMetadata(OPTIONAL_DEPS_METADATA, args, target);
-  };
+  return (target, _key, index) => Reflector.appendMetadata(OPTIONAL_DEPS_METADATA, index, target);
 }

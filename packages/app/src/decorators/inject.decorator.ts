@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -23,9 +24,5 @@ export interface InjectMetadata {
  */
 
 export function Inject(token: InjectMetadata['token']): ParameterDecorator {
-  return (target, _key, index) => {
-    let dependencies = Reflect.getMetadata(SELF_DECLARED_DEPS_METADATA, target) ?? [];
-    dependencies = [...dependencies, { index, token }];
-    Reflect.defineMetadata(SELF_DECLARED_DEPS_METADATA, dependencies, target);
-  };
+  return (target, _key, index) => Reflector.appendMetadata(SELF_DECLARED_DEPS_METADATA, { index, token }, target);
 }

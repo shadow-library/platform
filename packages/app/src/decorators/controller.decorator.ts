@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -19,5 +20,5 @@ export interface ControllerMetadata extends Record<string | symbol, any> {}
  */
 
 export function Controller(metadata: ControllerMetadata = {}): ClassDecorator {
-  return target => Reflect.defineMetadata(CONTROLLER_METADATA, metadata, target);
+  return target => Reflector.updateMetadata(CONTROLLER_METADATA, metadata, target);
 }

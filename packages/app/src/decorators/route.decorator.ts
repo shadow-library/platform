@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import merge from 'deepmerge';
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -25,9 +25,6 @@ export function Route(metadata: RouteMetadata = {}): ClassDecorator & MethodDeco
   return (target: object, _propertyKey?: string | symbol, descriptor?: TypedPropertyDescriptor<any>): void => {
     const object = descriptor ? descriptor.value : target;
     assert(object, 'Route decorator can only be applied to class or method');
-
-    const oldMetadata = Reflect.getMetadata(ROUTE_METADATA, object) ?? {};
-    const newMetadata = merge(oldMetadata, metadata);
-    Reflect.defineMetadata(ROUTE_METADATA, newMetadata, object);
+    Reflector.updateMetadata(ROUTE_METADATA, metadata, object);
   };
 }
