@@ -668,6 +668,10 @@ Logger.attachTransport('console:pretty'); // Console with colors and brief forma
 Logger.attachTransport('file:json'); // File logging with JSON format
 Logger.attachTransport('cloudwatch:json'); // CloudWatch logging
 
+// Attach transport with custom format
+import { format } from 'winston';
+Logger.attachTransport('console:pretty', format.simple());
+
 // Chain multiple transports
 Logger.attachTransport('console:pretty').attachTransport('file:json');
 ```
@@ -1075,7 +1079,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `Logger.setDefaultMetadata(metadata)` - Set default metadata
 - `Logger.getRedactor(paths, censor?)` - Create data redactor
 - `Logger.addTransport(transport)` - Add log transport
-- `Logger.attachTransport(type)` - Attach predefined transport type
+- `Logger.attachTransport(type, format?)` - Attach predefined transport type with optional custom format
 - `Logger.isDebugEnabled()` - Check if debug logging enabled
 
 #### Reflector

@@ -98,11 +98,12 @@ class LoggerStatic {
   }
 
   /* istanbul ignore next */
-  attachTransport(type: AttachableTransports): this {
+  attachTransport(type: AttachableTransports, format?: Logform.Format): this {
     let transport: Transport | null = null;
     const appName = Config.get('app.name');
     const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata(), this.getLogContext()));
     const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
+    if (format) baseFormats.push(format);
 
     switch (type) {
       case 'console:pretty': {
