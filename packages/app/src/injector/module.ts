@@ -202,6 +202,12 @@ export class Module {
   loadDependencies(): void {
     const instances = this.getAllInstances();
     for (const provider of instances) {
+      if (provider.isAliasProvider()) {
+        const aliasProvider = this.getInternalProvider(provider.getAliasToken());
+        this.providers.set(provider.getToken(), aliasProvider);
+        continue;
+      }
+
       const dependencies = provider.getDependencies();
       for (let index = 0; index < dependencies.length; index++) {
         const dependency = dependencies[index];

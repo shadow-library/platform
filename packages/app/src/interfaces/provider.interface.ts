@@ -19,7 +19,7 @@ export interface FactoryDependency {
   optional: boolean;
 }
 
-export type Provider<T = any> = Class<T> | ClassProvider<T> | ValueProvider<T> | FactoryProvider<T>;
+export type Provider<T = any> = Class<T> | ClassProvider<T> | ValueProvider<T> | FactoryProvider<T> | AliasProvider;
 
 export interface ClassProvider<T = any> {
   /**
@@ -46,6 +46,11 @@ export interface ClassProvider<T = any> {
    * This option is only available on factory providers!
    */
   useFactory?: never;
+
+  /**
+   * This option is only available on alias providers!
+   */
+  useExisting?: never;
 }
 
 export interface ValueProvider<T = any> {
@@ -73,6 +78,11 @@ export interface ValueProvider<T = any> {
    * This option is only available on factory providers!
    */
   useFactory?: never;
+
+  /**
+   * This option is only available on alias providers!
+   */
+  useExisting?: never;
 }
 
 export interface FactoryProvider<T = any> {
@@ -100,4 +110,41 @@ export interface FactoryProvider<T = any> {
    * This option is only available on value providers!
    */
   useValue?: never;
+
+  /**
+   * This option is only available on alias providers!
+   */
+  useExisting?: never;
+}
+
+export interface AliasProvider {
+  /**
+   * Injection token
+   */
+  token: InjectionToken;
+
+  /**
+   * The token to which the injection is aliased.
+   */
+  useExisting: InjectionToken;
+
+  /**
+   * This option is only available on class providers!
+   */
+  useClass?: never;
+
+  /**
+   * This option is only available on value providers!
+   */
+  useValue?: never;
+
+  /**
+   * This option is only available on factory providers!
+   */
+  inject?: never;
+
+  /**
+   * This option is only available on factory providers!
+   */
+  useFactory?: never;
 }

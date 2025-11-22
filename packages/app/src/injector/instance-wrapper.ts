@@ -9,7 +9,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { DIErrors, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
+import { DIErrors, isAliasProvider, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
 import { INJECTABLE_METADATA, INTERCEPTOR_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
 import { InjectMetadata, InjectableOptions } from '../decorators';
 import { FactoryDependency, FactoryProvider, InjectionToken, Interceptor, InterceptorConfig, InterceptorContext, Provider } from '../interfaces';
@@ -56,6 +56,7 @@ export class InstanceWrapper<T extends object = any> {
   private readonly transient: boolean = false;
   private readonly isFactory: boolean = false;
   private readonly isClass: boolean = false;
+  private readonly isAlias: boolean = false;
 
   constructor(provider: Provider, injectable?: boolean) {
     if (isValueProvider(provider)) {
@@ -73,6 +74,14 @@ export class InstanceWrapper<T extends object = any> {
       this.metatype = provider.useFactory;
       this.inject = this.getFactoryDependencies(provider.inject);
       this.dependencies = new Array(this.inject.length);
+      return;
+    }
+
+    if (isAliasProvider(provider)) {
+      this.isAlias = true;
+      this.token = provider.token;
+      this.inject = [{ token: provider.useExisting, optional: false }];
+      this.dependencies = new Array(1);
       return;
     }
 
@@ -151,6 +160,16 @@ export class InstanceWrapper<T extends object = any> {
 
   isTransient(): boolean {
     return this.transient;
+  }
+
+  isAliasProvider(): boolean {
+    return this.isAlias;
+  }
+
+  getAliasToken(): InjectionToken {
+    const actualProvider = this.inject[0];
+    assert(actualProvider, `Alias provider '${this.getTokenName()}' has no target token`);
+    return actualProvider.token;
   }
 
   getDependencies(): InjectionMetadata[] {

@@ -155,6 +155,55 @@ describe('Module', () => {
       expect(module['exports'].size).toBe(0);
       expect(module['providers'].get('TEST')).toBeDefined();
     });
+
+    it('should handle alias providers correctly', () => {
+      @Injectable()
+      abstract class BaseService {
+        abstract getName(): string;
+      }
+
+      @Injectable()
+      class AliasService extends BaseService {
+        override getName(): string {
+          return 'AliasService';
+        }
+
+        getAliasName(): string {
+          return 'AliasService';
+        }
+      }
+
+      const metadata = {
+        providers: [
+          { token: AliasService, useClass: AliasService },
+          { token: BaseService, useExisting: AliasService },
+        ],
+        exports: [AliasService, BaseService],
+      };
+      @Module(metadata)
+      class AliasModule {}
+
+      const module = new ModuleWrapper(AliasModule, metadata);
+      module.loadDependencies();
+      expect(module['providers'].get(BaseService)).toBeDefined();
+      expect(module['providers'].get(AliasService)).toBeDefined();
+      expect(module.getProvider(AliasService)).toBe(module.getProvider(BaseService));
+    });
+
+    it('should handle aliasing providers from imported modules', () => {
+      const token = 'ALIASED_CAT_SERVICE';
+      const metadata = {
+        providers: [{ token, useExisting: CatService }],
+        exports: [token],
+      };
+      @Module(metadata)
+      class AliasModule {}
+
+      const moduleWithAlias = new ModuleWrapper(AliasModule, metadata);
+      moduleWithAlias.addImport(module);
+      moduleWithAlias.loadDependencies();
+      expect(moduleWithAlias.getProvider(token)).toBe(module.getProvider(CatService));
+    });
   });
 
   describe('General methods', () => {

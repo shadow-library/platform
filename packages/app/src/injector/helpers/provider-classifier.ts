@@ -2,11 +2,10 @@
  * Importing npm packages
  */
 
-import { ClassProvider, FactoryProvider, Provider, ValueProvider } from '../../interfaces';
-
 /**
  * Importing user defined packages
  */
+import { AliasProvider, ClassProvider, FactoryProvider, Provider, ValueProvider } from '../../interfaces';
 
 /**
  * Defining types
@@ -26,4 +25,8 @@ export function isValueProvider<T = any>(provider: Provider): provider is ValueP
 
 export function isFactoryProvider<T = any>(provider: Provider): provider is FactoryProvider<T> {
   return 'useFactory' in provider && typeof provider?.useFactory === 'function';
+}
+
+export function isAliasProvider(provider: Provider): provider is AliasProvider {
+  return 'useExisting' in provider && typeof provider?.useExisting !== 'undefined';
 }

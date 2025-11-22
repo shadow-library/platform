@@ -279,6 +279,22 @@ describe('InstanceWrapper', () => {
     });
   });
 
+  describe('Alias Provider', () => {
+    const provider = { token: 'ALIAS', useExisting: 'ORIGINAL' };
+
+    beforeEach(() => {
+      instanceWrapper = new InstanceWrapper(provider);
+    });
+
+    it('should return the alias token', () => {
+      expect(instanceWrapper.getAliasToken()).toBe('ORIGINAL');
+    });
+
+    it('should identify as an alias provider', () => {
+      expect(instanceWrapper.isAliasProvider()).toBe(true);
+    });
+  });
+
   describe('General', () => {
     @Injectable()
     class Provider {

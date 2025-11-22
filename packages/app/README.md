@@ -353,6 +353,22 @@ adminEndpoint() {
 })
 ```
 
+#### Alias Provider
+
+The `useExisting` syntax allows you to create aliases for existing providers. This creates two ways to access the same provider. In the example below, the (string-based) token `'AliasedLoggerService'` is an alias for the (class-based) token `LoggerService`. Assume we have two different dependencies, one for `'AliasedLoggerService'` and one for `LoggerService`. If both dependencies are specified with `SINGLETON` scope, they'll both resolve to the same instance.
+
+```ts
+@Module({
+  providers: [
+    LoggerService,
+    {
+      token: 'AliasedLoggerService',
+      useExisting: LoggerService
+    }
+  ]
+})
+```
+
 ### Forward References
 
 Handle circular dependencies between modules:
