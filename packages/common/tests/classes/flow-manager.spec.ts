@@ -267,6 +267,12 @@ describe('FlowManager', () => {
 
       expect(flow.getContext().totalAmount).toBe(200);
     });
+
+    it('should update context using a function', () => {
+      const flow = FlowManager.create(orderFlowDefinition, { orderId: '123', items: [], totalAmount: 100 });
+      flow.updateContext(ctx => ({ totalAmount: ctx.totalAmount + 50 }));
+      expect(flow.getContext().totalAmount).toBe(150);
+    });
   });
 
   describe('getAvailableTransitions', () => {
@@ -313,6 +319,23 @@ describe('FlowManager', () => {
       const flow2 = FlowManager.create(approvalFlow, { approverCount: 3 });
       flow2.transitionTo('review');
       expect(flow2.getAvailableTransitions()).toStrictEqual(['approved']);
+    });
+  });
+
+  describe('peekTransitions', () => {
+    it('should return potential next states from a target state', () => {
+      const flow = FlowManager.create(orderFlowDefinition);
+      expect(flow.peekTransitions('processing')).toStrictEqual(['shipped', 'cancelled']);
+    });
+
+    it('should return empty array if target state has no transitions', () => {
+      const flow = FlowManager.create(orderFlowDefinition);
+      expect(flow.peekTransitions('delivered')).toStrictEqual([]);
+    });
+
+    it('should throw error if target state is unknown', () => {
+      const flow = FlowManager.create(orderFlowDefinition);
+      expect(() => flow.peekTransitions('unknown' as any)).toThrow(InternalError);
     });
   });
 
@@ -381,6 +404,122 @@ describe('FlowManager', () => {
       flow.transitionTo('cancelled');
 
       expect(() => flow.transitionTo('processing')).toThrow(InternalError);
+    });
+  });
+
+  describe('Hooks', () => {
+    type HookState = 'start' | 'middle' | 'end';
+    interface HookContext {
+      enteredMiddle?: boolean;
+      leftStart?: boolean;
+      value: number;
+    }
+
+    const hookFlow: FlowDefinition<HookState, HookContext> = {
+      name: 'HookFlow',
+      startState: 'start',
+      states: {
+        start: {
+          getNextStates: () => ['middle'],
+          onLeave: (context, nextState) => {
+            if (nextState === 'middle') {
+              return { leftStart: true, value: context.value + 1 };
+            }
+            return true;
+          },
+        },
+        middle: {
+          getNextStates: () => ['end'],
+          onEnter: context => {
+            return { enteredMiddle: true, value: context.value * 2 };
+          },
+        },
+        end: { isFinal: true },
+      },
+    };
+
+    it('should execute onLeave and onEnter hooks during transition', () => {
+      const flow = FlowManager.create(hookFlow, { value: 10 });
+      flow.transitionTo('middle');
+
+      expect(flow.getContext()).toMatchObject({
+        leftStart: true,
+        enteredMiddle: true,
+        value: 22, // (10 + 1) * 2
+      });
+    });
+
+    it('should prevent transition if onLeave returns false', () => {
+      const guardFlow: FlowDefinition<HookState, HookContext> = {
+        ...hookFlow,
+        states: {
+          ...hookFlow.states,
+          start: {
+            getNextStates: () => ['middle'],
+            onLeave: () => false,
+          },
+        },
+      };
+
+      const flow = FlowManager.create(guardFlow, { value: 10 });
+      expect(() => flow.transitionTo('middle')).toThrow(InternalError);
+      expect(flow.getCurrentState()).toBe('start');
+    });
+  });
+
+  describe('Actions and Auto-transition', () => {
+    type ActionState = 'start' | 'step1' | 'step2' | 'end';
+    interface ActionContext {
+      count: number;
+    }
+
+    it('should execute actions recursively until settled', () => {
+      const autoFlow: FlowDefinition<ActionState, ActionContext> = {
+        name: 'AutoFlow',
+        startState: 'start',
+        states: {
+          start: { getNextStates: () => ['step1'] },
+          step1: {
+            getNextStates: () => ['step2'],
+            action: ctx => ({ nextState: 'step2', contextUpdates: { count: ctx.count + 1 } }),
+          },
+          step2: {
+            getNextStates: () => ['end'],
+            action: ctx => ({ nextState: 'end', contextUpdates: { count: ctx.count + 1 } }),
+          },
+          end: { isFinal: true },
+        },
+      };
+
+      const flow = FlowManager.create(autoFlow, { count: 0 });
+      flow.transitionTo('step1');
+
+      // step1 -> action -> step2 -> action -> end
+      expect(flow.getCurrentState()).toBe('end');
+      expect(flow.getContext().count).toBe(2);
+      expect(flow.getHistory()).toStrictEqual(['start', 'step1', 'step2']);
+    });
+
+    it('should detect infinite loops or max depth exceeded', () => {
+      const loopFlow: FlowDefinition<ActionState, ActionContext> = {
+        name: 'LoopFlow',
+        startState: 'start',
+        states: {
+          start: { getNextStates: () => ['step1'] },
+          step1: {
+            getNextStates: () => ['step2'],
+            action: () => ({ nextState: 'step2' }),
+          },
+          step2: {
+            getNextStates: () => ['step1'],
+            action: () => ({ nextState: 'step1' }),
+          },
+          end: { isFinal: true },
+        },
+      };
+
+      const flow = FlowManager.create(loopFlow, { count: 0 });
+      expect(() => flow.transitionTo('step1')).toThrow(InternalError);
     });
   });
 });

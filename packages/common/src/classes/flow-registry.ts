@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { InternalError } from '@lib/errors';
+import { AppError, ErrorCode, InternalError } from '@lib/errors';
 
 import { FlowDefinition, FlowManager, FlowState } from './flow-manager';
 
@@ -26,7 +26,11 @@ export class FlowRegistry {
   private readonly flows = new Map<string, FlowDefinition<any, any>>();
 
   register(definition: FlowDefinition<any, any>): this {
-    if (this.flows.has(definition.name)) throw new InternalError(`Flow definition '${definition.name}' is already registered`);
+    if (this.flows.has(definition.name)) {
+      const error = new AppError(ErrorCode.FLOW_ALREADY_REGISTERED, { flowName: definition.name });
+      /** Throwing an internal error for backward compatibility, need to remove in next major version */
+      throw new InternalError(error.getMessage()).setCause(error);
+    }
     this.flows.set(definition.name, definition);
     return this;
   }
@@ -50,7 +54,11 @@ export class FlowRegistry {
 
   get<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>>(flowName: string): FlowDefinition<StateNames, Context> {
     const definition = this.flows.get(flowName);
-    if (!definition) throw new InternalError(`Flow definition '${flowName}' is not registered`);
+    if (!definition) {
+      const error = new AppError(ErrorCode.FLOW_NOT_REGISTERED, { flowName });
+      /** Throwing an internal error for backward compatibility, need to remove in next major version */
+      throw new InternalError(error.getMessage()).setCause(error);
+    }
     return definition as FlowDefinition<StateNames, Context>;
   }
 
@@ -68,14 +76,22 @@ export class FlowRegistry {
 
   restore<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>>(snapshot: string): FlowManager<StateNames, Context> {
     const parsed: ParsedSnapshot<StateNames, Context> = JSON.parse(snapshot);
-    if (!parsed.flowName) throw new InternalError('Snapshot missing flowName field');
+    if (!parsed.flowName) {
+      const error = new AppError(ErrorCode.FLOW_SNAPSHOT_INVALID);
+      /** Throwing an internal error for backward compatibility, need to remove in next major version */
+      throw new InternalError(error.getMessage()).setCause(error);
+    }
     const definition = this.get<StateNames, Context>(parsed.flowName);
     return FlowManager.from(definition, parsed.state);
   }
 
   getFlowName(snapshot: string): string {
     const match = snapshot.match(/"flowName"\s*:\s*"([^"]+)"/);
-    if (!match) throw new InternalError('Snapshot missing flowName field');
+    if (!match) {
+      const error = new AppError(ErrorCode.FLOW_SNAPSHOT_INVALID);
+      /** Throwing an internal error for backward compatibility, need to remove in next major version */
+      throw new InternalError(error.getMessage()).setCause(error);
+    }
     return match[1] as string;
   }
 }

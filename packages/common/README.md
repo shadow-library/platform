@@ -425,6 +425,86 @@ const flowName = flowRegistry.getFlowName(snapshot); // Uses regex, no JSON pars
 console.log(`Processing ${flowName} flow`);
 ```
 
+#### Advanced Flow Features
+
+**Lifecycle Hooks**
+
+You can define `onEnter` and `onLeave` hooks for each state to execute logic during transitions.
+
+```ts
+const hookFlow: FlowDefinition = {
+  name: 'HookFlow',
+  startState: 'start',
+  states: {
+    start: {
+      getNextStates: () => ['middle'],
+      // Prevent transition if condition is not met
+      onLeave: (context, nextState) => {
+        if (!context.isValid) return false;
+        // Return partial context updates
+        return { leftStart: true };
+      },
+    },
+    middle: {
+      getNextStates: () => ['end'],
+      // Execute logic when entering state
+      onEnter: (context, prevState) => {
+        console.log(`Entered from ${prevState}`);
+        return { enteredMiddle: true };
+      },
+    },
+    end: { isFinal: true },
+  },
+};
+```
+
+**Automatic Actions**
+
+Use the `action` property to define automatic transitions. The flow manager will recursively execute actions until it settles in a state without an action or reaches a final state.
+
+```ts
+const autoFlow: FlowDefinition = {
+  name: 'AutoFlow',
+  startState: 'start',
+  states: {
+    start: { getNextStates: () => ['process'] },
+    process: {
+      getNextStates: () => ['finish'],
+      // Automatically transition to 'finish' and update context
+      action: context => ({
+        nextState: 'finish',
+        contextUpdates: { processed: true }
+      }),
+    },
+    finish: { isFinal: true },
+  },
+};
+
+const flow = FlowManager.create(autoFlow);
+flow.transitionTo('process'); // Will automatically advance to 'finish'
+```
+
+**Context Updates**
+
+You can update the context using a partial object or a function updater.
+
+```ts
+// Partial update
+flow.updateContext({ count: 10 });
+
+// Function updater (useful for counters or dependent updates)
+flow.updateContext(ctx => ({ count: ctx.count + 1 }));
+```
+
+**Peeking Transitions**
+
+Check what transitions would be available from a hypothetical future state without actually transitioning.
+
+```ts
+// Check what comes after 'processing'
+const nextStates = flow.peekTransitions('processing');
+```
+
 ### 🌐 **HTTP Client & API Requests**
 
 #### Fluent API Client

@@ -30,6 +30,11 @@ export class InternalError extends Error {
     this.publicErrorCode = publicErrorCode as ErrorCode;
   }
 
+  setCause(cause: Error): this {
+    this.cause = cause;
+    return this;
+  }
+
   getPublicErrorCode(): ErrorCode {
     return this.publicErrorCode;
   }

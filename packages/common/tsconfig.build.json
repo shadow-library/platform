@@ -4,8 +4,7 @@
   "compilerOptions": {
     /** Emit */
     "noEmit": false,
-    "declaration": true,
-    "removeComments": true
+    "declaration": true
   },
   "include": ["src/**/*.ts"]
 }
