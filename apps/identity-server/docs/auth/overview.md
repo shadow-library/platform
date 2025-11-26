@@ -15,36 +15,62 @@ This solution adopts a **State-Based Authentication Architecture** for high perf
 
 The core of this scalable design is the flowId. It is a pointer to a user's current authentication context. This flowId is also used as the primary key for the `user_sign_in_events` table once the user attempts a credential submission.
 
+The Flow Manager handles the logic, state definitions, and transitions in code. Redis is used exclusively to persist the Flow Context—the stateful object containing all data accumulated during a user's specific execution of a flow.
+
 **Key Pattern:** `auth_flow:{uuid}`
 **Type:** Redis Hash or JSON  
-**TTL:** 10-15 Minutes (Sliding expiration on access)
+**TTL:** 10-15 Minutes (The auth flow expires after this and the user has to start again)
 
-| Field        | Type    | Description                                                                                                           |
-| :----------- | :------ | :-------------------------------------------------------------------------------------------------------------------- |
-| status       | String  | Current state (e.g., IDENTIFIED, MFA_CHALLENGE).                                                                      |
-| identifier   | String  | Input provided by user (email/phone).                                                                                 |
-| userId       | String  | Resolved DB ID (if user exists).                                                                                      |
-| authModeUsed | String  | Stores the primary method used in the current attempt (e.g., PASSWORD). Populates user_sign_in_events.auth_mode_used. |
-| mfaModeUsed  | String  | Stores the secondary method used (e.g., TOTP). Populates user_sign_in_events.mfa_mode_used.                           |
-| context      | JSON    | Device fingerprint, IP, User Agent (for fraud detection).                                                             |
-| regData      | JSON    | Temporary storage for registration fields (DOB, Names) before DB commit.                                              |
-| failureCount | Integer | Tracks failed credential attempts within this flow (**Primary Brute Force Counter**).                                 |
-| resendCount  | Integer | Tracks how many times a challenge (e.g., OTP) has been resent for the current flow.                                   |
+### Context Object Structure
+
+The stored value is a JSON object representing the FlowContext. It contains the following data categories:
+
+| Field              | Type    | Description                                                                                                                                     |
+| :----------------- | :------ | :---------------------------------------------------------------------------------------------------------------------------------------------- |
+| identifier         | String  | Input provided by user (email/phone).                                                                                                           |
+| userId             | String  | Resolved DB ID (if user exists).                                                                                                                |
+| authModeUsed       | String  | Stores the primary method used in the current attempt (e.g., PASSWORD). Populates user_sign_in_events.auth_mode_used.                           |
+| mfaModeUsed        | String  | Stores the secondary method used (e.g., TOTP). Populates user_sign_in_events.mfa_mode_used.                                                     |
+| device             | JSON    | Device fingerprint, IP, User Agent (for fraud detection).                                                                                       |
+| regData            | JSON    | Temporary storage for registration fields (DOB, Names) before DB commit.                                                                        |
+| globalFailureCount | Integer | **Limit: 5**. Tracks total incorrect attempts across all methods combined. If this hits 5, the entire flow is locked/terminated.                |
+| failureCount       | Integer | **Limit: 3**. Tracks failures for the current method. If this hits 3, the entire flow is locked/terminated.                                     |
+| globalResendCount  | Integer | **Limit: 5.** Tracks total OTP resend requests.                                                                                                 |
+| resendCount        | Integer | **Limit: 3.** Tracks total OTP resend requests.                                                                                                 |
+| activeChallenge    | JSON    | Stores the currently active OTP/secret for verification. Should contain: `{ "code": "123456", "method": "SMS_OTP", "expiresAt": <timestamp> }`. |
 
 ## **3. Detailed Workflows**
 
 ### **A. Authentication (Login)**
+
+The login flow is dynamic. The client reacts to the `status` returned by the server rather than assuming a fixed sequence.
+
+**Mermaid Visualization:**
+
+```mermaid
+flowchart TB
+  USER_IDENTIFIED --> SELECT_AUTH_MODE
+
+  SELECT_AUTH_MODE --> AWAITING_WEBAUTHN & AWAITING_PASSWORD
+  SELECT_AUTH_MODE --> SEND_SMS_OTP & SEND_EMAIL_OTP & AWAITING_TOTP
+
+  SEND_SMS_OTP --> AWAITING_SMS_OTP
+  SEND_EMAIL_OTP --> AWAITING_EMAIL_OTP
+
+  AWAITING_EMAIL_OTP & AWAITING_SMS_OTP --> SELECT_AUTH_MODE & COMPLETED
+  AWAITING_WEBAUTHN & AWAITING_PASSWORD --> SELECT_AUTH_MODE & COMPLETED
+```
 
 **Phase 1: Identification (`POST /auth/login/init`)**
 
 - **DB/Redis Action:** Only Redis flow created. No user_sign_in_events logged yet.
 - **Logic:** If the user does not exist, return 404 Not Found immediately (No sign-in event logged). **Crucially: Before returning methods, check User's Persistent Lock Status (Tier 4). If locked, only include OTP methods in allowedMethods.**
 
-**Phase 2: Challenge (`POST /auth/challenge`)**
+**Phase 2: Challenge (`POST /auth/challenge/resend`)**
 
 - **DB/Redis Action:** Increments resendCount in Redis.
 
-**Phase 3: Credential Submission and Logging (`POST /auth/verify`)**
+**Phase 3: Credential Submission and Logging (`POST /auth/challenge/verify`)**
 
 This is the point where the `user_sign_in_events` is first created. The checks are as follows:
 
@@ -61,7 +87,7 @@ This is the point where the `user_sign_in_events` is first created. The checks a
       - `id`: `flowId`.
       - `status`: `SUCCESS`.
       - All other fields populated.
-    - If MFA required, update Redis flow `status` to `MFA_REQUIRED`.
+    - If MFA required, update Redis flow `status`.
     - If Login Complete, proceed to Session Creation.
 
 **Phase 4: Session Creation (Final Step)**
@@ -87,6 +113,14 @@ This is the point where the `user_sign_in_events` is first created. The checks a
 
 The registration flow is a multi-step process designed to collect data sequentially before committing the new user to the database. The final commit occurs in Phase 4.
 
+**Mermaid Visualization:**
+
+```mermaid
+flowchart TB
+  REGISTRATION_INIT --> SEND_EMAIL_OTP --> AWAITING_EMAIL_OTP
+  AWAITING_EMAIL_OTP --> AWAITING_DEMOGRAPHICS --> AWAITING_PROFILE --> COMPLETED
+```
+
 **Phase 1: Initiate Registration (`POST /auth/register/init`)**
 
 - **Client Action:** Submits email and deviceFingerprint.
@@ -95,12 +129,12 @@ The registration flow is a multi-step process designed to collect data sequentia
   2. Create Redis Flow key (`auth_flow:{flowId}`) with `status: REGISTRATION_INIT`.
 - **Next Step:** Client requests OTP via /auth/challenge.
 
-**Phase 2: Verify Email OTP (`POST /auth/verify`)**
+**Phase 2: Verify Email OTP (`POST /auth/challenge/verify`)**
 
 - **Client Action:** Submits flowId and OTP_EMAIL code.
 - **DB/Redis Action:**
   1. Validate OTP against stored code (or external service).
-  2. If successful, update Redis flow `status: EMAIL_VERIFIED`.
+  2. If successful, update Redis flow `status: AWAITING_DEMOGRAPHICS`.
   3. If failed, increment `failureCount` and return `401 Unauthorized`.
 - **Next Step:** Client submits demographics via `/auth/register/demographics`.
 
@@ -109,7 +143,7 @@ The registration flow is a multi-step process designed to collect data sequentia
 - **Client Action:** Submits flowId, dateOfBirth, and gender.
 - **DB/Redis Action:**
   1. Update the Redis Flow `regData` hash with the submitted fields.
-  2. Update Redis flow `status: DEMOGRAPHICS_SET`.
+  2. Update Redis flow `status: AWAITING_PROFILE`.
 - **Next Step:** Client submits profile name via `/auth/register/profile`.
 
 **Phase 4: Set Profile & Complete (`POST /auth/register/profile`)**
@@ -128,31 +162,37 @@ The registration flow is a multi-step process designed to collect data sequentia
 
 The recovery flow ensures the user proves ownership of the account before a password reset is permitted, culminating in a successful login after the reset.
 
+**Mermaid Visualization:**
+
+```mermaid
+flowchart TB
+  RECOVERY_INIT --> SEND_SMS_OTP & SEND_EMAIL_OTP
+
+  SEND_SMS_OTP --> AWAITING_SMS_OTP
+  SEND_EMAIL_OTP --> AWAITING_EMAIL_OTP
+
+  AWAITING_EMAIL_OTP & AWAITING_SMS_OTP --> AWAITING_NEW_PASSWORD
+  AWAITING_NEW_PASSWORD --> COMPLETED
+```
+
 **Phase 1: Initiate Recovery (`POST /auth/recover/init`)**
 
 - **Client Action:** Submits `email`.
 - **DB/Redis Action:**
   1. Look up user ID by email. If not found, return `404 Not Found` (avoids enumeration).
-  2. Create Redis Flow key (`auth_flow:{flowId}`) with `status: RECOVERY_MODE` and associated `userId`.
+  2. Create Redis Flow key (`auth_flow:{flowId}`) with `status: RECOVERY_INIT` and associated `userId`.
+  3. Send the OTP via email or phone number of the user and set the flow status as `AWAITING_SMS_OTP` or `AWAITING_EMAIL_OTP`
 - **Next Step:** Client requests OTP via `/auth/challenge`.
 
-**Phase 2: Request Recovery Challenge (`POST /auth/challenge`)**
-
-- **Client Action:** Submits `flowId` and requests `OTP_EMAIL`.
-- **DB/Redis Action:**
-  1. Generate and send OTP to the primary email address.
-  2. Update Redis flow (e.g., set OTP code and increment `resendCount`).
-- **Next Step:** Client submits OTP to `/auth/verify`.
-
-**Phase 3: Verify Recovery OTP (`POST /auth/verify`)**
+**Phase 2: Verify Recovery OTP (`POST /auth/challenge/verify`)**
 
 - **Client Action:** Submits `flowId` and `OTP_EMAIL` code.
 - **DB/Redis Action:**
   1. DB Logging (Attempt): Create initial entry in `user_sign_in_events` with `status: FAILED` or `INVALID_CREDENTIALS` if incorrect.
-  2. If OTP successful, update Redis flow `status: RECOVERY_VERIFIED`.
+  2. If OTP successful, update Redis flow `status: AWAITING_NEW_PASSWORD`.
 - **Next Step:** Client submits new password to `/auth/recover/reset`.
 
-**Phase 4: Reset Password & Complete (POST /auth/recover/reset)**
+**Phase 3: Reset Password & Complete (POST /auth/recover/reset)**
 
 - **Client Action:** Submits `flowId` and `newPassword`.
 - **DB Transaction (Reset & Login):**

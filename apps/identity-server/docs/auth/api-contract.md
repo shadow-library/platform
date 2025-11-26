@@ -16,7 +16,7 @@ All successful authentication responses (Login, Register, Refresh) **DO NOT** re
 
 ### **State Machine Logic**
 
-The authentication flow is linear. Each endpoint expects the `flowId` to be in a specific `flowStatus`.
+The authentication flow is linear. Each endpoint expects the `flowId` to be in a specific `status`.
 
 - **Skipping Steps:** If you try to call Step 3 while the flow is in Step 1, the API returns `409 Conflict`.
 - **Going Back:** The API generally does not support "undoing" a step. To change previous data (e.g., wrong email), call `/auth/cancel` and start a new flow.
@@ -38,39 +38,60 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
   ```
 
 - **Success Response (200 OK):**
-  ```json
+  ```jsonc
   {
-    "flowId": "flow_abc123...",
-    "flowStatus": "REGISTRATION_INIT",
-    "nextStep": "OTP_EMAIL"
+    "flowId": "auth_flow_123abc...", // The session token for this flow
+    "status": "AWAITING_EMAIL_OTP", // The current node in your Mermaid diagram
   }
   ```
 
-### **1.2 Verify Email OTP, Credentials, and MFA**
+### **1.2 Verify Email OTP**
 
-**POST** `/auth/verify`
+**POST** `/auth/challenge/verify`
 
 - **Purpose:** Verifies OTP code in Registration.
 - **Request Body:**
 
-  ```json
+  ```jsonc
   {
-    "flowId": "flow_abc123...",
-    "method": "OTP_EMAIL",
-    "code": "123456"
+    "flowId": "auth_flow_123abc...",
+    "code": "123456",
   }
   ```
 
-- **Success Response (200 OK):**
+- **Success Response (200 OK):** Completed flow
   ```json
   {
-    "flowId": "flow_abc123...",
-    "flowStatus": "EMAIL_VERIFIED",
-    "nextStep": "SET_DEMOGRAPHICS"
+    "flowId": "auth_flow_8372_xyz",
+    "status": "AWAITING_DEMOGRAPHICS"
   }
   ```
 
-### **1.3 Set Demographics**
+### **1.3 Resend Email OTP**
+
+**POST** `/auth/challenge/resend`
+
+- **Purpose:** Request resend of email OTP in Registration.
+- **Request Body:**
+
+  ```jsonc
+  {
+    "flowId": "auth_flow_123abc...",
+    "method": "EMAIL_OTP",
+  }
+  ```
+
+- **Success Response (200 OK):** Completed flow
+  ```jsonc
+  {
+    "flowId": "auth_flow_8372_xyz",
+    "method": "EMAIL_OTP", // denotes what was resent
+    "status": "SUCCESS", // denotes OTP send is success
+    "retryAfterSeconds": 60, // denotes after what time this can be called again
+  }
+  ```
+
+### **1.4 Set Demographics**
 
 **POST** `/auth/register/demographics`
 
@@ -78,7 +99,7 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 
   ```json
   {
-    "flowId": "flow_abc123...",
+    "flowId": "auth_flow_abc123...",
     "dateOfBirth": "1995-08-15",
     "gender": "FEMALE"
   }
@@ -87,13 +108,12 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 - **Success Response (200 OK):**
   ```json
   {
-    "flowId": "flow_abc123...",
-    "flowStatus": "DEMOGRAPHICS_SET",
-    "nextStep": "SET_PROFILE"
+    "flowId": "auth_flow_abc123...",
+    "status": "AWAITING_PROFILE"
   }
   ```
 
-### **1.4 Set Profile & Complete**
+### **1.5 Set Profile & Complete**
 
 **POST** `/auth/register/profile`
 
@@ -101,7 +121,7 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 
   ```json
   {
-    "flowId": "flow_abc123...",
+    "flowId": "auth_flow_abc123...",
     "firstName": "Jane",
     "lastName": "Doe"
   }
@@ -111,8 +131,8 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
   Server sets AT, RT, and isLoggedIn cookies via headers.
   ```json
   {
-    "flowId": "flow_abc123...",
-    "flowStatus": "COMPLETED"
+    "flowId": "auth_flow_abc123...",
+    "status": "COMPLETED"
   }
   ```
 
@@ -132,25 +152,24 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
   ```
 
 - **Success Response (200 OK):**
-  ```json
+  ```jsonc
   {
-    "flowId": "flow_xyz789...",
-    "flowStatus": "IDENTIFIED",
-    "allowedMethods": [{ "method": "OTP_EMAIL", "maskedTarget": "j***@example.com" }, { "method": "PASSWORD" }],
-    "nextStep": "LOGIN"
+    "flowId": "auth_flow_123abc...", // The session token for this flow
+    "status": "AWAITING_PASSWORD", // The current node in your Mermaid diagram
+    "hasAlternativeMethods": true, // Tells the UI whether user has different auth modes he can select from
   }
   ```
 
 ### **2.2 Request/Resend Challenge**
 
-**POST** `/auth/challenge`
+**POST** `/auth/challenge/resend`
 
 - **Purpose:** Triggers sending an OTP.
 - **Request Body:**
 
   ```json
   {
-    "flowId": "flow_xyz789...",
+    "flowId": "auth_flow_xyz789...",
     "method": "OTP_EMAIL"
   }
   ```
@@ -158,21 +177,22 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 - **Success Response (200 OK):**
   ```json
   {
-    "flowId": "flow_xyz789...",
-    "message": "Challenge sent successfully."
+    "flowId": "auth_flow_8372_xyz",
+    "method": "EMAIL_OTP", // denotes what was resent
+    "status": "SUCCESS", // denotes OTP send is success
+    "retryAfterSeconds": 60 // denotes after what time this can be called again
   }
   ```
 
 ### **2.3 Verify Credential**
 
-**POST** `/auth/verify`
+**POST** `/auth/challenge/verify`
 
 - **Request Body (Password Submission):**
 
   ```json
   {
-    "flowId": "flow_xyz789...",
-    "method": "PASSWORD",
+    "flowId": "auth_flow_xyz789...",
     "password": "secretPassword123"
   }
   ```
@@ -182,19 +202,66 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 
   ```json
   {
-    "flowId": "flow_xyz789...",
-    "flowStatus": "COMPLETED",
-    "message": "Login successful. Check cookies for session tokens."
+    "flowId": "auth_flow_xyz789...",
+    "status": "COMPLETED"
   }
   ```
 
 - **Success Response (200 OK - Intermediate Step/MFA):**
-  ```json
+
+  ```jsonc
   {
-    "flowId": "flow_xyz789...",
-    "flowStatus": "MFA_REQUIRED",
-    "allowedMethods": [{ "method": "TOTP" }],
-    "nextStep": "MFA"
+    "flowId": "auth_flow_xyz789...",
+    "status": "AWAITING_TOTP",
+    "attemptsLeft": 3, // number of attempts left before flow termination
+    "resendsLeft": 3, // number of resends left, provided only in case of OTP
+
+    // Context for UI, provide only what is required based on the auth method
+    "metadata": {
+      "maskedPhone": "**99",
+      "maskedEmail": "u***@gmail.com",
+    },
+  }
+  ```
+
+### **2.4 List available challenges**
+
+**GET** `/auth/challenge/methods?flowId=<flowId>`
+
+- **Purpose:** return the list of challenges that the user can choose from at this point in the flow. This endpoint is useful for client UI to render selection (your SELECT_AUTH_MODE state).
+- **Success Response (200 OK)**
+
+  ```jsonc
+  {
+    "flowId": "auth_flow_8372_xyz",
+    "methods": [
+      {
+        "name": "TOTP",
+      },
+      {
+        "name": "SMS_OTP",
+        "metadata": { "maskedPhone": "**99" },
+      },
+      {
+        "name": "EMAIL_OTP",
+        "metadata": { "maskedEmail": "u***@gmail.com" },
+      },
+    ],
+  }
+  ```
+
+### **2.5 Change challenge**
+
+**POST** `/auth/challenge/change`
+
+- **Purpose**: user requests to switch active challenge (e.g., from `AWAITING_EMAIL_OTP` → `AWAITING_SMS_OTP`). Returns the updated set of available challenges and server action (send OTP, etc.).
+- **Success Response (200 OK)**
+  ```jsonc
+  {
+    "flowId": "auth_flow_8372_xyz",
+    "status": "AWAITING_SMS_OTP", // State updated to the new method
+    "hasAlternativeMethods": true, // They can still switch back if SMS fails
+    "metadata": { "maskedPhone": "**99" },
   }
   ```
 
@@ -207,29 +274,37 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 - **Request Body:**
   ```json
   {
-    "email": "jane.doe@example.com"
+    "email": "jane.doe@example.com",
+    "deviceId": "uuid-v4-string"
   }
   ```
 - **Success Response:**
-  ```json
+
+  ```jsonc
   {
-    "flowId": "...",
-    "flowStatus": "RECOVERY_MODE",
-    "nextStep": "OTP_EMAIL"
+    "flowId": "auth_flow_xyz123",
+    "status": "AWAITING_SMS_OTP",
+    "attemptsLeft": 3, // number of attempts left before flow termination
+    "resendsLeft": 3, // number of resends left, provided only in case of OTP
+
+    // Context for UI, provide only what is required based on the auth method
+    "metadata": {
+      "maskedPhone": "**99",
+      "maskedEmail": "u***@gmail.com",
+    },
   }
   ```
 
 ### **3.2 Verify Recovery OTP**
 
-**POST** `/auth/verify`
+**POST** `/auth/challenge/verify`
 
 - **Purpose:** Verifies recovery OTP.
 - **Request Body:**
 
   ```json
   {
-    "flowId": "flow_xyz123",
-    "method": "OTP_EMAIL",
+    "flowId": "auth_flow_xyz123",
     "code": "987654"
   }
   ```
@@ -237,9 +312,8 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 - **Success Response:**
   ```json
   {
-    "flowId": "flow_xyz123",
-    "flowStatus": "RECOVERY_VERIFIED",
-    "nextStep": "SET_PASSWORD"
+    "flowId": "auth_flow_xyz123",
+    "status": "AWAITING_NEW_PASSWORD"
   }
   ```
 
@@ -251,7 +325,7 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
 
   ```json
   {
-    "flowId": "flow_xyz123",
+    "flowId": "auth_flow_xyz123",
     "newPassword": "NewSecurePassword123!"
   }
   ```
@@ -260,9 +334,8 @@ The authentication flow is linear. Each endpoint expects the `flowId` to be in a
   Server sets AT, RT, and isLoggedIn cookies via headers.
   ```json
   {
-    "flowId": "flow_xyz123",
-    "flowStatus": "COMPLETED",
-    "message": "Password reset successful and user logged in."
+    "flowId": "auth_flow_xyz123",
+    "status": "COMPLETED"
   }
   ```
 
