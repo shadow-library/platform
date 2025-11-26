@@ -13,7 +13,10 @@ import { AppError, ErrorCode, InternalError } from '@lib/errors';
 
 export type ContextUpdater<Context> = Partial<Context> | ((currentContext: Context) => Partial<Context>);
 
-export type ActionResult<StateName extends string, Context> = undefined | { nextState: StateName; contextUpdates?: Partial<Context> };
+export interface ActionResult<StateName extends string, Context> {
+  nextState: StateName;
+  contextUpdates?: Partial<Context>;
+}
 
 export interface FlowStateDefinition<StateName extends string = string, Context extends Record<string, any> = Record<string, any>> {
   /** Function to determine the next possible states from the current state and context. */
@@ -23,13 +26,16 @@ export interface FlowStateDefinition<StateName extends string = string, Context 
   isFinal?: boolean;
 
   /** Called when leaving the state. Can return false to prevent transition, or partial context updates. */
-  onLeave?: (context: Context, nextState: StateName) => boolean | undefined | Partial<Context>;
+  /* eslint-disable-next-line @typescript-eslint/no-invalid-void-type */
+  onLeave?: (context: Context, nextState: StateName) => void | boolean | Partial<Context>;
 
   /** Called when entering the state. Can return partial context updates. */
-  onEnter?: (context: Context, prevState: StateName) => undefined | Partial<Context>;
+  /* eslint-disable-next-line @typescript-eslint/no-invalid-void-type */
+  onEnter?: (context: Context, prevState: StateName) => void | Partial<Context>;
 
   /** Action to be performed in this state. Can return the next state to transition to, or an object with nextState and context updates. */
-  action?: (context: Context) => ActionResult<StateName, Context>;
+  /* eslint-disable-next-line @typescript-eslint/no-invalid-void-type */
+  action?: (context: Context) => void | ActionResult<StateName, Context>;
 }
 
 export interface FlowState<StateName extends string = string, Context extends Record<string, any> = Record<string, any>> {
