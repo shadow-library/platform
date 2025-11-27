@@ -5,6 +5,11 @@ import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, boolean, date, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
+ * Importing user defined packages
+ */
+import { userSessions, userSignInEvents } from './auth-tokens.schemas';
+
+/**
  * Defining the types
  */
 
@@ -26,7 +31,7 @@ export namespace User {
  * Declaring the tables
  */
 
-export const userStatus = pgEnum('user_status', ['ACTIVE', 'INACTIVE', 'DISABLED', 'SUSPENDED', 'CLOSED']);
+export const userStatus = pgEnum('user_status', ['ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED', 'CLOSED']);
 export const gender = pgEnum('gender', ['MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED']);
 export const userAuthProvider = pgEnum('user_auth_provider', ['PASSWORD', 'OTP', 'TOTP', 'GOOGLE', 'MICROSOFT']);
 export const passwordAlgorithm = pgEnum('password_algorithm', ['BCRYPT', 'ARGON2ID']);
@@ -112,6 +117,8 @@ export const usersRelations = relations(users, ({ many, one }) => ({
   emails: many(userEmails),
   phones: many(userPhones),
   authIdentities: many(userAuthIdentities),
+  signInEvents: many(userSignInEvents),
+  sessions: many(userSessions),
 }));
 
 export const userProfilesRelations = relations(userProfiles, ({ one }) => ({
