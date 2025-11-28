@@ -38,8 +38,13 @@ const distPackageJson = structuredClone(packageJson);
 distPackageJson.main = './cjs/index.js';
 distPackageJson.module = './esm/index.js';
 distPackageJson.types = './esm/index.d.ts';
-distPackageJson.exports = { '.': { import: './esm/index.js', require: './cjs/index.js' } };
-for (const subPath of subPathExports) distPackageJson.exports[`./${subPath}`] = { import: `./esm/${subPath}/index.js`, require: `./cjs/${subPath}/index.js` };
+distPackageJson.exports = { '.': { import: './esm/index.js', require: './cjs/index.js', types: './esm/index.d.ts' } };
+distPackageJson.typesVersions = { '*': {} };
+for (const subPath of subPathExports) {
+  const types = `./esm/${subPath}/index.d.ts`;
+  distPackageJson.exports[`./${subPath}`] = { import: `./esm/${subPath}/index.js`, require: `./cjs/${subPath}/index.js`, types };
+  distPackageJson.typesVersions['*'][subPath] = [types];
+}
 delete distPackageJson.scripts;
 delete distPackageJson.devDependencies;
 
@@ -77,4 +82,4 @@ if (fs.existsSync(tsbuildinfo)) fs.rmSync(tsbuildinfo);
 
 const endTime = process.hrtime(startTime);
 const timeTaken = endTime[0] * 1e3 + endTime[1] * 1e-6;
-success(`Built successfull in ${formatTime(timeTaken)}`);
+success(`Built successful in ${formatTime(timeTaken)}`);
