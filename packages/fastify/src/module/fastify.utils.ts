@@ -5,7 +5,7 @@ import assert from 'node:assert';
 
 import { JSONSchema } from '@shadow-library/class-schema';
 import { ValidationError, throwError, utils } from '@shadow-library/common';
-import Ajv, { SchemaObject, ValidateFunction } from 'ajv';
+import Ajv, { Options as AjvOptions, SchemaObject, ValidateFunction } from 'ajv';
 import { FastifyInstance, fastify } from 'fastify';
 import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationResult, SchemaErrorDataVar } from 'fastify/types/schema';
 
@@ -19,14 +19,18 @@ import { FastifyConfig, FastifyModuleOptions } from './fastify-module.interface'
  * Defining types
  */
 
+export interface AjvValidators {
+  strictValidator: Ajv;
+  lenientValidator: Ajv;
+}
+
 /**
  * Declaring the constants
  */
 const keywords = ['x-fastify'];
 const allowedHttpParts = ['body', 'params', 'querystring'];
-const strictValidator = new Ajv({ allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords });
-const lenientValidator = new Ajv({ allErrors: true, coerceTypes: true, useDefaults: true, removeAdditional: true, strict: true, keywords });
 const notFoundError = new ServerError(ServerErrorCode.S002);
+const defaultAjvOptions: AjvOptions = { allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords };
 
 export const notFoundHandler = (): never => throwError(notFoundError);
 
@@ -41,12 +45,12 @@ function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> 
   return ajv.getSchema(schema.$id) as ValidateFunction<unknown>;
 }
 
-export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>): FastifyValidationResult {
+export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>, validators: AjvValidators): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
-  if (routeSchema.httpPart === 'body') return compileSchema(strictValidator, routeSchema.schema);
-  if (routeSchema.httpPart === 'params') return compileSchema(lenientValidator, routeSchema.schema);
+  if (routeSchema.httpPart === 'body') return compileSchema(validators.strictValidator, routeSchema.schema);
+  if (routeSchema.httpPart === 'params') return compileSchema(validators.lenientValidator, routeSchema.schema);
 
-  const validate = compileSchema(lenientValidator, routeSchema.schema);
+  const validate = compileSchema(validators.lenientValidator, routeSchema.schema);
   return (data: Record<string, unknown>) => {
     validate(data);
 
@@ -77,12 +81,21 @@ export function formatSchemaErrors(errors: FastifySchemaValidationError[], dataV
 export async function createFastifyInstance(config: FastifyConfig, fastifyFactory?: FastifyModuleOptions['fastifyFactory']): Promise<FastifyInstance> {
   const options = utils.object.omitKeys(config, ['port', 'host', 'errorHandler', 'responseSchema']);
   const { errorHandler } = config;
-  const instance = fastify(options);
 
+  const strictValidator = new Ajv({ ...defaultAjvOptions, ...config.ajv?.customOptions });
+  const lenientValidator = new Ajv({ ...defaultAjvOptions, coerceTypes: true, ...config.ajv?.customOptions });
+  for (let plugin of config.ajv?.plugins ?? []) {
+    if (typeof plugin === 'function') plugin = [plugin, {}];
+    const [ajvPlugin, options] = plugin;
+    ajvPlugin(strictValidator, options);
+    ajvPlugin(lenientValidator, options);
+  }
+
+  const instance = fastify(options);
   instance.setSchemaErrorFormatter(formatSchemaErrors);
   instance.setNotFoundHandler(notFoundHandler);
   instance.setErrorHandler(errorHandler.handle.bind(errorHandler));
-  instance.setValidatorCompiler(compileValidator);
+  instance.setValidatorCompiler(routeSchema => compileValidator(routeSchema, { strictValidator, lenientValidator }));
 
   return fastifyFactory ? await fastifyFactory(instance) : instance;
 }

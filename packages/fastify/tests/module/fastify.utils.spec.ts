@@ -3,12 +3,13 @@
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ValidationError } from '@shadow-library/common';
+import Ajv from 'ajv';
 import { FastifyInstance } from 'fastify';
 
 /**
  * Importing user defined packages
  */
-import { compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } from '@lib/module/fastify.utils';
+import { AjvValidators, compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } from '@lib/module/fastify.utils';
 import { ServerError } from '@shadow-library/fastify';
 
 /**
@@ -40,6 +41,11 @@ describe('Create Fastify Instance', () => {
   let instance: FastifyInstance;
   const fastifyFactory = jest.fn((instance: FastifyInstance) => instance);
   const errorHandler = { handle: jest.fn() };
+  const defaultAjvOptions = { allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords: ['x-fastify'] };
+  const validators: AjvValidators = {
+    strictValidator: new Ajv({ ...defaultAjvOptions }),
+    lenientValidator: new Ajv({ ...defaultAjvOptions, coerceTypes: true }),
+  };
   const schema = {
     $id: 'TestSchema',
     type: 'object',
@@ -94,27 +100,45 @@ describe('Create Fastify Instance', () => {
   });
 
   it('should validate query schema and transform it to valid data without throwing errors for invalid data', () => {
-    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' });
+    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' }, validators);
     const result = validate({ orderBy: 'rand', active: 'false', limit: '-10', offset: '20', order: 'asc' });
     expect(result).toStrictEqual({ value: { active: false, limit: 20, offset: 20, order: 'asc' } });
   });
 
   it('should validate query schema and return same data for valid data', () => {
-    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' });
+    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'querystring' }, validators);
     const result = validate({ orderBy: 'name', active: true, limit: 10, offset: 20, order: 'asc' });
     expect(result).toStrictEqual({ value: { orderBy: 'name', active: true, limit: 10, offset: 20, order: 'asc' } });
   });
 
   it('should throw error for body schema validation', () => {
-    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'body' });
+    const validate = compileValidator({ schema, method: 'get', url: '/test', httpPart: 'body' }, validators);
     const result = validate({ orderBy: 'rand', active: 'false', limit: '-10', offset: '20', order: 'asc' });
     expect(result).toBe(false);
   });
 
   it('should throw error for params schema validation', () => {
     const schema = { type: 'object', properties: { id: { type: 'string', pattern: '^[0-9a-f]{12}$' } }, required: ['id'] };
-    const validate = compileValidator({ schema, method: 'get', url: '/user/:id', httpPart: 'params' });
+    const validate = compileValidator({ schema, method: 'get', url: '/user/:id', httpPart: 'params' }, validators);
     const result = validate({ id: '123' });
     expect(result).toBe(false);
+  });
+
+  it('should apply custom ajv options when config.ajv.customOptions is provided', async () => {
+    const customOptions = { verbose: true };
+    instance = await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { customOptions } });
+    expect(instance).toBeDefined();
+    expect(instance.setValidatorCompiler).toHaveBeenCalled();
+  });
+
+  it('should apply ajv plugins when config.ajv.plugins is provided', async () => {
+    const mockPlugin = jest.fn();
+    const pluginOptions = { testOption: true };
+    instance = await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { plugins: [[mockPlugin, pluginOptions], mockPlugin] } });
+    expect(instance).toBeDefined();
+    expect(mockPlugin).toHaveBeenNthCalledWith(1, expect.any(Object), pluginOptions);
+    expect(mockPlugin).toHaveBeenNthCalledWith(2, expect.any(Object), pluginOptions);
+    expect(mockPlugin).toHaveBeenNthCalledWith(3, expect.any(Object), {});
+    expect(mockPlugin).toHaveBeenNthCalledWith(4, expect.any(Object), {});
   });
 });

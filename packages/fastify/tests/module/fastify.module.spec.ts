@@ -1,14 +1,15 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Router } from '@shadow-library/app';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { Module, Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '@lib/constants';
-import { ContextService, FastifyModule, FastifyRouter, HttpController } from '@shadow-library/fastify';
+import { Body, ContextService, FastifyModule, FastifyRouter, HttpController, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -101,6 +102,60 @@ describe('FastifyModule', () => {
         module: FastifyModule,
         providers: expect.arrayContaining([]),
         exports: [Router, ContextService, FASTIFY_INSTANCE, Export],
+      });
+    });
+  });
+
+  describe('integration', () => {
+    @Schema()
+    class TestBody {
+      @Field(() => String, { minLength: 1, maxLength: 10 })
+      name: string;
+    }
+
+    @Schema()
+    class TestResponse {
+      @Field(() => String)
+      message: string;
+    }
+
+    @HttpController('/test')
+    class TestController {
+      @Post()
+      @RespondFor(200, TestResponse)
+      create(@Body() body: TestBody): TestResponse {
+        return { message: `Hello, ${body.name}!` };
+      }
+    }
+
+    @Module({
+      imports: [FastifyModule.forRoot({ controllers: [TestController] })],
+    })
+    class TestModule {}
+
+    let app: ShadowApplication;
+    let router: FastifyRouter;
+
+    beforeAll(async () => {
+      app = await ShadowFactory.create(TestModule).then(app => app.start());
+      router = app.get(Router);
+    });
+
+    afterAll(() => app.stop());
+
+    it('should validate and process request body correctly', async () => {
+      const response = await router.mockRequest().post('/test').body({ name: 'World' });
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({ message: 'Hello, World!' });
+    });
+
+    it('should return validation error for invalid body', async () => {
+      const response = await router.mockRequest().post('/test').body({ name: '' });
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).toMatchObject({
+        code: 'S003',
+        type: 'VALIDATION_ERROR',
+        fields: [{ field: 'body.name', msg: expect.stringContaining('must NOT have fewer than 1 character') }],
       });
     });
   });

@@ -850,6 +850,55 @@ export class AppModule {}
 - **Database**: Add database connection decorators
 - **Caching**: Configure caching plugins
 
+### Customizing AJV Validation
+
+The module uses [AJV](https://ajv.js.org/) for JSON Schema validation. You can customize the AJV instance by providing custom options or plugins through the `ajv` configuration:
+
+```typescript
+import { Module } from '@shadow-library/app';
+import { FastifyModule } from '@shadow-library/fastify';
+import ajvFormats from 'ajv-formats';
+import ajvKeywords from 'ajv-keywords';
+
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController],
+      ajv: {
+        // Custom AJV options
+        customOptions: {
+          removeAdditional: 'all',
+          coerceTypes: 'array',
+          useDefaults: true,
+        },
+        // AJV plugins - supports both formats:
+        // 1. Just the plugin function (uses empty options)
+        // 2. Tuple of [plugin, options]
+        plugins: [
+          ajvFormats, // Plugin without options
+          [ajvKeywords, { keywords: ['typeof', 'instanceof'] }], // Plugin with options
+        ],
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+#### AJV Configuration Options
+
+| Option          | Type                                       | Description                                           |
+| --------------- | ------------------------------------------ | ----------------------------------------------------- |
+| `customOptions` | `object`                                   | Custom AJV options to merge with the default settings |
+| `plugins`       | `Array<Plugin \| [Plugin, PluginOptions]>` | Array of AJV plugins to register with both validators |
+
+#### Common Use Cases for AJV Customization:
+
+- **Format Validation**: Add `ajv-formats` for email, uri, date-time validation
+- **Custom Keywords**: Use `ajv-keywords` for additional validation keywords
+- **Strict Mode**: Configure strict schema validation settings
+- **Type Coercion**: Customize how types are coerced during validation
+
 ## Middleware
 
 Create custom middleware by implementing the `Middleware` decorator:
