@@ -8,10 +8,7 @@ import { Module, ShadowFactory } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { CacheModule } from '../src/cache/cache.module';
-import { CacheService } from '../src/cache/cache.service';
-import { MemcacheService } from '../src/cache/memcache.service';
-import { RedisCacheService } from '../src/cache/redis-cache.service';
+import { CacheModule, CacheService, MemcacheService, RedisCacheService } from '@shadow-library/modules/cache';
 
 describe('Cache Module', () => {
   const redisMock = {

@@ -9,7 +9,6 @@
         "@fastify/helmet": "^13.0.2",
         "@fastify/swagger": "^9.5.2",
         "@scalar/fastify-api-reference": "^1.38.1",
-        "deepmerge": "^4.3.1",
         "luxon": "^3.7.2",
         "openapi-types": "^12.1.3",
       },

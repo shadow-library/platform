@@ -11,13 +11,6 @@ import { AsyncHttpMiddleware, HttpRequest, HttpResponse, Middleware } from '@sha
  * Defining types
  */
 
-declare module 'fastify' {
-  interface FastifyRequest {
-    /** Correlation ID */
-    cid: string;
-  }
-}
-
 /**
  * Declaring the constants
  */

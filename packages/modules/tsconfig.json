@@ -26,7 +26,8 @@
     "moduleResolution": "node",
     "paths": {
       "@lib/*": ["src/*"],
-      "@shadow-library/module": ["src/index.ts"]
+      "@shadow-library/modules": ["src/index.ts"],
+      "@shadow-library/modules/*": ["src/*"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],

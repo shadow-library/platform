@@ -115,9 +115,11 @@ export class AppModule {}
 
 1.  **Health Check**: Automatically registers a `HealthController` that responds to `GET /health` with `{ status: 'ok' }`.
 2.  **CSRF Protection**:
-    - Sets a `csrf-token` cookie on `GET` requests if not present.
-    - Validates the `x-csrf-token` header against the cookie on state-changing requests (`POST`, `PUT`, `DELETE`, etc.).
-    - Tokens are signed and have an expiration time.
+    - CSRF validation is only performed when cookies are present in the request (cookie-based session detection).
+    - Sets a `csrf-token` cookie when cookies are present but the CSRF token is missing.
+    - Validates the `x-csrf-token` header against the cookie token on state-changing requests (`POST`, `PUT`, `DELETE`, etc.).
+    - Tokens have an expiration time and are automatically refreshed before expiry.
+    - **Dev Mode Toggle**: CSRF protection can be disabled in non-production environments by setting the `HTTP_CORE_CSRF_ENABLED` environment variable to `false`.
 3.  **Request Initialization**:
     - Ensures every request has a unique `x-correlation-id` header for tracing.
     - Preserves the ID if sent by the client.

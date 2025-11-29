@@ -1,14 +1,10 @@
 /**
  * Importing npm packages
  */
-import { type FastifyCompressOptions } from '@fastify/compress';
 import { fastifyCookie } from '@fastify/cookie';
-import { type FastifyHelmetOptions } from '@fastify/helmet';
 import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
 import { Config, LogData, Logger } from '@shadow-library/common';
 import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
-import deepmerge from 'deepmerge';
-import { OpenAPIV3 } from 'openapi-types';
 import { PartialDeep } from 'type-fest';
 
 /**
@@ -16,24 +12,21 @@ import { PartialDeep } from 'type-fest';
  */
 import { HealthController } from './controllers/health.controller';
 import { HTTP_CORE_CONFIGS } from './http-core.constants';
-import { CSRFOptions, CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
+import { type HttpCoreModuleOptions } from './http-core.types';
+import { CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
+import { CSRFTokenService } from './services';
 
 /**
  * Defining types
  */
-
-export interface HttpCoreModuleOptions {
-  csrf: CSRFOptions;
-  helmet: FastifyHelmetOptions;
-  compress: FastifyCompressOptions;
-  openapi: Partial<OpenAPIV3.Document>;
-}
 
 /**
  * Declaring the constants
  */
 const DEFAULT_HTTP_CORE_CONFIGS: HttpCoreModuleOptions = {
   csrf: {
+    cookieName: 'csrf-token',
+    headerName: 'x-csrf-token',
     expiresIn: { days: 1 },
     refreshLeeway: { hours: 6 },
     tokenRadix: 36,
@@ -76,7 +69,9 @@ export class HttpCoreModule implements OnModuleInit {
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ServerInstance,
     private readonly contextService: ContextService,
-  ) {}
+  ) {
+    Config.load('http-core.csrf.enabled', { defaultValue: 'true' });
+  }
 
   async onModuleInit(): Promise<void> {
     await this.fastify.register(fastifyCookie);
@@ -109,12 +104,15 @@ export class HttpCoreModule implements OnModuleInit {
   }
 
   static forRoot(options: PartialDeep<HttpCoreModuleOptions> = {}): DynamicModule {
-    const httpCoreOptions = deepmerge(DEFAULT_HTTP_CORE_CONFIGS, options);
+    const httpCoreOptions: Record<string, any> = { ...DEFAULT_HTTP_CORE_CONFIGS };
+    for (const key in options) httpCoreOptions[key] = { ...httpCoreOptions[key], ...(options as Record<string, any>)[key] };
+
     return {
       module: HttpCoreModule,
       imports: [FastifyModule],
-      providers: [{ token: HTTP_CORE_CONFIGS, useValue: httpCoreOptions }],
+      providers: [CSRFTokenService, { token: HTTP_CORE_CONFIGS, useValue: httpCoreOptions }],
       controllers: [HealthController, RequestInitializerMiddleware, CsrfProtectionMiddleware],
+      exports: [CSRFTokenService],
     };
   }
 }
