@@ -465,6 +465,23 @@ describe('FlowManager', () => {
       expect(() => flow.transitionTo('middle')).toThrow(InternalError);
       expect(flow.getCurrentState()).toBe('start');
     });
+
+    it('should automatically settle after flow creation', () => {
+      const flowDef: FlowDefinition<HookState, HookContext> = {
+        name: 'HookFlow',
+        startState: 'start',
+        states: {
+          start: { getNextStates: () => ['middle'], action: () => ({ nextState: 'middle' }) },
+          middle: { getNextStates: () => ['end'] },
+          end: { isFinal: true },
+        },
+      };
+      const flow = FlowManager.create(flowDef, { value: 5 });
+
+      // onEnter of start state should have been called
+      expect(flow.getContext()).toStrictEqual({ value: 5 });
+      expect(flow.getCurrentState()).toBe('middle');
+    });
   });
 
   describe('Actions and Auto-transition', () => {

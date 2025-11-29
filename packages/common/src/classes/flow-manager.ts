@@ -74,7 +74,9 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
     initialContext: Context = {} as Context,
   ): FlowManager<StateNames, Context> {
     const initialState: FlowState<StateNames, Context> = { currentState: definition.startState, history: [], context: initialContext };
-    return new FlowManager(definition, initialState);
+    const flow = new FlowManager(definition, initialState);
+    flow.settle();
+    return flow;
   }
 
   static from<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>>(
