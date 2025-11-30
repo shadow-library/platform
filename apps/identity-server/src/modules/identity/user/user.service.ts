@@ -4,10 +4,9 @@
 import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
+import { Logger, MaybeNull } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { SQL, eq } from 'drizzle-orm';
-import validator, { StrongPasswordOptions } from 'validator';
 
 /**
  * Importing user defined packages
@@ -54,8 +53,6 @@ interface FindUserFilter {
 /**
  * Declaring the constants
  */
-const USERNAME_REGEX = /^[a-zA-Z0-9-_.]{3,32}$/;
-const STRONG_PASSWORD_OPTIONS: StrongPasswordOptions = { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 };
 
 @Injectable()
 export class UserService {
@@ -76,14 +73,6 @@ export class UserService {
   async createUserWithPassword(data: CreateUser): Promise<UserDetails> {
     const user = await this.db
       .transaction(async tx => {
-        const validationError = new ValidationError();
-        if (!validator.isEmail(data.email)) validationError.addFieldError('email', 'Invalid email address.');
-        if (!validator.isStrongPassword(data.password, STRONG_PASSWORD_OPTIONS)) validationError.addFieldError('password', 'Does not meet the password strength requirements.');
-        if (data.username && !USERNAME_REGEX.test(data.username)) validationError.addFieldError('username', `Does not match the pattern - ${USERNAME_REGEX}.`);
-        if (data.phoneNumber && !validator.isMobilePhone(data.phoneNumber, 'any', { strictMode: true })) validationError.addFieldError('phoneNumber', 'Invalid phone number.');
-        if (validationError.getErrorCount()) throw validationError;
-        this.logger.debug('validation passed for new user creation');
-
         const [user] = await tx.insert(schema.users).values({ username: data.username, status: data.status }).returning();
         assert(user, 'User creation failed');
         this.logger.debug('user created', { userId: user.id });

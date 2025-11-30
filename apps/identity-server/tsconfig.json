@@ -23,8 +23,9 @@
     /** Modules */
     "baseUrl": ".",
     "module": "ES2022",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "paths": {
+      "@modules/*": ["src/modules/*"],
       "@server/*": ["src/*"]
     },
     "resolveJsonModule": true,
