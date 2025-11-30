@@ -5,14 +5,16 @@ import { Injectable } from '@shadow-library/app';
 import { Config, InternalError, Logger } from '@shadow-library/common';
 import { DrizzleQueryError, Logger as QueryLogger } from 'drizzle-orm';
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
+import { Redis } from 'ioredis';
+import Memcached from 'memcached';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
 
-import { constraintErrorMap } from './database.constants';
-import { PostgresError } from './database.types';
+import { constraintErrorMap } from './datastore.constants';
+import { PostgresError } from './datastore.types';
 import * as schema from './schemas';
 
 /**
@@ -26,14 +28,23 @@ export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
  */
 
 @Injectable()
-export class DatabaseService {
-  private readonly logger = Logger.getLogger(APP_NAME, DatabaseService.name);
+export class DatastoreService {
+  private readonly logger = Logger.getLogger(APP_NAME, DatastoreService.name);
+
   private readonly primaryDB: PrimaryDatabase;
+  private readonly redisClient: Redis;
+  private readonly memcachedClient?: Memcached;
 
   constructor() {
     const queryLogger = this.getQueryLogger();
     const primaryDatabaseURL = Config.get('db.primary.url');
     this.primaryDB = drizzle(primaryDatabaseURL, { schema, logger: queryLogger });
+
+    const redisURL = Config.get('cache.redis.url');
+    this.redisClient = new Redis(redisURL);
+
+    const memcachedServers = Config.get('cache.memcached.servers');
+    if (memcachedServers.length > 0) this.memcachedClient = new Memcached(memcachedServers);
   }
 
   private getQueryLogger(): QueryLogger {
@@ -55,6 +66,14 @@ export class DatabaseService {
 
   getPrimaryDatabase(): PrimaryDatabase {
     return this.primaryDB;
+  }
+
+  getRedisClient(): Redis {
+    return this.redisClient;
+  }
+
+  getMemcachedClient(): Memcached | undefined {
+    return this.memcachedClient;
   }
 
   translateError(error: unknown): never {

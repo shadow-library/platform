@@ -6,7 +6,7 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { DatabaseService } from './database.service';
+import { DatastoreService } from './datastore.service';
 
 /**
  * Defining types
@@ -17,7 +17,7 @@ import { DatabaseService } from './database.service';
  */
 
 @Module({
-  providers: [DatabaseService],
-  exports: [DatabaseService],
+  providers: [DatastoreService],
+  exports: [DatastoreService],
 })
-export class DatabaseModule {}
+export class DatastoreModule {}

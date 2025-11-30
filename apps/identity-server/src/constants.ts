@@ -14,4 +14,4 @@
  * Declaring the constants
  */
 
-export const NAMESPACE = 'shadow-identity';
+export const APP_NAME = 'shadow-identity';
