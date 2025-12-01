@@ -20,6 +20,8 @@ import { type HttpCoreModuleOptions } from '../http-core.types';
  */
 
 export interface CSRFOptions {
+  disabled?: boolean;
+
   cookieName: string;
   headerName: string;
   expiresIn: DurationLike;

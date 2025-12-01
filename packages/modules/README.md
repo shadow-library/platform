@@ -90,6 +90,7 @@ import { HttpCoreModule } from '@shadow-library/modules/http-core';
       imports: [
         HttpCoreModule.forRoot({
           csrf: {
+            disabled: false, // Set to true to completely disable CSRF protection
             expiresIn: { days: 1 },
             refreshLeeway: { hours: 6 },
           },
@@ -115,11 +116,12 @@ export class AppModule {}
 
 1.  **Health Check**: Automatically registers a `HealthController` that responds to `GET /health` with `{ status: 'ok' }`.
 2.  **CSRF Protection**:
+    - **Disable Option**: CSRF protection can be completely disabled by setting `csrf.disabled: true` in the module configuration. When disabled, the middleware is not registered at all.
     - CSRF validation is only performed when cookies are present in the request (cookie-based session detection).
     - Sets a `csrf-token` cookie when cookies are present but the CSRF token is missing.
     - Validates the `x-csrf-token` header against the cookie token on state-changing requests (`POST`, `PUT`, `DELETE`, etc.).
     - Tokens have an expiration time and are automatically refreshed before expiry.
-    - **Dev Mode Toggle**: CSRF protection can be disabled in non-production environments by setting the `HTTP_CORE_CSRF_ENABLED` environment variable to `false`.
+    - **Dev Mode Toggle**: In non-production environments, CSRF protection can be disabled at runtime by setting the `HTTP_CORE_CSRF_ENABLED` environment variable to `false`.
 3.  **Request Initialization**:
     - Ensures every request has a unique `x-correlation-id` header for tracing.
     - Preserves the ID if sent by the client.

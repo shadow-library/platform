@@ -168,6 +168,61 @@ describe('HttpCore Module', () => {
       expect(response.statusCode).toBe(200);
       expectCSRFCookie(response);
     });
+
+    describe('when CSRF is disabled', () => {
+      let disabledApp: ShadowApplication;
+      let disabledRouter: FastifyRouter;
+
+      const HttpCoreDisabled = HttpCoreModule.forRoot({
+        csrf: {
+          disabled: true,
+          expiresIn: { seconds: 10 },
+          refreshLeeway: { second: 1 },
+        },
+      });
+
+      @HttpController('/api')
+      class DisabledController {
+        @Post('/action')
+        @HttpStatus(200)
+        doPost() {
+          return { status: 'ok' };
+        }
+      }
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreDisabled], controllers: [DisabledController] })] })
+      class DisabledAppModule {}
+
+      beforeEach(async () => {
+        disabledApp = await ShadowFactory.create(DisabledAppModule);
+        disabledRouter = disabledApp.get(Router);
+      });
+
+      it('should allow POST request without CSRF token when cookies are present', async () => {
+        const response = await disabledRouter.mockRequest().post('/api/action').cookies({ 'some-cookie': 'value' });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ status: 'ok' });
+      });
+
+      it('should not set CSRF token cookie on GET request with cookies', async () => {
+        const response = await disabledRouter.mockRequest().get('/health').cookies({ 'some-cookie': 'value' });
+        expect(response.statusCode).toBe(200);
+        const csrfCookie = response.cookies.find(c => c.name === 'csrf-token');
+        expect(csrfCookie).toBeUndefined();
+      });
+
+      it('should allow POST request without CSRF token header when cookies are present', async () => {
+        const response = await disabledRouter.mockRequest().post('/api/action').cookies({ 'csrf-token': 'some-value' });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ status: 'ok' });
+      });
+
+      it('should allow POST request with invalid CSRF token when cookies are present', async () => {
+        const response = await disabledRouter.mockRequest().post('/api/action').headers({ 'x-csrf-token': 'invalid' }).cookies({ 'csrf-token': 'some-value' });
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ status: 'ok' });
+      });
+    });
   });
 
   describe('CSRFTokenService', () => {
