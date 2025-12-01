@@ -23,7 +23,7 @@
     /** Modules */
     "baseUrl": ".",
     "module": "ES2022",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "paths": {
       "@server/*": ["src/*"]
     },

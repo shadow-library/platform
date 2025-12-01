@@ -17,8 +17,10 @@ import { HttpCoreModule } from '@shadow-library/modules';
  * Declaring the constants
  */
 
+const AppHttpCoreModule = HttpCoreModule.forRoot({ csrf: { disabled: true } });
+
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [HttpCoreModule.forRoot()],
+  imports: [AppHttpCoreModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),
