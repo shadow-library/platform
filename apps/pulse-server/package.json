@@ -1,5 +1,5 @@
 {
-  "name": "@shadow-library/service-name",
+  "name": "@shadow-library/pulse",
   "type": "module",
   "version": "0.0.0",
   "description": "description",
@@ -13,14 +13,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/service-name.git"
+    "url": "git+ssh://git@github.com/shadow-library/pulse.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/service-name/issues"
+    "url": "https://github.com/shadow-library/pulse/issues"
   },
-  "homepage": "https://github.com/shadow-library/service-name#readme",
+  "homepage": "https://github.com/shadow-library/pulse#readme",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
