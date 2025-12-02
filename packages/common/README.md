@@ -57,6 +57,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 - **Data masking utilities** for emails, numbers, words, and flexible text masking
 - **Object manipulation** (pick, omit, deep freeze, path access, plain object detection)
 - **Temporal utilities** with time unit support
+- **Pagination utilities** for offset, page, and cursor-based pagination
 - **Reflection utilities** with metadata management
 - **Functional programming helpers** (tryCatch, withThis, throwError)
 
@@ -473,7 +474,7 @@ const autoFlow: FlowDefinition = {
       // Automatically transition to 'finish' and update context
       action: context => ({
         nextState: 'finish',
-        contextUpdates: { processed: true }
+        contextUpdates: { processed: true },
       }),
     },
     finish: { isFinal: true },
@@ -933,6 +934,52 @@ await utils.temporal.sleep(5, 'm'); // 5 minutes
 await utils.temporal.sleep(1, 'h'); // 1 hour
 ```
 
+#### Pagination Utilities
+
+```ts
+import { utils } from '@shadow-library/common';
+
+// Normalize pagination input (handles string/number conversion and validation)
+const offsetPagination = utils.pagination.normalise(
+  { limit: '20', offset: '10', sortBy: 'createdAt', sortOrder: 'desc' },
+  { mode: 'offset', defaults: { limit: 10, offset: 0, sortBy: 'id', sortOrder: 'asc' } },
+);
+// Result: { limit: 20, offset: 10, sortBy: 'createdAt', sortOrder: 'desc' }
+
+const pagePagination = utils.pagination.normalise({ limit: 25, page: '3' }, { mode: 'page', defaults: { limit: 10, page: 1, sortBy: 'id', sortOrder: 'asc' } });
+// Result: { limit: 25, page: 3, sortBy: 'id', sortOrder: 'asc' }
+
+const cursorPagination = utils.pagination.normalise({ cursor: 'abc123', limit: 50 }, { mode: 'cursor', defaults: { limit: 20, cursor: null, sortBy: 'id', sortOrder: 'asc' } });
+// Result: { limit: 50, cursor: 'abc123', sortBy: 'id', sortOrder: 'asc' }
+
+// Create pagination results
+const items = [{ id: 1 }, { id: 2 }, { id: 3 }];
+
+// Offset pagination result
+const offsetResult = utils.pagination.createResult(
+  { limit: 10, offset: 0, sortBy: 'id', sortOrder: 'asc' },
+  items,
+  100, // total count
+);
+// Result: { total: 100, limit: 10, offset: 0, items: [...] }
+
+// Page pagination result
+const pageResult = utils.pagination.createResult(
+  { limit: 10, page: 1, sortBy: 'id', sortOrder: 'asc' },
+  items,
+  100, // total count
+);
+// Result: { total: 100, limit: 10, page: 1, totalPages: 10, items: [...] }
+
+// Cursor pagination result (pass getCursor function instead of total)
+const cursorResult = utils.pagination.createResult(
+  { limit: 10, cursor: null, sortBy: 'id', sortOrder: 'asc' },
+  items,
+  item => item.id.toString(), // getCursor function
+);
+// Result: { limit: 10, nextCursor: '3', items: [...] }
+```
+
 #### Functional Programming Helpers
 
 ```ts
@@ -1199,6 +1246,21 @@ The package uses environment variables for configuration. Below are the key vari
 #### Temporal Utils
 
 - `utils.temporal.sleep(duration, unit?)` - Sleep for specified duration
+
+#### Pagination Utils
+
+- `utils.pagination.normalise(input, options)` - Normalize pagination input from query parameters
+  - `input.limit` - Page size (string or number)
+  - `input.sortBy` - Field to sort by
+  - `input.sortOrder` - Sort direction ('asc' or 'desc')
+  - `input.offset` - Offset for offset-based pagination
+  - `input.page` - Page number for page-based pagination
+  - `input.cursor` - Cursor for cursor-based pagination
+  - `options.mode` - Pagination mode ('offset', 'page', or 'cursor')
+  - `options.defaults` - Default values for pagination
+- `utils.pagination.createResult(query, items, totalOrGetCursor)` - Create pagination result
+  - For offset/page modes: pass total count as third argument
+  - For cursor mode: pass getCursor function as third argument
 
 #### General Utils
 

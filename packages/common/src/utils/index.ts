@@ -6,6 +6,7 @@
  * Importing user defined packages
  */
 import { objectUtils } from './object';
+import { paginationUtils } from './pagination';
 import { stringUtils } from './string';
 import { temporalUtils } from './temporal';
 
@@ -21,6 +22,7 @@ class Utils {
   readonly object = objectUtils;
   readonly string = stringUtils;
   readonly temporal = temporalUtils;
+  readonly pagination = paginationUtils;
 
   /**
    * Validates the object.
