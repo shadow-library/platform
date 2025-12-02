@@ -201,4 +201,119 @@ describe('TransformerFactory', () => {
       path: 'arrObj.0.val',
     });
   });
+
+  describe('hasTransformableFields', () => {
+    it('should throw error for non-branded schemas', () => {
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(() => factory.hasTransformableFields({ $id: 'test', type: 'object', properties: {} })).toThrow(InternalError);
+    });
+
+    it('should return true for schema with transformable field', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'Simple',
+        type: 'object',
+        properties: { str: { type: 'string', tagged: true } },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(true);
+    });
+
+    it('should return false for schema without transformable fields', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'Simple',
+        type: 'object',
+        properties: { str: { type: 'string' }, num: { type: 'number' } },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(false);
+    });
+
+    it('should return true for array schema with transformable items', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'ArraySchema',
+        type: 'array',
+        items: { type: 'string', tagged: true },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(true);
+    });
+
+    it('should return false for array schema without transformable items', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'ArraySchema',
+        type: 'array',
+        items: { type: 'string' },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(false);
+    });
+
+    it('should return true for nested object with transformable field', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'NestedSchema',
+        type: 'object',
+        properties: {
+          nested: {
+            type: 'object',
+            properties: { deep: { type: 'string', tagged: true } },
+          },
+        },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(true);
+    });
+
+    it('should return true for schema with transformable field in definitions', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'WithDefinitions',
+        type: 'object',
+        definitions: {
+          SubSchema: { $id: 'SubSchema', type: 'object', properties: { val: { type: 'string', tagged: true } } },
+        },
+        properties: { sub: { $ref: 'SubSchema' } },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(true);
+    });
+
+    it('should return false for schema with no transformable fields in definitions', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'WithDefinitions',
+        type: 'object',
+        definitions: {
+          SubSchema: { $id: 'SubSchema', type: 'object', properties: { val: { type: 'string' } } },
+        },
+        properties: { sub: { $ref: 'SubSchema' } },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(false);
+    });
+
+    it('should return true when root schema itself is transformable', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'RootTagged',
+        type: 'object',
+        tagged: true,
+        properties: { str: { type: 'string' } },
+      };
+
+      const factory = new TransformerFactory(schema => !!schema.tagged);
+      expect(factory.hasTransformableFields(schema as any)).toBe(true);
+    });
+  });
 });

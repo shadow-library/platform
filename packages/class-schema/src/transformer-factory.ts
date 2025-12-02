@@ -52,6 +52,28 @@ export class TransformerFactory {
     this.context = { transformers: {}, schemas: {}, constructPath: (prefix, field) => (prefix ? `${prefix}.${field.toString()}` : field.toString()) };
   }
 
+  private hasTransformTargets(schema: JSONSchema): boolean {
+    if (this.filter(schema)) return true;
+    if (schema.type === 'array' && schema.items && this.hasTransformTargets(schema.items)) return true;
+
+    if (schema.type === 'object' && schema.properties) {
+      const isTransformable = Object.values(schema.properties).some(subSchema => this.hasTransformTargets(subSchema));
+      if (isTransformable) return true;
+    }
+
+    if (schema.definitions) {
+      const isTransformable = Object.values(schema.definitions).some(defSchema => this.hasTransformTargets(defSchema));
+      if (isTransformable) return true;
+    }
+
+    return false;
+  }
+
+  hasTransformableFields(schema: JSONSchema): boolean {
+    if (!ClassSchema.isBranded(schema)) throw new InternalError('Invalid schema: only schemas built with this package are supported');
+    return this.hasTransformTargets(schema);
+  }
+
   private generateTransformer(schema: ParsedSchema): MaybeNull<InternalTransformer> {
     const cachedTransformer = this.context.transformers[schema.$id];
     if (cachedTransformer !== undefined) return cachedTransformer;
@@ -87,8 +109,7 @@ export class TransformerFactory {
     if (schema.type === 'object' && schema.properties) {
       const fields = [];
       const refFields = [];
-      const keys = Object.keys(schema.properties);
-      for (const key of keys) {
+      for (const key of Object.keys(schema.properties)) {
         const subSchema = schema.properties[key] as JSONSchema;
         const isRef = subSchema.$ref || (subSchema.type === 'array' && subSchema.items?.$ref);
         if (this.filter(subSchema)) fields.push(key);
@@ -146,8 +167,7 @@ export class TransformerFactory {
   }
 
   maybeCompile(schema: ParsedSchema): MaybeNull<Transformer> {
-    if (!ClassSchema.isBranded(schema)) throw new InternalError('Invalid schema: only schemas built with this package are supported');
-
+    if (!this.hasTransformableFields(schema)) return null;
     const clonedSchema = structuredClone(schema);
     Object.values(clonedSchema.definitions || {}).forEach(def => this.generateTransformer(def));
     delete clonedSchema.definitions;

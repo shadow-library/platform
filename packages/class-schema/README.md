@@ -477,10 +477,65 @@ const processedData = processor.processData(rawUserData);
 
 ### Method Comparison
 
-| Method                 | Return Type           | Use Case                                                          |
-| ---------------------- | --------------------- | ----------------------------------------------------------------- |
-| `compile(schema)`      | `Transformer`         | Always returns a function, use when you always want to transform  |
-| `maybeCompile(schema)` | `Transformer \| null` | Returns null if no fields match, use for performance optimization |
+| Method                           | Return Type           | Use Case                                                          |
+| -------------------------------- | --------------------- | ----------------------------------------------------------------- |
+| `compile(schema)`                | `Transformer`         | Always returns a function, use when you always want to transform  |
+| `maybeCompile(schema)`           | `Transformer \| null` | Returns null if no fields match, use for performance optimization |
+| `hasTransformableFields(schema)` | `boolean`             | Check if schema has any transformable fields without compiling    |
+
+### Checking for Transformable Fields
+
+Use `hasTransformableFields` to check if a schema contains any fields that match the filter criteria, without actually compiling a transformer:
+
+```typescript
+import { TransformerFactory, ClassSchema } from '@shadow-library/class-schema';
+
+@Schema()
+class User {
+  @Field()
+  id: string;
+
+  @Field()
+  name: string;
+
+  @Field({ format: 'date-time' })
+  createdAt: string;
+}
+
+@Schema()
+class Product {
+  @Field()
+  id: string;
+
+  @Field()
+  name: string;
+
+  @Field(() => Number)
+  price: number;
+}
+
+const userSchema = ClassSchema.generate(User);
+const productSchema = ClassSchema.generate(Product);
+
+const dateFactory = new TransformerFactory(field => field.format === 'date-time');
+
+// Check without compiling
+console.log(dateFactory.hasTransformableFields(userSchema)); // true - has date-time field
+console.log(dateFactory.hasTransformableFields(productSchema)); // false - no date-time fields
+
+// Useful for conditional logic before expensive operations
+if (dateFactory.hasTransformableFields(userSchema)) {
+  const transformer = dateFactory.compile(userSchema);
+  // Use transformer...
+}
+```
+
+This method is useful when you need to:
+
+- Conditionally enable/disable features based on schema capabilities
+- Validate schemas before processing
+- Make routing decisions based on schema content
+- Avoid unnecessary transformer compilation in hot paths
 
 ### Masking Sensitive Data for Logging
 
@@ -800,6 +855,49 @@ try {
 } catch (error) {
   console.log(error.message);
   // "Invalid schema: only schemas built with this package are supported"
+}
+```
+
+#### TransformerFactory Methods
+
+##### `new TransformerFactory(filter)`
+
+Creates a new transformer factory with a field filter function:
+
+```typescript
+const factory = new TransformerFactory(fieldSchema => fieldSchema.format === 'date-time');
+```
+
+##### `factory.compile(schema)`
+
+Compiles a transformer function. Returns a no-op function if no fields match the filter:
+
+```typescript
+const transformer = factory.compile(schema);
+const result = transformer(data, (value, fieldSchema, ctx) => transformedValue);
+```
+
+##### `factory.maybeCompile(schema)`
+
+Compiles a transformer function. Returns `null` if no fields match the filter:
+
+```typescript
+const transformer = factory.maybeCompile(schema);
+if (transformer) {
+  const result = transformer(data, (value, fieldSchema, ctx) => transformedValue);
+}
+```
+
+##### `factory.hasTransformableFields(schema)`
+
+Checks if a schema contains any fields matching the filter criteria. Returns `true` if transformable fields exist, `false` otherwise. Throws an error if the schema is not branded:
+
+```typescript
+const factory = new TransformerFactory(fieldSchema => fieldSchema.format === 'date-time');
+
+if (factory.hasTransformableFields(schema)) {
+  // Schema has date-time fields
+  const transformer = factory.compile(schema);
 }
 ```
 
