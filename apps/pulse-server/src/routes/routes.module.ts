@@ -8,6 +8,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { TemplateRoutesModule } from './template';
 
 /**
  * Defining types
@@ -20,8 +21,11 @@ import { HttpCoreModule } from '@shadow-library/modules';
 const AppHttpCoreModule = HttpCoreModule.forRoot({ csrf: { disabled: true } });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule],
+  imports: [AppHttpCoreModule, TemplateRoutesModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),
+
+  routePrefix: '/api',
+  prefixVersioning: true,
 });

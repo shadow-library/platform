@@ -1,23 +1,32 @@
 /**
  * Importing npm packages
  */
+import { InferEnum, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
-
-import { notificationChannel } from './configurations';
-import { priority, templateGroups } from './templates';
 
 /**
  * Importing user defined packages
  */
+import { templateGroups } from './templates';
 
 /**
  * Defining types
  */
 
+export namespace Notification {
+  export type Status = InferEnum<typeof notificationStatus>;
+  export type Channel = InferEnum<typeof notificationChannel>;
+  export type Priority = InferEnum<typeof priority>;
+  export type Job = InferEnum<typeof notificationJobs>;
+  export type Message = InferEnum<typeof notificationMessages>;
+}
+
 /**
  * Declaring the constants
  */
 
+export const priority = pgEnum('priority', ['LOW', 'MEDIUM', 'HIGH']);
+export const notificationChannel = pgEnum('notification_channel', ['EMAIL', 'SMS', 'PUSH']);
 export const notificationStatus = pgEnum('notification_status', ['PENDING', 'PROCESSING', 'FAILED', 'SENT', 'PERMANENTLY_FAILED']);
 
 export const notificationJobs = pgTable(
@@ -64,3 +73,16 @@ export const notificationMessages = pgTable(
   },
   t => [index('notification_messages_created_at_channel_idx').on(t.createdAt, t.channel)],
 );
+
+/**
+ * Declaring the relations
+ */
+
+export const notificationJobRelations = relations(notificationJobs, ({ one, many }) => ({
+  templateGroup: one(templateGroups, { fields: [notificationJobs.templateGroupId], references: [templateGroups.id] }),
+  messages: many(notificationMessages),
+}));
+
+export const notificationMessageRelations = relations(notificationMessages, ({ one }) => ({
+  notificationJob: one(notificationJobs, { fields: [notificationMessages.notificationJobId], references: [notificationJobs.id] }),
+}));

@@ -25,6 +25,7 @@
     "module": "ES2022",
     "moduleResolution": "bundler",
     "paths": {
+      "@modules/*": ["src/modules/*"],
       "@server/*": ["src/*"]
     },
     "resolveJsonModule": true,

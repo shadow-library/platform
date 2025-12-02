@@ -28,7 +28,7 @@ describe('Server', () => {
   });
 
   it('should return health check', async () => {
-    const response = await router.mockRequest().get('/health');
+    const response = await router.mockRequest().get('/api/v1/health');
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok' });
   });

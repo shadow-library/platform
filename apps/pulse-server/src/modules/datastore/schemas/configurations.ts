@@ -1,21 +1,25 @@
 /**
  * Importing npm packages
  */
-import { bigint, bigserial, boolean, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferSelectModel, relations } from 'drizzle-orm';
+import { bigint, bigserial, boolean, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
  */
+import { notificationChannel } from './notification-jobs';
 
 /**
  * Defining types
  */
 
+export type SenderProfile = InferSelectModel<typeof senderProfiles>;
+export type ServiceConfiguration = InferSelectModel<typeof serviceConfigurations>;
+export type AppConfiguration = InferSelectModel<typeof appConfigurations>;
+
 /**
  * Declaring the constants
  */
-
-export const notificationChannel = pgEnum('notification_channel', ['EMAIL', 'SMS', 'PUSH']);
 
 export const senderProfiles = pgTable(
   'sender_profiles',
@@ -49,3 +53,13 @@ export const appConfigurations = pgTable('app_configurations', {
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
+
+/**
+ * Declaring the relations
+ */
+
+export const serviceConfigurationRelations = relations(serviceConfigurations, ({ one }) => ({
+  defaultSmsSenderProfile: one(senderProfiles, { fields: [serviceConfigurations.defaultSmsSenderProfileId], references: [senderProfiles.id] }),
+  defaultEmailSenderProfile: one(senderProfiles, { fields: [serviceConfigurations.defaultEmailSenderProfileId], references: [senderProfiles.id] }),
+  defaultPushSenderProfile: one(senderProfiles, { fields: [serviceConfigurations.defaultPushSenderProfileId], references: [senderProfiles.id] }),
+}));
