@@ -4,15 +4,17 @@
 import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger, MaybeNull } from '@shadow-library/common';
+import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { SQL, eq } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+import validator, { StrongPasswordOptions } from 'validator';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
 import { DatastoreService, ID, OpResult, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
 
 /**
@@ -53,6 +55,7 @@ interface FindUserFilter {
 /**
  * Declaring the constants
  */
+const PASSWORD_VALIDATION_OPTIONS: StrongPasswordOptions = { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 };
 
 @Injectable()
 export class UserService {
@@ -71,6 +74,16 @@ export class UserService {
   }
 
   async createUserWithPassword(data: CreateUser): Promise<UserDetails> {
+    if (!validator.isEmail(data.email)) throw new ValidationError('email', ERROR_MESSAGES.INVALID_EMAIL);
+    if (!validator.isStrongPassword(data.password, PASSWORD_VALIDATION_OPTIONS)) throw new ValidationError('password', ERROR_MESSAGES.INVALID_PASSWORD);
+    if (data.phoneNumber && !validator.isMobilePhone(data.phoneNumber, 'any', { strictMode: true })) throw new ValidationError('phoneNumber', ERROR_MESSAGES.INVALID_PHONE_NUMBER);
+    if (data.username && !REGEX.USERNAME.test(data.username)) throw new ValidationError('username', ERROR_MESSAGES.INVALID_USERNAME);
+    if (data.dateOfBirth) {
+      const since = DateTime.fromJSDate(data.dateOfBirth).diffNow('years');
+      const age = Math.floor(-since.years);
+      if (age < 13 || age > 120) throw new ValidationError('dateOfBirth', ERROR_MESSAGES.INVALID_DATE_OF_BIRTH);
+    }
+
     const user = await this.db
       .transaction(async tx => {
         const [user] = await tx.insert(schema.users).values({ username: data.username, status: data.status }).returning();
