@@ -1,10 +1,13 @@
 /**
  * Importing npm packages
  */
+import { JsonObject } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
+import { utils } from '@lib/utils';
+
 import { AppError, AppErrorObject } from './app.error';
 import { ErrorCode } from './error-code.error';
 
@@ -15,6 +18,7 @@ import { ErrorCode } from './error-code.error';
 export interface FieldError {
   field: string;
   msg: string;
+  details?: JsonObject;
 }
 
 export interface ValidationErrorObject extends AppErrorObject {
@@ -29,30 +33,32 @@ export class ValidationError extends AppError {
   private errors: FieldError[] = [];
 
   constructor();
-  constructor(field: string, message: string);
-  constructor(field?: string, message?: string) {
+  constructor(field: string, message: string, details?: JsonObject);
+  constructor(field?: string, message?: string, details?: JsonObject) {
     super(ErrorCode.VALIDATION_ERROR);
     this.name = this.constructor.name;
-    if (field && message) this.addFieldError(field, message);
+    if (field && message) this.addFieldError(field, message, details);
   }
 
   static combineErrors(...errors: ValidationError[]): ValidationError {
     const combinedError = new ValidationError();
-    for (const error of errors.flat()) {
-      for (const fieldError of error.getErrors()) {
-        combinedError.addFieldError(fieldError.field, fieldError.msg);
+    for (const error of errors) {
+      for (const fieldError of error.getErrors(true)) {
+        combinedError.addFieldError(fieldError.field, fieldError.msg, fieldError.details);
       }
     }
     return combinedError;
   }
 
-  addFieldError(field: string, msg: string): ValidationError {
-    this.errors.push({ field, msg });
+  addFieldError(field: string, msg: string, details?: JsonObject): ValidationError {
+    if (details) msg = utils.string.interpolate(msg, details);
+    this.errors.push({ field, msg, details });
     return this;
   }
 
-  getErrors(): FieldError[] {
-    return this.errors;
+  getErrors(withDetails = false): FieldError[] {
+    if (withDetails) return [...this.errors];
+    return this.errors.map(error => ({ field: error.field, msg: error.msg }));
   }
 
   getErrorCount(): number {
@@ -69,7 +75,7 @@ export class ValidationError extends AppError {
     return `Validation failed for ${fields.join(', ')} and ${lastField}`;
   }
 
-  override toObject(): ValidationErrorObject {
-    return { ...super.toObject(), fields: this.getErrors() };
+  override toObject(withDetails = false): ValidationErrorObject {
+    return { ...super.toObject(), fields: this.getErrors(withDetails) };
   }
 }

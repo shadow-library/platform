@@ -82,4 +82,71 @@ describe('ValidationError', () => {
       { field: 'fieldTwo', msg: 'value two' },
     ]);
   });
+
+  it('should create an instance with details', () => {
+    const details = { min: 5, max: 10 };
+    const error = new ValidationError('fieldOne', 'Value must be between {min} and {max}', details);
+
+    expect(error.getErrorCount()).toBe(1);
+    expect(error.getErrors()).toStrictEqual([{ field: 'fieldOne', msg: 'Value must be between 5 and 10' }]);
+    expect(error.getErrors(true)).toStrictEqual([{ field: 'fieldOne', msg: 'Value must be between 5 and 10', details }]);
+  });
+
+  it('should return errors with details when withDetails is true', () => {
+    const detailsOne = { min: 1 };
+    const detailsTwo = { max: 100 };
+    const error = new ValidationError('fieldOne', 'Min is {min}', detailsOne).addFieldError('fieldTwo', 'Max is {max}', detailsTwo);
+
+    expect(error.getErrors(false)).toStrictEqual([
+      { field: 'fieldOne', msg: 'Min is 1' },
+      { field: 'fieldTwo', msg: 'Max is 100' },
+    ]);
+    expect(error.getErrors(true)).toStrictEqual([
+      { field: 'fieldOne', msg: 'Min is 1', details: detailsOne },
+      { field: 'fieldTwo', msg: 'Max is 100', details: detailsTwo },
+    ]);
+  });
+
+  it('should combine errors and preserve details', () => {
+    const detailsOne = { min: 5 };
+    const detailsTwo = { max: 10 };
+    const errorOne = new ValidationError('fieldOne', 'Min is {min}', detailsOne);
+    const errorTwo = new ValidationError('fieldTwo', 'Max is {max}', detailsTwo);
+    const combinedError = ValidationError.combineErrors(errorOne, errorTwo);
+
+    expect(combinedError.getErrors()).toStrictEqual([
+      { field: 'fieldOne', msg: 'Min is 5' },
+      { field: 'fieldTwo', msg: 'Max is 10' },
+    ]);
+    expect(combinedError.getErrors(true)).toStrictEqual([
+      { field: 'fieldOne', msg: 'Min is 5', details: detailsOne },
+      { field: 'fieldTwo', msg: 'Max is 10', details: detailsTwo },
+    ]);
+  });
+
+  it('should return error object with details when withDetails is true', () => {
+    const details = { value: 'test' };
+    const error = new ValidationError('fieldOne', 'Invalid: {value}', details);
+
+    expect(error.toObject()).toStrictEqual({
+      code: 'VALIDATION_ERROR',
+      type: 'VALIDATION_ERROR',
+      message: 'Validation Error',
+      fields: [{ field: 'fieldOne', msg: 'Invalid: test' }],
+    });
+    expect(error.toObject(true)).toStrictEqual({
+      code: 'VALIDATION_ERROR',
+      type: 'VALIDATION_ERROR',
+      message: 'Validation Error',
+      fields: [{ field: 'fieldOne', msg: 'Invalid: test', details }],
+    });
+  });
+
+  it('should not mutate original errors array when getting errors', () => {
+    const error = new ValidationError('fieldOne', 'value one');
+    const errors = error.getErrors(true);
+    errors.push({ field: 'fieldTwo', msg: 'value two' });
+
+    expect(error.getErrorCount()).toBe(1);
+  });
 });

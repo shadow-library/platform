@@ -822,12 +822,24 @@ console.log(error.getCode()); // 'USER_NOT_FOUND'
 console.log(error.getType()); // 'NOT_FOUND'
 console.log(error.getMessage()); // 'User with ID 123 not found'
 
-// Validation errors
-const validation = new ValidationError().addFieldError('email', 'Invalid email format').addFieldError('password', 'Password too short');
+// Validation errors with field-level details
+const validation = new ValidationError().addFieldError('email', 'Invalid email format').addFieldError('age', 'Age must be between {min} and {max}', { min: 18, max: 100 });
 
-// Combine multiple validation errors
+// Get errors without details (default)
+console.log(validation.getErrors());
+// [{ field: 'email', msg: 'Invalid email format' }, { field: 'age', msg: 'Age must be between 18 and 100' }]
+
+// Get errors with details
+console.log(validation.getErrors(true));
+// [{ field: 'email', msg: 'Invalid email format' }, { field: 'age', msg: 'Age must be between 18 and 100', details: { min: 18, max: 100 } }]
+
+// Combine multiple validation errors (preserves details)
 const combined = ValidationError.combineErrors(validation1, validation2);
 console.log(combined.getSummary()); // 'Validation failed for email and password'
+
+// Convert to object with or without details
+console.log(validation.toObject()); // fields without details
+console.log(validation.toObject(true)); // fields with details
 ```
 
 ### 🛠️ **Utility Functions**
@@ -1182,12 +1194,13 @@ The package uses environment variables for configuration. Below are the key vari
 
 #### ValidationError
 
-- `new ValidationError(field?, message?)` - Create validation error
-- `.addFieldError(field, message)` - Add field error
-- `.getErrors()` - Get all field errors
+- `new ValidationError(field?, message?, details?)` - Create validation error with optional field, message, and details
+- `.addFieldError(field, message, details?)` - Add field error with optional details (message supports `{key}` interpolation)
+- `.getErrors(withDetails?)` - Get all field errors (pass `true` to include details)
 - `.getErrorCount()` - Get error count
 - `.getSummary()` - Get human-readable summary
-- `ValidationError.combineErrors(...errors)` - Combine multiple errors
+- `.toObject(withDetails?)` - Convert to plain object (pass `true` to include details in fields)
+- `ValidationError.combineErrors(...errors)` - Combine multiple errors (preserves details)
 
 ### Services
 
