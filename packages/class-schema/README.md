@@ -346,6 +346,112 @@ class PublicUser extends PickType(User, ['id', 'email', 'name'] as const) {}
 class CreateUserDto extends OmitType(User, ['id'] as const) {}
 ```
 
+## Schema Composition
+
+The `SchemaComposer` provides utilities for composing multiple schemas using JSON Schema's `anyOf`, `oneOf`, and discriminator patterns.
+
+### Using `anyOf`
+
+Use `anyOf` when the data can match any of the specified schemas:
+
+```typescript
+import { Schema, Field, SchemaComposer, ClassSchema } from '@shadow-library/class-schema';
+
+@Schema({ $id: 'EmailContact' })
+class EmailContact {
+  @Field({ const: 'email' })
+  type: 'email';
+
+  @Field({ format: 'email' })
+  address: string;
+}
+
+@Schema({ $id: 'PhoneContact' })
+class PhoneContact {
+  @Field({ const: 'phone' })
+  type: 'phone';
+
+  @Field()
+  number: string;
+}
+
+// Create a union type using anyOf
+const Contact = SchemaComposer.anyOf(EmailContact, PhoneContact);
+const schema = ClassSchema.generate(Contact);
+```
+
+### Using `oneOf`
+
+Use `oneOf` when the data must match exactly one of the specified schemas:
+
+```typescript
+const User = SchemaComposer.oneOf(NativeUser, OAuthUser);
+const schema = ClassSchema.generate(User);
+```
+
+### Using Discriminators
+
+Use `discriminator` for efficient variant detection based on a discriminator property. This generates a JSON Schema with a `discriminator` object containing `propertyName` and `mapping`:
+
+```typescript
+@Schema({ $id: 'NativeUser' })
+class NativeUser {
+  @Field({ const: 'native' })
+  type: 'native';
+
+  @Field()
+  username: string;
+
+  @Field()
+  password: string;
+}
+
+@Schema({ $id: 'OAuthUser' })
+class OAuthUser {
+  @Field({ const: 'oauth' })
+  type: 'oauth';
+
+  @Field()
+  username: string;
+
+  @Field()
+  provider: string;
+}
+
+// Create discriminated union with 'type' as the discriminator key
+const User = SchemaComposer.discriminator('type', NativeUser, OAuthUser);
+const schema = ClassSchema.generate(User);
+
+console.log(schema);
+// Output includes:
+// {
+//   "oneOf": [{ "$ref": "NativeUser" }, { "$ref": "OAuthUser" }],
+//   "discriminator": {
+//     "propertyName": "type",
+//     "mapping": { "native": "NativeUser", "oauth": "OAuthUser" }
+//   },
+//   ...
+// }
+```
+
+### Nested Schema Composition
+
+Schema composition works seamlessly with nested fields:
+
+```typescript
+@Schema({ $id: 'Account' })
+class Account {
+  @Field()
+  id: string;
+
+  @Field(() => SchemaComposer.oneOf(NativeUser, OAuthUser))
+  admin: NativeUser | OAuthUser;
+
+  @Field(() => [SchemaComposer.discriminator('type', NativeUser, OAuthUser)])
+  users: (NativeUser | OAuthUser)[];
+}
+```
+
 ## Schema Registry
 
 Manage multiple schemas efficiently:
@@ -595,6 +701,154 @@ console.log('Masked for logging:', maskedData);
 // }
 ```
 
+### Transforming Discriminated Unions
+
+The `TransformerFactory` automatically detects and handles discriminated union schemas (`anyOf`/`oneOf`). It intelligently determines the correct variant based on the data and applies transformations only to matching fields.
+
+#### Automatic Discriminator Detection
+
+The factory automatically detects discriminators using three strategies (in order of priority):
+
+1. **Const discriminator**: Uses `const` values to identify variants
+2. **Type discriminator**: Uses JavaScript `typeof` to distinguish variants
+3. **Enum discriminator**: Uses non-overlapping enum values to distinguish variants
+
+```typescript
+@Schema({ $id: 'Cat' })
+class Cat {
+  @Field({ const: 'cat' })
+  type: 'cat';
+
+  @Field()
+  @FieldMetadata({ sensitive: true })
+  meow: string;
+}
+
+@Schema({ $id: 'Dog' })
+class Dog {
+  @Field({ const: 'dog' })
+  type: 'dog';
+
+  @Field()
+  @FieldMetadata({ sensitive: true })
+  bark: string;
+}
+
+// Create discriminated union
+const Animal = SchemaComposer.oneOf(Cat, Dog);
+const schema = ClassSchema.generate(Animal);
+
+// Transformer automatically uses 'type' field as const discriminator
+const factory = new TransformerFactory(field => field.sensitive === true);
+const transformer = factory.compile(schema);
+
+const catData = { type: 'cat', meow: 'meow meow' };
+const dogData = { type: 'dog', bark: 'woof woof' };
+
+console.log(transformer(catData, () => 'xxx')); // { type: 'cat', meow: 'xxx' }
+console.log(transformer(dogData, () => 'xxx')); // { type: 'dog', bark: 'xxx' }
+```
+
+#### Type-Based Discriminator
+
+When variants have fields with different JavaScript types:
+
+```typescript
+@Schema({ $id: 'StringVariant' })
+class StringVariant {
+  @Field()
+  value: string;
+
+  @Field()
+  @FieldMetadata({ tagged: true })
+  strField: string;
+}
+
+@Schema({ $id: 'NumberVariant' })
+class NumberVariant {
+  @Field(() => Number)
+  value: number;
+
+  @Field(() => Number)
+  @FieldMetadata({ tagged: true })
+  numField: number;
+}
+
+const Mixed = SchemaComposer.oneOf(StringVariant, NumberVariant);
+const schema = ClassSchema.generate(Mixed);
+
+// Factory detects 'value' field has different types and uses typeof for discrimination
+const factory = new TransformerFactory(field => field.tagged === true);
+const transformer = factory.compile(schema);
+
+transformer({ value: 'hello', strField: 'world' }, () => 'xxx'); // { value: 'hello', strField: 'xxx' }
+transformer({ value: 42, numField: 100 }, () => 999); // { value: 42, numField: 999 }
+```
+
+#### Enum-Based Discriminator
+
+When variants have non-overlapping enum values:
+
+```typescript
+@Schema({ $id: 'SmallSize' })
+class SmallSize {
+  @Field({ enum: ['xs', 'sm'] })
+  size: 'xs' | 'sm';
+
+  @Field()
+  @FieldMetadata({ tagged: true })
+  smallField: string;
+}
+
+@Schema({ $id: 'LargeSize' })
+class LargeSize {
+  @Field({ enum: ['lg', 'xl'] })
+  size: 'lg' | 'xl';
+
+  @Field()
+  @FieldMetadata({ tagged: true })
+  largeField: string;
+}
+
+const Size = SchemaComposer.oneOf(SmallSize, LargeSize);
+const schema = ClassSchema.generate(Size);
+
+const factory = new TransformerFactory(field => field.tagged === true);
+const transformer = factory.compile(schema);
+
+transformer({ size: 'xs', smallField: 'tiny' }, () => 'xxx'); // { size: 'xs', smallField: 'xxx' }
+transformer({ size: 'xl', largeField: 'huge' }, () => 'xxx'); // { size: 'xl', largeField: 'xxx' }
+```
+
+#### Fallback Behaviour
+
+When no valid discriminator can be determined (e.g., overlapping enums or no distinguishing fields), the transformer applies all variant transformers to the data:
+
+```typescript
+@Schema({ $id: 'VariantA' })
+class VariantA {
+  @Field()
+  @FieldMetadata({ tagged: true })
+  fieldA: string;
+}
+
+@Schema({ $id: 'VariantB' })
+class VariantB {
+  @Field()
+  @FieldMetadata({ tagged: true })
+  fieldB: string;
+}
+
+const Union = SchemaComposer.oneOf(VariantA, VariantB);
+const schema = ClassSchema.generate(Union);
+
+const factory = new TransformerFactory(field => field.tagged === true);
+const transformer = factory.compile(schema);
+
+// Both transformers are applied since no discriminator exists
+transformer({ fieldA: 'a', fieldB: 'b' }, () => 'xxx'); // { fieldA: 'xxx', fieldB: 'xxx' }
+```
+
 ## Array Schemas
 
 Generate schemas for arrays:
@@ -787,7 +1041,35 @@ const summary: UserSummary = {
 
 - **`ClassSchema<T>`**: Main schema generator class
 - **`SchemaRegistry`**: Registry for managing multiple schemas
+- **`SchemaComposer`**: Utility for composing multiple schemas with `anyOf`, `oneOf`, and discriminators
 - **`TransformerFactory`**: Factory for creating data transformers
+
+#### SchemaComposer Static Methods
+
+##### `SchemaComposer.anyOf(...Classes)`
+
+Creates a schema that matches any of the provided classes:
+
+```typescript
+const Contact = SchemaComposer.anyOf(EmailContact, PhoneContact);
+```
+
+##### `SchemaComposer.oneOf(...Classes)`
+
+Creates a schema that matches exactly one of the provided classes:
+
+```typescript
+const User = SchemaComposer.oneOf(NativeUser, OAuthUser);
+```
+
+##### `SchemaComposer.discriminator(key, ...Classes)`
+
+Creates a discriminated union schema with automatic mapping generation:
+
+```typescript
+const User = SchemaComposer.discriminator('type', NativeUser, OAuthUser);
+// Generates schema with discriminator.mapping based on const values
+```
 
 #### ClassSchema Static Methods
 

@@ -104,7 +104,7 @@ describe('Schema Composer', () => {
       $id: `class-schema:oneOf?Classes=${encodeURIComponent('NativeUser,OAuthUser')}&discriminatorKey=type`,
       type: 'object',
       oneOf: [{ $ref: NativeUser.name }, { $ref: OAuthUser.name }],
-      discriminator: { propertyName: 'type' },
+      discriminator: { propertyName: 'type', mapping: { native: NativeUser.name, oauth: OAuthUser.name } },
       definitions: { [NativeUser.name]: nativeUserSchema, [OAuthUser.name]: oauthUserSchema },
     });
   });
@@ -129,7 +129,7 @@ describe('Schema Composer', () => {
         'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type': {
           $id: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type',
           type: 'object',
-          discriminator: { propertyName: 'type' },
+          discriminator: { propertyName: 'type', mapping: { native: 'NativeUser', oauth: 'OAuthUser' } },
           oneOf: [{ $ref: 'NativeUser' }, { $ref: 'OAuthUser' }],
         },
         NativeUser: {

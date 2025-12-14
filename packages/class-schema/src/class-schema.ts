@@ -137,8 +137,16 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     /** Adding the composed classes to the schema */
     const composedMetadata = Reflect.getMetadata(METADATA_KEYS.COMPOSED_CLASS, Class) as SchemaComposerMetadata;
     if (composedMetadata) {
-      schema[composedMetadata.op] = composedMetadata.classes.map(cls => ({ $ref: this.getSchemaId(cls) }));
-      if (composedMetadata.discriminatorKey) schema.discriminator = { propertyName: composedMetadata.discriminatorKey };
+      const subSchemas = composedMetadata.classes.map(cls => this.getSchemaId(cls));
+      schema[composedMetadata.op] = subSchemas.map(id => ({ $ref: id }));
+      if (composedMetadata.discriminatorKey) {
+        const mapping: Record<string, string> = {};
+        for (const schemaName of subSchemas) {
+          const constValue = this.schema.definitions?.[schemaName]?.properties?.[composedMetadata.discriminatorKey]?.const;
+          mapping[constValue] = schemaName;
+        }
+        schema.discriminator = { propertyName: composedMetadata.discriminatorKey, mapping };
+      }
     }
 
     /** Adding the object properties to the schema */
