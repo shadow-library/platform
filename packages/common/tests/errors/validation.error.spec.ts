@@ -83,6 +83,33 @@ describe('ValidationError', () => {
     ]);
   });
 
+  it('should interpolate message with details', () => {
+    const details = { limit: 10 };
+    const error = new ValidationError('fieldOne', 'Value must be less than {limit}', details);
+
+    expect(error.getErrors()).toStrictEqual([{ field: 'fieldOne', msg: 'Value must be less than 10' }]);
+  });
+
+  it('should not interpolate message without details', () => {
+    const error = new ValidationError('fieldOne', 'Value must be less than {limit}');
+
+    expect(error.getErrors()).toStrictEqual([{ field: 'fieldOne', msg: 'Value must be less than {limit}' }]);
+  });
+
+  it('should not interpolate message when the placeholder is missing in details', () => {
+    const details = { max: 20 };
+    const error = new ValidationError('fieldOne', 'Value must be less than {limit}', details);
+
+    expect(error.getErrors()).toStrictEqual([{ field: 'fieldOne', msg: 'Value must be less than {limit}' }]);
+  });
+
+  it('should not interpolate message when the placeholder is malformed', () => {
+    const details = { limit: 10 };
+    const error = new ValidationError('fieldOne', 'Value must be less than { lim it }', details);
+
+    expect(error.getErrors()).toStrictEqual([{ field: 'fieldOne', msg: 'Value must be less than { lim it }' }]);
+  });
+
   it('should create an instance with details', () => {
     const details = { min: 5, max: 10 };
     const error = new ValidationError('fieldOne', 'Value must be between {min} and {max}', details);
@@ -109,9 +136,8 @@ describe('ValidationError', () => {
 
   it('should combine errors and preserve details', () => {
     const detailsOne = { min: 5 };
-    const detailsTwo = { max: 10 };
     const errorOne = new ValidationError('fieldOne', 'Min is {min}', detailsOne);
-    const errorTwo = new ValidationError('fieldTwo', 'Max is {max}', detailsTwo);
+    const errorTwo = new ValidationError('fieldTwo', 'Max is 10');
     const combinedError = ValidationError.combineErrors(errorOne, errorTwo);
 
     expect(combinedError.getErrors()).toStrictEqual([
@@ -120,7 +146,19 @@ describe('ValidationError', () => {
     ]);
     expect(combinedError.getErrors(true)).toStrictEqual([
       { field: 'fieldOne', msg: 'Min is 5', details: detailsOne },
-      { field: 'fieldTwo', msg: 'Max is 10', details: detailsTwo },
+      { field: 'fieldTwo', msg: 'Max is 10' },
+    ]);
+  });
+
+  it('should not interpolate the message again when combining errors', () => {
+    const details = { limit: 50, limitPlaceholder: '{limit}' };
+    const errorOne = new ValidationError('fieldOne', 'Value must be less than {limitPlaceholder}', details);
+    const errorTwo = new ValidationError('fieldTwo', 'Value must be less than {limit}', details);
+    const combinedError = ValidationError.combineErrors(errorOne, errorTwo);
+
+    expect(combinedError.getErrors()).toStrictEqual([
+      { field: 'fieldOne', msg: 'Value must be less than {limit}' },
+      { field: 'fieldTwo', msg: 'Value must be less than 50' },
     ]);
   });
 
@@ -147,6 +185,6 @@ describe('ValidationError', () => {
     const errors = error.getErrors(true);
     errors.push({ field: 'fieldTwo', msg: 'value two' });
 
-    expect(error.getErrorCount()).toBe(1);
+    expect(error.getErrors(true)).toStrictEqual([{ field: 'fieldOne', msg: 'value one' }]);
   });
 });

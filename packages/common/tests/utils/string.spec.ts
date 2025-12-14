@@ -33,6 +33,37 @@ describe('String Utils', () => {
     it('should escape the curly braces if it is prefixed with a backslash', () => {
       expect(utils.string.interpolate('Hello \\{name}', { name: 'World' })).toBe('Hello {name}');
     });
+
+    it('should handle nested keys', () => {
+      expect(utils.string.interpolate('Hello {user.name}', { user: { name: 'Alice' } })).toBe('Hello Alice');
+    });
+
+    it('should trim the key before lookup', () => {
+      expect(utils.string.interpolate('Hello {  name  }', { name: 'Bob' })).toBe('Hello Bob');
+    });
+
+    it('should handle multiple placeholders', () => {
+      expect(utils.string.interpolate('Hello {firstName} {lastName}', { firstName: 'John', lastName: 'Doe' })).toBe('Hello John Doe');
+    });
+
+    it('should handle adjacent placeholders', () => {
+      expect(utils.string.interpolate('{greeting}{punctuation}', { greeting: 'Hello', punctuation: '!' })).toBe('Hello!');
+    });
+
+    it('should handle no placeholders', () => {
+      expect(utils.string.interpolate('Hello World', {})).toBe('Hello World');
+    });
+
+    it('should handle malformed placeholders', () => {
+      expect(utils.string.interpolate('Hello {name', { name: 'World' })).toBe('Hello {name');
+      expect(utils.string.interpolate('Hello name}', { name: 'World' })).toBe('Hello name}');
+      expect(utils.string.interpolate('Hello {n ame}', { name: 'World' })).toBe('Hello {n ame}');
+    });
+
+    it('should handle placeholders which are objects or arrays', () => {
+      expect(utils.string.interpolate('Data: {data}', { data: { key: 'value' } })).toBe('Data: [object Object]');
+      expect(utils.string.interpolate('List: {list}', { list: [1, 2, 3] })).toBe('List: 1,2,3');
+    });
   });
 
   describe('maskEmail', () => {

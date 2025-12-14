@@ -44,15 +44,19 @@ export class ValidationError extends AppError {
     const combinedError = new ValidationError();
     for (const error of errors) {
       for (const fieldError of error.getErrors(true)) {
-        combinedError.addFieldError(fieldError.field, fieldError.msg, fieldError.details);
+        combinedError.errors.push(fieldError);
       }
     }
     return combinedError;
   }
 
   addFieldError(field: string, msg: string, details?: JsonObject): ValidationError {
-    if (details) msg = utils.string.interpolate(msg, details);
-    this.errors.push({ field, msg, details });
+    const obj: FieldError = { field, msg };
+    if (details) {
+      obj.msg = utils.string.interpolate(msg, details);
+      obj.details = details;
+    }
+    this.errors.push(obj);
     return this;
   }
 
