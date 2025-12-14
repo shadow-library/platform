@@ -419,8 +419,8 @@ describe('TransformerFactory', () => {
           $id: 'ConstDiscriminatorOneOf',
           type: 'object',
           definitions: {
-            Cat: { $id: 'Cat', type: 'object', properties: { type: { const: 'cat' }, name: { type: 'string', tagged: true } } },
-            Dog: { $id: 'Dog', type: 'object', properties: { type: { const: 'dog' }, breed: { type: 'string' } } },
+            Cat: { $id: 'Cat', type: 'object', required: ['type', 'name'], properties: { type: { const: 'cat' }, name: { type: 'string', tagged: true } } },
+            Dog: { $id: 'Dog', type: 'object', required: ['type', 'breed'], properties: { type: { const: 'dog' }, breed: { type: 'string' } } },
           },
           oneOf: [{ $ref: 'Cat' }, { $ref: 'Dog' }],
         };
@@ -441,8 +441,8 @@ describe('TransformerFactory', () => {
           $id: 'ConstDiscriminatorAnyOf',
           type: 'object',
           definitions: {
-            Circle: { $id: 'Circle', type: 'object', properties: { shape: { const: 'circle' }, radius: { type: 'number' } } },
-            Square: { $id: 'Square', type: 'object', properties: { shape: { const: 'square' }, side: { type: 'number', tagged: true } } },
+            Circle: { $id: 'Circle', type: 'object', required: ['shape', 'radius'], properties: { shape: { const: 'circle' }, radius: { type: 'number' } } },
+            Square: { $id: 'Square', type: 'object', required: ['shape', 'side'], properties: { shape: { const: 'square' }, side: { type: 'number', tagged: true } } },
           },
           anyOf: [{ $ref: 'Circle' }, { $ref: 'Square' }],
         };
@@ -463,8 +463,8 @@ describe('TransformerFactory', () => {
           $id: 'ConstDiscriminatorContext',
           type: 'object',
           definitions: {
-            TypeA: { $id: 'TypeA', type: 'object', properties: { kind: { const: 'a' }, value: { type: 'string', tagged: true } } },
-            TypeB: { $id: 'TypeB', type: 'object', properties: { kind: { const: 'b' }, data: { type: 'string', tagged: true } } },
+            TypeA: { $id: 'TypeA', type: 'object', required: ['kind', 'value'], properties: { kind: { const: 'a' }, value: { type: 'string', tagged: true } } },
+            TypeB: { $id: 'TypeB', type: 'object', required: ['kind', 'data'], properties: { kind: { const: 'b' }, data: { type: 'string', tagged: true } } },
           },
           anyOf: [{ $ref: 'TypeA' }, { $ref: 'TypeB' }],
         };
@@ -486,8 +486,18 @@ describe('TransformerFactory', () => {
           $id: 'NumericConstDiscriminator',
           type: 'object',
           definitions: {
-            Version1: { $id: 'Version1', type: 'object', properties: { version: { const: 1 }, legacyField: { type: 'string', tagged: true } } },
-            Version2: { $id: 'Version2', type: 'object', properties: { version: { const: 2 }, newField: { type: 'string', tagged: true } } },
+            Version1: {
+              $id: 'Version1',
+              type: 'object',
+              required: ['version', 'legacyField'],
+              properties: { version: { const: 1 }, legacyField: { type: 'string', tagged: true } },
+            },
+            Version2: {
+              $id: 'Version2',
+              type: 'object',
+              required: ['version', 'newField'],
+              properties: { version: { const: 2 }, newField: { type: 'string', tagged: true } },
+            },
           },
           oneOf: [{ $ref: 'Version1' }, { $ref: 'Version2' }],
         };
@@ -508,8 +518,18 @@ describe('TransformerFactory', () => {
           $id: 'BooleanConstDiscriminator',
           type: 'object',
           definitions: {
-            Active: { $id: 'Active', type: 'object', properties: { active: { const: true }, enabledFeature: { type: 'string', tagged: true } } },
-            Inactive: { $id: 'Inactive', type: 'object', properties: { active: { const: false }, disabledReason: { type: 'string', tagged: true } } },
+            Active: {
+              $id: 'Active',
+              type: 'object',
+              required: ['active', 'enabledFeature'],
+              properties: { active: { const: true }, enabledFeature: { type: 'string', tagged: true } },
+            },
+            Inactive: {
+              $id: 'Inactive',
+              type: 'object',
+              required: ['active', 'disabledReason'],
+              properties: { active: { const: false }, disabledReason: { type: 'string', tagged: true } },
+            },
           },
           oneOf: [{ $ref: 'Active' }, { $ref: 'Inactive' }],
         };
@@ -532,8 +552,18 @@ describe('TransformerFactory', () => {
           $id: 'TypeDiscriminator',
           type: 'object',
           definitions: {
-            StringVariant: { $id: 'StringVariant', type: 'object', properties: { value: { type: 'string' }, strField: { type: 'string', tagged: true } } },
-            NumberVariant: { $id: 'NumberVariant', type: 'object', properties: { value: { type: 'number' }, numField: { type: 'number', tagged: true } } },
+            StringVariant: {
+              $id: 'StringVariant',
+              type: 'object',
+              required: ['value', 'strField'],
+              properties: { value: { type: 'string' }, strField: { type: 'string', tagged: true } },
+            },
+            NumberVariant: {
+              $id: 'NumberVariant',
+              type: 'object',
+              required: ['value', 'numField'],
+              properties: { value: { type: 'number' }, numField: { type: 'number', tagged: true } },
+            },
           },
           oneOf: [{ $ref: 'StringVariant' }, { $ref: 'NumberVariant' }],
         };
@@ -554,8 +584,8 @@ describe('TransformerFactory', () => {
           $id: 'TypeDiscriminatorAnyOf',
           type: 'object',
           definitions: {
-            BooleanVariant: { $id: 'BooleanVariant', type: 'object', properties: { boolField: { type: 'string', tagged: true } } },
-            StringVariant: { $id: 'StringVariant', type: 'object', properties: { strField: { type: 'string', tagged: true } } },
+            BooleanVariant: { $id: 'BooleanVariant', type: 'object', required: ['boolField'], properties: { boolField: { type: 'boolean', tagged: true } } },
+            StringVariant: { $id: 'StringVariant', type: 'object', required: ['strField'], properties: { strField: { type: 'string', tagged: true } } },
           },
           anyOf: [{ $ref: 'BooleanVariant' }, { $ref: 'StringVariant' }],
         };
@@ -563,7 +593,7 @@ describe('TransformerFactory', () => {
         const factory = new TransformerFactory(schema => !!schema.tagged);
         const transformer = factory.compile(schema as any);
 
-        const boolData = { boolField: 'boolean variant' };
+        const boolData = { boolField: true };
         const objData = { strField: 'string variant' };
 
         expect(transformer(boolData, () => 'xxx')).toStrictEqual({ boolField: 'xxx' });
@@ -578,8 +608,18 @@ describe('TransformerFactory', () => {
           $id: 'EnumDiscriminator',
           type: 'object',
           definitions: {
-            SmallSize: { $id: 'SmallSize', type: 'object', properties: { size: { enum: ['xs', 'sm'] }, smallField: { type: 'string', tagged: true } } },
-            LargeSize: { $id: 'LargeSize', type: 'object', properties: { size: { enum: ['lg', 'xl'] }, largeField: { type: 'string', tagged: true } } },
+            SmallSize: {
+              $id: 'SmallSize',
+              type: 'object',
+              required: ['size', 'smallField'],
+              properties: { size: { enum: ['xs', 'sm'] }, smallField: { type: 'string', tagged: true } },
+            },
+            LargeSize: {
+              $id: 'LargeSize',
+              type: 'object',
+              required: ['size', 'largeField'],
+              properties: { size: { enum: ['lg', 'xl'] }, largeField: { type: 'string', tagged: true } },
+            },
           },
           oneOf: [{ $ref: 'SmallSize' }, { $ref: 'LargeSize' }],
         };
@@ -600,10 +640,16 @@ describe('TransformerFactory', () => {
           $id: 'EnumDiscriminatorAnyOf',
           type: 'object',
           definitions: {
-            PrimaryColor: { $id: 'PrimaryColor', type: 'object', properties: { color: { enum: ['red', 'blue', 'yellow'] }, primaryField: { type: 'string', tagged: true } } },
+            PrimaryColor: {
+              $id: 'PrimaryColor',
+              type: 'object',
+              required: ['color', 'primaryField'],
+              properties: { color: { enum: ['red', 'blue', 'yellow'] }, primaryField: { type: 'string', tagged: true } },
+            },
             SecondaryColor: {
               $id: 'SecondaryColor',
               type: 'object',
+              required: ['color', 'secondaryField'],
               properties: { color: { enum: ['green', 'orange', 'purple'] }, secondaryField: { type: 'string', tagged: true } },
             },
           },
@@ -626,8 +672,18 @@ describe('TransformerFactory', () => {
           $id: 'NumericEnumDiscriminator',
           type: 'object',
           definitions: {
-            LowPriority: { $id: 'LowPriority', type: 'object', properties: { priority: { enum: [1, 2, 3] }, lowField: { type: 'string', tagged: true } } },
-            HighPriority: { $id: 'HighPriority', type: 'object', properties: { priority: { enum: [7, 8, 9] }, highField: { type: 'string', tagged: true } } },
+            LowPriority: {
+              $id: 'LowPriority',
+              type: 'object',
+              required: ['priority', 'lowField'],
+              properties: { priority: { enum: [1, 2, 3] }, lowField: { type: 'string', tagged: true } },
+            },
+            HighPriority: {
+              $id: 'HighPriority',
+              type: 'object',
+              required: ['priority', 'highField'],
+              properties: { priority: { enum: [7, 8, 9] }, highField: { type: 'string', tagged: true } },
+            },
           },
           oneOf: [{ $ref: 'LowPriority' }, { $ref: 'HighPriority' }],
         };
@@ -650,8 +706,8 @@ describe('TransformerFactory', () => {
           $id: 'NoDiscriminator',
           type: 'object',
           definitions: {
-            VariantA: { $id: 'VariantA', type: 'object', properties: { fieldA: { type: 'string', tagged: true } } },
-            VariantB: { $id: 'VariantB', type: 'object', properties: { fieldB: { type: 'string', tagged: true } } },
+            VariantA: { $id: 'VariantA', type: 'object', required: ['fieldA'], properties: { fieldA: { type: 'string', tagged: true } } },
+            VariantB: { $id: 'VariantB', type: 'object', required: ['fieldB'], properties: { fieldB: { type: 'string', tagged: true } } },
           },
           oneOf: [{ $ref: 'VariantA' }, { $ref: 'VariantB' }],
         };
@@ -674,8 +730,8 @@ describe('TransformerFactory', () => {
           $id: 'NoDiscriminatorAnyOf',
           type: 'object',
           definitions: {
-            TypeX: { $id: 'TypeX', type: 'object', properties: { x: { type: 'number', tagged: true } } },
-            TypeY: { $id: 'TypeY', type: 'object', properties: { y: { type: 'number', tagged: true } } },
+            TypeX: { $id: 'TypeX', type: 'object', required: ['x'], properties: { x: { type: 'number', tagged: true } } },
+            TypeY: { $id: 'TypeY', type: 'object', required: ['y'], properties: { y: { type: 'number', tagged: true } } },
           },
           anyOf: [{ $ref: 'TypeX' }, { $ref: 'TypeY' }],
         };
@@ -698,8 +754,8 @@ describe('TransformerFactory', () => {
           $id: 'OverlappingEnums',
           type: 'object',
           definitions: {
-            SetA: { $id: 'SetA', type: 'object', properties: { value: { enum: [1, 2, 3] }, aField: { type: 'string', tagged: true } } },
-            SetB: { $id: 'SetB', type: 'object', properties: { value: { enum: [3, 4, 5] }, bField: { type: 'string', tagged: true } } },
+            SetA: { $id: 'SetA', type: 'object', required: ['value', 'aField'], properties: { value: { enum: [1, 2, 3] }, aField: { type: 'string', tagged: true } } },
+            SetB: { $id: 'SetB', type: 'object', required: ['value', 'bField'], properties: { value: { enum: [3, 4, 5] }, bField: { type: 'string', tagged: true } } },
           },
           oneOf: [{ $ref: 'SetA' }, { $ref: 'SetB' }],
         };
@@ -720,8 +776,8 @@ describe('TransformerFactory', () => {
           $id: 'NestedDiscriminator',
           type: 'object',
           definitions: {
-            Cat: { $id: 'Cat', type: 'object', properties: { type: { const: 'cat' }, meow: { type: 'string', tagged: true } } },
-            Dog: { $id: 'Dog', type: 'object', properties: { type: { const: 'dog' }, bark: { type: 'string', tagged: true } } },
+            Cat: { $id: 'Cat', type: 'object', required: ['type', 'meow'], properties: { type: { const: 'cat' }, meow: { type: 'string', tagged: true } } },
+            Dog: { $id: 'Dog', type: 'object', required: ['type', 'bark'], properties: { type: { const: 'dog' }, bark: { type: 'string', tagged: true } } },
             Animal: { $id: 'Animal', type: 'object', oneOf: [{ $ref: 'Cat' }, { $ref: 'Dog' }] },
           },
           properties: {
@@ -743,8 +799,8 @@ describe('TransformerFactory', () => {
           $id: 'ArrayOfDiscriminated',
           type: 'object',
           definitions: {
-            Circle: { $id: 'Circle', type: 'object', properties: { kind: { const: 'circle' }, radius: { type: 'number', tagged: true } } },
-            Rect: { $id: 'Rect', type: 'object', properties: { kind: { const: 'rect' }, width: { type: 'number', tagged: true } } },
+            Circle: { $id: 'Circle', type: 'object', required: ['kind', 'radius'], properties: { kind: { const: 'circle' }, radius: { type: 'number', tagged: true } } },
+            Rect: { $id: 'Rect', type: 'object', required: ['kind', 'width'], properties: { kind: { const: 'rect' }, width: { type: 'number', tagged: true } } },
             Shape: { $id: 'Shape', type: 'object', oneOf: [{ $ref: 'Circle' }, { $ref: 'Rect' }] },
           },
           properties: {

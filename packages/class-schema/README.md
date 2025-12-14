@@ -713,6 +713,8 @@ The factory automatically detects discriminators using three strategies (in orde
 2. **Type discriminator**: Uses JavaScript `typeof` to distinguish variants
 3. **Enum discriminator**: Uses non-overlapping enum values to distinguish variants
 
+> **Important**: Only **required fields** are considered when detecting discriminators. Optional fields are skipped because they may not be present in the data, making them unreliable for variant discrimination. Make sure your discriminator field is marked as required (not optional) in your schema.
+
 ```typescript
 @Schema({ $id: 'Cat' })
 class Cat {

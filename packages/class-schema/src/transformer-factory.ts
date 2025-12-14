@@ -134,15 +134,14 @@ export class TransformerFactory {
     }
   }
 
-  private getDiscriminatorConditions(schema: ParsedSchema): VariantCondition[] | null {
-    const variantIds = schema.anyOf ?? schema.oneOf ?? [];
-    const variants = variantIds.map(variant => (variant.$ref ? this.context.schemas[variant.$ref] : variant)) as ParsedSchema[];
+  private getDiscriminatorConditions(variants: ParsedSchema[]): VariantCondition[] | null {
     const discriminator: VariantCondition[] = [];
 
     /** Converting the variants into field definitions */
     const fields: FieldDefinition[] = [];
     for (const variant of variants) {
       for (const key in variant.properties) {
+        if (!variant.required?.includes(key)) continue;
         const subSchema = variant.properties[key] as ParsedSchema;
         let fieldDef = fields.find(f => f.name === key);
         if (!fieldDef) {
@@ -236,7 +235,9 @@ export class TransformerFactory {
 
     /** Handling discriminators */
     if (schema.type === 'object' && (schema.anyOf || schema.oneOf)) {
-      const discriminators = this.getDiscriminatorConditions(schema);
+      const variantIds = schema.anyOf ?? schema.oneOf ?? [];
+      const variants = variantIds.map(variant => (variant.$ref ? this.context.schemas[variant.$ref] : variant)) as ParsedSchema[];
+      const discriminators = this.getDiscriminatorConditions(variants);
       if (discriminators) {
         for (const { condition, schemaId } of discriminators) {
           ops += `
@@ -247,7 +248,6 @@ export class TransformerFactory {
         `;
         }
       } else {
-        const variants = schema.anyOf ?? schema.oneOf ?? [];
         for (const variant of variants) {
           ops += `
           {
@@ -313,6 +313,7 @@ export class TransformerFactory {
       ${ops}
       return data;
     `;
+
     const func = new Function('data', 'action', 'ctx', content) as Transformer;
     const transformer = func.bind(this.context);
     this.context.transformers[schema.$id] = transformer;
