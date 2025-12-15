@@ -111,6 +111,11 @@ describe('ClassSchema', () => {
       expect(ClassSchema.isBranded(schema)).toBe(true);
     });
 
+    it('should return true for branded array schema', () => {
+      const schema = new ClassSchema([Sample]).getJSONSchema();
+      expect(ClassSchema.isBranded(schema)).toBe(true);
+    });
+
     it('should return true for branded clone schema', () => {
       const schema = new ClassSchema(Sample).getJSONSchema(true);
       expect(ClassSchema.isBranded(schema)).toBe(true);

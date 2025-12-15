@@ -42,11 +42,11 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
       const schemaId = this.getSchemaId(Class[0]);
       this.schema.$id = `${schemaId}?type=Array`;
       this.schema.items ??= { $ref: schemaId };
-      return;
+    } else {
+      this.schema = this.getSchema(Class);
+      this.populateSchema(this.schema, Class);
     }
 
-    this.schema = this.getSchema(Class);
-    this.populateSchema(this.schema, Class);
     this.brand(this.schema);
   }
 
