@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { RouteMetadata } from '@shadow-library/app';
-import { JSONSchema } from '@shadow-library/class-schema';
+import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 import { FastifyInstance, RouteShorthandOptions } from 'fastify';
 
 /**
@@ -20,7 +20,7 @@ declare module '@shadow-library/app' {
     method?: HttpMethod;
     path?: string;
     version?: number;
-    schemas?: RouteInputSchemas & { response?: Record<number | string, JSONSchema> };
+    schemas?: RouteInputSchemas & { response?: Record<number | string, JSONSchema | SchemaClass> };
 
     rawBody?: boolean;
     silentValidation?: boolean;

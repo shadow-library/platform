@@ -4,8 +4,7 @@
 import assert from 'node:assert';
 
 import { Route } from '@shadow-library/app';
-import { JSONSchema } from '@shadow-library/class-schema';
-import { Class } from 'type-fest';
+import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -24,7 +23,7 @@ export enum RouteInputType {
   RESPONSE = 'response',
 }
 
-export type RouteInputSchemas = Partial<Record<'body' | 'params' | 'query', JSONSchema | Class<unknown>>>;
+export type RouteInputSchemas = Partial<Record<'body' | 'params' | 'query', JSONSchema | SchemaClass>>;
 
 /**
  * Declaring the constants

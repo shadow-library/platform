@@ -17,7 +17,7 @@ import { CreateUserBody } from './create-user-body.dto';
  */
 
 @Schema()
-export class UserRaResponse extends CreateUserBody {
+export class UserRawResponse extends CreateUserBody {
   @Field(() => Number, { description: 'ID of the user' })
   id: number;
 }

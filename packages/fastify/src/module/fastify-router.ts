@@ -4,10 +4,10 @@
 import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
-import { ClassSchema, JSONSchema, ParsedSchema, TransformerFactory } from '@shadow-library/class-schema';
-import { InternalError, Logger, MaybeUndefined, utils } from '@shadow-library/common';
-import merge from 'deepmerge';
-import { type FastifyInstance, RouteOptions } from 'fastify';
+import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
+import { Fn, InternalError, Logger, MaybeUndefined, SyncFn, utils } from '@shadow-library/common';
+import { all as deepmerge } from 'deepmerge';
+import { type FastifyInstance, RouteOptions, preHandlerAsyncHookHandler, preSerializationAsyncHookHandler } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
 import stringify from 'json-stable-stringify';
 import { Chain as MockRequestChain, InjectOptions as MockRequestOptions, Response as MockResponse } from 'light-my-request';
@@ -17,9 +17,10 @@ import { Class, JsonObject, JsonValue, Promisable } from 'type-fest';
  * Importing user defined packages
  */
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
-import { HttpMethod, MiddlewareMetadata, SensitiveDataType } from '../decorators';
-import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, RouteHandler, ServerMetadata } from '../interfaces';
+import { HttpMethod, MiddlewareMetadata, MiddlewareType, SensitiveDataType } from '../decorators';
+import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, ServerMetadata } from '../interfaces';
 import { ContextService } from '../services';
+import { INBUILT_TRANSFORMERS } from './data-transformers';
 import { type FastifyConfig } from './fastify-module.interface';
 
 /**
@@ -89,19 +90,24 @@ export interface ChildRouteRequest {
 
 type MiddlewareHandler = ParsedController<MiddlewareMetadata>['handler'];
 
+interface Transformers {
+  body?: Transformer;
+  query?: Transformer;
+  params?: Transformer;
+  response?: Record<string, Transformer>;
+}
+
 interface RouteArtifacts {
-  transforms: {
-    maskBody?(body: object): object;
-    maskQuery?(query: object): object;
-    maskParams?(params: object): object;
-  };
+  masks: Partial<Record<'body' | 'query' | 'params', Transformer>>;
+  transformers: Transformers;
 }
 
 /**
  * Declaring the constants
  */
 const httpMethods = Object.values(HttpMethod).filter(m => m !== HttpMethod.ALL) as Exclude<HttpMethod, HttpMethod.ALL>[];
-const DEFAULT_ARTIFACTS: RouteArtifacts = { transforms: {} };
+const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
+const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');
 
 @Injectable()
 export class FastifyRouter extends Router {
@@ -110,7 +116,11 @@ export class FastifyRouter extends Router {
   private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
   private readonly cachedDynamicMiddlewares = new Map<string, MiddlewareHandler>();
   private readonly childRouter: ChildRouter<HTTPVersion.V1> | null = null;
+
+  private readonly transformers: Record<string, SyncFn> = { ...INBUILT_TRANSFORMERS };
   private readonly sensitiveTransformer = new TransformerFactory(s => s['x-fastify']?.sensitive === true);
+  private readonly inputDataTransformer = new TransformerFactory(s => this.isTransformable('input', s));
+  private readonly outputDataTransformer = new TransformerFactory(s => this.isTransformable('output', s));
 
   constructor(
     @Inject(FASTIFY_CONFIG) private readonly config: FastifyConfig,
@@ -118,6 +128,7 @@ export class FastifyRouter extends Router {
     private readonly context: ContextService,
   ) {
     super();
+    if (config.transformers) Object.assign(this.transformers, config.transformers);
     if (config.enableChildRoutes) {
       const options = utils.object.pickKeys(config, ['ignoreTrailingSlash', 'ignoreDuplicateSlashes', 'allowUnsafeRegex', 'caseSensitive', 'maxParamLength', 'querystringParser']);
       this.childRouter = findMyWay(options);
@@ -128,6 +139,11 @@ export class FastifyRouter extends Router {
     return this.instance;
   }
 
+  private isTransformable(type: 'input' | 'output', schema: JSONSchema): boolean {
+    const transformerType = schema['x-fastify']?.transform?.[type];
+    return typeof transformerType === 'string' && transformerType in this.transformers;
+  }
+
   private joinPaths(...parts: MaybeUndefined<string>[]): string {
     const path = parts
       .filter(p => typeof p === 'string')
@@ -135,6 +151,12 @@ export class FastifyRouter extends Router {
       .filter(Boolean)
       .join('/');
     return `/${path}`;
+  }
+
+  private addRouteHandler(routeOptions: RouteOptions, hook: MiddlewareType, handler: Fn, action: 'prepend' | 'append' = 'append'): void {
+    const existingHandlers = Array.isArray(routeOptions[hook]) ? routeOptions[hook] : routeOptions[hook] ? [routeOptions[hook]] : [];
+    if (action === 'prepend') routeOptions[hook] = [handler, ...existingHandlers];
+    else routeOptions[hook] = [...existingHandlers, handler];
   }
 
   private registerRawBody(): void {
@@ -156,7 +178,17 @@ export class FastifyRouter extends Router {
     return '****';
   }
 
+  private generateDataTransformer(type: 'input' | 'output'): TransformerAction {
+    return (value, schema) => {
+      const transformType = schema['x-fastify']?.transform?.[type] as string;
+      const transformer = this.transformers[transformType];
+      assert(transformer, `transformer '${transformType}' not found`);
+      return transformer(value);
+    };
+  }
+
   private getRequestLogger(): CallbackRouteHandler {
+    const mask = this.maskField.bind(this);
     return (req, res, done) => {
       const startTime = process.hrtime();
 
@@ -165,7 +197,7 @@ export class FastifyRouter extends Router {
         if (isLoggingDisabled) return;
 
         const { url, config } = req.routeOptions;
-        const { transforms } = config.artifacts ?? DEFAULT_ARTIFACTS;
+        const { masks } = config.artifacts ?? DEFAULT_ARTIFACTS;
         const metadata: RequestMetadata = {};
         metadata.rid = this.context.getRID();
         metadata.url = url ?? req.raw.url;
@@ -178,9 +210,9 @@ export class FastifyRouter extends Router {
 
         const resTime = process.hrtime(startTime);
         metadata.timeTaken = (resTime[0] * 1e3 + resTime[1] * 1e-6).toFixed(3); // Converting time to milliseconds
-        if (req.body) metadata.body = transforms.maskBody ? transforms.maskBody(structuredClone(req.body)) : req.body;
-        if (req.query) metadata.query = transforms.maskQuery ? transforms.maskQuery(structuredClone(req.query)) : req.query;
-        if (req.params) metadata.params = transforms.maskParams ? transforms.maskParams(structuredClone(req.params)) : req.params;
+        if (req.body) metadata.body = masks.body ? masks.body(structuredClone(req.body), mask) : req.body;
+        if (req.query) metadata.query = masks.query ? masks.query(structuredClone(req.query), mask) : req.query;
+        if (req.params) metadata.params = masks.params ? masks.params(structuredClone(req.params), mask) : req.params;
         this.logger.http(`${req.method} ${metadata.url} -> ${res.statusCode} (${metadata.timeTaken}ms)`, metadata);
       });
 
@@ -286,6 +318,60 @@ export class FastifyRouter extends Router {
     return handler;
   }
 
+  private transformResponseHandler(): preSerializationAsyncHookHandler {
+    const transform = this.generateDataTransformer('output');
+
+    return async (request, reply, payload) => {
+      const statusCode = String(reply.statusCode);
+      const responseTransformers = request.routeOptions.config.artifacts?.transformers.response;
+      if (!responseTransformers) return payload;
+
+      let transformer = responseTransformers[statusCode];
+      if (!transformer) {
+        const fallbackStatus = statusCode.charAt(0) + 'xx';
+        transformer = responseTransformers[fallbackStatus];
+        this.logger.debug(`using fallback response transformer for status code ${statusCode}`, { fallbackStatus });
+      }
+
+      if (transformer) {
+        this.logger.debug(`transforming response for status code ${statusCode}`);
+        const cloned = deepmerge([{}, payload as object]);
+        const data = transformer(cloned, transform);
+        this.logger.debug(`transformed response for status code ${statusCode}`, { data });
+        return data;
+      }
+
+      return payload;
+    };
+  }
+
+  private transformRequestHandler(): preHandlerAsyncHookHandler {
+    const transform = this.generateDataTransformer('input');
+
+    return async request => {
+      const transformers = request.routeOptions.config.artifacts?.transformers;
+      if (!transformers) return;
+
+      if (transformers.body && request.body) {
+        this.logger.debug('transforming request body', { body: request.body });
+        request.body = transformers.body(request.body as object, transform);
+        this.logger.debug('transformed request body', { body: request.body });
+      }
+
+      if (transformers.query && request.query) {
+        this.logger.debug('transforming request query', { query: request.query });
+        request.query = transformers.query(request.query as object, transform);
+        this.logger.debug('transformed request query', { query: request.query });
+      }
+
+      if (transformers.params && request.params) {
+        this.logger.debug('transforming request params', { params: request.params });
+        request.params = transformers.params(request.params as object, transform);
+        this.logger.debug('transformed request params', { params: request.params });
+      }
+    };
+  }
+
   async register(controllers: ControllerRouteMetadata[]): Promise<void> {
     const { middlewares, routes } = this.parseControllers(controllers);
     const defaultResponseSchemas = this.config.responseSchema ?? {};
@@ -305,7 +391,7 @@ export class FastifyRouter extends Router {
       this.logger.debug(`registering route ${metadata.method} ${metadata.path}`);
 
       const fastifyRouteOptions = utils.object.omitKeys(metadata, ['path', 'method', 'schemas', 'rawBody', 'status', 'headers', 'redirect', 'render']);
-      const artifacts: RouteArtifacts = { transforms: {} };
+      const artifacts: RouteArtifacts = { masks: {}, transformers: {} };
       const routeOptions = { ...fastifyRouteOptions, config: { metadata, artifacts } } as RouteOptions;
       routeOptions.url = metadata.path;
       routeOptions.method = metadata.method === HttpMethod.ALL ? httpMethods : [metadata.method];
@@ -318,46 +404,80 @@ export class FastifyRouter extends Router {
         const handler = await this.getMiddlewareHandler(middleware, metadata);
         if (typeof handler === 'function') {
           this.logger.debug(`applying '${type}' middleware '${name}'`);
-          const middlewareHandler = routeOptions[type] as RouteHandler[];
-          if (middlewareHandler) middlewareHandler.push(handler);
-          else routeOptions[type] = [handler];
+          this.addRouteHandler(routeOptions, type, handler);
         }
       }
 
-      routeOptions.schema = {};
+      const responseSchemas = { ...defaultResponseSchemas };
+      routeOptions.schema = { response: responseSchemas };
       routeOptions.attachValidation = metadata.silentValidation ?? false;
-      routeOptions.schema.response = merge(metadata.schemas?.response ?? {}, defaultResponseSchemas);
-      const { body: bodySchema, params: paramsSchema, query: querySchema } = metadata.schemas ?? {};
+      const { body: bodySchema, params: paramsSchema, query: querySchema, response: responseSchema } = metadata.schemas ?? {};
       const isMaskEnabled = this.config.maskSensitiveData ?? true;
 
       if (bodySchema) {
-        const schema = typeof bodySchema === 'function' ? ClassSchema.generate(bodySchema) : bodySchema;
+        const schema = isClassSchema(bodySchema) ? ClassSchema.generate(bodySchema) : bodySchema;
         routeOptions.schema.body = schema;
-        if (ClassSchema.isBranded(schema) && isMaskEnabled) {
-          const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
-          if (transformer) artifacts.transforms.maskBody = obj => transformer(obj, this.maskField);
+        if (ClassSchema.isBranded(schema)) {
+          const bodyTransformer = this.inputDataTransformer.maybeCompile(schema as ParsedSchema);
+          if (bodyTransformer) artifacts.transformers.body = bodyTransformer;
+          if (isMaskEnabled) {
+            const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
+            if (transformer) artifacts.masks.body = transformer;
+          }
         }
       }
 
       if (paramsSchema) {
-        const schema = typeof paramsSchema === 'function' ? ClassSchema.generate(paramsSchema) : paramsSchema;
+        const schema = isClassSchema(paramsSchema) ? ClassSchema.generate(paramsSchema) : paramsSchema;
         routeOptions.schema.params = schema;
-        if (ClassSchema.isBranded(schema) && isMaskEnabled) {
-          const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
-          if (transformer) artifacts.transforms.maskParams = obj => transformer(obj, this.maskField);
+        if (ClassSchema.isBranded(schema)) {
+          const paramsTransformer = this.inputDataTransformer.maybeCompile(schema as ParsedSchema);
+          if (paramsTransformer) artifacts.transformers.params = paramsTransformer;
+          if (isMaskEnabled) {
+            const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
+            if (transformer) artifacts.masks.params = transformer;
+          }
         }
       }
 
       if (querySchema) {
-        const schema = typeof querySchema === 'function' ? ClassSchema.generate(querySchema) : querySchema;
+        const schema = isClassSchema(querySchema) ? ClassSchema.generate(querySchema) : querySchema;
         routeOptions.schema.querystring = schema;
-        if (ClassSchema.isBranded(schema) && isMaskEnabled) {
-          const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
-          if (transformer) artifacts.transforms.maskQuery = obj => transformer(obj, this.maskField);
+        if (ClassSchema.isBranded(schema)) {
+          const queryTransformer = this.inputDataTransformer.maybeCompile(schema as ParsedSchema);
+          if (queryTransformer) artifacts.transformers.query = queryTransformer;
+          if (isMaskEnabled) {
+            const transformer = this.sensitiveTransformer.maybeCompile(schema as ParsedSchema);
+            if (transformer) artifacts.masks.query = transformer;
+          }
         }
       }
-      this.logger.debug('route options', { options: routeOptions });
 
+      if (responseSchema) {
+        const responseTransformers: Record<string, Transformer> = {};
+        artifacts.transformers.response = responseTransformers;
+        for (const [code, schemaDef] of Object.entries(responseSchema)) {
+          const statusCode = code.toLowerCase();
+          const schema = isClassSchema(schemaDef) ? ClassSchema.generate(schemaDef) : schemaDef;
+          responseSchemas[statusCode] = schema;
+          if (ClassSchema.isBranded(schema)) {
+            const transformer = this.outputDataTransformer.maybeCompile(schema as ParsedSchema);
+            if (transformer) responseTransformers[statusCode] = transformer;
+          }
+        }
+
+        if (Object.keys(responseTransformers).length > 0) {
+          const handler = this.transformResponseHandler();
+          this.addRouteHandler(routeOptions, 'preSerialization', handler);
+        }
+      }
+
+      if ('body' in artifacts.transformers || 'query' in artifacts.transformers || 'params' in artifacts.transformers) {
+        const handler = this.transformRequestHandler();
+        this.addRouteHandler(routeOptions, 'preHandler', handler, 'prepend');
+      }
+
+      this.logger.debug('route options', { options: routeOptions });
       this.instance.route(routeOptions);
       this.logger.info(`registered route ${metadata.method} ${routeOptions.url}`);
     }

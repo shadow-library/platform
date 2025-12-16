@@ -82,27 +82,16 @@ describe('HTTP Output Decorators', () => {
     expect(Route).toBeCalledWith({ render: true });
   });
 
-  it('should enhace the method with response schema metadata', () => {
+  it('should enhance the method with response schema metadata', () => {
     class Controller {
       @RespondFor(200, Input)
       static single() {}
     }
 
-    expect(Route).toBeCalledWith({
-      schemas: {
-        response: {
-          200: {
-            $id: expect.stringContaining(Input.name),
-            type: 'object',
-            required: ['name'],
-            properties: { name: { type: 'string' } },
-          },
-        },
-      },
-    });
+    expect(Route).toBeCalledWith({ schemas: { response: { 200: Input } } });
   });
 
-  it('should enhace the method with multiple response schema metadata', () => {
+  it('should enhance the method with multiple response schema metadata', () => {
     class Controller {
       @RespondFor(200, Input)
       @RespondFor(201, { type: 'object' })
@@ -110,17 +99,6 @@ describe('HTTP Output Decorators', () => {
     }
 
     expect(Route).toHaveBeenNthCalledWith(2, { schemas: { response: { 201: { type: 'object' } } } });
-    expect(Route).toHaveBeenNthCalledWith(1, {
-      schemas: {
-        response: {
-          200: {
-            $id: expect.stringContaining(Input.name),
-            type: 'object',
-            required: ['name'],
-            properties: { name: { type: 'string' } },
-          },
-        },
-      },
-    });
+    expect(Route).toHaveBeenNthCalledWith(1, { schemas: { response: { 200: Input } } });
   });
 });

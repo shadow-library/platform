@@ -17,6 +17,12 @@ import { HealthController } from './health.controller';
  * Defining types
  */
 
+declare module '@shadow-library/fastify' {
+  interface CustomTransformers {
+    'int:stringify': (value: number) => string;
+  }
+}
+
 /**
  * Declaring the constants
  */
@@ -27,6 +33,7 @@ import { HealthController } from './health.controller';
       prefixVersioning: true,
       controllers: [HealthController, UserController, AuthMiddleware, AccessMiddleware],
       providers: [UserService],
+      transformers: { 'int:stringify': (value: number) => String(value) },
     }),
   ],
 })

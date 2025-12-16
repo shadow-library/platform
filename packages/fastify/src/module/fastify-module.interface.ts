@@ -9,6 +9,7 @@ import { Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { CustomTransformers } from '../decorators';
 import { ErrorHandler } from '../interfaces';
 import { ContextService } from '../services';
 
@@ -70,6 +71,11 @@ export interface FastifyConfig extends FastifyServerOptions {
    * The global route prefix for all routes in the Fastify instance
    */
   routePrefix?: string;
+
+  /**
+   * Object defining custom transformers for request and response data transformation
+   */
+  transformers?: Record<keyof CustomTransformers, (value: any) => any>;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {

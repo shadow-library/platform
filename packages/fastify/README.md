@@ -952,6 +952,393 @@ class CreateProductDto {
 }
 ```
 
+## Data Transformation
+
+The `@Transform` decorator enables automatic data transformation at two key points in the request-response lifecycle:
+
+1. **After Validation (Request)**: Transforms incoming data (body, query, params) after AJV validation but before it reaches your route handler. This allows validation to run against the original data type while your handler receives the transformed type.
+
+2. **Before Serialization (Response)**: Transforms outgoing response data before it's serialized and sent to the client. This allows you to work with one data type internally while presenting a different format to API consumers.
+
+### How It Works
+
+The `@Transform` decorator works in conjunction with `@Field` from `@shadow-library/class-schema`. The `@Field` decorator defines the **source/validation type** (the type used for JSON Schema validation), while `@Transform` converts the data to the **target type** (the type your code actually works with or returns to the client).
+
+```mermaid
+flowchart LR
+  subgraph responseFlow["Response Flow"]
+    Response["Response (JSON)"]
+    Serialization["Serialization (JSON)"]
+    ResTransform["Transform (Pre Serialization)"]
+    ResHandler["Route Handler (Returns Data)"]
+  end
+
+ subgraph requestFlow["Request Flow"]
+    ReqHandler["Route Handler (Receives Transformed Data)"]
+    ReqTransform["Transform (Post Validation)"]
+    Validation["Validation (AJV)"]
+    rawReq["Raw Request (JSON)"]
+  end
+
+  rawReq --> Validation
+  Validation --> ReqTransform
+  ReqTransform --> ReqHandler
+  ResHandler --> ResTransform
+  ResTransform --> Serialization
+  Serialization --> Response
+```
+
+### Basic Usage
+
+The `@Transform` decorator accepts either a transformer name (string) or an options object:
+
+```typescript
+// Single transformer - applies to both input and output
+@Transform('string:trim')
+
+// Options object - specify different transformers for input and output
+@Transform({ input: 'int:parse', output: 'int:stringify' })
+
+// Options object - specify only input or output
+@Transform({ input: 'string:trim' })  // Only transforms input
+@Transform({ output: 'email:normalize' })  // Only transforms output
+```
+
+#### Example
+
+```typescript
+import { Schema, Field } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
+
+@Schema()
+class CreateUserDto {
+  @Field(() => String)
+  @Transform('string:trim')
+  name: string;
+
+  @Field(() => String, { format: 'email' })
+  @Transform('email:normalize')
+  email: string;
+}
+
+@HttpController('/users')
+export class UserController {
+  @Post()
+  async createUser(@Body() userData: CreateUserDto) {
+    // userData.name is automatically trimmed
+    // userData.email is normalized (trimmed and lowercased)
+    return this.userService.create(userData);
+  }
+}
+```
+
+### Built-in Transformers
+
+The following transformers are available out of the box:
+
+| Transformer       | Input Type | Output Type | Description                                |
+| ----------------- | ---------- | ----------- | ------------------------------------------ |
+| `email:normalize` | `string`   | `string`    | Trims whitespace and converts to lowercase |
+| `string:trim`     | `string`   | `string`    | Removes leading and trailing whitespace    |
+| `int:parse`       | `string`   | `number`    | Parses string to integer (base 10)         |
+| `float:parse`     | `string`   | `number`    | Parses string to floating-point number     |
+| `bigint:parse`    | `string`   | `bigint`    | Parses string to BigInt                    |
+
+### Request Transformation Examples
+
+#### Normalizing User Input
+
+```typescript
+@Schema()
+class SignUpDto {
+  @Field(() => String)
+  @Transform('string:trim')
+  username: string;
+
+  @Field(() => String, { format: 'email' })
+  @Transform('email:normalize')
+  email: string;
+
+  @Field(() => String)
+  password: string;
+}
+```
+
+#### Parsing Query Parameters
+
+Query parameters are always received as strings from the HTTP layer. Use `@Transform` to convert them to the appropriate type while keeping `@Field` for validation:
+
+```typescript
+@Schema()
+class PaginationQuery {
+  // @Field defines the validation type (string from query params)
+  // @Transform converts the validated string to a number for your handler
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('int:parse')
+  page: number;
+
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('int:parse')
+  limit: number;
+}
+
+@HttpController('/products')
+export class ProductController {
+  @Get()
+  async getProducts(@Query() query: PaginationQuery) {
+    // query.page and query.limit are numbers here, not strings
+    // Validation ensured they were numeric strings before transformation
+    return this.productService.findAll(query.page, query.limit);
+  }
+}
+```
+
+#### Working with Large Numbers
+
+JavaScript numbers lose precision beyond `Number.MAX_SAFE_INTEGER`. Use BigInt for large numbers while transmitting as strings:
+
+```typescript
+@Schema()
+class TransactionDto {
+  // Validated as a string (safe for JSON transmission)
+  // Transformed to BigInt for precise arithmetic in your handler
+  @Field(() => String, { pattern: '^-?[0-9]+$' })
+  @Transform('bigint:parse')
+  amount: bigint;
+
+  @Field(() => String)
+  recipientId: string;
+}
+
+@HttpController('/transactions')
+export class TransactionController {
+  @Post()
+  async createTransaction(@Body() dto: TransactionDto) {
+    // dto.amount is a BigInt - safe for precise calculations
+    const fee = dto.amount / 100n; // BigInt arithmetic
+    return this.transactionService.process(dto);
+  }
+}
+```
+
+### Response Transformation Examples
+
+Transformers also work on response schemas, allowing you to convert internal data types to API-friendly formats.
+
+#### Currency Formatting
+
+Store and compute with integers (cents) to avoid floating-point errors, but display as decimal strings for the API:
+
+```typescript
+// Define a custom transformer for cents to decimal conversion
+declare module '@shadow-library/fastify' {
+  export interface CustomTransformers {
+    'currency:format': (value: number) => string;
+  }
+}
+
+// Register the transformer in your module config
+FastifyModule.forRoot({
+  controllers: [ProductController],
+  transformers: {
+    'currency:format': (cents: number) => (cents / 100).toFixed(2),
+  },
+});
+
+// Use in your response DTO
+@Schema()
+class ProductResponse {
+  @Field(() => Number)
+  id: number;
+
+  @Field(() => String)
+  name: string;
+
+  // Internally stored as integer (cents), transformed to "19.99" format for API response
+  @Field(() => String)
+  @Transform('currency:format')
+  price: number; // TypeScript type is what is used internally
+}
+
+@HttpController('/products')
+export class ProductController {
+  @Get('/:id')
+  @RespondFor(200, ProductResponse)
+  async getProduct(@Params() params: { id: string }): Promise<ProductResponse> {
+    const product = await this.productService.findById(params.id);
+    // product.price = 1999 (integer cents from database)
+    return product;
+    // Response: { id: 1, name: "Widget", price: "19.99" }
+  }
+}
+```
+
+#### Date Formatting
+
+```typescript
+declare module '@shadow-library/fastify' {
+  export interface CustomTransformers {
+    'date:iso': (value: Date) => string;
+  }
+}
+
+FastifyModule.forRoot({
+  controllers: [EventController],
+  transformers: {
+    'date:iso': (date: Date) => date.toISOString(),
+  },
+});
+
+@Schema()
+class EventResponse {
+  @Field(() => String)
+  name: string;
+
+  // Date object internally, ISO string in API response
+  @Field(() => String)
+  @Transform('date:iso')
+  startDate: Date;
+}
+```
+
+### Different Input and Output Transformers
+
+Sometimes you need different transformations for incoming requests vs outgoing responses. The `@Transform` decorator supports separate `input` and `output` options:
+
+```typescript
+declare module '@shadow-library/fastify' {
+  export interface CustomTransformers {
+    'cents:parse': (value: string) => number;
+    'cents:format': (value: number) => string;
+  }
+}
+
+FastifyModule.forRoot({
+  controllers: [TransactionController],
+  transformers: {
+    'cents:parse': (value: string) => Math.round(parseFloat(value) * 100),
+    'cents:format': (cents: number) => (cents / 100).toFixed(2),
+  },
+});
+
+@Schema()
+class TransactionDto {
+  @Field(() => String)
+  @Transform({ input: 'cents:parse', output: 'cents:format' })
+  amount: number;
+}
+
+@HttpController('/transactions')
+export class TransactionController {
+  @Post()
+  @RespondFor(201, TransactionDto)
+  async createTransaction(@Body() dto: TransactionDto): Promise<TransactionDto> {
+    // Request: { "amount": "19.99" }
+    // dto.amount = 1999 (parsed to cents)
+
+    // Your business logic works with cents (integers)
+    const saved = await this.transactionService.save(dto);
+
+    return saved;
+    // Response: { "amount": "19.99" } (formatted back to decimal string)
+  }
+}
+```
+
+#### Input-Only or Output-Only Transformations
+
+You can also specify only input or output transformation:
+
+```typescript
+@Schema()
+class SearchQuery {
+  // Only transform input - sanitize search terms
+  @Field(() => String)
+  @Transform({ input: 'string:trim' })
+  query: string;
+}
+
+@Schema()
+class UserResponse {
+  @Field(() => String)
+  name: string;
+
+  // Only transform output - mask email for privacy
+  @Field(() => String)
+  @Transform({ output: 'email:mask' })
+  email: string;
+}
+```
+
+### Extending with Custom Transformers
+
+#### Step 1: Declare the Transformer Types
+
+Extend the `CustomTransformers` interface for type-safe transformer names:
+
+```typescript
+declare module '@shadow-library/fastify' {
+  export interface CustomTransformers {
+    'phone:normalize': (value: string) => string;
+    'currency:format': (value: number) => string;
+    'date:parse': (value: string) => Date;
+    'boolean:parse': (value: string) => boolean;
+  }
+}
+```
+
+#### Step 2: Register Transformers in Module Config
+
+```typescript
+@Module({
+  imports: [
+    FastifyModule.forRoot({
+      controllers: [UserController, ProductController],
+      transformers: {
+        'phone:normalize': (phone: string) => phone.replace(/[^0-9+]/g, ''),
+        'currency:format': (cents: number) => (cents / 100).toFixed(2),
+        'date:parse': (dateStr: string) => new Date(dateStr),
+        'boolean:parse': (value: string) => value === 'true' || value === '1',
+      },
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+#### Step 3: Use in Your Schemas
+
+```typescript
+@Schema()
+class UserDto {
+  @Field(() => String)
+  @Transform('phone:normalize')
+  phone: string;
+
+  @Field(() => String)
+  @Transform('boolean:parse')
+  isActive: boolean;
+}
+```
+
+### Best Practices
+
+1. **Validate First, Transform After**: The `@Field` decorator defines what's valid input. `@Transform` converts valid input to your preferred type.
+
+2. **Use Strings for Query/Params Validation**: Query parameters and URL params are always strings. Validate them as strings, then transform:
+
+   ```typescript
+   @Field(() => String, { pattern: '^[0-9]+$' }) // Validate as numeric string
+   @Transform('int:parse') // Convert to number
+   id: number;
+   ```
+
+3. **Avoid Floating-Point for Currency**: Store monetary values as integers (cents) and use transformers for display formatting.
+
+4. **Keep Transformers Pure**: Transformers should be pure functions without side effects.
+
+5. **Handle Edge Cases**: Ensure your custom transformers handle edge cases like empty strings, null values, etc.
+
 ## Response Serialization
 
 Define response schemas for automatic serialization and documentation:

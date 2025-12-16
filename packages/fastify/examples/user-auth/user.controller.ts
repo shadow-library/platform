@@ -10,7 +10,7 @@ import { CreateUserBody } from './dtos/create-user-body.dto';
 import { UserService } from './user.service';
 import { UpdateUserBody } from './dtos/update-user-body.dto';
 import { UserParams } from './dtos/user-params.dto';
-import { UserRaResponse } from './dtos/user-raw-response.dto';
+import { UserRawResponse } from './dtos/user-raw-response.dto';
 import { UserResponse } from './dtos/user-response.dto';
 import { AuthGuard } from './decorators/auth-guard.decorator';
 
@@ -39,7 +39,7 @@ export class UserController {
   @Get()
   @Version(2)
   @AuthGuard({ accessLevel: 1 })
-  @RespondFor(200, [UserRaResponse])
+  @RespondFor(200, [UserRawResponse])
   async listUsersRaw() {
     return this.userService.getAllUsers();
   }

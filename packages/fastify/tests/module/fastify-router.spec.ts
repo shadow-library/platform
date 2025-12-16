@@ -4,14 +4,14 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
-import { InternalError, Logger, utils, withThis } from '@shadow-library/common';
+import { Fn, InternalError, Logger, utils, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { ContextService, FastifyModule, FastifyRouter, HttpMethod, Sensitive, ServerMetadata } from '@shadow-library/fastify';
+import { ContextService, FastifyModule, FastifyRouter, HttpMethod, Sensitive, ServerMetadata, Transform } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -35,6 +35,7 @@ describe('FastifyRouter', () => {
     jest.clearAllMocks();
     jest.restoreAllMocks();
     instance = fastify();
+    config.transformers = { stringify: (value: unknown) => String(value) } as any;
     router = new FastifyRouter(config, instance, context);
   });
 
@@ -310,7 +311,7 @@ describe('FastifyRouter', () => {
     it('should register single method route', async () => {
       await router.register([]);
       expect(instance.route).toBeCalledWith({
-        config: { metadata: route.metadata, artifacts: { transforms: {} } },
+        config: { metadata: route.metadata, artifacts: { transformers: {}, masks: {} } },
         attachValidation: false,
         handler: expect.any(Function),
         method: ['GET'],
@@ -333,21 +334,156 @@ describe('FastifyRouter', () => {
         password: string;
       }
 
+      const mask = router['maskField'].bind(router);
       const schema = ClassSchema.generate(SensitiveClass);
       route.metadata.schemas = { body: schema, params: schema, query: schema };
       router['config'].maskSensitiveData = true;
       await router.register([]);
       expect(instance.route).toBeCalledWith({
-        config: { metadata: route.metadata, artifacts: { transforms: { maskBody: expect.any(Function), maskParams: expect.any(Function), maskQuery: expect.any(Function) } } },
+        config: {
+          metadata: route.metadata,
+          artifacts: {
+            transformers: {},
+            masks: { body: expect.any(Function), params: expect.any(Function), query: expect.any(Function) },
+          },
+        },
         attachValidation: false,
         handler: expect.any(Function),
         method: ['GET'],
         url: '/',
         schema: { response: {}, body: schema, params: schema, querystring: schema },
       });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transforms.maskBody?.({ password: 'secret' })).toEqual({ password: '****' });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transforms.maskParams?.({ password: 'secret' })).toEqual({ password: '****' });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transforms.maskQuery?.({ password: 'secret' })).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.masks?.body?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.masks?.params?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.masks?.query?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
+    });
+
+    it('should generate the artifacts for request body transformation', async () => {
+      @Schema()
+      class Body {
+        @Field(() => String)
+        @Transform('bigint:parse')
+        value: bigint;
+      }
+
+      const middleware = async () => {};
+      const toBigInt = (value: any) => BigInt(value);
+      const bodySchema = ClassSchema.generate(Body);
+      route.metadata.schemas = { body: Body };
+      route.metadata.preHandler = [middleware];
+      await router.register([]);
+      expect(instance.route).toBeCalledWith({
+        config: {
+          metadata: route.metadata,
+          artifacts: { transformers: { body: expect.any(Function) }, masks: {} },
+        },
+        attachValidation: false,
+        handler: expect.any(Function),
+        preHandler: [expect.any(Function), middleware],
+        method: ['GET'],
+        url: '/',
+        schema: { response: {}, body: bodySchema },
+      });
+
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.body?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+        value: BigInt('12345678901234567890'),
+      });
+    });
+
+    it('should generate the artifacts for the request query transformation', async () => {
+      @Schema()
+      class Query {
+        @Field(() => String)
+        @Transform('bigint:parse')
+        value: bigint;
+      }
+
+      const middleware = async () => {};
+      const toBigInt = (value: any) => BigInt(value);
+      const querySchema = ClassSchema.generate(Query);
+      route.metadata.schemas = { query: Query };
+      route.metadata.preHandler = [middleware];
+      await router.register([]);
+      expect(instance.route).toBeCalledWith({
+        config: {
+          metadata: route.metadata,
+          artifacts: { transformers: { query: expect.any(Function) }, masks: {} },
+        },
+        attachValidation: false,
+        handler: expect.any(Function),
+        preHandler: [expect.any(Function), middleware],
+        method: ['GET'],
+        url: '/',
+        schema: { response: {}, querystring: querySchema },
+      });
+
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.query?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+        value: BigInt('12345678901234567890'),
+      });
+    });
+
+    it('should generate the artifacts for the request params transformation', async () => {
+      @Schema()
+      class Params {
+        @Field(() => String)
+        @Transform('bigint:parse')
+        value: bigint;
+      }
+
+      const middleware = async () => {};
+      const toBigInt = (value: any) => BigInt(value);
+      const paramsSchema = ClassSchema.generate(Params);
+      route.metadata.schemas = { params: Params };
+      route.metadata.preHandler = [middleware];
+      await router.register([]);
+      expect(instance.route).toBeCalledWith({
+        config: {
+          metadata: route.metadata,
+          artifacts: { transformers: { params: expect.any(Function) }, masks: {} },
+        },
+        attachValidation: false,
+        handler: expect.any(Function),
+        preHandler: [expect.any(Function), middleware],
+        method: ['GET'],
+        url: '/',
+        schema: { response: {}, params: paramsSchema },
+      });
+
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.params?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+        value: BigInt('12345678901234567890'),
+      });
+    });
+
+    it('should generate the artifacts for the response body transformation', async () => {
+      @Schema()
+      class Response {
+        @Field(() => String)
+        @Transform('bigint:parse')
+        value: bigint;
+      }
+
+      const middleware = async () => {};
+      const toBigInt = (value: any) => BigInt(value);
+      const responseSchema = ClassSchema.generate(Response);
+      route.metadata.schemas = { response: { 200: responseSchema } };
+      route.metadata.preSerialization = [middleware];
+      await router.register([]);
+      expect(instance.route).toBeCalledWith({
+        config: {
+          metadata: route.metadata,
+          artifacts: { transformers: { response: { 200: expect.any(Function) } }, masks: {} },
+        },
+        attachValidation: false,
+        handler: expect.any(Function),
+        preSerialization: [middleware, expect.any(Function)],
+        method: ['GET'],
+        url: '/',
+        schema: { response: { 200: responseSchema } },
+      });
+
+      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.response?.[200]?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+        value: BigInt('12345678901234567890'),
+      });
     });
 
     it('should apply the middleware if generator returns a function', async () => {
@@ -553,7 +689,7 @@ describe('FastifyRouter', () => {
         headers: { 'x-service': 'test-service', 'content-length': '123' },
         query: { key: 'value' },
         body: { data: 'test' },
-        routeOptions: { url: '/test', config: { metadata: {}, artifacts: { transforms: {} } } },
+        routeOptions: { url: '/test', config: { metadata: {}, artifacts: { transformers: {}, masks: {} } } },
       } as any;
       const res = {
         statusCode: 200,
@@ -624,7 +760,7 @@ describe('FastifyRouter', () => {
         query: { key: 'value' },
         body: { data: 'test' },
         params: { id: '789' },
-        routeOptions: { url: '/api/test', config: { metadata: {}, artifacts: { transforms: { maskBody: mask, maskParams: mask, maskQuery: mask } } } },
+        routeOptions: { url: '/api/test', config: { metadata: {}, artifacts: { masks: { body: mask, params: mask, query: mask }, transformers: {} } } },
       } as any;
       const res = {
         statusCode: 200,
@@ -666,6 +802,103 @@ describe('FastifyRouter', () => {
       expect(cb).toHaveBeenCalled();
       expect(res.raw.on).toHaveBeenCalledWith('finish', expect.any(Function));
       expect(httpLogger).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('data transformers', () => {
+    @Schema()
+    class Data {
+      @Field(() => Boolean)
+      @Transform('stringify' as any)
+      bool: string;
+
+      @Field(() => String)
+      @Transform('bigint:parse')
+      bigint: bigint;
+    }
+
+    const schema = ClassSchema.generate(Data);
+    let inputTransform: Fn;
+    let outputTransform: Fn;
+
+    beforeEach(() => {
+      const transformers = { stringify: (value: unknown) => String(value) } as any;
+      router = new FastifyRouter({ ...config, transformers }, instance, context);
+      inputTransform = router['inputDataTransformer'].compile(schema);
+      outputTransform = router['outputDataTransformer'].compile(schema);
+    });
+
+    it('should not transform the request body payload when body transformer is not found', async () => {
+      const handler = router['transformRequestHandler']() as any;
+      const originalBody = { bool: true, bigint: '5' };
+      const request = { routeOptions: { config: {} }, body: originalBody };
+
+      await handler(request, {});
+      expect(request.body).toBe(originalBody);
+    });
+
+    it('should transform the request body payload', async () => {
+      const handler = router['transformRequestHandler']() as any;
+      const request = { routeOptions: { config: { artifacts: { transformers: { body: inputTransform } } } }, body: { bool: true, bigint: '5' } };
+
+      await handler(request, {});
+      expect(request.body).toEqual({ bool: 'true', bigint: 5n });
+    });
+
+    it('should transform the request query payload', async () => {
+      const handler = router['transformRequestHandler']() as any;
+      const request = { routeOptions: { config: { artifacts: { transformers: { query: inputTransform } } } }, query: { bool: true, bigint: '5' } };
+
+      await handler(request, {});
+      expect(request.query).toEqual({ bool: 'true', bigint: 5n });
+    });
+
+    it('should transform the request params payload', async () => {
+      const handler = router['transformRequestHandler']() as any;
+      const request = { routeOptions: { config: { artifacts: { transformers: { params: inputTransform } } } }, params: { bool: true, bigint: '5' } };
+
+      await handler(request, {});
+      expect(request.params).toEqual({ bool: 'true', bigint: 5n });
+    });
+
+    it('should not transform the response body payload when artifacts are not found', async () => {
+      const handler = router['transformResponseHandler']() as any;
+      const reply = { statusCode: 200 };
+      const payload = { bool: true, bigint: '5' };
+      const request = { routeOptions: { config: {} } };
+
+      const result = await handler(request, reply, payload);
+      expect(result).toBe(payload);
+    });
+
+    it('should transform the response body payload', async () => {
+      const handler = router['transformResponseHandler']() as any;
+      const reply = { statusCode: 200 };
+      const payload = { bool: true, bigint: '5' };
+      const request = { routeOptions: { config: { artifacts: { transformers: { response: { 200: inputTransform } } } } } };
+
+      const result = await handler(request, reply, payload);
+      expect(result).toEqual({ bool: 'true', bigint: 5n });
+    });
+
+    it('should transform the response body payload using fallback status code', async () => {
+      const handler = router['transformResponseHandler']() as any;
+      const reply = { statusCode: 201 };
+      const payload = { bool: true, bigint: '5' };
+      const request = { routeOptions: { config: { artifacts: { transformers: { response: { '2xx': inputTransform } } } } } };
+
+      const result = await handler(request, reply, payload);
+      expect(result).toEqual({ bool: 'true', bigint: 5n });
+    });
+
+    it('should not transform the response body payload when transformer are not found', async () => {
+      const handler = router['transformResponseHandler']() as any;
+      const reply = { statusCode: 201 };
+      const payload = { bool: true, bigint: '5' };
+      const request = { routeOptions: { config: { artifacts: { transformers: { response: { 200: inputTransform } } } } } };
+
+      const result = await handler(request, reply, payload);
+      expect(result).toBe(payload);
     });
   });
 });
