@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import assert from 'node:assert';
+
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Class } from 'type-fest';
 
@@ -12,7 +14,7 @@ import { Class } from 'type-fest';
  * Defining types
  */
 
-export type SortOrder = 'ASC' | 'DESC';
+export type SortOrder = 'asc' | 'desc';
 
 export interface IPagination<T> {
   total: number;
@@ -53,18 +55,20 @@ export function Paginated<T>(Item: Class<T>): Class<IPagination<T>> {
 }
 
 export function PaginationQuery<T extends string>(sortBy: T[], defaults: Partial<IPaginationQuery<T>> = {}): Class<IPaginationQuery<T>> {
+  assert(sortBy.length > 0, 'sortBy must have at least one value');
+
   @Schema()
   class PaginationQuery implements IPaginationQuery<T> {
-    @Field({ default: defaults.limit ?? 20 })
+    @Field({ default: defaults.limit ?? 20, minimum: 1, maximum: 100 })
     limit: number;
 
-    @Field({ default: defaults.offset ?? 0 })
+    @Field({ default: defaults.offset ?? 0, minimum: 0 })
     offset: number;
 
-    @Field({ default: defaults.sortOrder ?? 'ASC' })
+    @Field({ default: defaults.sortOrder ?? 'asc', enum: ['asc', 'desc'] })
     sortOrder: SortOrder;
 
-    @Field({ default: defaults.sortBy ?? sortBy[0] })
+    @Field({ default: defaults.sortBy ?? sortBy[0], enum: sortBy })
     sortBy: T;
   }
 
