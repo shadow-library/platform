@@ -35,6 +35,9 @@ export interface BaseFieldSchema<T> {
 
   /** Whether null is allowed */
   nullable?: boolean;
+
+  /** Default value of the field */
+  default?: T;
 }
 
 export interface ArrayFieldSchema extends BaseFieldSchema<any[]> {
