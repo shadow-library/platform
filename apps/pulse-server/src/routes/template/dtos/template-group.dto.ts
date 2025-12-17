@@ -2,6 +2,8 @@
  * Importing npm packages
  */
 import { Field, OmitType, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
+import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
 /**
  * Importing user defined packages
@@ -26,8 +28,9 @@ export class TemplateGroupResponse {
   @Field()
   templateKey: string;
 
-  @Field({ nullable: true })
-  description: string | null;
+  @Field({ optional: true })
+  @Transform('strip:null')
+  description?: string | null;
 
   @Field({ enum: schema.priority.enumValues })
   priority: string;
@@ -67,25 +70,17 @@ export class TemplateGroupDetailResponse extends TemplateGroupResponse {
 }
 
 @Schema()
-export class ListTemplateGroupsQuery {
+export class ListTemplateGroupsQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
   @Field({ optional: true })
   key?: string;
-
-  @Field({ optional: true })
-  offset?: number;
-
-  @Field({ optional: true })
-  limit?: number;
-
-  @Field({ optional: true, enum: ['createdAt', 'updatedAt'] })
-  sortBy?: 'createdAt' | 'updatedAt';
-
-  @Field({ optional: true, enum: ['asc', 'desc'] })
-  sortOrder?: 'asc' | 'desc';
 }
 
 @Schema()
 export class TemplateGroupParams {
   @Field(() => Number)
+  @Transform('bigint:parse')
   id: bigint;
 }
+
+@Schema()
+export class ListTemplateGroupResponse extends Paginated(TemplateGroupResponse) {}

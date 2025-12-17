@@ -2,12 +2,12 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
-
-import { schema } from '@modules/datastore';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { schema } from '@modules/datastore';
 
 /**
  * Defining types
@@ -26,6 +26,7 @@ export class TemplateVariantResponse {
   locale: string;
 
   @Field({ optional: true })
+  @Transform('strip:null')
   subject?: string | null;
 
   @Field()

@@ -4,7 +4,7 @@
 import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { InferInsertModel, asc, desc, eq, like } from 'drizzle-orm';
 
@@ -14,7 +14,7 @@ import { InferInsertModel, asc, desc, eq, like } from 'drizzle-orm';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { DatastoreService, PrimaryDatabase, Template, schema } from '../datastore';
+import { DatastoreService, PrimaryDatabase, Template, schema, templateGroups } from '../datastore';
 
 /**
  * Defining types
@@ -64,13 +64,16 @@ export class TemplateGroupService {
     return templateGroup;
   }
 
-  async listTemplateGroups(filter: ListTemplateQuery = {}, pagination: Pagination = {}): Promise<Template.Group[]> {
-    const limit = pagination.limit ?? 20;
-    const offset = pagination.offset ?? 0;
-    const sortOrder = pagination.sortOrder === 'asc' ? asc : desc;
-    const sortField = pagination.sortBy === 'createdAt' ? schema.templateGroups.createdAt : schema.templateGroups.updatedAt;
+  async listTemplateGroups(filter: ListTemplateQuery = {}, pagination: Pagination = {}): Promise<OffsetPaginationResult<Template.Group>> {
+    const query = utils.pagination.normalise(pagination, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
+    const sortOrder = query.sortOrder === 'asc' ? asc : desc;
+    const sortField = query.sortBy === 'createdAt' ? schema.templateGroups.createdAt : schema.templateGroups.updatedAt;
     const where = filter.key ? like(schema.templateGroups.templateKey, `%${filter.key}%`) : undefined;
-    return await this.db.query.templateGroups.findMany({ limit, offset, orderBy: sortOrder(sortField), where });
+    const [total, items] = await Promise.all([
+      this.db.$count(templateGroups, where),
+      this.db.query.templateGroups.findMany({ limit: query.limit, offset: query.offset, orderBy: sortOrder(sortField), where }),
+    ]);
+    return utils.pagination.createResult(query, items, total);
   }
 
   async getTemplateGroup(id: bigint): Promise<TemplateDetails | null> {

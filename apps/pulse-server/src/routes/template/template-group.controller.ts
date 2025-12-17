@@ -9,7 +9,15 @@ import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor, Serv
 import { TemplateGroupService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 
-import { CreateTemplateGroupBody, ListTemplateGroupsQuery, TemplateGroupDetailResponse, TemplateGroupParams, TemplateGroupResponse, UpdateTemplateGroupBody } from './dtos';
+import {
+  CreateTemplateGroupBody,
+  ListTemplateGroupResponse,
+  ListTemplateGroupsQuery,
+  TemplateGroupDetailResponse,
+  TemplateGroupParams,
+  TemplateGroupResponse,
+  UpdateTemplateGroupBody,
+} from './dtos';
 
 /**
  * Defining types
@@ -30,8 +38,8 @@ export class TemplateGroupController {
   }
 
   @Get()
-  @RespondFor(200, [TemplateGroupResponse])
-  listTemplateGroups(@Query() query: ListTemplateGroupsQuery): Promise<TemplateGroupResponse[]> {
+  @RespondFor(200, ListTemplateGroupResponse)
+  listTemplateGroups(@Query() query: ListTemplateGroupsQuery): Promise<ListTemplateGroupResponse> {
     const { key, ...pagination } = query;
     return this.templateGroupService.listTemplateGroups({ key }, pagination);
   }
