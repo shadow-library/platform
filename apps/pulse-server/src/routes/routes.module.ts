@@ -8,6 +8,8 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { CUSTOM_DATA_TRANSFORMERS } from './common';
+import { DashboardModule } from './dashboard';
 import { TemplateRoutesModule } from './template';
 
 /**
@@ -21,11 +23,12 @@ import { TemplateRoutesModule } from './template';
 const AppHttpCoreModule = HttpCoreModule.forRoot({ csrf: { disabled: true } });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, TemplateRoutesModule],
+  imports: [AppHttpCoreModule, TemplateRoutesModule, DashboardModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),
 
   routePrefix: '/api',
   prefixVersioning: true,
+  transformers: CUSTOM_DATA_TRANSFORMERS,
 });
