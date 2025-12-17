@@ -42,7 +42,7 @@
     "@fastify/view": "^10.0.2",
     "@release-it/conventional-changelog": "^10.0.1",
     "@shadow-library/app": "^1.0.11",
-    "@shadow-library/class-schema": "^0.1.1",
+    "@shadow-library/class-schema": "^0.1.3",
     "@shadow-library/common": "^1.0.22",
     "@types/bun": "^1.2.20",
     "@typescript-eslint/parser": "^8.40.0",
@@ -64,7 +64,7 @@
   "peerDependencies": {
     "@fastify/view": "^10.0.0",
     "@shadow-library/app": "^1.0.11",
-    "@shadow-library/class-schema": "^0.0.12",
+    "@shadow-library/class-schema": "^0.1.3",
     "@shadow-library/common": "^1.0.22",
     "reflect-metadata": "^0.2.2"
   },

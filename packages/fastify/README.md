@@ -1036,13 +1036,14 @@ export class UserController {
 
 The following transformers are available out of the box:
 
-| Transformer       | Input Type | Output Type | Description                                |
-| ----------------- | ---------- | ----------- | ------------------------------------------ |
-| `email:normalize` | `string`   | `string`    | Trims whitespace and converts to lowercase |
-| `string:trim`     | `string`   | `string`    | Removes leading and trailing whitespace    |
-| `int:parse`       | `string`   | `number`    | Parses string to integer (base 10)         |
-| `float:parse`     | `string`   | `number`    | Parses string to floating-point number     |
-| `bigint:parse`    | `string`   | `bigint`    | Parses string to BigInt                    |
+| Transformer       | Input Type | Output Type | Description                                                                          |
+| ----------------- | ---------- | ----------- | ------------------------------------------------------------------------------------ |
+| `email:normalize` | `string`   | `string`    | Trims whitespace and converts to lowercase                                           |
+| `string:trim`     | `string`   | `string`    | Removes leading and trailing whitespace                                              |
+| `int:parse`       | `string`   | `number`    | Parses string to integer (base 10)                                                   |
+| `float:parse`     | `string`   | `number`    | Parses string to floating-point number                                               |
+| `bigint:parse`    | `string`   | `bigint`    | Parses string to BigInt                                                              |
+| `strip:null`      | `any`      | `any`       | Returns undefined when the field is null which will remove the field from the object |
 
 ### Request Transformation Examples
 

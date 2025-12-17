@@ -5,7 +5,7 @@ import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
 import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
-import { Fn, InternalError, Logger, MaybeUndefined, SyncFn, utils } from '@shadow-library/common';
+import { Fn, InternalError, Logger, MaybeUndefined, utils } from '@shadow-library/common';
 import { all as deepmerge } from 'deepmerge';
 import { type FastifyInstance, RouteOptions, preHandlerAsyncHookHandler, preSerializationAsyncHookHandler } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
@@ -17,7 +17,7 @@ import { Class, JsonObject, JsonValue, Promisable } from 'type-fest';
  * Importing user defined packages
  */
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE, HTTP_CONTROLLER_INPUTS, HTTP_CONTROLLER_TYPE, NAMESPACE } from '../constants';
-import { HttpMethod, MiddlewareMetadata, MiddlewareType, SensitiveDataType } from '../decorators';
+import { HttpMethod, MiddlewareMetadata, MiddlewareType, SensitiveDataType, TransformerFn } from '../decorators';
 import { AsyncRouteHandler, CallbackRouteHandler, HttpRequest, HttpResponse, ServerMetadata } from '../interfaces';
 import { ContextService } from '../services';
 import { INBUILT_TRANSFORMERS } from './data-transformers';
@@ -117,7 +117,7 @@ export class FastifyRouter extends Router {
   private readonly cachedDynamicMiddlewares = new Map<string, MiddlewareHandler>();
   private readonly childRouter: ChildRouter<HTTPVersion.V1> | null = null;
 
-  private readonly transformers: Record<string, SyncFn> = { ...INBUILT_TRANSFORMERS };
+  private readonly transformers: Record<string, TransformerFn> = { ...INBUILT_TRANSFORMERS };
   private readonly sensitiveTransformer = new TransformerFactory(s => s['x-fastify']?.sensitive === true);
   private readonly inputDataTransformer = new TransformerFactory(s => this.isTransformable('input', s));
   private readonly outputDataTransformer = new TransformerFactory(s => this.isTransformable('output', s));
@@ -179,11 +179,11 @@ export class FastifyRouter extends Router {
   }
 
   private generateDataTransformer(type: 'input' | 'output'): TransformerAction {
-    return (value, schema) => {
+    return (value, schema, ctx) => {
       const transformType = schema['x-fastify']?.transform?.[type] as string;
       const transformer = this.transformers[transformType];
       assert(transformer, `transformer '${transformType}' not found`);
-      return transformer(value);
+      return transformer(value, ctx);
     };
   }
 

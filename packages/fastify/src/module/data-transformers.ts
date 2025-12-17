@@ -22,4 +22,6 @@ export const INBUILT_TRANSFORMERS: InbuiltTransformers = {
   'int:parse': value => parseInt(value, 10),
   'float:parse': value => parseFloat(value),
   'bigint:parse': value => BigInt(value),
+
+  'strip:null': value => (value === null ? undefined : value),
 };

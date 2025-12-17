@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 
-import { FieldMetadata } from '@shadow-library/class-schema';
+import { FieldMetadata, TransformerContext } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -27,9 +27,13 @@ export interface InbuiltTransformers {
   'int:parse': (value: string) => number;
   'float:parse': (value: string) => number;
   'bigint:parse': (value: string) => bigint;
+
+  'strip:null': (value: any) => any;
 }
 
 export type TransformTypes = keyof CustomTransformers | keyof InbuiltTransformers;
+
+export type TransformerFn = (value: any, ctx: TransformerContext) => any;
 
 /**
  * Declaring the constants
