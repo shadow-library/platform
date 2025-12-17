@@ -217,7 +217,7 @@ export class TransformerFactory {
         ops += `
           if (Array.isArray(data)) {
             const getContext = (index) => ({ ...ctx, field: index.toString(), path: this.constructPath(ctx.prefix, index) });
-            data = data.map((value, index) => action(value, this.schemas['${schema.$id}'], getContext(index)));
+            data = data.map((value, index) => action(value, this.schemas['${schema.$id}'], getContext(index))).filter(value => value !== undefined);
           }
         `;
       } else {
@@ -226,7 +226,7 @@ export class TransformerFactory {
             const transformer = this.transformers['${schema.items.$ref}'];
             if (transformer) {
               const getContext = (index) => ({ ...ctx, prefix: this.constructPath(ctx.prefix, index) });
-              data = data.map((value, index) => transformer(value, action, getContext(index)));
+              data = data.map((value, index) => transformer(value, action, getContext(index))).filter(value => value !== undefined);
             }
           }
         `;
@@ -269,13 +269,13 @@ export class TransformerFactory {
         else if (isRef) refFields.push(key);
       }
 
-      if (!fields.length && !refFields.length) return (this.context.transformers[schema.$id] = null);
       for (const field of fields) {
         ops += `
-          if (data.${field} != null) {
+          if ('${field}' in data) {
             const value = data.${field};
             const childContext = { parent: data, root: ctx.root, field: '${field}', path: this.constructPath(ctx.prefix, '${field}') };
             data.${field} = action(value, this.schemas['${schema.$id}'].properties.${field}, childContext);
+            if (data.${field} === undefined) delete data.${field};
           }
         `;
       }
@@ -288,17 +288,18 @@ export class TransformerFactory {
               const transformer = this.transformers['${refSchema.items?.$ref}'];
               if (transformer) {
                 const getContext = (index) => ({ parent: data, root: ctx.root, prefix: this.constructPath(ctx.prefix, '${field}.' + index) });
-                data.${field} = data.${field}.map((value, index) => transformer(value, action, getContext(index)));
+                data.${field} = data.${field}.map((value, index) => transformer(value, action, getContext(index))).filter(value => value !== undefined);
               }
             }
           `;
         } else {
           ops += `
-            if (data.${field} != null) {
+            if ('${field}' in data) {
               const transformer = this.transformers['${refSchema.$ref}'];
               if (transformer) {
                 const childContext = { parent: data, root: ctx.root, prefix: this.constructPath(ctx.prefix, '${field}') };
                 data.${field} = transformer(data.${field}, action, childContext);
+                if (data.${field} === undefined) delete data.${field};
               }
             }
           `;

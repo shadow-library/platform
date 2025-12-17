@@ -509,6 +509,19 @@ const transformed = transformer(data, value => new Date(value));
 console.log(transformed.createdAt instanceof Date); // true
 ```
 
+> **Note on field handling**: The transformer uses `'field' in data` to check fields, so fields explicitly set to `undefined` or `null` **are transformed**, while missing keys are skipped. If the action returns `undefined`, the field is **removed** from the object. Array items that transform to `undefined` are filtered out.
+
+```typescript
+// Transform to undefined - field is removed
+transformer({ name: 'test' }, () => undefined); // {}
+
+// Field with null - transformed (key exists)
+transformer({ name: null }, () => 'xxx'); // { name: 'xxx' }
+
+// Missing key - not transformed (action not called)
+transformer({}, () => 'xxx'); // {}
+```
+
 ### Conditional Transformation with `maybeCompile`
 
 The `maybeCompile` method returns `null` if no fields match the filter, allowing you to optimize performance by skipping transformation entirely:
@@ -850,6 +863,8 @@ const transformer = factory.compile(schema);
 // Both transformers are applied since no discriminator exists
 transformer({ fieldA: 'a', fieldB: 'b' }, () => 'xxx'); // { fieldA: 'xxx', fieldB: 'xxx' }
 ```
+
+> **Best Practice**: Always ensure nested `$ref` objects are valid objects before transformation, or handle potential errors when the nested object might be `null` or `undefined`.
 
 ## Array Schemas
 
