@@ -14,21 +14,21 @@ export type SortOrder = 'asc' | 'desc';
 
 export type PaginationMode = 'offset' | 'page' | 'cursor';
 
-interface BasePagination {
+interface BasePagination<SortBy extends string = string> {
   limit: number;
-  sortBy: string;
+  sortBy: SortBy;
   sortOrder: SortOrder;
 }
 
-export interface OffsetPagination extends BasePagination {
+export interface OffsetPagination<SortBy extends string = string> extends BasePagination<SortBy> {
   offset: number;
 }
 
-export interface PagePagination extends BasePagination {
+export interface PagePagination<SortBy extends string = string> extends BasePagination<SortBy> {
   page: number;
 }
 
-export interface CursorPagination extends BasePagination {
+export interface CursorPagination<SortBy extends string = string> extends BasePagination<SortBy> {
   cursor: string | null;
 }
 
