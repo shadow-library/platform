@@ -58,6 +58,7 @@ describe('Schema Composer', () => {
     $id: NativeUser.name,
     type: 'object',
     required: ['type', 'username', 'password'],
+    additionalProperties: false,
     properties: {
       type: { type: 'string', const: 'native' },
       password: { type: 'string' },
@@ -68,6 +69,7 @@ describe('Schema Composer', () => {
     $id: OAuthUser.name,
     type: 'object',
     required: ['type', 'username', 'provider'],
+    additionalProperties: false,
     properties: {
       type: { type: 'string', const: 'oauth' },
       provider: { type: 'string' },
@@ -81,6 +83,7 @@ describe('Schema Composer', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: `class-schema:anyOf?Classes=${encodeURIComponent('NativeUser,OAuthUser')}`,
       type: 'object',
+      additionalProperties: false,
       anyOf: [{ $ref: NativeUser.name }, { $ref: OAuthUser.name }],
       definitions: { [NativeUser.name]: nativeUserSchema, [OAuthUser.name]: oauthUserSchema },
     });
@@ -92,6 +95,7 @@ describe('Schema Composer', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: `class-schema:oneOf?Classes=${encodeURIComponent('NativeUser,OAuthUser')}`,
       type: 'object',
+      additionalProperties: false,
       oneOf: [{ $ref: NativeUser.name }, { $ref: OAuthUser.name }],
       definitions: { [NativeUser.name]: nativeUserSchema, [OAuthUser.name]: oauthUserSchema },
     });
@@ -103,6 +107,7 @@ describe('Schema Composer', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: `class-schema:oneOf?Classes=${encodeURIComponent('NativeUser,OAuthUser')}&discriminatorKey=type`,
       type: 'object',
+      additionalProperties: false,
       oneOf: [{ $ref: NativeUser.name }, { $ref: OAuthUser.name }],
       discriminator: { propertyName: 'type', mapping: { native: NativeUser.name, oauth: OAuthUser.name } },
       definitions: { [NativeUser.name]: nativeUserSchema, [OAuthUser.name]: oauthUserSchema },
@@ -114,6 +119,7 @@ describe('Schema Composer', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: Account.name,
       type: 'object',
+      additionalProperties: false,
       properties: {
         id: { type: 'string' },
         admin: { $ref: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser' },
@@ -124,11 +130,13 @@ describe('Schema Composer', () => {
         'class-schema:oneOf?Classes=NativeUser%2COAuthUser': {
           $id: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser',
           type: 'object',
+          additionalProperties: false,
           oneOf: [{ $ref: 'NativeUser' }, { $ref: 'OAuthUser' }],
         },
         'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type': {
           $id: 'class-schema:oneOf?Classes=NativeUser%2COAuthUser&discriminatorKey=type',
           type: 'object',
+          additionalProperties: false,
           discriminator: { propertyName: 'type', mapping: { native: 'NativeUser', oauth: 'OAuthUser' } },
           oneOf: [{ $ref: 'NativeUser' }, { $ref: 'OAuthUser' }],
         },
@@ -136,6 +144,7 @@ describe('Schema Composer', () => {
           $id: 'NativeUser',
           type: 'object',
           required: ['type', 'username', 'password'],
+          additionalProperties: false,
           properties: {
             type: { type: 'string', const: 'native' },
             username: { type: 'string' },
@@ -146,6 +155,7 @@ describe('Schema Composer', () => {
           $id: 'OAuthUser',
           type: 'object',
           required: ['type', 'username', 'provider'],
+          additionalProperties: false,
           properties: {
             type: { type: 'string', const: 'oauth' },
             username: { type: 'string' },

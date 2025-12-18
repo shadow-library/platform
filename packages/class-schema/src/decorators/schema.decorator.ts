@@ -49,7 +49,7 @@ let counter = 0;
 
 export function Schema(options: SchemaOptions = {}): ClassDecorator {
   const { additionalProperties, patternProperties, ...objectProperties } = options;
-  const schema: JSONSchema = { ...objectProperties, type: 'object' };
+  const schema: JSONSchema = { ...objectProperties, type: 'object', additionalProperties: false };
 
   const metadata: Record<string, any> = {};
   if (additionalProperties !== undefined) metadata.additionalProperties = additionalProperties;

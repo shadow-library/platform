@@ -23,7 +23,7 @@ describe('@Schema', () => {
     class Sample {}
 
     const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Sample);
-    expect(options).toStrictEqual({ $id: 'id', type: 'object', description: 'description' });
+    expect(options).toStrictEqual({ $id: 'id', type: 'object', description: 'description', additionalProperties: false });
   });
 
   it('should set the default $id field', () => {
@@ -31,7 +31,7 @@ describe('@Schema', () => {
     class Sample {}
 
     const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Sample);
-    expect(options).toStrictEqual({ $id: expect.stringMatching(/^class-schema:Sample-[0-9]+$/), type: 'object' });
+    expect(options).toStrictEqual({ $id: expect.stringMatching(/^class-schema:Sample-[0-9]+$/), type: 'object', additionalProperties: false });
   });
 
   it('should set different $id field for schema having same name', () => {

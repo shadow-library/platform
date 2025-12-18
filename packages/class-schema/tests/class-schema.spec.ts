@@ -132,6 +132,7 @@ describe('ClassSchema', () => {
         $id: Primitive.name,
         type: 'object',
         required: ['str', 'num', 'bool', 'obj', 'arr'],
+        additionalProperties: false,
         properties: {
           str: { type: 'string' },
           num: { type: 'number' },
@@ -160,6 +161,7 @@ describe('ClassSchema', () => {
       $id: Primitive.name,
       type: 'object',
       required: ['str', 'num', 'bool', 'obj', 'arr'],
+      additionalProperties: false,
       properties: {
         str: { type: 'string' },
         num: { type: 'number' },
@@ -177,6 +179,7 @@ describe('ClassSchema', () => {
       title: 'ExtendedPrimitiveTitle',
       type: 'object',
       required: ['str', 'num', 'bool', 'obj', 'arr', 'extended', 'patternProperties'],
+      additionalProperties: false,
       properties: {
         str: { type: 'string' },
         num: { type: 'number' },
@@ -195,6 +198,7 @@ describe('ClassSchema', () => {
         [PatternProperties.name]: {
           $id: PatternProperties.name,
           type: 'object',
+          additionalProperties: false,
           patternProperties: { '^[a-zA-Z]{3,32}$': { type: 'boolean' } },
         },
       },
@@ -211,6 +215,7 @@ describe('ClassSchema', () => {
           $id: Primitive.name,
           type: 'object',
           required: ['str', 'num', 'bool', 'obj', 'arr'],
+          additionalProperties: false,
           properties: {
             str: { type: 'string' },
             num: { type: 'number' },
@@ -222,9 +227,11 @@ describe('ClassSchema', () => {
         [Sample.name]: {
           $id: Sample.name,
           type: 'object',
+          additionalProperties: false,
         },
       },
       required: ['email', 'date', 'age', 'primitive', 'primitives'],
+      additionalProperties: false,
       properties: {
         email: { type: 'string', format: 'email' },
         date: { type: ['string', 'null'], format: 'date-time', default: '2000-01-01T00:00:00Z' },
@@ -244,6 +251,7 @@ describe('ClassSchema', () => {
         [Folder.name]: {
           type: 'object',
           $id: Folder.name,
+          additionalProperties: false,
           properties: {
             name: { type: 'string' },
             files: { type: 'array', items: { $ref: File.name } },
@@ -253,6 +261,7 @@ describe('ClassSchema', () => {
         },
       },
       required: ['name', 'parent'],
+      additionalProperties: false,
       properties: {
         name: { type: 'string' },
         size: { type: 'number' },
@@ -268,7 +277,7 @@ describe('ClassSchema', () => {
     expect(schema.getJSONSchema()).toStrictEqual({
       $id: `${Sample.name}?type=Array`,
       definitions: {
-        Sample: { $id: 'Sample', type: 'object' },
+        Sample: { $id: 'Sample', type: 'object', additionalProperties: false },
       },
       type: 'array',
       items: { $ref: Sample.name },
@@ -288,6 +297,7 @@ describe('ClassSchema', () => {
       $id: File.name,
       type: 'object',
       required: ['name', 'parent'],
+      additionalProperties: false,
       properties: {
         name: { type: 'string' },
         size: { type: 'number' },
@@ -327,6 +337,7 @@ describe('ClassSchema', () => {
       $id: ConditionalSchema.name,
       type: 'object',
       required: ['role'],
+      additionalProperties: false,
       properties: {
         role: { type: 'string' },
         accessLevel: { type: 'string' },
