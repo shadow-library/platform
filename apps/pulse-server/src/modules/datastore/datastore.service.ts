@@ -64,7 +64,7 @@ export class DatastoreService {
       if (appError) throw appError;
     }
 
-    this.logger.error('Unknown database error', { error });
+    this.logger.error('Unknown database error', error);
     throw new InternalError('Unknown database error occurred');
   }
 }

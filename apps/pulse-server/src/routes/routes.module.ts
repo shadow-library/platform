@@ -23,7 +23,7 @@ import { TemplateRoutesModule } from './template';
 const AppHttpCoreModule = HttpCoreModule.forRoot({ csrf: { disabled: true } });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, TemplateRoutesModule, DashboardModule],
+  imports: [AppHttpCoreModule, DashboardModule, TemplateRoutesModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

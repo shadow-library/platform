@@ -4,7 +4,7 @@
 import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { InferInsertModel, asc, desc, eq, like } from 'drizzle-orm';
 
@@ -20,19 +20,8 @@ import { DatastoreService, PrimaryDatabase, Template, schema, templateGroups } f
  * Defining types
  */
 
-export interface ListTemplateQuery {
+export interface ListTemplateQuery extends Partial<OffsetPagination> {
   key?: string;
-}
-
-export interface Pagination {
-  offset?: number;
-  limit?: number;
-  sortBy?: 'createdAt' | 'updatedAt';
-  sortOrder?: 'asc' | 'desc';
-}
-
-export interface TemplateDetails extends Template.Group {
-  variants: Template.Variant[];
 }
 
 export type CreateTemplateGroup = Omit<InferInsertModel<typeof schema.templateGroups>, 'id' | 'createdAt' | 'updatedAt'>;
@@ -64,8 +53,8 @@ export class TemplateGroupService {
     return templateGroup;
   }
 
-  async listTemplateGroups(filter: ListTemplateQuery = {}, pagination: Pagination = {}): Promise<OffsetPaginationResult<Template.Group>> {
-    const query = utils.pagination.normalise(pagination, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
+  async listTemplateGroups(filter: ListTemplateQuery = {}): Promise<OffsetPaginationResult<Template.Group>> {
+    const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
     const sortOrder = query.sortOrder === 'asc' ? asc : desc;
     const sortField = query.sortBy === 'createdAt' ? schema.templateGroups.createdAt : schema.templateGroups.updatedAt;
     const where = filter.key ? like(schema.templateGroups.templateKey, `%${filter.key}%`) : undefined;
@@ -76,10 +65,9 @@ export class TemplateGroupService {
     return utils.pagination.createResult(query, items, total);
   }
 
-  async getTemplateGroup(id: bigint): Promise<TemplateDetails | null> {
+  async getTemplateGroup(templateKeyOrId: string | bigint): Promise<Template.Group | null> {
     const template = await this.db.query.templateGroups.findFirst({
-      where: eq(schema.templateGroups.id, id),
-      with: { variants: true },
+      where: typeof templateKeyOrId === 'bigint' ? eq(schema.templateGroups.id, templateKeyOrId) : eq(schema.templateGroups.templateKey, templateKeyOrId),
     });
 
     return template ?? null;

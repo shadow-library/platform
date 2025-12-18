@@ -10,8 +10,6 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
  */
 import { type Notification, schema } from '@modules/datastore';
 
-import { TemplateVariantResponse } from './template-variant.dto';
-
 /**
  * Defining types
  */
@@ -22,7 +20,7 @@ import { TemplateVariantResponse } from './template-variant.dto';
 
 @Schema()
 export class TemplateGroupResponse {
-  @Field(() => Number)
+  @Field(() => String)
   id: bigint;
 
   @Field()
@@ -60,14 +58,8 @@ export class CreateTemplateGroupBody {
   isActive?: boolean;
 }
 
-@Schema()
+@Schema({ minProperties: 1 })
 export class UpdateTemplateGroupBody extends OmitType(CreateTemplateGroupBody, ['templateKey']) {}
-
-@Schema()
-export class TemplateGroupDetailResponse extends TemplateGroupResponse {
-  @Field(() => [TemplateVariantResponse])
-  variants: TemplateVariantResponse[];
-}
 
 @Schema()
 export class ListTemplateGroupsQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
@@ -77,9 +69,9 @@ export class ListTemplateGroupsQuery extends PaginationQuery(['createdAt', 'upda
 
 @Schema()
 export class TemplateGroupParams {
-  @Field(() => Number)
+  @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
-  id: bigint;
+  groupId: bigint;
 }
 
 @Schema()

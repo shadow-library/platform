@@ -9,6 +9,7 @@ import { Module } from '@shadow-library/app';
 import { TemplateModule } from '@modules/template';
 
 import { TemplateGroupController } from './template-group.controller';
+import { TemplateVariantController } from './template-variant.controller';
 
 /**
  * Defining types
@@ -20,6 +21,6 @@ import { TemplateGroupController } from './template-group.controller';
 
 @Module({
   imports: [TemplateModule],
-  controllers: [TemplateGroupController],
+  controllers: [TemplateGroupController, TemplateVariantController],
 })
 export class TemplateRoutesModule {}

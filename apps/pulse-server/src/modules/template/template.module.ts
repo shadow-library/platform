@@ -8,6 +8,7 @@ import { Module } from '@shadow-library/app';
  */
 import { DatastoreModule } from '../datastore';
 import { TemplateGroupService } from './template-group.service';
+import { TemplateVariantService } from './template-variant.service';
 
 /**
  * Defining types
@@ -19,7 +20,7 @@ import { TemplateGroupService } from './template-group.service';
 
 @Module({
   imports: [DatastoreModule],
-  providers: [TemplateGroupService],
-  exports: [TemplateGroupService],
+  providers: [TemplateGroupService, TemplateVariantService],
+  exports: [TemplateGroupService, TemplateVariantService],
 })
 export class TemplateModule {}

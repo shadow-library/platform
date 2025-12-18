@@ -9,15 +9,7 @@ import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor, Serv
 import { TemplateGroupService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 
-import {
-  CreateTemplateGroupBody,
-  ListTemplateGroupResponse,
-  ListTemplateGroupsQuery,
-  TemplateGroupDetailResponse,
-  TemplateGroupParams,
-  TemplateGroupResponse,
-  UpdateTemplateGroupBody,
-} from './dtos';
+import { CreateTemplateGroupBody, ListTemplateGroupResponse, ListTemplateGroupsQuery, TemplateGroupParams, TemplateGroupResponse, UpdateTemplateGroupBody } from './dtos';
 
 /**
  * Defining types
@@ -40,21 +32,20 @@ export class TemplateGroupController {
   @Get()
   @RespondFor(200, ListTemplateGroupResponse)
   listTemplateGroups(@Query() query: ListTemplateGroupsQuery): Promise<ListTemplateGroupResponse> {
-    const { key, ...pagination } = query;
-    return this.templateGroupService.listTemplateGroups({ key }, pagination);
+    return this.templateGroupService.listTemplateGroups(query);
   }
 
-  @Get('/:id')
-  @RespondFor(200, TemplateGroupDetailResponse)
-  async getTemplateGroup(@Params() params: TemplateGroupParams): Promise<TemplateGroupDetailResponse> {
-    const templateGroup = await this.templateGroupService.getTemplateGroup(params.id);
+  @Get('/:groupId')
+  @RespondFor(200, TemplateGroupResponse)
+  async getTemplateGroup(@Params() params: TemplateGroupParams): Promise<TemplateGroupResponse> {
+    const templateGroup = await this.templateGroupService.getTemplateGroup(params.groupId);
     if (!templateGroup) throw new ServerError(AppErrorCode.TPL_GRP_001);
     return templateGroup;
   }
 
-  @Patch('/:id')
+  @Patch('/:groupId')
   @RespondFor(200, TemplateGroupResponse)
   updateTemplateGroup(@Params() params: TemplateGroupParams, @Body() body: UpdateTemplateGroupBody): Promise<TemplateGroupResponse> {
-    return this.templateGroupService.updateTemplateGroup(params.id, body);
+    return this.templateGroupService.updateTemplateGroup(params.groupId, body);
   }
 }
