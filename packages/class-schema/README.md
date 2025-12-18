@@ -934,6 +934,29 @@ interface SchemaOptions {
   minProperties?: number; // Minimum properties
   patternProperties?: Record<string, Class<unknown>>;
   additionalProperties?: boolean | Class<unknown>;
+  if?: JSONSchema; // Conditional schema: if
+  then?: JSONSchema; // Conditional schema: then
+  else?: JSONSchema; // Conditional schema: else
+}
+```
+
+Use `if`/`then`/`else` to embed JSON Schema conditional logic directly in the decorator:
+
+```typescript
+@Schema({
+  if: { properties: { type: { const: 'a' } } },
+  then: { required: ['aOnly'] },
+  else: { required: ['bOnly'] },
+})
+class ConditionalExample {
+  @Field({ const: 'a' })
+  type: 'a' | 'b';
+
+  @Field({ optional: true })
+  aOnly?: string;
+
+  @Field({ optional: true })
+  bOnly?: string;
 }
 ```
 

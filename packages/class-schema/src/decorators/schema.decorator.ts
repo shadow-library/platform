@@ -35,6 +35,11 @@ export interface SchemaOptions {
 
   /** Additional Properties of the object */
   additionalProperties?: boolean | Class<unknown>;
+
+  /** Conditional schema - if */
+  if?: JSONSchema;
+  then?: JSONSchema;
+  else?: JSONSchema;
 }
 
 /**
@@ -47,8 +52,8 @@ export function Schema(options: SchemaOptions = {}): ClassDecorator {
   const schema: JSONSchema = { ...objectProperties, type: 'object' };
 
   const metadata: Record<string, any> = {};
-  if (additionalProperties) metadata.additionalProperties = additionalProperties;
-  if (patternProperties) metadata.patternProperties = patternProperties;
+  if (additionalProperties !== undefined) metadata.additionalProperties = additionalProperties;
+  if (patternProperties !== undefined) metadata.patternProperties = patternProperties;
 
   return target => {
     if (!schema.$id) schema.$id = `class-schema:${target.name}-${counter++}`;

@@ -307,4 +307,32 @@ describe('ClassSchema', () => {
     const schema = new ClassSchema(File).getJSONSchema(true);
     expect((schema as any)[BRAND]).toBe(true);
   });
+
+  it('should generate the JSON schema with conditional keywords', () => {
+    @Schema({
+      $id: ConditionalSchema.name,
+      if: { properties: { role: { const: 'admin' } } },
+      then: { required: ['accessLevel'] },
+    })
+    class ConditionalSchema {
+      @Field()
+      role: string;
+
+      @Field({ optional: true })
+      accessLevel?: string;
+    }
+
+    const schema = new ClassSchema(ConditionalSchema).getJSONSchema();
+    expect(schema).toStrictEqual({
+      $id: ConditionalSchema.name,
+      type: 'object',
+      required: ['role'],
+      properties: {
+        role: { type: 'string' },
+        accessLevel: { type: 'string' },
+      },
+      if: { properties: { role: { const: 'admin' } } },
+      then: { required: ['accessLevel'] },
+    });
+  });
 });

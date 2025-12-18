@@ -55,4 +55,12 @@ describe('@Schema', () => {
     const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Sample);
     expect(options).toStrictEqual({ additionalProperties: true });
   });
+
+  it('should set extra properties with false value', () => {
+    @Schema({ additionalProperties: false })
+    class Sample {}
+
+    const options = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Sample);
+    expect(options).toStrictEqual({ additionalProperties: false });
+  });
 });
