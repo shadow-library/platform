@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/class-schema",
   "type": "module",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "sideEffects": false,
   "description": "Decorator-based JSON schema generator at runtime",
   "scripts": {
