@@ -8,7 +8,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { type Notification, schema } from '@modules/datastore';
+import { type Notification, type Template, schema } from '@modules/datastore';
 
 /**
  * Defining types
@@ -19,43 +19,34 @@ import { type Notification, schema } from '@modules/datastore';
  */
 
 @Schema()
-export class TemplateGroupResponse {
-  @Field(() => String)
-  id: bigint;
-
-  @Field()
-  templateKey: string;
-
-  @Field({ optional: true })
-  @Transform('strip:null')
-  description?: string | null;
-
-  @Field({ enum: schema.priority.enumValues })
-  priority: string;
-
-  @Field()
-  isActive: boolean;
-
-  @Field(() => String, { format: 'date-time' })
-  createdAt: Date;
-
-  @Field(() => String, { format: 'date-time' })
-  updatedAt: Date;
-}
-
-@Schema()
 export class CreateTemplateGroupBody {
   @Field()
   templateKey: string;
 
+  @Field(() => String, { enum: schema.messageTypes.enumValues })
+  messageType: Template.MessageType;
+
   @Field({ optional: true })
-  description?: string;
+  @Transform({ output: 'strip:null' })
+  description?: string | null;
 
   @Field(() => String, { enum: schema.priority.enumValues, optional: true })
   priority?: Notification.Priority;
 
   @Field({ optional: true })
   isActive?: boolean;
+}
+
+@Schema()
+export class TemplateGroupResponse extends CreateTemplateGroupBody {
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
 }
 
 @Schema({ minProperties: 1 })

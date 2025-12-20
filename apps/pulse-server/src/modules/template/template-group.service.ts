@@ -6,7 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { InferInsertModel, asc, desc, eq, like } from 'drizzle-orm';
+import { InferInsertModel, and, asc, desc, eq, like } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -22,11 +22,12 @@ import { DatastoreService, PrimaryDatabase, Template, schema, templateGroups } f
 
 export interface ListTemplateQuery extends Partial<OffsetPagination> {
   key?: string;
+  messageType?: Template.MessageType;
 }
 
 export type CreateTemplateGroup = Omit<InferInsertModel<typeof schema.templateGroups>, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type UpdateTemplateGroup = Pick<CreateTemplateGroup, 'isActive' | 'description' | 'priority'>;
+export type UpdateTemplateGroup = Pick<CreateTemplateGroup, 'isActive' | 'description' | 'priority' | 'messageType'>;
 
 /**
  * Declaring the constants
@@ -57,7 +58,10 @@ export class TemplateGroupService {
     const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
     const sortOrder = query.sortOrder === 'asc' ? asc : desc;
     const sortField = query.sortBy === 'createdAt' ? schema.templateGroups.createdAt : schema.templateGroups.updatedAt;
-    const where = filter.key ? like(schema.templateGroups.templateKey, `%${filter.key}%`) : undefined;
+    const whereConditions = [];
+    if (filter.messageType) whereConditions.push(eq(schema.templateGroups.messageType, filter.messageType));
+    if (filter.key) whereConditions.push(like(schema.templateGroups.templateKey, `%${filter.key}%`));
+    const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;
     const [total, items] = await Promise.all([
       this.db.$count(templateGroups, where),
       this.db.query.templateGroups.findMany({ limit: query.limit, offset: query.offset, orderBy: sortOrder(sortField), where }),

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
+import { bigint, bigserial, boolean, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -16,15 +16,19 @@ import { notificationChannel, priority } from './notification-jobs';
 export namespace Template {
   export type Group = InferSelectModel<typeof templateGroups>;
   export type Variant = InferSelectModel<typeof templateVariants>;
+
+  export type MessageType = InferEnum<typeof messageTypes>;
 }
 
 /**
  * Declaring the constants
  */
+export const messageTypes = pgEnum('message_types', ['OTP', 'TRANSACTIONAL', 'PROMOTIONAL']);
 
 export const templateGroups = pgTable('template_groups', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   templateKey: varchar('template_key', { length: 255 }).notNull().unique(),
+  messageType: messageTypes('message_type').notNull().default('TRANSACTIONAL'),
   description: varchar('description', { length: 500 }),
   priority: priority('priority').notNull().default('MEDIUM'),
   isActive: boolean('is_active').notNull().default(true),
