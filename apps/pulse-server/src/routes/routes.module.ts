@@ -9,6 +9,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { CUSTOM_DATA_TRANSFORMERS } from './common';
+import { ConfigurationRoutesModule } from './configuration';
 import { DashboardModule } from './dashboard';
 import { TemplateRoutesModule } from './template';
 
@@ -23,7 +24,7 @@ import { TemplateRoutesModule } from './template';
 const AppHttpCoreModule = HttpCoreModule.forRoot({ csrf: { disabled: true } });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, DashboardModule, TemplateRoutesModule],
+  imports: [AppHttpCoreModule, ConfigurationRoutesModule, DashboardModule, TemplateRoutesModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

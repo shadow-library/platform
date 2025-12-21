@@ -62,11 +62,12 @@ export const senderProfileAssignments = pgTable(
   {
     senderProfileId: bigint('sender_profile_id', { mode: 'bigint' })
       .notNull()
-      .references(() => senderProfiles.id, { onDelete: 'cascade' }),
+      .references(() => senderProfiles.id, { onDelete: 'restrict' }),
 
     messageType: messageTypes('message_type').notNull(),
-    region: varchar('region', { length: 2 }),
-    serviceName: varchar('service_name', { length: 100 }),
+    region: varchar('region', { length: 2 }).notNull().default('ZZ'),
+    serviceName: varchar('service_name', { length: 100 }).notNull().default('DEFAULT'),
+
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

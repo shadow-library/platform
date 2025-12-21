@@ -97,7 +97,7 @@ export class TemplateVariantService {
     if (Object.keys(update).length === 0) throw new ValidationError('update', 'must contain at least one field');
     const [templateVariant] = await this.db
       .update(schema.templateVariants)
-      .set(update)
+      .set({ ...update, updatedAt: new Date() })
       .where(and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.id, templateVariantId)))
       .returning()
       .catch(err => this.datastoreService.translateError(err));

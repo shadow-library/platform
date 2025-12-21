@@ -78,7 +78,11 @@ export class TemplateGroupService {
   }
 
   async updateTemplateGroup(id: bigint, update: UpdateTemplateGroup): Promise<Template.Group> {
-    const [result] = await this.db.update(schema.templateGroups).set(update).where(eq(schema.templateGroups.id, id)).returning();
+    const [result] = await this.db
+      .update(schema.templateGroups)
+      .set({ ...update, updatedAt: new Date() })
+      .where(eq(schema.templateGroups.id, id))
+      .returning();
     if (!result) throw new ServerError(AppErrorCode.TPL_GRP_001);
     return result;
   }

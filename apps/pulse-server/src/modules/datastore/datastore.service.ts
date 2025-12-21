@@ -62,6 +62,7 @@ export class DatastoreService {
     if (error instanceof DrizzleQueryError && this.isPostgresError(error.cause)) {
       const appError = constraintErrorMap[error.cause.constraint];
       if (appError) throw appError;
+      this.logger.error('Postgres error', error.cause);
     }
 
     this.logger.error('Unknown database error', error);
