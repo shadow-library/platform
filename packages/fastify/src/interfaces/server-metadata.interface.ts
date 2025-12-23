@@ -9,7 +9,7 @@ import { FastifyInstance, RouteShorthandOptions } from 'fastify';
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '../constants';
-import { HttpMethod, RouteInputSchemas } from '../decorators';
+import { ApiOperationMetadata, HttpMethod, RouteInputSchemas } from '../decorators';
 
 /**
  * Defining types
@@ -21,6 +21,7 @@ declare module '@shadow-library/app' {
     path?: string;
     version?: number;
     schemas?: RouteInputSchemas & { response?: Record<number | string, JSONSchema | SchemaClass> };
+    operation?: ApiOperationMetadata;
 
     rawBody?: boolean;
     silentValidation?: boolean;

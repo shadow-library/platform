@@ -551,6 +551,77 @@ describe('FastifyRouter', () => {
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ schema: { querystring: { type: 'object' }, response: {} } }));
     });
+
+    it('should add operation metadata to the route schema', async () => {
+      const operationMetadata = {
+        summary: 'Get user by ID',
+        description: 'Retrieve a user by their ID',
+        tags: ['users'],
+      };
+      route.metadata.operation = operationMetadata;
+      await router.register([]);
+      expect(instance.route).toBeCalledWith(
+        expect.objectContaining({
+          schema: expect.objectContaining({
+            summary: 'Get user by ID',
+            description: 'Retrieve a user by their ID',
+            tags: ['users'],
+            response: {},
+          }),
+        }),
+      );
+    });
+
+    it('should merge operation metadata with response schemas', async () => {
+      const operationMetadata = {
+        summary: 'Create user',
+        tags: ['users'],
+      };
+      const responseSchema = { 200: { type: 'object' }, 400: { type: 'object' } };
+      route.metadata.operation = operationMetadata;
+      route.metadata.schemas = { response: responseSchema };
+      await router.register([]);
+      expect(instance.route).toBeCalledWith(
+        expect.objectContaining({
+          schema: expect.objectContaining({
+            summary: 'Create user',
+            tags: ['users'],
+            response: responseSchema,
+          }),
+        }),
+      );
+    });
+
+    it('should include all operation metadata fields in the schema', async () => {
+      const operationMetadata = {
+        summary: 'Update user',
+        description: 'Update user information',
+        tags: ['users', 'admin'],
+        deprecated: false,
+        externalDocs: {
+          url: 'https://example.com/docs/users',
+          description: 'User documentation',
+        },
+        security: {
+          bearerAuth: [],
+        },
+      };
+      route.metadata.operation = operationMetadata;
+      await router.register([]);
+      expect(instance.route).toBeCalledWith(
+        expect.objectContaining({
+          schema: expect.objectContaining({
+            summary: 'Update user',
+            description: 'Update user information',
+            tags: ['users', 'admin'],
+            deprecated: false,
+            externalDocs: operationMetadata.externalDocs,
+            security: operationMetadata.security,
+            response: {},
+          }),
+        }),
+      );
+    });
   });
 
   describe('child routes', () => {

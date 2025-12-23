@@ -231,6 +231,7 @@ export class FastifyRouter extends Router {
             const versionPrefix = this.config.prefixVersioning ? `/v${version}` : '';
             const path = this.joinPaths(this.config.routePrefix, versionPrefix, metadata.path, route.metadata.path);
             const parsedController: ParsedController<ServerMetadata> = { ...route, instance, metatype };
+            if (metadata.operation || route.metadata.operation) route.metadata.operation = Object.assign({}, metadata.operation, route.metadata.operation);
             parsedController.metadata.path = path;
             parsedControllers.routes.push(parsedController);
           }
@@ -409,7 +410,7 @@ export class FastifyRouter extends Router {
       }
 
       const responseSchemas = { ...defaultResponseSchemas };
-      routeOptions.schema = { response: responseSchemas };
+      routeOptions.schema = { ...metadata.operation, response: responseSchemas };
       routeOptions.attachValidation = metadata.silentValidation ?? false;
       const { body: bodySchema, params: paramsSchema, query: querySchema, response: responseSchema } = metadata.schemas ?? {};
       const isMaskEnabled = this.config.maskSensitiveData ?? true;

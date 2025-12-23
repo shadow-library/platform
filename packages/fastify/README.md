@@ -952,6 +952,62 @@ class CreateProductDto {
 }
 ```
 
+## API Documentation Metadata
+
+The `@ApiOperation` decorator allows you to add OpenAPI/Swagger metadata to your route handlers. This metadata is integrated into the Fastify route schema and can be consumed by documentation generators like Swagger UI.
+
+```typescript
+@ApiOperation({
+  summary: string;              // Short description of the operation
+  description?: string;         // Detailed description
+  tags?: string[];              // Operation tags for grouping
+  deprecated?: boolean;         // Mark if endpoint is deprecated
+  externalDocs?: {              // Link to external documentation
+    url: string;
+    description?: string;
+  };
+  security?: Record<string, []>; // Security requirements
+})
+```
+
+### Example Usage
+
+```typescript
+import { HttpController, Get, Post, Body, ApiOperation } from '@shadow-library/fastify';
+
+@HttpController('/api/users')
+export class UserController {
+  @Get()
+  @ApiOperation({
+    summary: 'List all users',
+    description: 'Retrieve a paginated list of all users in the system',
+    tags: ['users'],
+  })
+  async getUsers() {
+    return [];
+  }
+
+  @Post()
+  @ApiOperation({
+    summary: 'Create a new user',
+    tags: ['users'],
+    security: { bearerAuth: [] },
+  })
+  async createUser(@Body() userData: CreateUserDto) {
+    return { id: 1, ...userData };
+  }
+
+  @Get('/:id')
+  @ApiOperation({
+    summary: 'Get user by ID',
+    deprecated: false,
+  })
+  async getUserById() {
+    return { id: 1, name: 'John' };
+  }
+}
+```
+
 ## Data Transformation
 
 The `@Transform` decorator enables automatic data transformation at two key points in the request-response lifecycle:

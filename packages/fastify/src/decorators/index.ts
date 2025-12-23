@@ -1,3 +1,4 @@
+export * from './api-operation.decorator';
 export * from './http-controller.decorator';
 export * from './http-input.decorator';
 export * from './http-output.decorator';
