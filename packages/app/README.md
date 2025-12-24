@@ -284,6 +284,32 @@ adminOnly() {
 }
 ```
 
+### @EnableIf
+
+Conditionally enable or disable controllers or routes based on runtime conditions.
+
+```ts
+// Conditional controller
+@EnableIf(process.env.FEATURE_FLAG === 'enabled')
+@Controller()
+class FeatureController {
+  @Route({ path: '/feature', method: 'GET' })
+  getFeature() {
+    return 'Feature enabled';
+  }
+}
+
+// Conditional route
+@Controller()
+class UserController {
+  @EnableIf(() => process.env.NODE_ENV === 'production')
+  @Route({ path: '/admin', method: 'GET' })
+  adminRoute() {
+    return 'Admin only in production';
+  }
+}
+```
+
 ### applyDecorators
 
 Combine multiple decorators into a single decorator for reusability.

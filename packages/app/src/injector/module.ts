@@ -10,11 +10,13 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { InternalOperationMetadata } from '@lib/internal.types';
+
 import { DIErrors, DependencyGraph } from './helpers';
 import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
 import { ControllerRouteMetadata, Router } from '../classes';
-import { CONTROLLER_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
+import { CONTROLLER_METADATA, INTERNAL_OPERATION_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
 import { RouteMetadata } from '../decorators';
 import { InjectionToken, ModuleMetadata, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
@@ -30,6 +32,10 @@ export enum HookTypes {
   ON_MODULE_DESTROY = 'onModuleDestroy',
   ON_APPLICATION_READY = 'onApplicationReady',
   ON_APPLICATION_STOP = 'onApplicationStop',
+}
+
+interface ParsedInternalMetadata {
+  enabled: boolean;
 }
 
 /**
@@ -245,7 +251,16 @@ export class Module {
     this.logger.info(`Module '${this.instance.getTokenName()}' initialized`);
   }
 
-  private getControllerRouteMetadata(controller: InstanceWrapper<Controller>): ControllerRouteMetadata {
+  private getParsedInternalMetadata(target: object): ParsedInternalMetadata {
+    const internalMetadata: InternalOperationMetadata = Reflect.getMetadata(INTERNAL_OPERATION_METADATA, target) || {};
+
+    let enabled = true;
+    if (internalMetadata.enableIf !== undefined) enabled = typeof internalMetadata.enableIf === 'function' ? internalMetadata.enableIf() : internalMetadata.enableIf;
+
+    return { enabled };
+  }
+
+  private getControllerRouteMetadata(controller: InstanceWrapper<Controller>): ControllerRouteMetadata | null {
     /* Extracting the route methods present in the instance */
     const methods = new Set<() => any>();
     const instance = controller.getInstance();
@@ -262,8 +277,14 @@ export class Module {
     const metatype = controller.getMetatype() as Class<Controller>;
     const metadata = Reflect.getMetadata(CONTROLLER_METADATA, metatype);
     const controllerRouteMetadata = Reflect.getMetadata(ROUTE_METADATA, metatype);
+    const internalControllerMetadata = this.getParsedInternalMetadata(metatype);
+    if (!internalControllerMetadata.enabled) return null;
+
     const routes: ControllerRouteMetadata['routes'] = [];
     for (const method of methods) {
+      const internalMethodMetadata = this.getParsedInternalMetadata(method);
+      if (!internalMethodMetadata.enabled) continue;
+
       const handlerName = method.name;
       const routeMetadata = Reflect.getMetadata(ROUTE_METADATA, method);
       const metadata = merge<RouteMetadata>(controllerRouteMetadata, routeMetadata);
@@ -287,7 +308,7 @@ export class Module {
 
     for (const controller of controllers) {
       const metadata = this.getControllerRouteMetadata(controller);
-      controllerRouteMetadata.push(metadata);
+      if (metadata) controllerRouteMetadata.push(metadata);
     }
 
     await router.register(controllerRouteMetadata);

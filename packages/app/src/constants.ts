@@ -26,3 +26,5 @@ export const ROUTE_METADATA = Symbol('route-metadata');
 export const INJECTABLE_METADATA = Symbol('injectable-metadata');
 export const MODULE_METADATA = Symbol('module-metadata');
 export const INTERCEPTOR_METADATA = Symbol('interceptor-metadata');
+
+export const INTERNAL_OPERATION_METADATA = Symbol('internal-operation-metadata');
