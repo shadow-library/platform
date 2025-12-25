@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, pgEnum, pgTable, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, pgEnum, pgTable, primaryKey, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -16,6 +16,7 @@ import { notificationChannel, priority } from './notification-jobs';
 export namespace Template {
   export type Group = InferSelectModel<typeof templateGroups>;
   export type Variant = InferSelectModel<typeof templateVariants>;
+  export type ChannelSetting = InferSelectModel<typeof templateChannelSettings>;
 
   export type MessageType = InferEnum<typeof messageTypes>;
 }
@@ -36,6 +37,22 @@ export const templateGroups = pgTable('template_groups', {
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });
 
+export const templateChannelSettings = pgTable(
+  'template_channel_settings',
+  {
+    templateGroupId: bigint('template_group_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => templateGroups.id, { onDelete: 'cascade' }),
+    channel: notificationChannel('channel').notNull(),
+
+    isEnabled: boolean('is_enabled').notNull().default(true),
+
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [primaryKey({ columns: [t.templateGroupId, t.channel] })],
+);
+
 export const templateVariants = pgTable(
   'template_variants',
   {
@@ -45,7 +62,7 @@ export const templateVariants = pgTable(
       .references(() => templateGroups.id, { onDelete: 'cascade' }),
 
     channel: notificationChannel('channel').notNull(),
-    locale: varchar('locale', { length: 10 }).notNull(),
+    locale: varchar('locale', { length: 5 }).notNull().default('en-ZZ'),
 
     subject: varchar('subject', { length: 255 }),
     body: varchar('body', { length: 5000 }).notNull(),
@@ -63,8 +80,13 @@ export const templateVariants = pgTable(
 
 export const templateGroupRelations = relations(templateGroups, ({ many }) => ({
   variants: many(templateVariants),
+  channelSettings: many(templateChannelSettings),
 }));
 
 export const templateVariantRelations = relations(templateVariants, ({ one }) => ({
   group: one(templateGroups, { fields: [templateVariants.templateGroupId], references: [templateGroups.id] }),
+}));
+
+export const templateChannelSettingRelations = relations(templateChannelSettings, ({ one }) => ({
+  group: one(templateGroups, { fields: [templateChannelSettings.templateGroupId], references: [templateGroups.id] }),
 }));

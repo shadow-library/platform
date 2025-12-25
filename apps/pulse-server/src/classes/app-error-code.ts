@@ -27,6 +27,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly TPL_GRP_002 = new AppErrorCode('TPL_GRP_002', ErrorType.CONFLICT, 'Template group with the given key already exists');
 
   /*!
+   * Template Channel Setting Errors
+   */
+
+  /** Template channel setting not found */
+  static readonly TPL_CHN_001 = new AppErrorCode('TPL_CHN_001', ErrorType.NOT_FOUND, 'Template channel setting not found');
+
+  /*!
    * Template Variant Errors
    */
 

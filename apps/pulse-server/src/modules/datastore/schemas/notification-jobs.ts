@@ -37,7 +37,7 @@ export const notificationJobs = pgTable(
       .notNull()
       .references(() => templateGroups.id, { onDelete: 'restrict' }),
     channel: notificationChannel('channel').notNull(),
-    locale: varchar('locale', { length: 10 }).notNull(),
+    locale: varchar('locale', { length: 5 }).notNull(),
     priority: priority('priority').notNull().default('MEDIUM'),
 
     recipient: varchar('recipient', { length: 500 }).notNull(),

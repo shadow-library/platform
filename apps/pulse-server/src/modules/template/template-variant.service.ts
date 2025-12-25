@@ -83,11 +83,17 @@ export class TemplateVariantService {
 
   async addTemplateVariant(templateGroupId: bigint, data: CreateTemplateVariant): Promise<Template.Variant> {
     if (data.channel === 'EMAIL' && !data.subject) throw new ValidationError('subject', 'must be provided when the channel is EMAIL');
-    const [templateVariant] = await this.db
-      .insert(schema.templateVariants)
-      .values({ ...data, templateGroupId })
-      .returning()
+    const templateVariant = await this.db
+      .transaction(async tx => {
+        const [templateVariant] = await tx
+          .insert(schema.templateVariants)
+          .values({ ...data, templateGroupId })
+          .returning();
+        await tx.insert(schema.templateChannelSettings).values({ templateGroupId, channel: data.channel, isEnabled: true }).onConflictDoNothing();
+        return templateVariant;
+      })
       .catch(err => this.datastoreService.translateError(err));
+
     assert(templateVariant, 'Failed to create template variant');
     this.logger.info('Template variant created', { channel: templateVariant.channel, locale: templateVariant.locale, templateGroupId });
     return templateVariant;
