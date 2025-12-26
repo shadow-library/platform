@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, pgEnum, pgTable, primaryKey, smallint, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, pgEnum, pgTable, smallint, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -16,7 +16,7 @@ import { messageTypes } from './templates';
 export namespace Configuration {
   export type SenderProfile = InferSelectModel<typeof senderProfiles>;
   export type SenderEndpoint = InferSelectModel<typeof senderEndpoints>;
-  export type SenderProfileAssignment = InferSelectModel<typeof senderProfileAssignments>;
+  export type SenderRoutingRule = InferSelectModel<typeof senderRoutingRules>;
 
   export type ServiceProvider = InferEnum<typeof notificationServiceProviders>;
 }
@@ -57,21 +57,22 @@ export const senderEndpoints = pgTable(
   t => [unique('sender_endpoints_channel_provider_identifier_unique').on(t.channel, t.provider, t.identifier)],
 );
 
-export const senderProfileAssignments = pgTable(
-  'sender_profile_assignments',
+export const senderRoutingRules = pgTable(
+  'sender_routing_rules',
   {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
     senderProfileId: bigint('sender_profile_id', { mode: 'bigint' })
       .notNull()
       .references(() => senderProfiles.id, { onDelete: 'restrict' }),
 
-    messageType: messageTypes('message_type').notNull(),
-    region: varchar('region', { length: 2 }).notNull().default('ZZ'),
-    serviceName: varchar('service_name', { length: 100 }).notNull().default('DEFAULT'),
+    service: varchar('service', { length: 100 }),
+    region: varchar('region', { length: 2 }),
+    messageType: messageTypes('message_type'),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [primaryKey({ columns: [t.serviceName, t.messageType, t.region] })],
+  t => [unique('sender_routing_rules_service_region_message_type_unique').on(t.service, t.region, t.messageType)],
 );
 
 /**
@@ -80,13 +81,13 @@ export const senderProfileAssignments = pgTable(
 
 export const senderProfileRelations = relations(senderProfiles, ({ many }) => ({
   endpoints: many(senderEndpoints),
-  assignments: many(senderProfileAssignments),
+  routingRules: many(senderRoutingRules),
 }));
 
 export const senderEndpointRelations = relations(senderEndpoints, ({ one }) => ({
   profile: one(senderProfiles, { fields: [senderEndpoints.senderProfileId], references: [senderProfiles.id] }),
 }));
 
-export const senderProfileAssignmentRelations = relations(senderProfileAssignments, ({ one }) => ({
-  profile: one(senderProfiles, { fields: [senderProfileAssignments.senderProfileId], references: [senderProfiles.id] }),
+export const senderRoutingRuleRelations = relations(senderRoutingRules, ({ one }) => ({
+  profile: one(senderProfiles, { fields: [senderRoutingRules.senderProfileId], references: [senderProfiles.id] }),
 }));

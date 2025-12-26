@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Field, OmitType, PickType, Schema } from '@shadow-library/class-schema';
+import { Field, PickType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
@@ -17,28 +17,34 @@ import { SenderProfileResponse } from './sender-profile.dto';
  */
 
 @Schema()
-export class CreateSenderAssignmentBody {
+export class CreateRoutingRuleBody {
   @Field(() => String)
   @Transform('bigint:parse')
   senderProfileId: bigint;
 
-  @Field(() => String, { enum: schema.messageTypes.enumValues })
-  messageType: Template.MessageType;
+  @Field(() => String, { enum: schema.messageTypes.enumValues, optional: true })
+  messageType?: Template.MessageType;
 
   @Field({ optional: true })
   region?: string;
 
   @Field({ optional: true })
-  serviceName?: string;
+  service?: string;
 }
 
 @Schema()
-export class SenderAssignmentResponse extends OmitType(CreateSenderAssignmentBody, ['region', 'serviceName'] as const) {
-  @Field()
-  region: string;
+export class SenderRoutingRuleResponse extends PickType(CreateRoutingRuleBody, ['senderProfileId'] as const) {
+  @Field(() => String, { enum: schema.messageTypes.enumValues, optional: true })
+  @Transform('strip:null')
+  messageType: Template.MessageType | null;
 
-  @Field()
-  serviceName: string;
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  region: string | null;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  service: string | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
@@ -48,16 +54,16 @@ export class SenderAssignmentResponse extends OmitType(CreateSenderAssignmentBod
 }
 
 @Schema()
-export class SenderAssignmentDetailResponse extends SenderAssignmentResponse {
+export class SenderRoutingRuleDetailResponse extends SenderRoutingRuleResponse {
   @Field()
   profile: SenderProfileResponse;
 }
 
 @Schema()
-export class UpdateSenderAssignmentBody extends PickType(CreateSenderAssignmentBody, ['senderProfileId']) {}
+export class UpdateSenderRoutingRuleBody extends PickType(CreateRoutingRuleBody, ['senderProfileId']) {}
 
 @Schema()
-export class ListSenderAssignmentsQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
+export class ListSenderRoutingRulesQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
   @Field(() => String, { enum: schema.messageTypes.enumValues, optional: true })
   messageType?: Template.MessageType;
 
@@ -69,7 +75,7 @@ export class ListSenderAssignmentsQuery extends PaginationQuery(['createdAt', 'u
 }
 
 @Schema()
-export class SenderAssignmentParams {
+export class SenderRoutingRuleParams {
   @Field()
   serviceName: string;
 
@@ -81,4 +87,4 @@ export class SenderAssignmentParams {
 }
 
 @Schema()
-export class ListSenderAssignmentResponse extends Paginated(SenderAssignmentResponse) {}
+export class ListSenderRoutingRuleResponse extends Paginated(SenderRoutingRuleResponse) {}

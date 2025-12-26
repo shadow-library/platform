@@ -7,9 +7,9 @@ import { Module } from '@shadow-library/app';
  * Importing user defined packages
  */
 import { DatastoreModule } from '../datastore';
-import { SenderAssignmentService } from './sender-assignment.service';
 import { SenderEndpointService } from './sender-endpoint.service';
 import { SenderProfileService } from './sender-profile.service';
+import { SenderRoutingRuleService } from './sender-routing-rule.service';
 
 /**
  * Defining types
@@ -21,7 +21,7 @@ import { SenderProfileService } from './sender-profile.service';
 
 @Module({
   imports: [DatastoreModule],
-  providers: [SenderProfileService, SenderEndpointService, SenderAssignmentService],
-  exports: [SenderProfileService, SenderEndpointService, SenderAssignmentService],
+  providers: [SenderProfileService, SenderEndpointService, SenderRoutingRuleService],
+  exports: [SenderProfileService, SenderEndpointService, SenderRoutingRuleService],
 })
 export class ConfigurationModule {}

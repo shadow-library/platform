@@ -50,8 +50,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SND_PRF_001 = new AppErrorCode('SND_PRF_001', ErrorType.NOT_FOUND, 'Sender profile not found');
   /** Sender profile with the given key already exists */
   static readonly SND_PRF_002 = new AppErrorCode('SND_PRF_002', ErrorType.CONFLICT, 'Sender profile with the given key already exists');
-  /** Cannot delete sender profile with active assignments */
-  static readonly SND_PRF_003 = new AppErrorCode('SND_PRF_003', ErrorType.CONFLICT, 'Cannot delete sender profile with active assignments');
+  /** Cannot delete sender profile with active routing rules */
+  static readonly SND_PRF_003 = new AppErrorCode('SND_PRF_003', ErrorType.CONFLICT, 'Cannot delete sender profile with active routing rules');
 
   /*!
    * Sender Endpoint Errors
@@ -63,13 +63,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SND_EP_002 = new AppErrorCode('SND_EP_002', ErrorType.CONFLICT, 'Sender endpoint with this channel, provider, and identifier already exists');
 
   /*!
-   * Sender Profile Assignment Errors
+   * Sender Routing Rule Errors
    */
 
-  /** Sender profile assignment not found */
-  static readonly SND_ASGN_001 = new AppErrorCode('SND_ASGN_001', ErrorType.NOT_FOUND, 'Sender profile assignment not found');
-  /** Sender profile assignment already exists for this combination */
-  static readonly SND_ASGN_002 = new AppErrorCode('SND_ASGN_002', ErrorType.CONFLICT, 'Sender profile assignment already exists for this combination');
-  /** Sender profile must be active to create assignment */
-  static readonly SND_ASGN_003 = new AppErrorCode('SND_ASGN_003', ErrorType.CONFLICT, 'Sender profile must be active to create assignment');
+  /** Sender routing rule not found */
+  static readonly SND_RTR_001 = new AppErrorCode('SND_RTR_001', ErrorType.NOT_FOUND, 'Sender routing rule not found');
+  /** Sender routing rule already exists for this combination */
+  static readonly SND_RTR_002 = new AppErrorCode('SND_RTR_002', ErrorType.CONFLICT, 'Sender routing rule already exists for this combination');
+  /** Sender profile must be active to create routing rule */
+  static readonly SND_RTR_003 = new AppErrorCode('SND_RTR_003', ErrorType.CONFLICT, 'Sender profile must be active to create routing rule');
 }

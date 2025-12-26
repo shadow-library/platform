@@ -8,9 +8,9 @@ import { Module } from '@shadow-library/app';
  */
 import { ConfigurationModule } from '@modules/configuration';
 
-import { SenderAssignmentController } from './sender-assignment.controller';
 import { SenderEndpointController } from './sender-endpoint.controller';
 import { SenderProfileController } from './sender-profile.controller';
+import { SenderRoutingRuleController } from './sender-routing-rule.controller';
 
 /**
  * Defining types
@@ -22,6 +22,6 @@ import { SenderProfileController } from './sender-profile.controller';
 
 @Module({
   imports: [ConfigurationModule],
-  controllers: [SenderProfileController, SenderEndpointController, SenderAssignmentController],
+  controllers: [SenderProfileController, SenderEndpointController, SenderRoutingRuleController],
 })
 export class ConfigurationRoutesModule {}

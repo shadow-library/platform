@@ -6,7 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { InferInsertModel, and, asc, desc, eq, like } from 'drizzle-orm';
+import { InferInsertModel, and, asc, desc, eq, isNull, like } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -44,12 +44,18 @@ export class SenderProfileService {
   }
 
   async createSenderProfile(data: CreateSenderProfile): Promise<Configuration.SenderProfile> {
-    const [senderProfile] = await this.db
-      .insert(schema.senderProfiles)
-      .values(data)
-      .returning()
+    const senderProfile = await this.db
+      .transaction(async tx => {
+        const [senderProfile] = await tx.insert(schema.senderProfiles).values(data).returning();
+        assert(senderProfile, 'Failed to create sender profile');
+
+        const routingRule = await tx.query.senderRoutingRules.findFirst({
+          where: and(isNull(schema.senderRoutingRules.service), isNull(schema.senderRoutingRules.region), isNull(schema.senderRoutingRules.messageType)),
+        });
+        if (!routingRule) await tx.insert(schema.senderRoutingRules).values({ senderProfileId: senderProfile.id });
+        return senderProfile;
+      })
       .catch(err => this.datastoreService.translateError(err));
-    assert(senderProfile, 'Failed to create sender profile');
     this.logger.info(`Created sender profile with key: '${senderProfile.key}'`, { senderProfile });
     return senderProfile;
   }
