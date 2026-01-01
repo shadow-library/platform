@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { InferEnum, relations } from 'drizzle-orm';
+import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
 import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
@@ -17,8 +17,8 @@ export namespace Notification {
   export type Status = InferEnum<typeof notificationStatus>;
   export type Channel = InferEnum<typeof notificationChannel>;
   export type Priority = InferEnum<typeof priority>;
-  export type Job = InferEnum<typeof notificationJobs>;
-  export type Message = InferEnum<typeof notificationMessages>;
+  export type Job = InferSelectModel<typeof notificationJobs>;
+  export type Message = InferSelectModel<typeof notificationMessages>;
 }
 
 /**
@@ -32,7 +32,7 @@ export const notificationStatus = pgEnum('notification_status', ['PENDING', 'PRO
 export const notificationJobs = pgTable(
   'notification_jobs',
   {
-    id: uuid('id').primaryKey(),
+    id: uuid('id').defaultRandom().primaryKey(),
     templateGroupId: bigint('template_group_id', { mode: 'bigint' })
       .notNull()
       .references(() => templateGroups.id, { onDelete: 'restrict' }),

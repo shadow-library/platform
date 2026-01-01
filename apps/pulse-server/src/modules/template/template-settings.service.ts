@@ -8,12 +8,14 @@ import { and, eq } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
-import { DatastoreService, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
+import { DatastoreService, LinkedWithParent, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
 import { AppErrorCode } from '@server/classes';
 
 /**
  * Defining types
  */
+
+export type LinkedTemplateChannelSetting = LinkedWithParent<Template.ChannelSetting, Template.Group>;
 
 /**
  * Declaring the constants
@@ -23,18 +25,18 @@ import { AppErrorCode } from '@server/classes';
 export class TemplateSettingsService {
   private readonly db: PrimaryDatabase;
 
-  constructor(datastoreService: DatastoreService) {
+  constructor(private readonly datastoreService: DatastoreService) {
     this.db = datastoreService.getPrimaryDatabase();
   }
 
-  async getEnabledChannels(templateKey: string): Promise<Notification.Channel[]> {
+  async getEnabledChannels(templateKey: string): Promise<LinkedTemplateChannelSetting[]> {
     const templateGroup = await this.db.query.templateGroups.findFirst({
       where: eq(schema.templateGroups.templateKey, templateKey),
       with: { channelSettings: { where: eq(schema.templateChannelSettings.isEnabled, true) } },
     });
 
     if (!templateGroup) throw new ServerError(AppErrorCode.TPL_GRP_001);
-    return templateGroup.channelSettings.map(setting => setting.channel);
+    return templateGroup.channelSettings.map(setting => this.datastoreService.attachParent(setting, templateGroup));
   }
 
   async getChannelSettings(templateGroupId: bigint, channel: Notification.Channel): Promise<Template.ChannelSetting> {

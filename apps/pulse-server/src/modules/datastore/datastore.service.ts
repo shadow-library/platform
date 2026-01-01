@@ -21,6 +21,8 @@ import * as schema from './schemas';
 
 export type PrimaryDatabase = BunSQLDatabase<typeof schema>;
 
+export type LinkedWithParent<T, U> = T & { getParent: () => U };
+
 /**
  * Declaring the constants
  */
@@ -67,5 +69,50 @@ export class DatastoreService {
 
     this.logger.error('Unknown database error', error);
     throw new InternalError('Unknown database error occurred');
+  }
+
+  attachParent<T extends object, U>(target: T, parent: U): LinkedWithParent<T, U> {
+    Object.defineProperty(target, 'getParent', { value: () => parent, enumerable: false, writable: false, configurable: false });
+    return target as LinkedWithParent<T, U>;
+  }
+
+  attachMatchingParent<S extends object, P extends object>(sources: S[], sourceKey: keyof S, parents: P[], parentKey?: keyof P): LinkedWithParent<S, P | null>[];
+  attachMatchingParent<S extends object, P extends object>(sources: S[], sourceKey: keyof S, parents: P[], throwErrorIfNotFound: true): LinkedWithParent<S, P>[];
+  attachMatchingParent<S extends object, P extends object>(
+    sources: S[],
+    sourceKey: keyof S,
+    parents: P[],
+    parentKey: keyof P,
+    throwErrorIfNotFound: true,
+  ): LinkedWithParent<S, P>[];
+  attachMatchingParent<S extends object, P extends object>(
+    sources: S[],
+    sourceKey: keyof S,
+    parents: P[],
+    parentKeyOrThrowErrorIfNotFound?: keyof P | boolean,
+    throwErrorIfNotFound = false,
+  ): LinkedWithParent<S, P | null>[] {
+    let parentKey = typeof parentKeyOrThrowErrorIfNotFound === 'undefined' ? sourceKey : parentKeyOrThrowErrorIfNotFound;
+    if (typeof parentKeyOrThrowErrorIfNotFound === 'boolean') {
+      throwErrorIfNotFound = parentKeyOrThrowErrorIfNotFound;
+      parentKey = sourceKey;
+    }
+
+    const parentMap = new Map<string, P>();
+    for (const parent of parents) {
+      const key = String(parent[parentKey as keyof P]);
+      parentMap.set(key, parent);
+    }
+
+    const result: LinkedWithParent<S, P | null>[] = [];
+    for (const source of sources) {
+      const key = String(source[sourceKey]);
+      const parent = parentMap.get(key) ?? null;
+      if (parent === null && throwErrorIfNotFound) throw new InternalError(`Parent not found for source with key ${key}`);
+      const linkedSource = this.attachParent(source, parent);
+      result.push(linkedSource);
+    }
+
+    return result;
   }
 }

@@ -44,14 +44,13 @@ export class SenderProfileService {
   }
 
   async createSenderProfile(data: CreateSenderProfile): Promise<Configuration.SenderProfile> {
+    const conditions = [isNull(schema.senderRoutingRules.service), isNull(schema.senderRoutingRules.region), isNull(schema.senderRoutingRules.messageType)];
+    const routingRule = await this.db.query.senderRoutingRules.findFirst({ where: and(...conditions) });
+
     const senderProfile = await this.db
       .transaction(async tx => {
         const [senderProfile] = await tx.insert(schema.senderProfiles).values(data).returning();
         assert(senderProfile, 'Failed to create sender profile');
-
-        const routingRule = await tx.query.senderRoutingRules.findFirst({
-          where: and(isNull(schema.senderRoutingRules.service), isNull(schema.senderRoutingRules.region), isNull(schema.senderRoutingRules.messageType)),
-        });
         if (!routingRule) await tx.insert(schema.senderRoutingRules).values({ senderProfileId: senderProfile.id });
         return senderProfile;
       })

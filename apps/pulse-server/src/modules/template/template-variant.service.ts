@@ -11,7 +11,7 @@ import { InferInsertModel, and, asc, desc, eq } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
-import { DatastoreService, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
+import { DatastoreService, LinkedWithParent, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
@@ -25,6 +25,8 @@ export interface ListVariantQuery extends Partial<OffsetPagination<'updatedAt' |
   channel?: Notification.Channel;
   locale?: string;
 }
+
+export type LinkedTemplateVariant = LinkedWithParent<Template.Variant, Template.Group>;
 
 /**
  * Declaring the constants
@@ -47,7 +49,7 @@ export class TemplateVariantService {
     return templateVariant ?? null;
   }
 
-  async getTemplateVariantByKey(templateKey: string, channel: Notification.Channel, locale: string): Promise<Template.Variant | null> {
+  async getTemplateVariantByKey(templateKey: string, channel: Notification.Channel, locale: string): Promise<LinkedTemplateVariant | null> {
     const templateGroup = await this.db.query.templateGroups.findFirst({
       where: eq(schema.templateGroups.templateKey, templateKey),
       with: {
@@ -58,7 +60,16 @@ export class TemplateVariantService {
       },
     });
 
-    return templateGroup?.variants[0] ?? null;
+    const variant = templateGroup?.variants[0];
+    return variant ? this.datastoreService.attachParent(variant, templateGroup) : null;
+  }
+
+  async getTemplateVariant(templateGroupId: bigint, channel: Notification.Channel, locale: string): Promise<Template.Variant | null> {
+    const templateVariant = await this.db.query.templateVariants.findFirst({
+      where: and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.channel, channel), eq(schema.templateVariants.locale, locale)),
+    });
+
+    return templateVariant ?? null;
   }
 
   async listTemplateVariants(templateGroupId: bigint, filter: ListVariantQuery = {}): Promise<OffsetPaginationResult<Template.Variant>> {
