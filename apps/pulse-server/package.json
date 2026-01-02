@@ -9,7 +9,9 @@
     "lint": "bun run scripts/lint.ts",
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts",
-    "dev": "bun run --watch src/main.ts"
+    "dev": "bun run --watch src/main.ts",
+    "db:create-template": "bun run scripts/create-template-db.ts",
+    "db:seed": "bun run scripts/seed.ts"
   },
   "repository": {
     "type": "git",
