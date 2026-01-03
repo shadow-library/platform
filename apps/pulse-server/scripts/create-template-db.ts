@@ -39,7 +39,7 @@ export async function createDatabaseFromTemplate(dbName: string): Promise<string
 export async function dropDatabase(dbName: string, sql?: SQL): Promise<void> {
   const isProvidedSQL = Boolean(sql);
   if (!sql) sql = new SQL(baseUrl);
-  await sql.unsafe(`DROP DATABASE IF EXISTS ${dbName}`);
+  await sql.unsafe(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
   logger.debug(`Database '${dbName}' dropped successfully`);
   if (!isProvidedSQL) await sql.close();
 }

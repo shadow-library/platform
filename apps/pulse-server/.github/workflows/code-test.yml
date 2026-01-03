@@ -9,6 +9,20 @@ jobs:
   test:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres
+        env:
+          POSTGRES_USER: admin
+          POSTGRES_PASSWORD: password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -22,8 +36,24 @@ jobs:
       - name: Lint code
         run: bun lint
 
-      - name: Test the code
-        run: bun test
-
       - name: Build the code
         run: bun run build
+
+      - name: Prepare test environment
+        run: |
+          bun run db:create-template
+          CID='${{ job.services.postgres.id }}'
+          docker exec "$CID" psql -U admin -d postgres -c "ALTER SYSTEM SET max_connections = '200';"
+          docker restart "$CID"
+
+      - name: Test the code
+        run: bun test
+        env:
+          LOG_LEVEL: http
+
+      - name: Upload test logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs
+          path: ./logs/*.log

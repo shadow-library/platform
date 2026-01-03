@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Field, OmitType, Schema } from '@shadow-library/class-schema';
+import { Field, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
@@ -50,7 +50,7 @@ export class TemplateGroupResponse extends CreateTemplateGroupBody {
 }
 
 @Schema({ minProperties: 1 })
-export class UpdateTemplateGroupBody extends OmitType(CreateTemplateGroupBody, ['templateKey']) {}
+export class UpdateTemplateGroupBody extends PartialType(OmitType(CreateTemplateGroupBody, ['templateKey'])) {}
 
 @Schema()
 export class ListTemplateGroupsQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {

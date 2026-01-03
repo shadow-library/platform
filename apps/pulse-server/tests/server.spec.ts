@@ -1,15 +1,12 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it } from 'bun:test';
-
-import { Router, ShadowFactory } from '@shadow-library/app';
-import { FastifyRouter } from '@shadow-library/fastify';
+import { describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
-import { AppModule } from '@server/app.module';
+import { TestEnvironment } from './test-environment';
 
 /**
  * Defining types
@@ -18,17 +15,13 @@ import { AppModule } from '@server/app.module';
 /**
  * Declaring the constants
  */
+const testEnv = new TestEnvironment('shadow_pulse_server_test');
 
 describe('Server', () => {
-  let router: FastifyRouter;
-
-  beforeEach(async () => {
-    const app = await ShadowFactory.create(AppModule);
-    router = app.get(Router);
-  });
+  testEnv.init();
 
   it('should return health check', async () => {
-    const response = await router.mockRequest().get('/api/v1/health');
+    const response = await testEnv.getRouter().mockRequest().get('/api/v1/health');
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok' });
   });
