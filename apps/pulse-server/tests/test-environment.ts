@@ -10,6 +10,7 @@ import { FastifyRouter } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { DatastoreService, PrimaryDatabase } from '@modules/datastore';
 import { createDatabaseFromTemplate, dropDatabase } from '@scripts/create-template-db';
 import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
@@ -52,5 +53,10 @@ export class TestEnvironment {
 
   getRouter(): FastifyRouter {
     return this.app.get(Router);
+  }
+
+  getPrimaryDatabase(): PrimaryDatabase {
+    const datastoreService = this.app.get(DatastoreService);
+    return datastoreService.getPrimaryDatabase();
   }
 }
