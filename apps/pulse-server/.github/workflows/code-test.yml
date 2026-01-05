@@ -37,7 +37,7 @@ jobs:
         run: bun lint
 
       - name: Build the code
-        run: bun run build
+        run: bun run type-check && bun run build
 
       - name: Prepare test environment
         run: |

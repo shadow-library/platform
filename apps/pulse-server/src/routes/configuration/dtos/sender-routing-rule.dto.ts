@@ -76,14 +76,9 @@ export class ListSenderRoutingRulesQuery extends PaginationQuery(['createdAt', '
 
 @Schema()
 export class SenderRoutingRuleParams {
-  @Field()
-  serviceName: string;
-
-  @Field(() => String, { enum: schema.messageTypes.enumValues })
-  messageType: Template.MessageType;
-
-  @Field()
-  region: string;
+  @Field(() => String)
+  @Transform('bigint:parse')
+  routingRuleId: bigint;
 }
 
 @Schema()

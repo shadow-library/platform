@@ -38,8 +38,7 @@ export const senderProfiles: SenderProfileInsertModel[] = [
   {
     id: 4n,
     key: 'otp-shortcodes',
-    displayName: 'OTP Shortcodes',
-    isActive: true,
+    isActive: false,
   },
   {
     id: 5n,

@@ -39,23 +39,23 @@ export class SenderRoutingRuleController {
     return this.senderRoutingRuleService.listSenderRoutingRules(query);
   }
 
-  @Get('/:serviceName/:messageType/:region')
+  @Get('/:routingRuleId')
   @RespondFor(200, SenderRoutingRuleDetailResponse)
   async getSenderRoutingRule(@Params() params: SenderRoutingRuleParams): Promise<SenderRoutingRuleDetailResponse> {
-    const senderRoutingRule = await this.senderRoutingRuleService.getSenderRoutingRule(params.serviceName, params.messageType, params.region);
+    const senderRoutingRule = await this.senderRoutingRuleService.getSenderRoutingRule(params.routingRuleId);
     if (!senderRoutingRule) throw new ServerError(AppErrorCode.SND_RTR_001);
     return senderRoutingRule;
   }
 
-  @Patch('/:serviceName/:messageType/:region')
+  @Patch('/:routingRuleId')
   @RespondFor(200, SenderRoutingRuleResponse)
   updateSenderRoutingRule(@Params() params: SenderRoutingRuleParams, @Body() body: UpdateSenderRoutingRuleBody): Promise<SenderRoutingRuleResponse> {
-    return this.senderRoutingRuleService.updateSenderRoutingRule(params.serviceName, params.messageType, params.region, body.senderProfileId);
+    return this.senderRoutingRuleService.updateSenderRoutingRule(params.routingRuleId, body.senderProfileId);
   }
 
-  @Delete('/:serviceName/:messageType/:region')
+  @Delete('/:routingRuleId')
   @HttpStatus(204)
   deleteSenderRoutingRule(@Params() params: SenderRoutingRuleParams): Promise<void> {
-    return this.senderRoutingRuleService.deleteSenderRoutingRule(params.serviceName, params.messageType, params.region);
+    return this.senderRoutingRuleService.deleteSenderRoutingRule(params.routingRuleId);
   }
 }
