@@ -43,10 +43,15 @@ await Bun.write(`${distDir}/package.json`, distPackageJsonString);
 /** Copy supporting files into 'dist' */
 fs.copyFileSync(`${rootDir}/README.md`, `${distDir}/README.md`);
 fs.copyFileSync(`${rootDir}/LICENSE`, `${distDir}/LICENSE`);
+fs.cpSync(`${rootDir}/generated/drizzle`, `${distDir}/generated/drizzle`, { recursive: true });
 
 const entryPoint = path.join(rootDir, 'src', 'main.ts');
 const result = await Bun.build({ entrypoints: [entryPoint], target: 'bun', minify: { identifiers: false }, outdir: 'dist' });
 if (!result.success) error(`Build failed: ${result.logs.join('\n')}`);
+
+const migrationEntryPoint = path.join(rootDir, 'scripts', 'migrate-db.ts');
+const migrationsResult = await Bun.build({ entrypoints: [migrationEntryPoint], target: 'bun', minify: { identifiers: false }, outdir: 'dist' });
+if (!migrationsResult.success) error(`Build failed: ${migrationsResult.logs.join('\n')}`);
 
 const endTime = process.hrtime(startTime);
 const timeTaken = endTime[0] * 1e3 + endTime[1] * 1e-6;

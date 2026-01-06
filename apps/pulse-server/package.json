@@ -11,6 +11,7 @@
     "build": "bun run scripts/build.ts",
     "dev": "bun run --watch src/main.ts",
     "db:create-template": "bun run scripts/create-template-db.ts",
+    "db:migrate": "bun run scripts/migrate-db.ts",
     "db:seed": "bun run scripts/seed.ts"
   },
   "repository": {
@@ -36,7 +37,6 @@
     "eslint-plugin-import": "^2.32.0",
     "globals": "^15.15.0",
     "husky": "^9.1.7",
-    "pg": "^8.16.3",
     "prettier": "^3.6.2",
     "tsc-alias": "^1.8.16",
     "type-fest": "^4.41.0",

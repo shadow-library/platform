@@ -14,4 +14,5 @@ COPY dist .
 
 # Running the application
 EXPOSE 8080
-ENTRYPOINT [ "bun", "run", "main.js" ]
+ENTRYPOINT [ "bun", "run" ]
+CMD [ "main.js" ]
