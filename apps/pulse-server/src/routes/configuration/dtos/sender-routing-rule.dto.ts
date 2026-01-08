@@ -18,7 +18,7 @@ import { SenderProfileResponse } from './sender-profile.dto';
 
 @Schema()
 export class CreateRoutingRuleBody {
-  @Field(() => String)
+  @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
   senderProfileId: bigint;
 
@@ -76,7 +76,7 @@ export class ListSenderRoutingRulesQuery extends PaginationQuery(['createdAt', '
 
 @Schema()
 export class SenderRoutingRuleParams {
-  @Field(() => String)
+  @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
   routingRuleId: bigint;
 }

@@ -36,7 +36,10 @@ export class DatastoreService {
   constructor() {
     const queryLogger = this.getQueryLogger();
     const primaryDatabaseURL = Config.get('db.primary.url');
-    this.primaryDB = drizzle(primaryDatabaseURL, { schema, logger: queryLogger });
+    const connectionOptions: Bun.SQL.PostgresOrMySQLOptions = {};
+    const maxConnections = Config.get('db.primary.max-connections');
+    if (maxConnections) connectionOptions.max = maxConnections;
+    this.primaryDB = drizzle({ schema, logger: queryLogger, connection: { ...connectionOptions, url: primaryDatabaseURL } });
   }
 
   private getQueryLogger(): QueryLogger {

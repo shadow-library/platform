@@ -50,6 +50,7 @@ jobs:
         run: bun test
         env:
           LOG_LEVEL: http
+          DB_PRIMARY_MAX_CONNECTIONS: 1
 
       - name: Upload test logs
         if: failure()

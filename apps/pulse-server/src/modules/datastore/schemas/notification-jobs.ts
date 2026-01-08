@@ -39,6 +39,7 @@ export const notificationJobs = pgTable(
     channel: notificationChannel('channel').notNull(),
     locale: varchar('locale', { length: 5 }).notNull(),
     priority: priority('priority').notNull().default('MEDIUM'),
+    service: varchar('service', { length: 100 }),
 
     recipient: varchar('recipient', { length: 500 }).notNull(),
     payload: jsonb('payload'),

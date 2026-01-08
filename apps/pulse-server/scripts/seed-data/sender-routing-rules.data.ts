@@ -28,8 +28,6 @@ export const senderRoutingRules: SenderRoutingRuleInsertModel[] = [
     id: 2n,
     senderProfileId: 1n,
     service: 'marketing',
-    region: 'US',
-    messageType: 'PROMOTIONAL',
   },
   {
     id: 3n,
@@ -51,5 +49,9 @@ export const senderRoutingRules: SenderRoutingRuleInsertModel[] = [
     service: 'ops',
     region: 'SG',
     messageType: 'TRANSACTIONAL',
+  },
+  {
+    id: 6n,
+    senderProfileId: 1n,
   },
 ];

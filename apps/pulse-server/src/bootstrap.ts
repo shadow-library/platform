@@ -19,6 +19,7 @@ declare module '@shadow-library/common' {
 
     /** Database configs */
     'db.primary.url': string;
+    'db.primary.max-connections'?: number;
   }
 }
 
@@ -27,4 +28,6 @@ declare module '@shadow-library/common' {
  */
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
+
 Config.load('db.primary.url', { defaultValue: 'postgresql://admin:password@localhost/shadow_pulse' });
+Config.load('db.primary.max-connections', { validateType: 'number' });
