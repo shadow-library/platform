@@ -6,7 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { InferInsertModel, and, asc, desc, eq, isNull } from 'drizzle-orm';
+import { InferInsertModel, and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -93,6 +93,65 @@ export class SenderRoutingRuleService {
   async getSenderRoutingRule(id: bigint): Promise<SenderRoutingRuleDetails | null> {
     const routingRule = await this.db.query.senderRoutingRules.findFirst({ where: eq(schema.senderRoutingRules.id, id), with: { profile: true } });
     return routingRule ?? null;
+  }
+
+  async resolveSenderRoutingRule(service?: string, region?: string, messageType?: Template.MessageType): Promise<SenderRoutingRuleDetails> {
+    const whereConditions = [];
+
+    if (service && region && messageType) {
+      whereConditions.push(
+        and(eq(schema.senderRoutingRules.service, service), eq(schema.senderRoutingRules.region, region), eq(schema.senderRoutingRules.messageType, messageType)),
+      );
+    }
+
+    if (service && region) {
+      whereConditions.push(and(eq(schema.senderRoutingRules.service, service), eq(schema.senderRoutingRules.region, region), isNull(schema.senderRoutingRules.messageType)));
+    }
+
+    if (service) {
+      whereConditions.push(and(eq(schema.senderRoutingRules.service, service), isNull(schema.senderRoutingRules.region), isNull(schema.senderRoutingRules.messageType)));
+    }
+
+    whereConditions.push(and(isNull(schema.senderRoutingRules.service), isNull(schema.senderRoutingRules.region), isNull(schema.senderRoutingRules.messageType)));
+
+    const [result] = await this.db
+      .select({
+        routingRule: schema.senderRoutingRules,
+        profile: schema.senderProfiles,
+        priority: sql<number>`
+          CASE
+            WHEN ${schema.senderRoutingRules.service} = ${service}
+              AND ${schema.senderRoutingRules.region} = ${region}
+              AND ${schema.senderRoutingRules.messageType} = ${messageType}
+            THEN 1
+
+            WHEN ${schema.senderRoutingRules.service} = ${service}
+              AND ${schema.senderRoutingRules.region} = ${region}
+              AND ${schema.senderRoutingRules.messageType} IS NULL
+            THEN 2
+
+            WHEN ${schema.senderRoutingRules.service} = ${service}
+              AND ${schema.senderRoutingRules.region} IS NULL
+              AND ${schema.senderRoutingRules.messageType} IS NULL
+            THEN 3
+
+            WHEN ${schema.senderRoutingRules.service} IS NULL
+              AND ${schema.senderRoutingRules.region} IS NULL
+              AND ${schema.senderRoutingRules.messageType} IS NULL
+            THEN 4
+
+            ELSE 5
+          END
+        `.as('priority'),
+      })
+      .from(schema.senderRoutingRules)
+      .innerJoin(schema.senderProfiles, eq(schema.senderRoutingRules.senderProfileId, schema.senderProfiles.id))
+      .where(or(...whereConditions))
+      .orderBy(asc(sql`priority`))
+      .limit(1);
+
+    if (!result) throw new ServerError(AppErrorCode.SND_RTR_001);
+    return { ...result.routingRule, profile: result.profile };
   }
 
   async updateSenderRoutingRule(id: bigint, updatedSenderProfileId: bigint): Promise<Configuration.SenderRoutingRule> {

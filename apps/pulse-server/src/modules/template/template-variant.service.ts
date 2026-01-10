@@ -64,12 +64,19 @@ export class TemplateVariantService {
     return variant ? this.datastoreService.attachParent(variant, templateGroup) : null;
   }
 
-  async getTemplateVariant(templateGroupId: bigint, channel: Notification.Channel, locale: string): Promise<Template.Variant | null> {
-    const templateVariant = await this.db.query.templateVariants.findFirst({
-      where: and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.channel, channel), eq(schema.templateVariants.locale, locale)),
+  async getTemplateVariant(templateGroupId: bigint, channel: Notification.Channel, locale: string): Promise<LinkedTemplateVariant | null> {
+    const templateGroup = await this.db.query.templateGroups.findFirst({
+      where: eq(schema.templateGroups.id, templateGroupId),
+      with: {
+        variants: {
+          where: and(eq(schema.templateVariants.channel, channel), eq(schema.templateVariants.locale, locale)),
+          limit: 1,
+        },
+      },
     });
 
-    return templateVariant ?? null;
+    const variant = templateGroup?.variants[0];
+    return variant ? this.datastoreService.attachParent(variant, templateGroup) : null;
   }
 
   async listTemplateVariants(templateGroupId: bigint, filter: ListVariantQuery = {}): Promise<OffsetPaginationResult<Template.Variant>> {
