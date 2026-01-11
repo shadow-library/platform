@@ -77,6 +77,15 @@ export class SenderEndpointService {
     return utils.pagination.createResult(query, items, total);
   }
 
+  async getSenderEndpointsByChannel(profileId: bigint, channel: Notification.Channel): Promise<Configuration.SenderEndpoint[]> {
+    const endpoints = await this.db.query.senderEndpoints.findMany({
+      where: and(eq(schema.senderEndpoints.senderProfileId, profileId), eq(schema.senderEndpoints.channel, channel), eq(schema.senderEndpoints.isActive, true)),
+      orderBy: desc(schema.senderEndpoints.weight),
+    });
+
+    return endpoints;
+  }
+
   async getSenderEndpoint(profileId: bigint, endpointId: bigint): Promise<Configuration.SenderEndpoint | null> {
     const endpoint = await this.db.query.senderEndpoints.findFirst({
       where: and(eq(schema.senderEndpoints.id, endpointId), eq(schema.senderEndpoints.senderProfileId, profileId)),

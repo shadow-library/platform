@@ -345,8 +345,8 @@ describe('Sender Routing Rule', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        senderProfileId: '1',
-        profile: expect.objectContaining({ id: '1' }),
+        senderProfileId: '6',
+        profile: expect.objectContaining({ id: '6' }),
       });
       expect(response.json().service).toBeUndefined();
       expect(response.json().region).toBeUndefined();

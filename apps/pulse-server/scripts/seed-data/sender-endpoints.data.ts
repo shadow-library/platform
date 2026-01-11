@@ -89,4 +89,18 @@ export const senderEndpoints: SenderEndpointInsertModel[] = [
     weight: 1,
     isActive: true,
   },
+  {
+    id: 9n,
+    senderProfileId: 6n,
+    channel: 'EMAIL',
+    provider: 'DEV',
+    identifier: 'Shadow Dev Apps <no-reply@dev.shadow-apps.com>',
+  },
+  {
+    id: 10n,
+    senderProfileId: 6n,
+    channel: 'SMS',
+    provider: 'DEV',
+    identifier: '+919999999999',
+  },
 ];

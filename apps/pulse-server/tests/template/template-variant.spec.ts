@@ -214,7 +214,7 @@ describe('Template Variant', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 2,
+        total: 4,
         limit: 20,
         offset: 0,
         items: expect.arrayContaining([
@@ -236,7 +236,7 @@ describe('Template Variant', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
-        total: 1,
+        total: 2,
         limit: 20,
         offset: 0,
         items: [
@@ -244,6 +244,16 @@ describe('Template Variant', () => {
             id: '1',
             channel: 'EMAIL',
             locale: 'en-US',
+            subject: 'Welcome to Shadow',
+            body: 'Hi {{name}}, thanks for signing up!',
+            isActive: true,
+            createdAt: expect.stringMatching(TEST_REGEX.dateISO),
+            updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
+          },
+          {
+            id: '6',
+            channel: 'EMAIL',
+            locale: 'en-ZZ',
             subject: 'Welcome to Shadow',
             body: 'Hi {{name}}, thanks for signing up!',
             isActive: true,
@@ -305,7 +315,7 @@ describe('Template Variant', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 2,
+        total: 4,
         limit: 1,
         offset: 0,
         items: expect.any(Array),
@@ -331,7 +341,7 @@ describe('Template Variant', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 2,
+        total: 4,
         limit: 20,
         offset: 0,
       });

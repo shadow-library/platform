@@ -11,6 +11,7 @@ import { FastifyRouter } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { DatastoreService, PrimaryDatabase } from '@modules/datastore';
+import { NotificationService } from '@modules/notification';
 import { createDatabaseFromTemplate, dropDatabase } from '@scripts/create-template-db';
 import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
@@ -30,6 +31,7 @@ const baseUrl = `postgresql://${user}:${password}@${host}`;
 
 export const TEST_REGEX = {
   id: /^\d+$/,
+  uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
   dateISO: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/,
 } satisfies Record<string, RegExp>;
 
@@ -43,6 +45,8 @@ export class TestEnvironment {
   async init(): Promise<void> {
     TestEnvironment.logger.info(`Setting up test environment with database: '${this.databaseName}'`);
     Config['cache'].set('db.primary.url', `${baseUrl}/${this.databaseName}`);
+
+    NotificationService.prototype['executeNotificationJob'] = () => Bun.sleep(10);
 
     beforeEach(() => createDatabaseFromTemplate(this.databaseName));
     afterEach(() => dropDatabase(this.databaseName));

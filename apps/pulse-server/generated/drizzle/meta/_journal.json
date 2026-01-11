@@ -15,6 +15,13 @@
       "when": 1767893699344,
       "tag": "0001_nice_gressill",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1768072955335,
+      "tag": "0002_flaky_paper_doll",
+      "breakpoints": true
     }
   ]
 }

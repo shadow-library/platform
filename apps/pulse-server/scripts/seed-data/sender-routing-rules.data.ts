@@ -52,6 +52,6 @@ export const senderRoutingRules: SenderRoutingRuleInsertModel[] = [
   },
   {
     id: 6n,
-    senderProfileId: 1n,
+    senderProfileId: 6n,
   },
 ];

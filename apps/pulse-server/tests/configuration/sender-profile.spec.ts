@@ -134,7 +134,7 @@ describe('Sender Profile', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 5,
+        total: 6,
         limit: 20,
         offset: 0,
         items: expect.arrayContaining([
@@ -207,7 +207,7 @@ describe('Sender Profile', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 5,
+        total: 6,
         limit: 2,
         offset: 0,
       });
@@ -219,7 +219,7 @@ describe('Sender Profile', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 5,
+        total: 6,
         limit: 2,
         offset: 2,
       });

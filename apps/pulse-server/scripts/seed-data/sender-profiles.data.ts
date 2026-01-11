@@ -46,4 +46,10 @@ export const senderProfiles: SenderProfileInsertModel[] = [
     displayName: 'System Service',
     isActive: true,
   },
+  {
+    id: 6n,
+    key: 'development-testing',
+    displayName: 'Development Testing',
+    isActive: true,
+  },
 ];
