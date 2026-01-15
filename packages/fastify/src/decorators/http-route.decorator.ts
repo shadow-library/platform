@@ -6,6 +6,7 @@ import { Route } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { ApiOperation } from './api-operation.decorator';
 
 /**
  * Defining types
@@ -33,7 +34,13 @@ export interface RouteOptions {
 
 export function HttpRoute(options: RouteOptions): MethodDecorator {
   if (options.path && options.path.charAt(0) !== '/') options.path = `/${options.path}`;
-  return Route(options);
+
+  return (target, propertyKey, descriptor) => {
+    const methodName = propertyKey.toString();
+    const summary = methodName.charAt(0).toUpperCase() + methodName.slice(1).replace(/([a-z])([A-Z])|([A-Z]+)([A-Z][a-z])/g, '$1$3 $2$4');
+    Route(options)(target, propertyKey, descriptor);
+    ApiOperation({ summary })(target, propertyKey, descriptor);
+  };
 }
 
 export const Get = (path?: string): MethodDecorator => HttpRoute({ method: HttpMethod.GET, path });

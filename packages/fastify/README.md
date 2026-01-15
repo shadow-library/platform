@@ -956,6 +956,8 @@ class CreateProductDto {
 
 The `@ApiOperation` decorator allows you to add OpenAPI/Swagger metadata to your route handlers. This metadata is integrated into the Fastify route schema and can be consumed by documentation generators like Swagger UI.
 
+> **Note:** Tags are auto-generated from controller class names (e.g., `UserController` → `['User']`, `UserAccountHandler` → `['User Account']`) by stripping common suffixes and converting camelCase to spaced words. Similarly, summaries are auto-generated from method names when using HTTP input decorators. Use `@ApiOperation` to override these defaults.
+
 ```typescript
 @ApiOperation({
   summary: string;              // Short description of the operation

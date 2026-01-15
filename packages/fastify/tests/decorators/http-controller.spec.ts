@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Controller } from '@shadow-library/app';
+import { Controller, Route } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -17,10 +17,11 @@ import { HttpController } from '@shadow-library/fastify';
 /**
  * Declaring the constants
  */
-const decorator = jest.fn();
+const controllerDecorator = jest.fn();
+const routeDecorator = jest.fn();
 jest.mock('@shadow-library/app', () => {
   const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Controller: jest.fn(() => decorator) };
+  return { ...actual, Controller: jest.fn(() => controllerDecorator), Route: jest.fn(() => routeDecorator) };
 });
 
 describe('@HttpController', () => {
@@ -38,5 +39,29 @@ describe('@HttpController', () => {
     @HttpController()
     class TestController {}
     expect(Controller).toBeCalledWith({ path: '', [HTTP_CONTROLLER_TYPE]: 'router' });
+  });
+
+  it(`should strip 'Api' suffix and generate tag`, () => {
+    @HttpController()
+    class UserApi {}
+    expect(Route).toBeCalledWith({ operation: { tags: ['User'] } });
+  });
+
+  it(`should convert camelCase to spaced words in tag`, () => {
+    @HttpController()
+    class UserAccountController {}
+    expect(Route).toBeCalledWith({ operation: { tags: ['User Account'] } });
+  });
+
+  it(`should handle multiple camelCase words and suffix stripping`, () => {
+    @HttpController()
+    class UserProfileSettingsRoute {}
+    expect(Route).toBeCalledWith({ operation: { tags: ['User Profile Settings'] } });
+  });
+
+  it(`should handle class name without any suffix`, () => {
+    @HttpController()
+    class Health {}
+    expect(Route).toBeCalledWith({ operation: { tags: ['Health'] } });
   });
 });
