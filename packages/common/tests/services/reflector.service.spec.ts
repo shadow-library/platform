@@ -173,6 +173,30 @@ describe('ReflectorService', () => {
       const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, target);
       expect(result).toStrictEqual(updateValue);
     });
+
+    it('should merge arrays by default', () => {
+      const target = {};
+      Reflect.defineMetadata(METADATA_KEYS.ROUTE, { roles: ['user', 'guest'], config: { items: [1, 2] } }, target);
+      Reflector.updateMetadata(METADATA_KEYS.ROUTE, { roles: ['admin'], config: { items: [3] } }, target);
+      const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, target);
+      expect(result).toStrictEqual({ roles: ['user', 'guest', 'admin'], config: { items: [1, 2, 3] } });
+    });
+
+    it('should merge arrays when arrayStrategy is "merge"', () => {
+      const target = {};
+      Reflect.defineMetadata(METADATA_KEYS.ROUTE, { roles: ['user', 'guest'], config: { items: [1, 2] } }, target);
+      Reflector.updateMetadata(METADATA_KEYS.ROUTE, { roles: ['admin'], config: { items: [3] } }, target, undefined, { arrayStrategy: 'merge' });
+      const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, target);
+      expect(result).toStrictEqual({ roles: ['user', 'guest', 'admin'], config: { items: [1, 2, 3] } });
+    });
+
+    it('should replace arrays when arrayStrategy is "replace"', () => {
+      const target = {};
+      Reflect.defineMetadata(METADATA_KEYS.ROUTE, { roles: ['user', 'guest'], config: { items: [1, 2] } }, target);
+      Reflector.updateMetadata(METADATA_KEYS.ROUTE, { roles: ['admin'], config: { items: [3] } }, target, undefined, { arrayStrategy: 'replace' });
+      const result = Reflect.getMetadata(METADATA_KEYS.ROUTE, target);
+      expect(result).toStrictEqual({ roles: ['admin'], config: { items: [3] } });
+    });
   });
 
   describe('cloneMetadata', () => {

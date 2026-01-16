@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { all as merge } from 'deepmerge';
+import { Options as DeepMergeOpts, all as merge } from 'deepmerge';
 
 /**
  * Importing user defined packages
@@ -12,6 +12,13 @@ import { all as merge } from 'deepmerge';
  */
 
 type MetadataKey = string | symbol;
+
+export interface UpdateMetadataOptions {
+  /**
+   * Array merge strategy. Defaults to 'merge'.
+   */
+  arrayStrategy?: 'merge' | 'replace';
+}
 
 /**
  * Declaring the constants
@@ -44,9 +51,10 @@ class ReflectorService {
     Reflect.defineMetadata(key, newMetadata, target, propertyKey as string | symbol);
   }
 
-  updateMetadata<T extends object = object>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol): void {
+  updateMetadata<T extends object = object>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol, options?: UpdateMetadataOptions): void {
+    const opts: DeepMergeOpts = options?.arrayStrategy === 'replace' ? { arrayMerge: (_, src) => src } : {};
     const oldMetadata = Reflect.getMetadata(key, target, propertyKey as string | symbol);
-    const newMetadata = typeof oldMetadata === 'object' && oldMetadata !== null ? merge([oldMetadata, value]) : value;
+    const newMetadata = typeof oldMetadata === 'object' && oldMetadata !== null ? merge([oldMetadata, value], opts) : value;
     Reflect.defineMetadata(key, newMetadata, target, propertyKey as string | symbol);
   }
 

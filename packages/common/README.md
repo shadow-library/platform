@@ -1037,8 +1037,10 @@ Reflector.defineMetadata('permissions', 'read', UserController, 'getUser');
 Reflector.appendMetadata('roles', 'guest', UserController);
 Reflector.prependMetadata('roles', 'super-admin', UserController);
 
-// Update object metadata
+// Update object metadata (merges arrays by default)
 Reflector.updateMetadata('config', { timeout: 5000 }, UserController);
+// Replace arrays instead of merging
+Reflector.updateMetadata('config', { items: [1] }, UserController, undefined, { arrayStrategy: 'replace' });
 
 // Clone metadata between objects
 Reflector.cloneMetadata(NewController, UserController);
@@ -1227,7 +1229,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `Reflector.defineMetadata(key, value, target, property?)` - Define metadata
 - `Reflector.getMetadata(key, target, property?)` - Get metadata
 - `Reflector.appendMetadata(key, value, target, property?)` - Append to metadata
-- `Reflector.updateMetadata(key, value, target, property?)` - Update metadata
+- `Reflector.updateMetadata(key, value, target, property?, options?)` - Update metadata (`options.arrayStrategy`: `'merge'` (default) | `'replace'`)
 - `Reflector.cloneMetadata(target, source, property?)` - Clone metadata
 
 ### Utility Functions
