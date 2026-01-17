@@ -162,7 +162,7 @@ describe('InstanceWrapper', () => {
   describe('Factory Provider', () => {
     const provider = {
       token: Symbol('factory'),
-      useFactory: (key: string, optional?: string) => 'CONFIG_VALUE' + key + optional,
+      useFactory: (key: string, optional?: string) => `CONFIG_VALUE-${key}-${optional}`,
       inject: ['DEPENDENCY', { token: 'OPTIONAL', optional: true }],
     };
 
@@ -194,7 +194,7 @@ describe('InstanceWrapper', () => {
     it('should load the instance', async () => {
       instanceWrapper.setDependency(0, new InstanceWrapper({ token: 'DEPENDENCY', useValue: 'DEPENDENCY_VALUE' }));
       const instance = await instanceWrapper.loadInstance();
-      expect(instance).toBe('CONFIG_VALUE' + 'DEPENDENCY_VALUE' + undefined);
+      expect(instance).toBe('CONFIG_VALUE-DEPENDENCY_VALUE-undefined');
     });
 
     it('should load the instance when there are no dependencies', async () => {

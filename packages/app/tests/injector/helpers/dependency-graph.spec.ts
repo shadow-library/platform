@@ -2,7 +2,6 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it } from '@jest/globals';
-import { InternalError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

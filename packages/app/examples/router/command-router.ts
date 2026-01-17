@@ -88,7 +88,7 @@ export class CommandRouter extends Router {
 
     let currentCommand = this.commands.find(cmd => cmd.cmd === cmdParts[0]);
     if (!currentCommand) return this.outputService.printError(`Command "${cmdParts[0]}" not found.`);
-    for (let index = 1; index < cmdParts.length && currentCommand; index++) {
+    for (let index = 1; index < cmdParts.length; index++) {
       const cmd: Command | undefined = currentCommand.children.find(child => child.cmd === cmdParts[index]);
       if (!cmd) break;
       currentCommand = cmd;
