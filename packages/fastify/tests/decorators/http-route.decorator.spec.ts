@@ -37,7 +37,7 @@ describe('HTTP Methods Decorators', () => {
 
       expect(Route).toBeCalledTimes(2);
       expect(Route).toBeCalledWith({ path: '/data', method: Decorator.name.toUpperCase() });
-      expect(Route).toBeCalledWith({ operation: { summary: 'Execute' } });
+      expect(Route).toBeCalledWith({ operation: { summary: 'Execute' } }, { arrayStrategy: 'replace' });
     });
   });
 });

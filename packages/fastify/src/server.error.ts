@@ -23,6 +23,11 @@ const ERROR_STATUS_CODES: Record<ErrorType, number> = {
   [ErrorType.UNAUTHORIZED]: 403,
   [ErrorType.VALIDATION_ERROR]: 422,
   [ErrorType.CONFLICT]: 409,
+
+  [ErrorType.INVALID_REQUEST]: 400,
+  [ErrorType.IO_ERROR]: 400,
+  [ErrorType.PERMISSION_DENIED]: 403,
+  [ErrorType.INTERNAL_ERROR]: 500,
 };
 
 export class ServerError extends AppError<ServerErrorCode> {

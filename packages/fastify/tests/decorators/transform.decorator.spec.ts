@@ -29,6 +29,7 @@ describe('@Transform', () => {
     const schema = ClassSchema.generate(TestClass);
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['name'],
       properties: {
@@ -51,6 +52,7 @@ describe('@Transform', () => {
     const schema = ClassSchema.generate(TestClass);
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['email'],
       properties: {

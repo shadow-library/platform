@@ -44,24 +44,24 @@ describe('@HttpController', () => {
   it(`should strip 'Api' suffix and generate tag`, () => {
     @HttpController()
     class UserApi {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['User'] } });
+    expect(Route).toBeCalledWith({ operation: { tags: ['User'] } }, { arrayStrategy: 'replace' });
   });
 
   it(`should convert camelCase to spaced words in tag`, () => {
     @HttpController()
     class UserAccountController {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['User Account'] } });
+    expect(Route).toBeCalledWith({ operation: { tags: ['User Account'] } }, { arrayStrategy: 'replace' });
   });
 
   it(`should handle multiple camelCase words and suffix stripping`, () => {
     @HttpController()
     class UserProfileSettingsRoute {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['User Profile Settings'] } });
+    expect(Route).toBeCalledWith({ operation: { tags: ['User Profile Settings'] } }, { arrayStrategy: 'replace' });
   });
 
   it(`should handle class name without any suffix`, () => {
     @HttpController()
     class Health {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['Health'] } });
+    expect(Route).toBeCalledWith({ operation: { tags: ['Health'] } }, { arrayStrategy: 'replace' });
   });
 });

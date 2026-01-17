@@ -30,6 +30,7 @@ describe('@Sensitive', () => {
 
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['sensitiveField'],
       properties: {
@@ -53,6 +54,7 @@ describe('@Sensitive', () => {
 
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['email'],
       properties: {
@@ -76,6 +78,7 @@ describe('@Sensitive', () => {
 
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['sensitiveField'],
       properties: {
@@ -106,6 +109,7 @@ describe('@Sensitive', () => {
 
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['password', 'email', 'regularField'],
       properties: {
@@ -135,6 +139,7 @@ describe('@Sensitive', () => {
 
     expect(schema).toEqual({
       $id: expect.any(String),
+      additionalProperties: false,
       type: 'object',
       required: ['regularField'],
       properties: {

@@ -29,5 +29,5 @@ export interface ApiOperationMetadata {
  */
 
 export function ApiOperation(options: ApiOperationMetadata): ClassDecorator & MethodDecorator {
-  return Route({ operation: options });
+  return Route({ operation: options }, { arrayStrategy: 'replace' });
 }

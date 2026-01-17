@@ -38,7 +38,7 @@ describe('@ApiOperation', () => {
       getUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options });
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with all operation metadata fields', () => {
@@ -61,7 +61,7 @@ describe('@ApiOperation', () => {
       createUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options });
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with minimal operation metadata', () => {
@@ -74,7 +74,7 @@ describe('@ApiOperation', () => {
       deleteUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options });
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with tags metadata', () => {
@@ -88,7 +88,7 @@ describe('@ApiOperation', () => {
       listUsers() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options });
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with deprecated flag', () => {
@@ -102,7 +102,7 @@ describe('@ApiOperation', () => {
       oldEndpoint() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options });
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with custom metadata properties', () => {
@@ -116,6 +116,6 @@ describe('@ApiOperation', () => {
       customEndpoint() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options });
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 });
