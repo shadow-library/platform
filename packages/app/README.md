@@ -200,7 +200,7 @@ class UserController {
 
 ### @Route
 
-Defines routing metadata for controller methods. The metadata is flexible and can be adapted to any routing system.
+Defines routing metadata for controller methods. The metadata is flexible and can be adapted to any routing system. Accepts an optional second parameter for merge options.
 
 ```ts
 @Route({ path: '/users/:id', method: 'GET' })
@@ -216,6 +216,13 @@ getUserById(id: string) {
 })
 createUser(userData: CreateUserDto) {
   return this.userService.create(userData);
+}
+
+// Using options to control metadata merge behaviour
+@Route({ data: ['item2'] }, { arrayStrategy: 'replace' })
+@Route({ data: ['item1'] })
+replaceArrays() {
+  // metadata.data will be ['item2'] instead of merged arrays
 }
 ```
 

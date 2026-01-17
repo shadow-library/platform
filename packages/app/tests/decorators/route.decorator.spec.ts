@@ -56,4 +56,16 @@ describe('RouteDecorator', () => {
     const metadata = Reflect.getMetadata(ROUTE_METADATA, controller.methodTwo);
     expect(metadata).toStrictEqual({ op: 'GET', path: '/users', auth: { jwt: true, oauth: true } });
   });
+
+  it('should replace route metadata when using replace option', () => {
+    class TestController {
+      @Route({ roles: ['user'] }, { arrayStrategy: 'replace' })
+      @Route({ roles: ['admin'] })
+      testMethod() {}
+    }
+
+    const instance = new TestController();
+    const metadata = Reflect.getMetadata(ROUTE_METADATA, instance.testMethod);
+    expect(metadata).toStrictEqual({ roles: ['user'] });
+  });
 });
