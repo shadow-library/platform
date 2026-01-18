@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { ApiOperation, Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -23,6 +23,7 @@ import {
  * Declaring the constants
  */
 
+@ApiOperation({ tags: ['Sender Endpoints'] })
 @HttpController('/sender-profiles/:profileId/endpoints')
 export class SenderEndpointController {
   constructor(private readonly senderEndpointService: SenderEndpointService) {}
