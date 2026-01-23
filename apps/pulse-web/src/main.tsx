@@ -1,9 +1,7 @@
 /**
  * Importing npm packages
  */
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { RouterProvider, createRouter } from '@tanstack/react-router';
-import { ConfigProvider } from 'antd';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
 
@@ -14,11 +12,11 @@ import ReactDOM from 'react-dom/client';
 /**
  * Importing user defined components
  */
-import { lightTheme } from './constants';
 
 /**
  *  Importing user defined modules
  */
+import AppProvider, { queryClient } from './components/AppProvider';
 import reportWebVitals from './reportWebVitals';
 import { routeTree } from './routeTree.gen';
 
@@ -36,7 +34,6 @@ declare module '@tanstack/react-router' {
 /**
  * Declaring constants and variables
  */
-const queryClient = new QueryClient();
 const router = createRouter({
   routeTree,
   context: { queryClient },
@@ -51,11 +48,9 @@ if (rootElement && !rootElement.innerHTML) {
   const root = ReactDOM.createRoot(rootElement);
   root.render(
     <StrictMode>
-      <QueryClientProvider client={queryClient}>
-        <ConfigProvider theme={lightTheme}>
-          <RouterProvider router={router} />
-        </ConfigProvider>
-      </QueryClientProvider>
+      <AppProvider>
+        <RouterProvider router={router} />
+      </AppProvider>
     </StrictMode>,
   );
 }
