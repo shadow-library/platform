@@ -1,0 +1,7 @@
+.container {
+  @apply flex items-center;
+}
+
+.container > svg {
+  @apply stroke-[50px];
+}

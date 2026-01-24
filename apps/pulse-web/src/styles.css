@@ -1,15 +1,178 @@
 @import 'tailwindcss';
 
+/* ========================================
+   Theme CSS Variables
+   These match Ant Design token colors
+   ======================================== */
+
+:root {
+  /* Brand / Primary Colors: palette */
+  --color-primary-light: #5b2d8b;
+  --color-primary-hover-light: #6f3fb0;
+  --color-primary-active-light: #4a2373;
+  --color-primary-bg-light: #e9ddf4;
+  --color-primary-border-light: #c9b1e6;
+  --color-primary-dark: #8a5fd2;
+  --color-primary-hover-dark: #9f7ae8;
+  --color-primary-active-dark: #7449b8;
+  --color-primary-bg-dark: #2b1f3a;
+  --color-primary-border-dark: #4e3a66;
+
+  /* Background Colors: palette */
+  --color-bg-base-light: #f7f7fa;
+  --color-bg-container-light: #ffffff;
+  --color-bg-elevated-light: #ffffff;
+  --color-bg-layout-light: #f2f3f8;
+  --color-bg-header-light: #141418;
+  --color-bg-sider-light: #141418;
+  --color-bg-footer-light: #141418;
+  --color-bg-input-light: #ffffff;
+  --color-bg-base-dark: #0f0f14;
+  --color-bg-container-dark: #1a1a22;
+  --color-bg-elevated-dark: #1f1f2a;
+  --color-bg-layout-dark: #0d0d12;
+  --color-bg-header-dark: #141418;
+  --color-bg-sider-dark: #141418;
+  --color-bg-footer-dark: #141418;
+  --color-bg-input-dark: #1a1a22;
+
+  /* Text Colors: palette */
+  --color-text-light: #1f1f1f;
+  --color-text-secondary-light: #595959;
+  --color-text-tertiary-light: #8c8c8c;
+  --color-text-disabled-light: #bfbfbf;
+  --color-text-lighter-light: #cfcfdc;
+  --color-text-inverse-light: #ffffff;
+  --color-text-dark: #ededed;
+  --color-text-secondary-dark: #b0b0c3;
+  --color-text-tertiary-dark: #8a8aa3;
+  --color-text-disabled-dark: #5a5a6e;
+  --color-text-lighter-dark: #cfcfdc;
+  --color-text-inverse-dark: #ffffff;
+
+  /* Border Colors: palette */
+  --color-border-light: #d9d9d9;
+  --color-border-secondary-light: #e6e6eb;
+  --color-border-dark: #2a2a35;
+  --color-border-secondary-dark: #343445;
+
+  /* Status Colors: palette */
+  --color-success-light: #3cb371;
+  --color-warning-light: #faad14;
+  --color-error-light: #d9363e;
+  --color-info-light: #5b8ff9;
+  --color-success-dark: #4fd6a2;
+  --color-warning-dark: #f5c043;
+  --color-error-dark: #ff5c5c;
+  --color-info-dark: #6daafb;
+
+  /* Component-specific: palette */
+  --color-menu-item-light: #cfcfdc;
+  --color-menu-item-hover-light: #ffffff;
+  --color-menu-item-hover-bg-light: rgba(91, 45, 139, 0.3);
+  --color-menu-item-selected-bg-light: #5b2d8b;
+  --color-menu-item-dark: #cfcfdc;
+  --color-menu-item-hover-dark: #ffffff;
+  --color-menu-item-hover-bg-dark: rgba(138, 95, 210, 0.3);
+  --color-menu-item-selected-bg-dark: #5b2d8b;
+}
+
+[data-theme='light'] {
+  /* Active theme tokens switch to light */
+  --color-primary: var(--color-primary-light);
+  --color-primary-hover: var(--color-primary-hover-light);
+  --color-primary-active: var(--color-primary-active-light);
+  --color-primary-bg: var(--color-primary-bg-light);
+  --color-primary-border: var(--color-primary-border-light);
+
+  --color-bg-base: var(--color-bg-base-light);
+  --color-bg-container: var(--color-bg-container-light);
+  --color-bg-elevated: var(--color-bg-elevated-light);
+  --color-bg-layout: var(--color-bg-layout-light);
+  --color-bg-header: var(--color-bg-header-light);
+  --color-bg-sider: var(--color-bg-sider-light);
+  --color-bg-footer: var(--color-bg-footer-light);
+  --color-bg-input: var(--color-bg-input-light);
+
+  --color-text: var(--color-text-light);
+  --color-text-secondary: var(--color-text-secondary-light);
+  --color-text-tertiary: var(--color-text-tertiary-light);
+  --color-text-disabled: var(--color-text-disabled-light);
+  --color-text-lighter: var(--color-text-lighter-light);
+  --color-text-inverse: var(--color-text-inverse-light);
+
+  --color-border: var(--color-border-light);
+  --color-border-secondary: var(--color-border-secondary-light);
+
+  --color-success: var(--color-success-light);
+  --color-warning: var(--color-warning-light);
+  --color-error: var(--color-error-light);
+  --color-info: var(--color-info-light);
+
+  --color-menu-item: var(--color-menu-item-light);
+  --color-menu-item-hover: var(--color-menu-item-hover-light);
+  --color-menu-item-hover-bg: var(--color-menu-item-hover-bg-light);
+  --color-menu-item-selected-bg: var(--color-menu-item-selected-bg-light);
+}
+
+[data-theme='dark'] {
+  /* Active theme tokens switch to dark */
+  --color-primary: var(--color-primary-dark);
+  --color-primary-hover: var(--color-primary-hover-dark);
+  --color-primary-active: var(--color-primary-active-dark);
+  --color-primary-bg: var(--color-primary-bg-dark);
+  --color-primary-border: var(--color-primary-border-dark);
+
+  --color-bg-base: var(--color-bg-base-dark);
+  --color-bg-container: var(--color-bg-container-dark);
+  --color-bg-elevated: var(--color-bg-elevated-dark);
+  --color-bg-layout: var(--color-bg-layout-dark);
+  --color-bg-header: var(--color-bg-header-dark);
+  --color-bg-sider: var(--color-bg-sider-dark);
+  --color-bg-footer: var(--color-bg-footer-dark);
+  --color-bg-input: var(--color-bg-input-dark);
+
+  --color-text: var(--color-text-dark);
+  --color-text-secondary: var(--color-text-secondary-dark);
+  --color-text-tertiary: var(--color-text-tertiary-dark);
+  --color-text-disabled: var(--color-text-disabled-dark);
+  --color-text-lighter: var(--color-text-lighter-dark);
+  --color-text-inverse: var(--color-text-inverse-dark);
+
+  --color-border: var(--color-border-dark);
+  --color-border-secondary: var(--color-border-secondary-dark);
+
+  --color-success: var(--color-success-dark);
+  --color-warning: var(--color-warning-dark);
+  --color-error: var(--color-error-dark);
+  --color-info: var(--color-info-dark);
+
+  --color-menu-item: var(--color-menu-item-dark);
+  --color-menu-item-hover: var(--color-menu-item-hover-dark);
+  --color-menu-item-hover-bg: var(--color-menu-item-hover-bg-dark);
+  --color-menu-item-selected-bg: var(--color-menu-item-selected-bg-dark);
+}
+
+/* ========================================
+   Base Styles
+   ======================================== */
+
 body {
   @apply m-0;
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background-color: var(--color-bg-layout);
+  color: var(--color-text);
 }
 
 code {
   font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }
+
+/* ========================================
+   Utility Classes
+   ======================================== */
 
 .flex-center {
   @apply flex justify-center items-center;

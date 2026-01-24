@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { ConfigProvider, type ThemeConfig } from 'antd';
-import { useContext, createContext, useState } from 'react';
+import { useContext, createContext, useState, useEffect } from 'react';
 
 /**
  *  Importing user defined modules
@@ -18,7 +18,7 @@ export type Theme = 'light' | 'dark';
 export interface ThemeContext {
   theme: Theme;
   setTheme: (theme: Theme) => void;
-  config: ThemeConfig;
+  toggleTheme: () => void;
 }
 
 export interface ThemeProviderProps {
@@ -30,7 +30,7 @@ export interface ThemeProviderProps {
  */
 const THEME_STORAGE_KEY = 'theme';
 const themeConfigs: Record<Theme, ThemeConfig> = { light: lightTheme, dark: darkTheme };
-const ThemeContext = createContext<ThemeContext>({ theme: 'light', setTheme: () => {}, config: {} });
+const ThemeContext = createContext<ThemeContext>({ theme: 'light', setTheme: () => {}, toggleTheme: () => {} });
 
 export function useTheme() {
   return useContext(ThemeContext);
@@ -38,18 +38,21 @@ export function useTheme() {
 
 export default function ThemeProvider(props: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
-    const theme = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
-    if (theme === 'light' || theme === 'dark') return theme;
+    const savedTheme = localStorage.getItem(THEME_STORAGE_KEY) as Theme;
+    if (savedTheme === 'light' || savedTheme === 'dark') return savedTheme;
     return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
   });
 
-  const setThemeWithStorage = (newTheme: Theme) => {
+  const setThemeState = (newTheme: Theme) => {
     localStorage.setItem(THEME_STORAGE_KEY, newTheme);
     setTheme(newTheme);
   };
 
+  useEffect(() => document.documentElement.setAttribute('data-theme', theme), [theme]);
+  const toggleTheme = () => setThemeState(theme === 'dark' ? 'light' : 'dark');
+
   return (
-    <ThemeContext.Provider value={{ theme, setTheme: setThemeWithStorage, config: themeConfigs[theme] }}>
+    <ThemeContext.Provider value={{ theme, setTheme: setThemeState, toggleTheme }}>
       <ConfigProvider theme={themeConfigs[theme]}>{props.children}</ConfigProvider>
     </ThemeContext.Provider>
   );

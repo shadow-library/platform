@@ -15,3 +15,6 @@ count.txt
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
+
+# Generated
+stats.html

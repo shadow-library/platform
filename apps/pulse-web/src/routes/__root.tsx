@@ -10,7 +10,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
 /**
  *  Importing user defined modules
  */
-import Header from '../components/Header';
+import Layout from '../components/Layout';
 
 /**
  * Declaring types
@@ -28,9 +28,9 @@ export const Route = createRootRouteWithContext<RouterContext>()({
   component: () => (
     <>
       <HeadContent />
-      <Header>
+      <Layout>
         <Outlet />
-      </Header>
+      </Layout>
       <TanStackDevtools
         config={{ position: 'bottom-right' }}
         plugins={[

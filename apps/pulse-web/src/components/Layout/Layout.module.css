@@ -1,0 +1,44 @@
+@import 'tailwindcss';
+
+.sideNavContainer {
+  @apply fixed left-0 top-16 bottom-0 w-64 overflow-y-auto z-40;
+  background-color: var(--color-bg-sider);
+  border-right: 1px solid var(--color-border-dark);
+}
+
+/* Top Navbar Styles */
+.topNavContainer {
+  @apply fixed top-0 left-0 right-0 h-16 z-50 flex items-center justify-between px-4;
+  background-color: var(--color-bg-header);
+  border-bottom: 1px solid var(--color-border-dark);
+}
+
+.logoSection {
+  @apply w-56 flex justify-center gap-3;
+}
+
+.searchContainer {
+  @apply flex-1 max-w-xl mx-8;
+}
+
+.rightSection {
+  @apply flex items-center gap-4;
+}
+
+.themeToggle {
+  @apply p-2 rounded-lg cursor-pointer transition-all duration-200;
+}
+
+/* Footer Styles */
+.footerContainer {
+  @apply h-12 flex items-center justify-center px-6 text-sm;
+  background-color: var(--color-bg-footer);
+  border-top: 1px solid var(--color-border-dark);
+  color: var(--color-text-tertiary);
+}
+
+/* Main Content Area */
+.main {
+  @apply ml-64 mt-16;
+  background-color: var(--color-bg-layout);
+}

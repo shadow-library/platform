@@ -16,7 +16,7 @@ import { type ThemeConfig } from 'antd';
  * Declaring the constants
  */
 
-export const lightTheme: ThemeConfig = {
+export const lightTheme = {
   algorithm: theme.defaultAlgorithm,
   token: {
     // Brand
@@ -83,9 +83,9 @@ export const lightTheme: ThemeConfig = {
       darkItemHoverBg: 'rgba(91, 45, 139, 0.30)',
     },
   },
-};
+} satisfies ThemeConfig;
 
-export const darkTheme: ThemeConfig = {
+export const darkTheme = {
   algorithm: theme.darkAlgorithm,
   token: {
     // Brand
@@ -126,4 +126,4 @@ export const darkTheme: ThemeConfig = {
     controlOutline: 'rgba(138, 95, 210, 0.35)',
     boxShadow: '0 4px 16px rgba(0, 0, 0, 0.45)',
   },
-};
+} satisfies ThemeConfig;

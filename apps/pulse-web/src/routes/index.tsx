@@ -20,5 +20,12 @@ export const Route = createFileRoute('/')({
 });
 
 function Dashboard() {
-  return <div>Dashboard</div>;
+  return (
+    <div>
+      <div>
+        Lorem ipsum dolor, sit amet consectetur adipisicing elit. Necessitatibus odit omnis quis quasi, quia veniam aliquid dignissimos unde doloribus expedita? Quis quam, officiis
+        fugiat illo distinctio voluptatibus consectetur praesentium voluptates!
+      </div>
+    </div>
+  );
 }

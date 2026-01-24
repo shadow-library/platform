@@ -2,25 +2,23 @@
  * Importing npm packages
  */
 import { useMemo } from 'react';
-import { clsx } from 'clsx';
 
 /**
  *  Importing user defined modules
  */
 import type { Theme } from '@/types';
 
+import { useTheme } from '../AppProvider';
+import { computeLogoDimensions } from './logo.utils';
+
+/**
+ * Importing styles
+ */
+import styles from './Logo.module.css';
+
 /**
  * Declaring types
  */
-
-type LogoLetter = (typeof LETTERS)[number];
-
-interface LetterSize {
-  width: number;
-  height: number;
-}
-
-type LetterSizes = Record<LogoLetter, LetterSize>;
 
 interface LogoColors {
   stroke: string;
@@ -30,18 +28,12 @@ interface LogoColors {
 export interface LogoProps {
   width?: number;
   theme?: Theme;
+  letterSpacing?: number;
 }
 
 /**
  * Declaring constants
  */
-
-const LETTERS = ['S', 'H', 'A', 'D', 'O', 'W'] as const;
-const LETTER_WIDTHS: Record<LogoLetter, number> = { S: 290, H: 290, A: 350, D: 300, O: 290, W: 430 };
-const ORIGINAL_TOTAL_WIDTH = Object.values(LETTER_WIDTHS).reduce((sum, w) => sum + w, 0);
-const ORIGINAL_HEIGHT = 410;
-
-const strokeClassName = 'fill-none stroke-[50px]';
 const primaryColors: Record<Theme, LogoColors> = {
   light: { stroke: 'stroke-violet-900', fill: 'fill-violet-900' },
   dark: { stroke: 'stroke-violet-500', fill: 'fill-violet-500' },
@@ -52,48 +44,25 @@ const secondaryColors: Record<Theme, LogoColors> = {
 };
 
 export default function Logo(props: LogoProps) {
-  const { width = 300, theme = 'light' } = props;
-  const primaryColor = primaryColors[theme];
-  const secondaryColor = secondaryColors[theme];
+  const { width = 300, theme } = props;
+  const { theme: currentTheme } = useTheme();
+  const { letterSpacing, letterSizes, height } = useMemo(() => computeLogoDimensions(width), [width]);
 
-  const { letterSpacing, letterSizes, height } = useMemo(() => {
-    // Calculate spacing as a proportion of total width (roughly 2.5% per gap)
-    const totalSpacing = width * 0.125; // 5 gaps total
-    const letterSpacing = totalSpacing / (LETTERS.length - 1);
-    const availableWidthForLetters = width - totalSpacing;
-    const scale = availableWidthForLetters / ORIGINAL_TOTAL_WIDTH;
-
-    const height = ORIGINAL_HEIGHT * scale;
-    const letterSizes = LETTERS.reduce(
-      (acc, letter) => Object.assign(acc, { [letter]: { width: LETTER_WIDTHS[letter] * scale, height: ORIGINAL_HEIGHT * scale } }),
-      {} as LetterSizes,
-    );
-
-    return { letterSpacing, letterSizes, height };
-  }, [width]);
+  const logoTheme = theme ?? currentTheme;
+  const primaryColor = primaryColors[logoTheme];
+  const secondaryColor = secondaryColors[logoTheme];
+  const gap = props.letterSpacing ?? letterSpacing;
 
   return (
-    <div className="flex items-center" style={{ gap: `${letterSpacing}px`, height: `${height}px` }} role="img" aria-label="Shadow Applications logo">
+    <div className={styles.container} style={{ gap: `${gap}px`, height: `${height}px` }} role="img" aria-label="Shadow Applications logo">
       {/* S */}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={letterSizes.S.width}
-        height={letterSizes.S.height}
-        viewBox="0 0 290 410"
-        className={clsx(strokeClassName, primaryColor.stroke)}
-      >
+      <svg xmlns="http://www.w3.org/2000/svg" width={letterSizes.S.width} height={letterSizes.S.height} viewBox="0 0 290 410" className={primaryColor.stroke}>
         <path d="M 25 345 L 70 385 210 385 255 340 255 265 235 245 45 165 25 145 25 70 70 25 210 25 255 70" strokeLinecap="round" />
         <path d="M 25 345 L 25 285 M 255 115 L 255 70" />
       </svg>
 
       {/* H */}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={letterSizes.H.width}
-        height={letterSizes.H.height}
-        viewBox="0 0 290 410"
-        className={clsx(strokeClassName, secondaryColor.stroke)}
-      >
+      <svg xmlns="http://www.w3.org/2000/svg" width={letterSizes.H.width} height={letterSizes.H.height} viewBox="0 0 290 410" className={secondaryColor.stroke}>
         <path d="M 25 410 L 25 0" />
         <path d="M 25 205 L 265 205" />
         <path d="M 265 410 L 265 0" />
@@ -111,13 +80,7 @@ export default function Logo(props: LogoProps) {
       </svg>
 
       {/* O */}
-      <svg
-        xmlns="http://www.w3.org/2000/svg"
-        width={letterSizes.O.width}
-        height={letterSizes.O.height}
-        viewBox="0 0 290 410"
-        className={clsx(strokeClassName, primaryColor.stroke)}
-      >
+      <svg xmlns="http://www.w3.org/2000/svg" width={letterSizes.O.width} height={letterSizes.O.height} viewBox="0 0 290 410" className={primaryColor.stroke}>
         <path d="M 25 70 L 25 345 70 385 210 385 255 340 255 70 210 25 70 25 25 70" strokeLinecap="round" />
       </svg>
 
