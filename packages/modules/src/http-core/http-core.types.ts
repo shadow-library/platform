@@ -27,9 +27,18 @@ declare module '@shadow-library/common' {
   }
 }
 
+export interface CommonOptions {
+  enabled?: boolean;
+}
+
+export interface OpenAPIOptions extends Partial<OpenAPIV3.Document>, CommonOptions {
+  routePrefix?: `/${string}`;
+  normalizeSchemaIds?: boolean;
+}
+
 export interface HttpCoreModuleOptions {
   csrf: CSRFOptions;
-  helmet: FastifyHelmetOptions;
-  compress: FastifyCompressOptions;
-  openapi: Partial<OpenAPIV3.Document>;
+  helmet: FastifyHelmetOptions & CommonOptions;
+  compress: FastifyCompressOptions & CommonOptions;
+  openapi: OpenAPIOptions;
 }

@@ -348,4 +348,153 @@ describe('HttpCore Module', () => {
       });
     });
   });
+
+  describe('OpenAPI Configuration', () => {
+    describe('when openapi is enabled', () => {
+      let openapiApp: ShadowApplication;
+      let openapiRouter: FastifyRouter;
+
+      const HttpCoreOpenAPI = HttpCoreModule.forRoot({
+        csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
+        openapi: { enabled: true, routePrefix: '/docs' },
+      });
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreOpenAPI] })] })
+      class OpenAPIAppModule {}
+
+      beforeEach(async () => {
+        openapiApp = await ShadowFactory.create(OpenAPIAppModule);
+        openapiRouter = openapiApp.get(Router);
+      });
+
+      it('should serve OpenAPI documentation at custom route prefix', async () => {
+        const response = await openapiRouter.mockRequest().get('/docs/');
+        expect(response.statusCode).toBe(200);
+      });
+
+      it('should serve OpenAPI JSON specification', async () => {
+        const response = await openapiRouter.mockRequest().get('/docs/openapi.json');
+        expect(response.statusCode).toBe(200);
+        const json = response.json();
+        expect(json.openapi).toBeDefined();
+        expect(json.info).toBeDefined();
+      });
+    });
+
+    describe('when openapi is disabled', () => {
+      let disabledApp: ShadowApplication;
+      let disabledRouter: FastifyRouter;
+
+      const HttpCoreNoOpenAPI = HttpCoreModule.forRoot({
+        csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
+        openapi: { enabled: false },
+      });
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreNoOpenAPI] })] })
+      class NoOpenAPIAppModule {}
+
+      beforeEach(async () => {
+        disabledApp = await ShadowFactory.create(NoOpenAPIAppModule);
+        disabledRouter = disabledApp.get(Router);
+      });
+
+      it('should not serve OpenAPI documentation', async () => {
+        const response = await disabledRouter.mockRequest().get('/dev/api-docs');
+        expect(response.statusCode).toBe(404);
+      });
+    });
+
+    describe('when normalizeSchemaIds is enabled', () => {
+      let normalizedApp: ShadowApplication;
+      let normalizedRouter: FastifyRouter;
+
+      const HttpCoreNormalized = HttpCoreModule.forRoot({
+        csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
+        openapi: { enabled: true, routePrefix: '/docs', normalizeSchemaIds: true },
+      });
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreNormalized] })] })
+      class NormalizedAppModule {}
+
+      beforeEach(async () => {
+        normalizedApp = await ShadowFactory.create(NormalizedAppModule);
+        normalizedRouter = normalizedApp.get(Router);
+      });
+
+      it('should serve OpenAPI with normalized schema IDs', async () => {
+        const response = await normalizedRouter.mockRequest().get('/docs/openapi.json');
+        expect(response.statusCode).toBe(200);
+        const json = response.json();
+        expect(json.components).toBeDefined();
+      });
+    });
+  });
+
+  describe('Helmet Configuration', () => {
+    let helmetApp: ShadowApplication;
+    let helmetRouter: FastifyRouter;
+
+    async function setupHelmet(enabled: boolean) {
+      const HttpCoreHelmet = HttpCoreModule.forRoot({
+        csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
+        helmet: { enabled, contentSecurityPolicy: false },
+      });
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreHelmet] })] })
+      class HelmetAppModule {}
+
+      helmetApp = await ShadowFactory.create(HelmetAppModule);
+      helmetRouter = helmetApp.get(Router);
+    }
+
+    it('should set security headers when helmet is enabled', async () => {
+      await setupHelmet(true);
+      const response = await helmetRouter.mockRequest().get('/health');
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-content-type-options']).toBe('nosniff');
+      expect(response.headers['x-dns-prefetch-control']).toBe('off');
+      expect(response.headers['x-frame-options']).toBe('SAMEORIGIN');
+    });
+
+    it('should not set security headers when helmet is disabled', async () => {
+      await setupHelmet(false);
+      const response = await helmetRouter.mockRequest().get('/health');
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['x-content-type-options']).toBeUndefined();
+      expect(response.headers['x-dns-prefetch-control']).toBeUndefined();
+      expect(response.headers['x-frame-options']).toBeUndefined();
+    });
+  });
+
+  describe('Compress Configuration', () => {
+    let compressApp: ShadowApplication;
+    let compressRouter: FastifyRouter;
+
+    async function setupCompression(enabled: boolean) {
+      const HttpCoreCompress = HttpCoreModule.forRoot({
+        csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
+        compress: { enabled, threshold: 0 },
+      });
+
+      @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreCompress] })] })
+      class CompressAppModule {}
+
+      compressApp = await ShadowFactory.create(CompressAppModule);
+      compressRouter = compressApp.get(Router);
+    }
+
+    it('should support compression when enabled', async () => {
+      await setupCompression(true);
+      const response = await compressRouter.mockRequest().get('/health').headers({ 'accept-encoding': 'gzip' });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-encoding']).toBe('gzip');
+    });
+
+    it('should not compress response when disabled', async () => {
+      await setupCompression(false);
+      const response = await compressRouter.mockRequest().get('/health').headers({ 'accept-encoding': 'gzip' });
+      expect(response.statusCode).toBe(200);
+      expect(response.headers['content-encoding']).toBeUndefined();
+    });
+  });
 });

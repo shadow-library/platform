@@ -95,13 +95,18 @@ import { HttpCoreModule } from '@shadow-library/modules/http-core';
             refreshLeeway: { hours: 6 },
           },
           helmet: {
+            enabled: true, // Enable/disable helmet middleware (defaults to true in production)
             global: true,
             // ... fastify-helmet options
           },
           compress: {
+            enabled: true, // Enable/disable compression middleware (defaults to true in production)
             // ... fastify-compress options
           },
           openapi: {
+            enabled: true, // Enable/disable OpenAPI documentation (defaults to true in development)
+            routePrefix: '/dev/api-docs', // Custom route prefix for OpenAPI docs
+            normalizeSchemaIds: true, // Normalize class-schema IDs for cleaner OpenAPI spec
             // ... OpenAPI document definition
           },
         }),
@@ -122,7 +127,19 @@ export class AppModule {}
     - Validates the `x-csrf-token` header against the cookie token on state-changing requests (`POST`, `PUT`, `DELETE`, etc.).
     - Tokens have an expiration time and are automatically refreshed before expiry.
     - **Dev Mode Toggle**: In non-production environments, CSRF protection can be disabled at runtime by setting the `HTTP_CORE_CSRF_ENABLED` environment variable to `false`.
-3.  **Request Initialization**:
+3.  **Security Headers (Helmet)**:
+    - **Enable Option**: Set `helmet.enabled` to toggle helmet middleware (defaults to `true` in production, `false` in development).
+    - Provides comprehensive security headers including `X-Content-Type-Options`, `X-Frame-Options`, `X-DNS-Prefetch-Control`, and more.
+    - Configurable Content Security Policy (CSP) and other security options.
+4.  **Compression**:
+    - **Enable Option**: Set `compress.enabled` to toggle compression middleware (defaults to `true` in production, `false` in development).
+    - Automatic response compression for improved performance.
+5.  **OpenAPI Documentation**:
+    - **Enable Option**: Set `openapi.enabled` to toggle OpenAPI documentation (defaults to `true` in development, `false` in production).
+    - **Route Prefix**: Configure the route prefix with `openapi.routePrefix` (defaults to `/dev/api-docs`).
+    - **Schema Normalization**: Set `openapi.normalizeSchemaIds: true` to normalize `class-schema:` prefixed IDs for cleaner OpenAPI specifications.
+    - Seamless integration with `@fastify/swagger` and `@scalar/fastify-api-reference` for interactive API documentation.
+6.  **Request Initialization**:
     - Ensures every request has a unique `x-correlation-id` header for tracing.
     - Preserves the ID if sent by the client.
 
