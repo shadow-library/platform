@@ -49,7 +49,7 @@
     "@shadow-library/class-schema": "^0.2.0",
     "@shadow-library/common": "^1.5.2",
     "@shadow-library/fastify": "^1.6.3",
-    "@shadow-library/modules": "^0.2.5",
+    "@shadow-library/modules": "^0.2.8",
     "ajv": "^8.17.1",
     "drizzle-orm": "^0.44.7",
     "libphonenumber-js": "^1.12.33",

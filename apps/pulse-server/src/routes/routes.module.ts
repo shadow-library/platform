@@ -22,7 +22,15 @@ import { TemplateRoutesModule } from './template';
  * Declaring the constants
  */
 
-const AppHttpCoreModule = HttpCoreModule.forRoot({ csrf: { disabled: true } });
+const AppHttpCoreModule = HttpCoreModule.forRoot({
+  csrf: {
+    disabled: true,
+  },
+
+  openapi: {
+    normalizeSchemaIds: true,
+  },
+});
 
 export const HttpRouteModule = FastifyModule.forRoot({
   imports: [AppHttpCoreModule, ConfigurationRoutesModule, DashboardModule, TemplateRoutesModule, NotificationRoutesModule],

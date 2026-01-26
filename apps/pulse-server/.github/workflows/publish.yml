@@ -49,6 +49,9 @@ jobs:
           tags: |
             type=sha
             type=raw,value=latest
+          labels: |
+            org.opencontainers.image.description=A notification service for Shadow applications
+            org.opencontainers.image.vendor=Shadow Apps
 
       - name: Build and push Docker image
         id: docker-build
