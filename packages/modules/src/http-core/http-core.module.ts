@@ -81,10 +81,10 @@ export class HttpCoreModule implements OnModuleInit {
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ServerInstance,
     private readonly contextService: ContextService,
   ) {
-    Config.load('http-core.csrf.enabled', { defaultValue: 'true' });
-    Config.load('http-core.helmet.enabled');
-    Config.load('http-core.compress.enabled');
-    Config.load('http-core.openapi.enabled');
+    Config.load('http-core.csrf.enabled', { validateType: 'boolean', defaultValue: 'true' });
+    Config.load('http-core.helmet.enabled', { validateType: 'boolean' });
+    Config.load('http-core.compress.enabled', { validateType: 'boolean' });
+    Config.load('http-core.openapi.enabled', { validateType: 'boolean' });
   }
 
   private firstDefined(...values: (boolean | undefined)[]): boolean {
@@ -104,13 +104,15 @@ export class HttpCoreModule implements OnModuleInit {
 
     const existingValues = Array.from(this.schemaIdMap.values());
     let normalized = id.replace('class-schema:', '').split(/[:-]/g)[0] as string;
-    for (let index = 1; index <= 100; index++) {
-      const candidate = normalized + index;
-      if (!existingValues.includes(candidate)) {
-        normalized = candidate;
-        break;
+    if (existingValues.includes(normalized)) {
+      for (let index = 1; index <= 100; index++) {
+        const candidate = normalized + index;
+        if (!existingValues.includes(candidate)) {
+          normalized = candidate;
+          break;
+        }
+        if (index === 100) throw new Error(`Unable to normalize schema ID for ${id} after 100 attempts`);
       }
-      if (index === 100) throw new Error(`Unable to normalize schema ID for ${id} after 100 attempts`);
     }
 
     this.schemaIdMap.set(id, normalized);
