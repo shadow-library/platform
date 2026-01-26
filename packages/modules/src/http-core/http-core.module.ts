@@ -7,7 +7,7 @@ import { fastifyCookie } from '@fastify/cookie';
 import { FastifyDynamicSwaggerOptions } from '@fastify/swagger';
 import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
-import { Config, LogData, Logger, utils } from '@shadow-library/common';
+import { Config, InternalError, LogData, Logger, utils } from '@shadow-library/common';
 import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
 import { OpenAPIV3 } from 'openapi-types';
 import { PartialDeep } from 'type-fest';
@@ -38,7 +38,6 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
     tokenLength: 32,
   },
   helmet: {
-    enabled: Config.isProd(),
     global: true,
     hidePoweredBy: true,
     xContentTypeOptions: true,
@@ -63,11 +62,9 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
     },
   },
   compress: {
-    enabled: Config.isProd(),
     global: true,
   },
   openapi: {
-    enabled: Config.isDev(),
     routePrefix: '/dev/api-docs',
     info: { title: Config.get('app.name'), version: '1.0.0' },
     components: { schemas: {} },
@@ -85,6 +82,17 @@ export class HttpCoreModule implements OnModuleInit {
     private readonly contextService: ContextService,
   ) {
     Config.load('http-core.csrf.enabled', { defaultValue: 'true' });
+    Config.load('http-core.helmet.enabled');
+    Config.load('http-core.compress.enabled');
+    Config.load('http-core.openapi.enabled');
+  }
+
+  private firstDefined(...values: (boolean | undefined)[]): boolean {
+    for (const value of values) {
+      if (typeof value === 'boolean') return value;
+    }
+
+    throw new InternalError('No defined boolean value found in firstDefined');
   }
 
   private resolveSchemaId(id: string): string {
@@ -172,7 +180,8 @@ export class HttpCoreModule implements OnModuleInit {
       return context;
     });
 
-    if (this.options.openapi.enabled) {
+    const isOpenapiEnabled = this.firstDefined(this.options.openapi.enabled, Config.get('http-core.openapi.enabled'), Config.isDev());
+    if (isOpenapiEnabled) {
       const fastifySwagger = await import('@fastify/swagger');
       const scalar = await import('@scalar/fastify-api-reference');
       const routePrefix = this.options.openapi.routePrefix ?? DEFAULT_HTTP_CORE_CONFIGS.openapi.routePrefix;
@@ -181,12 +190,14 @@ export class HttpCoreModule implements OnModuleInit {
       await this.fastify.register(scalar.default, { routePrefix });
     }
 
-    if (this.options.helmet.enabled) {
+    const isHelmetEnabled = this.firstDefined(this.options.helmet.enabled, Config.get('http-core.helmet.enabled'), Config.isProd());
+    if (isHelmetEnabled) {
       const helmet = await import('@fastify/helmet');
       await this.fastify.register(helmet, this.options.helmet);
     }
 
-    if (this.options.compress.enabled) {
+    const isCompressEnabled = this.firstDefined(this.options.compress.enabled, Config.get('http-core.compress.enabled'), Config.isProd());
+    if (isCompressEnabled) {
       const compress = await import('@fastify/compress');
       await this.fastify.register(compress, this.options.compress);
     }

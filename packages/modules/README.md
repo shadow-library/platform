@@ -117,6 +117,21 @@ import { HttpCoreModule } from '@shadow-library/modules/http-core';
 export class AppModule {}
 ```
 
+#### Configuration Precedence
+
+For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the following order of precedence is used to determine whether a feature is enabled:
+
+1. **Code Configuration** – The `enabled` option passed to `HttpCoreModule.forRoot()` takes the highest priority.
+2. **Environment Variable** – If not set in code, the corresponding environment variable is checked (e.g., `HTTP_CORE_HELMET_ENABLED`).
+3. **Environment Default** – If neither is set, the default is based on the current environment (production or development).
+
+| Feature     | Environment Variable         | Default (Production) | Default (Development) |
+| ----------- | ---------------------------- | -------------------- | --------------------- |
+| CSRF        | `HTTP_CORE_CSRF_ENABLED`     | `true`               | `true`                |
+| Helmet      | `HTTP_CORE_HELMET_ENABLED`   | `true`               | `false`               |
+| Compression | `HTTP_CORE_COMPRESS_ENABLED` | `true`               | `false`               |
+| OpenAPI     | `HTTP_CORE_OPENAPI_ENABLED`  | `false`              | `true`                |
+
 #### Features in Detail
 
 1.  **Health Check**: Automatically registers a `HealthController` that responds to `GET /health` with `{ status: 'ok' }`.
@@ -126,16 +141,12 @@ export class AppModule {}
     - Sets a `csrf-token` cookie when cookies are present but the CSRF token is missing.
     - Validates the `x-csrf-token` header against the cookie token on state-changing requests (`POST`, `PUT`, `DELETE`, etc.).
     - Tokens have an expiration time and are automatically refreshed before expiry.
-    - **Dev Mode Toggle**: In non-production environments, CSRF protection can be disabled at runtime by setting the `HTTP_CORE_CSRF_ENABLED` environment variable to `false`.
 3.  **Security Headers (Helmet)**:
-    - **Enable Option**: Set `helmet.enabled` to toggle helmet middleware (defaults to `true` in production, `false` in development).
     - Provides comprehensive security headers including `X-Content-Type-Options`, `X-Frame-Options`, `X-DNS-Prefetch-Control`, and more.
     - Configurable Content Security Policy (CSP) and other security options.
 4.  **Compression**:
-    - **Enable Option**: Set `compress.enabled` to toggle compression middleware (defaults to `true` in production, `false` in development).
     - Automatic response compression for improved performance.
 5.  **OpenAPI Documentation**:
-    - **Enable Option**: Set `openapi.enabled` to toggle OpenAPI documentation (defaults to `true` in development, `false` in production).
     - **Route Prefix**: Configure the route prefix with `openapi.routePrefix` (defaults to `/dev/api-docs`).
     - **Schema Normalization**: Set `openapi.normalizeSchemaIds: true` to normalize `class-schema:` prefixed IDs for cleaner OpenAPI specifications.
     - Seamless integration with `@fastify/swagger` and `@scalar/fastify-api-reference` for interactive API documentation.
