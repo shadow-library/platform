@@ -9,6 +9,7 @@ import { Class, SetRequired } from 'type-fest';
  */
 import { BRAND, Integer, METADATA_KEYS } from './constants';
 import { SchemaOptions } from './decorators';
+import { EnumType } from './enum-type';
 import { AnyFieldSchema, JSONSchema, JSONSchemaType } from './interfaces';
 import { SchemaComposerMetadata } from './internal.types';
 
@@ -65,7 +66,8 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
   }
 
   private getSchema(Class: Class<unknown>): ParsedSchema {
-    if (primitiveTypes.includes(Class)) return { $id: Class.name, type: Class.name.toLowerCase() as any };
+    if (primitiveTypes.includes(Class)) return { $id: Class.name, type: Class.name.toLowerCase() as JSONSchemaType };
+    if (EnumType.isEnumType(Class)) return EnumType.toSchema(Class);
     const schema = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Class) as ParsedSchema | undefined;
     if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
     return structuredClone(schema);

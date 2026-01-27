@@ -7,7 +7,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { METADATA_KEYS } from '@lib/constants';
+import { METADATA_KEYS, getCounterId } from '@lib/constants';
 import { JSONSchema } from '@lib/interfaces';
 
 /**
@@ -45,7 +45,6 @@ export interface SchemaOptions {
 /**
  * Declaring the constants
  */
-let counter = 0;
 
 export function Schema(options: SchemaOptions = {}): ClassDecorator {
   const { additionalProperties, patternProperties, ...objectProperties } = options;
@@ -56,7 +55,7 @@ export function Schema(options: SchemaOptions = {}): ClassDecorator {
   if (patternProperties !== undefined) metadata.patternProperties = patternProperties;
 
   return target => {
-    if (!schema.$id) schema.$id = `class-schema:${target.name}-${counter++}`;
+    if (!schema.$id) schema.$id = `class-schema:${target.name}-${getCounterId()}`;
     Reflector.updateMetadata(METADATA_KEYS.SCHEMA_OPTIONS, schema, target);
     if (Object.keys(metadata).length) Reflector.updateMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, metadata, target);
   };

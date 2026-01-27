@@ -9,6 +9,7 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { BRAND } from '@lib/constants';
+import { EnumType } from '@lib/enum-type';
 import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schema';
 
 /**
@@ -344,6 +345,75 @@ describe('ClassSchema', () => {
       },
       if: { properties: { role: { const: 'admin' } } },
       then: { required: ['accessLevel'] },
+    });
+  });
+
+  describe('EnumType', () => {
+    class StatusEnum extends EnumType {
+      static override readonly id = 'Status';
+      static override readonly values = ['active', 'inactive', 'pending'];
+      static override readonly type = 'string' as const;
+    }
+
+    class PriorityEnum extends EnumType {
+      static override readonly id = 'Priority';
+      static override readonly values = [1, 2, 3, 4, 5];
+      static override readonly type = 'number' as const;
+    }
+
+    it('should generate schema for string enum', () => {
+      expect(ClassSchema.generate(StatusEnum)).toMatchObject({
+        $id: 'Status',
+        type: 'string',
+        enum: ['active', 'inactive', 'pending'],
+      });
+    });
+
+    it('should generate schema for int enum', () => {
+      expect(ClassSchema.generate(PriorityEnum)).toMatchObject({
+        $id: 'Priority',
+        type: 'number',
+        enum: [1, 2, 3, 4, 5],
+      });
+    });
+
+    it('should generate the schema for multiple enums', () => {
+      @Schema({ $id: User.name })
+      class User {
+        @Field()
+        name: string;
+
+        @Field(() => StatusEnum)
+        status: string;
+
+        @Field(() => PriorityEnum)
+        priority: number;
+      }
+
+      const schema = ClassSchema.generate(User);
+      expect(schema).toEqual({
+        $id: 'User',
+        type: 'object',
+        definitions: {
+          Status: {
+            $id: 'Status',
+            type: 'string',
+            enum: ['active', 'inactive', 'pending'],
+          },
+          Priority: {
+            $id: 'Priority',
+            type: 'number',
+            enum: [1, 2, 3, 4, 5],
+          },
+        },
+        properties: {
+          name: { type: 'string' },
+          status: { $ref: 'Status' },
+          priority: { $ref: 'Priority' },
+        },
+        required: ['name', 'status', 'priority'],
+        additionalProperties: false,
+      });
     });
   });
 });

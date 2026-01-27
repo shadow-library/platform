@@ -14,6 +14,9 @@
  * Declaring the constants
  */
 
+let counter = 0;
+export const getCounterId = (): number => counter++;
+
 /* eslint-disable-next-line @typescript-eslint/no-extraneous-class */
 export class Integer {}
 

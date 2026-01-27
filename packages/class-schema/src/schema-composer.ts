@@ -8,8 +8,9 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { METADATA_KEYS } from './constants';
+import { METADATA_KEYS, getCounterId } from './constants';
 import { Schema } from './decorators';
+import { EnumType } from './enum-type';
 import { SchemaComposerMetadata } from './internal.types';
 
 /**
@@ -46,5 +47,15 @@ export class SchemaComposer {
 
   static discriminator<T extends Class<unknown>[]>(key: string, ...Classes: T): T[number] {
     return this.createClass({ opName: 'discriminator', op: 'oneOf', classes: Classes, discriminatorKey: key }) as T[number];
+  }
+
+  static enum(name: string, values: string[] | number[]): Class<unknown> {
+    class EnumClass extends EnumType {
+      static override readonly id = `class-schema:${name}-enum-${getCounterId()}`;
+      static override readonly values = values;
+      static override readonly type = typeof values[0] === 'number' ? 'number' : 'string';
+    }
+
+    return EnumClass;
   }
 }

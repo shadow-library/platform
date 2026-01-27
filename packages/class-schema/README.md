@@ -457,6 +457,59 @@ class Account {
 }
 ```
 
+### Enum Types
+
+Create reusable enum schemas using `SchemaComposer.enum()` for string or number enumerations:
+
+```typescript
+import { Schema, Field, SchemaComposer, ClassSchema } from '@shadow-library/class-schema';
+
+// Create string enum
+const Status = SchemaComposer.enum('Status', ['active', 'inactive', 'pending']);
+
+// Create number enum (e.g., priority levels)
+const Priority = SchemaComposer.enum('Priority', [1, 2, 3, 4, 5]);
+
+@Schema({ $id: 'Task' })
+class Task {
+  @Field()
+  name: string;
+
+  @Field(() => Status)
+  status: string;
+
+  @Field(() => Priority)
+  priority: number;
+}
+
+const schema = ClassSchema.generate(Task);
+console.log(schema);
+// Output:
+// {
+//   "$id": "Task",
+//   "type": "object",
+//   "required": ["name", "status", "priority"],
+//   "additionalProperties": false,
+//   "properties": {
+//     "name": { "type": "string" },
+//     "status": { "$ref": "class-schema:Status-enum-0" },
+//     "priority": { "$ref": "class-schema:Priority-enum-1" }
+//   },
+//   "definitions": {
+//     "class-schema:Status-enum-0": {
+//       "$id": "class-schema:Status-enum-0",
+//       "type": "string",
+//       "enum": ["active", "inactive", "pending"]
+//     },
+//     "class-schema:Priority-enum-1": {
+//       "$id": "class-schema:Priority-enum-1",
+//       "type": "number",
+//       "enum": [1, 2, 3, 4, 5]
+//     }
+//   }
+// }
+```
+
 ## Schema Registry
 
 Manage multiple schemas efficiently:
@@ -1086,7 +1139,7 @@ const summary: UserSummary = {
 
 - **`ClassSchema<T>`**: Main schema generator class
 - **`SchemaRegistry`**: Registry for managing multiple schemas
-- **`SchemaComposer`**: Utility for composing multiple schemas with `anyOf`, `oneOf`, and discriminators
+- **`SchemaComposer`**: Utility for composing multiple schemas with `anyOf`, `oneOf`, discriminators, and enums
 - **`TransformerFactory`**: Factory for creating data transformers
 
 #### SchemaComposer Static Methods
@@ -1114,6 +1167,18 @@ Creates a discriminated union schema with automatic mapping generation:
 ```typescript
 const User = SchemaComposer.discriminator('type', NativeUser, OAuthUser);
 // Generates schema with discriminator.mapping based on const values
+```
+
+##### `SchemaComposer.enum(id, values)`
+
+Creates an enum schema for string or number values:
+
+```typescript
+// String enum
+const Status = SchemaComposer.enum('Status', ['active', 'inactive', 'pending']);
+
+// Number enum
+const Priority = SchemaComposer.enum('Priority', [1, 2, 3, 4, 5]);
 ```
 
 #### ClassSchema Static Methods
