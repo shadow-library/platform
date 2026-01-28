@@ -6,8 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { SchemaComposer } from '@lib/schema-composer';
-import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
+import { ClassSchema, Field, Schema, SchemaComposer } from '@shadow-library/class-schema';
 
 /**
  * Defining types
