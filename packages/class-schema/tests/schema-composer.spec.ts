@@ -164,24 +164,4 @@ describe('Schema Composer', () => {
       },
     });
   });
-
-  it('should generate the schema for string enum', () => {
-    const Status = SchemaComposer.enum('Status', ['active', 'inactive', 'pending']);
-
-    expect(Status).toMatchObject({
-      id: expect.stringContaining('class-schema:Status-enum-'),
-      values: ['active', 'inactive', 'pending'],
-      type: 'string',
-    });
-  });
-
-  it('should generate the schema for number enum', () => {
-    const Status = SchemaComposer.enum('Status', [1, 2, 3, 4, 5]);
-
-    expect(Status).toMatchObject({
-      id: expect.stringContaining('class-schema:Status-enum-'),
-      values: [1, 2, 3, 4, 5],
-      type: 'number',
-    });
-  });
 });

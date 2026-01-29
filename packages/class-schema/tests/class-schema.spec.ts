@@ -349,21 +349,12 @@ describe('ClassSchema', () => {
   });
 
   describe('EnumType', () => {
-    class StatusEnum extends EnumType {
-      static override readonly id = 'Status';
-      static override readonly values = ['active', 'inactive', 'pending'];
-      static override readonly type = 'string' as const;
-    }
-
-    class PriorityEnum extends EnumType {
-      static override readonly id = 'Priority';
-      static override readonly values = [1, 2, 3, 4, 5];
-      static override readonly type = 'number' as const;
-    }
+    const StatusEnum = EnumType.create('Status', ['active', 'inactive', 'pending']);
+    const PriorityEnum = EnumType.create('Priority', [1, 2, 3, 4, 5]);
 
     it('should generate schema for string enum', () => {
       expect(ClassSchema.generate(StatusEnum)).toMatchObject({
-        $id: 'Status',
+        $id: StatusEnum.id,
         type: 'string',
         enum: ['active', 'inactive', 'pending'],
       });
@@ -371,22 +362,25 @@ describe('ClassSchema', () => {
 
     it('should generate schema for int enum', () => {
       expect(ClassSchema.generate(PriorityEnum)).toMatchObject({
-        $id: 'Priority',
+        $id: PriorityEnum.id,
         type: 'number',
         enum: [1, 2, 3, 4, 5],
       });
     });
 
     it('should generate the schema for multiple enums', () => {
+      const UserStatusEnum = EnumType.create('UserStatus', ['active', 'inactive', 'pending']);
+      const UserPriorityEnum = EnumType.create('UserPriority', [1, 2, 3, 4, 5]);
+
       @Schema({ $id: User.name })
       class User {
         @Field()
         name: string;
 
-        @Field(() => StatusEnum)
+        @Field(() => UserStatusEnum)
         status: string;
 
-        @Field(() => PriorityEnum)
+        @Field(() => UserPriorityEnum)
         priority: number;
       }
 
@@ -395,21 +389,21 @@ describe('ClassSchema', () => {
         $id: 'User',
         type: 'object',
         definitions: {
-          Status: {
-            $id: 'Status',
+          [UserStatusEnum.id]: {
+            $id: UserStatusEnum.id,
             type: 'string',
             enum: ['active', 'inactive', 'pending'],
           },
-          Priority: {
-            $id: 'Priority',
+          [UserPriorityEnum.id]: {
+            $id: UserPriorityEnum.id,
             type: 'number',
             enum: [1, 2, 3, 4, 5],
           },
         },
         properties: {
           name: { type: 'string' },
-          status: { $ref: 'Status' },
-          priority: { $ref: 'Priority' },
+          status: { $ref: UserStatusEnum.id },
+          priority: { $ref: UserPriorityEnum.id },
         },
         required: ['name', 'status', 'priority'],
         additionalProperties: false,

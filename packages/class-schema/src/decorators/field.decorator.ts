@@ -11,19 +11,21 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { Integer, METADATA_KEYS } from '@lib/constants';
-import { ArrayFieldSchema, BooleanFieldSchema, FieldSchema, NumberFieldSchema, ObjectFieldSchema, StringFieldSchema } from '@lib/interfaces';
+import { EnumType } from '@lib/enum-type';
+import { ArrayFieldSchema, BooleanFieldSchema, EnumFieldSchema, FieldSchema, NumberFieldSchema, ObjectFieldSchema, StringFieldSchema } from '@lib/interfaces';
 
 /**
  * Defining types
  */
 
-export type ReturnTypeFunc = (returns?: void) => Class<any> | Class<any>[];
+export type ReturnTypeFunc = (returns?: void) => EnumType | Class<any> | Class<any>[];
 
 /**
  * Declaring the constants
  */
 
 export function Field(options?: FieldSchema): PropertyDecorator;
+export function Field(returnTypeFn: (returns?: void) => EnumType, options?: EnumFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<String>, options?: StringFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<Boolean>, options?: BooleanFieldSchema): PropertyDecorator;
 export function Field(returnTypeFn: (returns?: void) => Class<Number>, options?: NumberFieldSchema): PropertyDecorator;

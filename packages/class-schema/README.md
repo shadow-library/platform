@@ -459,16 +459,22 @@ class Account {
 
 ### Enum Types
 
-Create reusable enum schemas using `SchemaComposer.enum()` for string or number enumerations:
+Create reusable enum schemas using `EnumType.create()` for string or number enumerations:
 
 ```typescript
-import { Schema, Field, SchemaComposer, ClassSchema } from '@shadow-library/class-schema';
+import { Schema, Field, EnumType, ClassSchema } from '@shadow-library/class-schema';
 
 // Create string enum
-const Status = SchemaComposer.enum('Status', ['active', 'inactive', 'pending']);
+const Status = EnumType.create('Status', ['active', 'inactive', 'pending']);
 
 // Create number enum (e.g., priority levels)
-const Priority = SchemaComposer.enum('Priority', [1, 2, 3, 4, 5]);
+const Priority = EnumType.create('Priority', [1, 2, 3, 4, 5]);
+
+// Create enum with additional options
+const Role = EnumType.create('Role', ['admin', 'user', 'guest'], {
+  description: 'User role in the system',
+  nullable: true,
+});
 
 @Schema({ $id: 'Task' })
 class Task {
@@ -1169,16 +1175,31 @@ const User = SchemaComposer.discriminator('type', NativeUser, OAuthUser);
 // Generates schema with discriminator.mapping based on const values
 ```
 
-##### `SchemaComposer.enum(id, values)`
+#### EnumType
+
+##### `EnumType.create(name, values, options?)`
 
 Creates an enum schema for string or number values:
 
 ```typescript
 // String enum
-const Status = SchemaComposer.enum('Status', ['active', 'inactive', 'pending']);
+const Status = EnumType.create('Status', ['active', 'inactive', 'pending']);
 
 // Number enum
-const Priority = SchemaComposer.enum('Priority', [1, 2, 3, 4, 5]);
+const Priority = EnumType.create('Priority', [1, 2, 3, 4, 5]);
+
+// With options
+const Role = EnumType.create('Role', ['admin', 'user'], { description: 'User role' });
+```
+
+##### `enumType.toSchema()`
+
+Converts the enum type to a JSON schema:
+
+```typescript
+const Status = EnumType.create('Status', ['active', 'inactive']);
+console.log(Status.toSchema());
+// { $id: 'class-schema:Status-enum-0', type: 'string', enum: ['active', 'inactive'] }
 ```
 
 #### ClassSchema Static Methods

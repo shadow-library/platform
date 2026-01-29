@@ -19,7 +19,7 @@ import { SchemaComposerMetadata } from './internal.types';
 
 export type ParsedSchema = SetRequired<JSONSchema, '$id' | 'type'> & { definitions?: Record<string, ParsedSchema> };
 
-export type SchemaClass = Class<unknown> | [Class<unknown>];
+export type SchemaClass = EnumType | Class<unknown> | [Class<unknown>];
 
 export interface ClassSchemaOptions {
   shallow?: boolean;
@@ -38,7 +38,8 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
   constructor(Class: T, options: ClassSchemaOptions = {}) {
     this.options = options;
 
-    if (Array.isArray(Class)) {
+    if (Class instanceof EnumType) this.schema = Class.toSchema();
+    else if (Array.isArray(Class)) {
       this.schema = this.getSchema(Array);
       const schemaId = this.getSchemaId(Class[0]);
       this.schema.$id = `${schemaId}?type=Array`;
@@ -65,9 +66,9 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     return schema;
   }
 
-  private getSchema(Class: Class<unknown>): ParsedSchema {
+  private getSchema(Class: EnumType | Class<unknown>): ParsedSchema {
+    if (Class instanceof EnumType) return Class.toSchema();
     if (primitiveTypes.includes(Class)) return { $id: Class.name, type: Class.name.toLowerCase() as JSONSchemaType };
-    if (EnumType.isEnumType(Class)) return EnumType.toSchema(Class);
     const schema = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Class) as ParsedSchema | undefined;
     if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
     return structuredClone(schema);

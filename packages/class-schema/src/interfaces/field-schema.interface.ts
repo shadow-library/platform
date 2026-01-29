@@ -82,6 +82,8 @@ export interface NumberFieldSchema extends BaseFieldSchema<number> {
   multipleOf?: number;
 }
 
+export type EnumFieldSchema = Omit<BaseFieldSchema<string | number>, 'const' | 'enum' | 'examples'>;
+
 export type BooleanFieldSchema = BaseFieldSchema<boolean>;
 
 export type ObjectFieldSchema = BaseFieldSchema<object>;

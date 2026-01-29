@@ -7,6 +7,7 @@ import { describe, expect, it } from 'bun:test';
  * Importing user defined packages
  */
 import { METADATA_KEYS } from '@lib/constants';
+import { EnumType } from '@lib/enum-type';
 import { Field } from '@shadow-library/class-schema';
 
 /**
@@ -19,6 +20,8 @@ import { Field } from '@shadow-library/class-schema';
 
 describe('@Field', () => {
   class Custom {}
+
+  const StatusEnum = EnumType.create('Status', ['active', 'inactive']);
 
   class Sample {
     @Field({ minLength: 1, maxLength: 10 })
@@ -41,6 +44,9 @@ describe('@Field', () => {
 
     @Field(() => [Custom])
     fieldCustomArray: Custom[];
+
+    @Field(() => StatusEnum, { description: 'User status' })
+    fieldEnum: string;
   }
 
   [String, Number, Boolean, Object, Array, Custom].forEach(Class => {
@@ -55,6 +61,11 @@ describe('@Field', () => {
     expect(getType()).toStrictEqual([Custom]);
   });
 
+  it('should set the field type as EnumType', () => {
+    const getType = Reflect.getMetadata(METADATA_KEYS.FIELD_TYPE, Sample.prototype, 'fieldEnum');
+    expect(getType()).toBe(StatusEnum);
+  });
+
   it('should set the field schema options', () => {
     const options = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, Sample.prototype, 'fieldString');
     expect(options).toStrictEqual({ minLength: 1, maxLength: 10 });
@@ -62,7 +73,7 @@ describe('@Field', () => {
 
   it('should set the list of fields', () => {
     const fields = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, Sample.prototype);
-    expect(fields).toStrictEqual(['fieldString', 'fieldNumber', 'fieldBoolean', 'fieldObject', 'fieldArray', 'fieldCustom', 'fieldCustomArray']);
+    expect(fields).toStrictEqual(['fieldString', 'fieldNumber', 'fieldBoolean', 'fieldObject', 'fieldArray', 'fieldCustom', 'fieldCustomArray', 'fieldEnum']);
   });
 
   it('should throw error for symbol keys', () => {
