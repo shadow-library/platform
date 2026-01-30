@@ -20,6 +20,7 @@ jobs:
     if: github.actor == 'leanderpaul' && github.triggering_actor == 'leanderpaul' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     permissions:
+      id-token: write
       contents: write
       pull-requests: write
 
@@ -59,7 +60,6 @@ jobs:
         run: bunx release-it ${{ github.event.inputs.bump }} --ci
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push changes
         run: |
