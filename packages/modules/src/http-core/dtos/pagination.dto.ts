@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import { Field, Schema } from '@shadow-library/class-schema';
+import { EnumType, Field, Schema } from '@shadow-library/class-schema';
 import { Class } from 'type-fest';
 
 /**
@@ -34,6 +34,8 @@ export interface IPaginationQuery<T extends string = string> {
  * Declaring the constants
  */
 
+const SortOrder = EnumType.create<SortOrder>('SortOrder', ['asc', 'desc']);
+
 export function Paginated<T>(Item: Class<T>): Class<IPagination<T>> {
   @Schema()
   class Pagination implements IPagination<T> {
@@ -54,8 +56,8 @@ export function Paginated<T>(Item: Class<T>): Class<IPagination<T>> {
   return Pagination;
 }
 
-export function PaginationQuery<T extends string>(sortBy: T[], defaults: Partial<IPaginationQuery<T>> = {}): Class<IPaginationQuery<T>> {
-  assert(sortBy.length > 0, 'sortBy must have at least one value');
+export function PaginationQuery<T extends string>(SortBy: EnumType<T>, defaults: Partial<IPaginationQuery<T>> = {}): Class<IPaginationQuery<T>> {
+  assert(SortBy.values.length > 0, 'sortBy must have at least one value');
 
   @Schema()
   class PaginationQuery implements IPaginationQuery<T> {
@@ -65,10 +67,10 @@ export function PaginationQuery<T extends string>(sortBy: T[], defaults: Partial
     @Field({ default: defaults.offset ?? 0, minimum: 0 })
     offset: number;
 
-    @Field({ default: defaults.sortOrder ?? 'asc', enum: ['asc', 'desc'] })
+    @Field(() => SortOrder, { default: defaults.sortOrder ?? 'asc' })
     sortOrder: SortOrder;
 
-    @Field({ default: defaults.sortBy ?? sortBy[0], enum: sortBy })
+    @Field(() => SortBy, { default: defaults.sortBy ?? SortBy.values[0] })
     sortBy: T;
   }
 

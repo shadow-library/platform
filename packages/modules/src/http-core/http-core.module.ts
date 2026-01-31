@@ -1,15 +1,10 @@
 /**
  * Importing npm packages
  */
-import assert from 'node:assert';
-
 import { fastifyCookie } from '@fastify/cookie';
-import { FastifyDynamicSwaggerOptions } from '@fastify/swagger';
 import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
-import { JSONSchema } from '@shadow-library/class-schema';
-import { Config, InternalError, LogData, Logger, utils } from '@shadow-library/common';
+import { Config, InternalError, LogData, Logger } from '@shadow-library/common';
 import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
-import { OpenAPIV3 } from 'openapi-types';
 import { PartialDeep } from 'type-fest';
 
 /**
@@ -19,7 +14,7 @@ import { HealthController } from './controllers/health.controller';
 import { HTTP_CORE_CONFIGS } from './http-core.constants';
 import { type HttpCoreModuleOptions } from './http-core.types';
 import { CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
-import { CSRFTokenService } from './services';
+import { CSRFTokenService, OpenApiService } from './services';
 
 /**
  * Defining types
@@ -73,13 +68,11 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
 
 @Module()
 export class HttpCoreModule implements OnModuleInit {
-  private schemaCounter = 0;
-  private schemaIdMap = new Map<string, string>();
-
   constructor(
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ServerInstance,
     private readonly contextService: ContextService,
+    private readonly openApiService: OpenApiService,
   ) {
     Config.load('http-core.csrf.enabled', { validateType: 'boolean', defaultValue: 'true' });
     Config.load('http-core.helmet.enabled', { validateType: 'boolean' });
@@ -88,85 +81,9 @@ export class HttpCoreModule implements OnModuleInit {
   }
 
   private firstDefined(...values: (boolean | undefined)[]): boolean {
-    for (const value of values) {
-      if (typeof value === 'boolean') return value;
-    }
-
-    throw new InternalError('No defined boolean value found in firstDefined');
-  }
-
-  private resolveSchemaId(id: string): string {
-    if (!this.options.openapi.normalizeSchemaIds) return id;
-    if (!id.startsWith('class-schema:')) return id;
-
-    const existing = this.schemaIdMap.get(id);
-    if (existing) return existing;
-
-    const existingValues = Array.from(this.schemaIdMap.values());
-    let normalized = id.replace('class-schema:', '').split(/[:-]/g)[0] as string;
-    if (existingValues.includes(normalized)) {
-      for (let index = 1; index <= 100; index++) {
-        const candidate = normalized + index;
-        if (!existingValues.includes(candidate)) {
-          normalized = candidate;
-          break;
-        }
-        if (index === 100) throw new Error(`Unable to normalize schema ID for ${id} after 100 attempts`);
-      }
-    }
-
-    this.schemaIdMap.set(id, normalized);
-    return normalized;
-  }
-
-  private normalizeOpenapiSpec(document: Partial<OpenAPIV3.Document>, schema: JSONSchema): JSONSchema {
-    document.components ??= {};
-    document.components.schemas ??= {};
-    assert(schema.$id, 'Schema must have an $id');
-
-    const schemaId = this.resolveSchemaId(schema.$id);
-    if (document.components.schemas[schemaId]) return { $ref: `#/components/schemas/${schemaId}` };
-
-    const definitions = [schema, ...Object.values(schema.definitions ?? {})];
-    for (const definition of definitions) {
-      if (definition.required?.length === 0) delete definition.required;
-      if (definition.$id) {
-        const resolvedId = this.resolveSchemaId(definition.$id);
-        document.components.schemas[resolvedId] = utils.object.omitKeys(definition, ['definitions', '$id']);
-      }
-
-      const properties = [...Object.values(definition.properties ?? {}), ...Object.values(definition.patternProperties ?? {})];
-      for (const property of properties) {
-        if (property.$ref && !property.$ref.startsWith('#/components/schemas/')) {
-          const resolvedRefId = this.resolveSchemaId(property.$ref);
-          property.$ref = `#/components/schemas/${resolvedRefId}`;
-        }
-
-        if (property.items?.$ref && !property.items.$ref.startsWith('#/components/schemas/')) {
-          const resolvedRefId = this.resolveSchemaId(property.items.$ref);
-          property.items.$ref = `#/components/schemas/${resolvedRefId}`;
-        }
-      }
-    }
-
-    return { $ref: `#/components/schemas/${schemaId}` };
-  }
-
-  private getFastifySwaggerOptions(): FastifyDynamicSwaggerOptions {
-    return {
-      openapi: utils.object.omitKeys(this.options.openapi, ['enabled', 'routePrefix', 'normalizeSchemaIds']),
-      refResolver: { buildLocalReference: (json, _1, _2, index) => (typeof json.$id === 'string' ? json.$id : `Fragment-${index}`) },
-      transform: opts => {
-        const schema = opts.schema as JSONSchema;
-        const document = (opts as any).openapiObject;
-        if (!schema.$id) schema.$id = `AutoGeneratedSchema${++this.schemaCounter}`;
-        const swaggerSchema = structuredClone(schema);
-        const responses = (swaggerSchema.response ?? {}) as Record<string, JSONSchema>;
-        if (swaggerSchema.body) swaggerSchema.body = this.normalizeOpenapiSpec(document, swaggerSchema.body);
-        for (const statusCode in responses) responses[statusCode] = this.normalizeOpenapiSpec(document, responses[statusCode] as JSONSchema);
-        return { schema: swaggerSchema, url: opts.url };
-      },
-    };
+    const value = values.find(v => typeof v === 'boolean');
+    if (value === undefined) throw new InternalError('No defined boolean value found in firstDefined');
+    return value;
   }
 
   async onModuleInit(): Promise<void> {
@@ -186,10 +103,9 @@ export class HttpCoreModule implements OnModuleInit {
     if (isOpenapiEnabled) {
       const fastifySwagger = await import('@fastify/swagger');
       const scalar = await import('@scalar/fastify-api-reference');
-      const routePrefix = this.options.openapi.routePrefix ?? DEFAULT_HTTP_CORE_CONFIGS.openapi.routePrefix;
 
-      await this.fastify.register(fastifySwagger, this.getFastifySwaggerOptions());
-      await this.fastify.register(scalar.default, { routePrefix });
+      await this.fastify.register(fastifySwagger, this.openApiService.getFastifySwaggerOptions());
+      await this.fastify.register(scalar.default, this.openApiService.getScalarOptions());
     }
 
     const isHelmetEnabled = this.firstDefined(this.options.helmet.enabled, Config.get('http-core.helmet.enabled'), Config.isProd());
@@ -212,7 +128,7 @@ export class HttpCoreModule implements OnModuleInit {
     return {
       module: HttpCoreModule,
       imports: [FastifyModule],
-      providers: [CSRFTokenService, { token: HTTP_CORE_CONFIGS, useValue: httpCoreOptions }],
+      providers: [CSRFTokenService, OpenApiService, { token: HTTP_CORE_CONFIGS, useValue: httpCoreOptions }],
       controllers: [HealthController, RequestInitializerMiddleware, CsrfProtectionMiddleware],
       exports: [CSRFTokenService],
     };
