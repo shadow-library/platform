@@ -26,6 +26,8 @@ export type NodeEnv = 'development' | 'production' | 'test';
 
 export type LogLevel = 'silly' | 'debug' | 'http' | 'info' | 'warn' | 'error';
 
+export type Runtime = 'node' | 'edge' | 'deno' | 'browser' | 'bun' | 'unknown';
+
 export interface ConfigRecords {
   /** Application configs */
   'app.env': NodeEnv;
@@ -128,6 +130,18 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     const value = this.cache.get(key);
     if (value == null) throw new Error(`Expected config value for '${key.toString()}' to be set`);
     return value;
+  }
+
+  getRuntime(): Runtime {
+    const globalRef = global as any;
+    if (typeof globalRef.Deno !== 'undefined' && typeof globalRef.Deno.version !== 'undefined') return 'deno';
+    if (typeof globalRef.Bun !== 'undefined' && typeof globalRef.Bun.version !== 'undefined') return 'bun';
+    if (typeof globalRef.process !== 'undefined' && globalRef.process.versions != null) {
+      if (globalRef.process.versions.node != null) return 'node';
+      if (globalRef.process.versions.edge != null) return 'edge';
+    }
+    if (typeof globalRef.window !== 'undefined' && typeof globalRef.document !== 'undefined') return 'browser';
+    return 'unknown';
   }
 }
 

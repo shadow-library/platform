@@ -32,6 +32,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 - **Array environment variables** with comma-separated value parsing
 - **Custom transformers** and validators
 - **Environment detection** (development, production, test)
+- **Runtime detection** (node, edge, deno, browser, bun)
 - **Production-required configurations** with automatic validation
 
 ### 📝 **Advanced Logging System**
@@ -1214,6 +1215,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `Config.isDev()` - Check if development environment
 - `Config.isProd()` - Check if production environment
 - `Config.isTest()` - Check if test environment
+- `Config.getRuntime()` - Get current runtime environment (`'node'` | `'edge'` | `'deno'` | `'browser'` | `'bun'` | `'unknown'`)
 
 #### Logger
 
