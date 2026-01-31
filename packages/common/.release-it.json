@@ -11,7 +11,8 @@
   },
   "npm": {
     "publishPath": "./dist",
-    "publishArgs": ["--access", "public"]
+    "publishArgs": ["--access", "public"],
+    "skipChecks": true
   },
   "hooks": {
     "before:init": ["bun test"],
