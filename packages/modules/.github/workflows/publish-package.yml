@@ -19,6 +19,10 @@ jobs:
   publish:
     if: github.actor == 'leanderpaul' && github.triggering_actor == 'leanderpaul' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -43,7 +47,7 @@ jobs:
       - name: Set up Node.js version
         uses: actions/setup-node@v4
         with:
-          node-version: '22.x'
+          node-version: '24'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Setup bun
@@ -56,7 +60,6 @@ jobs:
         run: bunx release-it ${{ github.event.inputs.bump }} ${{ startsWith(github.event.inputs.bump, 'pre') && '--preRelease=beta' || '' }} --ci
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Push changes
         run: |
