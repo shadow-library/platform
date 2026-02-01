@@ -40,7 +40,7 @@ The `HttpCoreModule` provides a robust foundation for HTTP services, integrating
 
 - **Security**: Built-in integration with `@fastify/helmet` for security headers and CSRF protection middleware.
 - **Compression**: Automatic response compression using `@fastify/compress`.
-- **Health Checks**: Ready-to-use `HealthController` exposing a `/health` endpoint.
+- **Health Checks**: Standalone health server with `/health/live` and `/health/ready` endpoints for Kubernetes probes.
 - **OpenAPI Support**: Seamless integration for generating OpenAPI documentation.
 - **Request Initialization**: Middleware for initializing request context.
 - **Cookie Support**: Integrated cookie handling.
@@ -125,16 +125,29 @@ For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the follo
 2. **Environment Variable** – If not set in code, the corresponding environment variable is checked (e.g., `HTTP_CORE_HELMET_ENABLED`).
 3. **Environment Default** – If neither is set, the default is based on the current environment (production or development).
 
-| Feature     | Environment Variable         | Default (Production) | Default (Development) |
-| ----------- | ---------------------------- | -------------------- | --------------------- |
-| CSRF        | `HTTP_CORE_CSRF_ENABLED`     | `true`               | `true`                |
-| Helmet      | `HTTP_CORE_HELMET_ENABLED`   | `true`               | `false`               |
-| Compression | `HTTP_CORE_COMPRESS_ENABLED` | `true`               | `false`               |
-| OpenAPI     | `HTTP_CORE_OPENAPI_ENABLED`  | `false`              | `true`                |
+| Feature       | Environment Variable         | Default (Production) | Default (Development) |
+| ------------- | ---------------------------- | -------------------- | --------------------- |
+| CSRF          | `HTTP_CORE_CSRF_ENABLED`     | `true`               | `true`                |
+| Helmet        | `HTTP_CORE_HELMET_ENABLED`   | `true`               | `false`               |
+| Compression   | `HTTP_CORE_COMPRESS_ENABLED` | `true`               | `false`               |
+| OpenAPI       | `HTTP_CORE_OPENAPI_ENABLED`  | `false`              | `true`                |
+| Health Server | `HTTP_CORE_HEALTH_ENABLED`   | `true`               | `false`               |
+
+##### Health Server Configuration
+
+| Setting | Environment Variable    | Default     |
+| ------- | ----------------------- | ----------- |
+| Host    | `HTTP_CORE_HEALTH_HOST` | `localhost` |
+| Port    | `HTTP_CORE_HEALTH_PORT` | `8081`      |
 
 #### Features in Detail
 
-1.  **Health Check**: Automatically registers a `HealthController` that responds to `GET /health` with `{ status: 'ok' }`.
+1.  **Health Check**: Runs a standalone HTTP server (separate from the main Fastify server) that provides Kubernetes-compatible health probes:
+    - `GET /health/live` - Liveness probe, always returns `200 OK` with body `ok` when the server is running.
+    - `GET /health/ready` - Readiness probe, returns `200 OK` with body `ok` when the application is ready, or `503 Service Unavailable` with body `not ready` during startup/shutdown.
+    - Supports both `GET` and `HEAD` methods.
+    - By default, runs on `localhost:8081` (configurable via environment variables).
+    - Enabled by default in production, disabled in development.
 2.  **CSRF Protection**:
     - **Disable Option**: CSRF protection can be completely disabled by setting `csrf.disabled: true` in the module configuration. When disabled, the middleware is not registered at all.
     - CSRF validation is only performed when cookies are present in the request (cookie-based session detection).

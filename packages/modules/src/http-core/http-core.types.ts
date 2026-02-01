@@ -27,6 +27,11 @@ declare module '@shadow-library/common' {
     'http-core.helmet.enabled'?: boolean;
     'http-core.compress.enabled'?: boolean;
     'http-core.openapi.enabled'?: boolean;
+
+    /*! Health Service configs */
+    'http-core.health.host': string;
+    'http-core.health.port': number;
+    'http-core.health.enabled': boolean;
   }
 }
 

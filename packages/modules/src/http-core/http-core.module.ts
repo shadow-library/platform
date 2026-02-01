@@ -10,11 +10,10 @@ import { PartialDeep } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { HealthController } from './controllers/health.controller';
 import { HTTP_CORE_CONFIGS } from './http-core.constants';
 import { type HttpCoreModuleOptions } from './http-core.types';
 import { CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
-import { CSRFTokenService, OpenApiService } from './services';
+import { CSRFTokenService, HealthService, OpenApiService } from './services';
 
 /**
  * Defining types
@@ -78,6 +77,10 @@ export class HttpCoreModule implements OnModuleInit {
     Config.load('http-core.helmet.enabled', { validateType: 'boolean' });
     Config.load('http-core.compress.enabled', { validateType: 'boolean' });
     Config.load('http-core.openapi.enabled', { validateType: 'boolean' });
+
+    Config.load('http-core.health.host', { defaultValue: 'localhost' });
+    Config.load('http-core.health.port', { validateType: 'number', defaultValue: '8081' });
+    Config.load('http-core.health.enabled', { validateType: 'boolean', defaultValue: Config.isProd() ? 'true' : 'false' });
   }
 
   private firstDefined(...values: (boolean | undefined)[]): boolean {
@@ -124,12 +127,13 @@ export class HttpCoreModule implements OnModuleInit {
   static forRoot(options: PartialDeep<HttpCoreModuleOptions> = {}): DynamicModule {
     const httpCoreOptions: Record<string, any> = { ...DEFAULT_HTTP_CORE_CONFIGS };
     for (const key in options) httpCoreOptions[key] = { ...httpCoreOptions[key], ...(options as Record<string, any>)[key] };
+    const HttpCoreProvider = { token: HTTP_CORE_CONFIGS, useValue: httpCoreOptions };
 
     return {
       module: HttpCoreModule,
       imports: [FastifyModule],
-      providers: [CSRFTokenService, OpenApiService, { token: HTTP_CORE_CONFIGS, useValue: httpCoreOptions }],
-      controllers: [HealthController, RequestInitializerMiddleware, CsrfProtectionMiddleware],
+      providers: [CSRFTokenService, OpenApiService, HealthService, HttpCoreProvider],
+      controllers: [RequestInitializerMiddleware, CsrfProtectionMiddleware],
       exports: [CSRFTokenService],
     };
   }
