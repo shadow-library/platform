@@ -247,8 +247,9 @@ describe('Module', () => {
   describe('Module Ref', () => {
     let moduleRef: ModuleRef;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       moduleRef = module['getInternalProvider'](ModuleRef).getInstance() as any;
+      await module.init();
     });
 
     it('should throw an error if the provider is not found', () => {

@@ -58,18 +58,13 @@ describe('InstanceWrapper', () => {
       expect(() => new InstanceWrapper(InvalidClassProvider, true)).toThrowError(InternalError);
     });
 
-    it('should create an prototype instance during initialization', () => {
-      const instanceWrapper = new InstanceWrapper(ClassProvider);
-      const instances = Array.from(instanceWrapper['instances'].values());
-      expect(instances).toStrictEqual([{ instance: expect.any(ClassProvider), resolved: false }]);
-    });
-
     it('should handle alias tokens', () => {
       const provider = { token: 'CONFIG', useClass: ClassProvider };
       const instanceWrapper = new InstanceWrapper(provider);
+      instanceWrapper.loadInstance();
       const instances = Array.from(instanceWrapper['instances'].values());
       expect(instanceWrapper.getToken()).toBe(provider.token);
-      expect(instances).toStrictEqual([{ instance: expect.any(ClassProvider), resolved: false }]);
+      expect(instances).toStrictEqual([{ instance: expect.any(ClassProvider), resolved: true }]);
     });
 
     it('should identify transient provider', () => {
@@ -156,6 +151,28 @@ describe('InstanceWrapper', () => {
 
       expect(instance).toBeInstanceOf(ProviderOne);
       expect(instance.providerTwo).toBeInstanceOf(ProviderTwo);
+    });
+
+    it('should load the instance while maintaining the this reference', async () => {
+      @Injectable()
+      class Provider {
+        isReady = false;
+        fn;
+
+        constructor() {
+          this.fn = () => this.isReady;
+        }
+
+        onReady() {
+          this.isReady = true;
+        }
+      }
+
+      const instanceWrapper = new InstanceWrapper(Provider);
+      const instance = await instanceWrapper.loadInstance();
+      expect(instance.fn()).toBe(false);
+      instance.onReady();
+      expect(instance.fn()).toBe(true);
     });
   });
 
@@ -304,6 +321,7 @@ describe('InstanceWrapper', () => {
     beforeEach(() => {
       instanceWrapper = new InstanceWrapper(Provider);
       instanceWrapper.setDependency(0, new InstanceWrapper({ token: 'DEPENDENCY', useValue: 'DEPENDENCY_VALUE' }));
+      instanceWrapper.loadInstance();
     });
 
     it('should return the token', () => {
@@ -327,7 +345,7 @@ describe('InstanceWrapper', () => {
       const factoryProvider = new InstanceWrapper({ token: 'factory', useFactory: () => 'CONFIG_VALUE' });
 
       expect(factoryProvider.isResolved()).toBe(false);
-      expect(instanceWrapper.isResolved()).toBe(false);
+      expect(instanceWrapper.isResolved()).toBe(true);
       expect(instanceWrapper.isResolved(createContextId())).toBe(false);
       instanceWrapper.setDependency(0, new InstanceWrapper({ token: 'DEPENDENCY', useValue: 'DEPENDENCY_VALUE' }));
       await instanceWrapper.loadInstance();
@@ -339,6 +357,7 @@ describe('InstanceWrapper', () => {
     });
 
     it('should throw an error if the dependencies are not set', async () => {
+      instanceWrapper['instances'].clear();
       instanceWrapper['dependencies'].pop();
       await expect(() => instanceWrapper.loadInstance()).rejects.toThrowError(NeverError);
     });

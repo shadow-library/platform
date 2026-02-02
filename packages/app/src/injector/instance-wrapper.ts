@@ -97,10 +97,6 @@ export class InstanceWrapper<T extends object = any> {
     this.inject = this.getClassDependencies(Class);
     this.dependencies = new Array(this.inject.length);
     this.transient = Reflect.getMetadata(INJECTABLE_METADATA, Class)?.transient ?? false;
-    if (!this.transient) {
-      const instance = Object.create(Class.prototype);
-      this.instances.set(STATIC_CONTEXT, { instance, resolved: false });
-    }
   }
 
   private getFactoryDependencies(deps: FactoryProvider['inject']): InjectionMetadata[] {
@@ -258,7 +254,7 @@ export class InstanceWrapper<T extends object = any> {
     let instance: T;
     if (this.isFactory) instance = await (this.metatype as Factory<T>)(...dependencies);
     else instance = new (this.metatype as Class<T>)(...dependencies);
-    if (instancePerContext) instance = Object.assign(instancePerContext.instance, instance);
+    if (instancePerContext) instance = Object.assign(instance, instancePerContext.instance);
     this.instances.set(contextId, { instance, resolved: true });
     this.logger.debug(`Instance '${this.getTokenName()}' loaded`);
 
