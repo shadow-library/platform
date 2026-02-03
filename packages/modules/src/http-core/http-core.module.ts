@@ -77,10 +77,6 @@ export class HttpCoreModule implements OnModuleInit {
     Config.load('http-core.helmet.enabled', { validateType: 'boolean' });
     Config.load('http-core.compress.enabled', { validateType: 'boolean' });
     Config.load('http-core.openapi.enabled', { validateType: 'boolean' });
-
-    Config.load('http-core.health.host', { defaultValue: 'localhost' });
-    Config.load('http-core.health.port', { validateType: 'number', defaultValue: '8081' });
-    Config.load('http-core.health.enabled', { validateType: 'boolean', defaultValue: Config.isProd() ? 'true' : 'false' });
   }
 
   private firstDefined(...values: (boolean | undefined)[]): boolean {

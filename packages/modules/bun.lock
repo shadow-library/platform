@@ -18,7 +18,7 @@
         "@commitlint/config-conventional": "^19.8.1",
         "@eslint/js": "^9.37.0",
         "@release-it/conventional-changelog": "^10.0.1",
-        "@shadow-library/app": "^1.3.1",
+        "@shadow-library/app": "^1.3.2",
         "@shadow-library/class-schema": "^0.4.1",
         "@shadow-library/common": "^1.5.3",
         "@shadow-library/fastify": "^1.6.3",
@@ -43,9 +43,9 @@
         "typescript-eslint": "^8.46.0",
       },
       "peerDependencies": {
-        "@shadow-library/app": "^1.3.1",
+        "@shadow-library/app": "^1.3.2",
         "@shadow-library/class-schema": "^0.4.1",
-        "@shadow-library/common": "^1.5.3",
+        "@shadow-library/common": "^1.5.2",
         "@shadow-library/fastify": "^1.6.3",
         "ioredis": "^5.8.2",
         "memcached": "^2.2.2",
@@ -388,7 +388,7 @@
 
     "@scalar/types": ["@scalar/types@0.3.2", "", { "dependencies": { "@scalar/openapi-types": "0.5.0", "nanoid": "5.1.5", "type-fest": "5.0.0", "zod": "4.1.11" } }, "sha512-+X10CCvG57nAqYbTGteiSzRFQcMYm7DLfCRMeEfiWQ9Bq2ladat17XsMSvkvwcfpOSlsoepWf3P5dErERUSOQQ=="],
 
-    "@shadow-library/app": ["@shadow-library/app@1.3.1", "", { "dependencies": { "deepmerge": "^4.3.1", "type-fest": "^4.41.0" }, "peerDependencies": { "@shadow-library/common": "^1.5.2", "reflect-metadata": "^0.2.2" } }, "sha512-xOC06fSvXymHkJevKhvGBIkg0DHaw/aHxxL5di5o3bLPU/6IglihsOrMYjY1NAitJU5FKHkO3wBX2GSxZbcpgA=="],
+    "@shadow-library/app": ["@shadow-library/app@1.3.2", "", { "dependencies": { "deepmerge": "^4.3.1", "type-fest": "^4.41.0" }, "peerDependencies": { "@shadow-library/common": "^1.5.2", "reflect-metadata": "^0.2.2" } }, "sha512-8LOp7pqZHZaQuusvXOa+ZFwltjwnRzh7cHBdZ35dQaYKsP3GGH+FFYtGHVj0SvBZvHYpwvk7SdPnug+TA+45eg=="],
 
     "@shadow-library/class-schema": ["@shadow-library/class-schema@0.4.1", "", { "dependencies": { "deepmerge": "^4.3.1" }, "peerDependencies": { "@shadow-library/common": "^1.0.18", "reflect-metadata": "^0.2.2" } }, "sha512-RGeYXW3pMtMwDAG/u7Z35HDFhKwyiEwYc18cS81DXsBQh41tMlyU9Bj7NsbLQdYXMrvPvtKJ0nfB2Cx2mUsZNA=="],
 

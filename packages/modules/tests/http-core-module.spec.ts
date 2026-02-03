@@ -11,7 +11,7 @@ import { Response } from 'light-my-request';
 /**
  * Importing user defined packages
  */
-import { CSRFTokenService, HttpCoreModule } from '@shadow-library/modules/http-core';
+import { CSRFTokenService, HealthService, HttpCoreModule } from '@shadow-library/modules/http-core';
 
 /**
  * Defining types
@@ -572,8 +572,7 @@ describe('HttpCore Module', () => {
       });
     });
 
-    /** The isReady flag is getting set to false automatically, need to analyze */
-    describe.skip('Readiness Probe', () => {
+    describe('Readiness Probe', () => {
       it('should return 200 OK for GET /health/ready after application is ready', async () => {
         const response = await fetch(`${healthBaseUrl}/health/ready`);
         expect(response.status).toBe(200);
@@ -586,8 +585,8 @@ describe('HttpCore Module', () => {
       });
 
       it('should return 503 Service Unavailable before application is ready', async () => {
-        // const healthService = healthApp.select(HttpCoreModule).get(HealthService);
-        // healthService['isReady'] = false;
+        const healthService = healthApp.select(HttpCoreModule).get(HealthService);
+        healthService['isReady'] = false;
 
         const response = await fetch(`${healthBaseUrl}/health/ready`);
         expect(response.status).toBe(503);
