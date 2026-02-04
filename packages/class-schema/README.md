@@ -252,6 +252,36 @@ class User {
 }
 ```
 
+### Object Field Options
+
+For fields marked as objects, you can define `additionalProperties`, `patternProperties`, and `properties` directly on the field:
+
+```typescript
+class Settings {
+  // Allow any additional properties
+  @Field({ additionalProperties: true })
+  metadata: Record<string, unknown>;
+
+  // Properties matching specific patterns
+  @Field({
+    patternProperties: {
+      '^env_[a-z]+$': { minLength: 1 },
+      '^[0-9]+$': { minimum: 0 },
+    },
+  })
+  config: Record<string, unknown>;
+
+  // Explicit property schemas
+  @Field({
+    properties: {
+      name: { minLength: 1, maxLength: 100 },
+      age: { minimum: 0, maximum: 150 },
+    },
+  })
+  profile: Record<string, unknown>;
+}
+```
+
 ## Advanced Features
 
 ### Schema Inheritance

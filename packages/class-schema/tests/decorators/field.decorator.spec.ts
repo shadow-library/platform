@@ -87,4 +87,48 @@ describe('@Field', () => {
       return ABC;
     }).toThrow(Error);
   });
+
+  it('should set the field schema options for object fields with additionalProperties, patternProperties, and properties', () => {
+    class ObjectFieldSample {
+      @Field({
+        additionalProperties: true,
+      })
+      fieldWithAdditionalProps: Record<string, unknown>;
+
+      @Field({
+        patternProperties: {
+          '^[a-z]+$': { minLength: 1 },
+          '^[0-9]+$': { minimum: 0 },
+        },
+      })
+      fieldWithPatternProps: Record<string, unknown>;
+
+      @Field({
+        properties: {
+          name: { minLength: 1, maxLength: 100 },
+          age: { minimum: 0, maximum: 150 },
+        },
+      })
+      fieldWithProps: Record<string, unknown>;
+    }
+
+    const additionalPropsOptions = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, ObjectFieldSample.prototype, 'fieldWithAdditionalProps');
+    expect(additionalPropsOptions).toStrictEqual({ additionalProperties: true });
+
+    const patternPropsOptions = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, ObjectFieldSample.prototype, 'fieldWithPatternProps');
+    expect(patternPropsOptions).toStrictEqual({
+      patternProperties: {
+        '^[a-z]+$': { minLength: 1 },
+        '^[0-9]+$': { minimum: 0 },
+      },
+    });
+
+    const propsOptions = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, ObjectFieldSample.prototype, 'fieldWithProps');
+    expect(propsOptions).toStrictEqual({
+      properties: {
+        name: { minLength: 1, maxLength: 100 },
+        age: { minimum: 0, maximum: 150 },
+      },
+    });
+  });
 });

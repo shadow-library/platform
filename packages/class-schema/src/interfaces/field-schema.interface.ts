@@ -82,11 +82,20 @@ export interface NumberFieldSchema extends BaseFieldSchema<number> {
   multipleOf?: number;
 }
 
+export interface ObjectFieldSchema extends BaseFieldSchema<object> {
+  /** Whether additional properties are allowed */
+  additionalProperties?: boolean;
+
+  /** Properties of the object */
+  properties?: Record<string, FieldSchema>;
+
+  /** Properties matching the pattern */
+  patternProperties?: Record<string, FieldSchema>;
+}
+
 export type EnumFieldSchema = Omit<BaseFieldSchema<string | number>, 'const' | 'enum' | 'examples'>;
 
 export type BooleanFieldSchema = BaseFieldSchema<boolean>;
-
-export type ObjectFieldSchema = BaseFieldSchema<object>;
 
 export type FieldSchema = ObjectFieldSchema | ArrayFieldSchema | StringFieldSchema | NumberFieldSchema | BooleanFieldSchema;
 
