@@ -8,7 +8,8 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { type Configuration, type Notification, schema } from '@modules/datastore';
+import { type Configuration, type Notification } from '@modules/datastore';
+import { NotificationChannel, NotificationServiceProvider, SortByTime } from '@server/routes/common';
 
 /**
  * Declaring the constants
@@ -16,10 +17,10 @@ import { type Configuration, type Notification, schema } from '@modules/datastor
 
 @Schema()
 export class CreateSenderEndpointBody {
-  @Field(() => String, { enum: schema.notificationChannel.enumValues })
+  @Field(() => NotificationChannel)
   channel: Notification.Channel;
 
-  @Field(() => String, { enum: schema.notificationServiceProviders.enumValues })
+  @Field(() => NotificationServiceProvider)
   provider: Configuration.ServiceProvider;
 
   @Field()
@@ -57,11 +58,11 @@ export class SenderEndpointResponse extends OmitType(CreateSenderEndpointBody, [
 export class UpdateSenderEndpointBody extends PartialType(OmitType(CreateSenderEndpointBody, ['channel', 'provider'])) {}
 
 @Schema()
-export class ListSenderEndpointsQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
-  @Field(() => String, { enum: schema.notificationChannel.enumValues, optional: true })
+export class ListSenderEndpointsQuery extends PaginationQuery(SortByTime) {
+  @Field(() => NotificationChannel, { optional: true })
   channel?: Notification.Channel;
 
-  @Field(() => String, { enum: schema.notificationServiceProviders.enumValues, optional: true })
+  @Field(() => NotificationServiceProvider, { optional: true })
   provider?: Configuration.ServiceProvider;
 
   @Field({ optional: true })

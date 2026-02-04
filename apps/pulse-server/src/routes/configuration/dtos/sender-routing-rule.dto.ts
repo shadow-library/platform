@@ -8,7 +8,8 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { type Template, schema } from '@modules/datastore';
+import { type Template } from '@modules/datastore';
+import { MessageType, SortByTime } from '@server/routes/common';
 
 import { SenderProfileResponse } from './sender-profile.dto';
 
@@ -22,7 +23,7 @@ export class CreateRoutingRuleBody {
   @Transform('bigint:parse')
   senderProfileId: bigint;
 
-  @Field(() => String, { enum: schema.messageTypes.enumValues, optional: true })
+  @Field(() => MessageType, { optional: true })
   messageType?: Template.MessageType;
 
   @Field({ optional: true })
@@ -34,7 +35,7 @@ export class CreateRoutingRuleBody {
 
 @Schema()
 export class SenderRoutingRuleResponse extends PickType(CreateRoutingRuleBody, ['senderProfileId'] as const) {
-  @Field(() => String, { enum: schema.messageTypes.enumValues, optional: true })
+  @Field(() => MessageType, { optional: true })
   @Transform('strip:null')
   messageType: Template.MessageType | null;
 
@@ -63,8 +64,8 @@ export class SenderRoutingRuleDetailResponse extends SenderRoutingRuleResponse {
 export class UpdateSenderRoutingRuleBody extends PickType(CreateRoutingRuleBody, ['senderProfileId']) {}
 
 @Schema()
-export class ListSenderRoutingRulesQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
-  @Field(() => String, { enum: schema.messageTypes.enumValues, optional: true })
+export class ListSenderRoutingRulesQuery extends PaginationQuery(SortByTime) {
+  @Field(() => MessageType, { optional: true })
   messageType?: Template.MessageType;
 
   @Field({ optional: true })

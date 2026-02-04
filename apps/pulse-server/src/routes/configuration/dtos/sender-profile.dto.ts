@@ -5,6 +5,8 @@ import { Field, OmitType, PartialType, Schema } from '@shadow-library/class-sche
 import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
+import { SortByTime } from '@server/routes/common';
+
 /**
  * Importing user defined packages
  */
@@ -45,7 +47,7 @@ export class SenderProfileResponse extends OmitType(CreateSenderProfileBody, ['i
 export class UpdateSenderProfileBody extends PartialType(OmitType(CreateSenderProfileBody, ['key'])) {}
 
 @Schema()
-export class ListSenderProfilesQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
+export class ListSenderProfilesQuery extends PaginationQuery(SortByTime) {
   @Field({ optional: true })
   key?: string;
 

@@ -65,14 +65,12 @@ export const notificationMessages = pgTable(
       .notNull()
       .references(() => notificationJobs.id, { onDelete: 'cascade' }),
 
-    channel: notificationChannel('channel').notNull(),
     renderedSubject: varchar('rendered_subject', { length: 255 }),
     renderedBody: varchar('rendered_body', { length: 5000 }).notNull(),
-    payload: jsonb('payload'),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [index('notification_messages_created_at_channel_idx').on(t.createdAt, t.channel)],
+  t => [index('notification_messages_created_at_channel_idx').on(t.createdAt)],
 );
 
 /**

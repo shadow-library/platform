@@ -4,9 +4,9 @@
 import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
-import { AppError, Logger, utils } from '@shadow-library/common';
+import { AppError, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { eq, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import parsePhoneNumber from 'libphonenumber-js';
 import validator from 'validator';
 
@@ -69,6 +69,20 @@ export interface SendNotificationResult {
   status: NotificationStatus;
   channelResults: ChannelSendResult[];
 }
+
+export interface ListMessagesQuery extends Partial<OffsetPagination> {
+  channel?: Notification.Channel;
+  recipient?: string;
+}
+
+export type NotificationMessage = Notification.Message & {
+  channel: Notification.Channel;
+  recipient: string;
+  locale: string;
+  payload?: unknown;
+  templateKey: string;
+  messageType: Template.MessageType;
+};
 
 /**
  * Declaring the constants
@@ -258,5 +272,39 @@ export class NotificationService {
     else if (successCount > 0) status = NotificationStatus.PARTIAL_ACCEPTED;
 
     return { status, channelResults: results };
+  }
+
+  async listMessages(filter: ListMessagesQuery = {}): Promise<OffsetPaginationResult<NotificationMessage>> {
+    const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'createdAt', sortOrder: 'desc' } });
+    const sortOrder = query.sortOrder === 'asc' ? asc : desc;
+
+    const whereConditions: ReturnType<typeof eq>[] = [];
+    if (filter.channel) whereConditions.push(eq(schema.notificationJobs.channel, filter.channel));
+    if (filter.recipient) whereConditions.push(eq(schema.notificationJobs.recipient, filter.recipient));
+    const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    const baseQuery = this.db
+      .select()
+      .from(schema.notificationMessages)
+      .innerJoin(schema.notificationJobs, eq(schema.notificationMessages.notificationJobId, schema.notificationJobs.id))
+      .innerJoin(schema.templateGroups, eq(schema.notificationJobs.templateGroupId, schema.templateGroups.id))
+      .where(where);
+
+    const [countResult, rows] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.notificationMessages)
+        .innerJoin(schema.notificationJobs, eq(schema.notificationMessages.notificationJobId, schema.notificationJobs.id))
+        .where(where),
+      baseQuery.limit(query.limit).offset(query.offset).orderBy(sortOrder(schema.notificationMessages.createdAt)),
+    ]);
+
+    const total = Number(countResult[0]?.count ?? 0);
+    const items = rows.map(row => ({
+      ...row.notification_messages,
+      ...utils.object.pickKeys(row.notification_jobs, ['channel', 'recipient', 'locale', 'payload']),
+      ...utils.object.pickKeys(row.template_groups, ['templateKey', 'messageType']),
+    }));
+    return utils.pagination.createResult(query, items, total);
   }
 }

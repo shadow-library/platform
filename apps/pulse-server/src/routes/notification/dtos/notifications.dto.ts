@@ -7,8 +7,9 @@ import { ErrorResponseDto, ServerError, Transform } from '@shadow-library/fastif
 /**
  * Importing user defined packages
  */
-import { type Notification, schema } from '@modules/datastore';
+import { type Notification } from '@modules/datastore';
 import { ChannelNotificationStatus, NotificationStatus } from '@modules/notification';
+import { NotificationChannel } from '@server/routes/common';
 
 /**
  * Defining types
@@ -50,7 +51,7 @@ export class CreateNotificationBody {
 
 @Schema()
 export class NotificationChannelResponse {
-  @Field(() => String, { enum: schema.notificationChannel.enumValues })
+  @Field(() => NotificationChannel)
   channel: Notification.Channel;
 
   @Field(() => String, { enum: Object.values(ChannelNotificationStatus) })

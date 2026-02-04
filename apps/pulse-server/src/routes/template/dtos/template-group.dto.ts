@@ -8,7 +8,8 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { type Notification, type Template, schema } from '@modules/datastore';
+import { type Notification, type Template } from '@modules/datastore';
+import { MessageType, Priority, SortByTime } from '@server/routes/common';
 
 /**
  * Defining types
@@ -23,14 +24,14 @@ export class CreateTemplateGroupBody {
   @Field()
   templateKey: string;
 
-  @Field(() => String, { enum: schema.messageTypes.enumValues })
+  @Field(() => MessageType)
   messageType: Template.MessageType;
 
   @Field({ optional: true })
   @Transform({ output: 'strip:null' })
   description?: string | null;
 
-  @Field(() => String, { enum: schema.priority.enumValues, optional: true })
+  @Field(() => Priority, { optional: true })
   priority?: Notification.Priority;
 
   @Field({ optional: true })
@@ -53,7 +54,7 @@ export class TemplateGroupResponse extends CreateTemplateGroupBody {
 export class UpdateTemplateGroupBody extends PartialType(OmitType(CreateTemplateGroupBody, ['templateKey'])) {}
 
 @Schema()
-export class ListTemplateGroupsQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
+export class ListTemplateGroupsQuery extends PaginationQuery(SortByTime) {
   @Field({ optional: true })
   key?: string;
 }

@@ -8,7 +8,8 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { type Notification, schema } from '@modules/datastore';
+import { type Notification } from '@modules/datastore';
+import { NotificationChannel, SortByTime } from '@server/routes/common';
 
 /**
  * Defining types
@@ -20,7 +21,7 @@ import { type Notification, schema } from '@modules/datastore';
 
 @Schema()
 export class CreateTemplateVariantBody {
-  @Field(() => String, { enum: schema.notificationChannel.enumValues })
+  @Field(() => NotificationChannel)
   channel: Notification.Channel;
 
   @Field()
@@ -56,8 +57,8 @@ export class TemplateVariantResponse extends CreateTemplateVariantBody {
 export class ListTemplateVariantResponse extends Paginated(TemplateVariantResponse) {}
 
 @Schema()
-export class ListTemplateVariantQuery extends PaginationQuery(['createdAt', 'updatedAt'] as const) {
-  @Field(() => String, { enum: schema.notificationChannel.enumValues, optional: true })
+export class ListTemplateVariantQuery extends PaginationQuery(SortByTime) {
+  @Field(() => NotificationChannel, { optional: true })
   channel?: Notification.Channel;
 
   @Field({ optional: true })

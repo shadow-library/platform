@@ -1,14 +1,16 @@
 /**
  * Importing npm packages
  */
-import { Body, HttpController, Post, RespondFor } from '@shadow-library/fastify';
+import { EnableIf } from '@shadow-library/app';
+import { Config } from '@shadow-library/common';
+import { Body, Get, HttpController, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { NotificationService } from '@modules/notification';
 
-import { CreateNotificationBody, CreateNotificationResponse } from './dtos';
+import { CreateNotificationBody, CreateNotificationResponse, ListNotificationMessagesQuery, ListNotificationMessagesResponse } from './dtos';
 
 /**
  * Defining types
@@ -26,5 +28,12 @@ export class NotificationController {
   @RespondFor(201, CreateNotificationResponse)
   createNotification(@Body() body: CreateNotificationBody): Promise<CreateNotificationResponse> {
     return this.notificationService.send(body);
+  }
+
+  @Get('/messages')
+  @EnableIf(() => Config.get('server.env') === 'dev')
+  @RespondFor(200, ListNotificationMessagesResponse)
+  listMessages(@Query() query: ListNotificationMessagesQuery): Promise<ListNotificationMessagesResponse> {
+    return this.notificationService.listMessages(query);
   }
 }

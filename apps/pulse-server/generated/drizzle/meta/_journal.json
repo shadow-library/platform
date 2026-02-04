@@ -22,6 +22,13 @@
       "when": 1768072955335,
       "tag": "0002_flaky_paper_doll",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1770058199630,
+      "tag": "0003_ordinary_gamma_corps",
+      "breakpoints": true
     }
   ]
 }

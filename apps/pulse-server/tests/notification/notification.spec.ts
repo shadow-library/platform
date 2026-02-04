@@ -121,4 +121,81 @@ describe('Notification', () => {
       });
     });
   });
+
+  describe('GET /v1/notifications/messages', () => {
+    it('should return all notification messages', async () => {
+      const response = await testEnv.getRouter().mockRequest().get('/api/v1/notifications/messages');
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({
+        total: 5,
+        items: expect.arrayContaining([
+          expect.objectContaining({
+            id: expect.stringMatching(TEST_REGEX.id),
+            channel: expect.stringMatching(/(EMAIL|SMS|PUSH)/),
+            recipient: expect.any(String),
+            locale: expect.stringMatching(/[a-zA-Z-]{2,4}/),
+            renderedSubject: expect.any(String),
+            renderedBody: expect.any(String),
+            templateKey: expect.any(String),
+            messageType: expect.stringMatching(/(TRANSACTIONAL|PROMOTIONAL)/),
+            createdAt: expect.stringMatching(TEST_REGEX.dateISO),
+            payload: expect.anything(),
+          }),
+        ]),
+        offset: 0,
+        limit: 20,
+      });
+    });
+
+    it('should filter notification messages by channel', async () => {
+      const response = await testEnv.getRouter().mockRequest().get('/api/v1/notifications/messages?channel=SMS');
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({
+        total: 1,
+        items: [
+          {
+            id: '5',
+            channel: 'SMS',
+            recipient: '+15551230003',
+            locale: 'en-US',
+            templateKey: 'spring-promo',
+            messageType: 'PROMOTIONAL',
+            payload: { offer: 'SPRING50' },
+            renderedSubject: 'Spring promo',
+            renderedBody: 'Use code SPRING50 for 50% off.',
+            createdAt: expect.stringMatching(TEST_REGEX.dateISO),
+          },
+        ],
+        offset: 0,
+        limit: 20,
+      });
+    });
+
+    it('should filter notification messages by recipient', async () => {
+      const response = await testEnv.getRouter().mockRequest().get('/api/v1/notifications/messages?recipient=alice@example.com');
+
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toStrictEqual({
+        total: 1,
+        items: [
+          {
+            id: '1',
+            channel: 'EMAIL',
+            recipient: 'alice@example.com',
+            locale: 'en-US',
+            renderedSubject: 'Welcome to Shadow',
+            templateKey: 'sign-up',
+            messageType: 'TRANSACTIONAL',
+            renderedBody: 'Hi Alice, welcome aboard!',
+            payload: { name: 'Alice' },
+            createdAt: expect.stringMatching(TEST_REGEX.dateISO),
+          },
+        ],
+        offset: 0,
+        limit: 20,
+      });
+    });
+  });
 });
