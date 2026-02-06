@@ -9,7 +9,8 @@
     "preview": "vite preview --port 3000",
     "lint": "bun run scripts/lint.ts",
     "test": "bunx playwright test",
-    "test:setup": "bunx playwright install --with-deps chromium"
+    "test:setup": "bunx playwright install --with-deps chromium",
+    "generate:api-ops": "bun run scripts/generate-api-operations.ts"
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -37,6 +38,7 @@
     "@types/react-dom": "^19.2.0",
     "@typescript-eslint/parser": "^8.50.1",
     "@vitejs/plugin-react": "^5.0.4",
+    "ajv": "^8.17.1",
     "eslint": "^9.39.2",
     "eslint-import-resolver-typescript": "^4.4.4",
     "eslint-plugin-import": "^2.32.0",
@@ -44,6 +46,7 @@
     "eslint-plugin-react-hooks": "^7.0.1",
     "globals": "^16.5.0",
     "husky": "^9.1.7",
+    "orval": "^8.2.0",
     "prettier": "^3.5.3",
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "^5.7.2",

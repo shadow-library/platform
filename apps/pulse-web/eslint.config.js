@@ -18,7 +18,7 @@ import { defineConfig, globalIgnores } from 'eslint/config';
  */
 
 export default defineConfig([
-  globalIgnores(['src/routeTree.gen.ts']),
+  globalIgnores(['**/*.gen.ts']),
   eslintJs.configs.recommended,
   ...eslintTs.configs.strict,
   ...eslintTs.configs.stylistic,
