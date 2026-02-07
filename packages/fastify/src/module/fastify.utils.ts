@@ -94,8 +94,8 @@ export async function createFastifyInstance(config: FastifyConfig, fastifyFactor
   const instance = fastify(options);
   instance.setSchemaErrorFormatter(formatSchemaErrors);
   instance.setNotFoundHandler(notFoundHandler);
-  instance.setErrorHandler(errorHandler.handle.bind(errorHandler));
   instance.setValidatorCompiler(routeSchema => compileValidator(routeSchema, { strictValidator, lenientValidator }));
+  if (errorHandler) instance.setErrorHandler(errorHandler.handle.bind(errorHandler));
 
   return fastifyFactory ? await fastifyFactory(instance) : instance;
 }

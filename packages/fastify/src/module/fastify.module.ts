@@ -28,11 +28,13 @@ import { createFastifyInstance } from './fastify.utils';
 @Module({})
 export class FastifyModule {
   private static getDefaultConfig(): FastifyConfig {
+    Config.load('app.host', { defaultValue: 'localhost' });
+    Config.load('app.port', { defaultValue: '8080', validateType: 'number' });
     const errorResponseSchema = ClassSchema.generate(ErrorResponseDto);
 
     return {
-      host: 'localhost',
-      port: 8080,
+      host: Config.get('app.host'),
+      port: Config.get('app.port'),
       responseSchema: { '4xx': errorResponseSchema, '5xx': errorResponseSchema },
       errorHandler: new DefaultErrorHandler(),
       maskSensitiveData: Config.isProd(),
@@ -43,6 +45,14 @@ export class FastifyModule {
         ignoreTrailingSlash: true,
         ignoreDuplicateSlashes: true,
       },
+    };
+  }
+
+  private static createConfigFactory(factory: FastifyModuleAsyncOptions['useFactory']) {
+    return (...args: any[]) => {
+      const config = factory(...args);
+      if (config instanceof Promise) return config.then(resolvedConfig => Object.assign({}, this.getDefaultConfig(), resolvedConfig));
+      return Object.assign({}, this.getDefaultConfig(), config);
     };
   }
 
@@ -62,7 +72,7 @@ export class FastifyModule {
     const fastifyFactory = (config: FastifyConfig) => createFastifyInstance(config, options.fastifyFactory);
 
     const providers: Provider[] = [{ token: Router, useClass: FastifyRouter }, ContextService];
-    providers.push({ token: FASTIFY_CONFIG, useFactory: options.useFactory, inject: options.inject });
+    providers.push({ token: FASTIFY_CONFIG, useFactory: this.createConfigFactory(options.useFactory), inject: options.inject });
     providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
     if (options.providers) providers.push(...options.providers);
 

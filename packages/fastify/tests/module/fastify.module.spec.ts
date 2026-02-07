@@ -63,7 +63,7 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         controllers: [Controller],
-        providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory }]),
+        providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
         exports: [Router, ContextService, FASTIFY_INSTANCE],
       });
     });

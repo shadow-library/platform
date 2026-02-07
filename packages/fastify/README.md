@@ -663,6 +663,27 @@ childRouteHeaders: (contextService) => {
 
 ## Configuration
 
+### Default Configuration
+
+The `FastifyModule` automatically provides sensible defaults for core server options. The `host`, `port`, and `errorHandler` properties are all **optional** — if not specified, they are resolved from `@shadow-library/common`'s `Config` or fall back to built-in defaults:
+
+| Property       | Config Key | Default Value         |
+| -------------- | ---------- | --------------------- |
+| `host`         | `app.host` | `'localhost'`         |
+| `port`         | `app.port` | `8080`                |
+| `errorHandler` | —          | `DefaultErrorHandler` |
+
+The `Config.load()` calls register `app.host` and `app.port` with the `Config` system, so they can be overridden via environment variables or any config source supported by `@shadow-library/common` without changing your module setup:
+
+```typescript
+// No explicit host/port needed — defaults are loaded from Config
+FastifyModule.forRoot({
+  controllers: [UserController],
+});
+```
+
+> **Note:** When using `forRootAsync`, the defaults are automatically merged with the config returned by your factory function, so you only need to specify the properties you want to override.
+
 ### Dynamic Module Configuration
 
 `FastifyModule` is a **dynamic module** that configures itself based on the options you provide. Unlike static modules, dynamic modules return a module configuration object at runtime, allowing for flexible dependency injection and configuration.
@@ -740,7 +761,7 @@ export class AppModule {}
 
 #### Asynchronous Configuration (forRootAsync)
 
-Use `forRootAsync` when you need to inject dependencies or load configuration dynamically:
+Use `forRootAsync` when you need to inject dependencies or load configuration dynamically. The config returned by your `useFactory` is automatically merged with the default configuration, so you only need to provide the properties you want to override:
 
 ```typescript
 @Module({
@@ -757,6 +778,8 @@ Use `forRootAsync` when you need to inject dependencies or load configuration dy
 })
 export class AppModule {}
 ```
+
+If your factory returns a `Promise`, the defaults are merged after the promise resolves. This works seamlessly with both sync and async factories.
 
 #### Dynamic Module Benefits
 
