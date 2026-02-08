@@ -22,7 +22,7 @@ import { type ICacheStore } from './cache.service';
 
 @Injectable()
 export class RedisCacheService implements ICacheStore {
-  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, RedisCacheService.name);
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'RedisCacheService');
   private readonly redis: Redis;
 
   constructor(@Inject(CACHE_MODULE_OPTIONS) options: CacheModuleOptions) {

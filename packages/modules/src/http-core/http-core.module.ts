@@ -10,7 +10,7 @@ import { PartialDeep } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { HTTP_CORE_CONFIGS } from './http-core.constants';
+import { HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from './http-core.constants';
 import { type HttpCoreModuleOptions } from './http-core.types';
 import { CsrfProtectionMiddleware, RequestInitializerMiddleware } from './middlewares';
 import { CSRFTokenService, HealthService, OpenApiService } from './services';
@@ -44,14 +44,14 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
     crossOriginResourcePolicy: { policy: 'same-origin' },
     contentSecurityPolicy: {
       directives: {
-        defaultSrc: ['self'],
-        baseUri: ['self'],
-        scriptSrc: ['self'],
-        styleSrc: ['self'],
-        objectSrc: ['none'],
-        formAction: ['self'],
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'"],
+        objectSrc: ["'none'"],
+        formAction: ["'self'"],
         upgradeInsecureRequests: [],
-        manifestSrc: ['self'],
+        manifestSrc: ["'self'"],
       },
     },
   },
@@ -67,6 +67,8 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
 
 @Module()
 export class HttpCoreModule implements OnModuleInit {
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'HttpCoreModule');
+
   constructor(
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ServerInstance,
@@ -105,18 +107,21 @@ export class HttpCoreModule implements OnModuleInit {
 
       await this.fastify.register(fastifySwagger, this.openApiService.getFastifySwaggerOptions());
       await this.fastify.register(scalar.default, this.openApiService.getScalarOptions());
+      this.logger.info('OpenAPI registered with options', { options: this.options.openapi });
     }
 
     const isHelmetEnabled = this.firstDefined(this.options.helmet.enabled, Config.get('http-core.helmet.enabled'), Config.isProd());
     if (isHelmetEnabled) {
       const helmet = await import('@fastify/helmet');
       await this.fastify.register(helmet, this.options.helmet);
+      this.logger.info('Helmet registered with options', { options: this.options.helmet });
     }
 
     const isCompressEnabled = this.firstDefined(this.options.compress.enabled, Config.get('http-core.compress.enabled'), Config.isProd());
     if (isCompressEnabled) {
       const compress = await import('@fastify/compress');
       await this.fastify.register(compress, this.options.compress);
+      this.logger.info('Compress registered with options', { options: this.options.compress });
     }
   }
 

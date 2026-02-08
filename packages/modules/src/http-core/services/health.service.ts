@@ -24,19 +24,19 @@ type HealthServer = Server | Bun.Server<unknown> | null;
 
 @Injectable()
 export class HealthService implements OnApplicationReady, OnApplicationStop {
-  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, HealthService.name);
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'HealthService');
 
   private isReady = false;
   private server: HealthServer = null;
 
   constructor() {
-    Config.load('http-core.health.host', { defaultValue: 'localhost' });
-    Config.load('http-core.health.port', { validateType: 'number', defaultValue: '8081' });
-    Config.load('http-core.health.enabled', { validateType: 'boolean', defaultValue: Config.isProd() ? 'true' : 'false' });
+    Config.load('health.host', { defaultValue: 'localhost' });
+    Config.load('health.port', { validateType: 'number', defaultValue: '8081' });
+    Config.load('health.enabled', { validateType: 'boolean', defaultValue: Config.isProd() ? 'true' : 'false' });
 
-    if (Config.get('http-core.health.enabled')) {
-      const hostname = Config.get('http-core.health.host');
-      const port = Config.get('http-core.health.port');
+    if (Config.get('health.enabled')) {
+      const hostname = Config.get('health.host');
+      const port = Config.get('health.port');
       this.server = this.createServer(hostname, port);
       this.server?.unref();
       this.logger.info('Health server started', { hostname, port });

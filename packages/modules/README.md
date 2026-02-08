@@ -131,14 +131,14 @@ For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the follo
 | Helmet        | `HTTP_CORE_HELMET_ENABLED`   | `true`               | `false`               |
 | Compression   | `HTTP_CORE_COMPRESS_ENABLED` | `true`               | `false`               |
 | OpenAPI       | `HTTP_CORE_OPENAPI_ENABLED`  | `false`              | `true`                |
-| Health Server | `HTTP_CORE_HEALTH_ENABLED`   | `true`               | `false`               |
+| Health Server | `HEALTH_ENABLED`             | `true`               | `false`               |
 
 ##### Health Server Configuration
 
-| Setting | Environment Variable    | Default     |
-| ------- | ----------------------- | ----------- |
-| Host    | `HTTP_CORE_HEALTH_HOST` | `localhost` |
-| Port    | `HTTP_CORE_HEALTH_PORT` | `8081`      |
+| Setting | Environment Variable | Default     |
+| ------- | -------------------- | ----------- |
+| Host    | `HEALTH_HOST`        | `localhost` |
+| Port    | `HEALTH_PORT`        | `8081`      |
 
 #### Features in Detail
 

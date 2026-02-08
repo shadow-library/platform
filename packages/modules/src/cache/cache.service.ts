@@ -31,7 +31,7 @@ export interface ICacheStore {
 
 @Injectable()
 export class CacheService {
-  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, CacheService.name);
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'CacheService');
 
   private readonly lruCache: LRUCache;
   private readonly cacheStore: ICacheStore;

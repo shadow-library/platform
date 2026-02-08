@@ -22,7 +22,7 @@ import { CSRFTokenService } from '../services';
 
 @Middleware({ type: 'onRequest', weight: 90 })
 export class CsrfProtectionMiddleware implements MiddlewareGenerator {
-  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, CsrfProtectionMiddleware.name);
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'CsrfProtectionMiddleware');
 
   constructor(
     @Inject(HTTP_CORE_CONFIGS) private readonly options: HttpCoreModuleOptions,

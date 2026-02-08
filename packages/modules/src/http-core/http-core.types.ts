@@ -29,9 +29,9 @@ declare module '@shadow-library/common' {
     'http-core.openapi.enabled'?: boolean;
 
     /*! Health Service configs */
-    'http-core.health.host': string;
-    'http-core.health.port': number;
-    'http-core.health.enabled': boolean;
+    'health.host': string;
+    'health.port': number;
+    'health.enabled': boolean;
   }
 }
 

@@ -22,7 +22,7 @@ import { type ICacheStore } from './cache.service';
 
 @Injectable()
 export class MemcacheService implements ICacheStore {
-  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, MemcacheService.name);
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'MemcacheService');
 
   private readonly memcached?: Memcached;
 

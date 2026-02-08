@@ -463,7 +463,7 @@ describe('HttpCore Module', () => {
     async function setupHelmet(enabled: boolean) {
       const HttpCoreHelmet = HttpCoreModule.forRoot({
         csrf: { expiresIn: { seconds: 10 }, refreshLeeway: { second: 1 } },
-        helmet: { enabled, contentSecurityPolicy: false },
+        helmet: { enabled },
       });
 
       @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreHelmet], controllers: [HelmetController] })] })
@@ -540,9 +540,9 @@ describe('HttpCore Module', () => {
     const healthBaseUrl = `http://${healthHost}:${healthPort}`;
 
     beforeAll(async () => {
-      Config['cache'].set('http-core.health.enabled', true);
-      Config['cache'].set('http-core.health.host', healthHost);
-      Config['cache'].set('http-core.health.port', healthPort);
+      Config['cache'].set('health.enabled', true);
+      Config['cache'].set('health.host', healthHost);
+      Config['cache'].set('health.port', healthPort);
 
       const HttpCoreHealth = HttpCoreModule.forRoot();
 

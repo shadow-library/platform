@@ -51,7 +51,7 @@ interface CSRFTokenValidationResult {
 @Injectable()
 export class CSRFTokenService {
   private readonly options: CSRFOptions;
-  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, CSRFTokenService.name);
+  private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'CSRFTokenService');
 
   constructor(@Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions) {
     const cookieName = options.csrf.cookieName.toLowerCase();

@@ -1,4 +1,7 @@
 name: Publish package to NPM
+permissions:
+  id-token: write
+  contents: write
 
 on:
   workflow_dispatch:
@@ -19,10 +22,6 @@ jobs:
   publish:
     if: github.actor == 'leanderpaul' && github.triggering_actor == 'leanderpaul' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    permissions:
-      id-token: write
-      contents: write
-      pull-requests: write
 
     steps:
       - name: Checkout repository
