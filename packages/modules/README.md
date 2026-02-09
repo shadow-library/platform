@@ -22,9 +22,12 @@ This package relies on several peer dependencies. Ensure you have them installed
 npm install @shadow-library/app @shadow-library/common @shadow-library/fastify reflect-metadata
 ```
 
-If you are using the Cache module, you will also need to install the driver for your chosen backend:
+If you are using the Database module, install the relevant drivers:
 
 ```bash
+# For Drizzle ORM (required for PostgreSQL)
+npm install drizzle-orm
+
 # For Redis
 npm install ioredis
 
@@ -45,13 +48,26 @@ The `HttpCoreModule` provides a robust foundation for HTTP services, integrating
 - **Request Initialization**: Middleware for initializing request context.
 - **Cookie Support**: Integrated cookie handling.
 
+### Database Module
+
+The `DatabaseModule` provides a unified database access layer for PostgreSQL (via Drizzle ORM), Redis, and Memcached.
+
+- **PostgreSQL via Drizzle ORM**: First-class support for built-in drizzle-orm drivers (`bun-sql`, `node-postgres`, `postgres-js`, etc.) with automatic dynamic imports, or a custom factory for full control.
+- **Redis**: Full Redis client lifecycle management via `ioredis`.
+- **Memcached**: Full Memcached client lifecycle management.
+- **Connection Testing**: Automatic connection verification on startup for all backends (PostgreSQL runs `SELECT 1`, Redis waits for `ready`, Memcached runs `stats`).
+- **Error Translation**: Translates PostgreSQL constraint violations into application-specific errors via a configurable constraint error map.
+- **Environment Variable Fallbacks**: Connection URLs can be provided in code or fall back to environment variables.
+- **Utility Methods**: `attachParent` and `attachMatchingParent` helpers for linking related database records.
+
 ### Cache Module
 
-The `CacheModule` offers a flexible caching layer with support for multiple backends.
+The `CacheModule` offers a multi-level caching strategy (L1: in-memory LRU, L2: Redis or Memcached).
 
-- **Redis Support**: Full integration with Redis via `RedisCacheService`.
-- **Memcached Support**: Support for Memcached via `MemcacheService`.
+- **L1 Cache**: In-memory LRU cache with configurable size and TTL.
+- **L2 Cache**: Automatically uses Redis or Memcached (provided by the `DatabaseModule`) as the L2 backend.
 - **Abstraction**: Unified `CacheService` for consistent caching operations regardless of the backend.
+- **Direct Access**: `RedisCacheService` and `MemcacheService` are also exported for backend-specific operations.
 
 ## Usage
 
@@ -63,10 +79,16 @@ You can import the modules separately to keep your application bundle small and 
 import { HttpCoreModule } from '@shadow-library/modules/http-core';
 ```
 
+### Importing Database
+
+```typescript
+import { DatabaseModule, DatabaseService } from '@shadow-library/modules/database';
+```
+
 ### Importing Cache
 
 ```typescript
-import { CacheModule, RedisCacheService, MemcacheService } from '@shadow-library/modules/cache';
+import { CacheModule, CacheService, RedisCacheService, MemcacheService } from '@shadow-library/modules/cache';
 ```
 
 ## Technical Details
@@ -167,57 +189,237 @@ For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the follo
     - Ensures every request has a unique `x-correlation-id` header for tracing.
     - Preserves the ID if sent by the client.
 
-### Cache Module
+### Database Module
 
-The `CacheModule` provides a multi-level caching strategy (L1: Memory, L2: Redis/Memcached).
+The `DatabaseModule` manages connections to PostgreSQL (via Drizzle ORM), Redis, and Memcached. It provides a `DatabaseService` that handles the full lifecycle (connect on init, disconnect on destroy) and exposes getter methods for each client.
 
 #### Configuration
 
-You can configure the module to use either Redis or Memcached as the L2 cache.
+Use `DatabaseModule.forRoot()` or `DatabaseModule.forRootAsync()` to register the module. All three backends (postgres, redis, memcache) are optional — configure only what you need.
 
-**Using Redis:**
+**Built-in Drizzle Driver (recommended for `bun-sql`, `node-postgres`, `postgres-js`, etc.):**
 
 ```typescript
 import { Module } from '@shadow-library/app';
-import { CacheModule } from '@shadow-library/modules/cache';
-import Redis from 'ioredis';
+import { DatabaseModule } from '@shadow-library/modules/database';
 
-const redisClient = new Redis();
+import * as schema from './schemas';
 
 @Module({
   imports: [
-    CacheModule.forRoot({
-      redis: redisClient,
+    DatabaseModule.forRoot({
+      postgres: {
+        type: 'bun-sql',
+        schema,
+        url: 'postgres://user:pass@localhost:5432/mydb',
+        connection: { max: 20 }, // optional driver-specific options
+        constraintErrorMap: {
+          users_email_unique: new ConflictError('Email already exists'),
+        },
+      },
+      redis: true, // uses DATABASE_REDIS_URL env var
+      memcache: true, // uses DATABASE_MEMCACHE_HOSTS env var
     }),
   ],
 })
 export class AppModule {}
 ```
 
-**Using Memcached:**
+The `type` field accepts any supported drizzle-orm driver sub-package:
+
+| Driver             | `type` value        |
+| ------------------ | ------------------- |
+| Bun SQL            | `'bun-sql'`         |
+| node-postgres (pg) | `'node-postgres'`   |
+| postgres.js        | `'postgres-js'`     |
+| Neon               | `'neon'`            |
+| PGlite             | `'pglite'`          |
+| Vercel Postgres    | `'vercel-postgres'` |
+| Xata HTTP          | `'xata-http'`       |
+| PG Proxy           | `'pg-proxy'`        |
+| AWS Data API       | `'aws-data-api'`    |
+
+**Custom Factory (full control):**
 
 ```typescript
 import { Module } from '@shadow-library/app';
-import { CacheModule } from '@shadow-library/modules/cache';
-import Memcached from 'memcached';
+import { DatabaseModule } from '@shadow-library/modules/database';
+import { drizzle } from 'drizzle-orm/bun-sql';
 
-const redisClient = new Redis();
-const memcachedClient = new Memcached('localhost:11211');
+import * as schema from './schemas';
 
 @Module({
   imports: [
-    CacheModule.forRoot({
-      redis: redisClient,
-      memcached: memcachedClient,
+    DatabaseModule.forRoot({
+      postgres: {
+        type: 'custom',
+        factory: logger => drizzle({ schema, logger, connection: 'postgres://...' }),
+      },
     }),
   ],
 })
 export class AppModule {}
 ```
+
+With a custom factory, you have full control — the module calls `factory(logger)` with a pre-configured query logger and uses the returned client directly.
+
+**Async Configuration:**
+
+```typescript
+DatabaseModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (configService: ConfigService) => ({
+    postgres: { type: 'bun-sql', schema, url: configService.get('DATABASE_URL') },
+    redis: { url: configService.get('REDIS_URL') },
+  }),
+});
+```
+
+#### Redis and Memcached Options
+
+Redis and Memcached can be configured with `true` (use environment variable defaults) or with an options object:
+
+```typescript
+// Boolean shorthand — resolves URL from environment variables
+redis: true,
+memcache: true,
+
+// Explicit configuration
+redis: {
+  url: 'redis://localhost:6379',
+  options: { /* ioredis options */ },
+},
+memcache: {
+  hosts: 'localhost:11211',
+  options: { /* memcached options */ },
+},
+```
+
+#### Environment Variables
+
+When connection URLs are not provided in code, the module falls back to these environment variables:
+
+| Setting         | Config Key                          | Description                                         |
+| --------------- | ----------------------------------- | --------------------------------------------------- |
+| PostgreSQL URL  | `database.postgres.url`             | PostgreSQL connection URL                           |
+| Max Connections | `database.postgres.max-connections` | Max connections (auto-applied for `bun-sql` driver) |
+| Redis URL       | `database.redis.url`                | Redis connection URL                                |
+| Memcached Hosts | `database.memcache.hosts`           | Memcached server host(s)                            |
+
+> For the `bun-sql` driver, the module automatically loads `database.postgres.max-connections` from the environment and sets it as the `max` connection option (user-provided connection options take precedence).
 
 #### Usage
 
-Inject the `CacheService` to interact with the cache. It handles the L1/L2 logic automatically.
+Inject `DatabaseService` to access the database clients:
+
+```typescript
+import { Injectable } from '@shadow-library/app';
+import { DatabaseService } from '@shadow-library/modules/database';
+
+@Injectable()
+export class UserService {
+  constructor(private readonly databaseService: DatabaseService) {}
+
+  async getUsers() {
+    const db = this.databaseService.getDrizzleClient();
+    return db.select().from(users);
+  }
+}
+```
+
+**Type-safe Drizzle client:**
+
+Augment the `DatabaseRecords` interface to get a fully typed `getDrizzleClient()` return type:
+
+```typescript
+import { BunSQLDatabase } from 'drizzle-orm/bun-sql';
+import * as schema from './schemas';
+
+declare module '@shadow-library/modules/database' {
+  interface DatabaseRecords {
+    drizzle: BunSQLDatabase<typeof schema>;
+  }
+}
+```
+
+**Error translation:**
+
+Use `translateError()` to map PostgreSQL constraint violations to application errors:
+
+```typescript
+try {
+  await db.insert(users).values({ email: 'duplicate@test.com' });
+} catch (error) {
+  // Throws the mapped error from constraintErrorMap, or InternalError for unknown errors
+  this.databaseService.translateError(error);
+}
+```
+
+**Utility methods:**
+
+```typescript
+// Attach a parent object to a child
+const linked = databaseService.attachParent(childRecord, parentRecord);
+linked.getParent(); // returns parentRecord
+
+// Batch-link sources to parents by matching keys
+const linked = databaseService.attachMatchingParent(orders, 'userId', users, 'id');
+linked[0].getParent(); // returns the matching user
+```
+
+**Available methods on `DatabaseService`:**
+
+| Method                                                   | Description                                                          |
+| -------------------------------------------------------- | -------------------------------------------------------------------- |
+| `getDrizzleClient()`                                     | Returns the Drizzle ORM client (throws if not configured)            |
+| `getRedisClient()`                                       | Returns the `ioredis` client (throws if not configured)              |
+| `getMemcacheClient()`                                    | Returns the `Memcached` client (throws if not configured)            |
+| `isDrizzleEnabled()`                                     | Returns `true` if the Drizzle client is initialized                  |
+| `isRedisEnabled()`                                       | Returns `true` if the Redis client is initialized                    |
+| `isMemcacheEnabled()`                                    | Returns `true` if the Memcached client is initialized                |
+| `translateError(error)`                                  | Translates a database error to an app error using the constraint map |
+| `attachParent(target, parent)`                           | Attaches a `getParent()` method to the target object                 |
+| `attachMatchingParent(sources, sourceKey, parents, ...)` | Batch-links sources to parents by key                                |
+
+### Cache Module
+
+The `CacheModule` provides a multi-level caching strategy (L1: in-memory LRU, L2: Redis or Memcached). It depends on the `DatabaseModule` for Redis and Memcached client connections.
+
+#### Configuration
+
+The `CacheModule` requires the `DatabaseModule` to be configured with Redis and/or Memcached. Import the `DatabaseModule` via `CacheModule.forRootAsync()`:
+
+```typescript
+import { Module } from '@shadow-library/app';
+import { DatabaseModule } from '@shadow-library/modules/database';
+import { CacheModule } from '@shadow-library/modules/cache';
+
+@Module({
+  imports: [
+    DatabaseModule.forRoot({
+      redis: true,
+    }),
+    CacheModule.forRootAsync({
+      imports: [DatabaseModule],
+      useFactory: () => ({
+        lruCacheSize: 10_000, // Max items in L1 cache (default: 5000)
+        lruCacheTTLSeconds: 300, // L1 entry TTL in seconds (optional)
+      }),
+    }),
+  ],
+})
+export class AppModule {}
+```
+
+The `CacheModule` automatically selects the L2 backend based on what's available:
+
+- If Memcached is enabled in `DatabaseModule`, it uses Memcached as L2.
+- Otherwise, it uses Redis as L2.
+
+#### Usage
+
+Inject `CacheService` to interact with the cache. It handles L1/L2 logic automatically:
 
 ```typescript
 import { Injectable } from '@shadow-library/app';
@@ -228,24 +430,17 @@ export class UserService {
   constructor(private readonly cacheService: CacheService) {}
 
   async getUser(id: string) {
-    // Try to get from cache
     const cachedUser = await this.cacheService.get(`user:${id}`);
-    if (cachedUser) {
-      return cachedUser;
-    }
+    if (cachedUser) return cachedUser;
 
-    // Fetch from DB...
     const user = { id, name: 'John Doe' };
-
-    // Set in cache with TTL (e.g., 60 seconds)
-    await this.cacheService.set(`user:${id}`, user, 60);
-
+    await this.cacheService.set(`user:${id}`, user, 60); // TTL: 60 seconds
     return user;
   }
 }
 ```
 
-You can also inject `RedisCacheService` or `MemcacheService` directly if you need backend-specific features (like `incr`, `decr`).
+You can also inject `RedisCacheService` or `MemcacheService` directly for backend-specific features:
 
 ```typescript
 import { Injectable } from '@shadow-library/app';
@@ -255,8 +450,8 @@ import { RedisCacheService } from '@shadow-library/modules/cache';
 export class CounterService {
   constructor(private readonly redisService: RedisCacheService) {}
 
-  async increment() {
-    return await this.redisService.incr('my-counter', 1);
+  async increment(key: string) {
+    return await this.redisService.incr(key, 1);
   }
 }
 ```

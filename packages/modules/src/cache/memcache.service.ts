@@ -1,16 +1,16 @@
 /**
  * Importing npm packages
  */
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { Logger, MaybeNull, NeverError } from '@shadow-library/common';
-import Memcached from 'memcached';
+import type Memcached from 'memcached';
 
 /**
  * Importing user defined packages
  */
-import { CACHE_MODULE_OPTIONS, LOGGER_NAMESPACE } from './cache.constants';
-import { type CacheModuleOptions } from './cache.module';
+import { LOGGER_NAMESPACE } from './cache.constants';
 import { type ICacheStore } from './cache.service';
+import { DatabaseService } from '../database/database.service';
 
 /**
  * Defining types
@@ -26,11 +26,11 @@ export class MemcacheService implements ICacheStore {
 
   private readonly memcached?: Memcached;
 
-  constructor(@Inject(CACHE_MODULE_OPTIONS) options: CacheModuleOptions) {
-    if (options.memcached) {
-      this.memcached = options.memcached;
+  constructor(databaseService: DatabaseService) {
+    if (databaseService.isMemcacheEnabled()) {
+      this.memcached = databaseService.getMemcacheClient();
       this.logger.info('Memcached client initialized successfully');
-    } else this.logger.warn('No Memcached client provided, MemcacheService will be inactive');
+    } else this.logger.warn('Memcached not enabled in DatabaseModule, MemcacheService will be inactive');
   }
 
   isEnabled(): boolean {

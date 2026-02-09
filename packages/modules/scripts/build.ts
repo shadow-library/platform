@@ -18,7 +18,7 @@ import path from 'node:path';
  */
 const rootDir = path.join(import.meta.dirname, '..');
 const distDir = path.join(rootDir, 'dist');
-const subPathExports = ['http-core', 'cache'];
+const subPathExports = ['http-core', 'cache', 'database'];
 
 const formatTime = (time: number) => (time < 1000 ? `${time.toFixed(0)}ms` : `${(time / 1000).toFixed(3)}s`);
 const success = (message: string) => console.log('\x1b[32m%s\x1b[0m', message); // eslint-disable-line no-console

@@ -1,16 +1,16 @@
 /**
  * Importing npm packages
  */
-import { Inject, Injectable } from '@shadow-library/app';
+import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import Redis from 'ioredis';
+import type Redis from 'ioredis';
 
 /**
  * Importing user defined packages
  */
-import { CACHE_MODULE_OPTIONS, LOGGER_NAMESPACE } from './cache.constants';
-import { type CacheModuleOptions } from './cache.module';
+import { LOGGER_NAMESPACE } from './cache.constants';
 import { type ICacheStore } from './cache.service';
+import { DatabaseService } from '../database/database.service';
 
 /**
  * Defining types
@@ -25,8 +25,8 @@ export class RedisCacheService implements ICacheStore {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'RedisCacheService');
   private readonly redis: Redis;
 
-  constructor(@Inject(CACHE_MODULE_OPTIONS) options: CacheModuleOptions) {
-    this.redis = options.redis;
+  constructor(databaseService: DatabaseService) {
+    this.redis = databaseService.getRedisClient();
   }
 
   async get<T = any>(key: string): Promise<T | null> {

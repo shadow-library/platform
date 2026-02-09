@@ -2,8 +2,6 @@
  * Importing npm packages
  */
 import { DynamicModule, FactoryProvider, Module, ModuleMetadata, Provider } from '@shadow-library/app';
-import { Redis } from 'ioredis';
-import Memcached from 'memcached';
 import { Promisable } from 'type-fest';
 
 /**
@@ -19,12 +17,6 @@ import { RedisCacheService } from './redis-cache.service';
  */
 
 export interface CacheModuleOptions {
-  /** The Redis client instance to be used for persistent caching */
-  redis: Redis;
-
-  /** Optional Memcached client instance for secondary caching layer */
-  memcached?: Memcached;
-
   /** Maximum size of the in-memory LRU cache (default: 5000 items) */
   lruCacheSize?: number;
 
@@ -34,7 +26,7 @@ export interface CacheModuleOptions {
 
 export interface CacheModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'>, Pick<FactoryProvider, 'inject'> {
   /** Factory function that returns CacheModuleOptions or a Promise resolving to it */
-  useFactory: (...args: any[]) => Promisable<CacheModuleOptions>;
+  useFactory: (...args: unknown[]) => Promisable<CacheModuleOptions>;
 }
 
 /**

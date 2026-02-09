@@ -9,6 +9,7 @@ import { Module, ShadowFactory } from '@shadow-library/app';
  * Importing user defined packages
  */
 import { CacheModule, CacheService, MemcacheService, RedisCacheService } from '@shadow-library/modules/cache';
+import { DatabaseService } from '@shadow-library/modules/database';
 
 describe('Cache Module', () => {
   const redisMock = {
@@ -37,7 +38,25 @@ describe('Cache Module', () => {
     let redisCacheService: RedisCacheService;
 
     @Module({
-      imports: [CacheModule.forRoot({ redis: redisMock as any })],
+      providers: [
+        {
+          token: DatabaseService,
+          useValue: {
+            getRedisClient: () => redisMock,
+            getMemcacheClient: () => {
+              throw new Error('Memcached not enabled');
+            },
+            isRedisEnabled: () => true,
+            isMemcacheEnabled: () => false,
+          },
+        },
+      ],
+      exports: [DatabaseService],
+    })
+    class MockRedisDatabaseModule {}
+
+    @Module({
+      imports: [CacheModule.forRootAsync({ imports: [MockRedisDatabaseModule], useFactory: () => ({}) })],
     })
     class RedisAppModule {}
 
@@ -112,7 +131,23 @@ describe('Cache Module', () => {
     let memcacheService: MemcacheService;
 
     @Module({
-      imports: [CacheModule.forRoot({ redis: redisMock as any, memcached: memcachedMock as any })],
+      providers: [
+        {
+          token: DatabaseService,
+          useValue: {
+            getRedisClient: () => redisMock,
+            getMemcacheClient: () => memcachedMock,
+            isRedisEnabled: () => true,
+            isMemcacheEnabled: () => true,
+          },
+        },
+      ],
+      exports: [DatabaseService],
+    })
+    class MockMemcachedDatabaseModule {}
+
+    @Module({
+      imports: [CacheModule.forRootAsync({ imports: [MockMemcachedDatabaseModule], useFactory: () => ({}) })],
     })
     class MemcachedAppModule {}
 
