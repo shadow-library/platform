@@ -32,6 +32,11 @@ export interface QueryLogger extends DrizzleLogger {
 /**
  * Declaring the constants
  */
+const DEFAULT_CONFIGS: Record<ConfigKey, string> = {
+  'database.postgres.url': 'postgresql://postgres:postgres@localhost/shadow_db',
+  'database.memcache.hosts': 'localhost:11211',
+  'database.redis.url': 'redis://localhost:6379',
+};
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -45,7 +50,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   private resolveConnectionUrl(database: string, url: string | undefined, configKey: ConfigKey): string {
     if (url) return url;
-    Config.load(configKey);
+    Config.load(configKey, { defaultValue: DEFAULT_CONFIGS[configKey], isProdRequired: true });
     const resolved = Config.get(configKey);
     if (!resolved) throw new InternalError(`${database} connection URL not provided and the config value for '${configKey}' is not set`);
     return resolved;
