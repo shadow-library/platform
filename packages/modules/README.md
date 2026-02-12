@@ -52,12 +52,13 @@ The `HttpCoreModule` provides a robust foundation for HTTP services, integrating
 
 The `DatabaseModule` provides a unified database access layer for PostgreSQL (via Drizzle ORM), Redis, and Memcached.
 
-- **PostgreSQL via Drizzle ORM**: First-class support for built-in drizzle-orm drivers (`bun-sql`, `node-postgres`, `postgres-js`, etc.) with automatic dynamic imports, or a custom factory for full control.
+- **PostgreSQL via Drizzle ORM**: Factory-based configuration — you provide a factory function that receives a `DrizzleConfig` (with logger pre-configured) and a `PostgresConnectionConfig` (with the resolved connection URL and optional max connections), and returns a Drizzle client.
 - **Redis**: Full Redis client lifecycle management via `ioredis`.
 - **Memcached**: Full Memcached client lifecycle management.
 - **Connection Testing**: Automatic connection verification on startup for all backends (PostgreSQL runs `SELECT 1`, Redis waits for `ready`, Memcached runs `stats`).
 - **Error Translation**: Translates PostgreSQL constraint violations into application-specific errors via a configurable constraint error map.
 - **Environment Variable Fallbacks**: Connection URLs can be provided in code or fall back to environment variables.
+- **Clear Peer Dependency Errors**: When optional peer dependencies (`ioredis`, `memcached`) are missing, the error message includes the exact install command for your runtime.
 - **Utility Methods**: `attachParent` and `attachMatchingParent` helpers for linking related database records.
 
 ### Cache Module
@@ -197,11 +198,15 @@ The `DatabaseModule` manages connections to PostgreSQL (via Drizzle ORM), Redis,
 
 Use `DatabaseModule.forRoot()` or `DatabaseModule.forRootAsync()` to register the module. All three backends (postgres, redis, memcache) are optional — configure only what you need.
 
-**Built-in Drizzle Driver (recommended for `bun-sql`, `node-postgres`, `postgres-js`, etc.):**
+The PostgreSQL configuration uses a factory function that gives you full control over how the Drizzle client is created. The factory receives:
+
+- `config: DrizzleConfig` — a pre-configured Drizzle config with the query logger already set up based on the environment.
+- `connection: PostgresConnectionConfig` — an object containing the resolved `url` and an optional `maxConnections` (loaded from environment config).
 
 ```typescript
 import { Module } from '@shadow-library/app';
 import { DatabaseModule } from '@shadow-library/modules/database';
+import { drizzle } from 'drizzle-orm/node-postgres';
 
 import * as schema from './schemas';
 
@@ -209,59 +214,23 @@ import * as schema from './schemas';
   imports: [
     DatabaseModule.forRoot({
       postgres: {
-        type: 'bun-sql',
-        schema,
-        url: 'postgres://user:pass@localhost:5432/mydb',
-        connection: { max: 20 }, // optional driver-specific options
+        factory: (config, connection) =>
+          drizzle({
+            ...config,
+            schema,
+            connection: { connectionString: connection.url, max: connection.maxConnections },
+          }),
         constraintErrorMap: {
           users_email_unique: new ConflictError('Email already exists'),
         },
       },
-      redis: true, // uses DATABASE_REDIS_URL env var
-      memcache: true, // uses DATABASE_MEMCACHE_HOSTS env var
+      redis: true, // uses database.redis.url config
+      memcache: true, // uses database.memcache.hosts config
     }),
   ],
 })
 export class AppModule {}
 ```
-
-The `type` field accepts any supported drizzle-orm driver sub-package:
-
-| Driver             | `type` value        |
-| ------------------ | ------------------- |
-| Bun SQL            | `'bun-sql'`         |
-| node-postgres (pg) | `'node-postgres'`   |
-| postgres.js        | `'postgres-js'`     |
-| Neon               | `'neon'`            |
-| PGlite             | `'pglite'`          |
-| Vercel Postgres    | `'vercel-postgres'` |
-| Xata HTTP          | `'xata-http'`       |
-| PG Proxy           | `'pg-proxy'`        |
-| AWS Data API       | `'aws-data-api'`    |
-
-**Custom Factory (full control):**
-
-```typescript
-import { Module } from '@shadow-library/app';
-import { DatabaseModule } from '@shadow-library/modules/database';
-import { drizzle } from 'drizzle-orm/bun-sql';
-
-import * as schema from './schemas';
-
-@Module({
-  imports: [
-    DatabaseModule.forRoot({
-      postgres: {
-        type: 'custom',
-        factory: logger => drizzle({ schema, logger, connection: 'postgres://...' }),
-      },
-    }),
-  ],
-})
-export class AppModule {}
-```
-
-With a custom factory, you have full control — the module calls `factory(logger)` with a pre-configured query logger and uses the returned client directly.
 
 **Async Configuration:**
 
@@ -270,7 +239,9 @@ DatabaseModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (configService: ConfigService) => ({
-    postgres: { type: 'bun-sql', schema, url: configService.get('DATABASE_URL') },
+    postgres: {
+      factory: (config, connection) => drizzle({ ...config, schema, connection: connection.url }),
+    },
     redis: { url: configService.get('REDIS_URL') },
   }),
 });
@@ -300,14 +271,14 @@ memcache: {
 
 When connection URLs are not provided in code, the module falls back to these environment variables:
 
-| Setting         | Config Key                          | Description                                         |
-| --------------- | ----------------------------------- | --------------------------------------------------- |
-| PostgreSQL URL  | `database.postgres.url`             | PostgreSQL connection URL                           |
-| Max Connections | `database.postgres.max-connections` | Max connections (auto-applied for `bun-sql` driver) |
-| Redis URL       | `database.redis.url`                | Redis connection URL                                |
-| Memcached Hosts | `database.memcache.hosts`           | Memcached server host(s)                            |
+| Setting         | Config Key                          | Description                                                                  |
+| --------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| PostgreSQL URL  | `database.postgres.url`             | PostgreSQL connection URL (passed to factory via `PostgresConnectionConfig`) |
+| Max Connections | `database.postgres.max-connections` | Max connections (passed to factory via `PostgresConnectionConfig`)           |
+| Redis URL       | `database.redis.url`                | Redis connection URL                                                         |
+| Memcached Hosts | `database.memcache.hosts`           | Memcached server host(s)                                                     |
 
-> For the `bun-sql` driver, the module automatically loads `database.postgres.max-connections` from the environment and sets it as the `max` connection option (user-provided connection options take precedence).
+> The `database.postgres.max-connections` config value is automatically loaded and included in the `PostgresConnectionConfig.maxConnections` field passed to your factory. Your factory decides how to use it (e.g., pass it as a driver-specific `max` option).
 
 #### Usage
 
@@ -322,7 +293,7 @@ export class UserService {
   constructor(private readonly databaseService: DatabaseService) {}
 
   async getUsers() {
-    const db = this.databaseService.getDrizzleClient();
+    const db = this.databaseService.getPostgresClient();
     return db.select().from(users);
   }
 }
@@ -330,7 +301,7 @@ export class UserService {
 
 **Type-safe Drizzle client:**
 
-Augment the `DatabaseRecords` interface to get a fully typed `getDrizzleClient()` return type:
+Augment the `DatabaseRecords` interface to get a fully typed `getPostgresClient()` return type:
 
 ```typescript
 import { BunSQLDatabase } from 'drizzle-orm/bun-sql';
@@ -338,7 +309,7 @@ import * as schema from './schemas';
 
 declare module '@shadow-library/modules/database' {
   interface DatabaseRecords {
-    drizzle: BunSQLDatabase<typeof schema>;
+    postgres: BunSQLDatabase<typeof schema>;
   }
 }
 ```
@@ -372,10 +343,10 @@ linked[0].getParent(); // returns the matching user
 
 | Method                                                   | Description                                                          |
 | -------------------------------------------------------- | -------------------------------------------------------------------- |
-| `getDrizzleClient()`                                     | Returns the Drizzle ORM client (throws if not configured)            |
+| `getPostgresClient()`                                    | Returns the Drizzle ORM client (throws if not configured)            |
 | `getRedisClient()`                                       | Returns the `ioredis` client (throws if not configured)              |
 | `getMemcacheClient()`                                    | Returns the `Memcached` client (throws if not configured)            |
-| `isDrizzleEnabled()`                                     | Returns `true` if the Drizzle client is initialized                  |
+| `isPostgresEnabled()`                                    | Returns `true` if the Postgres client is initialized                 |
 | `isRedisEnabled()`                                       | Returns `true` if the Redis client is initialized                    |
 | `isMemcacheEnabled()`                                    | Returns `true` if the Memcached client is initialized                |
 | `translateError(error)`                                  | Translates a database error to an app error using the constraint map |

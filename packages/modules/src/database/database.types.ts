@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { FactoryProvider, ModuleMetadata } from '@shadow-library/app';
+import { type DrizzleConfig } from 'drizzle-orm';
 import { type PgDatabase } from 'drizzle-orm/pg-core';
 import { type RedisOptions } from 'ioredis';
 import type Memcached from 'memcached';
@@ -10,7 +11,6 @@ import { Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { QueryLogger } from './database.service';
 
 /**
  * Defining types
@@ -25,11 +25,12 @@ declare module '@shadow-library/common' {
   }
 }
 
-export interface DatabaseRecords {
-  drizzle?: PgDatabase<any>;
-}
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface DatabaseRecords {}
 
-export type DrizzleClient = Exclude<DatabaseRecords['drizzle'], undefined>;
+type ResolveType<K extends string, Fallback> = DatabaseRecords extends Record<K, infer T> ? T : Fallback;
+
+export type PostgresClient = ResolveType<'postgres', PgDatabase<any>>;
 
 export interface PostgresError {
   errno: string;
@@ -43,39 +44,21 @@ export interface PostgresError {
   code: 'ERR_POSTGRES_SERVER_ERROR';
 }
 
-/** Supported built-in drizzle-orm PostgreSQL driver sub-packages */
-export type DrizzleDriver = 'bun-sql' | 'node-postgres' | 'postgres-js' | 'neon' | 'pglite' | 'vercel-postgres' | 'xata-http' | 'pg-proxy' | 'aws-data-api';
+export interface PostgresConnectionConfig {
+  /** The database connection URL. Resolved from `Config.get('database.postgres.url')` if not provided */
+  url: string;
 
-export interface BasePostgresConfig {
-  type: DrizzleDriver | 'custom';
+  /** Maximum number of connections. Resolved from `Config.get('database.postgres.max-connections')` if not provided */
+  maxConnections?: number;
+}
+
+export interface PostgresConfig {
+  /** Factory function that creates and returns a Drizzle client instance. */
+  factory: (config: DrizzleConfig, connection: PostgresConnectionConfig) => Promisable<PostgresClient>;
 
   /** Map of PostgreSQL constraint names to application-specific error instances used by `translateError()` */
   constraintErrorMap?: Record<string, Error>;
 }
-
-export interface DrizzleDriverPostgresConfig extends BasePostgresConfig {
-  /** The drizzle-orm driver sub-package name */
-  type: DrizzleDriver;
-
-  /** The database schema object passed to the drizzle driver */
-  schema: Record<string, unknown>;
-
-  /** Driver-specific connection options passed alongside the resolved URL */
-  connection?: Record<string, unknown>;
-
-  /** The database connection URL. Falls back to `Config.get('database.postgres.url')` if not provided */
-  url?: string;
-}
-
-export interface CustomPostgresConfig extends BasePostgresConfig {
-  /** Discriminant indicating a custom factory is used */
-  type: 'custom';
-
-  /** Factory function that returns a Drizzle client instance */
-  factory: (logger: QueryLogger) => DrizzleClient;
-}
-
-export type PostgresConfig = DrizzleDriverPostgresConfig | CustomPostgresConfig;
 
 export interface RedisConfig {
   /** The Redis connection URL. Falls back to `Config.get('database.redis.url')` if not provided */

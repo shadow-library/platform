@@ -3,7 +3,7 @@
  */
 import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 import { Config, InternalError, Logger, NeverError } from '@shadow-library/common';
-import { type Logger as DrizzleLogger } from 'drizzle-orm';
+import { type DrizzleConfig } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import type Memcached from 'memcached';
 
@@ -11,7 +11,8 @@ import type Memcached from 'memcached';
  * Importing user defined packages
  */
 import { DATABASE_MODULE_OPTIONS, LOGGER_NAMESPACE } from './database.constants';
-import { type DatabaseModuleOptions, DrizzleClient, MemcacheConfig, PostgresError, RedisConfig } from './database.types';
+import { type DatabaseModuleOptions, MemcacheConfig, PostgresClient, PostgresConnectionConfig, PostgresError, RedisConfig } from './database.types';
+import { renderPostgresQuery } from './database.utils';
 
 /**
  * Defining types
@@ -19,15 +20,7 @@ import { type DatabaseModuleOptions, DrizzleClient, MemcacheConfig, PostgresErro
 
 type ConfigKey = 'database.postgres.url' | 'database.redis.url' | 'database.memcache.hosts';
 
-interface DrizzleDriver {
-  drizzle: (config: Record<string, unknown>) => DrizzleClient;
-}
-
 export type LinkedWithParent<T, U> = T & { getParent: () => U };
-
-export interface QueryLogger extends DrizzleLogger {
-  isEnabled: boolean;
-}
 
 /**
  * Declaring the constants
@@ -42,84 +35,67 @@ const DEFAULT_CONFIGS: Record<ConfigKey, string> = {
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   private readonly logger = Logger.getLogger(LOGGER_NAMESPACE, 'DatabaseService');
 
-  private drizzleClient?: DrizzleClient;
+  private postgresClient?: PostgresClient;
   private redisClient?: Redis;
   private memcacheClient?: Memcached;
 
   constructor(@Inject(DATABASE_MODULE_OPTIONS) private readonly options: DatabaseModuleOptions) {}
 
-  private resolveConnectionUrl(database: string, url: string | undefined, configKey: ConfigKey): string {
+  private resolveConnectionUrl(database: string, configKey: ConfigKey, url?: string): string {
     if (url) return url;
     Config.load(configKey, { defaultValue: DEFAULT_CONFIGS[configKey], isProdRequired: true });
     const resolved = Config.get(configKey);
+    this.logger.debug(`Resolved ${database} connection URL from config key '${configKey}'`);
     if (!resolved) throw new InternalError(`${database} connection URL not provided and the config value for '${configKey}' is not set`);
     return resolved;
   }
 
-  private getQueryLogger(): QueryLogger {
-    const isLogEnabled = !Config.isProd() && (Config.get('log.level') === 'debug' || Config.get('log.level') === 'silly');
-    if (!isLogEnabled) return { isEnabled: false, logQuery: () => {} }; // eslint-disable-line @typescript-eslint/no-empty-function
+  private getImportError(error: unknown, packageName: string, contextLabel: string): InternalError {
+    const isModuleNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND';
+    const original = error instanceof Error ? error.message : String(error);
 
-    return {
-      isEnabled: true,
-      logQuery: (query: string, params: unknown[]) => {
-        /**
-         * Substituting parameters from the last to the first to avoid replacing $10 as $1 followed by a literal 0.
-         * This is a simple substitution and may not cover all edge cases, but it provides more readable logs for most queries.
-         */
-        let formattedQuery = query;
-        for (let index = params.length - 1; index >= 0; index--) {
-          const param = params[index];
-          const value = typeof param === 'string' ? `'${param}'` : String(param);
-          formattedQuery = formattedQuery.replace(`$${index + 1}`, value);
-        }
-        this.logger.debug(`SQL: ${formattedQuery}`);
-      },
-    };
-  }
+    let message = `Failed to load ${contextLabel}. `;
+    if (isModuleNotFound) {
+      const runtime = Config.getRuntime();
+      const installCommand = runtime === 'bun' || runtime === 'deno' ? `${runtime} add ${packageName}` : `npm install ${packageName}`;
+      message += `The package '${packageName}' is not installed. Run '${installCommand}' (or the equivalent for your package manager) and try again.`;
+    } else message += `The package '${packageName}' was found but could not be loaded. Original error: ${original}`;
 
-  private async importDrizzleDriver(driverName: string): Promise<DrizzleDriver> {
-    try {
-      const mod = (await import(`drizzle-orm/${driverName}`)) as DrizzleDriver;
-      if (!mod || typeof mod.drizzle !== 'function') throw new InternalError(`Invalid drizzle driver module imported for type '${driverName}'`);
-      return mod;
-    } catch (error) {
-      this.logger.error(`Failed to import drizzle driver for type '${driverName}'`, error);
-      let message = `Failed to load Drizzle driver for type '${driverName}'. Ensure the driver sub-package is installed.`;
-      if (error instanceof Error && 'code' in error && (error as Record<string, unknown>).code === 'MODULE_NOT_FOUND') {
-        message += ` The missing module is likely 'drizzle-orm/${driverName}', so check that this sub-package is included in your dependencies.`;
-      }
-      message += ` Original error: ${error instanceof Error ? error.message : String(error)}`;
-      throw new InternalError(message);
-    }
+    return new InternalError(message);
   }
 
   async onModuleInit(): Promise<void> {
     if (this.options.postgres) {
-      this.logger.debug('Initializing Drizzle client with config', { config: this.options.postgres });
       const postgres = this.options.postgres;
-      const queryLogger = this.getQueryLogger();
 
-      if (postgres.type === 'custom') this.drizzleClient = postgres.factory(queryLogger);
-      else {
-        const mod = await this.importDrizzleDriver(postgres.type);
-        const logger = queryLogger.isEnabled ? this.logger : false;
-        const connectionUrl = this.resolveConnectionUrl('PostgreSQL', postgres.url, 'database.postgres.url');
-        const connection = postgres.connection ? { url: connectionUrl, ...postgres.connection } : connectionUrl;
-        this.drizzleClient = mod.drizzle({ schema: postgres.schema, logger, connection });
-      }
+      /** Drizzle Configs */
+      const drizzleConfig: DrizzleConfig = { logger: false };
+      const isLogEnabled = !Config.isProd() && (Config.get('log.level') === 'debug' || Config.get('log.level') === 'silly');
+      if (isLogEnabled) drizzleConfig.logger = { logQuery: (query, params) => this.logger.debug(`SQL: ${renderPostgresQuery(query, params)}`) };
 
-      if (!this.drizzleClient) throw new NeverError('Drizzle client is in an impossible state: undefined after initialization');
-      await this.drizzleClient.execute('SELECT 1');
-      this.logger.info('Drizzle client connected');
+      /** Connection Configs */
+      const connectionConfig: PostgresConnectionConfig = { url: this.resolveConnectionUrl('PostgreSQL', 'database.postgres.url') };
+      Config.load('database.postgres.max-connections', { validateType: 'number' });
+      const maxConnections = Config.get('database.postgres.max-connections');
+      if (maxConnections) connectionConfig.maxConnections = maxConnections;
+
+      /** Initialize client and verify connection */
+      this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
+      if (!this.postgresClient) throw new NeverError('Postgres client is in an impossible state: undefined after initialization');
+      await this.postgresClient.execute('SELECT 1');
+      this.logger.info('Postgres client connected');
     }
 
     if (this.options.redis) {
+      let RedisClient: typeof Redis;
+      try {
+        ({ default: RedisClient } = await import('ioredis'));
+      } catch (error) {
+        throw this.getImportError(error, 'ioredis', 'Redis client');
+      }
       const config: RedisConfig = this.options.redis === true ? {} : this.options.redis;
-      this.logger.debug('Initializing Redis client with config', { config });
       const { url, options = {} } = config;
-      const connectionUrl = this.resolveConnectionUrl('Redis', url, 'database.redis.url');
-      const { default: RedisClient } = await import('ioredis');
+      const connectionUrl = this.resolveConnectionUrl('Redis', 'database.redis.url', url);
       this.redisClient = new RedisClient(connectionUrl, options);
       await new Promise<void>((resolve, reject) => {
         if (!this.redisClient) throw new NeverError('Redis client is in an impossible state: undefined after instantiation');
@@ -132,10 +108,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
     if (this.options.memcache) {
       const config: MemcacheConfig = this.options.memcache === true ? {} : this.options.memcache;
-      this.logger.debug('Initializing Memcached client with config', { config });
       const { hosts, options } = config;
-      const connectionHosts = this.resolveConnectionUrl('Memcached', hosts, 'database.memcache.hosts');
-      const { default: MemcachedClient } = await import('memcached');
+      const connectionHosts = this.resolveConnectionUrl('Memcached', 'database.memcache.hosts', hosts);
+      let MemcachedClient: typeof Memcached;
+      try {
+        ({ default: MemcachedClient } = await import('memcached'));
+      } catch (error) {
+        throw this.getImportError(error, 'memcached', 'Memcached client');
+      }
       this.memcacheClient = options ? new MemcachedClient(connectionHosts, options) : new MemcachedClient(connectionHosts);
       await new Promise<void>((resolve, reject) => {
         if (!this.memcacheClient) throw new NeverError('Memcached client is in an impossible state: undefined after instantiation');
@@ -158,9 +138,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  getDrizzleClient(): DrizzleClient {
-    if (!this.drizzleClient) throw new InternalError('Drizzle client is not initialized. Ensure drizzle config is provided in DatabaseModuleOptions');
-    return this.drizzleClient;
+  getPostgresClient(): PostgresClient {
+    if (!this.postgresClient) throw new InternalError('Postgres client is not initialized. Ensure postgres config is provided in DatabaseModuleOptions');
+    return this.postgresClient;
   }
 
   getRedisClient(): Redis {
@@ -173,8 +153,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return this.memcacheClient;
   }
 
-  isDrizzleEnabled(): boolean {
-    return this.drizzleClient !== undefined;
+  isPostgresEnabled(): boolean {
+    return this.postgresClient !== undefined;
   }
 
   isRedisEnabled(): boolean {

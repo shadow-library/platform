@@ -8,31 +8,30 @@ import { Module, ShadowFactory } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { DatabaseModule, DatabaseService, type DrizzleClient } from '@shadow-library/modules/database';
+import { DatabaseModule, DatabaseService, type PostgresClient } from '@shadow-library/modules/database';
 
 describe('Database Module', () => {
-  const drizzleMock = { execute: mock() } as unknown as DrizzleClient;
-  const drizzleFactory = mock((): DrizzleClient => drizzleMock);
-  const drizzleDriverFactory = mock((): DrizzleClient => drizzleMock);
+  const postgresMock = { execute: mock() } as unknown as PostgresClient;
+  const postgresFactory = mock((_config: unknown, _connection: unknown): PostgresClient => postgresMock);
 
   beforeEach(() => {
     mock.clearAllMocks();
   });
 
-  describe('Custom Factory (CustomPostgresConfig)', () => {
+  describe('Custom Factory (PostgresConfig)', () => {
     let databaseService: DatabaseService;
 
     @Module({
       imports: [
         DatabaseModule.forRoot({
-          postgres: { type: 'custom', factory: drizzleFactory },
+          postgres: { factory: postgresFactory },
         }),
       ],
     })
-    class DrizzleAppModule {}
+    class PostgresAppModule {}
 
     beforeEach(async () => {
-      const app = await ShadowFactory.create(DrizzleAppModule);
+      const app = await ShadowFactory.create(PostgresAppModule);
       databaseService = app.get(DatabaseService);
     });
 
@@ -40,16 +39,16 @@ describe('Database Module', () => {
       expect(databaseService).toBeDefined();
     });
 
-    it('should have drizzle enabled', () => {
-      expect(databaseService.isDrizzleEnabled()).toBe(true);
+    it('should have postgres enabled', () => {
+      expect(databaseService.isPostgresEnabled()).toBe(true);
     });
 
-    it('should return the drizzle client', () => {
-      expect(databaseService.getDrizzleClient()).toBe(drizzleMock);
+    it('should return the postgres client', () => {
+      expect(databaseService.getPostgresClient()).toBe(postgresMock);
     });
 
-    it('should have called the drizzle factory', () => {
-      expect(drizzleFactory).toHaveBeenCalledTimes(1);
+    it('should have called the postgres factory', () => {
+      expect(postgresFactory).toHaveBeenCalledTimes(1);
     });
 
     it('should have redis disabled', () => {
@@ -78,8 +77,7 @@ describe('Database Module', () => {
       imports: [
         DatabaseModule.forRoot({
           postgres: {
-            type: 'custom',
-            factory: drizzleFactory,
+            factory: postgresFactory,
             constraintErrorMap: {
               users_email_unique: customError,
             },
@@ -155,7 +153,7 @@ describe('Database Module', () => {
       imports: [
         DatabaseModule.forRootAsync({
           useFactory: () => ({
-            postgres: { type: 'custom' as const, factory: drizzleFactory },
+            postgres: { factory: postgresFactory },
           }),
         }),
       ],
@@ -171,86 +169,12 @@ describe('Database Module', () => {
       expect(databaseService).toBeDefined();
     });
 
-    it('should have drizzle enabled', () => {
-      expect(databaseService.isDrizzleEnabled()).toBe(true);
+    it('should have postgres enabled', () => {
+      expect(databaseService.isPostgresEnabled()).toBe(true);
     });
 
     it('should have called factory', () => {
-      expect(drizzleFactory).toHaveBeenCalledTimes(1);
-    });
-  });
-
-  describe('Built-in Driver (DrizzleDriverPostgresConfig)', () => {
-    let databaseService: DatabaseService;
-
-    mock.module('drizzle-orm/bun-sql', () => ({ drizzle: drizzleDriverFactory }));
-
-    @Module({
-      imports: [
-        DatabaseModule.forRoot({
-          postgres: { type: 'bun-sql', schema: { users: {} }, url: 'postgres://localhost:5432/test-driver' },
-        }),
-      ],
-    })
-    class DriverAppModule {}
-
-    beforeEach(async () => {
-      const app = await ShadowFactory.create(DriverAppModule);
-      databaseService = app.get(DatabaseService);
-    });
-
-    it('should be defined', () => {
-      expect(databaseService).toBeDefined();
-    });
-
-    it('should have drizzle enabled', () => {
-      expect(databaseService.isDrizzleEnabled()).toBe(true);
-    });
-
-    it('should return the drizzle client', () => {
-      expect(databaseService.getDrizzleClient()).toBe(drizzleMock);
-    });
-
-    it('should have called the driver drizzle function with correct connection and schema', () => {
-      expect(drizzleDriverFactory).toHaveBeenCalledWith(
-        expect.objectContaining({
-          schema: { users: {} },
-          connection: 'postgres://localhost:5432/test-driver',
-        }),
-      );
-    });
-  });
-
-  describe('Built-in Driver with connection options', () => {
-    let databaseService: DatabaseService;
-
-    mock.module('drizzle-orm/bun-sql', () => ({ drizzle: drizzleDriverFactory }));
-
-    @Module({
-      imports: [
-        DatabaseModule.forRoot({
-          postgres: { type: 'bun-sql', schema: { users: {} }, url: 'postgres://localhost:5432/test-driver', connection: { max: 10 } },
-        }),
-      ],
-    })
-    class DriverOptionsAppModule {}
-
-    beforeEach(async () => {
-      const app = await ShadowFactory.create(DriverOptionsAppModule);
-      databaseService = app.get(DatabaseService);
-    });
-
-    it('should have drizzle enabled', () => {
-      expect(databaseService.isDrizzleEnabled()).toBe(true);
-    });
-
-    it('should have merged connection options with url', () => {
-      expect(drizzleDriverFactory).toHaveBeenCalledWith(
-        expect.objectContaining({
-          schema: { users: {} },
-          connection: { url: 'postgres://localhost:5432/test-driver', max: 10 },
-        }),
-      );
+      expect(postgresFactory).toHaveBeenCalledTimes(1);
     });
   });
 });
