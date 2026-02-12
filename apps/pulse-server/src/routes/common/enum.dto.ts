@@ -6,7 +6,7 @@ import { EnumType } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
-import { schema } from '@modules/datastore';
+import { schema } from '@modules/database';
 
 /**
  * Defining types

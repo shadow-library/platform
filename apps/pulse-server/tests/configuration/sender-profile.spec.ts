@@ -15,7 +15,7 @@ import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 /**
  * Declaring the constants
  */
-const testEnv = new TestEnvironment('shadow_pulse_sender_profile_test');
+const testEnv = new TestEnvironment('sender_profile_test');
 
 describe('Sender Profile', () => {
   testEnv.init();
@@ -101,7 +101,7 @@ describe('Sender Profile', () => {
     });
 
     it('should create default routing rule when first sender profile is created', async () => {
-      const db = testEnv.getPrimaryDatabase();
+      const db = testEnv.getPostgresClient();
 
       await db.delete(db._.fullSchema.senderRoutingRules);
       await db.delete(db._.fullSchema.senderProfiles);
@@ -354,7 +354,7 @@ describe('Sender Profile', () => {
 
   describe('DELETE /v1/sender-profiles/:profileId', () => {
     it('should delete a sender profile without routing rules', async () => {
-      const db = testEnv.getPrimaryDatabase();
+      const db = testEnv.getPostgresClient();
       await db.delete(db._.fullSchema.senderRoutingRules);
 
       const response = await testEnv.getRouter().mockRequest().delete(`/api/v1/sender-profiles/1`);

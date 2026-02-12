@@ -15,7 +15,7 @@ import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 /**
  * Declaring the constants
  */
-const testEnv = new TestEnvironment('shadow_pulse_template_group_test');
+const testEnv = new TestEnvironment('template_group_test');
 
 describe('Template Group', () => {
   testEnv.init();

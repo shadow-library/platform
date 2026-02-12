@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
 import { InferInsertModel, and, asc, desc, eq, isNull, like } from 'drizzle-orm';
 
 /**
@@ -14,7 +15,7 @@ import { InferInsertModel, and, asc, desc, eq, isNull, like } from 'drizzle-orm'
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { Configuration, DatastoreService, PrimaryDatabase, schema } from '../datastore';
+import { Configuration, PrimaryDatabase, schema } from '../database';
 
 /**
  * Defining types
@@ -39,8 +40,8 @@ export class SenderProfileService {
 
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async createSenderProfile(data: CreateSenderProfile): Promise<Configuration.SenderProfile> {
@@ -54,7 +55,7 @@ export class SenderProfileService {
         if (!routingRule) await tx.insert(schema.senderRoutingRules).values({ senderProfileId: senderProfile.id });
         return senderProfile;
       })
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     this.logger.info(`Created sender profile with key: '${senderProfile.key}'`, { senderProfile });
     return senderProfile;
   }
@@ -97,7 +98,7 @@ export class SenderProfileService {
       .delete(schema.senderProfiles)
       .where(eq(schema.senderProfiles.id, id))
       .returning({ id: schema.senderProfiles.id })
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     if (result.length === 0) throw new ServerError(AppErrorCode.SND_PRF_001);
     this.logger.info(`Deleted sender profile with id: '${id}'`);
   }

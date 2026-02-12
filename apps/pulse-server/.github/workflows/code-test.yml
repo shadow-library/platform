@@ -13,8 +13,8 @@ jobs:
       postgres:
         image: postgres
         env:
-          POSTGRES_USER: admin
-          POSTGRES_PASSWORD: password
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
         ports:
           - 5432:5432
         options: >-
@@ -40,17 +40,14 @@ jobs:
         run: bun run type-check && bun run build
 
       - name: Prepare test environment
-        run: |
-          bun run db:create-template
-          CID='${{ job.services.postgres.id }}'
-          docker exec "$CID" psql -U admin -d postgres -c "ALTER SYSTEM SET max_connections = '200';"
-          docker restart "$CID"
+        run: bun run db:create-template
 
       - name: Test the code
         run: bun test
         env:
           LOG_LEVEL: http
-          DB_PRIMARY_MAX_CONNECTIONS: 1
+          DATABASE_POSTGRES_MAX_CONNECTIONS: 1
+          DATABASE_POSTGRES_LAZY_CONNECTION: true
 
       - name: Upload test logs
         if: failure()

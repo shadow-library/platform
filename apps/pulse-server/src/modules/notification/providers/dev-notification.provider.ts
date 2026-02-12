@@ -5,12 +5,13 @@ import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
+import { DatabaseService } from '@shadow-library/modules';
 import { InferInsertModel } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
-import { DatastoreService, PrimaryDatabase, schema } from '@modules/datastore';
+import { PrimaryDatabase, schema } from '@modules/database';
 import { APP_NAME } from '@server/constants';
 
 import {
@@ -38,8 +39,8 @@ export class DevNotificationProvider implements SMSProvider, EmailProvider, Push
   private readonly logger = Logger.getLogger(APP_NAME, DevNotificationProvider.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = this.datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = this.databaseService.getPostgresClient();
   }
 
   private async insertMessage(record: MessageRecord): Promise<NotificationOpResult> {
@@ -47,7 +48,7 @@ export class DevNotificationProvider implements SMSProvider, EmailProvider, Push
       .insert(schema.notificationMessages)
       .values(record)
       .returning()
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     assert(message, 'Failed to log notification message in dev provider');
     this.logger.info('Sent notification message', { notificationMessageId: message.id, jobId: record.notificationJobId });
     return { success: true };

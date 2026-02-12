@@ -8,7 +8,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { type Template } from '@modules/datastore';
+import { type Template } from '@modules/database';
 import { MessageType, SortByTime } from '@server/routes/common';
 
 import { SenderProfileResponse } from './sender-profile.dto';

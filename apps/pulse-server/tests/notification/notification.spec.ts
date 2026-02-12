@@ -15,7 +15,7 @@ import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 /**
  * Declaring the constants
  */
-const testEnv = new TestEnvironment('shadow_pulse_notification_test');
+const testEnv = new TestEnvironment('notification_test');
 
 describe('Notification', () => {
   testEnv.init();

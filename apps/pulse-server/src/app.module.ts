@@ -11,6 +11,7 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { DatabaseModule } from './modules/database';
 import { HttpRouteModule } from './routes';
 
 /**
@@ -22,6 +23,6 @@ import { HttpRouteModule } from './routes';
  */
 
 @Module({
-  imports: [HttpRouteModule],
+  imports: [DatabaseModule, HttpRouteModule],
 })
 export class AppModule {}

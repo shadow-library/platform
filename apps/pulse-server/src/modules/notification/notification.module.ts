@@ -2,12 +2,12 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
+import { DatabaseModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
 import { ConfigurationModule } from '@modules/configuration';
-import { DatastoreModule } from '@modules/datastore';
 import { TemplateModule } from '@modules/template';
 
 import { NotificationProviderService } from './notification-provider.service';
@@ -23,7 +23,7 @@ import { DevNotificationProvider } from './providers';
  */
 
 @Module({
-  imports: [DatastoreModule, TemplateModule, ConfigurationModule],
+  imports: [DatabaseModule, TemplateModule, ConfigurationModule],
   providers: [DevNotificationProvider, NotificationService, NotificationProviderService],
   exports: [NotificationService],
 })

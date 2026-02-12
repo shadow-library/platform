@@ -7,7 +7,7 @@ import { ErrorResponseDto, ServerError, Transform } from '@shadow-library/fastif
 /**
  * Importing user defined packages
  */
-import { type Notification } from '@modules/datastore';
+import { type Notification } from '@modules/database';
 import { ChannelNotificationStatus, NotificationStatus } from '@modules/notification';
 import { NotificationChannel } from '@server/routes/common';
 

@@ -3,12 +3,13 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService, LinkedWithParent } from '@shadow-library/modules';
 import { and, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
-import { DatastoreService, LinkedWithParent, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
+import { Notification, PrimaryDatabase, Template, schema } from '@modules/database';
 import { AppErrorCode } from '@server/classes';
 
 /**
@@ -25,8 +26,8 @@ export type LinkedTemplateChannelSetting = LinkedWithParent<Template.ChannelSett
 export class TemplateSettingsService {
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async getEnabledChannels(templateKey: string): Promise<LinkedTemplateChannelSetting[]> {
@@ -36,7 +37,7 @@ export class TemplateSettingsService {
     });
 
     if (!templateGroup) throw new ServerError(AppErrorCode.TPL_GRP_001);
-    return templateGroup.channelSettings.map(setting => this.datastoreService.attachParent(setting, templateGroup));
+    return templateGroup.channelSettings.map(setting => this.databaseService.attachParent(setting, templateGroup));
   }
 
   async getChannelSettings(templateGroupId: bigint, channel: Notification.Channel): Promise<Template.ChannelSetting> {

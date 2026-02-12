@@ -17,7 +17,7 @@ import { APP_NAME } from '@server/constants';
 /**
  * Declaring the constants
  */
-const url = process.env.PRIMARY_DATABASE_URL || 'postgresql://admin:password@localhost/shadow_pulse';
+const url = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
 const migrationsFolder = process.env.MIGRATIONS_FOLDER || 'generated/drizzle';
 const logger = Logger.getLogger(APP_NAME, 'migrate-db');
 

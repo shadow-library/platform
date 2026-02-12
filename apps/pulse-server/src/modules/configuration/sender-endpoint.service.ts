@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
 import { InferInsertModel, and, asc, desc, eq } from 'drizzle-orm';
 
 /**
@@ -14,7 +15,7 @@ import { InferInsertModel, and, asc, desc, eq } from 'drizzle-orm';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { Configuration, DatastoreService, Notification, PrimaryDatabase, schema } from '../datastore';
+import { Configuration, Notification, PrimaryDatabase, schema } from '../database';
 
 /**
  * Defining types
@@ -40,8 +41,8 @@ export class SenderEndpointService {
 
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async createSenderEndpoint(profileId: bigint, data: Omit<CreateSenderEndpoint, 'senderProfileId'>): Promise<Configuration.SenderEndpoint> {
@@ -52,7 +53,7 @@ export class SenderEndpointService {
       .insert(schema.senderEndpoints)
       .values({ ...data, senderProfileId: profileId })
       .returning()
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     assert(senderEndpoint, 'Failed to create sender endpoint');
     this.logger.info(`Created sender endpoint for profile: '${profileId}'`, { senderEndpoint });
     return senderEndpoint;
@@ -109,7 +110,7 @@ export class SenderEndpointService {
       .delete(schema.senderEndpoints)
       .where(and(eq(schema.senderEndpoints.id, endpointId), eq(schema.senderEndpoints.senderProfileId, profileId)))
       .returning({ id: schema.senderEndpoints.id })
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     if (result.length === 0) throw new ServerError(AppErrorCode.SND_EP_001);
     this.logger.info(`Deleted sender endpoint with id: '${endpointId}' for profile: '${profileId}'`);
   }

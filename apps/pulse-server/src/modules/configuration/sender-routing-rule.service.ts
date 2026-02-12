@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
 import { InferInsertModel, and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
 
 /**
@@ -14,7 +15,7 @@ import { InferInsertModel, and, asc, desc, eq, isNull, or, sql } from 'drizzle-o
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { Configuration, DatastoreService, PrimaryDatabase, Template, schema } from '../datastore';
+import { Configuration, PrimaryDatabase, Template, schema } from '../database';
 
 /**
  * Defining types
@@ -44,8 +45,8 @@ export class SenderRoutingRuleService {
 
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async createRoutingRule(data: CreateRoutingRule): Promise<Configuration.SenderRoutingRule> {
@@ -68,7 +69,7 @@ export class SenderRoutingRuleService {
       .insert(schema.senderRoutingRules)
       .values(data)
       .returning()
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     assert(routingRule, 'Failed to create sender routing rule');
     this.logger.info('Created sender routing rule', { routingRule });
     return routingRule;
@@ -176,7 +177,7 @@ export class SenderRoutingRuleService {
       .delete(schema.senderRoutingRules)
       .where(eq(schema.senderRoutingRules.id, id))
       .returning()
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     if (result.length === 0) throw new ServerError(AppErrorCode.SND_RTR_001);
     this.logger.info(`Deleted sender routing rule`, { routingRuleId: id, result });
   }

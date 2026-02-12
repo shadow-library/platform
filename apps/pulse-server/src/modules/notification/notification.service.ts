@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import parsePhoneNumber from 'libphonenumber-js';
 import validator from 'validator';
@@ -13,9 +14,8 @@ import validator from 'validator';
 /**
  * Importing user defined packages
  */
-
 import { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
-import { Configuration, DatastoreService, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
+import { Configuration, Notification, PrimaryDatabase, Template, schema } from '@modules/database';
 import { LinkedTemplateVariant, TemplateSettingsService, TemplateVariantService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
@@ -104,7 +104,7 @@ export class NotificationService {
   private readonly db: PrimaryDatabase;
 
   constructor(
-    private readonly datastoreService: DatastoreService,
+    private readonly databaseService: DatabaseService,
     private readonly notificationProviderService: NotificationProviderService,
 
     private readonly templateVariantService: TemplateVariantService,
@@ -112,7 +112,7 @@ export class NotificationService {
     private readonly senderRoutingRuleService: SenderRoutingRuleService,
     private readonly senderEndpointService: SenderEndpointService,
   ) {
-    this.db = this.datastoreService.getPrimaryDatabase();
+    this.db = this.databaseService.getPostgresClient();
   }
 
   private getValidatedRecipient(channel: Notification.Channel, recipients: Recipients): string | null {

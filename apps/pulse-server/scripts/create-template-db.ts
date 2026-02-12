@@ -9,7 +9,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 /**
  * Importing user defined packages
  */
-import * as schema from '@modules/datastore/schemas';
+import * as schema from '@modules/database/schemas';
 
 import { seed } from './seed';
 
@@ -21,11 +21,9 @@ import { seed } from './seed';
  * Declaring the constants
  */
 const logger = Logger.getLogger('Scripts', 'TemplateDBCreator');
-const host = process.env.PRIMARY_DATABASE_HOST ?? 'localhost';
-const user = process.env.PRIMARY_DATABASE_USER ?? 'admin';
-const password = process.env.PRIMARY_DATABASE_PASSWORD ?? 'password';
-const templateDbName = process.env.PRIMARY_TEMPLATE_DB_NAME ?? 'shadow_pulse_template';
-const baseUrl = `postgresql://${user}:${password}@${host}`;
+const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
+const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
+const templateDbName = process.env.POSTGRES_TEMPLATE_DB_NAME ?? 'shadow_pulse_template';
 
 export async function createDatabaseFromTemplate(dbName: string): Promise<string> {
   const sql = new SQL(baseUrl);

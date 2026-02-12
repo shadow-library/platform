@@ -8,7 +8,7 @@ import mustache from 'mustache';
 /**
  * Importing user defined packages
  */
-import { Configuration, Notification, Template } from '@modules/datastore';
+import { Configuration, Notification, Template } from '@modules/database';
 import { APP_NAME } from '@server/constants';
 
 import { DevNotificationProvider, EmailAddress, NotificationOpResult, SendEmailConfig, SendPushNotificationConfig, SendSMSConfig } from './providers';

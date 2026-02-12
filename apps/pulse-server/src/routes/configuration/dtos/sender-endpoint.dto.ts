@@ -8,7 +8,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { type Configuration, type Notification } from '@modules/datastore';
+import { type Configuration, type Notification } from '@modules/database';
 import { NotificationChannel, NotificationServiceProvider, SortByTime } from '@server/routes/common';
 
 /**

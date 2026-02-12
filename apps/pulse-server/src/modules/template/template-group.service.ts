@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
 import { InferInsertModel, and, asc, desc, eq, like } from 'drizzle-orm';
 
 /**
@@ -14,7 +15,7 @@ import { InferInsertModel, and, asc, desc, eq, like } from 'drizzle-orm';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
-import { DatastoreService, PrimaryDatabase, Template, schema, templateGroups } from '../datastore';
+import { PrimaryDatabase, Template, schema, templateGroups } from '../database';
 
 /**
  * Defining types
@@ -39,8 +40,8 @@ export class TemplateGroupService {
 
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async createTemplateGroup(data: CreateTemplateGroup): Promise<Template.Group> {
@@ -48,7 +49,7 @@ export class TemplateGroupService {
       .insert(schema.templateGroups)
       .values(data)
       .returning()
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     assert(templateGroup, 'Failed to create template group');
     this.logger.info(`Created template group with key: '${templateGroup.templateKey}'`, { templateGroup });
     return templateGroup;

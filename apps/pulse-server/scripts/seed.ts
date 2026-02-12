@@ -8,7 +8,7 @@ import { PgTableWithColumns } from 'drizzle-orm/pg-core';
 /**
  * Importing user defined packages
  */
-import * as schema from '@modules/datastore/schemas';
+import * as schema from '@modules/database/schemas';
 
 import * as seedData from './seed-data';
 
@@ -38,7 +38,7 @@ function getTableName(table: PgTableWithColumns<any>): string {
 
 export async function seed(db?: BunSQLDatabase<typeof schema>): Promise<void> {
   if (!db) {
-    const url = process.env.PRIMARY_DATABASE_URL ?? 'postgresql://admin:password@localhost/shadow_pulse';
+    const url = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
     db = drizzle(url, { schema });
     logger.debug(`Connected to database '${url.split('/').pop()}' for seeding`);
   }

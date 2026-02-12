@@ -6,12 +6,13 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, ValidationError, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService, LinkedWithParent } from '@shadow-library/modules';
 import { InferInsertModel, and, asc, desc, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
-import { DatastoreService, LinkedWithParent, Notification, PrimaryDatabase, Template, schema } from '@modules/datastore';
+import { Notification, PrimaryDatabase, Template, schema } from '@modules/database';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
@@ -38,8 +39,8 @@ export class TemplateVariantService {
 
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async getTemplateVariantById(templateGroupId: bigint, templateVariantId: bigint): Promise<Template.Variant | null> {
@@ -61,7 +62,7 @@ export class TemplateVariantService {
     });
 
     const variant = templateGroup?.variants[0];
-    return variant ? this.datastoreService.attachParent(variant, templateGroup) : null;
+    return variant ? this.databaseService.attachParent(variant, templateGroup) : null;
   }
 
   async getTemplateVariant(templateGroupId: bigint, channel: Notification.Channel, locale: string): Promise<LinkedTemplateVariant | null> {
@@ -76,7 +77,7 @@ export class TemplateVariantService {
     });
 
     const variant = templateGroup?.variants[0];
-    return variant ? this.datastoreService.attachParent(variant, templateGroup) : null;
+    return variant ? this.databaseService.attachParent(variant, templateGroup) : null;
   }
 
   async listTemplateVariants(templateGroupId: bigint, filter: ListVariantQuery = {}): Promise<OffsetPaginationResult<Template.Variant>> {
@@ -110,7 +111,7 @@ export class TemplateVariantService {
         await tx.insert(schema.templateChannelSettings).values({ templateGroupId, channel: data.channel, isEnabled: true }).onConflictDoNothing();
         return templateVariant;
       })
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
 
     assert(templateVariant, 'Failed to create template variant');
     this.logger.info('Template variant created', { channel: templateVariant.channel, locale: templateVariant.locale, templateGroupId });
@@ -124,7 +125,7 @@ export class TemplateVariantService {
       .set({ ...update, updatedAt: new Date() })
       .where(and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.id, templateVariantId)))
       .returning()
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     if (!templateVariant) throw new ServerError(AppErrorCode.TPL_VRT_001);
     this.logger.info('Template variant updated', { channel: templateVariant.channel, locale: templateVariant.locale, templateGroupId });
     return templateVariant;
@@ -135,7 +136,7 @@ export class TemplateVariantService {
       .delete(schema.templateVariants)
       .where(and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.id, templateVariantId)))
       .returning({ id: schema.templateVariants.id })
-      .catch(err => this.datastoreService.translateError(err));
+      .catch(err => this.databaseService.translateError(err));
     if (result.length === 0) throw new ServerError(AppErrorCode.TPL_VRT_001);
     this.logger.info('Template variant deleted', { templateVariantId, templateGroupId, result });
   }
