@@ -20,6 +20,7 @@ declare module '@shadow-library/common' {
   export interface ConfigRecords {
     'database.postgres.url'?: string;
     'database.postgres.max-connections'?: number;
+    'database.postgres.lazy-connection'?: boolean;
     'database.redis.url'?: string;
     'database.memcache.hosts'?: string;
   }
@@ -58,6 +59,8 @@ export interface PostgresConfig {
 
   /** Map of PostgreSQL constraint names to application-specific error instances used by `translateError()` */
   constraintErrorMap?: Record<string, Error>;
+
+  lazyConnection?: boolean;
 }
 
 export interface RedisConfig {

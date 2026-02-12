@@ -55,7 +55,7 @@ The `DatabaseModule` provides a unified database access layer for PostgreSQL (vi
 - **PostgreSQL via Drizzle ORM**: Factory-based configuration — you provide a factory function that receives a `DrizzleConfig` (with logger pre-configured) and a `PostgresConnectionConfig` (with the resolved connection URL and optional max connections), and returns a Drizzle client.
 - **Redis**: Full Redis client lifecycle management via `ioredis`.
 - **Memcached**: Full Memcached client lifecycle management.
-- **Connection Testing**: Automatic connection verification on startup for all backends (PostgreSQL runs `SELECT 1`, Redis waits for `ready`, Memcached runs `stats`).
+- **Connection Testing**: Automatic connection verification on startup for all backends (PostgreSQL runs `SELECT 1`, Redis waits for `ready`, Memcached runs `stats`). PostgreSQL supports **lazy connections** — skip the startup verification by setting `lazyConnection: true` in code or via the `database.postgres.lazy-connection` config key.
 - **Error Translation**: Translates PostgreSQL constraint violations into application-specific errors via a configurable constraint error map.
 - **Environment Variable Fallbacks**: Connection URLs can be provided in code or fall back to environment variables.
 - **Clear Peer Dependency Errors**: When optional peer dependencies (`ioredis`, `memcached`) are missing, the error message includes the exact install command for your runtime.
@@ -223,6 +223,7 @@ import * as schema from './schemas';
         constraintErrorMap: {
           users_email_unique: new ConflictError('Email already exists'),
         },
+        lazyConnection: true, // skip SELECT 1 verification on startup
       },
       redis: true, // uses database.redis.url config
       memcache: true, // uses database.memcache.hosts config
@@ -271,14 +272,17 @@ memcache: {
 
 When connection URLs are not provided in code, the module falls back to these environment variables:
 
-| Setting         | Config Key                          | Description                                                                  |
-| --------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
-| PostgreSQL URL  | `database.postgres.url`             | PostgreSQL connection URL (passed to factory via `PostgresConnectionConfig`) |
-| Max Connections | `database.postgres.max-connections` | Max connections (passed to factory via `PostgresConnectionConfig`)           |
-| Redis URL       | `database.redis.url`                | Redis connection URL                                                         |
-| Memcached Hosts | `database.memcache.hosts`           | Memcached server host(s)                                                     |
+| Setting         | Config Key                            | Description                                                                  |
+| --------------- | ------------------------------------- | ---------------------------------------------------------------------------- |
+| PostgreSQL URL  | `database.postgres.url`               | PostgreSQL connection URL (passed to factory via `PostgresConnectionConfig`) |
+| Max Connections | `database.postgres.max-connections`   | Max connections (passed to factory via `PostgresConnectionConfig`)           |
+| Lazy Connection | `database.postgres.lazy-connection`   | Skip `SELECT 1` verification on startup (default: `false`)                   |
+| Redis URL       | `database.redis.url`                  | Redis connection URL                                                         |
+| Memcached Hosts | `database.memcache.hosts`             | Memcached server host(s)                                                     |
 
 > The `database.postgres.max-connections` config value is automatically loaded and included in the `PostgresConnectionConfig.maxConnections` field passed to your factory. Your factory decides how to use it (e.g., pass it as a driver-specific `max` option).
+
+> **Lazy Connection:** By default, the module runs `SELECT 1` after initializing the PostgreSQL client to verify the connection. Set `lazyConnection: true` in the postgres config (or `database.postgres.lazy-connection` to `true` via environment) to skip this check. The code-level `lazyConnection` option takes precedence over the config key.
 
 #### Usage
 
