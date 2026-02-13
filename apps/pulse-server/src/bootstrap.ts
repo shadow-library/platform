@@ -13,12 +13,12 @@ import { Config } from '@shadow-library/common';
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
-    /** Server configs */
-    'server.env': 'dev' | 'staging' | 'prod';
+    /** App configs */
+    'app.stage': 'dev' | 'staging' | 'prod';
   }
 }
 
 /**
  * Configs
  */
-Config.load('server.env', { defaultValue: 'dev', allowedValues: ['dev', 'staging', 'prod'], isProdRequired: true });
+Config.load('app.stage', { defaultValue: 'dev', allowedValues: ['dev', 'staging', 'prod'], isProdRequired: true });

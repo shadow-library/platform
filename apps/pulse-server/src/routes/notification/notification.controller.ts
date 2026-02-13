@@ -31,7 +31,7 @@ export class NotificationController {
   }
 
   @Get('/messages')
-  @EnableIf(() => Config.get('server.env') === 'dev')
+  @EnableIf(() => Config.get('app.stage') === 'dev')
   @RespondFor(200, ListNotificationMessagesResponse)
   listMessages(@Query() query: ListNotificationMessagesQuery): Promise<ListNotificationMessagesResponse> {
     return this.notificationService.listMessages(query);
