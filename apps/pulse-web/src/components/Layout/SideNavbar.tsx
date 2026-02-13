@@ -24,6 +24,7 @@ import {
   AppstoreAddOutlined,
   AuditOutlined,
   ToolOutlined,
+  InboxOutlined,
 } from '@ant-design/icons';
 
 /**
@@ -82,6 +83,7 @@ const menuItems = [
     children: [
       { key: '/monitoring/metrics', icon: <LineChartOutlined />, label: 'Metrics' },
       { key: '/monitoring/delivery-logs', icon: <UnorderedListOutlined />, label: 'Delivery Logs' },
+      { key: '/monitoring/dev-inbox', icon: <InboxOutlined />, label: 'Dev Inbox' },
     ],
   },
   {

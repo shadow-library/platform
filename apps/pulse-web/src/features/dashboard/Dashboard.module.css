@@ -1,0 +1,13 @@
+@import 'tailwindcss';
+
+.channelStat {
+  @apply flex justify-between items-center;
+}
+
+.channelStat > span:first-child {
+  @apply text-[var(--color-text-secondary)];
+}
+
+.channelStat > span:last-child {
+  @apply font-semibold text-lg;
+}
