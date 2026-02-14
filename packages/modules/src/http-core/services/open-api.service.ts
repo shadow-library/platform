@@ -93,6 +93,16 @@ export class OpenApiService {
     return { $ref: `#/components/schemas/${schemaId}` };
   }
 
+  private widenParamsSchema(document: Partial<OpenAPIV3.Document>, schema: JSONSchema): JSONSchema {
+    const normalizedSchema = this.normalizeOpenapiSpec(document, schema, false);
+    const properties = normalizedSchema.properties ?? {};
+    for (const key in properties) {
+      const property = properties[key] as JSONSchema;
+      if (property.type !== 'string') properties[key] = { oneOf: [property, { type: 'string' }] };
+    }
+    return normalizedSchema;
+  }
+
   getFastifySwaggerOptions(): FastifyDynamicSwaggerOptions {
     return {
       openapi: utils.object.omitKeys(this.options, ['enabled', 'routePrefix', 'normalizeSchemaIds']),
@@ -104,8 +114,8 @@ export class OpenApiService {
         const swaggerSchema = structuredClone(schema);
         const responses = (swaggerSchema.response ?? {}) as Record<string, JSONSchema>;
         if (swaggerSchema.body) swaggerSchema.body = this.normalizeOpenapiSpec(document, swaggerSchema.body);
-        if (swaggerSchema.querystring) swaggerSchema.querystring = this.normalizeOpenapiSpec(document, swaggerSchema.querystring, false);
-        if (swaggerSchema.params) swaggerSchema.params = this.normalizeOpenapiSpec(document, swaggerSchema.params, false);
+        if (swaggerSchema.querystring) swaggerSchema.querystring = this.widenParamsSchema(document, swaggerSchema.querystring);
+        if (swaggerSchema.params) swaggerSchema.params = this.widenParamsSchema(document, swaggerSchema.params);
         for (const statusCode in responses) responses[statusCode] = this.normalizeOpenapiSpec(document, responses[statusCode] as JSONSchema);
         return { schema: swaggerSchema, url: opts.url };
       },
