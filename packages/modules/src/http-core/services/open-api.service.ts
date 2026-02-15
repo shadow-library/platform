@@ -8,6 +8,7 @@ import { FastifyApiReferenceOptions } from '@scalar/fastify-api-reference';
 import { Inject, Injectable } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
 import { utils } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
 import { OpenAPIV3 } from 'openapi-types';
 
 /**
@@ -20,6 +21,8 @@ import { type HttpCoreModuleOptions, type OpenAPIOptions } from '../http-core.ty
  * Defining types
  */
 
+type ParamTypeMode = 'typed' | 'string';
+
 /**
  * Declaring the constants
  */
@@ -31,7 +34,10 @@ export class OpenApiService {
   private schemaCounter = 0;
   private schemaIdMap = new Map<string, string>();
 
-  constructor(@Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions) {
+  constructor(
+    @Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions,
+    private readonly contextService: ContextService,
+  ) {
     this.options = options.openapi;
   }
 
@@ -93,13 +99,14 @@ export class OpenApiService {
     return { $ref: `#/components/schemas/${schemaId}` };
   }
 
-  private widenParamsSchema(document: Partial<OpenAPIV3.Document>, schema: JSONSchema): JSONSchema {
+  private normalizeParamsOpenapiSpec(document: Partial<OpenAPIV3.Document>, schema: JSONSchema): JSONSchema {
     const normalizedSchema = this.normalizeOpenapiSpec(document, schema, false);
+    const request = this.contextService.getRequest();
+    const paramTypeMode = (request.query as Record<string, ParamTypeMode>)?.paramTypeMode ?? 'typed';
+    if (paramTypeMode === 'typed') return normalizedSchema;
+
     const properties = normalizedSchema.properties ?? {};
-    for (const key in properties) {
-      const property = properties[key] as JSONSchema;
-      if (property.type !== 'string') properties[key] = { oneOf: [property, { type: 'string' }] };
-    }
+    for (const key in properties) properties[key] = { type: 'string', description: `Originally of type ${properties[key]?.type || properties[key]?.$ref}` };
     return normalizedSchema;
   }
 
@@ -114,8 +121,8 @@ export class OpenApiService {
         const swaggerSchema = structuredClone(schema);
         const responses = (swaggerSchema.response ?? {}) as Record<string, JSONSchema>;
         if (swaggerSchema.body) swaggerSchema.body = this.normalizeOpenapiSpec(document, swaggerSchema.body);
-        if (swaggerSchema.querystring) swaggerSchema.querystring = this.widenParamsSchema(document, swaggerSchema.querystring);
-        if (swaggerSchema.params) swaggerSchema.params = this.widenParamsSchema(document, swaggerSchema.params);
+        if (swaggerSchema.querystring) swaggerSchema.querystring = this.normalizeParamsOpenapiSpec(document, swaggerSchema.querystring);
+        if (swaggerSchema.params) swaggerSchema.params = this.normalizeParamsOpenapiSpec(document, swaggerSchema.params);
         for (const statusCode in responses) responses[statusCode] = this.normalizeOpenapiSpec(document, responses[statusCode] as JSONSchema);
         return { schema: swaggerSchema, url: opts.url };
       },
