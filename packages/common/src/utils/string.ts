@@ -19,6 +19,31 @@ import { objectUtils } from './object';
 const MASK_CHAR = '*';
 
 class StringUtils {
+  startsAndEndsWith(str: string, value: string): boolean {
+    return str.startsWith(value) && str.endsWith(value);
+  }
+
+  parseCsv(input: string): string[] {
+    const result: string[] = [];
+    let current = '';
+    let inQuotes = false;
+
+    for (let i = 0; i < input.length; i++) {
+      const char = input[i] as string;
+      if (char === '"') {
+        if (inQuotes && i + 1 < input.length && input[i + 1] === '"') {
+          current += '"';
+          i++;
+        } else inQuotes = !inQuotes;
+      } else if (char === ',' && !inQuotes) {
+        result.push(current.trim());
+        current = '';
+      } else current += char;
+    }
+    if (current) result.push(current.trim());
+    return result.filter(item => item !== '');
+  }
+
   /**
    * Interpolates the given string with the given object
    */

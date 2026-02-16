@@ -17,6 +17,87 @@ import { utils } from '@lib/utils';
  */
 
 describe('String Utils', () => {
+  describe('startsAndEndsWith', () => {
+    it('should return true when string starts and ends with the value', () => {
+      expect(utils.string.startsAndEndsWith('"hello"', '"')).toBe(true);
+    });
+
+    it('should return false when string only starts with the value', () => {
+      expect(utils.string.startsAndEndsWith('"hello', '"')).toBe(false);
+    });
+
+    it('should return false when string only ends with the value', () => {
+      expect(utils.string.startsAndEndsWith('hello"', '"')).toBe(false);
+    });
+
+    it('should return false when string neither starts nor ends with the value', () => {
+      expect(utils.string.startsAndEndsWith('hello', '"')).toBe(false);
+    });
+
+    it('should handle multi-character values', () => {
+      expect(utils.string.startsAndEndsWith('abchelloabc', 'abc')).toBe(true);
+      expect(utils.string.startsAndEndsWith('abchello', 'abc')).toBe(false);
+    });
+
+    it('should return true for a string that is the value repeated', () => {
+      expect(utils.string.startsAndEndsWith('""', '"')).toBe(true);
+    });
+
+    it('should return true for empty value on any string', () => {
+      expect(utils.string.startsAndEndsWith('hello', '')).toBe(true);
+    });
+
+    it('should return true for empty string with empty value', () => {
+      expect(utils.string.startsAndEndsWith('', '')).toBe(true);
+    });
+  });
+
+  describe('parseCsv', () => {
+    it('should parse simple comma-separated values', () => {
+      expect(utils.string.parseCsv('a,b,c')).toStrictEqual(['a', 'b', 'c']);
+    });
+
+    it('should trim whitespace around values', () => {
+      expect(utils.string.parseCsv(' a , b , c ')).toStrictEqual(['a', 'b', 'c']);
+    });
+
+    it('should handle quoted values containing commas', () => {
+      expect(utils.string.parseCsv('"hello, world",b,c')).toStrictEqual(['hello, world', 'b', 'c']);
+    });
+
+    it('should handle escaped double quotes inside quoted values', () => {
+      expect(utils.string.parseCsv('"say ""hello""",b')).toStrictEqual(['say "hello"', 'b']);
+    });
+
+    it('should handle a single value with no commas', () => {
+      expect(utils.string.parseCsv('hello')).toStrictEqual(['hello']);
+    });
+
+    it('should skip empty fields between commas', () => {
+      expect(utils.string.parseCsv('a,,c')).toStrictEqual(['a', 'c']);
+    });
+
+    it('should skip quoted empty string', () => {
+      expect(utils.string.parseCsv('"",b')).toStrictEqual(['b']);
+    });
+
+    it('should return empty array for empty input', () => {
+      expect(utils.string.parseCsv('')).toStrictEqual([]);
+    });
+
+    it('should handle values with mixed quoted and unquoted fields', () => {
+      expect(utils.string.parseCsv('a,"b,c",d')).toStrictEqual(['a', 'b,c', 'd']);
+    });
+
+    it('should handle quoted values with whitespace', () => {
+      expect(utils.string.parseCsv('" a ", b ')).toStrictEqual(['a', 'b']);
+    });
+
+    it('should handle newlines inside quoted values', () => {
+      expect(utils.string.parseCsv('"line1\nline2",b')).toStrictEqual(['line1\nline2', 'b']);
+    });
+  });
+
   describe('interpolate', () => {
     it('should interpolate the string with the object', () => {
       expect(utils.string.interpolate('Hello {name}', { name: 'World' })).toBe('Hello World');

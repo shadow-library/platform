@@ -863,6 +863,16 @@ const result = utils.string.interpolate(template, data);
 const escaped = utils.string.interpolate('Price: \\{notInterpolated}', {});
 // Result: 'Price: {notInterpolated}'
 
+// Check if string starts and ends with a value
+utils.string.startsAndEndsWith('"hello"', '"'); // true
+utils.string.startsAndEndsWith("'wrapped'", "'"); // true
+utils.string.startsAndEndsWith('hello', '"'); // false
+
+// Parse CSV strings
+utils.string.parseCsv('a, b, c'); // ['a', 'b', 'c']
+utils.string.parseCsv('"has, comma", normal'); // ['has, comma', 'normal']
+utils.string.parseCsv('"escaped ""quotes""", value'); // ['escaped "quotes"', 'value']
+
 // Email masking
 const maskedEmail = utils.string.maskEmail('user@example.com');
 // Result: 'u**r@e******.com'
@@ -1238,6 +1248,8 @@ The package uses environment variables for configuration. Below are the key vari
 
 #### String Utils
 
+- `utils.string.startsAndEndsWith(str, value)` - Check if string starts and ends with the given value
+- `utils.string.parseCsv(input)` - Parse CSV string into array (handles quoted values, escaped quotes, whitespace trimming)
 - `utils.string.interpolate(template, data)` - Interpolate string with object
 - `utils.string.maskEmail(email)` - Mask email address preserving structure
 - `utils.string.maskNumber(number, keepStart?, keepEnd?)` - Mask number preserving start/end digits
