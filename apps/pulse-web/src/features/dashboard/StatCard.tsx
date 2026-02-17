@@ -12,8 +12,9 @@ import { Card, Statistic } from 'antd';
  */
 
 export interface StatCardProps {
+  loading?: boolean;
   title: string;
-  value: number;
+  value?: number;
   icon: React.ReactNode;
   color: string;
 }
@@ -24,8 +25,14 @@ export interface StatCardProps {
 
 export default function StatCard(props: StatCardProps) {
   return (
-    <Card className="h-full">
-      <Statistic title={props.title} value={props.value} prefix={<span style={{ color: props.color }}>{props.icon}</span>} styles={{ content: { color: props.color } }} />
+    <Card className="h-full" loading={props.loading}>
+      <Statistic
+        loading={props.loading}
+        title={props.title}
+        value={props.value ?? 0}
+        prefix={<span style={{ color: props.color }}>{props.icon}</span>}
+        styles={{ content: { color: props.color } }}
+      />
     </Card>
   );
 }

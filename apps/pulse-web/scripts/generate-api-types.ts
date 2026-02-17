@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { SpawnSyncOptions, spawnSync } from 'node:child_process';
 import path from 'node:path';
 
 import openapiTS, { astToString } from 'openapi-typescript';
@@ -37,4 +38,10 @@ for (const path of Object.keys(openapiSpec.paths)) {
   if (hasPathParams) contents += `export type ${baseName}PathParams = Exclude<paths['${path}']['get']['parameters']['path'], undefined>;\n`;
 }
 await Bun.write(outputPath, contents);
+
+/** Formatting the generated file */
+const cwd = path.join(import.meta.dirname, '..');
+const options = { cwd, stdio: 'inherit' } satisfies SpawnSyncOptions;
+spawnSync('bunx', ['prettier', '--write', 'src/lib/apis/api-types.gen.ts'], options);
+
 console.log('API types generated successfully'); // eslint-disable-line no-console

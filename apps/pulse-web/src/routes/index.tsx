@@ -9,7 +9,7 @@ import type { ColumnsType } from 'antd/es/table';
 /**
  *  Importing user defined modules
  */
-import { getStats, type NotificationStatsWithDate } from '@/api';
+import { useStatsQuery, type NotificationStatsWithDate } from '@/lib/apis';
 import { ChannelCard, DashboardUtils, StatCard } from '@/features/dashboard';
 
 /**
@@ -22,7 +22,6 @@ import { ChannelCard, DashboardUtils, StatCard } from '@/features/dashboard';
 
 export const Route = createFileRoute('/')({
   component: Dashboard,
-  loader: () => getStats().then(result => result.data),
 });
 
 const trendColumns: ColumnsType<NotificationStatsWithDate> = [
@@ -70,8 +69,9 @@ const trendColumns: ColumnsType<NotificationStatsWithDate> = [
 ];
 
 function Dashboard() {
-  const { today, trend } = Route.useLoaderData();
-  const overallProgress = DashboardUtils.getSuccessProgress(today.overall.total, today.overall.succeeded);
+  const { data, isLoading } = useStatsQuery();
+
+  const overallProgress = data && DashboardUtils.getSuccessProgress(data.today.overall.total, data.today.overall.succeeded);
 
   return (
     <div className="space-y-6">
@@ -80,34 +80,34 @@ function Dashboard() {
         <Typography.Title level={2} className="!mb-0">
           Dashboard
         </Typography.Title>
-        <Typography.Text type="secondary">Today: {today.date}</Typography.Text>
+        <Typography.Text type="secondary">Today: {data?.today.date}</Typography.Text>
       </div>
 
       {/* Overall Stats */}
       <Card title="Today's Overview" className="shadow-sm">
         <Row gutter={[16, 16]}>
           <Col xs={24} sm={12} md={6}>
-            <StatCard title="Total Notifications" value={today.overall.total} icon={<NotificationOutlined />} color="var(--color-primary)" />
+            <StatCard loading={isLoading} title="Total Notifications" value={data?.today.overall.total} icon={<NotificationOutlined />} color="var(--color-primary)" />
           </Col>
           <Col xs={24} sm={12} md={6}>
-            <StatCard title="Succeeded" value={today.overall.succeeded} icon={<CheckCircleOutlined />} color="var(--color-success)" />
+            <StatCard loading={isLoading} title="Succeeded" value={data?.today.overall.succeeded} icon={<CheckCircleOutlined />} color="var(--color-success)" />
           </Col>
           <Col xs={24} sm={12} md={6}>
-            <StatCard title="Failed" value={today.overall.failed} icon={<CloseCircleOutlined />} color="var(--color-error)" />
+            <StatCard loading={isLoading} title="Failed" value={data?.today.overall.failed} icon={<CloseCircleOutlined />} color="var(--color-error)" />
           </Col>
           <Col xs={24} sm={12} md={6}>
-            <StatCard title="Pending" value={today.overall.pending} icon={<ClockCircleOutlined />} color="var(--color-warning)" />
+            <StatCard loading={isLoading} title="Pending" value={data?.today.overall.pending} icon={<ClockCircleOutlined />} color="var(--color-warning)" />
           </Col>
         </Row>
         <div className="mt-4 pt-4 border-t border-[var(--color-border)]">
           <div className="flex items-center gap-4">
             <span className="text-[var(--color-text-secondary)]">Overall Success Rate:</span>
             <Progress
-              percent={overallProgress.rate}
-              status={overallProgress.status}
-              strokeColor={overallProgress.strokeColor}
+              percent={overallProgress?.rate}
+              status={overallProgress?.status}
+              strokeColor={overallProgress?.strokeColor}
               className="flex-1 max-w-md"
-              aria-label={`Overall Success Rate: ${overallProgress.rate}%`}
+              aria-label={`Overall Success Rate: ${overallProgress?.rate}%`}
             />
           </div>
         </div>
@@ -119,13 +119,13 @@ function Dashboard() {
       </Typography.Title>
       <Row gutter={[16, 16]}>
         <Col xs={24} md={8}>
-          <ChannelCard channel="email" stats={today.channels.email} />
+          <ChannelCard loading={isLoading} channel="email" stats={data?.today.channels.email} />
         </Col>
         <Col xs={24} md={8}>
-          <ChannelCard channel="sms" stats={today.channels.sms} />
+          <ChannelCard loading={isLoading} channel="sms" stats={data?.today.channels.sms} />
         </Col>
         <Col xs={24} md={8}>
-          <ChannelCard channel="push" stats={today.channels.push} />
+          <ChannelCard loading={isLoading} channel="push" stats={data?.today.channels.push} />
         </Col>
       </Row>
 
@@ -136,12 +136,12 @@ function Dashboard() {
           <div className="flex justify-between items-center">
             <span>5-Day Trend</span>
             <Typography.Text type="secondary" className="font-normal">
-              {trend.fromDate} - {trend.toDate}
+              {data?.trend.fromDate} - {data?.trend.toDate}
             </Typography.Text>
           </div>
         }
       >
-        <Table columns={trendColumns} dataSource={trend.stats} rowKey="date" pagination={false} />
+        <Table loading={isLoading} columns={trendColumns} dataSource={data?.trend.stats} rowKey="date" pagination={false} />
       </Card>
     </div>
   );

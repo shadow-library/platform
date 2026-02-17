@@ -7,7 +7,7 @@ import { Card, Progress } from 'antd';
 /**
  *  Importing user defined modules
  */
-import type { NotificationDeliveryStats, NotificationChannel } from '@/api';
+import type { NotificationDeliveryStats, NotificationChannel } from '@/lib';
 import { getSuccessProgress } from './dashboard.utils';
 
 /**
@@ -22,8 +22,9 @@ import styles from './Dashboard.module.css';
 type Channel = Lowercase<NotificationChannel>;
 
 export interface ChannelCardProps {
+  loading?: boolean;
   channel: Channel;
-  stats: NotificationDeliveryStats;
+  stats?: NotificationDeliveryStats;
 }
 
 interface ChannelConfig {
@@ -34,6 +35,7 @@ interface ChannelConfig {
 /**
  * Declaring constants
  */
+const DEFAULT_STATS: NotificationDeliveryStats = { total: 0, succeeded: 0, failed: 0, pending: 0 };
 const channelConfigs: Record<Channel, ChannelConfig> = {
   email: { icon: <MailOutlined className="text-2xl" />, label: 'Email' },
   sms: { icon: <MessageOutlined className="text-2xl" />, label: 'SMS' },
@@ -42,7 +44,8 @@ const channelConfigs: Record<Channel, ChannelConfig> = {
 
 export default function ChannelCard(props: ChannelCardProps) {
   const channelConfig = channelConfigs[props.channel];
-  const progress = getSuccessProgress(props.stats.total, props.stats.succeeded);
+  const stats = props.stats || DEFAULT_STATS;
+  const progress = getSuccessProgress(stats.total, stats.succeeded);
 
   const cardTitle = (
     <div className="flex items-center gap-2">
@@ -52,23 +55,23 @@ export default function ChannelCard(props: ChannelCardProps) {
   );
 
   return (
-    <Card title={cardTitle} className="h-full">
+    <Card title={cardTitle} className="h-full" loading={props.loading}>
       <div className="space-y-4">
         <div className={styles.channelStat}>
           <span>Total</span>
-          <span>{props.stats.total}</span>
+          <span>{stats.total}</span>
         </div>
         <div className={styles.channelStat}>
           <span>Succeeded</span>
-          <span className="text-[var(--color-success)]">{props.stats.succeeded}</span>
+          <span className="text-[var(--color-success)]">{stats.succeeded}</span>
         </div>
         <div className={styles.channelStat}>
           <span>Failed</span>
-          <span className="text-[var(--color-error)]">{props.stats.failed}</span>
+          <span className="text-[var(--color-error)]">{stats.failed}</span>
         </div>
         <div className={styles.channelStat}>
           <span>Pending</span>
-          <span className="text-[var(--color-warning)]">{props.stats.pending}</span>
+          <span className="text-[var(--color-warning)]">{stats.pending}</span>
         </div>
         <Progress percent={progress.rate} status={progress.status} strokeColor={progress.strokeColor} aria-label={`${channelConfig.label} Success Rate`} />
       </div>
