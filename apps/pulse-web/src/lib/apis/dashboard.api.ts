@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
