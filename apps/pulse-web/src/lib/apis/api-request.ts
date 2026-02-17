@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import  { type JsonObject, type JsonValue } from '@/types';
+import { type JsonObject, type JsonValue } from '@/types';
 
 import { type components } from './api-types.gen';
 
