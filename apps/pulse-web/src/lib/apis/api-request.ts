@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import type { JsonObject, JsonValue } from 'type-fest';
+import { type JsonObject, type JsonValue } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
-import type { components } from './api-types.gen';
+import { type components } from './api-types.gen';
 
 /**
  * Defining types
