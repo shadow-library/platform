@@ -53,6 +53,10 @@ class LoggerStatic {
   private getLogMetadata: () => object = () => ({});
   private readonly contextProviders: ContextProviderConfig[] = [];
 
+  constructor() {
+    Config['logger'] = this.getLogger(Config.get('app.name'), 'ConfigService');
+  }
+
   private getLogContext(): LogData {
     const context: LogData = {};
     for (const { namespace, provider } of this.contextProviders) {

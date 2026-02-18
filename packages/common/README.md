@@ -28,11 +28,13 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 ### ⚙️ **Configuration Management**
 
 - **Type-safe configuration** with environment variable validation
-- **Built-in validation** for numbers, booleans, and allowed values
+- **Built-in validation** for numbers, integers, booleans, and allowed values
 - **Array environment variables** with comma-separated value parsing
 - **Custom transformers** and validators
 - **Environment detection** (development, production, test)
 - **Runtime detection** (node, edge, deno, browser, bun)
+- **Env file loading** from `.env` files via `ENV_FILES` variable with merge precedence
+- **Live reloading** with file watching, debounced change detection, and subscriber notifications
 - **Production-required configurations** with automatic validation
 
 ### 📝 **Advanced Logging System**
@@ -704,16 +706,91 @@ Config.load('database.url', {
 });
 ```
 
+#### Env File Loading
+
+Load environment variables from `.env` files by setting the `ENV_FILES` environment variable to a comma-separated list of file paths. Files are loaded in order, with later files taking precedence for duplicate keys. Real environment variables always take precedence over file values.
+
+```ts
+// Set ENV_FILES before creating the ConfigService
+// e.g. ENV_FILES=.env.base,.env.local node app.js
+
+import { Config, ConfigService } from '@shadow-library/common';
+
+// The ConfigService automatically loads env files on construction.
+// Values from env files are available to all subsequent load() calls.
+const dbHost = Config.get('db.host'); // Loaded from .env file
+```
+
+`.env` file format:
+
+```env
+# Comments are supported
+DB_HOST=localhost
+DB_PORT=5432
+
+# Quoted values (single or double quotes are stripped)
+API_KEY="my-secret-key"
+SECRET='another-secret'
+
+# Values with equals signs are handled correctly
+CONNECTION_STRING=postgresql://user:pass@host/db?opt=val
+```
+
+#### Live Reloading & Subscriptions
+
+Mark configurations as `reloadable` to automatically pick up changes when env files are modified. Use `subscribe()` to react to configuration changes.
+
+```ts
+import { ConfigService, ConfigRecords } from '@shadow-library/common';
+
+interface AppConfig extends ConfigRecords {
+  'db.host': string;
+  'db.password': string;
+  'cache.ttl': number;
+}
+
+class AppConfigService extends ConfigService<AppConfig> {
+  constructor() {
+    super();
+    // Mark configs as reloadable to enable live updates
+    this.load('db.host', { reloadable: true });
+    this.load('db.password', { reloadable: true });
+    this.load('cache.ttl', { reloadable: true, validateType: 'number' });
+  }
+}
+
+const config = new AppConfigService();
+
+// Subscribe to changes on a specific key
+const unsubscribe = config.subscribe('db.password', (key, newValue) => {
+  console.log(`Config '${key}' changed to '${newValue}'`);
+  reconnectDatabase(newValue);
+});
+
+// Subscribe to a key prefix to get notified for all matching changes
+config.subscribe('db', (key, newValue) => {
+  console.log(`DB config '${key}' changed`);
+});
+
+// Start watching env files for changes
+config.enableHotReloading();
+
+// Later: stop watching and unsubscribe
+unsubscribe();
+config.disableHotReloading();
+```
+
 **Configuration Options:**
 
 - `envKey`: Environment variable name (auto-generated from config key if not provided)
 - `defaultValue`: Default value if environment variable is not set
 - `isProdRequired`: Require the value in production environment
-- `validateType`: Built-in validation for `'number'` or `'boolean'` types
+- `validateType`: Built-in validation for `'number'`, `'integer'`, or `'boolean'` types
 - `validator`: Custom validation function
 - `isArray`: Parse comma-separated values as an array
 - `allowedValues`: Restrict to specific allowed values
 - `transform`: Custom transformation function for the value
+- `reloadable`: Enable live reloading when env files change (default: `false`)
 
 ### 📝 **Logging**
 
@@ -1087,6 +1164,7 @@ The package uses environment variables for configuration. Below are the key vari
 
 - `NODE_ENV`: Application environment (`development`, `production`, `test`)
 - `APP_NAME`: Application name (default: `shadow-app`)
+- `ENV_FILES`: Comma-separated list of `.env` file paths to load (e.g., `.env.base,.env.local`)
 
 ### Logging Configuration
 
@@ -1226,6 +1304,9 @@ The package uses environment variables for configuration. Below are the key vari
 - `Config.isProd()` - Check if production environment
 - `Config.isTest()` - Check if test environment
 - `Config.getRuntime()` - Get current runtime environment (`'node'` | `'edge'` | `'deno'` | `'browser'` | `'bun'` | `'unknown'`)
+- `Config.subscribe(key, callback)` - Subscribe to config changes (returns unsubscribe function). Supports prefix matching (e.g., subscribing to `'db'` matches `'db.host'`, `'db.port'`, etc.)
+- `Config.enableHotReloading()` - Start watching env files for changes and trigger reloads
+- `Config.disableHotReloading()` - Stop watching env files for changes
 
 #### Logger
 
