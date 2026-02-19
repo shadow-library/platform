@@ -199,7 +199,11 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     else if (opts.validateType === 'number') Object.assign(opts, NUMBER_CONFIG_OPTIONS);
     else if (opts.validateType === 'integer') Object.assign(opts, INTEGER_CONFIG_OPTIONS);
 
-    if (this.loadedOptions.has(name)) throw new InternalError(`Config key '${name.toString()}' is already loaded`);
+    /**
+     * Prevent loading the same config key multiple times as it can lead to unexpected behavior, especially with hot reloading
+     * Allowing multiple loads in test environment to facilitate testing with different config values within the same test suite
+     */
+    if (!this.isTest() && this.loadedOptions.has(name)) throw new InternalError(`Config key '${name.toString()}' is already loaded`);
     this.loadedOptions.set(name, Object.freeze(opts));
 
     const result = tryCatch(() => this.resolveConfigValue(name));
