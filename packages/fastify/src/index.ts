@@ -1,7 +1,8 @@
 /**
- * Importing npm packages
+ * Importing side-effect packages
  */
 import 'reflect-metadata';
+import './config';
 
 /**
  * exporting modules

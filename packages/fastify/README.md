@@ -684,6 +684,45 @@ FastifyModule.forRoot({
 
 > **Note:** When using `forRootAsync`, the defaults are automatically merged with the config returned by your factory function, so you only need to specify the properties you want to override.
 
+### Developer Options
+
+The library registers additional config keys under the `app.dev` namespace for development and debugging convenience. These are controlled via environment variables (or any config source) and require no changes to your module setup.
+
+| Config Key            | Type      | Default                        | Description                                       |
+| --------------------- | --------- | ------------------------------ | ------------------------------------------------- |
+| `app.dev.delay`       | `integer` | — (disabled)                   | Adds an artificial delay (in ms) to every request |
+| `app.dev.stack-trace` | `boolean` | `true` in dev, `false` in prod | Appends the error `stack` to error responses      |
+
+#### `app.dev.stack-trace`
+
+When enabled, the `DefaultErrorHandler` includes the error's `stack` property in the response body alongside the standard error fields. This is automatically enabled in non-production environments and disabled in production.
+
+A warning is logged if stack trace logging is active in a production environment.
+
+The response shape when enabled matches `DevErrorResponseDto`:
+
+```typescript
+import { DevErrorResponseDto } from '@shadow-library/fastify';
+
+// Error response shape with stack trace enabled:
+// {
+//   code: "S001",
+//   message: "An unexpected error has occurred",
+//   stack: "Error: ...\n    at ..."
+// }
+```
+
+#### `app.dev.delay`
+
+Adds an artificial delay in milliseconds to every incoming request via an `onRequest` hook. Useful for simulating slow networks or testing loading states in your frontend without modifying application code.
+
+A warning is logged if a dev delay is active in a production environment.
+
+```bash
+# Add a 500ms delay to every request
+APP_DEV_DELAY=500 node dist/main.js
+```
+
 ### Dynamic Module Configuration
 
 `FastifyModule` is a **dynamic module** that configures itself based on the options you provide. Unlike static modules, dynamic modules return a module configuration object at runtime, allowing for flexible dependency injection and configuration.

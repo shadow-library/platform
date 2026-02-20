@@ -41,6 +41,13 @@ distPackageJson.exports = { '.': { import: './esm/index.js', require: './cjs/ind
 delete distPackageJson.scripts;
 delete distPackageJson.devDependencies;
 
+if (Array.isArray(distPackageJson.sideEffects)) {
+  distPackageJson.sideEffects = distPackageJson.sideEffects.flatMap((entry: string) => {
+    const relativePath = entry.replace(/^src\//, '').replace(/\.ts$/, '.js');
+    return [`./esm/${relativePath}`, `./cjs/${relativePath}`];
+  });
+}
+
 const distPackageJsonString = JSON.stringify(distPackageJson, null, 2);
 fs.writeFileSync(`${distDir}/package.json`, distPackageJsonString);
 
@@ -75,4 +82,4 @@ if (fs.existsSync(tsbuildinfo)) fs.rmSync(tsbuildinfo);
 
 const endTime = process.hrtime(startTime);
 const timeTaken = endTime[0] * 1e3 + endTime[1] * 1e-6;
-success(`Built successfull in ${formatTime(timeTaken)}`);
+success(`Built successful in ${formatTime(timeTaken)}`);

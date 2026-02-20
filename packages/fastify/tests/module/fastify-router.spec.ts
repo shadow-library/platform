@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
-import { Fn, InternalError, Logger, utils, withThis } from '@shadow-library/common';
+import { Config, Fn, InternalError, Logger, utils, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
@@ -621,6 +621,49 @@ describe('FastifyRouter', () => {
           }),
         }),
       );
+    });
+
+    describe('dev delay', () => {
+      it('should not add delay hook when delay is not configured', async () => {
+        const addHook = jest.spyOn(instance, 'addHook');
+        await router.register([]);
+
+        const onRequestHooks = jest.mocked(addHook).mock.calls.filter(c => c[0] === 'onRequest');
+        expect(onRequestHooks).toHaveLength(2);
+      });
+
+      it('should add delay onRequest hook when configured', async () => {
+        jest.spyOn(Config, 'get').mockReturnValue(500 as any);
+        const addHook = jest.spyOn(instance, 'addHook');
+        await router.register([]);
+
+        const onRequestHooks = jest.mocked(addHook).mock.calls.filter(c => c[0] === 'onRequest');
+        expect(onRequestHooks).toHaveLength(3);
+      });
+
+      it('should invoke setTimeout with the configured delay', async () => {
+        const delay = 500;
+        jest.spyOn(Config, 'get').mockReturnValue(delay as any);
+        const addHook = jest.spyOn(instance, 'addHook');
+        const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
+        await router.register([]);
+
+        const onRequestCalls = jest.mocked(addHook).mock.calls.filter(c => c[0] === 'onRequest');
+        const delayHook = onRequestCalls[2]?.[1] as Fn;
+        const done = jest.fn();
+        (delayHook as any)({}, {}, done);
+
+        expect(setTimeoutSpy).toHaveBeenCalledWith(done, delay);
+      });
+
+      it('should warn when delay is active in production', async () => {
+        jest.spyOn(Config, 'get').mockReturnValue(500 as any);
+        jest.spyOn(Config, 'isProd').mockReturnValue(true);
+        const warn = jest.spyOn(router['logger'], 'warn');
+        await router.register([]);
+
+        expect(warn).toHaveBeenCalledWith('Dev delay is enabled in production');
+      });
     });
   });
 

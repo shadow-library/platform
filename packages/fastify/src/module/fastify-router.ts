@@ -5,7 +5,7 @@ import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
 import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
-import { Fn, InternalError, Logger, MaybeUndefined, utils } from '@shadow-library/common';
+import { Config, Fn, InternalError, Logger, MaybeUndefined, utils } from '@shadow-library/common';
 import { all as deepmerge } from 'deepmerge';
 import { type FastifyInstance, RouteOptions, preHandlerAsyncHookHandler, preSerializationAsyncHookHandler } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
@@ -384,6 +384,12 @@ export class FastifyRouter extends Router {
     this.instance.addHook('onRequest', this.context.init());
     this.instance.addHook('onRequest', this.getRequestLogger());
     this.logger.info('Registered global middlewares');
+
+    const delay = Config.get('app.dev.delay');
+    if (delay) {
+      if (Config.isProd()) this.logger.warn('Dev delay is enabled in production');
+      this.instance.addHook('onRequest', (_req, _res, done) => setTimeout(done, delay));
+    }
 
     for (const route of routes) {
       const metadata = route.metadata;

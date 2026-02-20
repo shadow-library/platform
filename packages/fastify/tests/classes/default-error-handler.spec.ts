@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AppError, ValidationError } from '@shadow-library/common';
+import { AppError, Config, Logger, ValidationError } from '@shadow-library/common';
 import { errorCodes } from 'fastify';
 
 /**
@@ -99,5 +99,29 @@ describe('DefaultErrorHandler', () => {
 
     expect(response.status).toHaveBeenCalledWith(500);
     expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
+  });
+
+  describe('stack trace', () => {
+    beforeEach(() => {
+      jest.spyOn(Config, 'get').mockReturnValue(true as any);
+    });
+
+    it('should include stack trace in error response when enabled', () => {
+      const handler = new DefaultErrorHandler();
+      const error = new ServerError(ServerErrorCode.S001);
+      handler.handle(error, request, response);
+
+      expect(response.send).toHaveBeenCalledWith(expect.objectContaining({ stack: expect.any(String) }));
+    });
+
+    it('should warn when stack trace is enabled in production', () => {
+      jest.spyOn(Config, 'isProd').mockReturnValue(true);
+      const warn = jest.fn();
+      jest.spyOn(Logger, 'getLogger').mockReturnValue({ warn, error: jest.fn() } as any);
+
+      new DefaultErrorHandler();
+
+      expect(warn).toHaveBeenCalledWith('Stack trace logging is enabled in production');
+    });
   });
 });

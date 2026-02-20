@@ -21,7 +21,7 @@ const config: Config = {
   testPathIgnorePatterns: ['integration'],
   detectOpenHandles: true,
 
-  setupFiles: ['reflect-metadata'],
+  setupFiles: ['reflect-metadata', '<rootDir>/tests/setup.ts'],
   transform: { '^.+\\.ts$': 'ts-jest' },
   moduleNameMapper: { '@lib/(.*)': '<rootDir>/src/$1', '@shadow-library/fastify': '<rootDir>/src' },
 

@@ -38,3 +38,9 @@ export class ErrorResponseDto {
   @Field(() => [ErrorFieldDto], { optional: true })
   fields?: ErrorFieldDto[];
 }
+
+@Schema()
+export class DevErrorResponseDto extends ErrorResponseDto {
+  @Field({ optional: true })
+  stack?: string;
+}

@@ -12,7 +12,7 @@ import { v4 as uuid } from 'uuid';
 import { DefaultErrorHandler } from '../classes';
 import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '../constants';
 import { ContextService } from '../services';
-import { ErrorResponseDto } from './error-response.dto';
+import { DevErrorResponseDto, ErrorResponseDto } from './error-response.dto';
 import { FastifyConfig, FastifyModuleAsyncOptions, FastifyModuleOptions } from './fastify-module.interface';
 import { FastifyRouter } from './fastify-router';
 import { createFastifyInstance } from './fastify.utils';
@@ -28,9 +28,9 @@ import { createFastifyInstance } from './fastify.utils';
 @Module({})
 export class FastifyModule {
   private static getDefaultConfig(): FastifyConfig {
-    Config.load('app.host', { defaultValue: 'localhost' });
-    Config.load('app.port', { defaultValue: '8080', validateType: 'number' });
-    const errorResponseSchema = ClassSchema.generate(ErrorResponseDto);
+    const stackTrace = Config.get('app.dev.stack-trace');
+    const errorResponseClass = stackTrace ? DevErrorResponseDto : ErrorResponseDto;
+    const errorResponseSchema = ClassSchema.generate(errorResponseClass);
 
     return {
       host: Config.get('app.host'),
