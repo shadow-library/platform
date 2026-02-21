@@ -43,8 +43,8 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   private resolveConnectionUrl(database: string, configKey: ConfigKey, url?: string): string {
     if (url) return url;
-    Config.load(configKey, { defaultValue: DEFAULT_CONFIGS[configKey], isProdRequired: true });
-    const resolved = Config.get(configKey);
+    let resolved = Config.get(configKey);
+    if (!resolved && !Config.isProd()) resolved = DEFAULT_CONFIGS[configKey];
     this.logger.debug(`Resolved ${database} connection URL from config key '${configKey}'`);
     if (!resolved) throw new InternalError(`${database} connection URL not provided and the config value for '${configKey}' is not set`);
     return resolved;
@@ -75,7 +75,6 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       /** Connection Configs */
       const connectionConfig: PostgresConnectionConfig = { url: this.resolveConnectionUrl('PostgreSQL', 'database.postgres.url') };
-      Config.load('database.postgres.max-connections', { validateType: 'number' });
       const maxConnections = Config.get('database.postgres.max-connections');
       if (maxConnections) connectionConfig.maxConnections = maxConnections;
 
@@ -83,8 +82,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
       if (!this.postgresClient) throw new NeverError('Postgres client is in an impossible state: undefined after initialization');
 
-      Config.load('database.postgres.lazy-connection', { validateType: 'boolean', defaultValue: 'false' });
-      const isLazyConnection = postgres.lazyConnection ?? Config.get('database.postgres.lazy-connection') ?? false;
+      const isLazyConnection = postgres.lazyConnection ?? Config.get('database.postgres.lazy-connection');
       if (isLazyConnection) this.logger.info('Postgres client initialized with lazy connection');
       else {
         await this.postgresClient.execute('SELECT 1');

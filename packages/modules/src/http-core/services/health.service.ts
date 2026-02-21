@@ -6,11 +6,10 @@ import { Server, createServer } from 'node:http';
 import { Injectable, OnApplicationReady, OnApplicationStop } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 
-import { LOGGER_NAMESPACE } from '../http-core.constants';
-
 /**
  * Importing user defined packages
  */
+import { LOGGER_NAMESPACE } from '../http-core.constants';
 
 /**
  * Defining types
@@ -30,10 +29,6 @@ export class HealthService implements OnApplicationReady, OnApplicationStop {
   private server: HealthServer = null;
 
   constructor() {
-    Config.load('health.host', { defaultValue: 'localhost' });
-    Config.load('health.port', { validateType: 'number', defaultValue: '8081' });
-    Config.load('health.enabled', { validateType: 'boolean', defaultValue: Config.isProd() ? 'true' : 'false' });
-
     if (Config.get('health.enabled')) {
       const hostname = Config.get('health.host');
       const port = Config.get('health.port');

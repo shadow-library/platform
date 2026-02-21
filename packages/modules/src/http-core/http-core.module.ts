@@ -74,12 +74,7 @@ export class HttpCoreModule implements OnModuleInit {
     @Inject(FASTIFY_INSTANCE) private readonly fastify: ServerInstance,
     private readonly contextService: ContextService,
     private readonly openApiService: OpenApiService,
-  ) {
-    Config.load('http-core.csrf.enabled', { validateType: 'boolean', defaultValue: 'true' });
-    Config.load('http-core.helmet.enabled', { validateType: 'boolean' });
-    Config.load('http-core.compress.enabled', { validateType: 'boolean' });
-    Config.load('http-core.openapi.enabled', { validateType: 'boolean' });
-  }
+  ) {}
 
   private firstDefined(...values: (boolean | undefined)[]): boolean {
     const value = values.find(v => typeof v === 'boolean');

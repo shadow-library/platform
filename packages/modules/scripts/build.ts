@@ -48,6 +48,13 @@ for (const subPath of subPathExports) {
 delete distPackageJson.scripts;
 delete distPackageJson.devDependencies;
 
+if (Array.isArray(distPackageJson.sideEffects)) {
+  distPackageJson.sideEffects = distPackageJson.sideEffects.flatMap((entry: string) => {
+    const relativePath = entry.replace(/^src\//, '').replace(/\.ts$/, '.js');
+    return [`./esm/${relativePath}`, `./cjs/${relativePath}`];
+  });
+}
+
 const distPackageJsonString = JSON.stringify(distPackageJson, null, 2);
 fs.writeFileSync(`${distDir}/package.json`, distPackageJsonString);
 

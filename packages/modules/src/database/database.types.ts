@@ -16,16 +16,6 @@ import { Promisable } from 'type-fest';
  * Defining types
  */
 
-declare module '@shadow-library/common' {
-  export interface ConfigRecords {
-    'database.postgres.url'?: string;
-    'database.postgres.max-connections'?: number;
-    'database.postgres.lazy-connection'?: boolean;
-    'database.redis.url'?: string;
-    'database.memcache.hosts'?: string;
-  }
-}
-
 // eslint-disable-next-line @typescript-eslint/no-empty-object-type
 export interface DatabaseRecords {}
 
