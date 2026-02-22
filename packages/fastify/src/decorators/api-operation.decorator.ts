@@ -12,6 +12,7 @@ import { Route } from '@shadow-library/app';
  */
 
 export interface ApiOperationMetadata {
+  operationId?: string;
   summary?: string;
   description?: string;
   tags?: string[];

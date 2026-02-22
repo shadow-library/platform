@@ -37,7 +37,25 @@ describe('HTTP Methods Decorators', () => {
 
       expect(Route).toBeCalledTimes(2);
       expect(Route).toBeCalledWith({ path: '/data', method: Decorator.name.toUpperCase() });
-      expect(Route).toBeCalledWith({ operation: { summary: 'Execute' } }, { arrayStrategy: 'replace' });
+      expect(Route).toBeCalledWith({ operation: { summary: 'Execute', operationId: 'execute' } }, { arrayStrategy: 'replace' });
     });
+  });
+
+  it('should derive summary and operationId from camelCase method name', () => {
+    class Controller {
+      @Get('users/:id')
+      static getUserById() {}
+    }
+
+    expect(Route).toBeCalledWith({ operation: { summary: 'Get User By Id', operationId: 'getUserById' } }, { arrayStrategy: 'replace' });
+  });
+
+  it('should prepend slash to path if missing', () => {
+    class Controller {
+      @Get('no-slash')
+      static noSlash() {}
+    }
+
+    expect(Route).toBeCalledWith({ path: '/no-slash', method: 'GET' });
   });
 });

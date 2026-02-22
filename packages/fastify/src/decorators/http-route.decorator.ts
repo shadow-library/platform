@@ -39,7 +39,7 @@ export function HttpRoute(options: RouteOptions): MethodDecorator {
     const methodName = propertyKey.toString();
     const summary = methodName.charAt(0).toUpperCase() + methodName.slice(1).replace(/([a-z])([A-Z])|([A-Z]+)([A-Z][a-z])/g, '$1$3 $2$4');
     Route(options)(target, propertyKey, descriptor);
-    ApiOperation({ summary })(target, propertyKey, descriptor);
+    ApiOperation({ summary, operationId: methodName })(target, propertyKey, descriptor);
   };
 }
 

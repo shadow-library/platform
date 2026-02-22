@@ -118,4 +118,18 @@ describe('@ApiOperation', () => {
 
     expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
+
+  it('should enhance the method with operationId metadata', () => {
+    const options: ApiOperationMetadata = {
+      summary: 'Get user',
+      operationId: 'getUser',
+    };
+
+    class TestController {
+      @ApiOperation(options)
+      getUser() {}
+    }
+
+    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+  });
 });
