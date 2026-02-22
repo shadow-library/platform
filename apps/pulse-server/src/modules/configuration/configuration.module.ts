@@ -7,9 +7,12 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { SenderEndpointService } from './sender-endpoint.service';
-import { SenderProfileService } from './sender-profile.service';
-import { SenderRoutingRuleService } from './sender-routing-rule.service';
+import { SenderEndpointController } from './sender-endpoint/sender-endpoint.controller';
+import { SenderEndpointService } from './sender-endpoint/sender-endpoint.service';
+import { SenderProfileController } from './sender-profile/sender-profile.controller';
+import { SenderProfileService } from './sender-profile/sender-profile.service';
+import { SenderRoutingRuleController } from './sender-routing-rule/sender-routing-rule.controller';
+import { SenderRoutingRuleService } from './sender-routing-rule/sender-routing-rule.service';
 
 /**
  * Defining types
@@ -21,6 +24,7 @@ import { SenderRoutingRuleService } from './sender-routing-rule.service';
 
 @Module({
   imports: [DatabaseModule],
+  controllers: [SenderProfileController, SenderEndpointController, SenderRoutingRuleController],
   providers: [SenderProfileService, SenderEndpointService, SenderRoutingRuleService],
   exports: [SenderProfileService, SenderEndpointService, SenderRoutingRuleService],
 })

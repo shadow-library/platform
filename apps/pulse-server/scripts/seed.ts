@@ -8,7 +8,7 @@ import { PgTableWithColumns } from 'drizzle-orm/pg-core';
 /**
  * Importing user defined packages
  */
-import * as schema from '@modules/database/schemas';
+import * as schema from '@server/database/schemas';
 
 import * as seedData from './seed-data';
 

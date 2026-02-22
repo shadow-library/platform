@@ -11,8 +11,8 @@ import { InferInsertModel } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
-import { PrimaryDatabase, schema } from '@modules/database';
 import { APP_NAME } from '@server/constants';
+import { PrimaryDatabase, schema } from '@server/database';
 
 import {
   EmailProvider,

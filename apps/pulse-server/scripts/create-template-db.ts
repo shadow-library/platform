@@ -9,7 +9,7 @@ import { migrate } from 'drizzle-orm/node-postgres/migrator';
 /**
  * Importing user defined packages
  */
-import * as schema from '@modules/database/schemas';
+import * as schema from '@server/database/schemas';
 
 import { seed } from './seed';
 

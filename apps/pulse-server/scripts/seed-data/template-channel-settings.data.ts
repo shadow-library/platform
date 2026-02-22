@@ -6,7 +6,7 @@ import { InferInsertModel } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
-import * as schema from '@modules/database/schemas';
+import * as schema from '@server/database/schemas';
 
 /**
  * Defining types

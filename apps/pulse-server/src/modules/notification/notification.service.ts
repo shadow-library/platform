@@ -15,10 +15,10 @@ import validator from 'validator';
  * Importing user defined packages
  */
 import { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
-import { Configuration, Notification, PrimaryDatabase, Template, schema } from '@modules/database';
 import { LinkedTemplateVariant, TemplateSettingsService, TemplateVariantService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { Configuration, Notification, PrimaryDatabase, Template, schema } from '@server/database';
 
 import { NotificationProviderService } from './notification-provider.service';
 import { NotificationOpResult } from './providers';

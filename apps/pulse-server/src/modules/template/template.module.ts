@@ -7,9 +7,11 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { TemplateGroupService } from './template-group.service';
+import { TemplateGroupController } from './template-group/template-group.controller';
+import { TemplateGroupService } from './template-group/template-group.service';
 import { TemplateSettingsService } from './template-settings.service';
-import { TemplateVariantService } from './template-variant.service';
+import { TemplateVariantController } from './template-variant/template-variant.controller';
+import { TemplateVariantService } from './template-variant/template-variant.service';
 
 /**
  * Defining types
@@ -21,6 +23,7 @@ import { TemplateVariantService } from './template-variant.service';
 
 @Module({
   imports: [DatabaseModule],
+  controllers: [TemplateGroupController, TemplateVariantController],
   providers: [TemplateGroupService, TemplateSettingsService, TemplateVariantService],
   exports: [TemplateGroupService, TemplateSettingsService, TemplateVariantService],
 })

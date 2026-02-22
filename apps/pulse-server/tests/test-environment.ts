@@ -11,11 +11,11 @@ import { DatabaseService } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { PrimaryDatabase } from '@modules/database';
 import { NotificationService } from '@modules/notification';
 import { createDatabaseFromTemplate, dropDatabase } from '@scripts/create-template-db';
 import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
+import { PrimaryDatabase } from '@server/database';
 
 /**
  * Defining types

@@ -9,8 +9,8 @@ import { and, eq } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
-import { Notification, PrimaryDatabase, Template, schema } from '@modules/database';
 import { AppErrorCode } from '@server/classes';
+import { Notification, PrimaryDatabase, Template, schema } from '@server/database';
 
 /**
  * Defining types

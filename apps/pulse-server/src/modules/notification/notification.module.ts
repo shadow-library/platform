@@ -11,6 +11,7 @@ import { ConfigurationModule } from '@modules/configuration';
 import { TemplateModule } from '@modules/template';
 
 import { NotificationProviderService } from './notification-provider.service';
+import { NotificationController } from './notification.controller';
 import { NotificationService } from './notification.service';
 import { DevNotificationProvider } from './providers';
 
@@ -24,6 +25,7 @@ import { DevNotificationProvider } from './providers';
 
 @Module({
   imports: [DatabaseModule, TemplateModule, ConfigurationModule],
+  controllers: [NotificationController],
   providers: [DevNotificationProvider, NotificationService, NotificationProviderService],
   exports: [NotificationService],
 })
