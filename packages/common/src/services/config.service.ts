@@ -215,6 +215,11 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     return this;
   }
 
+  register<T extends keyof Configs>(name: T, opts: ConfigOptions = {}): Configs[T] {
+    this.load(name, opts);
+    return this.get(name);
+  }
+
   private reload(): void {
     this.log('debug', 'Reloading config due to env file change');
     const newEnvVars = this.loadEnvFiles(this.envFilePaths);

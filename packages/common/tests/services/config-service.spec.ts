@@ -83,6 +83,25 @@ describe('Config Service', () => {
     });
   });
 
+  describe('register', () => {
+    it('should load and return the config value', () => {
+      const value = config.register('custom.key', { defaultValue: 'reg-value' });
+      expect(value).toBe('reg-value');
+    });
+
+    it('should return the correct type for typed configs', () => {
+      const value = config.register('boolean.key', { defaultValue: 'false', validateType: 'boolean' });
+      expect(value).toBe(false);
+    });
+
+    it('should be a no-op and return the existing value when called again with the same opts reference', () => {
+      const opts = { defaultValue: 'stable' };
+      config.register('custom.key', opts);
+      const value = config.register('custom.key', opts);
+      expect(value).toBe('stable');
+    });
+  });
+
   describe('get', () => {
     it('should return the correct value for a given key', () => {
       expect(Config.isDev()).toBe(false);

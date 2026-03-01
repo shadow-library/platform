@@ -719,6 +719,17 @@ Config.load('database.url', {
 });
 ```
 
+Use `register()` as a one-step alternative when you need the value immediately:
+
+```ts
+// Equivalent to load() + get() in a single call
+const dbUrl = Config.register('database.url', {
+  envKey: 'DATABASE_URL',
+  isProdRequired: true,
+  validator: value => value.startsWith('postgresql://'),
+});
+```
+
 #### Env File Loading
 
 Load environment variables from `.env` files by setting the `ENV_FILES` environment variable to a comma-separated list of file paths. Files are loaded in order, with later files taking precedence for duplicate keys. Real environment variables always take precedence over file values.
@@ -1313,6 +1324,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `Config.get(key)` - Get configuration value
 - `Config.getOrThrow(key)` - Get value or throw
 - `Config.load(key, options)` - Load configuration from environment variables
+- `Config.register(key, options)` - Load configuration and return its value in one step
 - `Config.isDev()` - Check if development environment
 - `Config.isProd()` - Check if production environment
 - `Config.isTest()` - Check if test environment
