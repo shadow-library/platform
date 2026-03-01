@@ -10,7 +10,7 @@ import type Memcached from 'memcached';
 /**
  * Importing user defined packages
  */
-import { DATABASE_MODULE_OPTIONS, LOGGER_NAMESPACE } from './database.constants';
+import { DATABASE_MODULE_OPTIONS, DEFAULT_CONFIGS, LOGGER_NAMESPACE } from './database.constants';
 import { type DatabaseModuleOptions, MemcacheConfig, PostgresClient, PostgresConnectionConfig, PostgresError, RedisConfig } from './database.types';
 import { renderPostgresQuery } from './database.utils';
 
@@ -25,11 +25,6 @@ export type LinkedWithParent<T, U> = T & { getParent: () => U };
 /**
  * Declaring the constants
  */
-const DEFAULT_CONFIGS: Record<ConfigKey, string> = {
-  'database.postgres.url': 'postgresql://postgres:postgres@localhost/shadow_db',
-  'database.memcache.hosts': 'localhost:11211',
-  'database.redis.url': 'redis://localhost:6379',
-};
 
 @Injectable()
 export class DatabaseService implements OnModuleInit, OnModuleDestroy {
@@ -43,10 +38,9 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
   private resolveConnectionUrl(database: string, configKey: ConfigKey, url?: string): string {
     if (url) return url;
-    let resolved = Config.get(configKey);
-    if (!resolved && !Config.isProd()) resolved = DEFAULT_CONFIGS[configKey];
+    const resolved = Config.register(configKey, DEFAULT_CONFIGS[configKey]);
     this.logger.debug(`Resolved ${database} connection URL from config key '${configKey}'`);
-    if (!resolved) throw new InternalError(`${database} connection URL not provided and the config value for '${configKey}' is not set`);
+    if (!resolved) throw new NeverError(`Connection URL for ${database} is in an impossible state: undefined after resolution`);
     return resolved;
   }
 
@@ -75,14 +69,14 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       /** Connection Configs */
       const connectionConfig: PostgresConnectionConfig = { url: this.resolveConnectionUrl('PostgreSQL', 'database.postgres.url') };
-      const maxConnections = Config.get('database.postgres.max-connections');
+      const maxConnections = Config.register('database.postgres.max-connections', DEFAULT_CONFIGS['database.postgres.max-connections']);
       if (maxConnections) connectionConfig.maxConnections = maxConnections;
 
       /** Initialize client and verify connection */
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
       if (!this.postgresClient) throw new NeverError('Postgres client is in an impossible state: undefined after initialization');
 
-      const isLazyConnection = postgres.lazyConnection ?? Config.get('database.postgres.lazy-connection');
+      const isLazyConnection = postgres.lazyConnection ?? Config.register('database.postgres.lazy-connection', DEFAULT_CONFIGS['database.postgres.lazy-connection']);
       if (isLazyConnection) this.logger.info('Postgres client initialized with lazy connection');
       else {
         await this.postgresClient.execute('SELECT 1');

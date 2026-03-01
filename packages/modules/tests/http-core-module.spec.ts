@@ -540,9 +540,8 @@ describe('HttpCore Module', () => {
     const healthBaseUrl = `http://${healthHost}:${healthPort}`;
 
     beforeAll(async () => {
+      Object.assign(Config['envVars'], { HEALTH_HOST: healthHost, HEALTH_PORT: healthPort.toString() });
       Config['cache'].set('health.enabled', true);
-      Config['cache'].set('health.host', healthHost);
-      Config['cache'].set('health.port', healthPort);
 
       const HttpCoreHealth = HttpCoreModule.forRoot();
 

@@ -9,7 +9,7 @@ import { Config, Logger } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { LOGGER_NAMESPACE } from '../http-core.constants';
+import { DEFAULT_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 
 /**
  * Defining types
@@ -29,9 +29,10 @@ export class HealthService implements OnApplicationReady, OnApplicationStop {
   private server: HealthServer = null;
 
   constructor() {
-    if (Config.get('health.enabled')) {
-      const hostname = Config.get('health.host');
-      const port = Config.get('health.port');
+    const isHealthEnabled = Config.register('health.enabled', DEFAULT_CONFIGS['health.enabled']);
+    if (isHealthEnabled) {
+      const hostname = Config.register('health.host', DEFAULT_CONFIGS['health.host']);
+      const port = Config.register('health.port', DEFAULT_CONFIGS['health.port']);
       this.server = this.createServer(hostname, port);
       this.server?.unref();
       this.logger.info('Health server started', { hostname, port });

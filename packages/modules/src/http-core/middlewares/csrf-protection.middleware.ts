@@ -8,7 +8,7 @@ import { AsyncRouteHandler, Middleware, MiddlewareGenerator, ServerError, Server
 /**
  * Importing user defined packages
  */
-import { HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
+import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS, LOGGER_NAMESPACE } from '../http-core.constants';
 import { type HttpCoreModuleOptions } from '../http-core.types';
 import { CSRFTokenService } from '../services';
 
@@ -36,9 +36,10 @@ export class CsrfProtectionMiddleware implements MiddlewareGenerator {
 
   generate(): AsyncRouteHandler | undefined {
     if (this.options.csrf.disabled === true) return;
+    const isCSRFEnabled = Config.register('http-core.csrf.enabled', DEFAULT_CONFIGS['http-core.csrf.enabled']);
     return async (request, response) => {
       if (!this.hasCookies(request.cookies)) return;
-      if (!Config.isProd() && !Config.get('http-core.csrf.enabled')) return;
+      if (!Config.isProd() && !isCSRFEnabled) return;
 
       const result = this.csrfTokenService.validateToken(request);
       const isMutation = request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS';

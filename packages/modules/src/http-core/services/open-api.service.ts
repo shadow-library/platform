@@ -8,7 +8,6 @@ import { FastifyApiReferenceOptions } from '@scalar/fastify-api-reference';
 import { Inject, Injectable } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
 import { utils } from '@shadow-library/common';
-import { ContextService } from '@shadow-library/fastify';
 import { OpenAPIV3 } from 'openapi-types';
 
 /**
@@ -21,8 +20,6 @@ import { type HttpCoreModuleOptions, type OpenAPIOptions } from '../http-core.ty
  * Defining types
  */
 
-type SchemaMode = 'strict' | 'api';
-
 /**
  * Declaring the constants
  */
@@ -34,10 +31,7 @@ export class OpenApiService {
   private schemaCounter = 0;
   private schemaIdMap = new Map<string, string>();
 
-  constructor(
-    @Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions,
-    private readonly contextService: ContextService,
-  ) {
+  constructor(@Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions) {
     this.options = options.openapi;
   }
 
@@ -99,31 +93,14 @@ export class OpenApiService {
     return { $ref: `#/components/schemas/${schemaId}` };
   }
 
-  private getSchemaMode(): SchemaMode {
-    const request = this.contextService.getRequest();
-    const mode = (request.query as Record<string, string>)?.schemaMode;
-    if (mode === 'strict' || mode === 'api') return mode;
-    return 'strict';
-  }
-
   private normalizeParamsOpenapiSpec(document: Partial<OpenAPIV3.Document>, schema: JSONSchema): JSONSchema {
     const normalizedSchema = this.normalizeOpenapiSpec(document, schema, false);
-    const schemaMode = this.getSchemaMode();
-    if (schemaMode === 'strict') return normalizedSchema;
 
     const requiredFields = new Set(normalizedSchema.required);
     const properties = normalizedSchema.properties ?? {};
     for (const key in properties) {
       const originalSchema = properties[key] as JSONSchema;
-      const updatedSchema: JSONSchema = { type: 'string', description: 'Expects a' };
-      if (originalSchema.type) updatedSchema.description += ` ${originalSchema.type}.`;
-      else if (originalSchema.$ref) updatedSchema.description += `valid ${originalSchema.$ref.split('/').pop()} schema.`;
-      if (originalSchema.default !== undefined) {
-        updatedSchema.default = String(originalSchema.default);
-        updatedSchema.description += ` Defaults to ${updatedSchema.default}.`;
-        requiredFields.delete(key);
-      }
-      properties[key] = updatedSchema;
+      if (originalSchema.default !== undefined) requiredFields.delete(key);
     }
 
     if (requiredFields.size) normalizedSchema.required = Array.from(requiredFields);

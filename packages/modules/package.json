@@ -2,9 +2,7 @@
   "name": "@shadow-library/modules",
   "type": "module",
   "version": "0.5.1",
-  "sideEffects": [
-    "src/*/config.ts"
-  ],
+  "sideEffects": false,
   "description": " A collection of shared modules for the Shadow Apps ecosystem, providing reusable components for configuration management, authentication, cloud access, email, notifications, and other essential services. Designed for seamless integration across all Node.js applications following the Shadow Library architecture.",
   "scripts": {
     "prepare": "husky",
@@ -30,7 +28,7 @@
     "@release-it/conventional-changelog": "^10.0.1",
     "@shadow-library/app": "^1.3.2",
     "@shadow-library/class-schema": "^0.4.1",
-    "@shadow-library/common": "^1.5.3",
+    "@shadow-library/common": "^1.6.3",
     "@shadow-library/fastify": "^1.6.3",
     "@types/bun": "^1.3.1",
     "@types/luxon": "^3.7.1",
