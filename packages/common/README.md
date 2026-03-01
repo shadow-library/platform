@@ -665,6 +665,19 @@ const timeout = myConfig.getOrThrow('api.timeout'); // Throws if undefined
 
 The `load()` method is exposed to allow developers to dynamically load environment variables into the singleton ConfigService instance. This ensures all configuration is managed in one place without creating multiple instances.
 
+> **Important:** Calling `load()` multiple times with the same key is only safe if you pass the **exact same options object reference**. If a different object is passed — even one with identical values — an error is thrown. This is intentional: it prevents accidental misconfiguration when modules independently try to register the same key with conflicting options.
+>
+> To safely call `load()` from multiple places (e.g. in module initializers that may run more than once), define your options as a module-level constant:
+>
+> ```ts
+> // ✅ Safe — always the same reference
+> const API_URL_OPTS: ConfigOptions = { envKey: 'API_URL', defaultValue: 'https://api.example.com' };
+> Config.load('custom.api.url', API_URL_OPTS);
+>
+> // ❌ Unsafe — new object literal on every call, throws on second invocation
+> Config.load('custom.api.url', { envKey: 'API_URL', defaultValue: 'https://api.example.com' });
+> ```
+
 ```ts
 import { Config } from '@shadow-library/common';
 

@@ -74,6 +74,13 @@ describe('Config Service', () => {
       expect(config.load('custom.key', { defaultValue: 'random-value' })).toBe(config);
       expect(config.get('custom.key')).toBe('random-value');
     });
+
+    it('should be a no-op when called again with the same opts reference', () => {
+      const opts = { defaultValue: 'original' };
+      config.load('custom.key', opts);
+      config.load('custom.key', opts); /** same reference — should not throw or re-execute */
+      expect(config.get('custom.key')).toBe('original');
+    });
   });
 
   describe('get', () => {
@@ -170,7 +177,7 @@ describe('Config Service', () => {
       expect(() => new CustomConfigService()).toThrow();
     });
 
-    it('should throw if a config key is loaded twice', () => {
+    it('should throw if a config key is loaded twice with different opts references', () => {
       class CustomConfigService extends ConfigService<CustomConfigRecords> {
         constructor() {
           super();
