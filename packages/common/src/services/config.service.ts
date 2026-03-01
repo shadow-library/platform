@@ -64,6 +64,7 @@ export interface ConfigRecords {
 /**
  * Declaring the constants
  */
+const DEFAULT_CONFIG_OPTIONS: ConfigOptions = {};
 const INTEGER_REGEX = /^-?\d+$/;
 const NUMBER_REGEX = /^-?\d+(\.\d+)?$/;
 const BOOLEAN_CONFIG_OPTIONS: Partial<ConfigOptions> = { allowedValues: ['true', 'false'], transform: val => val === 'true' };
@@ -194,7 +195,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     return opts.isArray ? transformedValues : transformedValues[0];
   }
 
-  load(name: keyof Configs, opts: ConfigOptions = {}): this {
+  load(name: keyof Configs, opts: ConfigOptions = DEFAULT_CONFIG_OPTIONS): this {
     /**
      * Prevent loading the same config key multiple times with different configs as it can lead to unexpected behavior, especially with hot reloading
      * Allowing multiple loads in test environment to facilitate testing with different config values within the same test suite
@@ -215,7 +216,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     return this;
   }
 
-  register<T extends keyof Configs>(name: T, opts: ConfigOptions = {}): Configs[T] {
+  register<T extends keyof Configs>(name: T, opts: ConfigOptions = DEFAULT_CONFIG_OPTIONS): Configs[T] {
     this.load(name, opts);
     return this.get(name);
   }
