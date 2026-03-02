@@ -81,6 +81,13 @@ describe('Config Service', () => {
       config.load('custom.key', opts); /** same reference — should not throw or re-execute */
       expect(config.get('custom.key')).toBe('original');
     });
+
+    it('should not overwrite a value already in cache when load is called', () => {
+      /** Simulates a dev injecting a value directly into cache during testing */
+      config['cache'].set('custom.key', 'injected-value');
+      config.load('custom.key', { defaultValue: 'env-default' });
+      expect(config.get('custom.key')).toBe('injected-value');
+    });
   });
 
   describe('register', () => {
@@ -90,8 +97,8 @@ describe('Config Service', () => {
     });
 
     it('should return the correct type for typed configs', () => {
-      const value = config.register('boolean.key', { defaultValue: 'false', validateType: 'boolean' });
-      expect(value).toBe(false);
+      const value = config.register('number.key', { defaultValue: '42', validateType: 'number' });
+      expect(value).toBe(42);
     });
 
     it('should be a no-op and return the existing value when called again with the same opts reference', () => {

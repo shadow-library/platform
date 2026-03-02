@@ -208,6 +208,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     else if (opts.validateType === 'number') Object.assign(opts, NUMBER_CONFIG_OPTIONS);
     else if (opts.validateType === 'integer') Object.assign(opts, INTEGER_CONFIG_OPTIONS);
     this.loadedOptions.set(name, Object.freeze(opts));
+    if (this.cache.has(name)) return this;
 
     const result = tryCatch(() => this.resolveConfigValue(name));
     if (!result.success) Utils.exit(result.error.message);
