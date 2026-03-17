@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { afterAll, afterEach, beforeAll, beforeEach } from 'bun:test';
+import { afterAll, beforeAll, beforeEach } from 'bun:test';
 
 import { Router, ShadowApplication } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
@@ -12,7 +12,7 @@ import { DatabaseService } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { NotificationService } from '@modules/notification';
-import { createDatabaseFromTemplate, dropDatabase } from '@scripts/create-template-db';
+import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
 import { PrimaryDatabase } from '@server/database';
@@ -48,7 +48,6 @@ export class TestEnvironment {
     NotificationService.prototype['executeNotificationJob'] = () => Bun.sleep(10);
 
     beforeEach(() => createDatabaseFromTemplate(databaseName));
-    afterEach(() => dropDatabase(databaseName));
 
     beforeAll(() => this.app.init());
     afterAll(() => this.app.stop());
