@@ -1,0 +1,58 @@
+{
+  "name": "@shadow-library/ui",
+  "type": "module",
+  "sideEffects": false,
+  "scripts": {
+    "build": "bun scripts/build.ts",
+    "storybook": "storybook dev -p 4000",
+    "build-storybook": "storybook build",
+    "type-check": "tsc",
+    "test": "vitest run",
+    "lint": "biome check",
+    "format": "biome format",
+    "prepare": "husky"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.4.8",
+    "@chromatic-com/storybook": "^5.0.2",
+    "@commitlint/cli": "^20.5.0",
+    "@commitlint/config-conventional": "^20.5.0",
+    "@mantine/core": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "@storybook/addon-a11y": "^10.3.1",
+    "@storybook/addon-docs": "^10.3.1",
+    "@storybook/addon-onboarding": "^10.3.1",
+    "@storybook/addon-themes": "^10.3.1",
+    "@storybook/addon-vitest": "^10.3.1",
+    "@storybook/react": "^10.3.1",
+    "@storybook/react-vite": "^10.3.1",
+    "@tanstack/react-router": "^1.168.1",
+    "@testing-library/react": "^16.3.2",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/bun": "latest",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.1",
+    "@vitest/browser-playwright": "^4.1.0",
+    "@vitest/coverage-v8": "^4.1.0",
+    "@vitest/ui": "^4.1.0",
+    "happy-dom": "^20.8.4",
+    "husky": "^9.1.7",
+    "playwright": "^1.58.2",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "storybook": "^10.3.1",
+    "tsc-alias": "^1.8.16",
+    "vitest": "^4.1.0"
+  },
+  "peerDependencies": {
+    "typescript": "^5.9.3",
+    "@mantine/core": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "lucide-react": "^0.577.0",
+    "@tanstack/react-router": "1.168.1"
+  },
+  "dependencies": {
+    "openapi-typescript": "^7.13.0"
+  }
+}

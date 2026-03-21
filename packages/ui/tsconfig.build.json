@@ -1,0 +1,12 @@
+{
+  "extends": "./tsconfig.json",
+  "tsc-alias": { "resolveFullPaths": true },
+  "compilerOptions": {
+    /** Emit */
+    "noEmit": false,
+    "declaration": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "exclude": ["src/**/stories/*"]
+}

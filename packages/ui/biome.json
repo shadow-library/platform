@@ -1,0 +1,91 @@
+{
+  "$schema": "https://biomejs.dev/schemas/2.4.8/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "includes": ["src", ".storybook"]
+  },
+  "formatter": {
+    "enabled": true,
+    "indentStyle": "space",
+    "indentWidth": 2,
+    "lineWidth": 140
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+
+      "correctness": {
+        "noUnusedImports": "error",
+        "noUnusedVariables": "error",
+        "useExhaustiveDependencies": "error",
+        "noChildrenProp": "error",
+        "useJsxKeyInIterable": "error"
+      },
+
+      "style": {
+        "noNonNullAssertion": "error",
+        "useSelfClosingElements": "warn",
+        "useFragmentSyntax": "warn",
+        "useConst": "error",
+        "noUselessElse": "error",
+        "useNamingConvention": {
+          "level": "warn",
+          "options": {
+            "strictCase": false,
+            "conventions": [
+              { "selector": { "kind": "function" }, "formats": ["camelCase", "PascalCase"] },
+              { "selector": { "kind": "variable" }, "formats": ["camelCase", "PascalCase", "CONSTANT_CASE"] },
+              { "selector": { "kind": "typeLike" }, "formats": ["PascalCase"] }
+            ]
+          }
+        },
+        "useImportType": {
+          "level": "on",
+          "options": { "style": "inlineType" }
+        }
+      },
+
+      "suspicious": {
+        "noExplicitAny": "error",
+        "noDuplicateJsxProps": "error",
+        "noArrayIndexKey": "warn"
+      },
+
+      "a11y": {
+        "useAltText": "error",
+        "useButtonType": "error",
+        "useKeyWithClickEvents": "warn",
+        "useKeyWithMouseEvents": "warn",
+        "noAccessKey": "warn"
+      },
+
+      "performance": {
+        "noReExportAll": "warn"
+      }
+    }
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "semicolons": "always"
+    }
+  },
+  "assist": {
+    "actions": {
+      "source": {
+        "organizeImports": {
+          "level": "on",
+          "options": {
+            "groups": [[":BUN:", ":NODE:"], [":PACKAGE:"], [":ALIAS:"], [":PATH:"]]
+          }
+        }
+      }
+    }
+  }
+}
