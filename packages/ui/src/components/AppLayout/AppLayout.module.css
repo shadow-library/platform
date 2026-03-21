@@ -1,0 +1,32 @@
+/* AppLayout */
+.main {
+  display: flex;
+  flex-direction: column;
+  min-height: calc(100vh - 56px);
+}
+
+.mainContent {
+  flex: 1;
+}
+
+/* SideNavbar */
+.navToggleSection {
+  border-top: 0.5px solid light-dark(var(--mantine-color-shadowSlate-1), var(--mantine-color-shadowSlate-7));
+  display: flex;
+  justify-content: flex-end;
+}
+
+.navToggleSectionCollapsed {
+  justify-content: center;
+}
+
+/* SideNavbarItem */
+.collapsedItem {
+  width: 100%;
+  border-radius: var(--mantine-radius-sm);
+}
+
+/* ContentFooter */
+.footer {
+  border-top: 0.5px solid light-dark(var(--mantine-color-shadowSlate-1), var(--mantine-color-shadowSlate-7));
+}

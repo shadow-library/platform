@@ -2,4 +2,4 @@ bun lint
 
 bun type-check
 
-bun test
+bun run test

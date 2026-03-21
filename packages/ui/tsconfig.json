@@ -31,7 +31,7 @@
       "@/*": ["./src/*"],
       "$storybook/*": ["./.storybook/*"]
     },
-    "types": ["vitest/globals", "storybook/test", "@testing-library/jest-dom"],
+    "types": ["vite/client", "vitest/globals", "storybook/test", "@testing-library/jest-dom"],
 
     /** Emit */
     "noEmit": true,

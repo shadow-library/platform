@@ -323,7 +323,6 @@ export async function generateApi(url: string): Promise<string> {
 
   const allTypes: string[] = [];
   const allFuncs: string[] = [];
-  let needsJsonObject = false;
 
   for (const [path, pathItem] of Object.entries(spec.paths)) {
     const pathLevelParams = pathItem.parameters ?? [];
@@ -333,7 +332,6 @@ export async function generateApi(url: string): Promise<string> {
       const endpoint = generateEndpoint(path, method, operation, pathLevelParams, spec);
       allTypes.push(...endpoint.types);
       allFuncs.push(endpoint.func);
-      if (endpoint.hasBody) needsJsonObject = true;
     }
   }
 
