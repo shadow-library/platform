@@ -1,20 +1,36 @@
-node_modules
-.DS_Store
-dist
-dist-ssr
-*.local
-count.txt
-.env
-.nitro
-.tanstack
-.wrangler
+# dependencies
+node_modules/
 
-# Playwright
+# IDE
+/.vscode
+/.project
+/.settings 
+
+# build output
+dist
+CHANGELOG.md
+
+# misc
+.DS_Store
+npm-debug.log
+*.tsbuildinfo
+.npmrc
+
+# tests
+/coverage
+/.nyc_output
+/logs
 /test-results/
 /playwright-report/
 /blob-report/
 /playwright/.cache/
 /playwright/.auth/
 
-# Generated
-stats.html
+# environment variables
+.env
+.env.local
+.env.*.local
+
+# Dev Generated Files
+.tanstack
+.nitro

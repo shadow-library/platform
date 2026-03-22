@@ -1,43 +1,43 @@
 /**
  * Importing npm packages
  */
-import { TanStackDevtools } from '@tanstack/react-devtools';
-import type { QueryClient } from '@tanstack/react-query';
-import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { HeadContent, Outlet, createRootRouteWithContext } from '@tanstack/react-router';
-import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 
 /**
- *  Importing user defined modules
+ * Importing user defined packages
  */
-import Layout from '../components/Layout';
 
 /**
- * Declaring types
+ * Defining types
  */
 
-interface RouterContext {
-  queryClient: QueryClient;
+/**
+ * Declaring the constants
+ */
+
+function RootComponent() {
+  return (
+    <html lang='en'>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <Outlet />
+        <Scripts />
+      </body>
+    </html>
+  );
 }
 
-/**
- * Declaring constants
- */
-
-export const Route = createRootRouteWithContext<RouterContext>()({
-  component: () => (
-    <>
-      <HeadContent />
-      <Layout>
-        <Outlet />
-      </Layout>
-      <TanStackDevtools
-        config={{ position: 'bottom-right' }}
-        plugins={[
-          { name: 'Tanstack Router', render: <TanStackRouterDevtools /> },
-          { name: 'React Query', render: <ReactQueryDevtools /> },
-        ]}
-      />
-    </>
-  ),
+export const Route = createRootRoute({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { title: 'Shadow Pulse' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { name: 'description', content: 'Shadow Pulse - Notification service for Shadow applications' },
+    ],
+    links: [{ rel: 'icon', href: '/favicon.svg' }],
+  }),
+  component: RootComponent,
 });
