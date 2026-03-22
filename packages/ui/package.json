@@ -7,6 +7,7 @@
     "storybook": "storybook dev -p 4000",
     "build-storybook": "storybook build",
     "type-check": "tsc",
+    "test:setup": "bunx playwright install",
     "test": "vitest run",
     "lint": "biome check",
     "format": "biome format",
@@ -19,6 +20,7 @@
     "@commitlint/config-conventional": "^20.5.0",
     "@mantine/core": "^8.3.18",
     "@mantine/hooks": "^8.3.18",
+    "@release-it/conventional-changelog": "^10.0.6",
     "@storybook/addon-a11y": "^10.3.1",
     "@storybook/addon-docs": "^10.3.1",
     "@storybook/addon-onboarding": "^10.3.1",
@@ -41,6 +43,7 @@
     "playwright": "^1.58.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
+    "release-it": "^19.2.4",
     "storybook": "^10.3.1",
     "tsc-alias": "^1.8.16",
     "vitest": "^4.1.0"
