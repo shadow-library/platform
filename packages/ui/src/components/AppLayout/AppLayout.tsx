@@ -2,18 +2,18 @@
  * Importing npm packages
  */
 import { AppShell } from '@mantine/core';
-import { LucideIcon } from 'lucide-react';
 import { ReactNode } from 'react';
 
 /**
  * Importing user defined packages
  */
+import styles from './AppLayout.module.css';
 import { ContentFooter } from './ContentFooter';
 import { SideNavbar } from './SideNavbar';
 import { TopNavbar } from './TopNavbar';
-import { useLayoutState } from './hooks';
+import { useLayoutState } from './hooks/use-layout-state';
 import { FooterConfig, NavItem, NotificationsConfig, UserInfo } from './layout.types';
-import styles from './AppLayout.module.css';
+import { Alphabet } from '../Logo';
 
 /**
  * Defining types
@@ -21,8 +21,8 @@ import styles from './AppLayout.module.css';
 
 interface AppLayoutProps {
   children: ReactNode;
+  productName: Alphabet[];
   appName: string;
-  appIcon: LucideIcon | ReactNode;
   navItems: NavItem[];
   user?: UserInfo;
   notifications?: NotificationsConfig;
@@ -38,11 +38,12 @@ const HEADER_HEIGHT = 56;
 const NAVBAR_WIDTH_EXPANDED = 260;
 const NAVBAR_WIDTH_COLLAPSED = 72;
 
-export function AppLayout({ children, appName, appIcon, navItems, user, notifications, footer, showThemeToggle = true, defaultCollapsed = false }: AppLayoutProps) {
+export function AppLayout({ children, appName, productName, navItems, user, notifications, footer, showThemeToggle = true, defaultCollapsed = false }: AppLayoutProps) {
   const { collapsed, toggleCollapsed, mobileOpened, toggleMobile, closeMobile } = useLayoutState({ defaultCollapsed });
 
   return (
     <AppShell
+      layout='alt'
       header={{ height: HEADER_HEIGHT }}
       navbar={{
         width: collapsed ? NAVBAR_WIDTH_COLLAPSED : NAVBAR_WIDTH_EXPANDED,
@@ -53,19 +54,11 @@ export function AppLayout({ children, appName, appIcon, navItems, user, notifica
       transitionDuration={200}
     >
       <AppShell.Header>
-        <TopNavbar
-          appName={appName}
-          appIcon={appIcon}
-          user={user}
-          notifications={notifications}
-          showThemeToggle={showThemeToggle}
-          mobileOpened={mobileOpened}
-          onToggleMobile={toggleMobile}
-        />
+        <TopNavbar user={user} notifications={notifications} showThemeToggle={showThemeToggle} mobileOpened={mobileOpened} onToggleMobile={toggleMobile} />
       </AppShell.Header>
 
       <AppShell.Navbar>
-        <SideNavbar items={navItems} collapsed={collapsed} onToggleCollapsed={toggleCollapsed} onNavigate={closeMobile} />
+        <SideNavbar items={navItems} collapsed={collapsed} onToggleCollapsed={toggleCollapsed} onNavigate={closeMobile} productName={productName} onCloseMobile={closeMobile} />
       </AppShell.Navbar>
 
       <AppShell.Main className={styles.main}>

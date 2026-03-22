@@ -1,0 +1,45 @@
+@keyframes glow-pulse {
+  0%,
+  100% {
+    filter: drop-shadow(0 0 4px var(--glow-color-low));
+  }
+  50% {
+    filter: drop-shadow(0 0 10px var(--glow-color-high));
+  }
+}
+
+.logoRoot {
+  height: 100%;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+
+  svg {
+    height: 100%;
+    stroke-width: 50px;
+  }
+
+  &.center {
+    justify-content: center;
+  }
+}
+
+.compactBrandContainer {
+  height: 100%;
+  padding: 4px;
+  border-radius: 6px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+
+  & > svg {
+    animation: glow-pulse 3s ease-in-out infinite;
+  }
+}
+
+.divider {
+  height: 70%;
+  margin-top: auto;
+  margin-bottom: auto;
+}

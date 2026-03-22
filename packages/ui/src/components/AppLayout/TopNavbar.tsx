@@ -1,9 +1,8 @@
 /**
  * Importing npm packages
  */
-import { ActionIcon, Avatar, Burger, Group, Indicator, Menu, Text, useMantineColorScheme } from '@mantine/core';
-import { Bell, LucideIcon, Moon, Sun } from 'lucide-react';
-import { isValidElement, ReactNode } from 'react';
+import { ActionIcon, Avatar, Burger, Group, Indicator, Menu, Text, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { Bell, Moon, Sun } from 'lucide-react';
 
 /**
  * Importing user defined packages
@@ -17,8 +16,6 @@ import type { NotificationsConfig, UserInfo } from './layout.types';
  */
 
 interface TopNavbarProps {
-  appName: string;
-  appIcon: LucideIcon | ReactNode;
   user?: UserInfo;
   notifications?: NotificationsConfig;
   showThemeToggle?: boolean;
@@ -30,34 +27,22 @@ interface TopNavbarProps {
  * Declaring the constants
  */
 
-export function TopNavbar({ appName, appIcon, user, notifications, showThemeToggle = true, mobileOpened, onToggleMobile }: TopNavbarProps) {
-  const { colorScheme, toggleColorScheme } = useMantineColorScheme();
-  const isDark = colorScheme === 'dark';
-
-  const renderAppIcon = () => {
-    if (isValidElement(appIcon)) return appIcon;
-    const IconComponent = appIcon as React.ComponentType<{ size: number }>;
-    return <IconComponent size={22} />;
-  };
+export function TopNavbar({ user, notifications, showThemeToggle = true, mobileOpened, onToggleMobile }: TopNavbarProps) {
+  const theme = useComputedColorScheme();
+  const { toggleColorScheme } = useMantineColorScheme();
 
   return (
     <Group h='100%' px='md' justify='space-between' wrap='nowrap'>
       {/* Left section */}
       <Group gap='sm' wrap='nowrap'>
         <Burger opened={mobileOpened} onClick={onToggleMobile} hiddenFrom='sm' size='sm' />
-        <Group gap='xs' wrap='nowrap'>
-          {renderAppIcon()}
-          <Text fw={600} size='lg' visibleFrom='xs'>
-            {appName}
-          </Text>
-        </Group>
       </Group>
 
       {/* Right section */}
       <Group gap='xs' wrap='nowrap'>
         {showThemeToggle && (
           <ActionIcon onClick={toggleColorScheme} size='lg' aria-label='Toggle color scheme'>
-            {isDark ? <Sun size={18} /> : <Moon size={18} />}
+            {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
           </ActionIcon>
         )}
 

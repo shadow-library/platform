@@ -6,9 +6,9 @@ import { ActionIcon, Menu, NavLink, Tooltip } from '@mantine/core';
 /**
  * Importing user defined packages
  */
-import type { NavItem } from './layout.types';
-import { useSideNavbarItem } from './hooks';
 import styles from './AppLayout.module.css';
+import { useSideNavbarItem } from './hooks/use-side-navbar-item';
+import type { NavItem } from './layout.types';
 
 /**
  * Defining types

@@ -5,6 +5,7 @@
     "": {
       "name": "ui",
       "dependencies": {
+        "clsx": "^2.1.1",
         "openapi-typescript": "^7.13.0",
       },
       "devDependencies": {

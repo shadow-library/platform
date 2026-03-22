@@ -1,15 +1,16 @@
 /**
  * Importing npm packages
  */
-import { ActionIcon, AppShell, ScrollArea, Stack, Tooltip } from '@mantine/core';
+import { ActionIcon, AppShell, CloseButton, Group, ScrollArea, Stack, Tooltip } from '@mantine/core';
 import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 
 /**
  * Importing user defined packages
  */
+import { Alphabet, Logo } from '../Logo';
+import styles from './AppLayout.module.css';
 import { SideNavbarItem } from './SideNavbarItem';
 import { NavItem } from './layout.types';
-import styles from './AppLayout.module.css';
 
 /**
  * Defining types
@@ -20,15 +21,26 @@ interface SideNavbarProps {
   collapsed: boolean;
   onToggleCollapsed: () => void;
   onNavigate?: () => void;
+  productName?: Alphabet[];
+  onCloseMobile?: () => void;
 }
 
 /**
  * Declaring the constants
  */
 
-export function SideNavbar({ items, collapsed, onToggleCollapsed, onNavigate }: SideNavbarProps) {
+export function SideNavbar({ items, collapsed, onToggleCollapsed, onNavigate, productName, onCloseMobile }: SideNavbarProps) {
   return (
     <>
+      <AppShell.Section className={styles.logoSection} p={collapsed ? 'xs' : 'sm'}>
+        <Group justify='space-between' w='100%' h='100%' wrap='nowrap'>
+          <div className={styles.logoContainer}>
+            <Logo variant='icon' productName={collapsed ? undefined : productName} />
+          </div>
+          <CloseButton hiddenFrom='sm' onClick={onCloseMobile} aria-label='Close navigation' />
+        </Group>
+      </AppShell.Section>
+
       <AppShell.Section grow component={ScrollArea} scrollbarSize={6}>
         <Stack gap={4} p={collapsed ? 'xs' : 'sm'} align={collapsed ? 'center' : 'stretch'}>
           {items.map((item) => (

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { ActionIcon, Badge, Card, createTheme, Modal, Paper, Table, Tooltip, type MantineColorsTuple } from '@mantine/core';
+import { ActionIcon, Badge, Card, createTheme, DefaultMantineColor, Modal, Paper, Table, Tooltip, type MantineColorsTuple } from '@mantine/core';
 
 /**
  * Importing user defined packages
@@ -11,54 +11,26 @@ import { ActionIcon, Badge, Card, createTheme, Modal, Paper, Table, Tooltip, typ
  * Defining types
  */
 
+type ShadowColors = 'cyan' | 'slate' | 'terracotta';
+
+declare module '@mantine/core' {
+  export interface MantineThemeColorsOverride {
+    colors: Record<ShadowColors | DefaultMantineColor, MantineColorsTuple>;
+    others: Record<string, any>;
+  }
+}
+
 /**
  * Declaring the constants
  */
 
-/**
- * Shadow Apps — Shared Mantine Theme (v8)
- *
- * Primary:  shadowCyan  [5] → #00bfb8 (dark) / [6] → #009e98 (light)
- * Neutral:  shadowSlate [8] → #141e2e (dark background)
- *
- * Usage:
- *   <MantineProvider theme={shadowTheme} defaultColorScheme="dark">
- *     <App />
- *   </MantineProvider>
- */
-
-const shadowCyan: MantineColorsTuple = [
-  '#e8fffe', // 0
-  '#c0f9f7', // 1
-  '#85f0ec', // 2
-  '#40e3dd', // 3
-  '#12d4cc', // 4
-  '#00bfb8', // 5 — primary on dark ★
-  '#009e98', // 6 — primary on light ★
-  '#007d78', // 7
-  '#005e5a', // 8
-  '#003e3b', // 9
-];
-
-const shadowSlate: MantineColorsTuple = [
-  '#f5f6f8', // 0
-  '#e5e8ed', // 1 — light border
-  '#c8cdd6', // 2
-  '#a2aab6', // 3
-  '#788596', // 4
-  '#546070', // 5 — muted text
-  '#3a4555', // 6
-  '#253040', // 7 — dark border
-  '#141e2e', // 8 — dark background ★
-  '#0c1220', // 9
-];
+const cyan: MantineColorsTuple = ['#e8fffe', '#c0f9f7', '#85f0ec', '#40e3dd', '#12d4cc', '#00bfb8', '#009e98', '#007d78', '#005e5a', '#003e3b'];
+const slate: MantineColorsTuple = ['#f5f6f8', '#e5e8ed', '#c8cdd6', '#a2aab6', '#788596', '#546070', '#3a4555', '#253040', '#141e2e', '#0c1220'];
+const terracotta: MantineColorsTuple = ['#f9e5dd', '#f2cbbb', '#ecb09a', '#e59678', '#df7c56', '#b26345', '#864a34', '#593223', '#2c1911', '#160c09'];
 
 export const shadowTheme = createTheme({
-  colors: {
-    shadowCyan,
-    shadowSlate,
-  },
-  primaryColor: 'shadowCyan',
+  colors: { cyan, slate, terracotta },
+  primaryColor: 'cyan',
   primaryShade: { light: 6, dark: 5 },
   autoContrast: true,
 
@@ -124,7 +96,7 @@ export const shadowTheme = createTheme({
       },
       styles: {
         root: {
-          border: `0.5px solid light-dark(${shadowSlate[1]}, ${shadowSlate[7]})`,
+          border: `0.5px solid light-dark(${slate[1]}, ${slate[7]})`,
         },
       },
     }),

@@ -9,6 +9,21 @@
   flex: 1;
 }
 
+/* SideNavbar - Logo Section */
+.logoSection {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 56px;
+  border-bottom: 0.5px solid light-dark(var(--mantine-color-shadowSlate-1), var(--mantine-color-shadowSlate-7));
+}
+
+.logoContainer {
+  height: 36px;
+  padding: 0px 10px;
+  width: 100%;
+}
+
 /* SideNavbar */
 .navToggleSection {
   border-top: 0.5px solid light-dark(var(--mantine-color-shadowSlate-1), var(--mantine-color-shadowSlate-7));

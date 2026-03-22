@@ -24,7 +24,6 @@ export const sampleNavItems: NavItem[] = [
   {
     label: 'Users',
     icon: Users,
-    path: '/users',
     children: [
       { label: 'All Users', icon: Users, path: '/users/all' },
       { label: 'Roles', icon: Shield, path: '/users/roles' },
@@ -41,7 +40,6 @@ export const sampleNavItems: NavItem[] = [
   {
     label: 'Settings',
     icon: Settings,
-    path: '/settings',
     children: [
       { label: 'General', icon: Settings, path: '/settings/general' },
       { label: 'Notifications', icon: Bell, path: '/settings/notifications' },

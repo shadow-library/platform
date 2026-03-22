@@ -2,7 +2,6 @@
  * Importing npm packages
  */
 import { preview } from '$storybook/preview';
-import { LayoutDashboard } from 'lucide-react';
 import { expect, waitFor } from 'storybook/test';
 
 /**
@@ -14,6 +13,7 @@ import { SideNavbar } from '../SideNavbar';
 import { SideNavbarItem } from '../SideNavbarItem';
 import { TopNavbar } from '../TopNavbar';
 import { sampleNavItems, sampleNotifications, sampleUser, withRouter } from './AppLayout.setup';
+import { D, E, M, O } from '@/components/Logo';
 
 /**
  * Defining types
@@ -29,8 +29,8 @@ const meta = preview.meta({
   parameters: { layout: 'fullscreen' },
   decorators: [withRouter('/')],
   args: {
-    appName: 'Shadow App',
-    appIcon: LayoutDashboard,
+    appName: 'Demo',
+    productName: [D, E, M, O],
     navItems: sampleNavItems,
     user: sampleUser,
     notifications: sampleNotifications,
