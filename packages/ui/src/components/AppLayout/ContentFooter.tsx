@@ -7,7 +7,7 @@ import { Box, Text } from '@mantine/core';
  * Importing user defined packages
  */
 import styles from './AppLayout.module.css';
-import { FooterConfig } from './layout.types';
+import { type FooterConfig } from './layout.types';
 
 /**
  * Defining types

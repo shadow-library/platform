@@ -24,7 +24,7 @@ const meta = preview.meta({
 export const BreadcrumbsNav = meta.story({
   render: () => (
     <Breadcrumbs>
-      {['Home', 'Settings', 'Profile'].map((item) => (
+      {['Home', 'Settings', 'Profile'].map(item => (
         <Anchor key={item} href='#' size='sm'>
           {item}
         </Anchor>

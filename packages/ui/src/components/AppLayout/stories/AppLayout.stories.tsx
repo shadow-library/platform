@@ -1,8 +1,10 @@
 /**
  * Importing npm packages
  */
-import { preview } from '$storybook/preview';
 import { expect, waitFor } from 'storybook/test';
+
+import { D, E, M, O } from '@/components/Logo';
+import { preview } from '$storybook/preview';
 
 /**
  * Importing user defined packages
@@ -13,7 +15,6 @@ import { SideNavbar } from '../SideNavbar';
 import { SideNavbarItem } from '../SideNavbarItem';
 import { TopNavbar } from '../TopNavbar';
 import { sampleNavItems, sampleNotifications, sampleUser, withRouter } from './AppLayout.setup';
-import { D, E, M, O } from '@/components/Logo';
 
 /**
  * Defining types

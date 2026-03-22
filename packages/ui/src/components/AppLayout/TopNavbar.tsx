@@ -9,7 +9,7 @@ import { Bell, Moon, Sun } from 'lucide-react';
  */
 import { getInitials } from '@/lib';
 
-import type { NotificationsConfig, UserInfo } from './layout.types';
+import { type NotificationsConfig, type UserInfo } from './layout.types';
 
 /**
  * Defining types

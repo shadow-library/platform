@@ -24,7 +24,7 @@ const meta = preview.meta({
 export const Variants = meta.story({
   render: () => (
     <Group>
-      {(['filled', 'light', 'outline', 'subtle', 'transparent', 'white'] as const).map((v) => (
+      {(['filled', 'light', 'outline', 'subtle', 'transparent', 'white'] as const).map(v => (
         <Button key={v} variant={v}>
           {v}
         </Button>
@@ -36,7 +36,7 @@ export const Variants = meta.story({
 export const Sizes = meta.story({
   render: () => (
     <Group>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((s) => (
+      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map(s => (
         <Button key={s} size={s}>
           Size {s}
         </Button>
@@ -62,7 +62,7 @@ export const States = meta.story({
 export const ActionIcons = meta.story({
   render: () => (
     <Group>
-      {(['filled', 'light', 'outline', 'subtle', 'transparent'] as const).map((v) => (
+      {(['filled', 'light', 'outline', 'subtle', 'transparent'] as const).map(v => (
         <ActionIcon key={v} variant={v} aria-label={v}>
           <Settings size={16} />
         </ActionIcon>

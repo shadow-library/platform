@@ -24,7 +24,7 @@ const meta = preview.meta({
 export const ThemeIcons = meta.story({
   render: () => (
     <Group>
-      {['blue', 'green', 'red', 'yellow', 'violet'].map((c) => (
+      {['blue', 'green', 'red', 'yellow', 'violet'].map(c => (
         <ThemeIcon key={c} color={c} variant='light'>
           <Check size={16} />
         </ThemeIcon>
@@ -48,7 +48,7 @@ export const Avatars = meta.story({
         </Avatar>
       </Indicator>
       <Avatar.Group>
-        {['blue', 'red', 'green'].map((c) => (
+        {['blue', 'red', 'green'].map(c => (
           <Avatar key={c} src={null} color={c}>
             {c[0]?.toUpperCase()}
           </Avatar>
@@ -101,7 +101,7 @@ export const Tables = meta.story({
         {[
           { name: 'Alice', role: 'Admin', status: 'Active' },
           { name: 'Bob', role: 'Editor', status: 'Inactive' },
-        ].map((row) => (
+        ].map(row => (
           <Table.Tr key={row.name}>
             <Table.Td>{row.name}</Table.Td>
             <Table.Td>{row.role}</Table.Td>
@@ -152,7 +152,7 @@ export const Lists = meta.story({
 export const ColorSwatches = meta.story({
   render: () => (
     <Group>
-      {['blue', 'red', 'green', 'grape', 'orange'].map((c) => (
+      {['blue', 'red', 'green', 'grape', 'orange'].map(c => (
         <ColorSwatch key={c} color={`var(--mantine-color-${c}-6)`} />
       ))}
     </Group>

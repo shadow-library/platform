@@ -2,18 +2,18 @@
  * Importing npm packages
  */
 import { AppShell } from '@mantine/core';
-import { ReactNode } from 'react';
+import { type ReactNode } from 'react';
 
+import { type Alphabet } from '../Logo';
 /**
  * Importing user defined packages
  */
 import styles from './AppLayout.module.css';
 import { ContentFooter } from './ContentFooter';
+import { useLayoutState } from './hooks/use-layout-state';
+import { type FooterConfig, type NavItem, type NotificationsConfig, type UserInfo } from './layout.types';
 import { SideNavbar } from './SideNavbar';
 import { TopNavbar } from './TopNavbar';
-import { useLayoutState } from './hooks/use-layout-state';
-import { FooterConfig, NavItem, NotificationsConfig, UserInfo } from './layout.types';
-import { Alphabet } from '../Logo';
 
 /**
  * Defining types

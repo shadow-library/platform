@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { JSX } from 'react';
-import { Bell, BookOpen, FileText, Home, LogOut, Package, Settings, Shield, User, Users } from 'lucide-react';
 import { createMemoryHistory, createRootRoute, createRoute, createRouter, Outlet, RouterProvider } from '@tanstack/react-router';
+import { Bell, BookOpen, FileText, Home, LogOut, Package, Settings, Shield, User, Users } from 'lucide-react';
+import { type JSX } from 'react';
 
 /**
  * Importing user defined packages
  */
-import { NavItem } from '../layout.types';
+import { type NavItem } from '../layout.types';
 
 /**
  * Defining types

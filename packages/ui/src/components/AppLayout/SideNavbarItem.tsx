@@ -8,7 +8,7 @@ import { ActionIcon, Menu, NavLink, Tooltip } from '@mantine/core';
  */
 import styles from './AppLayout.module.css';
 import { useSideNavbarItem } from './hooks/use-side-navbar-item';
-import type { NavItem } from './layout.types';
+import { type NavItem } from './layout.types';
 
 /**
  * Defining types
@@ -39,7 +39,7 @@ export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemPr
           </Menu.Target>
           <Menu.Dropdown>
             <Menu.Label>{item.label}</Menu.Label>
-            {item.children?.map((child) => (
+            {item.children?.map(child => (
               <Menu.Item
                 key={child.key ?? child.path ?? child.label}
                 leftSection={<child.icon size={16} />}
@@ -78,7 +78,7 @@ export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemPr
       defaultOpened={hasActiveChild}
       href={item.path}
     >
-      {hasChildren && item.children?.map((child) => <SideNavbarItem key={child.key ?? child.path ?? child.label} item={child} collapsed={false} onNavigate={onNavigate} />)}
+      {hasChildren && item.children?.map(child => <SideNavbarItem key={child.key ?? child.path ?? child.label} item={child} collapsed={false} onNavigate={onNavigate} />)}
     </NavLink>
   );
 }

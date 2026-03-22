@@ -40,7 +40,7 @@ export const Dividers = meta.story({
 export const GridLayout = meta.story({
   render: () => (
     <Grid>
-      {[1, 2, 3, 4].map((n) => (
+      {[1, 2, 3, 4].map(n => (
         <Grid.Col key={n} span={3}>
           <Paper p='sm' withBorder>
             <Center>
@@ -56,7 +56,7 @@ export const GridLayout = meta.story({
 export const FlexLayout = meta.story({
   render: () => (
     <Flex gap='sm' wrap='wrap'>
-      {['start', 'center', 'end'].map((a) => (
+      {['start', 'center', 'end'].map(a => (
         <Paper key={a} p='sm' withBorder miw={80}>
           <Text size='xs' ta='center'>
             {a}

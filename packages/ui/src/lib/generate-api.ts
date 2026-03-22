@@ -10,7 +10,7 @@
  * Defining types
  */
 
-interface OpenAPISpec {
+interface OpenApiSpec {
   paths: Record<string, PathItem>;
   components?: {
     schemas?: Record<string, SchemaOrRef>;
@@ -89,7 +89,7 @@ function resolveRefName(ref: string): string {
   return ref.split('/').pop() as string;
 }
 
-function resolveRef<T>(ref: string, spec: OpenAPISpec): T {
+function resolveRef<T>(ref: string, spec: OpenApiSpec): T {
   const segments = ref.replace(/^#\//, '').split('/');
   let current: unknown = spec;
   for (const segment of segments) current = (current as Record<string, unknown>)[segment];
@@ -110,37 +110,37 @@ function toPascalCase(str: string): string {
     .trim()
     .split(/[^a-zA-Z0-9]+/)
     .filter(Boolean)
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+    .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
     .join('');
 }
 
-function schemaToTs(schema: SchemaOrRef, spec: OpenAPISpec): string {
+function schemaToTs(schema: SchemaOrRef, spec: OpenApiSpec): string {
   if (isRef(schema)) return resolveRefName(schema.$ref);
 
   if (schema.allOf) {
-    const types = schema.allOf.map((s) => schemaToTs(s, spec));
+    const types = schema.allOf.map(s => schemaToTs(s, spec));
     return types.length === 1 ? (types[0] as string) : types.join(' & ');
   }
 
   if (schema.oneOf) {
-    const types = schema.oneOf.map((s) => schemaToTs(s, spec));
+    const types = schema.oneOf.map(s => schemaToTs(s, spec));
     return types.length === 1 ? (types[0] as string) : types.join(' | ');
   }
 
   if (schema.anyOf) {
-    const types = schema.anyOf.map((s) => schemaToTs(s, spec));
+    const types = schema.anyOf.map(s => schemaToTs(s, spec));
     return types.length === 1 ? (types[0] as string) : types.join(' | ');
   }
 
   if (schema.enum) {
-    return schema.enum.map((v) => (typeof v === 'string' ? `'${v}'` : String(v))).join(' | ');
+    return schema.enum.map(v => (typeof v === 'string' ? `'${v}'` : String(v))).join(' | ');
   }
 
   let type = schema.type;
   let nullable = schema.nullable === true;
   if (Array.isArray(type)) {
     nullable = nullable || type.includes('null');
-    type = type.find((t) => t !== 'null');
+    type = type.find(t => t !== 'null');
   }
 
   let result: string;
@@ -190,7 +190,7 @@ function schemaToTs(schema: SchemaOrRef, spec: OpenAPISpec): string {
   return nullable ? `${result} | null` : result;
 }
 
-function collectTypes(spec: OpenAPISpec): string {
+function collectTypes(spec: OpenApiSpec): string {
   const schemas = spec.components?.schemas;
   if (!schemas) return '';
 
@@ -218,7 +218,7 @@ function collectTypes(spec: OpenAPISpec): string {
   return lines.join('\n');
 }
 
-function resolveParameter(param: ParameterObject | ReferenceObject, spec: OpenAPISpec): ParameterObject {
+function resolveParameter(param: ParameterObject | ReferenceObject, spec: OpenApiSpec): ParameterObject {
   return isRef(param) ? resolveRef<ParameterObject>(param.$ref, spec) : param;
 }
 
@@ -227,7 +227,7 @@ function generateEndpoint(
   method: HttpMethod,
   operation: OperationObject,
   pathLevelParams: (ParameterObject | ReferenceObject)[],
-  spec: OpenAPISpec,
+  spec: OpenApiSpec,
 ): GeneratedEndpoint {
   const types: string[] = [];
   let hasBody = false;
@@ -238,22 +238,22 @@ function generateEndpoint(
   const pascalName = toPascalCase(summary);
 
   // Merge parameters (operation-level overrides path-level for same name+in)
-  const allParams = [...pathLevelParams, ...(operation.parameters ?? [])].map((p) => resolveParameter(p, spec));
+  const allParams = [...pathLevelParams, ...(operation.parameters ?? [])].map(p => resolveParameter(p, spec));
   const paramMap = new Map<string, ParameterObject>();
   for (const param of allParams) paramMap.set(`${param.in}:${param.name}`, param);
   const params = Array.from(paramMap.values());
 
   // Path params sorted by URL appearance
-  const pathParams = params.filter((p) => p.in === 'path');
-  const pathParamOrder = [...path.matchAll(/\{(\w+)\}/g)].map((m) => m[1]);
+  const pathParams = params.filter(p => p.in === 'path');
+  const pathParamOrder = [...path.matchAll(/\{(\w+)\}/g)].map(m => m[1]);
   pathParams.sort((a, b) => pathParamOrder.indexOf(a.name) - pathParamOrder.indexOf(b.name));
 
   // Query params
-  const queryParams = params.filter((p) => p.in === 'query');
+  const queryParams = params.filter(p => p.in === 'query');
   let queryTypeName: string | undefined;
   if (queryParams.length > 0) {
     queryTypeName = `${pascalName}Query`;
-    const props = queryParams.map((p) => {
+    const props = queryParams.map(p => {
       const originalType = p.schema ? schemaToTs(p.schema, spec) : 'unknown';
       const tsType = originalType === 'string' ? 'string | undefined' : `string | ${originalType} | undefined`;
       return `  ${p.name}?: ${tsType};`;
@@ -283,7 +283,7 @@ function generateEndpoint(
   // Response type
   let returnType = 'unknown';
   if (operation.responses) {
-    const successCode = ['200', '201', '204'].find((c) => operation.responses?.[c]);
+    const successCode = ['200', '201', '204'].find(c => operation.responses?.[c]);
     if (successCode === '204') returnType = 'void';
     else if (successCode) {
       const resp = operation.responses[successCode] as ResponseObject | ReferenceObject;
@@ -319,7 +319,7 @@ function generateEndpoint(
 
 export async function generateApi(url: string): Promise<string> {
   const response = await fetch(url);
-  const spec: OpenAPISpec = await response.json();
+  const spec: OpenApiSpec = await response.json();
 
   const allTypes: string[] = [];
   const allFuncs: string[] = [];

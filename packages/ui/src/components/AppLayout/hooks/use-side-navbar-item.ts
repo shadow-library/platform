@@ -6,7 +6,7 @@ import { useLocation, useNavigate } from '@tanstack/react-router';
 /**
  * Importing user defined packages
  */
-import { NavItem } from '../layout.types';
+import { type NavItem } from '../layout.types';
 
 /**
  * Defining types
@@ -23,7 +23,7 @@ function isRouteActive(itemPath: string, currentPath: string, exactMatch: boolea
 
 function isItemOrChildActive(item: NavItem, currentPath: string): boolean {
   if (item.path && isRouteActive(item.path, currentPath, item.exactMatch ?? false)) return true;
-  return item.children?.some((child) => isItemOrChildActive(child, currentPath)) ?? false;
+  return item.children?.some(child => isItemOrChildActive(child, currentPath)) ?? false;
 }
 
 export function useSideNavbarItem(item: NavItem, onNavigate?: () => void) {

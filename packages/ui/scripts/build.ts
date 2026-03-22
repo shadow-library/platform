@@ -21,7 +21,8 @@ const distDir = path.join(rootDir, 'dist');
 
 const formatTime = (time: number) => (time < 1000 ? `${time.toFixed(0)}ms` : `${(time / 1000).toFixed(3)}s`);
 const success = (message: string) => console.log('\x1b[32m%s\x1b[0m', message); // eslint-disable-line no-console
-const error = (message: string) => (console.error('\x1b[31m%s\x1b[0m', message), process.exit(1)); // eslint-disable-line no-console
+// biome-ignore lint: allow-console
+const error = (message: string) => (console.error('\x1b[31m%s\x1b[0m', message), process.exit(1));
 
 /** cleaning the previous build */
 if (fs.existsSync(distDir)) fs.rmSync(distDir, { recursive: true });

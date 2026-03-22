@@ -7,10 +7,10 @@ import { ChevronsLeft, ChevronsRight } from 'lucide-react';
 /**
  * Importing user defined packages
  */
-import { Alphabet, Logo } from '../Logo';
+import { type Alphabet, Logo } from '../Logo';
 import styles from './AppLayout.module.css';
+import { type NavItem } from './layout.types';
 import { SideNavbarItem } from './SideNavbarItem';
-import { NavItem } from './layout.types';
 
 /**
  * Defining types
@@ -43,7 +43,7 @@ export function SideNavbar({ items, collapsed, onToggleCollapsed, onNavigate, pr
 
       <AppShell.Section grow component={ScrollArea} scrollbarSize={6}>
         <Stack gap={4} p={collapsed ? 'xs' : 'sm'} align={collapsed ? 'center' : 'stretch'}>
-          {items.map((item) => (
+          {items.map(item => (
             <SideNavbarItem key={item.key ?? item.path ?? item.label} item={item} collapsed={collapsed} onNavigate={onNavigate} />
           ))}
         </Stack>

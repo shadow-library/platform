@@ -3,6 +3,7 @@
  */
 import { ColorSchemeScript, MantineProvider } from '@mantine/core';
 import '@mantine/core/styles.css';
+
 import { definePreview } from '@storybook/react-vite';
 
 /**

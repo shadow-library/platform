@@ -1,11 +1,11 @@
 /**
  * Importing npm packages
  */
+import { preview } from '$storybook/preview';
 
 /**
  * Importing user defined packages
  */
-import { preview } from '$storybook/preview';
 import { E, L, P, S, U } from '../Alphabets';
 import { Logo } from '../Logo';
 
@@ -26,7 +26,7 @@ const meta = preview.meta({
 
 export const Default = meta.story({
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: 48, width: 300 }}>
         <Story />
       </div>
@@ -40,7 +40,7 @@ export const InlineProduct = meta.story({
     variant: 'inline',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: 48, width: 300 }}>
         <Story />
       </div>
@@ -53,7 +53,7 @@ export const IconOnly = meta.story({
     variant: 'icon',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: 48, width: 300 }}>
         <Story />
       </div>
@@ -67,7 +67,7 @@ export const IconWithProduct = meta.story({
     variant: 'icon',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: 48, width: 300 }}>
         <Story />
       </div>
@@ -81,7 +81,7 @@ export const SmallContainer = meta.story({
     variant: 'inline',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: 24, width: 200 }}>
         <Story />
       </div>
@@ -95,7 +95,7 @@ export const LargeContainer = meta.story({
     variant: 'inline',
   },
   decorators: [
-    (Story) => (
+    Story => (
       <div style={{ height: 72, width: 800 }}>
         <Story />
       </div>

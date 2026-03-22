@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { ActionIcon, Badge, Card, createTheme, DefaultMantineColor, Modal, Paper, Table, Tooltip, type MantineColorsTuple } from '@mantine/core';
+import { ActionIcon, Badge, Card, createTheme, type DefaultMantineColor, type MantineColorsTuple, Modal, Paper, Table, Tooltip } from '@mantine/core';
 
 /**
  * Importing user defined packages
@@ -16,7 +16,6 @@ type ShadowColors = 'cyan' | 'slate' | 'terracotta';
 declare module '@mantine/core' {
   export interface MantineThemeColorsOverride {
     colors: Record<ShadowColors | DefaultMantineColor, MantineColorsTuple>;
-    others: Record<string, any>;
   }
 }
 

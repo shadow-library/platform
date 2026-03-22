@@ -7,7 +7,7 @@ import clsx from 'clsx';
 /**
  * Importing user defined packages
  */
-import { Alphabet } from './Alphabets';
+import { type Alphabet } from './Alphabets';
 import { BrandMark } from './BrandMark';
 import { useLogo } from './hooks/use-logo';
 import styles from './Logo.module.css';

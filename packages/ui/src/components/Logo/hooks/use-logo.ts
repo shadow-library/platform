@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { MantineColorShade, useComputedColorScheme, useMantineTheme } from '@mantine/core';
+import { type MantineColorShade, useComputedColorScheme, useMantineTheme } from '@mantine/core';
 
 /**
  * Importing user defined packages
  */
-import { Theme } from '@/types';
+import { type Theme } from '@/types';
 
 /**
  * Defining types

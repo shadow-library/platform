@@ -24,7 +24,7 @@ const meta = preview.meta({
 export const Alerts = meta.story({
   render: () => (
     <Stack gap='md'>
-      {(['info', 'success', 'warning', 'error'] as const).map((c) => (
+      {(['info', 'success', 'warning', 'error'] as const).map(c => (
         <Alert
           key={c}
           color={c === 'error' ? 'red' : c === 'success' ? 'green' : c === 'warning' ? 'yellow' : 'blue'}
@@ -41,7 +41,7 @@ export const Alerts = meta.story({
 export const Loaders = meta.story({
   render: () => (
     <Group>
-      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map((s) => (
+      {(['xs', 'sm', 'md', 'lg', 'xl'] as const).map(s => (
         <Loader key={s} size={s} />
       ))}
     </Group>
@@ -85,12 +85,12 @@ export const RingProgressStories = meta.story({
 export const Badges = meta.story({
   render: () => (
     <Group>
-      {(['blue', 'green', 'red', 'yellow', 'gray'] as const).map((c) => (
+      {(['blue', 'green', 'red', 'yellow', 'gray'] as const).map(c => (
         <Badge key={c} color={c}>
           {c}
         </Badge>
       ))}
-      {(['filled', 'light', 'outline', 'dot'] as const).map((v) => (
+      {(['filled', 'light', 'outline', 'dot'] as const).map(v => (
         <Badge key={v} variant={v}>
           {v}
         </Badge>

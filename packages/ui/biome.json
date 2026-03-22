@@ -6,13 +6,13 @@
     "useIgnoreFile": true
   },
   "files": {
-    "includes": ["src", ".storybook"]
+    "includes": ["src/**/*.{ts,tsx}", ".storybook/**/*.{ts,tsx}", "scripts/**/*.{ts,tsx}"]
   },
   "formatter": {
     "enabled": true,
     "indentStyle": "space",
     "indentWidth": 2,
-    "lineWidth": 140
+    "lineWidth": 180
   },
   "linter": {
     "enabled": true,
@@ -31,17 +31,12 @@
         "noNonNullAssertion": "error",
         "useSelfClosingElements": "warn",
         "useFragmentSyntax": "warn",
-        "useConst": "error",
         "noUselessElse": "error",
         "useNamingConvention": {
           "level": "warn",
           "options": {
             "strictCase": false,
-            "conventions": [
-              { "selector": { "kind": "function" }, "formats": ["camelCase", "PascalCase"] },
-              { "selector": { "kind": "variable" }, "formats": ["camelCase", "PascalCase", "CONSTANT_CASE"] },
-              { "selector": { "kind": "typeLike" }, "formats": ["PascalCase"] }
-            ]
+            "conventions": [{ "selector": { "kind": "objectLiteralProperty" }, "match": "[a-zA-Z0-9$_]+" }]
           }
         },
         "useImportType": {
@@ -53,7 +48,7 @@
       "suspicious": {
         "noExplicitAny": "error",
         "noDuplicateJsxProps": "error",
-        "noArrayIndexKey": "warn"
+        "noArrayIndexKey": "off"
       },
 
       "a11y": {
@@ -62,10 +57,6 @@
         "useKeyWithClickEvents": "warn",
         "useKeyWithMouseEvents": "warn",
         "noAccessKey": "warn"
-      },
-
-      "performance": {
-        "noReExportAll": "warn"
       }
     }
   },
@@ -73,7 +64,9 @@
     "formatter": {
       "quoteStyle": "single",
       "trailingCommas": "all",
-      "semicolons": "always"
+      "semicolons": "always",
+      "jsxQuoteStyle": "single",
+      "arrowParentheses": "asNeeded"
     }
   },
   "assist": {
@@ -82,7 +75,7 @@
         "organizeImports": {
           "level": "on",
           "options": {
-            "groups": [[":BUN:", ":NODE:"], [":PACKAGE:"], [":ALIAS:"], [":PATH:"]]
+            "groups": [[":BUN:", ":NODE:"], ":BLANK_LINE:", [":PACKAGE:", ":PACKAGE_WITH_PROTOCOL:"], ":BLANK_LINE:", [":ALIAS:"], ":BLANK_LINE:", [":PATH:"]]
           }
         }
       }

@@ -158,6 +158,7 @@ export class APIRequest {
     return response.json();
   }
 
+  // biome-ignore lint/suspicious/noThenProperty: This class is designed to be thenable for convenient usage in async contexts
   then<T, TResult1 = T, TResult2 = never>(
     resolve?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
     reject?: ((reason?: unknown) => TResult2 | PromiseLike<TResult2>) | null,
