@@ -17,6 +17,7 @@ import path from 'node:path';
  * Declaring the constants
  */
 const rootDir = path.join(import.meta.dirname, '..');
+const srcDir = path.join(rootDir, 'src');
 const distDir = path.join(rootDir, 'dist');
 
 const formatTime = (time: number) => (time < 1000 ? `${time.toFixed(0)}ms` : `${(time / 1000).toFixed(3)}s`);
@@ -52,6 +53,15 @@ const tscAlias = ['tsc-alias', '--outDir', distDir, '--project', 'tsconfig.build
 let result = spawnSync('bunx', tsc, { cwd: rootDir, stdio: 'inherit' });
 if (result.status === 0) result = spawnSync('bunx', tscAlias, { cwd: rootDir, stdio: 'inherit' });
 if (result.status !== 0) error('Build failed');
+
+/** Copying css files */
+const cssFiles = new Bun.Glob('**/*.css');
+for await (const file of cssFiles.scan(srcDir)) {
+  const srcPath = path.resolve(srcDir, file);
+  const destPath = path.resolve(distDir, file);
+  fs.mkdirSync(path.dirname(destPath), { recursive: true });
+  fs.copyFileSync(srcPath, destPath);
+}
 
 const endTime = process.hrtime(startTime);
 const timeTaken = endTime[0] * 1e3 + endTime[1] * 1e-6;
