@@ -12,11 +12,14 @@
     "check": "biome check"
   },
   "dependencies": {
-    "@tanstack/react-devtools": "latest",
-    "@tanstack/react-router": "latest",
-    "@tanstack/react-router-devtools": "latest",
-    "@tanstack/react-router-ssr-query": "latest",
-    "@tanstack/react-start": "latest",
+    "@mantine/core": "^8.3.18",
+    "@mantine/hooks": "^8.3.18",
+    "@shadow-library/ui": "^0.1.0",
+    "@tanstack/react-devtools": "^0.10.0",
+    "@tanstack/react-router": "^1.168.2",
+    "@tanstack/react-router-devtools": "^1.166.11",
+    "@tanstack/react-router-ssr-query": "^1.166.10",
+    "@tanstack/react-start": "^1.167.3",
     "@tanstack/router-plugin": "^1.167.3",
     "@types/node": "^25.5.0",
     "@vitejs/plugin-react": "^6.0.1",
@@ -28,7 +31,7 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.5",
-    "@tanstack/devtools-vite": "latest",
+    "@tanstack/devtools-vite": "^0.6.0",
     "@testing-library/dom": "^10.4.1",
     "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
