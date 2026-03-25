@@ -5,7 +5,8 @@
     /** Emit */
     "noEmit": false,
     "declaration": true,
-    "sourceMap": true
+    "emitDeclarationOnly": true,
+    "outDir": "dist"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["src/**/stories/*"]

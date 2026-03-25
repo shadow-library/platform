@@ -78,7 +78,7 @@ interface GeneratedEndpoint {
 /**
  * Declaring the constants
  */
-
+const IMPORT_STATEMENT_PLACEHOLDER = '<IMPORT_STATEMENT_PLACEHOLDER>';
 const HTTP_METHODS: HttpMethod[] = ['get', 'post', 'put', 'patch', 'delete'];
 
 function isRef(obj: unknown): obj is ReferenceObject {
@@ -178,7 +178,7 @@ function schemaToTs(schema: SchemaOrRef, spec: OpenApiSpec): string {
       } else if (schema.additionalProperties) {
         const vt = typeof schema.additionalProperties === 'boolean' ? 'unknown' : schemaToTs(schema.additionalProperties, spec);
         result = `Record<string, ${vt}>`;
-      } else result = 'Record<string, unknown>';
+      } else result = 'JsonObject';
       break;
     }
 
@@ -210,7 +210,7 @@ function collectTypes(spec: OpenApiSpec): string {
         const vt = typeof schema.additionalProperties === 'boolean' ? 'unknown' : schemaToTs(schema.additionalProperties, spec);
         props.push(`  [key: string]: ${vt};`);
       }
-      lines.push(`export interface ${name} {\n${props.join('\n')}\n}`);
+      lines.push(`export type ${name} = {\n${props.join('\n')}\n};`);
     } else lines.push(`export type ${name} = ${schemaToTs(schema, spec)};`);
     lines.push('');
   }
@@ -258,7 +258,7 @@ function generateEndpoint(
       const tsType = originalType === 'string' ? 'string | undefined' : `string | ${originalType} | undefined`;
       return `  ${p.name}?: ${tsType};`;
     });
-    types.push(`export interface ${queryTypeName} extends QueryParams {\n${props.join('\n')}\n}`);
+    types.push(`export type ${queryTypeName} = {\n${props.join('\n')}\n};`);
   }
 
   // Request body
@@ -274,7 +274,7 @@ function generateEndpoint(
         if (jsonSchema.type === 'object' && jsonSchema.properties && !jsonSchema.allOf && !jsonSchema.oneOf && !jsonSchema.anyOf) {
           const req = new Set(jsonSchema.required ?? []);
           const props = Object.entries(jsonSchema.properties).map(([key, val]) => `  ${key}${req.has(key) ? '' : '?'}: ${schemaToTs(val, spec)};`);
-          types.push(`export interface ${bodyTypeName} {\n${props.join('\n')}\n}`);
+          types.push(`export type ${bodyTypeName} = {\n${props.join('\n')}\n};`);
         } else types.push(`export type ${bodyTypeName} = ${schemaToTs(jsonSchema, spec)};`);
       }
     }
@@ -335,14 +335,7 @@ export async function generateApi(url: string): Promise<string> {
     }
   }
 
-  const lines: string[] = [
-    '/* eslint-disable */',
-    '',
-    '/** Auto-generated file — do not edit manually */',
-    '',
-    'import { APIRequest, type QueryParams } from "@shadow-library/ui";',
-    '',
-  ];
+  const lines: string[] = ['/** Auto-generated file — do not edit manually */', '', IMPORT_STATEMENT_PLACEHOLDER, ''];
   const schemaTypes = collectTypes(spec);
   if (schemaTypes.trim()) lines.push(schemaTypes);
 
@@ -356,5 +349,9 @@ export async function generateApi(url: string): Promise<string> {
     lines.push('');
   }
 
-  return lines.join('\n');
+  const contents = lines.join('\n');
+  const imports = ['APIRequest'];
+  if (contents.includes('JsonObject')) imports.push('type JsonObject');
+  const importStatement = `import { ${imports.join(', ')} } from '@shadow-library/ui';`;
+  return contents.replace(IMPORT_STATEMENT_PLACEHOLDER, importStatement);
 }
