@@ -8,7 +8,7 @@ import { type JSX } from 'react';
 /**
  * Importing user defined packages
  */
-import { type NavItem } from '../layout.types';
+import { type NavGroup, type NavItem } from '../layout.types';
 
 /**
  * Defining types
@@ -59,6 +59,51 @@ export const sampleUser = {
 };
 
 export const sampleNotifications = { count: 3, onClick: () => {} };
+
+export const groupedNavItems: (NavItem | NavGroup)[] = [
+  {
+    group: 'Main',
+    items: [
+      { label: 'Dashboard', icon: Home, path: '/', exactMatch: true },
+      { label: 'Projects', icon: Package, path: '/projects' },
+    ],
+  },
+  {
+    group: 'Management',
+    items: [
+      {
+        label: 'Users',
+        icon: Users,
+        children: [
+          { label: 'All Users', icon: Users, path: '/users/all' },
+          { label: 'Roles', icon: Shield, path: '/users/roles' },
+        ],
+      },
+      {
+        label: 'Content',
+        icon: BookOpen,
+        children: [
+          { label: 'Articles', icon: FileText, path: '/content/articles' },
+          { label: 'Pages', icon: FileText, path: '/content/pages' },
+        ],
+      },
+    ],
+  },
+  {
+    group: 'System',
+    items: [
+      {
+        label: 'Settings',
+        icon: Settings,
+        children: [
+          { label: 'General', icon: Settings, path: '/settings/general' },
+          { label: 'Notifications', icon: Bell, path: '/settings/notifications' },
+          { label: 'Security', icon: Shield, path: '/settings/security' },
+        ],
+      },
+    ],
+  },
+];
 
 export function withRouter(initialPath = '/') {
   return function RouterDecorator(Story: React.ComponentType): JSX.Element {

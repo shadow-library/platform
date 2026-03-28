@@ -1,21 +1,25 @@
 /**
  * Importing npm packages
  */
-import { ActionIcon, Avatar, Burger, Group, Indicator, Menu, Text, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
+import { ActionIcon, Avatar, Box, Burger, Group, Indicator, Menu, Text, useComputedColorScheme, useMantineColorScheme } from '@mantine/core';
 import { Bell, Moon, Sun } from 'lucide-react';
+import { type ReactNode } from 'react';
 
 /**
  * Importing user defined packages
  */
 import { getInitials } from '@/lib';
 
-import { type NotificationsConfig, type UserInfo } from './layout.types';
+import { useActiveNavLabel } from './hooks/use-active-nav-label';
+import { type NavGroup, type NavItem, type NotificationsConfig, type UserInfo } from './layout.types';
 
 /**
  * Defining types
  */
 
 interface TopNavbarProps {
+  navItems: (NavItem | NavGroup)[];
+  headerContent?: ReactNode;
   user?: UserInfo;
   notifications?: NotificationsConfig;
   showThemeToggle?: boolean;
@@ -27,15 +31,24 @@ interface TopNavbarProps {
  * Declaring the constants
  */
 
-export function TopNavbar({ user, notifications, showThemeToggle = true, mobileOpened, onToggleMobile }: TopNavbarProps) {
+export function TopNavbar({ navItems, headerContent, user, notifications, showThemeToggle = true, mobileOpened, onToggleMobile }: TopNavbarProps) {
   const theme = useComputedColorScheme();
   const { toggleColorScheme } = useMantineColorScheme();
+  const activeLabel = useActiveNavLabel(navItems);
 
   return (
     <Group h='100%' px='md' justify='space-between' wrap='nowrap'>
       {/* Left section */}
       <Group gap='sm' wrap='nowrap'>
         <Burger opened={mobileOpened} onClick={onToggleMobile} hiddenFrom='sm' size='sm' />
+        <Box visibleFrom='sm'>
+          {headerContent ??
+            (activeLabel && (
+              <Text fw={500} size='sm' c='dimmed'>
+                {activeLabel}
+              </Text>
+            ))}
+        </Box>
       </Group>
 
       {/* Right section */}

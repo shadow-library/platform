@@ -2,7 +2,6 @@
  * Importing npm packages
  */
 import { type LucideIcon } from 'lucide-react';
-import { type ReactNode } from 'react';
 
 /**
  * Importing user defined packages
@@ -58,9 +57,9 @@ export interface NotificationsConfig {
   onClick: () => void;
 }
 
-export interface FooterConfig {
-  /** Version string, e.g. "v1.2.3" */
-  version?: string;
-  /** Completely custom footer content — overrides default rendering */
-  content?: ReactNode;
+export interface NavGroup {
+  /** Section header label displayed above the grouped items */
+  group: string;
+  /** Nav items belonging to this group */
+  items: NavItem[];
 }

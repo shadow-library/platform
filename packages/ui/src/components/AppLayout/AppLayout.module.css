@@ -2,7 +2,8 @@
 .main {
   display: flex;
   flex-direction: column;
-  min-height: calc(100vh - 56px);
+  min-height: 100dvh;
+  background: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-8));
 }
 
 .mainContent {
@@ -15,13 +16,25 @@
   align-items: center;
   justify-content: center;
   min-height: 56px;
-  border-bottom: 0.5px solid light-dark(var(--mantine-color-shadowSlate-1), var(--mantine-color-shadowSlate-7));
+  position: relative;
+  margin-bottom: 5px;
 }
 
-.logoContainer {
-  height: 36px;
-  padding: 0px 10px;
-  width: 100%;
+.logoSection::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: calc(100% - 20px);
+  height: 1px;
+  background: light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
+}
+
+.brandIcon {
+  height: 40px;
+  width: 48px;
+  flex-shrink: 0;
 }
 
 /* SideNavbar */
@@ -35,6 +48,13 @@
   justify-content: center;
 }
 
+/* SideNavbar - Group divider */
+.navGroupDivider {
+  width: 80%;
+  align-self: center;
+  margin-block: 4px;
+}
+
 /* SideNavbarItem */
 .collapsedItem {
   width: 100%;
@@ -43,5 +63,5 @@
 
 /* ContentFooter */
 .footer {
-  border-top: 0.5px solid light-dark(var(--mantine-color-shadowSlate-1), var(--mantine-color-shadowSlate-7));
+  border-top: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));
 }
