@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import { MantineProvider } from '@mantine/core';
+import { shadowTheme } from '@shadow-library/ui';
 import { createRootRoute, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 
 /**
@@ -22,7 +24,9 @@ function RootComponent() {
         <HeadContent />
       </head>
       <body>
-        <Outlet />
+        <MantineProvider theme={shadowTheme}>
+          <Outlet />
+        </MantineProvider>
         <Scripts />
       </body>
     </html>

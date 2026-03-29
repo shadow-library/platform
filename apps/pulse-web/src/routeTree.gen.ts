@@ -9,50 +9,303 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
+import { Route as PublicRouteRouteImport } from './routes/_public/route'
+import { Route as PublicIndexRouteImport } from './routes/_public/index'
+import { Route as PublicMonitoringMetricsIndexRouteImport } from './routes/_public/monitoring/metrics/index'
+import { Route as PublicMonitoringDevInboxIndexRouteImport } from './routes/_public/monitoring/dev-inbox/index'
+import { Route as PublicMessagingTemplatesIndexRouteImport } from './routes/_public/messaging/templates/index'
+import { Route as PublicMessagingSendersIndexRouteImport } from './routes/_public/messaging/senders/index'
+import { Route as PublicMessagingProvidersIndexRouteImport } from './routes/_public/messaging/providers/index'
+import { Route as PublicConfigurationServicesIndexRouteImport } from './routes/_public/configuration/services/index'
+import { Route as PublicConfigurationRoutingRulesIndexRouteImport } from './routes/_public/configuration/routing-rules/index'
+import { Route as PublicConfigurationDefaultSettingsIndexRouteImport } from './routes/_public/configuration/default-settings/index'
+import { Route as PublicAccessControlUsersIndexRouteImport } from './routes/_public/access-control/users/index'
+import { Route as PublicAccessControlRolesPermissionsIndexRouteImport } from './routes/_public/access-control/roles-permissions/index'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const PublicRouteRoute = PublicRouteRouteImport.update({
+  id: '/_public',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PublicIndexRoute = PublicIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => PublicRouteRoute,
+} as any)
+const PublicMonitoringMetricsIndexRoute =
+  PublicMonitoringMetricsIndexRouteImport.update({
+    id: '/monitoring/metrics/',
+    path: '/monitoring/metrics/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicMonitoringDevInboxIndexRoute =
+  PublicMonitoringDevInboxIndexRouteImport.update({
+    id: '/monitoring/dev-inbox/',
+    path: '/monitoring/dev-inbox/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicMessagingTemplatesIndexRoute =
+  PublicMessagingTemplatesIndexRouteImport.update({
+    id: '/messaging/templates/',
+    path: '/messaging/templates/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicMessagingSendersIndexRoute =
+  PublicMessagingSendersIndexRouteImport.update({
+    id: '/messaging/senders/',
+    path: '/messaging/senders/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicMessagingProvidersIndexRoute =
+  PublicMessagingProvidersIndexRouteImport.update({
+    id: '/messaging/providers/',
+    path: '/messaging/providers/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicConfigurationServicesIndexRoute =
+  PublicConfigurationServicesIndexRouteImport.update({
+    id: '/configuration/services/',
+    path: '/configuration/services/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicConfigurationRoutingRulesIndexRoute =
+  PublicConfigurationRoutingRulesIndexRouteImport.update({
+    id: '/configuration/routing-rules/',
+    path: '/configuration/routing-rules/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicConfigurationDefaultSettingsIndexRoute =
+  PublicConfigurationDefaultSettingsIndexRouteImport.update({
+    id: '/configuration/default-settings/',
+    path: '/configuration/default-settings/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicAccessControlUsersIndexRoute =
+  PublicAccessControlUsersIndexRouteImport.update({
+    id: '/access-control/users/',
+    path: '/access-control/users/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
+const PublicAccessControlRolesPermissionsIndexRoute =
+  PublicAccessControlRolesPermissionsIndexRouteImport.update({
+    id: '/access-control/roles-permissions/',
+    path: '/access-control/roles-permissions/',
+    getParentRoute: () => PublicRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof IndexRoute
+  '/': typeof PublicIndexRoute
+  '/access-control/roles-permissions/': typeof PublicAccessControlRolesPermissionsIndexRoute
+  '/access-control/users/': typeof PublicAccessControlUsersIndexRoute
+  '/configuration/default-settings/': typeof PublicConfigurationDefaultSettingsIndexRoute
+  '/configuration/routing-rules/': typeof PublicConfigurationRoutingRulesIndexRoute
+  '/configuration/services/': typeof PublicConfigurationServicesIndexRoute
+  '/messaging/providers/': typeof PublicMessagingProvidersIndexRoute
+  '/messaging/senders/': typeof PublicMessagingSendersIndexRoute
+  '/messaging/templates/': typeof PublicMessagingTemplatesIndexRoute
+  '/monitoring/dev-inbox/': typeof PublicMonitoringDevInboxIndexRoute
+  '/monitoring/metrics/': typeof PublicMonitoringMetricsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/': typeof IndexRoute
+  '/': typeof PublicIndexRoute
+  '/access-control/roles-permissions': typeof PublicAccessControlRolesPermissionsIndexRoute
+  '/access-control/users': typeof PublicAccessControlUsersIndexRoute
+  '/configuration/default-settings': typeof PublicConfigurationDefaultSettingsIndexRoute
+  '/configuration/routing-rules': typeof PublicConfigurationRoutingRulesIndexRoute
+  '/configuration/services': typeof PublicConfigurationServicesIndexRoute
+  '/messaging/providers': typeof PublicMessagingProvidersIndexRoute
+  '/messaging/senders': typeof PublicMessagingSendersIndexRoute
+  '/messaging/templates': typeof PublicMessagingTemplatesIndexRoute
+  '/monitoring/dev-inbox': typeof PublicMonitoringDevInboxIndexRoute
+  '/monitoring/metrics': typeof PublicMonitoringMetricsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
-  '/': typeof IndexRoute
+  '/_public': typeof PublicRouteRouteWithChildren
+  '/_public/': typeof PublicIndexRoute
+  '/_public/access-control/roles-permissions/': typeof PublicAccessControlRolesPermissionsIndexRoute
+  '/_public/access-control/users/': typeof PublicAccessControlUsersIndexRoute
+  '/_public/configuration/default-settings/': typeof PublicConfigurationDefaultSettingsIndexRoute
+  '/_public/configuration/routing-rules/': typeof PublicConfigurationRoutingRulesIndexRoute
+  '/_public/configuration/services/': typeof PublicConfigurationServicesIndexRoute
+  '/_public/messaging/providers/': typeof PublicMessagingProvidersIndexRoute
+  '/_public/messaging/senders/': typeof PublicMessagingSendersIndexRoute
+  '/_public/messaging/templates/': typeof PublicMessagingTemplatesIndexRoute
+  '/_public/monitoring/dev-inbox/': typeof PublicMonitoringDevInboxIndexRoute
+  '/_public/monitoring/metrics/': typeof PublicMonitoringMetricsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/access-control/roles-permissions/'
+    | '/access-control/users/'
+    | '/configuration/default-settings/'
+    | '/configuration/routing-rules/'
+    | '/configuration/services/'
+    | '/messaging/providers/'
+    | '/messaging/senders/'
+    | '/messaging/templates/'
+    | '/monitoring/dev-inbox/'
+    | '/monitoring/metrics/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/access-control/roles-permissions'
+    | '/access-control/users'
+    | '/configuration/default-settings'
+    | '/configuration/routing-rules'
+    | '/configuration/services'
+    | '/messaging/providers'
+    | '/messaging/senders'
+    | '/messaging/templates'
+    | '/monitoring/dev-inbox'
+    | '/monitoring/metrics'
+  id:
+    | '__root__'
+    | '/_public'
+    | '/_public/'
+    | '/_public/access-control/roles-permissions/'
+    | '/_public/access-control/users/'
+    | '/_public/configuration/default-settings/'
+    | '/_public/configuration/routing-rules/'
+    | '/_public/configuration/services/'
+    | '/_public/messaging/providers/'
+    | '/_public/messaging/senders/'
+    | '/_public/messaging/templates/'
+    | '/_public/monitoring/dev-inbox/'
+    | '/_public/monitoring/metrics/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  IndexRoute: typeof IndexRoute
+  PublicRouteRoute: typeof PublicRouteRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
+    '/_public': {
+      id: '/_public'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof PublicRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_public/': {
+      id: '/_public/'
       path: '/'
       fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
+      preLoaderRoute: typeof PublicIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/monitoring/metrics/': {
+      id: '/_public/monitoring/metrics/'
+      path: '/monitoring/metrics'
+      fullPath: '/monitoring/metrics/'
+      preLoaderRoute: typeof PublicMonitoringMetricsIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/monitoring/dev-inbox/': {
+      id: '/_public/monitoring/dev-inbox/'
+      path: '/monitoring/dev-inbox'
+      fullPath: '/monitoring/dev-inbox/'
+      preLoaderRoute: typeof PublicMonitoringDevInboxIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/messaging/templates/': {
+      id: '/_public/messaging/templates/'
+      path: '/messaging/templates'
+      fullPath: '/messaging/templates/'
+      preLoaderRoute: typeof PublicMessagingTemplatesIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/messaging/senders/': {
+      id: '/_public/messaging/senders/'
+      path: '/messaging/senders'
+      fullPath: '/messaging/senders/'
+      preLoaderRoute: typeof PublicMessagingSendersIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/messaging/providers/': {
+      id: '/_public/messaging/providers/'
+      path: '/messaging/providers'
+      fullPath: '/messaging/providers/'
+      preLoaderRoute: typeof PublicMessagingProvidersIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/configuration/services/': {
+      id: '/_public/configuration/services/'
+      path: '/configuration/services'
+      fullPath: '/configuration/services/'
+      preLoaderRoute: typeof PublicConfigurationServicesIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/configuration/routing-rules/': {
+      id: '/_public/configuration/routing-rules/'
+      path: '/configuration/routing-rules'
+      fullPath: '/configuration/routing-rules/'
+      preLoaderRoute: typeof PublicConfigurationRoutingRulesIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/configuration/default-settings/': {
+      id: '/_public/configuration/default-settings/'
+      path: '/configuration/default-settings'
+      fullPath: '/configuration/default-settings/'
+      preLoaderRoute: typeof PublicConfigurationDefaultSettingsIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/access-control/users/': {
+      id: '/_public/access-control/users/'
+      path: '/access-control/users'
+      fullPath: '/access-control/users/'
+      preLoaderRoute: typeof PublicAccessControlUsersIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
+    }
+    '/_public/access-control/roles-permissions/': {
+      id: '/_public/access-control/roles-permissions/'
+      path: '/access-control/roles-permissions'
+      fullPath: '/access-control/roles-permissions/'
+      preLoaderRoute: typeof PublicAccessControlRolesPermissionsIndexRouteImport
+      parentRoute: typeof PublicRouteRoute
     }
   }
 }
 
+interface PublicRouteRouteChildren {
+  PublicIndexRoute: typeof PublicIndexRoute
+  PublicAccessControlRolesPermissionsIndexRoute: typeof PublicAccessControlRolesPermissionsIndexRoute
+  PublicAccessControlUsersIndexRoute: typeof PublicAccessControlUsersIndexRoute
+  PublicConfigurationDefaultSettingsIndexRoute: typeof PublicConfigurationDefaultSettingsIndexRoute
+  PublicConfigurationRoutingRulesIndexRoute: typeof PublicConfigurationRoutingRulesIndexRoute
+  PublicConfigurationServicesIndexRoute: typeof PublicConfigurationServicesIndexRoute
+  PublicMessagingProvidersIndexRoute: typeof PublicMessagingProvidersIndexRoute
+  PublicMessagingSendersIndexRoute: typeof PublicMessagingSendersIndexRoute
+  PublicMessagingTemplatesIndexRoute: typeof PublicMessagingTemplatesIndexRoute
+  PublicMonitoringDevInboxIndexRoute: typeof PublicMonitoringDevInboxIndexRoute
+  PublicMonitoringMetricsIndexRoute: typeof PublicMonitoringMetricsIndexRoute
+}
+
+const PublicRouteRouteChildren: PublicRouteRouteChildren = {
+  PublicIndexRoute: PublicIndexRoute,
+  PublicAccessControlRolesPermissionsIndexRoute:
+    PublicAccessControlRolesPermissionsIndexRoute,
+  PublicAccessControlUsersIndexRoute: PublicAccessControlUsersIndexRoute,
+  PublicConfigurationDefaultSettingsIndexRoute:
+    PublicConfigurationDefaultSettingsIndexRoute,
+  PublicConfigurationRoutingRulesIndexRoute:
+    PublicConfigurationRoutingRulesIndexRoute,
+  PublicConfigurationServicesIndexRoute: PublicConfigurationServicesIndexRoute,
+  PublicMessagingProvidersIndexRoute: PublicMessagingProvidersIndexRoute,
+  PublicMessagingSendersIndexRoute: PublicMessagingSendersIndexRoute,
+  PublicMessagingTemplatesIndexRoute: PublicMessagingTemplatesIndexRoute,
+  PublicMonitoringDevInboxIndexRoute: PublicMonitoringDevInboxIndexRoute,
+  PublicMonitoringMetricsIndexRoute: PublicMonitoringMetricsIndexRoute,
+}
+
+const PublicRouteRouteWithChildren = PublicRouteRoute._addFileChildren(
+  PublicRouteRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
-  IndexRoute: IndexRoute,
+  PublicRouteRoute: PublicRouteRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

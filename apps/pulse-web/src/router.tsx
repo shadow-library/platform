@@ -2,11 +2,13 @@
  * Importing npm packages
  */
 import { createRouter as createTanStackRouter } from '@tanstack/react-router';
-import { routeTree } from './routeTree.gen';
+import '@mantine/core/styles.css';
+import '@shadow-library/ui/styles.css';
 
 /**
  * Importing user defined packages
  */
+import { routeTree } from './routeTree.gen';
 
 /**
  * Defining types

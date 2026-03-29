@@ -23,6 +23,6 @@ function Home() {
   );
 }
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute('/_public/')({
   component: Home,
 });
