@@ -1,11 +1,13 @@
 /**
  * Importing npm packages
  */
-import { useLocation, useNavigate } from '@tanstack/react-router';
+import { useLocation } from '@tanstack/react-router';
 
 /**
  * Importing user defined packages
  */
+import { type VoidFn } from '@/types';
+
 import { type NavItem } from '../layout.types';
 
 /**
@@ -26,19 +28,17 @@ function isItemOrChildActive(item: NavItem, currentPath: string): boolean {
   return item.children?.some(child => isItemOrChildActive(child, currentPath)) ?? false;
 }
 
-export function useSideNavbarItem(item: NavItem, onNavigate?: () => void) {
+export function useSideNavbarItem(item: NavItem, onNavigate?: VoidFn) {
   const location = useLocation();
-  const navigate = useNavigate();
   const currentPath = location.pathname;
 
   const isActive = item.path ? isRouteActive(item.path, currentPath, item.exactMatch ?? false) : false;
   const hasChildren = item.children && item.children.length > 0;
   const hasActiveChild = hasChildren ? isItemOrChildActive(item, currentPath) : false;
-  const handleClick = () => {
-    item.onClick?.();
-    if (item.path) navigate({ to: item.path });
-    if (!hasChildren) onNavigate?.();
+  const onClick = (e: React.MouseEvent) => {
+    item.onClick?.(e);
+    if (item.path) onNavigate?.();
   };
 
-  return { isActive, hasChildren, hasActiveChild, handleClick, navigate };
+  return { isActive, hasChildren, hasActiveChild, onClick };
 }

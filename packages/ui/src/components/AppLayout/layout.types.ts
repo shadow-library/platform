@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { type LucideIcon } from 'lucide-react';
+import { type MouseEventHandler } from 'react';
 
 /**
  * Importing user defined packages
@@ -21,7 +22,7 @@ export interface NavItem {
   /** Route path — used for navigation and active-state matching */
   path?: string;
   /** Click handler — called in addition to navigation when `path` is set */
-  onClick?: () => void;
+  onClick?: MouseEventHandler;
   /** Nested children — renders accordion (expanded) or flyout (collapsed) */
   children?: NavItem[];
   /** If true, active match uses exact equality; otherwise prefix match. @default false */
@@ -33,7 +34,7 @@ export interface NavItem {
 export interface UserMenuAction {
   label: string;
   icon?: LucideIcon;
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
   color?: string;
   /** If true, a divider is rendered before this action */
   divider?: boolean;
@@ -54,7 +55,7 @@ export interface NotificationsConfig {
   /** Unread count displayed as badge; 0 hides badge */
   count: number;
   /** Called when the bell icon is clicked */
-  onClick: () => void;
+  onClick: MouseEventHandler<HTMLButtonElement>;
 }
 
 export interface NavGroup {

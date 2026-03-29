@@ -21,3 +21,5 @@ export interface PaginationUpdate extends Record<string, string | number | boole
   limit: number;
   skip: number;
 }
+
+export type VoidFn = () => void;

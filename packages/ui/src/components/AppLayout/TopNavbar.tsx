@@ -9,6 +9,7 @@ import { type ReactNode } from 'react';
  * Importing user defined packages
  */
 import { getInitials } from '@/lib';
+import { type VoidFn } from '@/types';
 
 import { useActiveNavLabel } from './hooks/use-active-nav-label';
 import { type NavGroup, type NavItem, type NotificationsConfig, type UserInfo } from './layout.types';
@@ -24,7 +25,7 @@ interface TopNavbarProps {
   notifications?: NotificationsConfig;
   showThemeToggle?: boolean;
   mobileOpened: boolean;
-  onToggleMobile: () => void;
+  onToggleMobile: VoidFn;
 }
 
 /**
@@ -40,7 +41,7 @@ export function TopNavbar({ navItems, headerContent, user, notifications, showTh
     <Group h='100%' px='md' justify='space-between' wrap='nowrap'>
       {/* Left section */}
       <Group gap='sm' wrap='nowrap'>
-        <Burger opened={mobileOpened} onClick={onToggleMobile} hiddenFrom='sm' size='sm' />
+        <Burger opened={mobileOpened} onClick={onToggleMobile} hiddenFrom='sm' size='sm' aria-label='Toggle navigation' />
         <Box visibleFrom='sm'>
           {headerContent ??
             (activeLabel && (
@@ -52,7 +53,7 @@ export function TopNavbar({ navItems, headerContent, user, notifications, showTh
       </Group>
 
       {/* Right section */}
-      <Group gap='xs' wrap='nowrap'>
+      <Group gap='sm' wrap='nowrap'>
         {showThemeToggle && (
           <ActionIcon onClick={toggleColorScheme} size='lg' aria-label='Toggle color scheme'>
             {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
@@ -70,7 +71,7 @@ export function TopNavbar({ navItems, headerContent, user, notifications, showTh
         {user && (
           <Menu position='bottom-end' offset={8} width={200}>
             <Menu.Target>
-              <ActionIcon variant='transparent' size='lg' radius='xl'>
+              <ActionIcon variant='transparent' size='lg' radius='xl' aria-label='User menu' ml='md'>
                 <Avatar src={user.avatarUrl} size='sm' radius='xl' color='initials'>
                   {!user.avatarUrl && getInitials(user.name)}
                 </Avatar>

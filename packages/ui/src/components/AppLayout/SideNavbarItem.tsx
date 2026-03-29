@@ -2,10 +2,13 @@
  * Importing npm packages
  */
 import { ActionIcon, Menu, NavLink, Tooltip } from '@mantine/core';
+import { Link } from '@tanstack/react-router';
 
 /**
  * Importing user defined packages
  */
+import { type VoidFn } from '@/types';
+
 import styles from './AppLayout.module.css';
 import { useSideNavbarItem } from './hooks/use-side-navbar-item';
 import { type NavItem } from './layout.types';
@@ -17,15 +20,17 @@ import { type NavItem } from './layout.types';
 interface SideNavbarItemProps {
   item: NavItem;
   collapsed: boolean;
-  onNavigate?: () => void;
+  isChild?: boolean;
+  onNavigate?: VoidFn;
 }
 
 /**
  * Declaring the constants
  */
 
-export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemProps) {
-  const { isActive, hasChildren, hasActiveChild, handleClick, navigate } = useSideNavbarItem(item, onNavigate);
+export function SideNavbarItem({ item, collapsed, isChild, onNavigate }: SideNavbarItemProps) {
+  const { isActive, hasChildren, hasActiveChild, onClick } = useSideNavbarItem(item, onNavigate);
+  const routeProps = item.path ? { component: Link, to: item.path } : {};
 
   /** Collapsed mode — icon only */
   if (collapsed) {
@@ -33,7 +38,15 @@ export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemPr
       return (
         <Menu trigger='hover' position='right-start' offset={4}>
           <Menu.Target>
-            <ActionIcon variant={hasActiveChild ? 'light' : 'subtle'} size='xl' onClick={handleClick} disabled={item.disabled} className={styles.collapsedItem}>
+            <ActionIcon
+              variant={hasActiveChild ? 'light' : 'subtle'}
+              size='xl'
+              onClick={onClick}
+              disabled={item.disabled}
+              className={styles.collapsedItem}
+              aria-label={item.label}
+              {...routeProps}
+            >
               <item.icon size={20} />
             </ActionIcon>
           </Menu.Target>
@@ -44,11 +57,8 @@ export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemPr
                 key={child.key ?? child.path ?? child.label}
                 leftSection={<child.icon size={16} />}
                 disabled={child.disabled}
-                onClick={() => {
-                  child.onClick?.();
-                  if (child.path) navigate({ to: child.path });
-                  onNavigate?.();
-                }}
+                onClick={onClick}
+                {...(child.path ? { component: Link, to: child.path } : {})}
               >
                 {child.label}
               </Menu.Item>
@@ -60,7 +70,15 @@ export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemPr
 
     return (
       <Tooltip label={item.label} position='right' offset={8}>
-        <ActionIcon variant={isActive ? 'light' : 'subtle'} size='xl' onClick={handleClick} disabled={item.disabled} className={styles.collapsedItem}>
+        <ActionIcon
+          variant={isActive ? 'light' : 'subtle'}
+          size='xl'
+          onClick={onClick}
+          disabled={item.disabled}
+          className={styles.collapsedItem}
+          aria-label={item.label}
+          {...routeProps}
+        >
           <item.icon size={20} />
         </ActionIcon>
       </Tooltip>
@@ -74,11 +92,12 @@ export function SideNavbarItem({ item, collapsed, onNavigate }: SideNavbarItemPr
       leftSection={<item.icon size={18} />}
       active={isActive || hasActiveChild}
       disabled={item.disabled}
-      onClick={hasChildren ? undefined : handleClick}
+      onClick={hasChildren ? undefined : onClick}
       defaultOpened={hasActiveChild}
-      href={item.path}
+      className={isChild ? styles.childNavLink : undefined}
+      {...routeProps}
     >
-      {hasChildren && item.children?.map(child => <SideNavbarItem key={child.key ?? child.path ?? child.label} item={child} collapsed={false} onNavigate={onNavigate} />)}
+      {hasChildren && item.children?.map(child => <SideNavbarItem key={child.key ?? child.path ?? child.label} item={child} collapsed={false} isChild onNavigate={onNavigate} />)}
     </NavLink>
   );
 }

@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { type JsonObject, type JsonValue } from '@/types';
+import { type JsonObject, type JsonValue, type VoidFn } from '@/types';
 
 import { ApiError, type ErrorResponse } from './api-error';
 
@@ -170,7 +170,7 @@ export class APIRequest {
     return this.execute<T>().catch(reject);
   }
 
-  finally(callback: () => void): Promise<unknown> {
+  finally(callback: VoidFn): Promise<unknown> {
     return this.execute().finally(callback);
   }
 }

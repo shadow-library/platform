@@ -20,7 +20,7 @@ import { mergeConfig } from 'vite';
 
 export default defineMain({
   stories: ['../src/**/*.stories.@(ts|tsx)', './mantine-showcase/**/*.stories.@(ts|tsx)'],
-  addons: ['@chromatic-com/storybook', '@storybook/addon-vitest', '@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-themes'],
+  addons: ['@storybook/addon-vitest', '@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-themes'],
   framework: '@storybook/react-vite',
   async viteFinal(config) {
     return mergeConfig(config, {

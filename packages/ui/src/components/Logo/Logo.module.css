@@ -36,6 +36,12 @@
   & > svg {
     animation: glow-pulse 3s ease-in-out infinite;
   }
+
+  @media (prefers-reduced-motion: reduce) {
+    & > svg {
+      animation: none;
+    }
+  }
 }
 
 .divider {

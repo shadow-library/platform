@@ -148,3 +148,36 @@ export const WithScrollableContent = meta.story({
     ),
   },
 });
+
+export const MobileScreen = meta.story({
+  args: { defaultCollapsed: true },
+  globals: { viewport: { value: 'mobile2' } },
+  /** Test: mobile viewport shows expanded sidebar labels (not icon-only) even when defaultCollapsed is true */
+  play: async ({ canvas, userEvent }) => {
+    const burger = canvas.getByLabelText('Toggle navigation');
+    await waitFor(() => expect(burger).toBeVisible());
+    await userEvent.click(burger);
+
+    await waitFor(() => expect(canvas.getByText('Projects')).toBeVisible());
+    await expect(canvas.getByText('Users')).toBeVisible();
+    await expect(canvas.getByText('Settings')).toBeVisible();
+    await expect(canvas.getByLabelText('Toggle sidebar')).not.toBeVisible();
+
+    const closeButton = canvas.getByLabelText('Close navigation');
+    await expect(closeButton).toBeVisible();
+    await userEvent.click(closeButton);
+  },
+});
+
+export const TabletScreen = meta.story({
+  globals: { viewport: { value: 'tablet' } },
+  /** Test: tablet viewport shows desktop-like layout with visible sidebar and no burger menu */
+  play: async ({ canvas }) => {
+    await waitFor(() => expect(canvas.getByText('Projects')).toBeVisible());
+    await expect(canvas.getByText('Users')).toBeVisible();
+    await expect(canvas.getByText('Settings')).toBeVisible();
+
+    await expect(canvas.getByLabelText('Toggle sidebar')).toBeVisible();
+    await expect(canvas.getByLabelText('Toggle navigation')).not.toBeVisible();
+  },
+});

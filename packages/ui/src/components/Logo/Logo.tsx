@@ -39,7 +39,7 @@ export function Logo({ height, productName, variant = 'inline' }: LogoProps) {
         <>
           {variant !== 'icon' && <Divider className={styles.divider} mx='xs' size='sm' color={colors.dividerColor} orientation='vertical' />}
           {productName.map((Icon, index) => (
-            <Icon key={index} fill={index % 2 === 1 ? colors.primaryColor : colors.secondaryColor} />
+            <Icon key={index} fill={index % 2 === 1 ? colors.primaryColor : colors.secondaryColor} aria-hidden='true' />
           ))}
         </>
       )}

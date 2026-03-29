@@ -61,6 +61,21 @@
   border-radius: var(--mantine-radius-sm);
 }
 
+.childNavLink {
+  --nl-color: light-dark(var(--mantine-color-dark-7), var(--mantine-color-dark-1));
+
+  &[data-active] {
+    font-weight: 600;
+    --nl-bg: transparent;
+    --nl-hover: light-dark(var(--mantine-color-gray-0), var(--mantine-color-dark-6));
+    --nl-color: var(--mantine-primary-color-filled);
+
+    svg {
+      stroke-width: 3px;
+    }
+  }
+}
+
 /* ContentFooter */
 .footer {
   border-top: 1px solid light-dark(var(--mantine-color-gray-2), var(--mantine-color-dark-5));

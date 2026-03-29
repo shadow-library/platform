@@ -14,7 +14,7 @@
     "test:setup": "bunx playwright install",
     "test": "vitest run",
     "lint": "biome check",
-    "format": "biome format",
+    "format": "biome format --write",
     "prepare": "husky"
   },
   "repository": {
@@ -29,7 +29,6 @@
   "homepage": "https://github.com/shadow-library/ui#readme",
   "devDependencies": {
     "@biomejs/biome": "^2.4.8",
-    "@chromatic-com/storybook": "^5.0.2",
     "@commitlint/cli": "^20.5.0",
     "@commitlint/config-conventional": "^20.5.0",
     "@mantine/core": "^8.3.18",

@@ -6,6 +6,8 @@ import { Divider, Stack, Text } from '@mantine/core';
 /**
  * Importing user defined packages
  */
+import { type VoidFn } from '@/types';
+
 import styles from './AppLayout.module.css';
 import { type NavGroup } from './layout.types';
 import { SideNavbarItem } from './SideNavbarItem';
@@ -18,7 +20,7 @@ interface SideNavbarGroupProps {
   group: NavGroup;
   collapsed: boolean;
   showDivider: boolean;
-  onNavigate?: () => void;
+  onNavigate?: VoidFn;
 }
 
 /**
