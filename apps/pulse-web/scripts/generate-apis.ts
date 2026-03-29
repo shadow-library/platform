@@ -22,5 +22,5 @@ const openapiSpecUrl = process.env.OPENAPI_SPEC_URL || 'https://pulse.shadow-app
 
 const contents = await generateApi(openapiSpecUrl);
 await Bun.write(outputPath, contents);
-// await Bun.$`biome format ${outputPath}`;
+await Bun.$`biome format --write ${outputPath}`;
 console.log(`API generated successfully at ${outputPath}`);
