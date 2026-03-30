@@ -10,7 +10,7 @@ import { type ReactNode } from 'react';
 import styles from './AppLayout.module.css';
 import { ContentFooter } from './ContentFooter';
 import { useLayoutState } from './hooks/use-layout-state';
-import { type NavGroup, type NavItem, type NotificationsConfig, type UserInfo } from './layout.types';
+import { type NavItems, type NotificationsConfig, type UserInfo } from './layout.types';
 import { SideNavbar } from './SideNavbar';
 import { TopNavbar } from './TopNavbar';
 
@@ -21,7 +21,7 @@ import { TopNavbar } from './TopNavbar';
 interface AppLayoutProps {
   appName: string;
   children: ReactNode;
-  navItems: (NavItem | NavGroup)[];
+  navItems: NavItems;
   headerContent?: ReactNode;
   user?: UserInfo;
   notifications?: NotificationsConfig;

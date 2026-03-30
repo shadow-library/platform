@@ -43,7 +43,7 @@ export type QueryParams = Record<string, string | number | boolean | undefined>;
  */
 
 export class APIRequest {
-  private static baseUrl = '/api/v1';
+  private static baseUrl = import.meta.env.VITE_API_BASE_URL || '';
   private static preRequestHook: PreRequestHook | null = null;
   private static postResponseHook: PostResponseHook | null = null;
 
@@ -125,8 +125,10 @@ export class APIRequest {
   async execute<T>(): Promise<T> {
     const { path, method, headers, query, data } = this.options;
 
-    const queryString = Object.keys(query).length > 0 ? `?${new URLSearchParams(query).toString()}` : '';
-    const url = path.startsWith('http://') || path.startsWith('https://') ? `${path}${queryString}` : `${APIRequest.baseUrl}${path}${queryString}`;
+    let url: string = path;
+    const searchParams = new URLSearchParams(query);
+    if (searchParams.size) url += `?${searchParams.toString()}`;
+    if (!path.startsWith('http://') && !path.startsWith('https://')) url = APIRequest.baseUrl + url;
 
     const init: RequestInit = { method, headers };
     if (data) {

@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { type LinkProps } from '@tanstack/react-router';
 import { type LucideIcon } from 'lucide-react';
 import { type MouseEventHandler } from 'react';
 
@@ -20,7 +21,7 @@ export interface NavItem {
   /** Lucide icon component (not element), e.g. `Home` not `<Home />` */
   icon: LucideIcon;
   /** Route path — used for navigation and active-state matching */
-  path?: string;
+  path?: LinkProps['to'];
   /** Click handler — called in addition to navigation when `path` is set */
   onClick?: MouseEventHandler;
   /** Nested children — renders accordion (expanded) or flyout (collapsed) */
@@ -64,3 +65,5 @@ export interface NavGroup {
   /** Nav items belonging to this group */
   items: NavItem[];
 }
+
+export type NavItems = (NavItem | NavGroup)[];
