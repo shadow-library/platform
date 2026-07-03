@@ -1,8 +1,8 @@
 {
-  "name": "@shadow-library/service-name",
+  "name": "@shadow-library/novel-forge-server",
   "type": "module",
   "version": "0.0.0",
-  "description": "description",
+  "description": "Backend service for the AI-powered novel generation platform. Provides workflow orchestration, lore management, chapter generation, AI integrations, user review pipelines, and continuity validation.",
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
@@ -13,14 +13,14 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/service-name.git"
+    "url": "git+ssh://git@github.com/shadow-library/novel-forge-server.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/service-name/issues"
+    "url": "https://github.com/shadow-library/novel-forge-server/issues"
   },
-  "homepage": "https://github.com/shadow-library/service-name#readme",
+  "homepage": "https://github.com/shadow-library/novel-forge-server#readme",
   "devDependencies": {
     "@commitlint/cli": "^19.8.1",
     "@commitlint/config-conventional": "^19.8.1",
