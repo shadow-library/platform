@@ -12,6 +12,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AiModule } from '@modules/ai';
 import { BibleModule } from '@modules/bible';
 import { ExtractionModule } from '@modules/extraction';
 import { ProjectModule } from '@modules/project';
@@ -32,7 +33,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, ExtractionModule, ProjectModule, SourceModule, BibleModule],
+  imports: [AppHttpCoreModule, AiModule, ExtractionModule, ProjectModule, SourceModule, BibleModule],
   host: Config.get('server.host'),
   port: Config.get('server.port'),
   routePrefix: '/api',

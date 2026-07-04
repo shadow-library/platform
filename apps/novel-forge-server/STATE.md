@@ -87,6 +87,18 @@
 - PromptModule<TOut>.schema typed as `z.ZodType<TOut, z.ZodTypeDef, unknown>` to allow ZodDefault transforms
 - 14 unit tests in `tests/ai/prompts.spec.ts`: AUTHORING_STYLE presence/absence, judge refine behavior, fix refine behavior, plan contiguity refine, extraction parse
 
+### A3 — Model router, telemetry callback, repair ladder
+
+- `MODEL_REGISTRY` in `models.ts`: 12 entries (grok-3/mini/image, claude-sonnet-4-6/haiku, gpt-4o/mini/image-1, qwen3:14b/8b/embedding:8b); `MODEL_MAP` keyed by model id
+- `defaults.ts`: `AiRole` (15 roles), `PRODUCTION_DEFAULTS` (xAI grok-3 for all except title→grok-3-mini, embedding→ollama/qwen3:embedding, image→grok-2-image), `LOCAL_TEST_DEFAULTS` (ollama/qwen3 for all)
+- `TelemetryHandler` extends `BaseCallbackHandler`; `registerCall` + handleLLMStart/End/Error; writes to `model_calls` table; DB-failure swallowed (just logs)
+- `ModelRouterService.resolveModel`: grok_only → xai; per-project config override; fallback to AI_PROFILE defaults
+- `ModelRouterService.buildClient`: switch on provider xai/anthropic/openai; ollama throws AI_002 (deferred to A10)
+- `ModelRouterService.structured<T>`: 3-attempt repair ladder (raw invoke → repair prompt with priorOutput+parseIssues → tolerant extractJsonBlock fallback); throws AI_001 on all failures
+- `@langchain/core` bumped to 1.2.1, `@langchain/anthropic` 1.5.1, `@langchain/openai` 1.5.3 (xai 1.4.3 requires core@^1)
+- ChatOllama import deferred (A10); buildClient throws AI_002 for ollama provider in non-A10 builds
+- Tests: 12 unit tests in `tests/ai/model-router.spec.ts`; buildClient patched via bracket access so no API key required; 26 total pass, 15 skip, 0 fail
+
 ## Open issues
 
 <!-- none yet -->

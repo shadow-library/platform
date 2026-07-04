@@ -25,6 +25,7 @@ declare module '@shadow-library/common' {
     'server.host': string;
 
     /** AI configs */
+    'ai.profile': 'production' | 'local-test';
     'ai.anthropicApiKey': string | undefined;
     'ai.openaiApiKey': string | undefined;
     'ai.xaiApiKey': string | undefined;
@@ -51,6 +52,7 @@ Config.load('app.stage', { defaultValue: 'dev', allowedValues: ['dev', 'staging'
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
+Config.load('ai.profile', { defaultValue: 'production', allowedValues: ['production', 'local-test'] });
 Config.load('ai.anthropicApiKey');
 Config.load('ai.openaiApiKey');
 Config.load('ai.xaiApiKey');
