@@ -63,7 +63,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] A6 — Tool registry: 6 read-only tools, loop, audit (A6, §4)
 - [x] A7 — LangGraph workflows + WorkflowRunService (A7, §2)
 - [x] A8 — Human review API: feedback/approve/revisions/review-queue/runs endpoints (A8, §6)
-- [ ] A9 — Job executors, crash recovery, checkpoint janitor (A9)
+- [x] A9 — Job executors, crash recovery, checkpoint janitor (A9)
 - [ ] A10 — Local LLM test harness: Ollama rung-3 suite + `ai:smoke` (A10, §8)
 - [ ] A11 — Hardening sweep, CI wiring, observability polish, docs (A11)
 - [ ] M6 — Source pipeline: acquire, extract, consolidate, assets, skeleton (migration Phase 6)

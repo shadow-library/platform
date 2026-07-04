@@ -5,7 +5,6 @@
 /**
  * Importing npm packages
  */
-import { Config } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -84,8 +83,10 @@ export const LOCAL_TEST_DEFAULTS: Record<AiRole, ResolvedModel> = {
   image: { provider: 'ollama', model: 'qwen3:8b' },
 };
 
+// Read directly from process.env so smoke scripts can override it at runtime
+// without needing to re-bootstrap Config (which caches at load time).
 export function getProfileDefaults(): Record<AiRole, ResolvedModel> {
-  const profile = Config.get('ai.profile');
+  const profile = process.env['AI_PROFILE'] ?? 'production';
   if (profile === 'local-test') return LOCAL_TEST_DEFAULTS;
   return PRODUCTION_DEFAULTS;
 }

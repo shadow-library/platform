@@ -7,6 +7,7 @@
  */
 import { ChatAnthropic } from '@langchain/anthropic';
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatXAI } from '@langchain/xai';
 import { Injectable } from '@shadow-library/app';
@@ -98,10 +99,7 @@ export class ModelRouterService {
       case 'openai':
         return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openaiApiKey') });
       case 'ollama':
-        // ChatOllama requires @langchain/ollama which has a peer dep on @langchain/core >=1.x.
-        // Loaded lazily so version incompatibility does not crash non-Ollama paths.
-        // Full Ollama wiring is completed in A10 (local-LLM harness).
-        throw new ServerError(AppErrorCode.AI_002);
+        return new ChatOllama({ model: resolved.model, baseUrl: Config.get('ai.ollamaHost'), temperature: 0 });
       default:
         throw new ServerError(AppErrorCode.AI_002);
     }

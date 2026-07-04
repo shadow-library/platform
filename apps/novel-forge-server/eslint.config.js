@@ -46,4 +46,9 @@ export default [
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
     },
   },
+  // Scripts run as CLI tools and write to stdout/stderr intentionally.
+  {
+    files: ['scripts/**/*.ts'],
+    rules: { 'no-console': 'off' },
+  },
 ];
