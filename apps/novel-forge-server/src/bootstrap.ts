@@ -32,6 +32,7 @@ declare module '@shadow-library/common' {
     'ai.grokLlmModel': string;
     'ai.grokImageModel': string;
     'ai.ollamaHost': string;
+    'ai.embeddingModel': string;
     'ai.allowClaudeCode': boolean;
     'ai.allowCodex': boolean;
     'ai.claudeCodeBin': string;
@@ -59,6 +60,7 @@ Config.load('ai.xaiApiKey');
 Config.load('ai.grokLlmModel', { defaultValue: 'grok-3' });
 Config.load('ai.grokImageModel', { defaultValue: 'grok-2-image' });
 Config.load('ai.ollamaHost', { defaultValue: 'http://localhost:11434' });
+Config.load('ai.embeddingModel', { defaultValue: 'qwen3-embedding:8b' });
 Config.load('ai.allowClaudeCode', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('ai.allowCodex', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('ai.claudeCodeBin', { defaultValue: 'claude' });

@@ -14,6 +14,9 @@ import { DatabaseModule } from '@shadow-library/modules';
 import { CatalogService } from './context/catalog.service';
 import { ContextAssembler } from './context/context-assembler.service';
 import { ModelRouterService } from './model-router.service';
+import { EmbeddingService } from './retrieval/embedding.service';
+import { IndexingService } from './retrieval/indexing.service';
+import { RetrievalService } from './retrieval/retrieval.service';
 import { TelemetryHandler } from './telemetry.handler';
 
 /**
@@ -26,7 +29,7 @@ import { TelemetryHandler } from './telemetry.handler';
 
 @Module({
   imports: [DatabaseModule],
-  providers: [TelemetryHandler, ModelRouterService, CatalogService, ContextAssembler],
-  exports: [ModelRouterService, TelemetryHandler, CatalogService, ContextAssembler],
+  providers: [TelemetryHandler, ModelRouterService, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler],
+  exports: [ModelRouterService, TelemetryHandler, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler],
 })
 export class AiModule {}

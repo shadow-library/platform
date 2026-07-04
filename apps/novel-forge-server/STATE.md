@@ -112,6 +112,17 @@
 - AiModule updated with CatalogService + ContextAssembler providers/exports
 - 13 unit tests in `tests/ai/context-assembler.spec.ts`: all 4 acceptance criteria covered; 39 total pass, 15 skip, 0 fail
 
+### A5 — LlamaIndex retrieval: prose + lore indexes
+
+- `chunker.ts`: `chunkText` splits at paragraph boundaries (~2000 chars), sentence-level fallback for oversized paragraphs
+- `EmbeddingService`: uses `ollama/browser` Ollama client; `embed`/`embedBatch` best-effort (null on error)
+- `IndexingService`: `addProse` (delete then insert chapter_chunks), `deleteProse`, `addLore` (upsert lore_chunks), `backfill` (indexes unindexed done chapters)
+- `RetrievalService`: `searchProse` + `searchLore` via raw Drizzle sql pgvector `<=>` cosine distance; grok_only projects return []
+- ContextAssembler.forOutline updated to inject retrieval hits (prose_retrieved + lore_retrieved sections)
+- RetrievalService optional in ContextAssembler constructor for unit-test safety
+- `ai.embeddingModel` config added with default `qwen3-embedding:8b`
+- 7 unit tests; 46 total pass, 16 skip, 0 fail
+
 ## Open issues
 
 <!-- none yet -->

@@ -20,6 +20,7 @@ import * as schema from '@server/database/schemas';
 import { CatalogService } from './catalog.service';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextTier, joinSections, renderSection } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph } from './token-budget';
+import { type RetrievalHit, RetrievalService } from '../retrieval';
 
 /**
  * Defining types
@@ -53,6 +54,7 @@ export class ContextAssembler {
   constructor(
     private readonly databaseService: DatabaseService,
     private readonly catalogService: CatalogService,
+    private readonly retrievalService?: RetrievalService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -376,7 +378,24 @@ export class ContextAssembler {
       sections.push(makeSection('catalog', catalogText, 'canonical', []));
     }
 
-    // Retrieval hits (A5) — absent for now; degrades gracefully.
+    // 4. Retrieval hits — best-effort; empty degrades gracefully.
+    if (this.retrievalService) {
+      const query = currentVolume?.objective?.split('\n')[0] ?? '';
+      if (query) {
+        const [proseHits, loreHits] = await Promise.all([
+          this.retrievalService.searchProse(projectId, query).catch(() => [] as RetrievalHit[]),
+          this.retrievalService.searchLore(projectId, query).catch(() => [] as RetrievalHit[]),
+        ]);
+        if (proseHits.length > 0) {
+          const content = proseHits.map((h, i) => `${i + 1}. [Ch ${h.metadata.chapter}] ${h.text}`).join('\n\n');
+          sections.push(makeSection('prose_retrieved', content, 'canonical', []));
+        }
+        if (loreHits.length > 0) {
+          const content = loreHits.map((h, i) => `${i + 1}. [${h.metadata.kind}:${h.metadata.refKey}] ${h.text}`).join('\n\n');
+          sections.push(makeSection('lore_retrieved', content, 'canonical', []));
+        }
+      }
+    }
 
     return this.finalize(projectId, 'outline', chapter, sections, [], budgetTokens, false);
   }
