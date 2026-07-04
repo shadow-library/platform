@@ -78,6 +78,15 @@
 - AiModule scaffolded (empty, no providers yet)
 - 7 new EnumType exports in enum.dto.ts: DraftReviewStatus, WorkflowRunStatus, ModelCallStatus, ToolCallStatus, DraftRevisionSource, UserFeedbackArtifactType, UserFeedbackDisposition
 
+### A2 — Prompt modules + Zod schemas
+
+- 13 Zod schema files in `src/modules/ai/schemas/`: extraction, generation, judge (with .refine), fix (with .refine + patch/rewrite validation), outline (contextRefs ordering), title, continuity, validation, review, new-novel (BibleStageSchema), plan (contiguous-span .refine), skeleton
+- 14 prompt modules + 6 bible-builder stages in `src/modules/ai/prompts/`; PROMPT_REGISTRY in index.ts
+- AUTHORING_STYLE constant in `authoring-preamble.ts`; generation + revision are `kind:'authoring'`; all others `kind:'analytical'`
+- judge has 2 few-shots (CONSISTENT + CONTRADICTION); fix has 1 few-shot (minimal patch)
+- PromptModule<TOut>.schema typed as `z.ZodType<TOut, z.ZodTypeDef, unknown>` to allow ZodDefault transforms
+- 14 unit tests in `tests/ai/prompts.spec.ts`: AUTHORING_STYLE presence/absence, judge refine behavior, fix refine behavior, plan contiguity refine, extraction parse
+
 ## Open issues
 
 <!-- none yet -->
