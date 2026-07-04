@@ -71,4 +71,14 @@ export class AppErrorCode extends ServerErrorCode {
    * Entity Errors
    */
   static readonly ENT_001 = new AppErrorCode('ENT_001', ErrorType.NOT_FOUND, 'Entity not found');
+
+  /*!
+   * Volume Errors
+   */
+  static readonly VOL_001 = new AppErrorCode('VOL_001', ErrorType.NOT_FOUND, 'Volume not found');
+
+  /*!
+   * Bible Document Errors
+   */
+  static readonly DOC_001 = new AppErrorCode('DOC_001', ErrorType.NOT_FOUND, 'Bible document not found');
 }

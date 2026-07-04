@@ -36,11 +36,29 @@
 - `TestEnvironment` in `tests/test-environment.ts` (requires PostgreSQL + template DB)
 - Tests require PostgreSQL; legacy scaffold test removed; `bun test` passes on unit-only specs
 
+### M2 — PostgreSQL schema & Drizzle migrations
+- 9 schema files: projects, chapters, knowledge, plan, story, bible, generation, jobs, vectors
+- 22 tables, 17 pgEnums; namespace type exports per file
+- `vector(1024)` via customType; `CREATE EXTENSION vector` + HNSW index in migration
+- `contentGenerator` enum defined in projects.ts; imported by chapters.ts + generation.ts
+- projects.ts self-ref FK uses `AnyPgColumn` annotation; `projectRelations` uses `one()`
+- All 18 EnumType exports in `enum.dto.ts`; eslint `no-namespace: off` added to match pulse
+
 ## Considered but deferred
 
 - External durable queue (in-process JobService sufficient per §1.1.9)
 - S3 image storage (interface only; local ships first)
 - Flask browse UI (out of scope; future frontend)
+
+### M3 — Core domain modules
+
+- ProjectModule: create/list/get/update/clone/delete/reset/status/cost — 9 routes under `/api/v1/projects`
+- SourceModule: ChapterService list/get/update/delete — 4 routes under `/api/v1/projects/:projectId/source/chapters`
+- BibleModule: EntityService (upsert-on-conflict), VolumeService (upsert + approve), BibleDocumentService — 15 routes total
+- new_novel project creation seeds 7 bibleDocument rows (one per section, slug='default')
+- clone uses `db.transaction` — copies child tables; `resetDerived=false` path is a TODO stub
+- VOL_001 (volume not found) + DOC_001 (bible doc not found) added to AppErrorCode
+- Integration tests PG-gated with top-level `await` SQL probe; 6 tests skipped cleanly without PG
 
 ## Open issues
 
