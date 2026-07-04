@@ -14,6 +14,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
 import { AiModule } from '../ai/ai.module';
+import { JobsModule } from '../jobs/jobs.module';
 
 /**
  * Defining types
@@ -24,7 +25,7 @@ import { AiModule } from '../ai/ai.module';
  */
 
 @Module({
-  imports: [DatabaseModule, AiModule],
+  imports: [DatabaseModule, AiModule, JobsModule],
   controllers: [GenerationController],
   providers: [GenerationService],
   exports: [GenerationService],

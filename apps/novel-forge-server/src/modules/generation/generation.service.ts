@@ -44,6 +44,8 @@ import { JudgeSchema } from '../ai/schemas/judge.schema';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
+import { JobExecutor } from '../jobs/job.executor';
+import { JobService } from '../jobs/job.service';
 
 /**
  * Defining types
@@ -70,6 +72,13 @@ export interface SearchResult {
   hits: { text: string; score: number; metadata: Record<string, unknown> }[];
 }
 
+export interface JobEnqueueResult {
+  jobId: string;
+  kind: string;
+  status: string;
+  target: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -88,6 +97,8 @@ export class GenerationService {
     private readonly retrievalService: RetrievalService,
     private readonly indexingService: IndexingService,
     private readonly toolRegistry: ToolRegistryService,
+    private readonly jobService: JobService,
+    private readonly jobExecutor: JobExecutor,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -249,7 +260,7 @@ export class GenerationService {
 
   // ─── Generation + Drafts ─────────────────────────────────────────────────────
 
-  async generate(projectId: bigint, body: GenerateBody): Promise<WorkflowRunResult> {
+  async generate(projectId: bigint, body: GenerateBody): Promise<JobEnqueueResult> {
     const limit = body.limit ?? 1;
 
     // Guard: volumes must be approved before generating.
@@ -266,25 +277,23 @@ export class GenerationService {
     const finalChapters = new Set(finalDrafts.map(d => d.chapter));
 
     const chaptersToGenerate = briefs.filter(b => !finalChapters.has(b.chapter)).slice(0, limit);
+
+    // Determine the concrete list of chapter numbers to enqueue.
+    let chapters: number[];
     if (chaptersToGenerate.length === 0) {
-      // No briefs without final drafts; generate using volume range.
       const firstVolume = approvedVolumes[0];
-      const chapter = firstVolume?.startChapter ?? 1;
-      return this.workflowRunService.runChapterGeneration({ projectId, chapter, guidance: body.guidance, autoFix: body.autoFix, maxFixes: body.maxFixes });
+      chapters = [firstVolume?.startChapter ?? 1];
+    } else {
+      chapters = chaptersToGenerate.map(b => b.chapter);
     }
 
-    let lastResult: WorkflowRunResult = { runId: '', outcome: 'no-op', status: 'completed' };
-    for (const brief of chaptersToGenerate) {
-      lastResult = await this.workflowRunService.runChapterGeneration({
-        projectId,
-        chapter: brief.chapter,
-        volumeKey: brief.volumeKey ?? undefined,
-        guidance: body.guidance,
-        autoFix: body.autoFix,
-        maxFixes: body.maxFixes,
-      });
-    }
-    return lastResult;
+    const target = [...chapters].sort((a, b) => a - b).join(',');
+    const payload = { chapters, autoFix: body.autoFix, maxFixes: body.maxFixes, guidance: body.guidance };
+
+    const jobId = await this.jobService.enqueue(projectId, 'generate', target, payload);
+    this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('generate job dispatch failed', { err, jobId }));
+
+    return { jobId, kind: 'generate', status: 'pending', target };
   }
 
   async listDrafts(projectId: bigint): Promise<Generation.Draft[]> {
@@ -818,9 +827,14 @@ export class GenerationService {
 
   // ─── Backfill ────────────────────────────────────────────────────────────────
 
-  async backfill(projectId: bigint): Promise<{ status: string; indexed: number; skipped: number }> {
-    const result = await this.indexingService.backfill(projectId);
-    return { status: 'ok', ...result };
+  async listJobs(projectId: bigint): Promise<unknown[]> {
+    return this.jobService.listByProject(projectId);
+  }
+
+  async backfill(projectId: bigint): Promise<JobEnqueueResult> {
+    const jobId = await this.jobService.enqueue(projectId, 'backfill', 'all');
+    this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('backfill job dispatch failed', { err, jobId }));
+    return { jobId, kind: 'backfill', status: 'pending', target: 'all' };
   }
 
   // ─── Helpers ─────────────────────────────────────────────────────────────────

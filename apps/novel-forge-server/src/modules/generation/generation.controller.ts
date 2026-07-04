@@ -91,9 +91,14 @@ export class GenerationController {
   // ─── Generation + Drafts ────────────────────────────────────────────────────
 
   @Post('/generate')
-  @RespondFor(200, WorkflowRunResponse)
-  generate(@Params() params: ProjectParams, @Body() body: GenerateBody): Promise<WorkflowRunResponse> {
-    return this.generationService.generate(params.projectId, body) as unknown as Promise<WorkflowRunResponse>;
+  @HttpStatus(202)
+  generate(@Params() params: ProjectParams, @Body() body: GenerateBody): Promise<unknown> {
+    return this.generationService.generate(params.projectId, body);
+  }
+
+  @Get('/jobs')
+  listJobs(@Params() params: ProjectParams): Promise<unknown> {
+    return this.generationService.listJobs(params.projectId);
   }
 
   @Get('/drafts')
@@ -258,6 +263,7 @@ export class GenerationController {
   // ─── Backfill ───────────────────────────────────────────────────────────────
 
   @Post('/backfill')
+  @HttpStatus(202)
   backfill(@Params() params: ProjectParams): Promise<unknown> {
     return this.generationService.backfill(params.projectId);
   }
