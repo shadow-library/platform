@@ -99,6 +99,19 @@
 - ChatOllama import deferred (A10); buildClient throws AI_002 for ollama provider in non-A10 builds
 - Tests: 12 unit tests in `tests/ai/model-router.spec.ts`; buildClient patched via bracket access so no API key required; 26 total pass, 15 skip, 0 fail
 
+### A4 — ContextAssembler: catalog, ref resolution, budgets, packs
+
+- `token-budget.ts`: `countTokens` (o200k_base), `truncateAtParagraph` (paragraph then word boundary), `applyBudget` (greedy fit)
+- `sections.ts`: `ContextSection`/`AssembledPack` types, `SECTION_LABELS` (frozen prompt contract), `renderSection`, `joinSections`
+- `CatalogService.render`: 6 parallel queries → compact chapters/volumes/entities/world-facts/threads/mysteries listing
+- `ContextAssembler.resolveRefs`: batched by ref type, order-preserving, unknown refs → `unresolved`
+- `forChapter`: grok-adjacency rule (summary+state not verbatim tail), FULL_CAST_MAX=5 entity split, budget eviction, SHA-256 dedup upsert into context_packs
+- `forOutline`: volume epitomes + catalog; retrieval slot absent (wired in A5)
+- `forRevision`: fresh ref resolution + current draft prose + last 5 feedback notes
+- `forValidationWindow`: window summaries + touching threads/mysteries/world-facts
+- AiModule updated with CatalogService + ContextAssembler providers/exports
+- 13 unit tests in `tests/ai/context-assembler.spec.ts`: all 4 acceptance criteria covered; 39 total pass, 15 skip, 0 fail
+
 ## Open issues
 
 <!-- none yet -->

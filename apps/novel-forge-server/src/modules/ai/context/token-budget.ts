@@ -1,0 +1,74 @@
+/**
+ * Importing packages with side effects
+ */
+
+/**
+ * Importing npm packages
+ */
+import { getEncoding } from 'js-tiktoken';
+
+/**
+ * Importing user defined packages
+ */
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+// Shared encoder instance — o200k_base for consistency across all token counting.
+const enc = getEncoding('o200k_base');
+
+export function countTokens(text: string): number {
+  if (!text) return 0;
+  return enc.encode(text).length;
+}
+
+export function truncateAtParagraph(text: string, maxTokens: number): { text: string; truncated: boolean } {
+  if (maxTokens === 0) return { text: '', truncated: true };
+
+  const paragraphs = text.split(/\n\n+/);
+  let accumulated = '';
+  let usedTokens = 0;
+
+  for (const para of paragraphs) {
+    const paraTokens = countTokens(para);
+    const separator = accumulated ? '\n\n' : '';
+    const separatorTokens = accumulated ? countTokens('\n\n') : 0;
+
+    if (usedTokens + separatorTokens + paraTokens <= maxTokens) {
+      accumulated += separator + para;
+      usedTokens += separatorTokens + paraTokens;
+    } else if (accumulated === '') {
+      // Even the first paragraph exceeds maxTokens — truncate at word boundary.
+      const words = para.split(/\s+/);
+      let wordAccumulated = '';
+      for (const word of words) {
+        const candidate = wordAccumulated ? wordAccumulated + ' ' + word : word;
+        if (countTokens(candidate) <= maxTokens) wordAccumulated = candidate;
+        else break;
+      }
+      return { text: wordAccumulated, truncated: true };
+    } else {
+      // First fit failure — stop here.
+      return { text: accumulated, truncated: true };
+    }
+  }
+
+  return { text: accumulated, truncated: false };
+}
+
+export function applyBudget<T extends { tokens: number }>(sections: T[], budgetTokens: number): T[] {
+  const result: T[] = [];
+  let used = 0;
+  for (const section of sections) {
+    if (used + section.tokens <= budgetTokens) {
+      result.push(section);
+      used += section.tokens;
+    }
+  }
+  return result;
+}

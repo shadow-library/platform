@@ -11,6 +11,8 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { CatalogService } from './context/catalog.service';
+import { ContextAssembler } from './context/context-assembler.service';
 import { ModelRouterService } from './model-router.service';
 import { TelemetryHandler } from './telemetry.handler';
 
@@ -24,7 +26,7 @@ import { TelemetryHandler } from './telemetry.handler';
 
 @Module({
   imports: [DatabaseModule],
-  providers: [TelemetryHandler, ModelRouterService],
-  exports: [ModelRouterService, TelemetryHandler],
+  providers: [TelemetryHandler, ModelRouterService, CatalogService, ContextAssembler],
+  exports: [ModelRouterService, TelemetryHandler, CatalogService, ContextAssembler],
 })
 export class AiModule {}
