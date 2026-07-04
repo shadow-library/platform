@@ -19,6 +19,7 @@ import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
+import { AcquireService } from '../source/acquire.service';
 
 /**
  * Defining types
@@ -33,6 +34,11 @@ interface GeneratePayload {
 
 interface ExtractPayload {
   chapters: number[];
+}
+
+interface IngestPayload {
+  limit?: number;
+  delayMs?: number;
 }
 
 /**
@@ -50,6 +56,7 @@ export class JobExecutor {
     private readonly workflowRunService: WorkflowRunService,
     private readonly indexingService: IndexingService,
     private readonly databaseService: DatabaseService,
+    private readonly acquireService: AcquireService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -87,6 +94,9 @@ export class JobExecutor {
         return this.runExtract(job);
       case 'backfill':
         return this.runBackfill(job);
+      case 'ingest':
+      case 'resume':
+        return this.runIngest(job);
       default:
         throw new Error(`Unsupported job kind: ${job.kind}`);
     }
@@ -116,5 +126,12 @@ export class JobExecutor {
     await this.jobService.progress(job.id, { done: 0, total: 1, current: 'all', phase: 'embedding' });
     await this.indexingService.backfill(job.projectId);
     await this.jobService.progress(job.id, { done: 1, total: 1, current: 'all', phase: 'embedding' });
+  }
+
+  private async runIngest(job: Job.Row): Promise<void> {
+    const { limit, delayMs } = (job.payload ?? {}) as IngestPayload;
+    await this.jobService.progress(job.id, { done: 0, total: 1, current: 'scraping', phase: 'ingest' });
+    const result = await this.acquireService.ingest(job.projectId, { limit, delayMs });
+    await this.jobService.progress(job.id, { done: result.ingested, total: result.ingested, current: 'done', phase: 'ingest' });
   }
 }

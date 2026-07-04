@@ -18,7 +18,6 @@
  * Declaring the constants
  */
 
-export * from './consolidate.service';
-export * from './extraction.module';
-export * from './extraction.service';
-export * from './knowledge.repository';
+export * from './pipeline.controller';
+export * from './pipeline.dto';
+export * from './pipeline.module';

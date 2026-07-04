@@ -65,7 +65,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] A8 — Human review API: feedback/approve/revisions/review-queue/runs endpoints (A8, §6)
 - [x] A9 — Job executors, crash recovery, checkpoint janitor (A9)
 - [x] A10 — Local LLM test harness: Ollama rung-3 suite + `ai:smoke` (A10, §8)
-- [ ] A11 — Hardening sweep, CI wiring, observability polish, docs (A11)
+- [x] A11 — Hardening sweep, CI wiring, observability polish, docs (A11)
 - [ ] M6 — Source pipeline: acquire, extract, consolidate, assets, skeleton (migration Phase 6)
 - [ ] M7 — Illustration + manuscript modules (non-AI remainder of migration Phase 7)
 - [ ] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table

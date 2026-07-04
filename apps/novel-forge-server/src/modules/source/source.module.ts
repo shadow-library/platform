@@ -11,6 +11,9 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AcquireService } from './acquire.service';
+import { AdapterRegistry } from './adapters/adapter.registry';
+import { AssetService } from './asset.service';
 import { ChapterController } from './chapter/chapter.controller';
 import { ChapterService } from './chapter/chapter.service';
 
@@ -25,7 +28,7 @@ import { ChapterService } from './chapter/chapter.service';
 @Module({
   imports: [DatabaseModule],
   controllers: [ChapterController],
-  providers: [ChapterService],
-  exports: [ChapterService],
+  providers: [ChapterService, AdapterRegistry, AcquireService, AssetService],
+  exports: [ChapterService, AdapterRegistry, AcquireService, AssetService],
 })
 export class SourceModule {}

@@ -11,9 +11,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { ConsolidateService } from './consolidate.service';
-import { ExtractionService } from './extraction.service';
-import { KnowledgeRepository } from './knowledge.repository';
+import { SkeletonService } from './skeleton.service';
 import { AiModule } from '../ai/ai.module';
 
 /**
@@ -26,7 +24,7 @@ import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [DatabaseModule, AiModule],
-  providers: [KnowledgeRepository, ConsolidateService, ExtractionService],
-  exports: [KnowledgeRepository, ConsolidateService, ExtractionService],
+  providers: [SkeletonService],
+  exports: [SkeletonService],
 })
-export class ExtractionModule {}
+export class PlanningModule {}
