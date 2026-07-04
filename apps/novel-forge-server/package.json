@@ -9,7 +9,10 @@
     "lint": "bun run scripts/lint.ts",
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts",
-    "dev": "bun run --watch src/main.ts"
+    "dev": "bun run --watch src/main.ts",
+    "db:create-template": "bun run scripts/create-template-db.ts",
+    "db:migrate": "bun run scripts/migrate-db.ts",
+    "db:seed": "bun run scripts/seed.ts"
   },
   "repository": {
     "type": "git",
@@ -27,6 +30,7 @@
     "@eslint/js": "~9.38.0",
     "@types/bun": "^1.3.1",
     "@typescript-eslint/parser": "^8.46.2",
+    "drizzle-kit": "^0.31.7",
     "eslint": "~9.38.0",
     "eslint-import-resolver-typescript": "^3.10.1",
     "eslint-plugin-import": "^2.32.0",
@@ -39,12 +43,23 @@
     "typescript-eslint": "^8.46.2"
   },
   "dependencies": {
-    "@shadow-library/app": "^1.2.0",
-    "@shadow-library/class-schema": "^0.0.12",
-    "@shadow-library/common": "^1.4.2",
-    "@shadow-library/fastify": "^1.4.0",
-    "@shadow-library/modules": "^0.1.1",
+    "@langchain/anthropic": "^0.3.22",
+    "@langchain/core": "^0.3.62",
+    "@langchain/langgraph": "^1.4.7",
+    "@langchain/ollama": "^1.3.0",
+    "@langchain/openai": "^0.5.16",
+    "@langchain/xai": "^1.4.3",
+    "@llamaindex/postgres": "^0.0.66",
+    "@shadow-library/app": "^1.3.2",
+    "@shadow-library/class-schema": "^0.4.2",
+    "@shadow-library/common": "^1.6.4",
+    "@shadow-library/fastify": "^1.7.0",
+    "@shadow-library/modules": "^0.6.0",
     "ajv": "^8.17.1",
-    "reflect-metadata": "^0.2.2"
+    "drizzle-orm": "^0.44.7",
+    "langchain": "^0.3.29",
+    "llamaindex": "^0.9.4",
+    "reflect-metadata": "^0.2.2",
+    "zod": "^3.25.76"
   }
 }

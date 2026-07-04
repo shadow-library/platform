@@ -23,9 +23,12 @@
     /** Modules */
     "baseUrl": ".",
     "module": "ES2022",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "paths": {
-      "@server/*": ["src/*"]
+      "@server/*": ["src/*"],
+      "@modules/*": ["src/modules/*"],
+      "@scripts/*": ["scripts/*"],
+      "@tests/*": ["tests/*"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
