@@ -46,6 +46,7 @@ export const volumes = pgTable(
     status: planStatus('status').notNull().default('draft'),
     cast: jsonb('cast'),
     body: text('body'),
+    epitome: text('epitome'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

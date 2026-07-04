@@ -27,3 +27,4 @@ export * from './bible';
 export * from './generation';
 export * from './jobs';
 export * from './vectors';
+export * from './ai';

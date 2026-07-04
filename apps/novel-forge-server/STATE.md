@@ -69,6 +69,15 @@
 - workSummary/rearmJobs/pendingJobs/corpusStats on jobs + related tables
 - ExtractionModule wired to HttpRouteModule; TestEnvironment.getService<T> added for DI access in tests
 
+### A1 — AI data model & migrations
+
+- `src/database/schemas/ai.ts` — 7 tables: workflowRuns, modelCalls, toolCalls, contextPacks, draftRevisions, userFeedback, loreChunks; 6 pgEnums; Ai namespace
+- draftReviewStatus enum + reviewStatus column on drafts; contextRefs on briefs; epitome on volumes
+- `generated/drizzle/0001_sticky_freak.sql` — all new tables/columns + HNSW index on lore_chunks.embedding
+- `@langchain/langgraph-checkpoint-postgres@1.0.4` added; PostgresSaver.setup() wired into migrate script
+- AiModule scaffolded (empty, no providers yet)
+- 7 new EnumType exports in enum.dto.ts: DraftReviewStatus, WorkflowRunStatus, ModelCallStatus, ToolCallStatus, DraftRevisionSource, UserFeedbackArtifactType, UserFeedbackDisposition
+
 ## Open issues
 
 <!-- none yet -->

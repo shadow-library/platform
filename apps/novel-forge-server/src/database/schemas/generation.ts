@@ -24,6 +24,7 @@ export namespace Generation {
   export type DraftStatus = InferEnum<typeof draftStatus>;
   export type JudgeVerdict = InferEnum<typeof judgeVerdict>;
   export type ContinuityProposalStatus = InferEnum<typeof continuityProposalStatus>;
+  export type DraftReviewStatus = InferEnum<typeof draftReviewStatus>;
 }
 
 /**
@@ -33,6 +34,7 @@ export namespace Generation {
 export const draftStatus = pgEnum('draft_status', ['draft', 'final']);
 export const judgeVerdict = pgEnum('judge_verdict', ['consistent', 'contradiction']);
 export const continuityProposalStatus = pgEnum('continuity_proposal_status', ['pending', 'applied', 'discarded']);
+export const draftReviewStatus = pgEnum('draft_review_status', ['generating', 'needs_review', 'contradiction', 'approved', 'final']);
 
 export const drafts = pgTable(
   'drafts',
@@ -53,6 +55,7 @@ export const drafts = pgTable(
     generator: contentGenerator('generator').notNull().default('standard'),
     judge: judgeVerdict('judge'),
     judgeNote: text('judge_note'),
+    reviewStatus: draftReviewStatus('review_status').notNull().default('generating'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -70,6 +73,7 @@ export const briefs = pgTable(
     volumeKey: varchar('volume_key'),
     title: varchar('title'),
     body: text('body').notNull(),
+    contextRefs: jsonb('context_refs'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

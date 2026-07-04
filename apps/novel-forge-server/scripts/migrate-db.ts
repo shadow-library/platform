@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Logger } from '@shadow-library/common';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
@@ -31,6 +32,10 @@ Logger.attachTransport('console:json');
 try {
   const db = drizzle(url);
   await migrate(db, { migrationsFolder });
+  logger.info('Drizzle migrations applied');
+  const checkpointer = PostgresSaver.fromConnString(url);
+  await checkpointer.setup();
+  logger.info('LangGraph checkpointer tables created');
   logger.info('Database migration completed successfully');
 } catch (error: any) {
   logger.error('Database migration failed', { error });
