@@ -21,6 +21,7 @@
 export * from './ai.module';
 export * from './context';
 export * from './defaults';
+export * from './graphs';
 export * from './model-router.service';
 export * from './models';
 export * from './retrieval';

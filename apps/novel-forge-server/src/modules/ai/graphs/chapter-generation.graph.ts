@@ -1,0 +1,443 @@
+/**
+ * Importing packages with side effects
+ */
+
+/**
+ * Importing npm packages
+ */
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
+import { Logger } from '@shadow-library/common';
+import { and, eq, sql } from 'drizzle-orm';
+
+/**
+ * Importing user defined packages
+ */
+import { APP_NAME } from '@server/constants';
+import { type PrimaryDatabase } from '@server/database';
+import * as schema from '@server/database/schemas';
+
+import { type ContextAssembler } from '../context/context-assembler.service';
+import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
+import { PROMPT_REGISTRY } from '../prompts';
+import { type IndexingService } from '../retrieval/indexing.service';
+import { type FixOutput, type JudgeOutput, JudgeSchema } from '../schemas';
+import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
+import { runToolLoop } from '../tools/tool-loop';
+import { type ToolRegistryService } from '../tools/tool-registry.service';
+import { type ToolContext } from '../tools/types';
+
+/**
+ * Defining types
+ */
+
+export interface GraphServices {
+  db: PrimaryDatabase;
+  contextAssembler: ContextAssembler;
+  modelRouter: ModelRouterService;
+  telemetry: TelemetryHandler;
+  toolRegistry: ToolRegistryService;
+  indexingService: IndexingService;
+}
+
+const ChapterGenAnnotation = Annotation.Root({
+  // inputs (immutable — reducer just replaces)
+  projectId: Annotation<string>({ reducer: (_, n) => n, default: () => '0' }),
+  chapter: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
+  volumeKey: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  guidance: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  autoFix: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
+  maxFixes: Annotation<number>({ reducer: (_, n) => n, default: () => 3 }),
+  runId: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  // working data
+  contextPackId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  prose: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  title: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  summary: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
+  continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
+  verdict: Annotation<'consistent' | 'contradiction' | null>({ reducer: (_, n) => n, default: () => null }),
+  findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
+  previousFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
+  attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
+  repairMode: Annotation<'patch' | 'rewrite'>({ reducer: (_, n) => n, default: () => 'patch' }),
+  patchApplied: Annotation<boolean>({ reducer: (_, n) => n, default: () => false }),
+  // outcome
+  draftId: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+  outcome: Annotation<string | null>({ reducer: (_, n) => n, default: () => null }),
+});
+
+type ChapterGenState = typeof ChapterGenAnnotation.State;
+export type JudgeFinding = JudgeOutput['findings'][number];
+
+/**
+ * Declaring the constants
+ */
+
+const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
+
+// Normalize finding text for dedup comparison.
+function normalizeFinding(text: string): string {
+  return text.toLowerCase().trim();
+}
+
+// True if any finding in `findings` matches a finding in `previousFindings` (substring match on normalized text).
+export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFinding[]): boolean {
+  if (previousFindings.length === 0) return false;
+  for (const f of findings) {
+    const norm = normalizeFinding(f.text);
+    for (const prev of previousFindings) {
+      if (normalizeFinding(prev.text).includes(norm) || norm.includes(normalizeFinding(prev.text))) return true;
+    }
+  }
+  return false;
+}
+
+// Routing function after judge — exported for testing.
+export function routeAfterJudge(state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'>): string {
+  if (state.verdict === 'consistent') return 'accept';
+  if (!state.autoFix) return 'awaitReview';
+  if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
+  return 'repairPatch';
+}
+
+// Routing function after repairPatch — exported for testing.
+export function routeAfterPatch(state: Pick<ChapterGenState, 'patchApplied'>): string {
+  return state.patchApplied ? 'persistDraft' : 'repairRewrite';
+}
+
+function extractJsonBlock(text: string): unknown {
+  let depth = 0;
+  let start = -1;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === '{') {
+      if (depth === 0) start = i;
+      depth++;
+    } else if (text[i] === '}') {
+      depth--;
+      if (depth === 0 && start !== -1) {
+        try {
+          return JSON.parse(text.slice(start, i + 1));
+        } catch {
+          start = -1;
+        }
+      }
+    }
+  }
+  return null;
+}
+
+function parseJudgeOutput(raw: string): JudgeOutput | null {
+  const fromJson = JudgeSchema.safeParse(tryParseJson(raw));
+  if (fromJson.success) return fromJson.data;
+  const extracted = extractJsonBlock(raw);
+  if (extracted) {
+    const fromExtracted = JudgeSchema.safeParse(extracted);
+    if (fromExtracted.success) return fromExtracted.data;
+  }
+  return null;
+}
+
+function tryParseJson(raw: string): unknown {
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return extractJsonBlock(raw);
+  }
+}
+
+// eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
+export function createChapterGenerationGraph(services: GraphServices) {
+  const { db, contextAssembler, modelRouter, toolRegistry } = services;
+
+  // ─── assembleContext ──────────────────────────────────────────────────────────
+  async function assembleContext(state: ChapterGenState) {
+    const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter);
+    return { contextPackId: pack.id ? String(pack.id) : null };
+  }
+
+  // ─── draftChapter ─────────────────────────────────────────────────────────────
+  async function draftChapter(state: ChapterGenState) {
+    const projectId = BigInt(state.projectId);
+    const [brief, projectRow] = await Promise.all([
+      db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) }),
+      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+    ]);
+
+    // Fetch context pack rendered text for the prompt.
+    let renderedPack = '';
+    if (state.contextPackId) {
+      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
+      renderedPack = pack?.rendered ?? '';
+    }
+
+    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'draftChapter', promptKey: 'generation', promptVersion: '1.0.0', role: 'generation' };
+
+    const result = (await modelRouter.structured(
+      PROMPT_REGISTRY.generation,
+      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', guidance: state.guidance },
+      ctx,
+      projectRow as ProjectConfig | undefined,
+    )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+
+    let title = result.title ?? '';
+    if (!title) {
+      const titleCtx: TelemetryContext = { ...ctx, promptKey: 'title', node: 'draftChapter:title' };
+      const titleResult = (await modelRouter.structured(PROMPT_REGISTRY.title, { prose: result.body.slice(0, 500) }, titleCtx)) as { title: string };
+      title = titleResult.title ?? '';
+    }
+
+    return {
+      prose: result.body,
+      title,
+      summary: result.summary,
+      continuationState: (result.state ?? {}) as Record<string, string>,
+    };
+  }
+
+  // ─── persistDraft ─────────────────────────────────────────────────────────────
+  async function persistDraft(state: ChapterGenState) {
+    const projectId = BigInt(state.projectId);
+
+    // Upsert draft (idempotent on projectId + chapter).
+    const [draft] = await db
+      .insert(schema.drafts)
+      .values({
+        projectId,
+        chapter: state.chapter,
+        title: state.title,
+        body: state.prose,
+        summary: state.summary,
+        state: state.continuationState as never,
+        volumeKey: state.volumeKey || null,
+        revision: 0,
+        reviewStatus: 'generating',
+      })
+      .onConflictDoUpdate({
+        target: [schema.drafts.projectId, schema.drafts.chapter],
+        set: {
+          title: sql`EXCLUDED.title`,
+          body: sql`EXCLUDED.body`,
+          summary: sql`EXCLUDED.summary`,
+          state: sql`EXCLUDED.state`,
+          revision: sql`drafts.revision + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+
+    if (!draft) throw new Error('[persistDraft] unexpected null result');
+
+    // Insert revision row (best-effort — ignore if duplicate).
+    const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
+    await db
+      .insert(schema.draftRevisions)
+      .values({
+        projectId,
+        draftId: draft.id,
+        revision: draft.revision,
+        source,
+        body: state.prose,
+        summary: state.summary,
+        state: state.continuationState as never,
+        runId: state.runId || null,
+      })
+      .onConflictDoNothing()
+      .catch(err => logger.warn('draftRevision insert conflict', { err }));
+
+    return { draftId: String(draft.id) };
+  }
+
+  // ─── judge ────────────────────────────────────────────────────────────────────
+  async function judge(state: ChapterGenState) {
+    const projectId = BigInt(state.projectId);
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+
+    let renderedPack = '';
+    if (state.contextPackId) {
+      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
+      renderedPack = pack?.rendered ?? '';
+    }
+
+    const toolCtx: ToolContext = {
+      chapter: state.chapter,
+      db: { query: db.query, select: db.select.bind(db) },
+      node: 'judge',
+      projectId,
+      retrieval: services.indexingService as never,
+      runId: state.runId || '',
+    };
+
+    const tools = toolRegistry.forNode('judge', toolCtx);
+    const rawTools = toolRegistry.getRaw('judge');
+    const model = modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined);
+
+    const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
+    const humanMsg = new HumanMessage(
+      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
+    );
+
+    const { messages } = await runToolLoop(model, tools, rawTools, [systemMsg, humanMsg], toolCtx, db as never);
+
+    // Parse last AI message content as JudgeOutput.
+    const lastAi = [...messages].reverse().find(m => m instanceof AIMessage || m._getType() === 'ai');
+    const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
+
+    const judgeResult = parseJudgeOutput(rawContent);
+
+    const verdict = judgeResult?.verdict ?? 'consistent';
+    const findings = judgeResult?.findings ?? [];
+
+    // Update draft with judge result.
+    if (state.draftId) {
+      const reviewStatus = verdict === 'consistent' ? 'needs_review' : 'contradiction';
+      const judgeNote = findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
+      await db
+        .update(schema.drafts)
+        .set({ judge: verdict, judgeNote: judgeNote || null, reviewStatus, updatedAt: new Date() })
+        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+    }
+
+    return { verdict, findings };
+  }
+
+  // ─── repairPatch ──────────────────────────────────────────────────────────────
+  async function repairPatch(state: ChapterGenState) {
+    const projectId = BigInt(state.projectId);
+    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+
+    let renderedPack = '';
+    if (state.contextPackId) {
+      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
+      renderedPack = pack?.rendered ?? '';
+    }
+
+    const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
+    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairPatch', promptKey: 'fix', promptVersion: '1.0.0', role: 'fix' };
+
+    const result = (await modelRouter.structured(
+      PROMPT_REGISTRY.fix,
+      { contextPack: renderedPack, prose: state.prose, findings: findingsStr },
+      ctx,
+      projectRow as ProjectConfig | undefined,
+    )) as FixOutput;
+
+    if (result.action === 'rewrite' && result.body) {
+      return { prose: result.body, repairMode: 'rewrite' as const, patchApplied: false };
+    }
+
+    if (result.action === 'patch' && result.patches && result.patches.length > 0) {
+      let patched = state.prose;
+      let allApplied = true;
+
+      for (const patch of result.patches) {
+        const occurrences = patched.split(patch.find).length - 1;
+        if (occurrences !== 1) {
+          allApplied = false;
+          break;
+        }
+        patched = patched.replace(patch.find, patch.replace);
+      }
+
+      if (allApplied) return { prose: patched, repairMode: 'patch' as const, patchApplied: true };
+    }
+
+    // Patch failed — fall through to rewrite.
+    return { repairMode: 'rewrite' as const, patchApplied: false };
+  }
+
+  // ─── repairRewrite ────────────────────────────────────────────────────────────
+  async function repairRewrite(state: ChapterGenState) {
+    const projectId = BigInt(state.projectId);
+    const [brief, projectRow] = await Promise.all([
+      db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) }),
+      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+    ]);
+
+    let renderedPack = '';
+    if (state.contextPackId) {
+      const pack = await db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(state.contextPackId)) });
+      renderedPack = pack?.rendered ?? '';
+    }
+
+    const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
+    const guidance = state.guidance ? `${state.guidance}\n\nPrevious judge findings to avoid:\n${findingsStr}` : `Avoid these issues from the previous draft:\n${findingsStr}`;
+
+    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairRewrite', promptKey: 'generation', promptVersion: '1.0.0', role: 'generation' };
+
+    const result = (await modelRouter.structured(
+      PROMPT_REGISTRY.generation,
+      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', guidance },
+      ctx,
+      projectRow as ProjectConfig | undefined,
+    )) as { title: string; body: string; summary: string; state?: Record<string, string> };
+
+    return {
+      prose: result.body,
+      title: result.title || state.title,
+      summary: result.summary,
+      continuationState: (result.state ?? {}) as Record<string, string>,
+      attempt: state.attempt + 1,
+      previousFindings: state.findings,
+      repairMode: 'patch' as const,
+    };
+  }
+
+  // ─── terminal nodes ───────────────────────────────────────────────────────────
+  async function accept(state: ChapterGenState) {
+    if (state.draftId) {
+      await db
+        .update(schema.drafts)
+        .set({ reviewStatus: 'needs_review', updatedAt: new Date() })
+        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+    }
+    return { outcome: 'accepted' };
+  }
+
+  async function acceptAsIs(state: ChapterGenState) {
+    if (state.draftId) {
+      await db
+        .update(schema.drafts)
+        .set({ reviewStatus: 'contradiction', updatedAt: new Date() })
+        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+    }
+    return { outcome: 'accepted_with_findings' };
+  }
+
+  async function awaitReview(state: ChapterGenState) {
+    if (state.draftId) {
+      await db
+        .update(schema.drafts)
+        .set({ reviewStatus: 'contradiction', updatedAt: new Date() })
+        .where(eq(schema.drafts.id, BigInt(state.draftId)));
+    }
+    return { outcome: 'awaiting_review' };
+  }
+
+  function finish(state: ChapterGenState) {
+    return { outcome: state.outcome };
+  }
+
+  return new StateGraph(ChapterGenAnnotation)
+    .addNode('assembleContext', assembleContext)
+    .addNode('draftChapter', draftChapter)
+    .addNode('persistDraft', persistDraft)
+    .addNode('judge', judge)
+    .addNode('repairPatch', repairPatch)
+    .addNode('repairRewrite', repairRewrite)
+    .addNode('accept', accept)
+    .addNode('acceptAsIs', acceptAsIs)
+    .addNode('awaitReview', awaitReview)
+    .addNode('finish', finish)
+    .addEdge(START, 'assembleContext')
+    .addEdge('assembleContext', 'draftChapter')
+    .addEdge('draftChapter', 'persistDraft')
+    .addEdge('persistDraft', 'judge')
+    .addConditionalEdges('judge', routeAfterJudge, { accept: 'accept', awaitReview: 'awaitReview', acceptAsIs: 'acceptAsIs', repairPatch: 'repairPatch' })
+    .addConditionalEdges('repairPatch', routeAfterPatch, { persistDraft: 'persistDraft', repairRewrite: 'repairRewrite' })
+    .addEdge('repairRewrite', 'persistDraft')
+    .addEdge('accept', 'finish')
+    .addEdge('acceptAsIs', 'finish')
+    .addEdge('awaitReview', 'finish')
+    .addEdge('finish', END)
+    .compile();
+}

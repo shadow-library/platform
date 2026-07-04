@@ -8,6 +8,13 @@
       "when": 1783154296870,
       "tag": "0000_eminent_norman_osborn",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783157225127,
+      "tag": "0001_sticky_freak",
+      "breakpoints": true
     }
   ]
 }
