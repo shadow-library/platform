@@ -11,6 +11,7 @@ import { Router, ShadowApplication } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
+import { type AbstractClass, type Class } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -60,5 +61,9 @@ export class TestEnvironment {
   getPostgresClient(): PrimaryDatabase {
     const databaseService = this.app.get(DatabaseService);
     return databaseService.getPostgresClient();
+  }
+
+  getService<T>(token: Class<T> | AbstractClass<T>): T {
+    return this.app.get(token);
   }
 }

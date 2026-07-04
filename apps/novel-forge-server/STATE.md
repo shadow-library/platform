@@ -60,6 +60,15 @@
 - VOL_001 (volume not found) + DOC_001 (bible doc not found) added to AppErrorCode
 - Integration tests PG-gated with top-level `await` SQL probe; 6 tests skipped cleanly without PG
 
+### M4 — Repository/persistence semantics
+
+- `KnowledgeRepository` in `src/modules/extraction/knowledge.repository.ts`; 12 methods
+- upsertEntity: attributes merged via `COALESCE(existing,'{}') || EXCLUDED`; firstSeenChapter via LEAST
+- insert-or-ignore: addAppearance, addRelationshipObservation, upsertEntityAlias (onConflictDoNothing)
+- COALESCE upserts: plotThread (openedChapter keeps first, closedChapter takes latest), mystery, worldFact, beat
+- workSummary/rearmJobs/pendingJobs/corpusStats on jobs + related tables
+- ExtractionModule wired to HttpRouteModule; TestEnvironment.getService<T> added for DI access in tests
+
 ## Open issues
 
 <!-- none yet -->
