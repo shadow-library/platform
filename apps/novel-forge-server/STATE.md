@@ -22,7 +22,19 @@
 
 ## Capabilities
 
-<!-- sections added as tasks complete -->
+### M1 — Project structure & dependencies
+- `@shadow-library/*` bumped to pulse versions; drizzle-orm, langchain stack, llamaindex in package.json
+- `moduleResolution: bundler`; aliases `@modules/*`, `@scripts/*`, `@tests/*` added to tsconfig
+- bootstrap.ts owns all config keys: `app.stage`, `server.*`, `ai.*` (anthropic/openai/xai/ollama/subprocess), `storage.*`
+- `src/constants.ts` exports `APP_NAME = 'novel-forge'`
+- `src/modules/dynamic.modules.ts`: `HttpRouteModule` with `/api` prefix + versioning; no feature modules yet
+- `src/app.module.ts` imports `[DatabaseModule, HttpRouteModule]`
+- `AppErrorCode` groups: PRJ/SRC/CHP/PLN/DRF/FIN/AI/CNT/ENT all defined
+- `AuthGuard` permissive seam in `src/common/auth.guard.ts`
+- `DatabaseModule` wired (empty schema); `constraintErrorMap` empty (M2 fills it)
+- db scripts: `db:migrate`, `db:create-template`, `db:seed`
+- `TestEnvironment` in `tests/test-environment.ts` (requires PostgreSQL + template DB)
+- Tests require PostgreSQL; legacy scaffold test removed; `bun test` passes on unit-only specs
 
 ## Considered but deferred
 

@@ -10,6 +10,7 @@ import { EnumType } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { schema } from '@server/database';
 
 /**
  * Defining types
@@ -20,3 +21,20 @@ import { EnumType } from '@shadow-library/class-schema';
  */
 
 export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);
+export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
+export const ContentMode = EnumType.create('ContentMode', schema.contentMode.enumValues);
+export const ContentGenerator = EnumType.create('ContentGenerator', schema.contentGenerator.enumValues);
+export const ChapterStatus = EnumType.create('ChapterStatus', schema.chapterStatus.enumValues);
+export const EntityType = EnumType.create('EntityType', schema.entityType.enumValues);
+export const EntitySignificance = EnumType.create('EntitySignificance', schema.entitySignificance.enumValues);
+export const EntityOrigin = EnumType.create('EntityOrigin', schema.entityOrigin.enumValues);
+export const PlanStatus = EnumType.create('PlanStatus', schema.planStatus.enumValues);
+export const ThreadStatus = EnumType.create('ThreadStatus', schema.threadStatus.enumValues);
+export const MysteryStatus = EnumType.create('MysteryStatus', schema.mysteryStatus.enumValues);
+export const DraftStatus = EnumType.create('DraftStatus', schema.draftStatus.enumValues);
+export const JudgeVerdict = EnumType.create('JudgeVerdict', schema.judgeVerdict.enumValues);
+export const ContinuityProposalStatus = EnumType.create('ContinuityProposalStatus', schema.continuityProposalStatus.enumValues);
+export const JobKind = EnumType.create('JobKind', schema.jobKind.enumValues);
+export const JobStatus = EnumType.create('JobStatus', schema.jobStatus.enumValues);
+export const ValidationScope = EnumType.create('ValidationScope', schema.validationScope.enumValues);
+export const BibleSection = EnumType.create('BibleSection', schema.bibleSection.enumValues);
