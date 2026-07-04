@@ -18,6 +18,7 @@ import { EmbeddingService } from './retrieval/embedding.service';
 import { IndexingService } from './retrieval/indexing.service';
 import { RetrievalService } from './retrieval/retrieval.service';
 import { TelemetryHandler } from './telemetry.handler';
+import { ToolRegistryService } from './tools/tool-registry.service';
 
 /**
  * Defining types
@@ -29,7 +30,7 @@ import { TelemetryHandler } from './telemetry.handler';
 
 @Module({
   imports: [DatabaseModule],
-  providers: [TelemetryHandler, ModelRouterService, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler],
-  exports: [ModelRouterService, TelemetryHandler, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler],
+  providers: [TelemetryHandler, ModelRouterService, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler, ToolRegistryService],
+  exports: [ModelRouterService, TelemetryHandler, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler, ToolRegistryService],
 })
 export class AiModule {}

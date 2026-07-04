@@ -123,6 +123,15 @@
 - `ai.embeddingModel` config added with default `qwen3-embedding:8b`
 - 7 unit tests; 46 total pass, 16 skip, 0 fail
 
+### A6 — Tool registry: 6 read-only tools, loop, audit
+
+- `ReadonlyDb = Pick<PrimaryDatabase, 'query' | 'select'>` — write tools fail at compile time
+- 6 `RegisteredTool` consts: search_lore, get_entity, get_chapter_summaries, search_prose, get_world_facts, get_plot_threads
+- `ToolRegistryService.forNode(nodeName, ctx)` → `DynamicStructuredTool[]` filtered by allowedNodes; ctx captured in closures; token-truncation applied in wrapper
+- `runToolLoop(model, tools, rawTools, messages, ctx, fullDb, opts?)`: maxRounds=6, per-tool call count tracking, audit rows to toolCalls, budget_exceeded/invalid_args/handler_error handled; final unbound invoke after budget exhaustion
+- `ToolRegistryService` added to AiModule providers/exports
+- 7 unit tests; 53 total pass, 16 skip, 0 fail
+
 ## Open issues
 
 <!-- none yet -->

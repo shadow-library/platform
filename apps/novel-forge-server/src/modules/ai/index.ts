@@ -20,8 +20,9 @@
 
 export * from './ai.module';
 export * from './context';
+export * from './defaults';
 export * from './model-router.service';
+export * from './models';
 export * from './retrieval';
 export * from './telemetry.handler';
-export * from './defaults';
-export * from './models';
+export * from './tools';
