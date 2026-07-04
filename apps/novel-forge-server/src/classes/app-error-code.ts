@@ -49,6 +49,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_001 = new AppErrorCode('DRF_001', ErrorType.NOT_FOUND, 'Draft not found');
   static readonly DRF_002 = new AppErrorCode('DRF_002', ErrorType.CLIENT_ERROR, 'Draft is already finalized');
   static readonly DRF_003 = new AppErrorCode('DRF_003', ErrorType.CLIENT_ERROR, 'Unresolved contradiction — resolve or use autoFix before generating next chapter');
+  static readonly DRF_004 = new AppErrorCode('DRF_004', ErrorType.CLIENT_ERROR, 'Draft is not approved — approve draft before finalizing');
 
   /*!
    * Finalize Errors

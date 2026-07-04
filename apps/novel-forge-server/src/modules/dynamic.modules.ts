@@ -15,6 +15,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 import { AiModule } from '@modules/ai';
 import { BibleModule } from '@modules/bible';
 import { ExtractionModule } from '@modules/extraction';
+import { GenerationModule } from '@modules/generation';
 import { ProjectModule } from '@modules/project';
 import { SourceModule } from '@modules/source';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
@@ -33,7 +34,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, AiModule, ExtractionModule, ProjectModule, SourceModule, BibleModule],
+  imports: [AppHttpCoreModule, AiModule, ExtractionModule, GenerationModule, ProjectModule, SourceModule, BibleModule],
   host: Config.get('server.host'),
   port: Config.get('server.port'),
   routePrefix: '/api',
