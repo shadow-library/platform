@@ -70,5 +70,11 @@ export function applyBudget<T extends { tokens: number }>(sections: T[], budgetT
       used += section.tokens;
     }
   }
+  // Guarantee at least one section so the LLM always has context to work with.
+  // If nothing fit (budget > 0 but every section overshoots), force-include the first.
+  if (result.length === 0 && sections.length > 0 && budgetTokens > 0) {
+    const first = sections[0];
+    if (first !== undefined) result.push(first);
+  }
   return result;
 }

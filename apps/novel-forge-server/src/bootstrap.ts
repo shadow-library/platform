@@ -38,6 +38,9 @@ declare module '@shadow-library/common' {
     'ai.claudeCodeBin': string;
     'ai.codexBin': string;
 
+    /** Observability configs */
+    'ai.langsmithApiKey': string | undefined;
+
     /** Storage configs */
     'storage.driver': 'local';
     'storage.imageDir': string;
@@ -65,6 +68,8 @@ Config.load('ai.allowClaudeCode', { defaultValue: 'false', validateType: 'boolea
 Config.load('ai.allowCodex', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('ai.claudeCodeBin', { defaultValue: 'claude' });
 Config.load('ai.codexBin', { defaultValue: 'codex' });
+
+Config.load('ai.langsmithApiKey');
 
 Config.load('storage.driver', { defaultValue: 'local', allowedValues: ['local'] });
 Config.load('storage.imageDir', { defaultValue: './images' });
