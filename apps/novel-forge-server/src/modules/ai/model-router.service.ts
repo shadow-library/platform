@@ -23,6 +23,7 @@ import { APP_NAME } from '@server/constants';
 import { type AiRole, type ResolvedModel, getProfileDefaults } from './defaults';
 import { MODEL_MAP } from './models';
 import { type PromptModule } from './prompts/types';
+import { ChatClaudeCode, ChatCodex } from './subprocess-providers';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
 /**
@@ -100,6 +101,12 @@ export class ModelRouterService {
         return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openaiApiKey') });
       case 'ollama':
         return new ChatOllama({ model: resolved.model, baseUrl: Config.get('ai.ollamaHost'), temperature: 0 });
+      case 'anthropic-claude-code':
+        if (!Config.get('ai.allowClaudeCode')) throw new ServerError(AppErrorCode.AI_002);
+        return new ChatClaudeCode(Config.get('ai.claudeCodeBin'));
+      case 'openai-codex':
+        if (!Config.get('ai.allowCodex')) throw new ServerError(AppErrorCode.AI_002);
+        return new ChatCodex(Config.get('ai.codexBin'));
       default:
         throw new ServerError(AppErrorCode.AI_002);
     }

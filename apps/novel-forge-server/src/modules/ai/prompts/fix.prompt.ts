@@ -11,6 +11,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
 import { FixSchema } from '../schemas/fix.schema';
 
@@ -22,8 +23,7 @@ import { FixSchema } from '../schemas/fix.schema';
  * Declaring the constants
  */
 
-const system =
-  "You are a surgical editor tasked with repairing continuity contradictions in a chapter draft. You receive the draft, the judge's findings (with [HARD] severity markers), and the established canon. Choose: PATCH if the contradiction can be fixed with targeted find/replace operations (preferred — minimize disruption). REWRITE if the contradiction is structural and patches cannot fix it. For patches: find strings must be unique and verbatim; replace text must preserve prose style. Minimal intervention only — do not rewrite sections that are not contradicted.";
+const system = `${AUTHORING_STYLE}\n\nYou are a surgical editor tasked with repairing continuity contradictions in a chapter draft. You receive the draft, the judge's findings (with [HARD] severity markers), and the established canon. Choose: PATCH if the contradiction can be fixed with targeted find/replace operations (preferred — minimize disruption). REWRITE if the contradiction is structural and patches cannot fix it. For patches: find strings must be unique and verbatim; replace text must preserve prose style. Minimal intervention only — do not rewrite sections that are not contradicted.`;
 
 const fewShots = [
   new HumanMessage(
@@ -42,7 +42,7 @@ const fewShots = [
 export const fixPrompt: PromptModule<typeof FixSchema._type> = {
   key: 'fix',
   version: '1.0.0',
-  kind: 'analytical',
+  kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],

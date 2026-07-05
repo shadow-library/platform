@@ -68,6 +68,6 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] A11 — Hardening sweep, CI wiring, observability polish, docs (A11)
 - [x] M6 — Source pipeline: acquire, extract, consolidate, assets, skeleton (migration Phase 6)
 - [x] M7 — Illustration + manuscript modules (non-AI remainder of migration Phase 7)
-- [ ] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table
+- [x] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
