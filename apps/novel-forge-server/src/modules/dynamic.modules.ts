@@ -16,6 +16,7 @@ import { AiModule } from '@modules/ai';
 import { BibleModule } from '@modules/bible';
 import { ExtractionModule } from '@modules/extraction';
 import { GenerationModule } from '@modules/generation';
+import { IllustrationModule } from '@modules/illustration';
 import { JobsModule } from '@modules/jobs';
 import { PipelineModule } from '@modules/pipeline';
 import { PlanningModule } from '@modules/planning';
@@ -37,7 +38,19 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, AiModule, ExtractionModule, GenerationModule, JobsModule, PipelineModule, PlanningModule, ProjectModule, SourceModule, BibleModule],
+  imports: [
+    AppHttpCoreModule,
+    AiModule,
+    ExtractionModule,
+    GenerationModule,
+    IllustrationModule,
+    JobsModule,
+    PipelineModule,
+    PlanningModule,
+    ProjectModule,
+    SourceModule,
+    BibleModule,
+  ],
   host: Config.get('server.host'),
   port: Config.get('server.port'),
   routePrefix: '/api',
