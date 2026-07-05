@@ -27,7 +27,7 @@ import { type ImageStorageProvider } from './image-storage.interface';
 @Injectable()
 export class LocalImageStorageProvider implements ImageStorageProvider {
   private get imageDir(): string {
-    return Config.get('storage.imageDir');
+    return Config.get('storage.local.dir');
   }
 
   async save(projectId: bigint, entityKey: string, bytes: Uint8Array, mime: string): Promise<string> {

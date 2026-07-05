@@ -65,9 +65,9 @@ export class IllustrationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const isGrokOnly = project?.contentMode === 'grok_only';
 
-    const apiKey = isGrokOnly ? Config.get('ai.xaiApiKey') : Config.get('ai.openaiApiKey');
+    const apiKey = isGrokOnly ? Config.get('ai.xai.api.key') : Config.get('ai.openai.api.key');
     const url = isGrokOnly ? 'https://api.x.ai/v1/images/generations' : 'https://api.openai.com/v1/images/generations';
-    const model = isGrokOnly ? Config.get('ai.grokImageModel') : 'gpt-image-1';
+    const model = isGrokOnly ? Config.get('ai.grok.image.model') : 'gpt-image-1';
 
     const res = await fetch(url, {
       method: 'POST',

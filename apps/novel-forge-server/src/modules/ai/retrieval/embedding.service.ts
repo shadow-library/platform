@@ -29,8 +29,8 @@ export class EmbeddingService {
   private readonly model: string;
 
   constructor() {
-    this.ollama = new Ollama({ host: Config.get('ai.ollamaHost') });
-    this.model = Config.get('ai.embeddingModel');
+    this.ollama = new Ollama({ host: Config.get('ai.ollama.host') });
+    this.model = Config.get('ai.embedding.model');
   }
 
   // Embed a single text. Returns null on any error (best-effort — never throws).

@@ -80,12 +80,12 @@ export class ModelRouterService {
 
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
     // 1. grok_only forces xAI on every role
-    if (project?.contentMode === 'grok_only') return { provider: 'xai', model: Config.get('ai.grokLlmModel') };
+    if (project?.contentMode === 'grok_only') return { provider: 'xai', model: Config.get('ai.grok.llm.model') };
     // 2. per-project config override
     const projectModel = (project?.config?.models as Record<string, ResolvedModel> | undefined)?.[role];
     if (projectModel) return projectModel;
     // 3. AI_PROFILE defaults
-    return getProfileDefaults()[role] ?? { provider: 'xai', model: Config.get('ai.grokLlmModel') };
+    return getProfileDefaults()[role] ?? { provider: 'xai', model: Config.get('ai.grok.llm.model') };
   }
 
   buildClient(resolved: ResolvedModel): BaseChatModel {
@@ -94,19 +94,19 @@ export class ModelRouterService {
 
     switch (provider) {
       case 'xai':
-        return new ChatXAI({ model: resolved.model, apiKey: Config.get('ai.xaiApiKey') });
+        return new ChatXAI({ model: resolved.model, apiKey: Config.get('ai.xai.api.key') });
       case 'anthropic':
-        return new ChatAnthropic({ model: resolved.model, apiKey: Config.get('ai.anthropicApiKey') });
+        return new ChatAnthropic({ model: resolved.model, apiKey: Config.get('ai.anthropic.api.key') });
       case 'openai':
-        return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openaiApiKey') });
+        return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openai.api.key') });
       case 'ollama':
-        return new ChatOllama({ model: resolved.model, baseUrl: Config.get('ai.ollamaHost'), temperature: 0 });
+        return new ChatOllama({ model: resolved.model, baseUrl: Config.get('ai.ollama.host'), temperature: 0 });
       case 'anthropic-claude-code':
-        if (!Config.get('ai.allowClaudeCode')) throw new ServerError(AppErrorCode.AI_002);
-        return new ChatClaudeCode(Config.get('ai.claudeCodeBin'));
+        if (!Config.get('ai.claude-code.enabled')) throw new ServerError(AppErrorCode.AI_002);
+        return new ChatClaudeCode(Config.get('ai.claude-code.bin'));
       case 'openai-codex':
-        if (!Config.get('ai.allowCodex')) throw new ServerError(AppErrorCode.AI_002);
-        return new ChatCodex(Config.get('ai.codexBin'));
+        if (!Config.get('ai.codex.enabled')) throw new ServerError(AppErrorCode.AI_002);
+        return new ChatCodex(Config.get('ai.codex.bin'));
       default:
         throw new ServerError(AppErrorCode.AI_002);
     }

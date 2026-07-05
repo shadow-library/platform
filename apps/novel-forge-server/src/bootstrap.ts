@@ -24,26 +24,30 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
-    /** AI configs */
+    /** AI provider configs */
     'ai.profile': 'production' | 'local-test';
-    'ai.anthropicApiKey': string | undefined;
-    'ai.openaiApiKey': string | undefined;
-    'ai.xaiApiKey': string | undefined;
-    'ai.grokLlmModel': string;
-    'ai.grokImageModel': string;
-    'ai.ollamaHost': string;
-    'ai.embeddingModel': string;
-    'ai.allowClaudeCode': boolean;
-    'ai.allowCodex': boolean;
-    'ai.claudeCodeBin': string;
-    'ai.codexBin': string;
+    'ai.anthropic.api.key': string | undefined;
+    'ai.openai.api.key': string | undefined;
+    'ai.xai.api.key': string | undefined;
+
+    /** AI model configs */
+    'ai.grok.llm.model': string;
+    'ai.grok.image.model': string;
+    'ai.ollama.host': string;
+    'ai.embedding.model': string;
+
+    /** Subprocess provider configs */
+    'ai.claude-code.enabled': boolean;
+    'ai.claude-code.bin': string;
+    'ai.codex.enabled': boolean;
+    'ai.codex.bin': string;
 
     /** Observability configs */
-    'ai.langsmithApiKey': string | undefined;
+    'ai.langsmith.api.key': string | undefined;
 
     /** Storage configs */
     'storage.driver': 'local';
-    'storage.imageDir': string;
+    'storage.local.dir': string;
   }
 }
 
@@ -57,19 +61,18 @@ Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
 Config.load('ai.profile', { defaultValue: 'production', allowedValues: ['production', 'local-test'] });
-Config.load('ai.anthropicApiKey', { envKey: 'AI_ANTHROPIC_API_KEY' });
-Config.load('ai.openaiApiKey', { envKey: 'AI_OPENAI_API_KEY' });
-Config.load('ai.xaiApiKey', { envKey: 'AI_XAI_API_KEY' });
-Config.load('ai.grokLlmModel', { envKey: 'AI_GROK_LLM_MODEL', defaultValue: 'grok-3' });
-Config.load('ai.grokImageModel', { envKey: 'AI_GROK_IMAGE_MODEL', defaultValue: 'grok-2-image' });
-Config.load('ai.ollamaHost', { envKey: 'AI_OLLAMA_HOST', defaultValue: 'http://localhost:11434' });
-Config.load('ai.embeddingModel', { envKey: 'AI_EMBEDDING_MODEL', defaultValue: 'qwen3-embedding:8b' });
-Config.load('ai.allowClaudeCode', { envKey: 'AI_ALLOW_CLAUDE_CODE', defaultValue: 'false', validateType: 'boolean' });
-Config.load('ai.allowCodex', { envKey: 'AI_ALLOW_CODEX', defaultValue: 'false', validateType: 'boolean' });
-Config.load('ai.claudeCodeBin', { envKey: 'AI_CLAUDE_CODE_BIN', defaultValue: 'claude' });
-Config.load('ai.codexBin', { envKey: 'AI_CODEX_BIN', defaultValue: 'codex' });
-
-Config.load('ai.langsmithApiKey', { envKey: 'AI_LANGSMITH_API_KEY' });
+Config.load('ai.anthropic.api.key');
+Config.load('ai.openai.api.key');
+Config.load('ai.xai.api.key');
+Config.load('ai.grok.llm.model', { defaultValue: 'grok-3' });
+Config.load('ai.grok.image.model', { defaultValue: 'grok-2-image' });
+Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
+Config.load('ai.embedding.model', { defaultValue: 'qwen3-embedding:8b' });
+Config.load('ai.claude-code.enabled', { defaultValue: 'false', validateType: 'boolean' });
+Config.load('ai.claude-code.bin', { defaultValue: 'claude' });
+Config.load('ai.codex.enabled', { defaultValue: 'false', validateType: 'boolean' });
+Config.load('ai.codex.bin', { defaultValue: 'codex' });
+Config.load('ai.langsmith.api.key');
 
 Config.load('storage.driver', { defaultValue: 'local', allowedValues: ['local'] });
-Config.load('storage.imageDir', { envKey: 'STORAGE_IMAGE_DIR', defaultValue: './images' });
+Config.load('storage.local.dir', { defaultValue: './images' });
