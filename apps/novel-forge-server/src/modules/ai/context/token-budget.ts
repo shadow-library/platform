@@ -61,6 +61,44 @@ export function truncateAtParagraph(text: string, maxTokens: number): { text: st
   return { text: accumulated, truncated: false };
 }
 
+// Keeps the END of the text — the tail — up to maxTokens, dropping from the front instead of the back.
+// Used for `prev_ending`: the model must see how the previous chapter actually stopped, not how it started.
+export function truncateAtParagraphTail(text: string, maxTokens: number): { text: string; truncated: boolean } {
+  if (maxTokens === 0) return { text: '', truncated: true };
+
+  const paragraphs = text.split(/\n\n+/);
+  let accumulated = '';
+  let usedTokens = 0;
+
+  for (let i = paragraphs.length - 1; i >= 0; i--) {
+    const para = paragraphs[i] ?? '';
+    const paraTokens = countTokens(para);
+    const separator = accumulated ? '\n\n' : '';
+    const separatorTokens = accumulated ? countTokens('\n\n') : 0;
+
+    if (usedTokens + separatorTokens + paraTokens <= maxTokens) {
+      accumulated = para + separator + accumulated;
+      usedTokens += separatorTokens + paraTokens;
+    } else if (accumulated === '') {
+      // Even the last paragraph exceeds maxTokens — truncate at word boundary, keeping the tail end.
+      const words = para.split(/\s+/);
+      let wordAccumulated = '';
+      for (let w = words.length - 1; w >= 0; w--) {
+        const word = words[w] ?? '';
+        const candidate = wordAccumulated ? word + ' ' + wordAccumulated : word;
+        if (countTokens(candidate) <= maxTokens) wordAccumulated = candidate;
+        else break;
+      }
+      return { text: wordAccumulated, truncated: true };
+    } else {
+      // First fit failure — stop here.
+      return { text: accumulated, truncated: true };
+    }
+  }
+
+  return { text: accumulated, truncated: false };
+}
+
 export function applyBudget<T extends { tokens: number }>(sections: T[], budgetTokens: number): T[] {
   const result: T[] = [];
   let used = 0;

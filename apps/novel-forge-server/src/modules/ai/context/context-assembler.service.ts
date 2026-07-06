@@ -19,7 +19,7 @@ import * as schema from '@server/database/schemas';
 
 import { CatalogService } from './catalog.service';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextTier, joinSections, renderSection } from './sections';
-import { applyBudget, countTokens, truncateAtParagraph } from './token-budget';
+import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 
 /**
@@ -40,8 +40,10 @@ function makeSection(key: string, content: string, tier: ContextTier, sourceRefs
   return { key, tier, tokens, truncated: false, sourceRefs, rendered };
 }
 
-function makeSectionTruncated(key: string, content: string, maxTokens: number, tier: ContextTier, sourceRefs: string[] = []): ContextSection {
-  const { text, truncated } = truncateAtParagraph(content, maxTokens);
+// Tail variant — keeps the END of `content` (used for prev_ending: the model must see how the
+// previous chapter actually stopped, not how it started).
+function makeSectionTail(key: string, content: string, maxTokens: number, tier: ContextTier, sourceRefs: string[] = []): ContextSection {
+  const { text, truncated } = truncateAtParagraphTail(content, maxTokens);
   const rendered = renderSection(key, text);
   const tokens = countTokens(rendered);
   return { key, tier, tokens, truncated, sourceRefs, rendered };
@@ -265,7 +267,7 @@ export class ContextAssembler {
         sections.push(makeSection('prev_ending', content, tier, [`chapter:${chapter - 1}`]));
       } else {
         const raw = prevChapter.content ?? '';
-        sections.push(makeSectionTruncated('prev_ending', raw, PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSectionTail('prev_ending', raw, PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
     }
 
@@ -441,7 +443,7 @@ export class ContextAssembler {
         const stateStr = prevDraft?.state ? JSON.stringify(prevDraft.state) : 'null';
         sections.push(makeSection('prev_ending', `Summary: ${prevChapter.summary ?? ''}\nState: ${stateStr}`, tier, [`chapter:${chapter - 1}`]));
       } else {
-        sections.push(makeSectionTruncated('prev_ending', prevChapter.content ?? '', PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
+        sections.push(makeSectionTail('prev_ending', prevChapter.content ?? '', PREV_ENDING_TAIL, tier, [`chapter:${chapter - 1}`]));
       }
     }
 
@@ -526,13 +528,13 @@ export class ContextAssembler {
 
     // 2. Plot threads touching the window
     if (threadRows.length > 0) {
-      const lines = threadRows.map(t => `**${t.threadKey}** (${t.status}): ${t.summary ?? ''}`);
+      const lines = threadRows.map(t => `**${t.threadKey}** (${t.status}${t.intentionallyOpen ? ', intentionally open — do not flag as unresolved' : ''}): ${t.summary ?? ''}`);
       sections.push(makeSection('plot_threads', lines.join('\n'), 'canonical', []));
     }
 
     // 3. Mysteries touching the window
     if (mysteryRows.length > 0) {
-      const lines = mysteryRows.map(m => `**${m.mysteryKey}** (${m.status}): ${m.question}`);
+      const lines = mysteryRows.map(m => `**${m.mysteryKey}** (${m.status}${m.intentionallyOpen ? ', intentionally open — do not flag as unresolved' : ''}): ${m.question}`);
       sections.push(makeSection('mysteries', lines.join('\n'), 'canonical', []));
     }
 

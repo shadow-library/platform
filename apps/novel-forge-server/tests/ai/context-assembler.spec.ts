@@ -11,8 +11,8 @@ import { describe, expect, it, mock } from 'bun:test';
  * Importing user defined packages
  */
 import { CatalogService } from '@modules/ai/context/catalog.service';
-import { ContextAssembler, FULL_CAST_MAX } from '@modules/ai/context/context-assembler.service';
-import { applyBudget, countTokens, truncateAtParagraph } from '@modules/ai/context/token-budget';
+import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
+import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
 
 /**
  * Defining types
@@ -68,6 +68,41 @@ describe('truncateAtParagraph', () => {
   it('returns truncated=false when text fits within budget', () => {
     const short = 'Short text.';
     const { truncated } = truncateAtParagraph(short, 1000);
+    expect(truncated).toBe(false);
+  });
+});
+
+// ─── token-budget / truncateAtParagraphTail ─────────────────────────────────
+
+describe('truncateAtParagraphTail', () => {
+  it('keeps paragraphs that fit and drops those that exceed maxTokens, from the front', () => {
+    // Three paragraphs; para2 + para3 fit together, para1 would exceed — the TAIL is kept.
+    const para1 = 'Alpha paragraph with some words here.';
+    const para2 = 'Beta paragraph with some words here too.';
+    const para3 = 'Gamma paragraph with some words here as well, bringing the total over budget.';
+    const text = [para1, para2, para3].join('\n\n');
+
+    const twoParasTokens = countTokens(`${para2}\n\n${para3}`);
+    const threeParasTokens = countTokens(text);
+
+    // Budget: enough for two but not three.
+    const maxTokens = twoParasTokens + Math.floor((threeParasTokens - twoParasTokens) / 2);
+
+    const { text: result, truncated } = truncateAtParagraphTail(text, maxTokens);
+    expect(truncated).toBe(true);
+    expect(result).not.toContain('Alpha');
+    expect(result).toContain('Gamma');
+  });
+
+  it('returns empty string with truncated=true when maxTokens is 0', () => {
+    const { text, truncated } = truncateAtParagraphTail('some text', 0);
+    expect(text).toBe('');
+    expect(truncated).toBe(true);
+  });
+
+  it('returns truncated=false when text fits within budget', () => {
+    const short = 'Short text.';
+    const { truncated } = truncateAtParagraphTail(short, 1000);
     expect(truncated).toBe(false);
   });
 });
@@ -176,6 +211,44 @@ describe('ContextAssembler.forChapter — grok-adjacency', () => {
     expect(prevEndingSection?.rendered).toContain('Summary:');
     // Raw prose tail should NOT be in the section (grok-adjacency renders summary+state, not content)
     expect(prevEndingSection?.rendered).not.toContain('Long prose...');
+  });
+});
+
+// ─── Test 4b: prev_ending keeps the tail, not the opening, of a standard chapter ─
+
+describe('ContextAssembler.forChapter — prev_ending tail truncation', () => {
+  it('keeps the END of the previous chapter, not its opening, when content exceeds PREV_ENDING_TAIL', async () => {
+    // Build enough paragraphs that the opening and closing paragraphs can't both fit in the budget.
+    const openingPara = 'OPENING_MARKER: '.repeat(200);
+    const closingPara = 'CLOSING_MARKER: '.repeat(200);
+    const content = [openingPara, closingPara].join('\n\n');
+    expect(countTokens(content)).toBeGreaterThan(PREV_ENDING_TAIL);
+
+    const prevChapter = { number: 4, generator: 'standard', status: 'done', summary: 'Something happened', content, title: 'Ch4' };
+
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => null) },
+        chapters: { findFirst: mock(async () => prevChapter), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    const prevEndingSection = pack.sections.find(s => s.key === 'prev_ending');
+    expect(prevEndingSection).toBeDefined();
+    expect(prevEndingSection?.rendered).toContain('CLOSING_MARKER');
+    expect(prevEndingSection?.rendered).not.toContain('OPENING_MARKER');
   });
 });
 

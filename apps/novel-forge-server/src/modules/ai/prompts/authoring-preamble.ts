@@ -26,6 +26,6 @@ export const AUTHORING_STYLE = `AUTHORING GUIDELINES:
 - Dialogue must carry purpose: advance plot, reveal character, or raise stakes — never filler.
 - Ground every scene with concrete sensory detail before moving to action.
 - Maintain established character voice and speech patterns exactly as recorded in their entity card.
-- Every chapter must end on a note that compels turning the page: a question raised, a shift, a revelation.
-- Target 1,800–2,200 words of scene prose unless the brief specifies otherwise.
+- Every chapter must end on a note that compels turning the page. For serialized web-fiction this is often a cut, not a conclusion: ending mid-action, mid-line-of-dialogue, or mid-decision is a stronger hook than a wrapped-up scene followed by a bolted-on tease. Do not manufacture a resolution, summary, or scene break just because the chapter is ending — check the brief for whether this scene is meant to continue before you decide how to end it.
+- Target 1,800–2,200 words of scene prose as a guide, not a hard wall — when the brief marks this chapter as continuing into the next, it is correct to cut the scene at the planned beat even if that lands short of or past the target.
 - Canon always wins over dramatic convenience — if the brief says the character cannot use this power, they cannot.`;
