@@ -55,6 +55,16 @@ export class AppErrorCode extends ServerErrorCode {
    * Finalize Errors
    */
   static readonly FIN_001 = new AppErrorCode('FIN_001', ErrorType.CLIENT_ERROR, 'Chapters must be finalized in order');
+  static readonly FIN_002 = new AppErrorCode(
+    'FIN_002',
+    ErrorType.CLIENT_ERROR,
+    'An earlier chapter needs re-validation after a bible or chapter change — run validation before finalizing',
+  );
+  static readonly FIN_003 = new AppErrorCode(
+    'FIN_003',
+    ErrorType.CLIENT_ERROR,
+    'The latest validation report has an unresolved error for this chapter — resolve it before finalizing',
+  );
 
   /*!
    * AI Errors

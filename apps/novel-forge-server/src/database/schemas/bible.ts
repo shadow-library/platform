@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, jsonb, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -39,6 +39,9 @@ export const bibleDocuments = pgTable(
     slug: varchar('slug').notNull(),
     frontmatter: jsonb('frontmatter'),
     body: text('body'),
+    // Monotonic revision + content hash so dependents can detect when canon they were validated against changed.
+    revision: integer('revision').notNull().default(1),
+    contentHash: varchar('content_hash'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

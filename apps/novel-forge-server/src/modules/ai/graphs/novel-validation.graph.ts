@@ -215,8 +215,26 @@ export function createNovelValidationGraph(services: ValidationServices) {
 
   // ─── persistReport ────────────────────────────────────────────────────────────
   async function persistReport(state: ValidationState) {
-    // The report is stored on the workflow_runs.outcome field (updated by WorkflowRunService on completion).
-    // Nothing to do here beyond propagating.
+    const projectId = BigInt(state.projectId);
+    const report = state.report as ValidationOutput | null;
+    const issues = report?.issues ?? [];
+
+    // Durably record the report — the run outcome alone is not queryable canon.
+    await db
+      .insert(schema.validationReports)
+      .values({ projectId, scope: 'novel', chapter: null, issues: issues.length, summary: report?.summary ?? null, payload: (report ?? { issues: [], summary: '' }) as never });
+
+    // Validation is the authority on freshness: a finalized chapter with an unresolved error is flagged
+    // for re-validation; every other finalized chapter is marked clean.
+    const errorChapters = new Set(issues.filter(i => i.severity === 'error' && typeof i.chapter === 'number').map(i => i.chapter));
+    const finalized = await db.query.chapters.findMany({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.status, 'done')), columns: { number: true } });
+    for (const ch of finalized) {
+      await db
+        .update(schema.chapters)
+        .set({ needsRevalidation: errorChapters.has(ch.number), updatedAt: new Date() })
+        .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, ch.number)));
+    }
+
     return { outcome: JSON.stringify(state.report) };
   }
 

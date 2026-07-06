@@ -43,6 +43,13 @@
       "when": 1783364905671,
       "tag": "0005_add_llm_cache",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783365438309,
+      "tag": "0006_add_bible_revision_and_revalidation",
+      "breakpoints": true
     }
   ]
 }

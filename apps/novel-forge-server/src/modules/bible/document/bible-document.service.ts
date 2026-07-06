@@ -5,10 +5,12 @@
 /**
  * Importing npm packages
  */
+import { createHash } from 'node:crypto';
+
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -44,15 +46,32 @@ export class BibleDocumentService {
   }
 
   async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody): Promise<Bible.Document> {
-    const [doc] = await this.db
-      .insert(schema.bibleDocuments)
-      .values({ projectId, section, slug, frontmatter: body.frontmatter, body: body.body })
-      .onConflictDoUpdate({
-        target: [schema.bibleDocuments.projectId, schema.bibleDocuments.section, schema.bibleDocuments.slug],
-        set: { frontmatter: body.frontmatter, body: body.body, updatedAt: new Date() },
-      })
-      .returning()
-      .catch(err => this.databaseService.translateError(err));
+    const existing = await this.get(projectId, section, slug);
+    const contentHash = createHash('sha256')
+      .update(JSON.stringify({ frontmatter: body.frontmatter ?? null, body: body.body ?? null }))
+      .digest('hex');
+    const contentChanged = !existing || existing.contentHash !== contentHash;
+
+    // Canon that already exists and did not change must not bump its revision or invalidate chapters.
+    if (existing && !contentChanged) return existing;
+
+    // Bumping the revision and invalidating dependents happens atomically: a bible edit that survives
+    // must always mark the chapters validated against the prior canon as needing re-validation.
+    const doc = await this.db.transaction(async tx => {
+      const [row] = await tx
+        .insert(schema.bibleDocuments)
+        .values({ projectId, section, slug, frontmatter: body.frontmatter, body: body.body, contentHash, revision: 1 })
+        .onConflictDoUpdate({
+          target: [schema.bibleDocuments.projectId, schema.bibleDocuments.section, schema.bibleDocuments.slug],
+          set: { frontmatter: body.frontmatter, body: body.body, contentHash, revision: sql`${schema.bibleDocuments.revision} + 1`, updatedAt: new Date() },
+        })
+        .returning();
+
+      // A canon change can affect any chapter — flag every finalized chapter of the project for re-validation.
+      await tx.update(schema.chapters).set({ needsRevalidation: true, updatedAt: new Date() }).where(eq(schema.chapters.projectId, projectId));
+
+      return row;
+    });
 
     if (!doc) throw new Error('Bible document upsert failed unexpectedly');
     return doc;

@@ -10,7 +10,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, eq, inArray, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -558,6 +558,21 @@ export class GenerationService {
       });
       if (!prevFinal) throw new ServerError(AppErrorCode.FIN_001);
     }
+
+    // Enforce bible/chapter consistency: an earlier finalized chapter invalidated by a canon change must
+    // be re-validated before we build the next chapter on top of stale context.
+    const stale = await this.db.query.chapters.findFirst({
+      where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.needsRevalidation, true), lt(schema.chapters.number, draft.chapter)),
+    });
+    if (stale) throw new ServerError(AppErrorCode.FIN_002);
+
+    // Block if the most recent novel validation flagged an unresolved error for this very chapter.
+    const latestReport = await this.db.query.validationReports.findFirst({
+      where: and(eq(schema.validationReports.projectId, projectId), eq(schema.validationReports.scope, 'novel')),
+      orderBy: desc(schema.validationReports.createdAt),
+    });
+    const reportIssues = (latestReport?.payload as { issues?: { chapter?: number; severity?: string }[] } | undefined)?.issues ?? [];
+    if (reportIssues.some(i => i.severity === 'error' && i.chapter === draft.chapter)) throw new ServerError(AppErrorCode.FIN_003);
 
     return this.workflowRunService.runChapterFinalization({
       projectId,
