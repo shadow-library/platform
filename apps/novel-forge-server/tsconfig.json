@@ -21,14 +21,13 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "baseUrl": ".",
     "module": "ES2022",
     "moduleResolution": "bundler",
     "paths": {
-      "@server/*": ["src/*"],
-      "@modules/*": ["src/modules/*"],
-      "@scripts/*": ["scripts/*"],
-      "@tests/*": ["tests/*"]
+      "@server/*": ["./src/*"],
+      "@modules/*": ["./src/modules/*"],
+      "@scripts/*": ["./scripts/*"],
+      "@tests/*": ["./tests/*"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
