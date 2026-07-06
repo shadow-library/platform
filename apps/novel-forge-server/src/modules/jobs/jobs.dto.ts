@@ -5,12 +5,13 @@
 /**
  * Importing npm packages
  */
-import { Field, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { JobKind, JobStatus } from '@server/common';
 
 /**
  * Defining types
@@ -22,7 +23,8 @@ import { Transform } from '@shadow-library/fastify';
 
 @Schema()
 export class JobIdParams {
-  @Field() jobId: string;
+  @Field()
+  jobId: string;
 }
 
 @Schema()
@@ -30,4 +32,49 @@ export class ProjectJobsParams {
   @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
   projectId: bigint;
+}
+
+@Schema()
+export class JobResponse {
+  @Field()
+  id: string;
+
+  @Field(() => String)
+  projectId: bigint;
+
+  @Field(() => JobKind)
+  kind: string;
+
+  @Field()
+  target: string;
+
+  @Field(() => JobStatus)
+  status: string;
+
+  @Field(() => Integer)
+  attempts: number;
+
+  @Field({ optional: true, nullable: true })
+  lastError?: string | null;
+
+  @Field(() => Object, { optional: true, nullable: true })
+  payload?: unknown;
+
+  @Field(() => Object, { optional: true, nullable: true })
+  progress?: unknown;
+
+  @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
+  nextAttemptAt?: Date | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ListJobResponse {
+  @Field(() => [JobResponse])
+  items: JobResponse[];
 }

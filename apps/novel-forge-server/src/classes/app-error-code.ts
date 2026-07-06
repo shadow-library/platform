@@ -82,4 +82,9 @@ export class AppErrorCode extends ServerErrorCode {
    * Bible Document Errors
    */
   static readonly DOC_001 = new AppErrorCode('DOC_001', ErrorType.NOT_FOUND, 'Bible document not found');
+
+  /*!
+   * Job Errors
+   */
+  static readonly JOB_001 = new AppErrorCode('JOB_001', ErrorType.NOT_FOUND, 'Job not found');
 }

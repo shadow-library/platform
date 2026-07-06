@@ -12,8 +12,11 @@ import { Body, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query,
  */
 
 import {
+  AiUsageResponse,
+  ApprovePlanResponse,
   BriefResponse,
   ChapterParams,
+  ChapterReviewResponse,
   ContinuityProposalResponse,
   DraftResponse,
   DraftRevisionResponse,
@@ -22,13 +25,24 @@ import {
   GenerateBody,
   GenerateGrokBody,
   ImportDraftBody,
+  JobEnqueueResponse,
+  JudgeResponse,
+  ListDraftResponse,
+  ListDraftRevisionResponse,
+  ListGenerationJobResponse,
+  ListWorkflowRunResponse,
+  MarkdownResponse,
   OutlineBody,
+  OutlineResponse,
   PlanBody,
+  PlanResponse,
   ProjectParams,
+  ReviewQueueResponse,
   ReviseDraftBody,
   RevisionParams,
   RunParams,
   SearchQuery,
+  SearchResponse,
   SeedFromBriefBody,
   UpdateBriefBody,
   UpdateContinuityBody,
@@ -60,20 +74,23 @@ export class GenerationController {
   }
 
   @Post('/plan')
-  plan(@Params() params: ProjectParams, @Body() body: PlanBody): Promise<unknown> {
-    return this.generationService.plan(params.projectId, body);
+  @RespondFor(200, PlanResponse)
+  plan(@Params() params: ProjectParams, @Body() body: PlanBody): Promise<PlanResponse> {
+    return this.generationService.plan(params.projectId, body) as unknown as Promise<PlanResponse>;
   }
 
   @Post('/approve')
-  approvePlan(@Params() params: ProjectParams): Promise<unknown> {
+  @RespondFor(200, ApprovePlanResponse)
+  approvePlan(@Params() params: ProjectParams): Promise<ApprovePlanResponse> {
     return this.generationService.approvePlan(params.projectId);
   }
 
   // ─── Outlines / Briefs ──────────────────────────────────────────────────────
 
   @Post('/outline')
-  outline(@Params() params: ProjectParams, @Body() body: OutlineBody): Promise<unknown> {
-    return this.generationService.outline(params.projectId, body);
+  @RespondFor(200, OutlineResponse)
+  outline(@Params() params: ProjectParams, @Body() body: OutlineBody): Promise<OutlineResponse> {
+    return this.generationService.outline(params.projectId, body) as unknown as Promise<OutlineResponse>;
   }
 
   @Get('/briefs/:n')
@@ -92,18 +109,23 @@ export class GenerationController {
 
   @Post('/generate')
   @HttpStatus(202)
-  generate(@Params() params: ProjectParams, @Body() body: GenerateBody): Promise<unknown> {
-    return this.generationService.generate(params.projectId, body);
+  @RespondFor(202, JobEnqueueResponse)
+  generate(@Params() params: ProjectParams, @Body() body: GenerateBody): Promise<JobEnqueueResponse> {
+    return this.generationService.generate(params.projectId, body) as unknown as Promise<JobEnqueueResponse>;
   }
 
   @Get('/jobs')
-  listJobs(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.listJobs(params.projectId);
+  @RespondFor(200, ListGenerationJobResponse)
+  async listJobs(@Params() params: ProjectParams): Promise<ListGenerationJobResponse> {
+    const items = await this.generationService.listJobs(params.projectId);
+    return { items } as unknown as ListGenerationJobResponse;
   }
 
   @Get('/drafts')
-  listDrafts(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.listDrafts(params.projectId);
+  @RespondFor(200, ListDraftResponse)
+  async listDrafts(@Params() params: ProjectParams): Promise<ListDraftResponse> {
+    const items = await this.generationService.listDrafts(params.projectId);
+    return { items } as unknown as ListDraftResponse;
   }
 
   @Get('/drafts/:n')
@@ -125,8 +147,9 @@ export class GenerationController {
   }
 
   @Post('/drafts/:n/judge')
-  judgeDraft(@Params() params: ChapterParams): Promise<unknown> {
-    return this.generationService.judgeDraft(params.projectId, params.n);
+  @RespondFor(200, JudgeResponse)
+  judgeDraft(@Params() params: ChapterParams): Promise<JudgeResponse> {
+    return this.generationService.judgeDraft(params.projectId, params.n) as unknown as Promise<JudgeResponse>;
   }
 
   @Post('/drafts/:n/feedback')
@@ -143,8 +166,10 @@ export class GenerationController {
   }
 
   @Get('/drafts/:n/revisions')
-  listRevisions(@Params() params: ChapterParams): Promise<unknown> {
-    return this.generationService.listRevisions(params.projectId, params.n);
+  @RespondFor(200, ListDraftRevisionResponse)
+  async listRevisions(@Params() params: ChapterParams): Promise<ListDraftRevisionResponse> {
+    const items = await this.generationService.listRevisions(params.projectId, params.n);
+    return { items } as unknown as ListDraftRevisionResponse;
   }
 
   @Get('/drafts/:n/revisions/:r')
@@ -154,8 +179,9 @@ export class GenerationController {
   }
 
   @Get('/drafts/:n/prompt')
-  getDraftPrompt(@Params() params: ChapterParams): Promise<unknown> {
-    return this.generationService.getDraftPrompt(params.projectId, params.n);
+  @RespondFor(200, MarkdownResponse)
+  getDraftPrompt(@Params() params: ChapterParams): Promise<MarkdownResponse> {
+    return this.generationService.getDraftPrompt(params.projectId, params.n) as unknown as Promise<MarkdownResponse>;
   }
 
   @Post('/drafts/:n/import')
@@ -219,20 +245,24 @@ export class GenerationController {
   }
 
   @Post('/chapters/:n/review')
-  reviewChapter(@Params() params: ChapterParams): Promise<unknown> {
-    return this.generationService.reviewChapter(params.projectId, params.n);
+  @RespondFor(200, ChapterReviewResponse)
+  reviewChapter(@Params() params: ChapterParams): Promise<ChapterReviewResponse> {
+    return this.generationService.reviewChapter(params.projectId, params.n) as unknown as Promise<ChapterReviewResponse>;
   }
 
   // ─── Human review queue / runs ───────────────────────────────────────────────
 
   @Get('/review-queue')
-  getReviewQueue(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.getReviewQueue(params.projectId);
+  @RespondFor(200, ReviewQueueResponse)
+  getReviewQueue(@Params() params: ProjectParams): Promise<ReviewQueueResponse> {
+    return this.generationService.getReviewQueue(params.projectId) as unknown as Promise<ReviewQueueResponse>;
   }
 
   @Get('/runs')
-  listRuns(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.listRuns(params.projectId);
+  @RespondFor(200, ListWorkflowRunResponse)
+  async listRuns(@Params() params: ProjectParams): Promise<ListWorkflowRunResponse> {
+    const items = await this.generationService.listRuns(params.projectId);
+    return { items } as unknown as ListWorkflowRunResponse;
   }
 
   @Get('/runs/:runId')
@@ -242,29 +272,33 @@ export class GenerationController {
   }
 
   @Get('/ai-usage')
-  getAiUsage(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.getAiUsage(params.projectId);
+  @RespondFor(200, AiUsageResponse)
+  getAiUsage(@Params() params: ProjectParams): Promise<AiUsageResponse> {
+    return this.generationService.getAiUsage(params.projectId) as unknown as Promise<AiUsageResponse>;
   }
 
   // ─── Search ─────────────────────────────────────────────────────────────────
 
   @Get('/search')
-  search(@Params() params: ProjectParams, @Query() query: SearchQuery): Promise<unknown> {
-    return this.generationService.search(params.projectId, query);
+  @RespondFor(200, SearchResponse)
+  search(@Params() params: ProjectParams, @Query() query: SearchQuery): Promise<SearchResponse> {
+    return this.generationService.search(params.projectId, query) as unknown as Promise<SearchResponse>;
   }
 
   // ─── Manuscript ─────────────────────────────────────────────────────────────
 
   @Get('/manuscript')
-  getManuscript(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.getManuscript(params.projectId);
+  @RespondFor(200, MarkdownResponse)
+  getManuscript(@Params() params: ProjectParams): Promise<MarkdownResponse> {
+    return this.generationService.getManuscript(params.projectId) as unknown as Promise<MarkdownResponse>;
   }
 
   // ─── Backfill ───────────────────────────────────────────────────────────────
 
   @Post('/backfill')
   @HttpStatus(202)
-  backfill(@Params() params: ProjectParams): Promise<unknown> {
-    return this.generationService.backfill(params.projectId);
+  @RespondFor(202, JobEnqueueResponse)
+  backfill(@Params() params: ProjectParams): Promise<JobEnqueueResponse> {
+    return this.generationService.backfill(params.projectId) as unknown as Promise<JobEnqueueResponse>;
   }
 }

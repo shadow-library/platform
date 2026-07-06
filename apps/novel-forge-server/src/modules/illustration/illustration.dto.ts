@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -14,29 +15,75 @@
  * Defining types
  */
 
+@Schema()
 export class IllustrationParams {
-  projectId!: string;
-  entityKey!: string;
+  @Field()
+  projectId: string;
+
+  @Field()
+  entityKey: string;
 }
 
+@Schema()
 export class StartIllustrationBody {
+  @Field({ optional: true })
   instruction?: string;
+
+  @Field({ optional: true })
   noChat?: boolean;
 }
 
+@Schema()
 export class RefineIllustrationBody {
-  sessionId!: string;
-  instruction!: string;
+  @Field()
+  sessionId: string;
+
+  @Field()
+  instruction: string;
 }
 
+@Schema()
 export class SaveIllustrationBody {
-  sessionId!: string;
+  @Field()
+  sessionId: string;
 }
 
+@Schema()
 export class CancelIllustrationBody {
-  sessionId!: string;
+  @Field()
+  sessionId: string;
 }
 
 /**
  * Declaring the constants
  */
+
+@Schema()
+export class StartIllustrationResponse {
+  @Field()
+  sessionId: string;
+
+  @Field()
+  previewUrl: string;
+}
+
+@Schema()
+export class RefineIllustrationResponse {
+  @Field()
+  previewUrl: string;
+}
+
+@Schema()
+export class SaveIllustrationResponse {
+  @Field()
+  saved: boolean;
+
+  @Field()
+  imagePath: string;
+}
+
+@Schema()
+export class CancelIllustrationResponse {
+  @Field()
+  cancelled: boolean;
+}

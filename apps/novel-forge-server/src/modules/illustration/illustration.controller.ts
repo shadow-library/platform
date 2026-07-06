@@ -5,12 +5,22 @@
 /**
  * Importing npm packages
  */
-import { Body, HttpController, Params, Post } from '@shadow-library/fastify';
+import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { CancelIllustrationBody, IllustrationParams, RefineIllustrationBody, SaveIllustrationBody, StartIllustrationBody } from './illustration.dto';
+import {
+  CancelIllustrationBody,
+  CancelIllustrationResponse,
+  IllustrationParams,
+  RefineIllustrationBody,
+  RefineIllustrationResponse,
+  SaveIllustrationBody,
+  SaveIllustrationResponse,
+  StartIllustrationBody,
+  StartIllustrationResponse,
+} from './illustration.dto';
 import { IllustrationService } from './illustration.service';
 
 /**
@@ -26,22 +36,26 @@ export class IllustrationController {
   constructor(private readonly illustrationService: IllustrationService) {}
 
   @Post('/')
-  start(@Params() params: IllustrationParams, @Body() body: StartIllustrationBody): Promise<{ sessionId: string; previewUrl: string }> {
+  @RespondFor(200, StartIllustrationResponse)
+  start(@Params() params: IllustrationParams, @Body() body: StartIllustrationBody): Promise<StartIllustrationResponse> {
     return this.illustrationService.start(BigInt(params.projectId), params.entityKey, body);
   }
 
   @Post('/refine')
-  refine(@Body() body: RefineIllustrationBody): Promise<{ previewUrl: string }> {
+  @RespondFor(200, RefineIllustrationResponse)
+  refine(@Body() body: RefineIllustrationBody): Promise<RefineIllustrationResponse> {
     return this.illustrationService.refine(body.sessionId, body.instruction);
   }
 
   @Post('/save')
-  save(@Body() body: SaveIllustrationBody): Promise<{ saved: boolean; imagePath: string }> {
+  @RespondFor(200, SaveIllustrationResponse)
+  save(@Body() body: SaveIllustrationBody): Promise<SaveIllustrationResponse> {
     return this.illustrationService.save(body.sessionId);
   }
 
   @Post('/cancel')
-  cancel(@Body() body: CancelIllustrationBody): Promise<{ cancelled: boolean }> {
+  @RespondFor(200, CancelIllustrationResponse)
+  cancel(@Body() body: CancelIllustrationBody): Promise<CancelIllustrationResponse> {
     return this.illustrationService.cancel(body.sessionId);
   }
 }
