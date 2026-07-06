@@ -61,10 +61,26 @@ export class JobExecutor {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
+  // On boot, drain any jobs left pending — including ones just reset from in_progress by crash recovery.
+  // Without this a crashed job would sit pending forever with no one to pick it up.
+  async onModuleInit(): Promise<void> {
+    const pending = await this.jobService.findPending();
+    if (pending.length === 0) return;
+    this.logger.info(`Dispatching ${pending.length} pending job(s) on boot`);
+    for (const job of pending) this.dispatch(job.id).catch(err => this.logger.error('Boot dispatch failed', { err, jobId: job.id }));
+  }
+
   async dispatch(jobId: string): Promise<void> {
     const job = await this.jobService.get(jobId);
     if (!job) {
       this.logger.warn('dispatch: job not found', { jobId });
+      return;
+    }
+
+    // Only pending jobs are dispatchable. A done/failed job must not silently re-run (and re-spend on
+    // LLM calls); an in_progress job is already owned by another dispatch on the per-project lock.
+    if (job.status !== 'pending') {
+      this.logger.warn('dispatch: skipping non-pending job', { jobId, status: job.status });
       return;
     }
 
@@ -74,7 +90,12 @@ export class JobExecutor {
     const key = this.concurrency.lockKey(projectId, isLocal);
 
     await this.concurrency.run(key, async () => {
-      await this.jobService.start(jobId);
+      // Claim the job atomically; if another worker beat us to it inside the lock, stand down.
+      const claimed = await this.jobService.start(jobId);
+      if (!claimed) {
+        this.logger.warn('dispatch: job already claimed by another worker', { jobId });
+        return;
+      }
       try {
         await this.runJob(job);
         await this.jobService.succeed(jobId);

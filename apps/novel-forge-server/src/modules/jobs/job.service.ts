@@ -44,7 +44,9 @@ export class JobService {
     await this.recoverStuck();
   }
 
-  // Insert a new job row; if (projectId, kind, target) already exists, return the existing id.
+  // Insert a new job row for (projectId, kind, target). Deduplication only applies to *active* work:
+  // if a pending/in_progress job already exists we return it unchanged, but a previously terminal job
+  // (done/failed) is reset to pending with the new payload so re-posting genuinely re-runs the work.
   async enqueue(projectId: bigint, kind: Job.Kind, target: string, payload?: unknown): Promise<string> {
     const [inserted] = await this.db
       .insert(schema.jobs)
@@ -54,20 +56,38 @@ export class JobService {
 
     if (inserted) return inserted.id;
 
-    // Conflict — return the existing job's id.
+    // Conflict on the (projectId, kind, target) unique index — inspect the existing job.
     const existing = await this.db.query.jobs.findFirst({
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, kind), eq(schema.jobs.target, target)),
-      columns: { id: true },
+      columns: { id: true, status: true },
     });
     if (!existing) throw new Error(`enqueue: job not found after conflict on (${projectId}, ${kind}, ${target})`);
+
+    // Active job: real dedup — return it as-is without disturbing an in-flight run.
+    if (existing.status === 'pending' || existing.status === 'in_progress') return existing.id;
+
+    // Terminal job (done/failed): reset it so the re-request runs again from a clean slate.
+    await this.db
+      .update(schema.jobs)
+      .set({ status: 'pending', attempts: 0, lastError: null, progress: null, payload: payload as never, nextAttemptAt: null, updatedAt: new Date() })
+      .where(eq(schema.jobs.id, existing.id));
     return existing.id;
   }
 
-  async start(jobId: string): Promise<void> {
-    await this.db
+  // Pending jobs awaiting dispatch — used by the executor to drain the queue on boot after crash recovery.
+  async findPending(): Promise<Job.Row[]> {
+    return this.db.query.jobs.findMany({ where: eq(schema.jobs.status, 'pending'), orderBy: desc(schema.jobs.createdAt) });
+  }
+
+  // Atomically claim a pending job. Returns false if another worker already claimed it, which keeps the
+  // boot dispatcher and a fresh enqueue+dispatch from ever running the same job twice.
+  async start(jobId: string): Promise<boolean> {
+    const claimed = await this.db
       .update(schema.jobs)
       .set({ status: 'in_progress', attempts: sql`${schema.jobs.attempts} + 1`, updatedAt: new Date() })
-      .where(eq(schema.jobs.id, jobId));
+      .where(and(eq(schema.jobs.id, jobId), eq(schema.jobs.status, 'pending')))
+      .returning({ id: schema.jobs.id });
+    return claimed.length > 0;
   }
 
   async progress(jobId: string, progress: JobProgress): Promise<void> {
