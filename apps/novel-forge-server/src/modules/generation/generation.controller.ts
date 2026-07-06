@@ -13,6 +13,7 @@ import { Body, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query,
 
 import {
   AiUsageResponse,
+  ApproveDraftBody,
   ApprovePlanResponse,
   BriefResponse,
   ChapterParams,
@@ -161,8 +162,8 @@ export class GenerationController {
 
   @Post('/drafts/:n/approve')
   @RespondFor(200, DraftResponse)
-  approveDraft(@Params() params: ChapterParams): Promise<DraftResponse> {
-    return this.generationService.approveDraft(params.projectId, params.n) as unknown as Promise<DraftResponse>;
+  approveDraft(@Params() params: ChapterParams, @Body() body: ApproveDraftBody): Promise<DraftResponse> {
+    return this.generationService.approveDraft(params.projectId, params.n, body) as unknown as Promise<DraftResponse>;
   }
 
   @Get('/drafts/:n/revisions')

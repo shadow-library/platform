@@ -154,6 +154,15 @@ export class FeedbackBody {
 }
 
 @Schema()
+export class ApproveDraftBody {
+  @Field({ optional: true })
+  reviewerId?: string;
+
+  @Field({ optional: true })
+  idempotencyKey?: string;
+}
+
+@Schema()
 export class ImportDraftBody {
   @Field()
   prose: string;

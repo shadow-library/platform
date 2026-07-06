@@ -183,10 +183,15 @@ export const userFeedback = pgTable(
     artifactType: userFeedbackArtifactType('artifact_type').notNull(),
     artifactRef: varchar('artifact_ref').notNull(),
     disposition: userFeedbackDisposition('disposition').notNull(),
+    reviewerId: varchar('reviewer_id'),
+    idempotencyKey: varchar('idempotency_key'),
     note: text('note'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [index('user_feedback_project_id_artifact_type_artifact_ref_idx').on(t.projectId, t.artifactType, t.artifactRef)],
+  t => [
+    index('user_feedback_project_id_artifact_type_artifact_ref_idx').on(t.projectId, t.artifactType, t.artifactRef),
+    unique('user_feedback_idempotency_key_unique').on(t.idempotencyKey),
+  ],
 );
 
 export const loreChunks = pgTable(

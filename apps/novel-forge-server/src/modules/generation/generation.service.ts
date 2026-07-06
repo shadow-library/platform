@@ -462,17 +462,35 @@ export class GenerationService {
     return feedback;
   }
 
-  async approveDraft(projectId: bigint, chapter: number): Promise<Generation.Draft> {
+  async approveDraft(projectId: bigint, chapter: number, options?: { reviewerId?: string; idempotencyKey?: string }): Promise<Generation.Draft> {
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw new ServerError(AppErrorCode.DRF_002);
 
-    await this.db.insert(schema.userFeedback).values({ projectId, artifactType: 'draft', artifactRef: String(chapter), disposition: 'approved', note: null });
+    // Record the approval and flip the draft's review status in one transaction: a crash can never
+    // leave an approval logged without the draft approved, or the draft approved with no audit row.
+    // `idempotencyKey` (unique) makes a retried approve a no-op instead of a duplicate approval row.
+    const updated = await this.db.transaction(async tx => {
+      await tx
+        .insert(schema.userFeedback)
+        .values({
+          projectId,
+          artifactType: 'draft',
+          artifactRef: String(chapter),
+          disposition: 'approved',
+          reviewerId: options?.reviewerId ?? null,
+          idempotencyKey: options?.idempotencyKey ?? null,
+          note: null,
+        })
+        .onConflictDoNothing({ target: schema.userFeedback.idempotencyKey });
 
-    const [updated] = await this.db
-      .update(schema.drafts)
-      .set({ reviewStatus: 'approved', updatedAt: new Date() })
-      .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
-      .returning();
+      const [row] = await tx
+        .update(schema.drafts)
+        .set({ reviewStatus: 'approved', updatedAt: new Date() })
+        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
+        .returning();
+      return row;
+    });
+
     if (!updated) throw new ServerError(AppErrorCode.DRF_001);
     return updated;
   }
