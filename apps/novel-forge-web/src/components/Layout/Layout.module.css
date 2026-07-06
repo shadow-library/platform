@@ -1,0 +1,70 @@
+@import 'tailwindcss';
+
+.sideNavContainer {
+  @apply fixed left-0 top-16 bottom-0 w-64 overflow-y-auto z-40;
+  background-color: var(--color-bg-sider);
+  border-right: 1px solid var(--color-border-dark);
+}
+
+/* Top Navbar Styles */
+.topNavContainer {
+  @apply fixed top-0 left-0 right-0 h-16 z-50 flex items-center justify-between px-4;
+  background-color: var(--color-bg-header);
+  border-bottom: 1px solid var(--color-border-dark);
+}
+
+.logoSection {
+  @apply w-56 flex justify-center gap-3;
+}
+
+.searchContainer {
+  @apply flex-1 max-w-xl mx-8;
+}
+
+.rightSection {
+  @apply flex items-center gap-4;
+}
+
+.themeToggle {
+  @apply p-2 rounded-lg cursor-pointer transition-all duration-200;
+}
+
+/* Footer Styles */
+.footerContainer {
+  @apply h-12 flex items-center justify-center px-6 text-sm;
+}
+
+/* Main Content Area */
+.main {
+  @apply ml-64 mt-16;
+  background-color: var(--color-bg-layout);
+}
+
+/* Per-novel workspace switcher (top of workspace sidebar) */
+.novelSwitch {
+  @apply flex items-center gap-3 w-full text-left rounded-lg p-2 mb-2 cursor-pointer transition-colors;
+  background-color: rgba(255, 255, 255, 0.04);
+  border: 1px solid var(--color-border-dark);
+}
+
+.novelSwitch:hover {
+  background-color: var(--color-menu-item-hover-bg);
+}
+
+.novelSwitchCover {
+  @apply block w-8 h-10 rounded flex-none;
+}
+
+.novelSwitchText {
+  @apply flex flex-col min-w-0;
+}
+
+.novelSwitchText strong {
+  @apply text-sm truncate;
+  color: var(--color-text-inverse);
+}
+
+.novelSwitchText span {
+  @apply text-xs truncate;
+  color: var(--color-text-lighter);
+}
