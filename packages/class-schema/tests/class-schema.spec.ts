@@ -410,4 +410,24 @@ describe('ClassSchema', () => {
       });
     });
   });
+
+  describe('primitive arrays', () => {
+    // Uses the default (absolute) `class-schema:<name>-<n>` `$id`, which is where a bare `$ref: 'String'`
+    // for array items fails to resolve. Items must inline their primitive `type` instead.
+    @Schema()
+    class WithPrimitiveArray {
+      @Field(() => [String])
+      tags: string[];
+
+      @Field(() => [Integer], { optional: true })
+      counts?: number[];
+    }
+
+    it('should inline primitive array items instead of emitting an unresolvable $ref', () => {
+      const schema = ClassSchema.generate(WithPrimitiveArray);
+      expect(schema.properties?.tags).toStrictEqual({ type: 'array', items: { type: 'string' } });
+      expect(schema.properties?.counts).toStrictEqual({ type: 'array', items: { type: 'integer' } });
+      expect(schema.definitions).toBeUndefined();
+    });
+  });
 });

@@ -110,7 +110,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
     else {
       const Class = fieldType[0] as Class<unknown>;
       schema.type = 'array';
-      schema.items ??= { $ref: this.getSchemaId(Class) };
+      schema.items ??= this.getFieldSchema(Class);
     }
 
     return schema;
