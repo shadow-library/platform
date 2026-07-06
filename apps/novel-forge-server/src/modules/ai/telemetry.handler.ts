@@ -56,20 +56,34 @@ export class TelemetryHandler extends BaseCallbackHandler {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
-  // Called by ModelRouterService before invoking a chain — registers context so handleLLMEnd can write.
-  registerCall(langchainRunId: string, ctx: TelemetryContext, provider: string, model: string, attempt = 0): void {
-    this.pending.set(langchainRunId, { startedAt: Date.now(), ctx, provider, model, attempt });
-  }
+  // Attribution flows in through the invoke config's `metadata` under `nfTelemetry`. Reading it here —
+  // rather than pre-registering by a langchain runId we can't know ahead of a prompt.pipe(llm) chain —
+  // is what keeps every model_calls row tagged with its project/run/node/attempt.
+  override async handleLLMStart(
+    _llm: Serialized,
+    _messages: unknown[],
+    runId: string,
+    _parentRunId?: string,
+    _extraParams?: Record<string, unknown>,
+    _tags?: string[],
+    metadata?: Record<string, unknown>,
+  ): Promise<void> {
+    if (this.pending.has(runId)) return;
 
-  override async handleLLMStart(_llm: Serialized, _messages: unknown[], runId: string): Promise<void> {
-    if (!this.pending.has(runId))
-      this.pending.set(runId, {
-        startedAt: Date.now(),
-        ctx: { projectId: BigInt(0), promptKey: 'unknown', promptVersion: '0', role: 'unknown' },
-        provider: 'unknown',
-        model: 'unknown',
-        attempt: 0,
-      });
+    const nf = metadata?.['nfTelemetry'] as (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number }) | undefined;
+    if (nf) {
+      const { provider, model, attempt, projectId, ...ctx } = nf;
+      this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt });
+      return;
+    }
+
+    this.pending.set(runId, {
+      startedAt: Date.now(),
+      ctx: { projectId: BigInt(0), promptKey: 'unknown', promptVersion: '0', role: 'unknown' },
+      provider: 'unknown',
+      model: 'unknown',
+      attempt: 0,
+    });
   }
 
   override async handleLLMEnd(output: LLMResult, runId: string): Promise<void> {

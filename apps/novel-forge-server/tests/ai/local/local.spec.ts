@@ -56,7 +56,13 @@ describe('Rung-3 Ollama integration', () => {
       (Config as unknown as { cache: Map<string, unknown> }).cache.set('ai.ollamaHost', ollamaHost);
       // Select the local-test profile so the router resolves all roles to Ollama.
       process.env['AI_PROFILE'] = 'local-test';
-      router = new ModelRouterService(new NoopCallbackHandler() as unknown as TelemetryHandler);
+      const stubDbService = {
+        getPostgresClient: () => ({
+          query: { llmCache: { findFirst: async () => undefined } },
+          insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }),
+        }),
+      };
+      router = new ModelRouterService(new NoopCallbackHandler() as unknown as TelemetryHandler, stubDbService as never);
     });
 
     afterAll(() => {

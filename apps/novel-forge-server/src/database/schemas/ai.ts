@@ -25,6 +25,7 @@ export namespace Ai {
   export type ContextPack = InferSelectModel<typeof contextPacks>;
   export type DraftRevision = InferSelectModel<typeof draftRevisions>;
   export type UserFeedback = InferSelectModel<typeof userFeedback>;
+  export type LlmCache = InferSelectModel<typeof llmCache>;
   export type LoreChunk = InferSelectModel<typeof loreChunks>;
   export type WorkflowRunStatus = InferEnum<typeof workflowRunStatus>;
   export type ModelCallStatus = InferEnum<typeof modelCallStatus>;
@@ -194,6 +195,26 @@ export const userFeedback = pgTable(
   ],
 );
 
+export const llmCache = pgTable(
+  'llm_cache',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    role: varchar('role').notNull(),
+    promptKey: varchar('prompt_key').notNull(),
+    promptVersion: varchar('prompt_version').notNull(),
+    provider: varchar('provider').notNull(),
+    model: varchar('model').notNull(),
+    // sha256 of provider|model|promptKey|promptVersion|serialized-input (input carries the context pack text).
+    requestHash: varchar('request_hash').notNull(),
+    response: text('response').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [unique('llm_cache_request_hash_unique').on(t.requestHash), index('llm_cache_project_id_role_idx').on(t.projectId, t.role)],
+);
+
 export const loreChunks = pgTable(
   'lore_chunks',
   {
@@ -234,4 +255,8 @@ export const userFeedbackRelations = relations(userFeedback, ({ one }) => ({
 
 export const loreChunksRelations = relations(loreChunks, ({ one }) => ({
   project: one(projects, { fields: [loreChunks.projectId], references: [projects.id] }),
+}));
+
+export const llmCacheRelations = relations(llmCache, ({ one }) => ({
+  project: one(projects, { fields: [llmCache.projectId], references: [projects.id] }),
 }));

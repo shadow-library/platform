@@ -52,7 +52,11 @@ class SmokeNoop extends BaseCallbackHandler {
   name = 'smoke-noop';
 }
 
-const router = new ModelRouterService(new SmokeNoop() as never);
+// Minimal DatabaseService stub — smoke test runs deterministic roles with cache disabled (always misses).
+const stubDbService = {
+  getPostgresClient: () => ({ query: { llmCache: { findFirst: async () => undefined } }, insert: () => ({ values: () => ({ onConflictDoNothing: () => Promise.resolve() }) }) }),
+};
+const router = new ModelRouterService(new SmokeNoop() as never, stubDbService as never);
 
 logger.info('AI smoke test starting', { ollamaHost, profile: 'local-test' });
 

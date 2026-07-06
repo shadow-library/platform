@@ -23,10 +23,17 @@ import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema'
  * Declaring the constants
  */
 
+// Minimal DatabaseService stub: cache always misses, cache writes are no-ops.
+function stubDatabaseService(): never {
+  const noopInsert = { values: () => ({ onConflictDoNothing: () => Promise.resolve() }) };
+  const db = { query: { llmCache: { findFirst: async () => undefined } }, insert: () => noopInsert };
+  return { getPostgresClient: () => db } as never;
+}
+
 describe('ModelRouterService.resolveModel', () => {
   // Create a minimal stub — we only need resolveModel which has no DB dependency
   const stubTelemetry = {} as never;
-  const router = new ModelRouterService(stubTelemetry);
+  const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
 
   it('returns xai/grok-3 for grok_only project regardless of role', () => {
     const resolved = router.resolveModel('extraction', { contentMode: 'grok_only' });
@@ -110,7 +117,7 @@ describe('PRODUCTION_DEFAULTS vs LOCAL_TEST_DEFAULTS', () => {
 describe('ModelRouterService.structured (repair ladder)', () => {
   function makeRouter(fakeChain: { invoke: ReturnType<typeof mock> }): ModelRouterService {
     const stubTelemetry = {} as never;
-    const router = new ModelRouterService(stubTelemetry);
+    const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
     // Patch buildClient so no real provider is instantiated (no API keys needed in tests).
     (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ pipe: () => fakeChain });
     return router;

@@ -5,6 +5,8 @@
 /**
  * Importing npm packages
  */
+import { createHash } from 'node:crypto';
+
 import { ChatAnthropic } from '@langchain/anthropic';
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
 import { ChatOllama } from '@langchain/ollama';
@@ -13,12 +15,15 @@ import { ChatXAI } from '@langchain/xai';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
+import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type AiRole, type ResolvedModel, getProfileDefaults } from './defaults';
 import { MODEL_MAP } from './models';
@@ -39,6 +44,16 @@ export interface ProjectConfig {
 /**
  * Declaring the constants
  */
+
+// Deterministic verification/extraction roles: identical input must yield identical output, so their
+// results are safe to cache. Creative roles (generation, revision, plan, outline…) are never cached —
+// caching them would make a re-request return byte-identical prose.
+const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review']);
+const LLM_TIMEOUT_MS = Number(process.env['AI_LLM_TIMEOUT_MS'] ?? 120_000);
+const LLM_MAX_RETRIES = Number(process.env['AI_LLM_MAX_RETRIES'] ?? 2);
+const LLM_BACKOFF_MS = Number(process.env['AI_LLM_BACKOFF_MS'] ?? 500);
+
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 function extractJsonBlock(text: string): unknown {
   let depth = 0;
@@ -82,8 +97,14 @@ function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data
 @Injectable()
 export class ModelRouterService {
   private readonly logger = Logger.getLogger(APP_NAME, ModelRouterService.name);
+  private readonly db: PrimaryDatabase;
 
-  constructor(private readonly telemetry: TelemetryHandler) {}
+  constructor(
+    private readonly telemetry: TelemetryHandler,
+    private readonly databaseService: DatabaseService,
+  ) {
+    this.db = databaseService.getPostgresClient() as PrimaryDatabase;
+  }
 
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
     // 1. grok_only forces xAI on every role
@@ -131,23 +152,26 @@ export class ModelRouterService {
     const llm = this.buildClient(resolved);
     const chain = promptModule.template.pipe(llm);
 
-    // ─── Attempt 1: invoke ───────────────────────────────────────────────────
-    const start1 = Date.now();
-    let rawOutput1 = '';
-
-    try {
-      const result = await chain.invoke(input, { callbacks: [this.telemetry] });
-      rawOutput1 = typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
-    } catch (err) {
-      this.logger.warn('LLM transport error on attempt 1', { role, err });
-      throw new ServerError(AppErrorCode.AI_001);
+    // ─── Cache read-through (deterministic roles only) ────────────────────────
+    const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input) : null;
+    if (requestHash) {
+      const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
+      if (cached) {
+        const parsedCached = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(cached.response)), promptModule.postValidate);
+        if (parsedCached.success) {
+          this.logger.debug('LLM cache hit — skipping model call', { role, requestHash });
+          return parsedCached.data;
+        }
+      }
     }
 
-    const latency1 = Date.now() - start1;
-    this.logger.debug(`Attempt 1 complete`, { role, latencyMs: latency1, rawLength: rawOutput1.length });
-
+    // ─── Attempt 1: invoke ───────────────────────────────────────────────────
+    const rawOutput1 = await this.invokeResilient(chain, input, this.invokeConfig(ctx, resolved, 0), role);
     const parsed1 = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(rawOutput1)), promptModule.postValidate);
-    if (parsed1.success) return parsed1.data;
+    if (parsed1.success) {
+      await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
+      return parsed1.data;
+    }
 
     this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.issues.length });
 
@@ -159,28 +183,97 @@ export class ModelRouterService {
       instruction: 'The previous response could not be parsed. Fix the JSON so it matches the required schema. Output ONLY valid JSON.',
     };
 
-    let rawOutput2 = '';
-    try {
-      const result2 = await chain.invoke(repairInput, { callbacks: [this.telemetry] });
-      rawOutput2 = typeof result2.content === 'string' ? result2.content : JSON.stringify(result2.content);
-    } catch (err) {
-      this.logger.warn('LLM transport error on repair attempt', { role, err });
-      throw new ServerError(AppErrorCode.AI_001);
-    }
-
+    const rawOutput2 = await this.invokeResilient(chain, repairInput, this.invokeConfig(ctx, resolved, 1), role);
     const parsed2 = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(rawOutput2)), promptModule.postValidate);
-    if (parsed2.success) return parsed2.data;
+    if (parsed2.success) {
+      await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput2);
+      return parsed2.data;
+    }
 
     // ─── Attempt 3: tolerant extraction ──────────────────────────────────────
     this.logger.warn('Repair parse failed — trying tolerant extraction', { role });
     const extracted = extractJsonBlock(rawOutput2);
     if (extracted) {
       const parsed3 = applyPostValidate(parseSchema<T>(promptModule.schema, extracted), promptModule.postValidate);
-      if (parsed3.success) return parsed3.data;
+      if (parsed3.success) {
+        await this.cacheResponse(requestHash, ctx, resolved, promptModule, JSON.stringify(extracted));
+        return parsed3.data;
+      }
     }
 
     // ─── Fail ────────────────────────────────────────────────────────────────
     this.logger.error('All parse attempts failed', { role, rawOutput1: rawOutput1.slice(0, 200) });
     throw new ServerError(AppErrorCode.AI_001);
+  }
+
+  // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).
+  private invokeConfig(ctx: TelemetryContext, resolved: ResolvedModel, attempt: number): { callbacks: TelemetryHandler[]; metadata: Record<string, unknown> } {
+    return {
+      callbacks: [this.telemetry],
+      metadata: { nfTelemetry: { ...ctx, projectId: String(ctx.projectId), provider: resolved.provider, model: resolved.model, attempt } },
+    };
+  }
+
+  // Invoke the chain with a per-call timeout budget and transient-error backoff. Retries only cover
+  // transport/timeout failures; a returned (parseable-or-not) response is never retried here.
+  private async invokeResilient(
+    chain: { invoke: (input: Record<string, unknown>, config: object) => Promise<{ content: unknown }> },
+    input: Record<string, unknown>,
+    config: object,
+    role: string,
+  ): Promise<string> {
+    let lastErr: unknown;
+    for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
+      try {
+        const result = await this.withTimeout(chain.invoke(input, config), LLM_TIMEOUT_MS);
+        return typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
+      } catch (err) {
+        lastErr = err;
+        if (attempt < LLM_MAX_RETRIES) {
+          const backoff = LLM_BACKOFF_MS * 2 ** attempt;
+          this.logger.warn('LLM transport error — backing off before retry', { role, attempt, backoff, err });
+          await sleep(backoff);
+        }
+      }
+    }
+    this.logger.error('LLM call failed after retries', { role, err: lastErr });
+    throw new ServerError(AppErrorCode.AI_001);
+  }
+
+  private withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => {
+      timer = setTimeout(() => reject(new Error(`LLM call exceeded ${ms}ms timeout budget`)), ms);
+    });
+    return Promise.race([promise, timeout]).finally(() => clearTimeout(timer));
+  }
+
+  private hashRequest(resolved: ResolvedModel, promptModule: { key: string; version: string }, input: Record<string, unknown>): string {
+    const payload = JSON.stringify({ provider: resolved.provider, model: resolved.model, promptKey: promptModule.key, promptVersion: promptModule.version, input });
+    return createHash('sha256').update(payload).digest('hex');
+  }
+
+  private async cacheResponse(
+    requestHash: string | null,
+    ctx: TelemetryContext,
+    resolved: ResolvedModel,
+    promptModule: { key: string; version: string },
+    response: string,
+  ): Promise<void> {
+    if (!requestHash) return;
+    await this.db
+      .insert(schema.llmCache)
+      .values({
+        projectId: ctx.projectId,
+        role: promptModule.key,
+        promptKey: promptModule.key,
+        promptVersion: promptModule.version,
+        provider: resolved.provider,
+        model: resolved.model,
+        requestHash,
+        response,
+      })
+      .onConflictDoNothing({ target: schema.llmCache.requestHash })
+      .catch(err => this.logger.warn('Failed to write llm_cache row', { err }));
   }
 }
