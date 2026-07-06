@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Logger } from '@shadow-library/common';
 import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
@@ -63,6 +64,11 @@ export async function createTemplateDatabase(): Promise<void> {
 
   await migrate(db, { migrationsFolder: 'generated/drizzle' });
   logger.debug(`Migrations applied successfully to database '${templateDbName}'`);
+
+  // Create the LangGraph checkpoint tables so cloned test DBs can persist graph checkpoints.
+  const checkpointer = PostgresSaver.fromConnString(templateDbUrl);
+  await checkpointer.setup();
+  logger.debug(`LangGraph checkpoint tables created in database '${templateDbName}'`);
 
   await seed(db);
   logger.debug(`Seed data inserted successfully into database '${templateDbName}'`);

@@ -656,88 +656,102 @@ export class GenerationService {
     const proposalRow = await this.getContinuityProposal(projectId, chapter);
     const delta = proposalRow.proposal as unknown as ContinuityOutput;
 
-    // Insert new entities introduced in this chapter.
-    if (delta.newEntities && delta.newEntities.length > 0) {
-      await this.db
-        .insert(schema.entities)
-        .values(
-          delta.newEntities.map(e => ({ projectId, entityKey: e.entityKey, name: e.name, type: e.type, notes: e.notes, origin: 'generated' as const, firstSeenChapter: chapter })),
-        )
-        .onConflictDoNothing();
-    }
-
-    // Upsert entity appearances for appeared entities.
-    if (delta.appeared && delta.appeared.length > 0) {
-      const entityRows = await this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, delta.appeared)) });
-      for (const entity of entityRows) {
-        await this.db.insert(schema.entityAppearances).values({ entityId: entity.id, projectId, chapter, firstChapter: chapter }).onConflictDoNothing();
+    // Apply every canon mutation, mark the proposal applied, and flag the chapter in one transaction:
+    // a partial application must never be recorded as `applied`.
+    const updated = await this.db.transaction(async tx => {
+      // Insert new entities introduced in this chapter.
+      if (delta.newEntities && delta.newEntities.length > 0) {
+        await tx
+          .insert(schema.entities)
+          .values(
+            delta.newEntities.map(e => ({
+              projectId,
+              entityKey: e.entityKey,
+              name: e.name,
+              type: e.type,
+              notes: e.notes,
+              origin: 'generated' as const,
+              firstSeenChapter: chapter,
+            })),
+          )
+          .onConflictDoNothing();
       }
-    }
 
-    // Upsert plot threads.
-    if (delta.threads && delta.threads.length > 0) {
-      for (const t of delta.threads) {
-        await this.db
-          .insert(schema.plotThreads)
-          .values({
-            projectId,
-            threadKey: t.threadKey,
-            status: t.status,
-            summary: t.summary,
-            openedChapter: t.status === 'open' ? chapter : undefined,
-            intentionallyOpen: t.intentionallyOpen ?? false,
-          })
-          .onConflictDoUpdate({
-            target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
-            set: {
+      // Upsert entity appearances for appeared entities.
+      if (delta.appeared && delta.appeared.length > 0) {
+        const entityRows = await tx.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, delta.appeared)) });
+        for (const entity of entityRows) {
+          await tx.insert(schema.entityAppearances).values({ entityId: entity.id, projectId, chapter, firstChapter: chapter }).onConflictDoNothing();
+        }
+      }
+
+      // Upsert plot threads.
+      if (delta.threads && delta.threads.length > 0) {
+        for (const t of delta.threads) {
+          await tx
+            .insert(schema.plotThreads)
+            .values({
+              projectId,
+              threadKey: t.threadKey,
               status: t.status,
               summary: t.summary,
-              closedChapter: t.status === 'closed' ? chapter : undefined,
+              openedChapter: t.status === 'open' ? chapter : undefined,
               intentionallyOpen: t.intentionallyOpen ?? false,
-              updatedAt: new Date(),
-            },
-          });
+            })
+            .onConflictDoUpdate({
+              target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
+              set: {
+                status: t.status,
+                summary: t.summary,
+                closedChapter: t.status === 'closed' ? chapter : undefined,
+                intentionallyOpen: t.intentionallyOpen ?? false,
+                updatedAt: new Date(),
+              },
+            });
+        }
       }
-    }
 
-    // Upsert mysteries.
-    if (delta.mysteries && delta.mysteries.length > 0) {
-      for (const m of delta.mysteries) {
-        await this.db
-          .insert(schema.mysteries)
-          .values({
-            projectId,
-            mysteryKey: m.mysteryKey,
-            status: m.status,
-            question: m.question ?? '',
-            openedChapter: m.status === 'open' ? chapter : undefined,
-            resolvedChapter: m.status === 'resolved' ? chapter : undefined,
-            intentionallyOpen: m.intentionallyOpen ?? false,
-          })
-          .onConflictDoUpdate({
-            target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
-            set: {
+      // Upsert mysteries.
+      if (delta.mysteries && delta.mysteries.length > 0) {
+        for (const m of delta.mysteries) {
+          await tx
+            .insert(schema.mysteries)
+            .values({
+              projectId,
+              mysteryKey: m.mysteryKey,
               status: m.status,
-              question: m.question ?? undefined,
+              question: m.question ?? '',
+              openedChapter: m.status === 'open' ? chapter : undefined,
               resolvedChapter: m.status === 'resolved' ? chapter : undefined,
               intentionallyOpen: m.intentionallyOpen ?? false,
-              updatedAt: new Date(),
-            },
-          });
+            })
+            .onConflictDoUpdate({
+              target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
+              set: {
+                status: m.status,
+                question: m.question ?? undefined,
+                resolvedChapter: m.status === 'resolved' ? chapter : undefined,
+                intentionallyOpen: m.intentionallyOpen ?? false,
+                updatedAt: new Date(),
+              },
+            });
+        }
       }
-    }
 
-    // Mark proposal applied and chapter continuityApplied.
-    const [updated] = await this.db
-      .update(schema.continuityProposals)
-      .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
-      .where(eq(schema.continuityProposals.id, proposalRow.id))
-      .returning();
+      // Mark proposal applied and chapter continuityApplied.
+      const [row] = await tx
+        .update(schema.continuityProposals)
+        .set({ status: 'applied', appliedAt: new Date(), updatedAt: new Date() })
+        .where(eq(schema.continuityProposals.id, proposalRow.id))
+        .returning();
 
-    await this.db
-      .update(schema.chapters)
-      .set({ continuityApplied: true, updatedAt: new Date() })
-      .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)));
+      await tx
+        .update(schema.chapters)
+        .set({ continuityApplied: true, updatedAt: new Date() })
+        .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapter)));
+
+      return row;
+    });
 
     return updated ?? proposalRow;
   }

@@ -9,7 +9,7 @@ import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { eq } from 'drizzle-orm';
+import { and, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -103,6 +103,11 @@ export class WorkflowRunService {
     this.checkpointer = PostgresSaver.fromConnString(DB_URL);
   }
 
+  async onModuleInit(): Promise<void> {
+    // Ensure the LangGraph checkpoint tables exist for the connected database (idempotent).
+    await this.checkpointer.setup();
+  }
+
   private get graphServices(): GraphServices {
     return {
       db: this.db,
@@ -111,10 +116,25 @@ export class WorkflowRunService {
       telemetry: this.telemetry,
       toolRegistry: this.toolRegistry,
       indexingService: this.indexingService,
+      checkpointer: this.checkpointer,
     };
   }
 
+  // Create a workflow_run row, or reuse the one left behind by a crashed prior attempt of the same
+  // job/target. Reusing its id (used as the checkpoint thread_id) is what lets a retried job resume
+  // from the last completed graph node instead of re-executing — and re-calling — the LLM.
   private async createRun(projectId: bigint, graph: string, target: string, input: unknown, jobId?: string): Promise<string> {
+    if (jobId) {
+      const existing = await this.db.query.workflowRuns.findFirst({
+        where: and(eq(schema.workflowRuns.jobId, jobId), eq(schema.workflowRuns.graph, graph), eq(schema.workflowRuns.target, target), eq(schema.workflowRuns.status, 'running')),
+        columns: { id: true },
+      });
+      if (existing) {
+        this.logger.warn('Resuming existing workflow run from checkpoint after crash', { runId: existing.id, jobId, graph, target });
+        return existing.id;
+      }
+    }
+
     const [run] = await this.db
       .insert(schema.workflowRuns)
       .values({ projectId, graph, target, status: 'running', input: input as never, jobId: jobId ?? null, nodeTrace: [] })

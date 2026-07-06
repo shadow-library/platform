@@ -1,0 +1,1 @@
+ALTER TABLE "chapters" ADD COLUMN "locked" boolean DEFAULT false NOT NULL;

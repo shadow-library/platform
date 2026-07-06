@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
+import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { Logger } from '@shadow-library/common';
 import { and, eq } from 'drizzle-orm';
 
@@ -39,6 +39,7 @@ export interface ValidationServices {
   telemetry: TelemetryHandler;
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
+  checkpointer: BaseCheckpointSaver;
 }
 
 interface WindowSpec {
@@ -102,7 +103,7 @@ function tryParseValidation(raw: string): ValidationOutput | null {
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createNovelValidationGraph(services: ValidationServices) {
-  const { db, contextAssembler, modelRouter, toolRegistry } = services;
+  const { db, contextAssembler, modelRouter, toolRegistry, checkpointer } = services;
 
   // ─── planWindows ──────────────────────────────────────────────────────────────
   async function planWindows(state: ValidationState) {
@@ -229,5 +230,5 @@ export function createNovelValidationGraph(services: ValidationServices) {
     .addEdge('validateWindows', 'mergeFindings')
     .addEdge('mergeFindings', 'persistReport')
     .addEdge('persistReport', END)
-    .compile();
+    .compile({ checkpointer });
 }

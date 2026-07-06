@@ -6,14 +6,12 @@
  * Importing npm packages
  */
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
-import { Logger } from '@shadow-library/common';
+import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
-import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
@@ -39,6 +37,7 @@ export interface GraphServices {
   telemetry: TelemetryHandler;
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
+  checkpointer: BaseCheckpointSaver;
 }
 
 const ChapterGenAnnotation = Annotation.Root({
@@ -73,8 +72,6 @@ export type JudgeFinding = JudgeOutput['findings'][number];
 /**
  * Declaring the constants
  */
-
-const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
 
 // Normalize finding text for dedup comparison.
 function normalizeFinding(text: string): string {
@@ -148,7 +145,7 @@ function tryParseJson(raw: string): unknown {
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createChapterGenerationGraph(services: GraphServices) {
-  const { db, contextAssembler, modelRouter, toolRegistry } = services;
+  const { db, contextAssembler, modelRouter, toolRegistry, checkpointer } = services;
 
   // ─── assembleContext ──────────────────────────────────────────────────────────
   async function assembleContext(state: ChapterGenState) {
@@ -198,52 +195,56 @@ export function createChapterGenerationGraph(services: GraphServices) {
   // ─── persistDraft ─────────────────────────────────────────────────────────────
   async function persistDraft(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
-
-    // Upsert draft (idempotent on projectId + chapter).
-    const [draft] = await db
-      .insert(schema.drafts)
-      .values({
-        projectId,
-        chapter: state.chapter,
-        title: state.title,
-        body: state.prose,
-        summary: state.summary,
-        state: state.continuationState as never,
-        volumeKey: state.volumeKey || null,
-        revision: 0,
-        reviewStatus: 'generating',
-      })
-      .onConflictDoUpdate({
-        target: [schema.drafts.projectId, schema.drafts.chapter],
-        set: {
-          title: sql`EXCLUDED.title`,
-          body: sql`EXCLUDED.body`,
-          summary: sql`EXCLUDED.summary`,
-          state: sql`EXCLUDED.state`,
-          revision: sql`drafts.revision + 1`,
-          updatedAt: new Date(),
-        },
-      })
-      .returning();
-
-    if (!draft) throw new Error('[persistDraft] unexpected null result');
-
-    // Insert revision row (best-effort — ignore if duplicate).
     const source = state.attempt === 0 ? 'generated' : state.repairMode === 'patch' ? 'patched' : 'rewritten';
-    await db
-      .insert(schema.draftRevisions)
-      .values({
-        projectId,
-        draftId: draft.id,
-        revision: draft.revision,
-        source,
-        body: state.prose,
-        summary: state.summary,
-        state: state.continuationState as never,
-        runId: state.runId || null,
-      })
-      .onConflictDoNothing()
-      .catch(err => logger.warn('draftRevision insert conflict', { err }));
+
+    // Upsert the draft and record its revision in one transaction: the revision log must never
+    // diverge from the draft it describes. `onConflictDoNothing` on the revision keeps the whole
+    // node idempotent on checkpoint replay, but a real insert failure now rolls the draft back too.
+    const draft = await db.transaction(async tx => {
+      const [row] = await tx
+        .insert(schema.drafts)
+        .values({
+          projectId,
+          chapter: state.chapter,
+          title: state.title,
+          body: state.prose,
+          summary: state.summary,
+          state: state.continuationState as never,
+          volumeKey: state.volumeKey || null,
+          revision: 0,
+          reviewStatus: 'generating',
+        })
+        .onConflictDoUpdate({
+          target: [schema.drafts.projectId, schema.drafts.chapter],
+          set: {
+            title: sql`EXCLUDED.title`,
+            body: sql`EXCLUDED.body`,
+            summary: sql`EXCLUDED.summary`,
+            state: sql`EXCLUDED.state`,
+            revision: sql`drafts.revision + 1`,
+            updatedAt: new Date(),
+          },
+        })
+        .returning();
+
+      if (!row) throw new Error('[persistDraft] unexpected null result');
+
+      await tx
+        .insert(schema.draftRevisions)
+        .values({
+          projectId,
+          draftId: row.id,
+          revision: row.revision,
+          source,
+          body: state.prose,
+          summary: state.summary,
+          state: state.continuationState as never,
+          runId: state.runId || null,
+        })
+        .onConflictDoNothing();
+
+      return row;
+    });
 
     return { draftId: String(draft.id) };
   }
@@ -440,5 +441,5 @@ export function createChapterGenerationGraph(services: GraphServices) {
     .addEdge('acceptAsIs', 'finish')
     .addEdge('awaitReview', 'finish')
     .addEdge('finish', END)
-    .compile();
+    .compile({ checkpointer });
 }

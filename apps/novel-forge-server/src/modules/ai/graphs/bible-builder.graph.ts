@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
+import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { Logger } from '@shadow-library/common';
 import { eq, sql } from 'drizzle-orm';
 
@@ -35,6 +35,7 @@ export interface BibleBuilderServices {
   telemetry: TelemetryHandler;
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
+  checkpointer: BaseCheckpointSaver;
 }
 
 const BibleBuilderAnnotation = Annotation.Root({
@@ -76,7 +77,7 @@ const STAGE_SLUG_MAP: Record<string, string> = {
 
 // eslint-disable-next-line @typescript-eslint/explicit-module-boundary-types
 export function createBibleBuilderGraph(services: BibleBuilderServices) {
-  const { db, modelRouter, indexingService } = services;
+  const { db, modelRouter, indexingService, checkpointer } = services;
 
   async function fetchStageDoc(projectId: bigint, stageName: string): Promise<string | null> {
     const section = STAGE_SECTION_MAP[stageName];
@@ -247,5 +248,5 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     .addEdge('plot', 'volumes')
     .addEdge('volumes', 'indexLore')
     .addEdge('indexLore', END)
-    .compile();
+    .compile({ checkpointer });
 }

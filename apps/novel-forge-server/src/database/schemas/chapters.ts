@@ -43,6 +43,8 @@ export const chapters = pgTable(
     wordCount: integer('word_count'),
     status: chapterStatus('status').notNull(),
     generator: contentGenerator('generator').notNull().default('standard'),
+    // Set true when finalization commits the canonical prose; a locked chapter is immutable at the write path.
+    locked: boolean('locked').notNull().default(false),
     continuityApplied: boolean('continuity_applied').notNull().default(false),
     note: text('note'),
     scrapedAt: timestamp('scraped_at'),

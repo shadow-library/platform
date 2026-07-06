@@ -22,6 +22,13 @@
       "when": 1783346463972,
       "tag": "0002_futuristic_lake",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1783363961545,
+      "tag": "0003_add_chapter_locked",
+      "breakpoints": true
     }
   ]
 }

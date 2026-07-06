@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Annotation, END, START, StateGraph } from '@langchain/langgraph';
+import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { Logger } from '@shadow-library/common';
 import { and, eq, sql } from 'drizzle-orm';
 
@@ -35,6 +35,7 @@ export interface ExtractionServices {
   telemetry: TelemetryHandler;
   toolRegistry: ToolRegistryService;
   indexingService: IndexingService;
+  checkpointer: BaseCheckpointSaver;
 }
 
 const SourceExtractionAnnotation = Annotation.Root({
@@ -61,7 +62,7 @@ export function createSourceExtractionGraph(services: ExtractionServices): Retur
 }
 
 function buildSourceExtractionGraph(services: ExtractionServices) {
-  const { db, modelRouter, indexingService } = services;
+  const { db, modelRouter, indexingService, checkpointer } = services;
 
   // ─── loadChapter ──────────────────────────────────────────────────────────────
   async function loadChapter(state: ExtractionState) {
@@ -289,5 +290,5 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     .addEdge('persistKnowledge', 'embedProse')
     .addEdge('embedProse', 'finish')
     .addEdge('finish', END)
-    .compile();
+    .compile({ checkpointer });
 }
