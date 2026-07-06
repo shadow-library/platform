@@ -34,10 +34,10 @@ function SettingRow({ label, hint, control }: { label: string; hint?: string; co
 
 function Settings() {
   return (
-    <div style={{ maxWidth: 760 }}>
+    <div>
       <PageHeader title="Settings" subtitle="Studio-wide defaults for AI generation, canon rules, and exports." />
 
-      <Space direction="vertical" size={16} style={{ width: '100%' }}>
+      <Space orientation="vertical" size={16} style={{ width: '100%' }}>
         <Card title="Default model & creativity">
           <Segmented defaultValue="Balanced" options={['Precise', 'Balanced', 'Creative']} />
           <Text type="secondary" style={{ display: 'block', marginTop: 8, fontSize: 12 }}>
@@ -51,7 +51,7 @@ function Settings() {
             hint="Guides brief and draft generation."
             control={
               <Form.Item noStyle>
-                <InputNumber defaultValue={3000} step={250} min={500} addonAfter="words" />
+                <InputNumber defaultValue={3000} step={250} min={500} suffix="words" />
               </Form.Item>
             }
           />

@@ -22,7 +22,7 @@ export default function GlobalShell({ children }: PropsWithChildren) {
       <TopNavbar />
       <GlobalSidebar />
       <main className={styles.main}>
-        <div className="p-6 min-h-[calc(100vh-7rem)]">{children}</div>
+        <div className="mx-auto w-full max-w-[1200px] p-6 min-h-[calc(100vh-7rem)]">{children}</div>
         <Footer />
       </main>
     </div>

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { AppstoreOutlined, DashboardOutlined, PartitionOutlined, SettingOutlined, UserOutlined } from '@ant-design/icons';
+import { AppstoreOutlined, DashboardOutlined, SettingOutlined } from '@ant-design/icons';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { Menu } from 'antd';
 import type { MenuProps } from 'antd';
@@ -18,11 +18,7 @@ const menuItems: MenuProps['items'] = [
   { type: 'group', label: 'Main', children: [
     { key: '/', icon: <DashboardOutlined />, label: 'Dashboard' },
     { key: '/projects', icon: <AppstoreOutlined />, label: 'Projects' },
-    { key: '/sitemap', icon: <PartitionOutlined />, label: 'Sitemap' },
-  ] },
-  { type: 'group', label: 'Account', children: [
     { key: '/settings', icon: <SettingOutlined />, label: 'Settings' },
-    { key: '/profile', icon: <UserOutlined />, label: 'Profile' },
   ] },
 ];
 

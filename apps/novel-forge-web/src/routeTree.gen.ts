@@ -9,14 +9,11 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as LoginRouteImport } from './routes/login'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as NovelsNovelIdRouteImport } from './routes/novels/$novelId'
-import { Route as AppSitemapRouteImport } from './routes/_app/sitemap'
 import { Route as AppSettingsRouteImport } from './routes/_app/settings'
 import { Route as AppProjectsRouteImport } from './routes/_app/projects'
-import { Route as AppProfileRouteImport } from './routes/_app/profile'
 import { Route as NovelsNovelIdIndexRouteImport } from './routes/novels/$novelId/index'
 import { Route as NovelsNovelIdWorldRouteImport } from './routes/novels/$novelId/world'
 import { Route as NovelsNovelIdVolumesRouteImport } from './routes/novels/$novelId/volumes'
@@ -41,11 +38,6 @@ import { Route as NovelsNovelIdAssetsRouteImport } from './routes/novels/$novelI
 import { Route as NovelsNovelIdApprovalsRouteImport } from './routes/novels/$novelId/approvals'
 import { Route as NovelsNovelIdCharacterCharacterIdRouteImport } from './routes/novels/$novelId/character.$characterId'
 
-const LoginRoute = LoginRouteImport.update({
-  id: '/login',
-  path: '/login',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -60,11 +52,6 @@ const NovelsNovelIdRoute = NovelsNovelIdRouteImport.update({
   path: '/novels/$novelId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppSitemapRoute = AppSitemapRouteImport.update({
-  id: '/sitemap',
-  path: '/sitemap',
-  getParentRoute: () => AppRoute,
-} as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
@@ -73,11 +60,6 @@ const AppSettingsRoute = AppSettingsRouteImport.update({
 const AppProjectsRoute = AppProjectsRouteImport.update({
   id: '/projects',
   path: '/projects',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppProfileRoute = AppProfileRouteImport.update({
-  id: '/profile',
-  path: '/profile',
   getParentRoute: () => AppRoute,
 } as any)
 const NovelsNovelIdIndexRoute = NovelsNovelIdIndexRouteImport.update({
@@ -203,11 +185,8 @@ const NovelsNovelIdCharacterCharacterIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/login': typeof LoginRoute
-  '/profile': typeof AppProfileRoute
   '/projects': typeof AppProjectsRoute
   '/settings': typeof AppSettingsRoute
-  '/sitemap': typeof AppSitemapRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/novels/$novelId/approvals': typeof NovelsNovelIdApprovalsRoute
   '/novels/$novelId/assets': typeof NovelsNovelIdAssetsRoute
@@ -234,11 +213,8 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/character/$characterId': typeof NovelsNovelIdCharacterCharacterIdRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRoute
-  '/profile': typeof AppProfileRoute
   '/projects': typeof AppProjectsRoute
   '/settings': typeof AppSettingsRoute
-  '/sitemap': typeof AppSitemapRoute
   '/': typeof AppIndexRoute
   '/novels/$novelId/approvals': typeof NovelsNovelIdApprovalsRoute
   '/novels/$novelId/assets': typeof NovelsNovelIdAssetsRoute
@@ -267,11 +243,8 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
-  '/login': typeof LoginRoute
-  '/_app/profile': typeof AppProfileRoute
   '/_app/projects': typeof AppProjectsRoute
   '/_app/settings': typeof AppSettingsRoute
-  '/_app/sitemap': typeof AppSitemapRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/novels/$novelId/approvals': typeof NovelsNovelIdApprovalsRoute
@@ -302,11 +275,8 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/login'
-    | '/profile'
     | '/projects'
     | '/settings'
-    | '/sitemap'
     | '/novels/$novelId'
     | '/novels/$novelId/approvals'
     | '/novels/$novelId/assets'
@@ -333,11 +303,8 @@ export interface FileRouteTypes {
     | '/novels/$novelId/character/$characterId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/login'
-    | '/profile'
     | '/projects'
     | '/settings'
-    | '/sitemap'
     | '/'
     | '/novels/$novelId/approvals'
     | '/novels/$novelId/assets'
@@ -365,11 +332,8 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
-    | '/login'
-    | '/_app/profile'
     | '/_app/projects'
     | '/_app/settings'
-    | '/_app/sitemap'
     | '/novels/$novelId'
     | '/_app/'
     | '/novels/$novelId/approvals'
@@ -399,19 +363,11 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
-  LoginRoute: typeof LoginRoute
   NovelsNovelIdRoute: typeof NovelsNovelIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/login': {
-      id: '/login'
-      path: '/login'
-      fullPath: '/login'
-      preLoaderRoute: typeof LoginRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -433,13 +389,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/sitemap': {
-      id: '/_app/sitemap'
-      path: '/sitemap'
-      fullPath: '/sitemap'
-      preLoaderRoute: typeof AppSitemapRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/_app/settings': {
       id: '/_app/settings'
       path: '/settings'
@@ -452,13 +401,6 @@ declare module '@tanstack/react-router' {
       path: '/projects'
       fullPath: '/projects'
       preLoaderRoute: typeof AppProjectsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/profile': {
-      id: '/_app/profile'
-      path: '/profile'
-      fullPath: '/profile'
-      preLoaderRoute: typeof AppProfileRouteImport
       parentRoute: typeof AppRoute
     }
     '/novels/$novelId/': {
@@ -626,18 +568,14 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
-  AppProfileRoute: typeof AppProfileRoute
   AppProjectsRoute: typeof AppProjectsRoute
   AppSettingsRoute: typeof AppSettingsRoute
-  AppSitemapRoute: typeof AppSitemapRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppProfileRoute: AppProfileRoute,
   AppProjectsRoute: AppProjectsRoute,
   AppSettingsRoute: AppSettingsRoute,
-  AppSitemapRoute: AppSitemapRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
@@ -702,7 +640,6 @@ const NovelsNovelIdRouteWithChildren = NovelsNovelIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
-  LoginRoute: LoginRoute,
   NovelsNovelIdRoute: NovelsNovelIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
