@@ -1,0 +1,20 @@
+{
+  "short_name": "Novel Forge",
+  "name": "Novel Forge",
+  "icons": [
+    {
+      "src": "favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml"
+    },
+    {
+      "src": "logo.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "theme_color": "#36156e",
+  "background_color": "#ffffff"
+}
