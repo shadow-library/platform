@@ -36,41 +36,92 @@ export class VolumeKeyParams {
   @Transform('bigint:parse')
   projectId: bigint;
 
-  @Field() volumeKey: string;
+  @Field()
+  volumeKey: string;
 }
 
 @Schema()
 export class CreateVolumeBody {
-  @Field() volumeKey: string;
-  @Field(() => Integer, { optional: true }) ordinal?: number;
-  @Field({ optional: true }) title?: string;
-  @Field({ optional: true }) objective?: string;
-  @Field({ optional: true }) conflict?: string;
-  @Field({ optional: true }) payoff?: string;
-  @Field(() => Integer, { optional: true }) startChapter?: number;
-  @Field(() => Integer, { optional: true }) endChapter?: number;
-  @Field(() => PlanStatus, { optional: true }) status?: Plan.Status;
-  @Field(() => Object, { optional: true }) cast?: Record<string, unknown>;
-  @Field({ optional: true }) body?: string;
+  @Field()
+  volumeKey: string;
+
+  @Field(() => Integer, { optional: true })
+  ordinal?: number;
+
+  @Field({ optional: true })
+  title?: string;
+
+  @Field({ optional: true })
+  objective?: string;
+
+  @Field({ optional: true })
+  conflict?: string;
+
+  @Field({ optional: true })
+  payoff?: string;
+
+  @Field(() => Integer, { optional: true })
+  startChapter?: number;
+
+  @Field(() => Integer, { optional: true })
+  endChapter?: number;
+
+  @Field(() => PlanStatus, { optional: true })
+  status?: Plan.Status;
+
+  @Field(() => Object, { optional: true })
+  cast?: Record<string, unknown>;
+
+  @Field({ optional: true })
+  body?: string;
 }
 
 @Schema()
 export class VolumeResponse {
-  @Field(() => String) id: bigint;
-  @Field(() => String) projectId: bigint;
-  @Field() volumeKey: string;
-  @Field(() => Integer) ordinal: number;
-  @Field({ optional: true, nullable: true }) title?: string | null;
-  @Field({ optional: true, nullable: true }) objective?: string | null;
-  @Field({ optional: true, nullable: true }) conflict?: string | null;
-  @Field({ optional: true, nullable: true }) payoff?: string | null;
-  @Field(() => Integer, { optional: true, nullable: true }) startChapter?: number | null;
-  @Field(() => Integer, { optional: true, nullable: true }) endChapter?: number | null;
-  @Field(() => PlanStatus) status: Plan.Status;
-  @Field(() => Object, { optional: true, nullable: true }) cast?: Record<string, unknown> | null;
-  @Field({ optional: true, nullable: true }) body?: string | null;
-  @Field(() => String, { format: 'date-time' }) createdAt: Date;
-  @Field(() => String, { format: 'date-time' }) updatedAt: Date;
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => String)
+  projectId: bigint;
+
+  @Field()
+  volumeKey: string;
+
+  @Field(() => Integer)
+  ordinal: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  objective?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  conflict?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  payoff?: string | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  startChapter?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  endChapter?: number | null;
+
+  @Field(() => PlanStatus)
+  status: Plan.Status;
+
+  @Field(() => Object, { optional: true, nullable: true })
+  cast?: Record<string, unknown> | null;
+
+  @Field({ optional: true, nullable: true })
+  body?: string | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
 }
 
 @Schema({ minProperties: 1 })
@@ -78,7 +129,8 @@ export class UpdateVolumeBody extends PartialType(OmitType(CreateVolumeBody, ['v
 
 @Schema()
 export class ListVolumesQuery extends PaginationQuery(SortByTime) {
-  @Field(() => PlanStatus, { optional: true }) status?: Plan.Status;
+  @Field(() => PlanStatus, { optional: true })
+  status?: Plan.Status;
 }
 
 @Schema()
@@ -86,6 +138,9 @@ export class ListVolumeResponse extends Paginated(VolumeResponse) {}
 
 @Schema()
 export class ApprovePlanResponse {
-  @Field(() => Integer) volumesApproved: number;
-  @Field() approved: boolean;
+  @Field(() => Integer)
+  volumesApproved: number;
+
+  @Field()
+  approved: boolean;
 }

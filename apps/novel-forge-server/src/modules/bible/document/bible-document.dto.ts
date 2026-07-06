@@ -35,25 +35,45 @@ export class BibleDocParams {
   @Transform('bigint:parse')
   projectId: bigint;
 
-  @Field(() => BibleSection) section: Bible.Section;
+  @Field(() => BibleSection)
+  section: Bible.Section;
 
-  @Field() slug: string;
+  @Field()
+  slug: string;
 }
 
 @Schema()
 export class UpsertBibleDocBody {
-  @Field(() => Object, { optional: true }) frontmatter?: Record<string, unknown>;
-  @Field({ optional: true }) body?: string;
+  @Field(() => Object, { optional: true })
+  frontmatter?: Record<string, unknown>;
+
+  @Field({ optional: true })
+  body?: string;
 }
 
 @Schema()
 export class BibleDocResponse {
-  @Field(() => String) id: bigint;
-  @Field(() => String) projectId: bigint;
-  @Field(() => BibleSection) section: Bible.Section;
-  @Field() slug: string;
-  @Field(() => Object, { optional: true, nullable: true }) frontmatter?: Record<string, unknown> | null;
-  @Field({ optional: true, nullable: true }) body?: string | null;
-  @Field(() => String, { format: 'date-time' }) createdAt: Date;
-  @Field(() => String, { format: 'date-time' }) updatedAt: Date;
+  @Field(() => String)
+  id: bigint;
+
+  @Field(() => String)
+  projectId: bigint;
+
+  @Field(() => BibleSection)
+  section: Bible.Section;
+
+  @Field()
+  slug: string;
+
+  @Field(() => Object, { optional: true, nullable: true })
+  frontmatter?: Record<string, unknown> | null;
+
+  @Field({ optional: true, nullable: true })
+  body?: string | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
 }
