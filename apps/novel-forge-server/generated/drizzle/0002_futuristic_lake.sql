@@ -1,0 +1,2 @@
+ALTER TABLE "mysteries" ADD COLUMN "intentionally_open" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "plot_threads" ADD COLUMN "intentionally_open" boolean DEFAULT false NOT NULL;

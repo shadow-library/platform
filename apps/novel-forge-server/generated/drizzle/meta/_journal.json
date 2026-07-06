@@ -15,6 +15,13 @@
       "when": 1783157225127,
       "tag": "0001_sticky_freak",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783346463972,
+      "tag": "0002_futuristic_lake",
+      "breakpoints": true
     }
   ]
 }

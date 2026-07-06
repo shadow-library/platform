@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -68,6 +68,9 @@ export const plotThreads = pgTable(
     summary: text('summary'),
     owner: varchar('owner'),
     payoff: text('payoff'),
+    // Marked by the outliner/continuity-extraction as a deliberate running thread, not an oversight —
+    // novel-validation must not flag it as an unresolved-thread issue while this is true.
+    intentionallyOpen: boolean('intentionally_open').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
@@ -104,6 +107,9 @@ export const mysteries = pgTable(
     openedChapter: integer('opened_chapter'),
     resolvedChapter: integer('resolved_chapter'),
     knownTo: varchar('known_to'),
+    // Marked by the outliner/continuity-extraction as a deliberate running mystery, not an oversight —
+    // novel-validation must not flag it as an unresolved-mystery issue while this is true.
+    intentionallyOpen: boolean('intentionally_open').notNull().default(false),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
