@@ -13,7 +13,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
  */
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { FixSchema } from '../schemas/fix.schema';
+import { type FixOutput, FixSchema } from '../schemas/fix.schema';
 
 /**
  * Defining types
@@ -39,7 +39,7 @@ const fewShots = [
   ),
 ];
 
-export const fixPrompt: PromptModule<typeof FixSchema._type> = {
+export const fixPrompt: PromptModule<FixOutput> = {
   key: 'fix',
   version: '1.0.0',
   kind: 'authoring',

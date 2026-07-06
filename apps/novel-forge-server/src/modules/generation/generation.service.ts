@@ -40,7 +40,8 @@ import { PROMPT_REGISTRY } from '../ai/prompts';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
-import { JudgeSchema } from '../ai/schemas/judge.schema';
+import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
+import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
@@ -82,6 +83,16 @@ export interface JobEnqueueResult {
 /**
  * Declaring the constants
  */
+
+// Folds outline-time continuation decisions into the stored brief body so the drafter — which only
+// ever reads `chapterBrief` as plain text — actually sees them (see docs on the generation prompt).
+function renderBriefBody(c: { objective: string; events: string[]; continuesIntoNextChapter?: boolean; startsFromPreviousChapter?: boolean; handoffBeat?: string }): string {
+  const lines = [c.objective, ...(c.events ?? [])];
+  if (c.continuesIntoNextChapter) lines.push("[CONTINUES INTO NEXT CHAPTER] Do not resolve this chapter's central action/tension.");
+  if (c.startsFromPreviousChapter) lines.push('[STARTS FROM PREVIOUS CHAPTER] Open in the exact beat the previous chapter handed off — no time skip, no recap.');
+  if (c.handoffBeat) lines.push(`Handoff beat: ${c.handoffBeat}`);
+  return lines.join('\n');
+}
 
 @Injectable()
 export class GenerationService {
@@ -213,27 +224,32 @@ export class GenerationService {
       ctx,
     );
 
-    const chapters = outlineOutput as { chapter: number; volumeKey: string; title: string; objective: string; events: string[]; requiredContext: string[]; pov?: string }[];
+    const chapters = outlineOutput as {
+      chapter: number;
+      volumeKey: string;
+      title: string;
+      objective: string;
+      events: string[];
+      requiredContext: string[];
+      pov?: string;
+      continuesIntoNextChapter?: boolean;
+      startsFromPreviousChapter?: boolean;
+      handoffBeat?: string;
+    }[];
 
     const upserted = await Promise.all(
-      chapters.map(c =>
-        this.db
+      chapters.map(c => {
+        const briefBody = renderBriefBody(c);
+        return this.db
           .insert(schema.briefs)
-          .values({
-            projectId,
-            chapter: c.chapter,
-            volumeKey: c.volumeKey,
-            title: c.title,
-            body: [c.objective, ...(c.events ?? [])].join('\n'),
-            contextRefs: c.requiredContext as never,
-          })
+          .values({ projectId, chapter: c.chapter, volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never })
           .onConflictDoUpdate({
             target: [schema.briefs.projectId, schema.briefs.chapter],
-            set: { volumeKey: c.volumeKey, title: c.title, body: [c.objective, ...(c.events ?? [])].join('\n'), contextRefs: c.requiredContext as never, updatedAt: new Date() },
+            set: { volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never, updatedAt: new Date() },
           })
           .returning()
-          .then(rows => rows[0]),
-      ),
+          .then(rows => rows[0]);
+      }),
     );
 
     return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
@@ -419,7 +435,7 @@ export class GenerationService {
     // Parse the last AI message as JudgeOutput.
     const lastAi = [...resultMessages].reverse().find(m => m._getType() === 'ai');
     const rawContent = lastAi ? (typeof lastAi.content === 'string' ? lastAi.content : JSON.stringify(lastAi.content)) : '{}';
-    const parsed = JudgeSchema.safeParse(this.tryParseJson(rawContent));
+    const parsed = parseSchema<JudgeOutput>(JudgeSchema, this.tryParseJson(rawContent));
 
     const judgeOutput = parsed.success ? parsed.data : { verdict: 'consistent' as const, findings: [] };
 
@@ -663,10 +679,23 @@ export class GenerationService {
       for (const t of delta.threads) {
         await this.db
           .insert(schema.plotThreads)
-          .values({ projectId, threadKey: t.threadKey, status: t.status, summary: t.summary, openedChapter: t.status === 'open' ? chapter : undefined })
+          .values({
+            projectId,
+            threadKey: t.threadKey,
+            status: t.status,
+            summary: t.summary,
+            openedChapter: t.status === 'open' ? chapter : undefined,
+            intentionallyOpen: t.intentionallyOpen ?? false,
+          })
           .onConflictDoUpdate({
             target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
-            set: { status: t.status, summary: t.summary, closedChapter: t.status === 'closed' ? chapter : undefined, updatedAt: new Date() },
+            set: {
+              status: t.status,
+              summary: t.summary,
+              closedChapter: t.status === 'closed' ? chapter : undefined,
+              intentionallyOpen: t.intentionallyOpen ?? false,
+              updatedAt: new Date(),
+            },
           });
       }
     }
@@ -683,10 +712,17 @@ export class GenerationService {
             question: m.question ?? '',
             openedChapter: m.status === 'open' ? chapter : undefined,
             resolvedChapter: m.status === 'resolved' ? chapter : undefined,
+            intentionallyOpen: m.intentionallyOpen ?? false,
           })
           .onConflictDoUpdate({
             target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
-            set: { status: m.status, question: m.question ?? undefined, resolvedChapter: m.status === 'resolved' ? chapter : undefined, updatedAt: new Date() },
+            set: {
+              status: m.status,
+              question: m.question ?? undefined,
+              resolvedChapter: m.status === 'resolved' ? chapter : undefined,
+              intentionallyOpen: m.intentionallyOpen ?? false,
+              updatedAt: new Date(),
+            },
           });
       }
     }

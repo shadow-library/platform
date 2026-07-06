@@ -12,7 +12,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
  */
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { OutlineSchema } from '../schemas/outline.schema';
+import { type OutlineOutput, OutlineSchema } from '../schemas/outline.schema';
 
 /**
  * Defining types
@@ -22,16 +22,18 @@ import { OutlineSchema } from '../schemas/outline.schema';
  * Declaring the constants
  */
 
-const system = `${AUTHORING_STYLE}\n\nYou are a chapter outliner for a serialized novel. You receive the current volume plan, the available context catalog (titles-only view of entities, threads, chapters, world facts, and mysteries available as context), and the volume's cast and objectives. Produce a brief for each chapter in the volume, including: title, objective, key events in order, required context refs (most important first — select from the catalog only, do not invent refs), and the POV character. The requiredContext ordering is the eviction priority — put most essential items first.`;
+const system = `${AUTHORING_STYLE}\n\nYou are a chapter outliner for a serialized novel. You receive the current volume plan, the available context catalog (titles-only view of entities, threads, chapters, world facts, and mysteries available as context), and the volume's cast and objectives. Produce a brief for each chapter in the volume, including: title, objective, key events in order, required context refs (most important first — select from the catalog only, do not invent refs), and the POV character. The requiredContext ordering is the eviction priority — put most essential items first.
 
-export const outlinePrompt: PromptModule<typeof OutlineSchema._type> = {
+For each chapter, decide whether it resolves its central action or hands it off to the next chapter — this is a planning decision, not something to leave to the chapter author. Set continuesIntoNextChapter: true when the scene's tension, action, or conversation should still be live when the chapter ends; this is expected and desirable for serialized pacing, not a fallback. When you set it, populate handoffBeat with the specific moment where the next chapter must pick up — e.g. "mid-swing, blade an inch from the guard's throat," not "the fight continues." A chapter with startsFromPreviousChapter: true must open in the same physical/emotional moment the prior chapter's handoffBeat describes — no time skip, no cutaway, no summary past it. Do not mark every chapter as continuing — reserve it for action, dialogue, or confrontation beats that genuinely span more than one chapter's worth of prose; a chapter that completes its own beat should leave both flags false.`;
+
+export const outlinePrompt: PromptModule<OutlineOutput> = {
   key: 'outline',
   version: '1.0.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],
-    ['human', 'Context catalog:\n{catalog}\n\nVolume plan:\n{volumePlan}\n\nChapters to outline: {startChapter}–{endChapter}'],
+    ['human', 'Context catalog:\n{catalog}\n\nVolume plan:\n{volumePlan}\n\nChapters to outline: {startChapter}–{endChapter}\n\nAdditional guidance: {extraContext}'],
   ]),
   schema: OutlineSchema,
 };

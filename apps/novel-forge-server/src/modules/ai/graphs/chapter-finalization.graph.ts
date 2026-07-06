@@ -212,13 +212,14 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     for (const t of delta.threads ?? []) {
       await db
         .insert(schema.plotThreads)
-        .values({ projectId, threadKey: t.threadKey, status: t.status, openedChapter: state.chapter, summary: t.summary ?? null })
+        .values({ projectId, threadKey: t.threadKey, status: t.status, openedChapter: state.chapter, summary: t.summary ?? null, intentionallyOpen: t.intentionallyOpen ?? false })
         .onConflictDoUpdate({
           target: [schema.plotThreads.projectId, schema.plotThreads.threadKey],
           set: {
             status: sql`EXCLUDED.status`,
             closedChapter: t.status === 'closed' ? state.chapter : sql`plot_threads.closed_chapter`,
             summary: sql`COALESCE(EXCLUDED.summary, plot_threads.summary)`,
+            intentionallyOpen: sql`EXCLUDED.intentionally_open`,
             updatedAt: new Date(),
           },
         })
@@ -229,13 +230,21 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     for (const m of delta.mysteries ?? []) {
       await db
         .insert(schema.mysteries)
-        .values({ projectId, mysteryKey: m.mysteryKey, status: m.status, openedChapter: state.chapter, question: m.question ?? '' })
+        .values({
+          projectId,
+          mysteryKey: m.mysteryKey,
+          status: m.status,
+          openedChapter: state.chapter,
+          question: m.question ?? '',
+          intentionallyOpen: m.intentionallyOpen ?? false,
+        })
         .onConflictDoUpdate({
           target: [schema.mysteries.projectId, schema.mysteries.mysteryKey],
           set: {
             status: sql`EXCLUDED.status`,
             resolvedChapter: m.status === 'resolved' ? state.chapter : sql`mysteries.resolved_chapter`,
             question: sql`COALESCE(EXCLUDED.question, mysteries.question)`,
+            intentionallyOpen: sql`EXCLUDED.intentionally_open`,
             updatedAt: new Date(),
           },
         })

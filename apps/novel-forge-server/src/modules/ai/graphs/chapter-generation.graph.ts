@@ -22,6 +22,7 @@ import { type ModelRouterService, type ProjectConfig } from '../model-router.ser
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
 import { type FixOutput, type JudgeOutput, JudgeSchema } from '../schemas';
+import { parseSchema } from '../schemas/validate';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
@@ -127,11 +128,11 @@ function extractJsonBlock(text: string): unknown {
 }
 
 function parseJudgeOutput(raw: string): JudgeOutput | null {
-  const fromJson = JudgeSchema.safeParse(tryParseJson(raw));
+  const fromJson = parseSchema<JudgeOutput>(JudgeSchema, tryParseJson(raw));
   if (fromJson.success) return fromJson.data;
   const extracted = extractJsonBlock(raw);
   if (extracted) {
-    const fromExtracted = JudgeSchema.safeParse(extracted);
+    const fromExtracted = parseSchema<JudgeOutput>(JudgeSchema, extracted);
     if (fromExtracted.success) return fromExtracted.data;
   }
   return null;

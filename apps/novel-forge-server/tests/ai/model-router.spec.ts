@@ -13,7 +13,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
-import { JudgeSchema } from '@modules/ai/schemas/judge.schema';
+import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 
 /**
  * Defining types
@@ -129,7 +129,7 @@ describe('ModelRouterService.structured (repair ladder)', () => {
       schema: JudgeSchema,
     };
 
-    const result = await router.structured(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
+    const result = await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
     expect(result.verdict).toBe('consistent');
     expect(fakeChain.invoke).toHaveBeenCalledTimes(1);
   });
@@ -154,7 +154,7 @@ describe('ModelRouterService.structured (repair ladder)', () => {
       schema: JudgeSchema,
     };
 
-    const result = await router.structured(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
+    const result = await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
     expect(result.verdict).toBe('consistent');
     expect(callCount).toBe(2);
   });
@@ -172,6 +172,6 @@ describe('ModelRouterService.structured (repair ladder)', () => {
       schema: JudgeSchema,
     };
 
-    await expect(router.structured(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' })).rejects.toThrow();
+    await expect(router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' })).rejects.toThrow();
   });
 });

@@ -7,7 +7,7 @@
  */
 import { type BaseMessage } from '@langchain/core/messages';
 import { type ChatPromptTemplate } from '@langchain/core/prompts';
-import { type z } from 'zod';
+import { type SchemaClass } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -44,7 +44,10 @@ export interface PromptModule<TOut> {
   kind: 'authoring' | 'analytical';
   system: string;
   template: ChatPromptTemplate;
-  schema: z.ZodType<TOut, z.ZodTypeDef, unknown>;
+  schema: SchemaClass;
+  // Cross-field/cross-item business rules JSON Schema can't express declaratively (e.g. comparing
+  // adjacent array items). Runs after schema validation succeeds; a non-empty return re-enters the repair ladder.
+  postValidate?: (data: TOut) => string[];
   fewShots?: BaseMessage[];
 }
 

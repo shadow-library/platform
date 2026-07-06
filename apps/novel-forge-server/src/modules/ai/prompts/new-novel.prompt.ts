@@ -12,7 +12,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
  */
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { BibleStageSchema } from '../schemas/new-novel.schema';
+import { type BibleStageOutput, BibleStageSchema } from '../schemas/new-novel.schema';
 
 /**
  * Defining types
@@ -24,7 +24,7 @@ import { BibleStageSchema } from '../schemas/new-novel.schema';
 
 const system = `${AUTHORING_STYLE}\n\nYou are a novel architect generating a bible section for a new serialized novel. You receive the project brief (premise, themes, tone, and instructions) and the outputs of earlier bible stages. Write the requested section as detailed, evocative prose that a chapter author can use as a reference. Be specific and concrete — avoid vague generalities.`;
 
-export const newNovelPrompt: PromptModule<typeof BibleStageSchema._type> = {
+export const newNovelPrompt: PromptModule<BibleStageOutput> = {
   key: 'new-novel',
   version: '1.0.0',
   kind: 'authoring',

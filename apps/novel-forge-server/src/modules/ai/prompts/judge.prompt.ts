@@ -12,7 +12,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
  * Importing user defined packages
  */
 import { type PromptModule } from './types';
-import { JudgeSchema } from '../schemas/judge.schema';
+import { type JudgeOutput, JudgeSchema } from '../schemas/judge.schema';
 
 /**
  * Defining types
@@ -47,7 +47,7 @@ const fewShots = [
   ),
 ];
 
-export const judgePrompt: PromptModule<typeof JudgeSchema._type> = {
+export const judgePrompt: PromptModule<JudgeOutput> = {
   key: 'judge',
   version: '1.0.0',
   kind: 'analytical',

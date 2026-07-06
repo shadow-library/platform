@@ -10,7 +10,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { BibleStageSchema } from '../../schemas/new-novel.schema';
+import { type BibleStageOutput, BibleStageSchema } from '../../schemas/new-novel.schema';
 import { AUTHORING_STYLE } from '../authoring-preamble';
 import { type PromptModule } from '../types';
 
@@ -24,7 +24,7 @@ import { type PromptModule } from '../types';
 
 const system = `${AUTHORING_STYLE}\n\nGenerate the factions and locations bible document. For each major faction: its goals, methods, internal structure, and relationship to the protagonist and antagonist forces. For each major location: what it looks, sounds, and feels like, why it matters to the plot, and who controls it. Include only factions and locations that will appear in the story.`;
 
-export const factionsLocationsPrompt: PromptModule<typeof BibleStageSchema._type> = {
+export const factionsLocationsPrompt: PromptModule<BibleStageOutput> = {
   key: 'bible:factions-locations',
   version: '1.0.0',
   kind: 'authoring',

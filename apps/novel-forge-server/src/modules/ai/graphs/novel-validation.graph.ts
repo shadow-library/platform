@@ -22,6 +22,7 @@ import { type ModelRouterService, type ProjectConfig } from '../model-router.ser
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
 import { type ValidationOutput, ValidationSchema } from '../schemas';
+import { parseSchema } from '../schemas/validate';
 import { type TelemetryHandler } from '../telemetry.handler';
 import { runToolLoop } from '../tools/tool-loop';
 import { type ToolRegistryService } from '../tools/tool-registry.service';
@@ -86,14 +87,14 @@ function extractJsonBlock(text: string): unknown {
 
 function tryParseValidation(raw: string): ValidationOutput | null {
   try {
-    const parsed = ValidationSchema.safeParse(JSON.parse(raw));
+    const parsed = parseSchema<ValidationOutput>(ValidationSchema, JSON.parse(raw));
     if (parsed.success) return parsed.data;
   } catch {
     // try extraction
   }
   const extracted = extractJsonBlock(raw);
   if (extracted) {
-    const parsed = ValidationSchema.safeParse(extracted);
+    const parsed = parseSchema<ValidationOutput>(ValidationSchema, extracted);
     if (parsed.success) return parsed.data;
   }
   return null;

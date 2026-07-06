@@ -5,11 +5,12 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
+import { FixAction } from './enums';
 
 /**
  * Defining types
@@ -19,21 +20,31 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const FixSchema = z
-  .object({
-    action: z.enum(['patch', 'rewrite']).describe('patch = targeted find/replace; rewrite = full chapter replacement'),
-    patches: z
-      .array(
-        z.object({
-          find: z.string().min(1).describe('exact verbatim text to find in the draft — must be unique within the chapter'),
-          replace: z.string().min(1).describe('replacement text; preserves surrounding prose style'),
-        }),
-      )
-      .optional(),
-    body: z.string().optional().describe('for rewrite only: complete replacement chapter prose'),
-  })
-  .refine(p => (p.action === 'patch' && p.patches && p.patches.length > 0) || (p.action === 'rewrite' && !!p.body), {
-    message: 'patch requires at least one patches entry; rewrite requires body',
-  });
+@Schema()
+export class FixPatch {
+  @Field({ minLength: 1, description: 'exact verbatim text to find in the draft — must be unique within the chapter' })
+  find: string;
 
-export type FixOutput = z.infer<typeof FixSchema>;
+  @Field({ minLength: 1, description: 'replacement text; preserves surrounding prose style' })
+  replace: string;
+}
+
+// patch requires at least one patches entry; rewrite requires body — expressed as an if/then/else so
+// AJV enforces the same cross-field rule zod's `.refine()` used to.
+@Schema({
+  if: { properties: { action: { const: 'patch' } }, required: ['action'] },
+  then: { properties: { patches: { type: 'array', minItems: 1 } }, required: ['patches'] },
+  else: { properties: { body: { type: 'string', minLength: 1 } }, required: ['body'] },
+})
+export class FixSchema {
+  @Field(() => FixAction, { description: 'patch = targeted find/replace; rewrite = full chapter replacement' })
+  action: 'patch' | 'rewrite';
+
+  @Field(() => [FixPatch], { optional: true })
+  patches?: FixPatch[];
+
+  @Field({ optional: true, description: 'for rewrite only: complete replacement chapter prose' })
+  body?: string;
+}
+
+export type FixOutput = FixSchema;

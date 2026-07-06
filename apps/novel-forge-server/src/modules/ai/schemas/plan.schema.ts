@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -19,27 +19,45 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const VolumeSpecSchema = z.object({
-  volumeKey: z.string().min(1).describe('snake_case identifier, e.g. vol_01_awakening'),
-  ordinal: z.number().int().min(1),
-  title: z.string().min(1),
-  objective: z.string().min(1).describe('what this volume arc must accomplish in the novel'),
-  conflict: z.string().min(1).describe('the central conflict or obstacle of this volume'),
-  payoff: z.string().min(1).describe('how the conflict resolves at the end of this volume'),
-  startChapter: z.number().int().min(1),
-  endChapter: z.number().int().min(1),
-  cast: z.array(z.string()).optional().describe('entityKeys of primary characters in this volume'),
-});
+@Schema()
+export class VolumeSpecSchema {
+  @Field({ minLength: 1, description: 'snake_case identifier, e.g. vol_01_awakening' })
+  volumeKey: string;
 
-export const PlanSchema = z
-  .array(VolumeSpecSchema)
-  .min(1)
-  .refine(
-    vols => {
-      const sorted = [...vols].sort((a, b) => a.ordinal - b.ordinal);
-      return sorted.every((v, i) => i === 0 || v.startChapter === (sorted[i - 1]?.endChapter ?? 0) + 1);
-    },
-    { message: 'volume chapter spans must be contiguous' },
-  );
+  @Field(() => Integer, { minimum: 1 })
+  ordinal: number;
 
-export type PlanOutput = z.infer<typeof PlanSchema>;
+  @Field({ minLength: 1 })
+  title: string;
+
+  @Field({ minLength: 1, description: 'what this volume arc must accomplish in the novel' })
+  objective: string;
+
+  @Field({ minLength: 1, description: 'the central conflict or obstacle of this volume' })
+  conflict: string;
+
+  @Field({ minLength: 1, description: 'how the conflict resolves at the end of this volume' })
+  payoff: string;
+
+  @Field(() => Integer, { minimum: 1 })
+  startChapter: number;
+
+  @Field(() => Integer, { minimum: 1 })
+  endChapter: number;
+
+  @Field(() => [String], { optional: true, description: 'entityKeys of primary characters in this volume' })
+  cast?: string[];
+}
+
+export const PlanSchema = [VolumeSpecSchema] as [typeof VolumeSpecSchema];
+
+export type PlanOutput = VolumeSpecSchema[];
+
+// Cross-item constraint JSON Schema can't express declaratively (comparing adjacent array items) —
+// kept as a plain post-validation check, wired into ModelRouterService.structured() via
+// PromptModule.postValidate, the same way zod's `.refine()` used to gate this.
+export function validatePlanContiguity(vols: VolumeSpecSchema[]): string[] {
+  const sorted = [...vols].sort((a, b) => a.ordinal - b.ordinal);
+  const ok = sorted.every((v, i) => i === 0 || v.startChapter === (sorted[i - 1]?.endChapter ?? 0) + 1);
+  return ok ? [] : ['volume chapter spans must be contiguous'];
+}

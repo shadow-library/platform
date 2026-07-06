@@ -5,11 +5,13 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
+import { EntityType, MysteryStatus, ThreadStatus } from '@server/common';
+import { type Knowledge, type Story } from '@server/database';
 
 /**
  * Defining types
@@ -19,56 +21,126 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const ContinuitySchema = z.object({
-  appeared: z.array(z.string()).describe('entityKeys of entities who appear in this chapter'),
-  newEntities: z
-    .array(
-      z.object({
-        entityKey: z.string().min(1),
-        name: z.string().min(1),
-        type: z.enum(['character', 'faction', 'location', 'power_rule', 'item', 'concept']),
-        notes: z.string().optional(),
-      }),
-    )
-    .describe('new entities introduced in this chapter not yet in the knowledge base'),
-  threads: z.array(
-    z.object({
-      threadKey: z.string().min(1),
-      status: z.enum(['open', 'closed']),
-      summary: z.string().optional(),
-    }),
-  ),
-  mysteries: z.array(
-    z.object({
-      mysteryKey: z.string().min(1),
-      status: z.enum(['open', 'resolved']),
-      question: z.string().optional(),
-    }),
-  ),
-  timeline: z.array(
-    z.object({
-      whenText: z.string().optional(),
-      event: z.string().min(1),
-      significance: z.string().optional(),
-    }),
-  ),
-  relationships: z.array(
-    z.object({
-      entityKey: z.string().min(1),
-      targetKey: z.string().min(1),
-      kind: z.string().min(1),
-      note: z.string().optional(),
-    }),
-  ),
-  power: z.array(
-    z.object({
-      character: z.string().min(1),
-      stage: z.string().min(1),
-      feat: z.string().optional(),
-      next: z.string().optional(),
-    }),
-  ),
-  chapterSummary: z.string().min(1).describe('2-3 sentence summary of what happened'),
-});
+@Schema()
+export class ContinuityNewEntity {
+  @Field({ minLength: 1 })
+  entityKey: string;
 
-export type ContinuityOutput = z.infer<typeof ContinuitySchema>;
+  @Field({ minLength: 1 })
+  name: string;
+
+  @Field(() => EntityType)
+  type: Knowledge.EntityType;
+
+  @Field({ optional: true })
+  notes?: string;
+}
+
+@Schema()
+export class ContinuityThread {
+  @Field({ minLength: 1 })
+  threadKey: string;
+
+  @Field(() => ThreadStatus)
+  status: Story.ThreadStatus;
+
+  @Field({ optional: true })
+  summary?: string;
+
+  @Field({
+    optional: true,
+    default: false,
+    description: 'marked as a deliberate running thread, not an oversight — novel-validation must not flag it as unresolved',
+  })
+  intentionallyOpen?: boolean;
+}
+
+@Schema()
+export class ContinuityMystery {
+  @Field({ minLength: 1 })
+  mysteryKey: string;
+
+  @Field(() => MysteryStatus)
+  status: Story.MysteryStatus;
+
+  @Field({ optional: true })
+  question?: string;
+
+  @Field({
+    optional: true,
+    default: false,
+    description: 'marked as a deliberate running mystery, not an oversight — novel-validation must not flag it as unresolved',
+  })
+  intentionallyOpen?: boolean;
+}
+
+@Schema()
+export class ContinuityTimelineEvent {
+  @Field({ optional: true })
+  whenText?: string;
+
+  @Field({ minLength: 1 })
+  event: string;
+
+  @Field({ optional: true })
+  significance?: string;
+}
+
+@Schema()
+export class ContinuityRelationship {
+  @Field({ minLength: 1 })
+  entityKey: string;
+
+  @Field({ minLength: 1 })
+  targetKey: string;
+
+  @Field({ minLength: 1 })
+  kind: string;
+
+  @Field({ optional: true })
+  note?: string;
+}
+
+@Schema()
+export class ContinuityPower {
+  @Field({ minLength: 1 })
+  character: string;
+
+  @Field({ minLength: 1 })
+  stage: string;
+
+  @Field({ optional: true })
+  feat?: string;
+
+  @Field({ optional: true })
+  next?: string;
+}
+
+@Schema()
+export class ContinuitySchema {
+  @Field(() => [String], { description: 'entityKeys of entities who appear in this chapter' })
+  appeared: string[];
+
+  @Field(() => [ContinuityNewEntity], { description: 'new entities introduced in this chapter not yet in the knowledge base' })
+  newEntities: ContinuityNewEntity[];
+
+  @Field(() => [ContinuityThread])
+  threads: ContinuityThread[];
+
+  @Field(() => [ContinuityMystery])
+  mysteries: ContinuityMystery[];
+
+  @Field(() => [ContinuityTimelineEvent])
+  timeline: ContinuityTimelineEvent[];
+
+  @Field(() => [ContinuityRelationship])
+  relationships: ContinuityRelationship[];
+
+  @Field(() => [ContinuityPower])
+  power: ContinuityPower[];
+
+  @Field({ minLength: 1, description: '2-3 sentence summary of what happened' })
+  chapterSummary: string;
+}
+
+export type ContinuityOutput = ContinuitySchema;

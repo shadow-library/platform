@@ -5,11 +5,12 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
+import { ValidationSeverity } from './enums';
 
 /**
  * Defining types
@@ -19,17 +20,31 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const ValidationIssueSchema = z.object({
-  chapter: z.number().int().optional().describe('chapter number where the issue appears, omit for novel-scope issues'),
-  severity: z.enum(['error', 'warning']),
-  category: z.string().min(1).describe('e.g. continuity, timeline, character_consistency, power_scaling, plot_thread'),
-  description: z.string().min(1),
-  canonReference: z.string().optional().describe('cite the specific canon fact or chapter that conflicts'),
-});
+@Schema()
+export class ValidationIssueSchema {
+  @Field(() => Integer, { optional: true, description: 'chapter number where the issue appears, omit for novel-scope issues' })
+  chapter?: number;
 
-export const ValidationSchema = z.object({
-  issues: z.array(ValidationIssueSchema),
-  summary: z.string().min(1).describe('overall assessment: what is healthy and what needs attention'),
-});
+  @Field(() => ValidationSeverity)
+  severity: 'error' | 'warning';
 
-export type ValidationOutput = z.infer<typeof ValidationSchema>;
+  @Field({ minLength: 1, description: 'e.g. continuity, timeline, character_consistency, power_scaling, plot_thread' })
+  category: string;
+
+  @Field({ minLength: 1 })
+  description: string;
+
+  @Field({ optional: true, description: 'cite the specific canon fact or chapter that conflicts' })
+  canonReference?: string;
+}
+
+@Schema()
+export class ValidationSchema {
+  @Field(() => [ValidationIssueSchema])
+  issues: ValidationIssueSchema[];
+
+  @Field({ minLength: 1, description: 'overall assessment: what is healthy and what needs attention' })
+  summary: string;
+}
+
+export type ValidationOutput = ValidationSchema;

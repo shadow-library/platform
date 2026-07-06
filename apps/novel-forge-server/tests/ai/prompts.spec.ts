@@ -8,7 +8,8 @@ import { describe, expect, it } from 'bun:test';
  */
 import { PROMPT_REGISTRY } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
-import { ExtractionSchema, FixSchema, JudgeSchema, PlanSchema } from '@modules/ai/schemas';
+import { ExtractionSchema, FixSchema, JudgeSchema, PlanSchema, validatePlanContiguity } from '@modules/ai/schemas';
+import { parseSchema } from '@modules/ai/schemas/validate';
 
 /**
  * Declaring the constants
@@ -35,65 +36,64 @@ describe('Prompt modules', () => {
 
   describe('JudgeSchema', () => {
     it('accepts consistent verdict with no findings', () => {
-      expect(() => JudgeSchema.parse({ verdict: 'consistent', findings: [] })).not.toThrow();
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
     });
 
     it('accepts contradiction verdict with hard finding', () => {
-      expect(() => JudgeSchema.parse({ verdict: 'contradiction', findings: [{ severity: 'hard', text: 'Contradicts chapter 3.' }] })).not.toThrow();
+      expect(parseSchema(JudgeSchema, { verdict: 'contradiction', findings: [{ severity: 'hard', text: 'Contradicts chapter 3.' }] }).success).toBe(true);
     });
 
     it('rejects contradiction verdict with no hard findings', () => {
-      expect(() => JudgeSchema.parse({ verdict: 'contradiction', findings: [{ severity: 'soft', text: 'Minor issue.' }] })).toThrow();
+      expect(parseSchema(JudgeSchema, { verdict: 'contradiction', findings: [{ severity: 'soft', text: 'Minor issue.' }] }).success).toBe(false);
     });
   });
 
   describe('FixSchema', () => {
     it('accepts valid patch', () => {
-      expect(() => FixSchema.parse({ action: 'patch', patches: [{ find: 'old text', replace: 'new text' }] })).not.toThrow();
+      expect(parseSchema(FixSchema, { action: 'patch', patches: [{ find: 'old text', replace: 'new text' }] }).success).toBe(true);
     });
 
     it('rejects patch with no patches', () => {
-      expect(() => FixSchema.parse({ action: 'patch', patches: [] })).toThrow();
+      expect(parseSchema(FixSchema, { action: 'patch', patches: [] }).success).toBe(false);
     });
 
     it('accepts rewrite with body', () => {
-      expect(() => FixSchema.parse({ action: 'rewrite', body: 'Full replacement chapter prose.' })).not.toThrow();
+      expect(parseSchema(FixSchema, { action: 'rewrite', body: 'Full replacement chapter prose.' }).success).toBe(true);
     });
   });
 
   describe('PlanSchema', () => {
     it('rejects non-contiguous chapter spans', () => {
-      expect(() =>
-        PlanSchema.parse([
-          { volumeKey: 'vol_1', ordinal: 1, title: 'V1', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 1, endChapter: 5 },
-          { volumeKey: 'vol_2', ordinal: 2, title: 'V2', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 7, endChapter: 12 },
-        ]),
-      ).toThrow();
+      const vols = [
+        { volumeKey: 'vol_1', ordinal: 1, title: 'V1', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 1, endChapter: 5 },
+        { volumeKey: 'vol_2', ordinal: 2, title: 'V2', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 7, endChapter: 12 },
+      ];
+      const parsed = parseSchema(PlanSchema, vols);
+      expect(parsed.success && validatePlanContiguity(parsed.data as never).length === 0).toBe(false);
     });
 
     it('accepts contiguous volumes', () => {
-      expect(() =>
-        PlanSchema.parse([
-          { volumeKey: 'vol_1', ordinal: 1, title: 'V1', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 1, endChapter: 5 },
-          { volumeKey: 'vol_2', ordinal: 2, title: 'V2', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 6, endChapter: 12 },
-        ]),
-      ).not.toThrow();
+      const vols = [
+        { volumeKey: 'vol_1', ordinal: 1, title: 'V1', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 1, endChapter: 5 },
+        { volumeKey: 'vol_2', ordinal: 2, title: 'V2', objective: 'x', conflict: 'y', payoff: 'z', startChapter: 6, endChapter: 12 },
+      ];
+      const parsed = parseSchema(PlanSchema, vols);
+      expect(parsed.success && validatePlanContiguity(parsed.data as never).length === 0).toBe(true);
     });
   });
 
   describe('ExtractionSchema', () => {
     it('accepts minimal valid output', () => {
-      expect(() =>
-        ExtractionSchema.parse({
-          entities: [],
-          relationships: [],
-          beats: [],
-          plotThreads: [],
-          worldFacts: [],
-          mysteries: [],
-          chapterSummary: 'The hero arrives in the city.',
-        }),
-      ).not.toThrow();
+      const result = parseSchema(ExtractionSchema, {
+        entities: [],
+        relationships: [],
+        beats: [],
+        plotThreads: [],
+        worldFacts: [],
+        mysteries: [],
+        chapterSummary: 'The hero arrives in the city.',
+      });
+      expect(result.success).toBe(true);
     });
   });
 });

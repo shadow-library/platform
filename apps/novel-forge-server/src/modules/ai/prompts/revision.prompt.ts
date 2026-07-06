@@ -12,7 +12,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
  */
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { GenerationSchema } from '../schemas/generation.schema';
+import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
 
 /**
  * Defining types
@@ -22,9 +22,11 @@ import { GenerationSchema } from '../schemas/generation.schema';
  * Declaring the constants
  */
 
-const system = `${AUTHORING_STYLE}\n\nYou are revising a novel chapter based on editorial feedback. You receive the current draft, the original chapter brief, the established canon context, and specific feedback. Revise the chapter to address all blocking feedback. For suggestions, use your judgement — incorporate them if they strengthen the chapter without violating canon. Maintain the chapter's structure and objectives. Return the complete revised chapter.`;
+const system = `${AUTHORING_STYLE}\n\nYou are revising a novel chapter based on editorial feedback. You receive the current draft, the original chapter brief, the established canon context, and specific feedback. Revise the chapter to address all blocking feedback. For suggestions, use your judgement — incorporate them if they strengthen the chapter without violating canon. Maintain the chapter's structure and objectives. Return the complete revised chapter.
 
-export const revisionPrompt: PromptModule<typeof GenerationSchema._type> = {
+If feedback asks you to "wrap up," "resolve," or "finish" a chapter whose brief is marked "[CONTINUES INTO NEXT CHAPTER]", treat that as a request to sharpen the cutoff's clarity and tension — not to resolve the underlying conflict. Preserve the unresolved state and the brief's handoff beat unless the feedback explicitly overrides the brief itself.`;
+
+export const revisionPrompt: PromptModule<GenerationOutput> = {
   key: 'revision',
   version: '1.0.0',
   kind: 'authoring',

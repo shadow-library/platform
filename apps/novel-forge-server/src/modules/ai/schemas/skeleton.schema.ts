@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -19,15 +19,25 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const CharacterArcSchema = z.object({
-  character: z.string().min(1).describe('entityKey or name of the character'),
-  arc: z.string().min(1).describe('development journey from novel start to end — what they learn, lose, or become'),
-});
+@Schema()
+export class CharacterArcSchema {
+  @Field({ minLength: 1, description: 'entityKey or name of the character' })
+  character: string;
 
-export const SkeletonSchema = z.object({
-  characterArcs: z.array(CharacterArcSchema).min(1).describe('arcs for all major characters'),
-  powerCurve: z.string().min(1).describe('narrative of how protagonist(s) power/ability evolves across the entire novel — peaks, setbacks, final level'),
-  thematicStatement: z.string().optional().describe('the central theme as a single declarative sentence'),
-});
+  @Field({ minLength: 1, description: 'development journey from novel start to end — what they learn, lose, or become' })
+  arc: string;
+}
 
-export type SkeletonOutput = z.infer<typeof SkeletonSchema>;
+@Schema()
+export class SkeletonSchema {
+  @Field(() => [CharacterArcSchema], { minItems: 1, description: 'arcs for all major characters' })
+  characterArcs: CharacterArcSchema[];
+
+  @Field({ minLength: 1, description: 'narrative of how protagonist(s) power/ability evolves across the entire novel — peaks, setbacks, final level' })
+  powerCurve: string;
+
+  @Field({ optional: true, description: 'the central theme as a single declarative sentence' })
+  thematicStatement?: string;
+}
+
+export type SkeletonOutput = SkeletonSchema;

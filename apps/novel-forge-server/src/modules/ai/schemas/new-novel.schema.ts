@@ -5,11 +5,13 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
+import { EntitySignificance, EntityType } from '@server/common';
+import { type Knowledge } from '@server/database';
 
 /**
  * Defining types
@@ -19,20 +21,31 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const BibleStageSchema = z.object({
-  body: z.string().min(1).describe('prose content for this bible section'),
-  entities: z
-    .array(
-      z.object({
-        entityKey: z.string().min(1),
-        name: z.string().min(1),
-        type: z.enum(['character', 'faction', 'location', 'power_rule', 'item', 'concept']),
-        significance: z.enum(['major', 'minor']).optional(),
-        notes: z.string().optional(),
-      }),
-    )
-    .optional()
-    .describe('entities introduced in this section, if applicable'),
-});
+@Schema()
+export class BibleStageEntity {
+  @Field({ minLength: 1 })
+  entityKey: string;
 
-export type BibleStageOutput = z.infer<typeof BibleStageSchema>;
+  @Field({ minLength: 1 })
+  name: string;
+
+  @Field(() => EntityType)
+  type: Knowledge.EntityType;
+
+  @Field(() => EntitySignificance, { optional: true })
+  significance?: Knowledge.EntitySignificance;
+
+  @Field({ optional: true })
+  notes?: string;
+}
+
+@Schema()
+export class BibleStageSchema {
+  @Field({ minLength: 1, description: 'prose content for this bible section' })
+  body: string;
+
+  @Field(() => [BibleStageEntity], { optional: true, description: 'entities introduced in this section, if applicable' })
+  entities?: BibleStageEntity[];
+}
+
+export type BibleStageOutput = BibleStageSchema;

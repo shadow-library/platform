@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -19,9 +19,13 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const TitleSchema = z.object({
-  title: z.string().min(1).max(200).describe('chapter title, evocative and consistent with established chapter title style'),
-  alternatives: z.array(z.string().max(200)).optional().describe('2-3 alternatives if uncertain'),
-});
+@Schema()
+export class TitleSchema {
+  @Field({ minLength: 1, maxLength: 200, description: 'chapter title, evocative and consistent with established chapter title style' })
+  title: string;
 
-export type TitleOutput = z.infer<typeof TitleSchema>;
+  @Field(() => [String], { optional: true, description: '2-3 alternatives if uncertain' })
+  alternatives?: string[];
+}
+
+export type TitleOutput = TitleSchema;

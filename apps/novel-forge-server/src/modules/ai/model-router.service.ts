@@ -23,6 +23,7 @@ import { APP_NAME } from '@server/constants';
 import { type AiRole, type ResolvedModel, getProfileDefaults } from './defaults';
 import { MODEL_MAP } from './models';
 import { type PromptModule } from './prompts/types';
+import { type SchemaIssue, type SchemaParseResult, parseSchema, renderSchemaIssues } from './schemas/validate';
 import { ChatClaudeCode, ChatCodex } from './subprocess-providers';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
@@ -68,8 +69,14 @@ function tryParseJson(raw: string): unknown {
   }
 }
 
-function renderZodIssues(issues: { path: (string | number)[]; message: string }[]): string {
-  return issues.map(i => `- ${i.path.join('.')}: ${i.message}`).join('\n');
+// Runs postValidate (if declared) after schema validation succeeds, folding any returned issue
+// messages into the same success/failure shape so the repair ladder treats them identically.
+function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data: T) => string[]): SchemaParseResult<T> {
+  if (!result.success || !postValidate) return result;
+  const messages = postValidate(result.data);
+  if (messages.length === 0) return result;
+  const issues: SchemaIssue[] = messages.map(message => ({ path: [], message }));
+  return { success: false, issues };
 }
 
 @Injectable()
@@ -139,16 +146,16 @@ export class ModelRouterService {
     const latency1 = Date.now() - start1;
     this.logger.debug(`Attempt 1 complete`, { role, latencyMs: latency1, rawLength: rawOutput1.length });
 
-    const parsed1 = promptModule.schema.safeParse(tryParseJson(rawOutput1));
+    const parsed1 = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(rawOutput1)), promptModule.postValidate);
     if (parsed1.success) return parsed1.data;
 
-    this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.error.issues.length });
+    this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.issues.length });
 
     // ─── Attempt 2: repair ───────────────────────────────────────────────────
     const repairInput = {
       ...input,
       priorOutput: rawOutput1,
-      parseIssues: renderZodIssues(parsed1.error.issues),
+      parseIssues: renderSchemaIssues(parsed1.issues),
       instruction: 'The previous response could not be parsed. Fix the JSON so it matches the required schema. Output ONLY valid JSON.',
     };
 
@@ -161,14 +168,14 @@ export class ModelRouterService {
       throw new ServerError(AppErrorCode.AI_001);
     }
 
-    const parsed2 = promptModule.schema.safeParse(tryParseJson(rawOutput2));
+    const parsed2 = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(rawOutput2)), promptModule.postValidate);
     if (parsed2.success) return parsed2.data;
 
     // ─── Attempt 3: tolerant extraction ──────────────────────────────────────
     this.logger.warn('Repair parse failed — trying tolerant extraction', { role });
     const extracted = extractJsonBlock(rawOutput2);
     if (extracted) {
-      const parsed3 = promptModule.schema.safeParse(extracted);
+      const parsed3 = applyPostValidate(parseSchema<T>(promptModule.schema, extracted), promptModule.postValidate);
       if (parsed3.success) return parsed3.data;
     }
 

@@ -5,11 +5,12 @@
 /**
  * Importing npm packages
  */
-import { z } from 'zod';
+import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
+import { ReviewDisposition, ReviewSeverity } from './enums';
 
 /**
  * Defining types
@@ -19,17 +20,25 @@ import { z } from 'zod';
  * Declaring the constants
  */
 
-export const ReviewSchema = z.object({
-  disposition: z.enum(['approve', 'revision_requested']),
-  note: z.string().optional().describe('overall note to the author'),
-  findings: z
-    .array(
-      z.object({
-        severity: z.enum(['blocking', 'suggestion']),
-        text: z.string().min(1).describe('specific finding with location if possible'),
-      }),
-    )
-    .optional(),
-});
+@Schema()
+export class ReviewFinding {
+  @Field(() => ReviewSeverity)
+  severity: 'blocking' | 'suggestion';
 
-export type ReviewOutput = z.infer<typeof ReviewSchema>;
+  @Field({ minLength: 1, description: 'specific finding with location if possible' })
+  text: string;
+}
+
+@Schema()
+export class ReviewSchema {
+  @Field(() => ReviewDisposition)
+  disposition: 'approve' | 'revision_requested';
+
+  @Field({ optional: true, description: 'overall note to the author' })
+  note?: string;
+
+  @Field(() => [ReviewFinding], { optional: true })
+  findings?: ReviewFinding[];
+}
+
+export type ReviewOutput = ReviewSchema;
