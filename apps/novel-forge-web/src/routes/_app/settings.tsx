@@ -51,7 +51,7 @@ function Settings() {
             hint="Guides brief and draft generation."
             control={
               <Form.Item noStyle>
-                <InputNumber defaultValue={3000} step={250} min={500} suffix="words" />
+                <InputNumber defaultValue={3000} step={250} min={500} suffix="words" style={{ width: 180 }} />
               </Form.Item>
             }
           />

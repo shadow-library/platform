@@ -27,15 +27,7 @@ function Dashboard() {
 
   return (
     <div>
-      <PageHeader
-        title="Dashboard"
-        subtitle="Your studio at a glance — pick up a novel or start a new one."
-        extra={
-          <Button type="primary" icon={<PlusOutlined />} onClick={() => navigate({ to: '/projects' })}>
-            New novel
-          </Button>
-        }
-      />
+      <PageHeader title="Dashboard" subtitle="Your studio at a glance — pick up where you left off." />
 
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col xs={12} md={8}>
