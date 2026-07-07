@@ -10,6 +10,7 @@ import { forwardRef } from 'react';
  */
 import { cn } from '@/lib';
 
+import { useButtonGroupContext } from '../ButtonGroup/ButtonGroup.context';
 import styles from './Button.module.css';
 import { type ButtonProps } from './Button.types';
 
@@ -22,9 +23,18 @@ import { type ButtonProps } from './Button.types';
  * from which every other interactive control inherits sizing, radius, focus, and motion.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'secondary', size = 'md', loading = false, loadingText, fullWidth = false, prefix, suffix, asChild = false, type, disabled, className, children, ...props },
+  { variant: variantProp, size: sizeProp, loading = false, loadingText, fullWidth = false, prefix, suffix, asChild = false, type, disabled, className, children, ...props },
   ref,
 ) {
+  // Inside a ButtonGroup the group's variant/size win — the whole set stays uniform by design.
+  const group = useButtonGroupContext();
+  const variant = group?.variant ?? variantProp ?? 'secondary';
+  const size = group?.size ?? sizeProp ?? 'md';
+
+  const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.NODE_ENV;
+  if (nodeEnv !== 'production' && group && ((variantProp != null && variantProp !== group.variant) || (sizeProp != null && sizeProp !== group.size)))
+    console.warn('Button: `variant`/`size` are controlled by the enclosing ButtonGroup and the value passed here is ignored.');
+
   const rootClassName = cn(styles.root, className);
 
   // asChild delegates rendering to the consumer's element (e.g. a router link); the loading

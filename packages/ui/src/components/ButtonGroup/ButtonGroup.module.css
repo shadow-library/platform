@@ -1,0 +1,61 @@
+/*
+ * Button Group — pure composition. No colors, heights, or type styles of its own; only the border
+ * and radius arithmetic that fuses child Buttons into one control. Members bring their own tokens.
+ */
+
+.root {
+  display: inline-flex;
+}
+
+.root[data-orientation='vertical'] {
+  flex-direction: column;
+}
+
+/* ── Spaced cluster (toolbars, related-but-separate actions) ─ */
+.root[data-attached='false'] {
+  gap: 4px;
+}
+
+/*
+ * Attached (fused) — horizontal. Every member after the first overlaps the shared border by 1px
+ * and squares its leading corners; every member but the last squares its trailing corners. The net
+ * divider between two members stays a single 1px line.
+ */
+.root[data-attached='true'][data-orientation='horizontal'] > *:not(:first-child) {
+  margin-left: calc(-1 * var(--sh-border-width));
+  border-top-left-radius: 0;
+  border-bottom-left-radius: 0;
+}
+
+.root[data-attached='true'][data-orientation='horizontal'] > *:not(:last-child) {
+  border-top-right-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/* Attached — vertical. */
+.root[data-attached='true'][data-orientation='vertical'] > *:not(:first-child) {
+  margin-top: calc(-1 * var(--sh-border-width));
+  border-top-left-radius: 0;
+  border-top-right-radius: 0;
+}
+
+.root[data-attached='true'][data-orientation='vertical'] > *:not(:last-child) {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+}
+
+/*
+ * Raise the hovered/focused member so its full border — and the focus ring's four sides — paint
+ * above the neighbours it overlaps.
+ */
+.root[data-attached='true'] > *:hover,
+.root[data-attached='true'] > *:focus-visible {
+  position: relative;
+  z-index: 1;
+}
+
+/* Whole-group disable: dim once here; children are made inert by the component, not re-dimmed. */
+.root[data-disabled='true'] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
