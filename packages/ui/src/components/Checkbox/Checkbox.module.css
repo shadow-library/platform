@@ -1,0 +1,81 @@
+/*
+ * Checkbox — the system selection control. 16px box, 4px radius, accent fill; reused by Multi
+ * Select, tables, and Tree. Uses the offset focus-ring (non-text control), not the field ring.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.root[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.box {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  padding: 0;
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-surface-raised);
+  color: var(--sh-on-accent);
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.box:not(:disabled):hover {
+  border-color: var(--sh-border-interactive);
+}
+.box:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+/* Invalid border applies to the unchecked box; the checked/indeterminate fill overrides it. */
+.box[data-invalid='true'] {
+  border-color: var(--sh-danger-solid);
+}
+.box[data-state='checked'],
+.box[data-state='indeterminate'] {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+.box:disabled {
+  cursor: not-allowed;
+}
+
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.indicator svg {
+  display: block;
+  width: 11px;
+  height: 11px;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.label {
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--sh-text-primary);
+  cursor: pointer;
+}
+.description {
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-text-tertiary);
+}
