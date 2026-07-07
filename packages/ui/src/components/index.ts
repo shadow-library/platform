@@ -13,6 +13,7 @@ export * from './Dialog';
 export * from './Drawer';
 export * from './DropdownMenu';
 export * from './EmptyState';
+export * from './FileUpload';
 export * from './FormField';
 export * from './IconButton';
 export * from './Input';
