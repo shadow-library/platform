@@ -1,0 +1,200 @@
+/*
+ * Sidebar — surface-app chrome with a border-default right edge (App Shell's recipe). Item states map
+ * to bg-hover / accent-soft / accent; the active edge bar is a 3px accent bleed. No sidebar-specific
+ * colors. Expanded 248px, rail 56px.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  width: 248px;
+  height: 100%;
+  flex-shrink: 0;
+  background: var(--sh-surface-app);
+  border-right: var(--sh-border-width) solid var(--sh-border-default);
+  transition: width var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.root[data-collapsed] {
+  width: 56px;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  height: 56px;
+  padding: 0 12px 0 16px;
+  flex-shrink: 0;
+}
+.workspace {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.collapseToggle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.collapseToggle:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.collapseToggle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.collapseToggle svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 8px;
+}
+.footer {
+  flex-shrink: 0;
+  padding: 8px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+/* ── Section ─────────────────────────────────────────────── */
+.section + .section {
+  margin-top: 12px;
+}
+.sectionLabel {
+  padding: 6px 8px 4px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+/* ── Item ────────────────────────────────────────────────── */
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  border-radius: var(--sh-radius-md);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+[data-density='compact'] .item {
+  height: 28px;
+}
+.root[data-collapsed] .item {
+  justify-content: center;
+  gap: 0;
+}
+.item:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.item:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.item[data-active] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-weight: 500;
+}
+.item[data-active]::before {
+  content: '';
+  position: absolute;
+  left: -8px;
+  top: 6px;
+  bottom: 6px;
+  width: 3px;
+  border-radius: 0 var(--sh-radius-sm) var(--sh-radius-sm) 0;
+  background: var(--sh-accent);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: currentColor;
+}
+.icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.item[data-active] .icon {
+  color: var(--sh-accent);
+}
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+.badge {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+.chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--sh-text-tertiary);
+  transition: transform var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item[aria-expanded='true'] .chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Group children ──────────────────────────────────────── */
+.groupList {
+  margin: 2px 0 0;
+  padding: 0 0 0 16px;
+  list-style: none;
+  border-left: var(--sh-border-width) solid var(--sh-border-subtle);
+  margin-left: 15px;
+}
+.groupList .item {
+  height: 30px;
+}
+[data-density='compact'] .groupList .item {
+  height: 26px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .root,
+  .chevron {
+    transition: none;
+  }
+}

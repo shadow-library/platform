@@ -29,6 +29,7 @@ export * from './RadioGroup';
 export * from './SegmentedControl';
 export * from './Select';
 export * from './Shell';
+export * from './Sidebar';
 export * from './Skeleton';
 export * from './Slider';
 export * from './Spinner';
