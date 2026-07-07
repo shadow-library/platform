@@ -1,0 +1,279 @@
+/*
+ * Multi Select — Select's trigger and listbox with checkbox semantics and tag-style values.
+ * Trigger inherits the Input field surface; the overlay reuses Select's surface. Tokens only.
+ */
+
+/* ── Trigger (grows to two tag rows) ─────────────────────── */
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 3px 10px 3px 4px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-md);
+  color: var(--sh-text-primary);
+  font-family: inherit;
+  font-size: var(--sh-text-body-sm);
+  cursor: pointer;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.trigger[data-size='sm'] {
+  min-height: var(--sh-control-height-sm);
+  border-radius: var(--sh-radius-sm);
+}
+.trigger[data-size='md'] {
+  min-height: var(--sh-control-height-md);
+}
+.trigger[data-size='lg'] {
+  min-height: var(--sh-control-height-lg);
+  font-size: var(--sh-text-body);
+}
+.trigger:not(:disabled):hover {
+  border-color: var(--sh-border-interactive);
+}
+.trigger:focus-visible,
+.trigger[data-state='open'] {
+  outline: none;
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+.trigger[data-invalid] {
+  border-color: var(--sh-danger-solid);
+}
+.trigger[data-invalid]:focus-visible,
+.trigger[data-invalid][data-state='open'] {
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
+.trigger:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.tags {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+  max-height: 3.25rem;
+  overflow: hidden;
+}
+.placeholder {
+  padding-left: 8px;
+  color: var(--sh-text-placeholder);
+}
+
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 4px 0 8px;
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-surface-well);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+.tagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+}
+.tagRemove:hover {
+  background: var(--sh-border-default);
+  color: var(--sh-text-primary);
+}
+.tagRemove svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
+
+.overflow {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 8px;
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-accent-soft);
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-accent);
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.chevron svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Overlay surface (inherits Select) ───────────────────── */
+.content {
+  z-index: var(--sh-z-dropdown);
+  min-width: var(--radix-popover-trigger-width);
+  max-height: min(320px, var(--radix-popover-content-available-height));
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.content[data-state='open'] {
+  animation: sh-ms-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+
+.search {
+  padding: 4px;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.searchInput {
+  width: 100%;
+  height: var(--sh-control-height-sm);
+  padding: 0 8px;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  outline: none;
+}
+.searchInput::placeholder {
+  color: var(--sh-text-placeholder);
+}
+
+.list {
+  padding: 4px;
+  overflow-y: auto;
+  outline: none;
+}
+
+/* ── Options (checkbox rows) ─────────────────────────────── */
+.option {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: var(--sh-control-height-md);
+  padding: 0 10px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  user-select: none;
+}
+.option[data-active] {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.option[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+.optionLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border-radius: var(--sh-radius-sm);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  background: var(--sh-surface-raised);
+  color: var(--sh-on-accent);
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.checkbox[data-checked],
+.checkbox[data-indeterminate='true'] {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+.checkbox svg {
+  display: block;
+  width: 11px;
+  height: 11px;
+}
+.dash {
+  width: 8px;
+  height: 2px;
+  border-radius: 1px;
+  background: var(--sh-on-accent);
+}
+
+.empty {
+  padding: 8px 10px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+.divider {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--sh-border-subtle);
+}
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 6px 4px;
+}
+.count {
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+.clearAll {
+  padding: 4px 6px;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-accent);
+  cursor: pointer;
+}
+.clearAll:hover {
+  background: var(--sh-accent-soft);
+}
+
+@keyframes sh-ms-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
