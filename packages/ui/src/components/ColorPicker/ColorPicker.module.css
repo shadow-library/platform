@@ -1,0 +1,152 @@
+/*
+ * Color Picker — Input trigger surface with a committed-value swatch; a fixed 232px palette panel.
+ * Selected swatch gets an accent outline + luminance-aware check. No new tokens.
+ */
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--sh-control-height-md);
+  padding: 0 10px 0 6px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-md);
+  font: inherit;
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  cursor: pointer;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.trigger[data-size='sm'] {
+  height: var(--sh-control-height-sm);
+}
+.trigger[data-size='lg'] {
+  height: var(--sh-control-height-lg);
+}
+.trigger:not(:disabled):hover {
+  border-color: var(--sh-border-interactive);
+}
+.trigger:focus-visible {
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+  outline: none;
+}
+.trigger:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+.triggerSwatch {
+  width: 20px;
+  height: 20px;
+  border-radius: var(--sh-radius-sm);
+  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.1);
+}
+.triggerHex {
+  text-transform: uppercase;
+}
+
+/* ── Panel ───────────────────────────────────────────────── */
+.content {
+  z-index: var(--sh-z-dropdown);
+  width: 232px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+}
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+}
+.swatch {
+  position: relative;
+  aspect-ratio: 1;
+  padding: 0;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.1);
+}
+.swatch[data-selected] {
+  outline: 2px solid var(--sh-accent);
+  outline-offset: 1px;
+}
+.swatch:focus-visible {
+  outline: 2px solid var(--sh-accent);
+  outline-offset: 1px;
+}
+.swatchCheck {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.swatchCheck svg {
+  width: 12px;
+  height: 12px;
+}
+
+.hexRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: var(--sh-control-height-md);
+  padding: 0 8px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-md);
+}
+.hexRow:focus-within {
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+.hexRow:has([data-invalid]) {
+  border-color: var(--sh-danger-solid);
+}
+.hexPreview {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-sm);
+  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.1);
+}
+.hexInput {
+  flex: 1;
+  min-width: 0;
+  border: none;
+  background: transparent;
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  text-transform: uppercase;
+  outline: none;
+}
+
+.recent {
+  display: flex;
+  gap: 6px;
+}
+.recentSwatch {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.1);
+}
+.recentSwatch:focus-visible {
+  outline: 2px solid var(--sh-accent);
+  outline-offset: 1px;
+}
