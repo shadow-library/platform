@@ -6,6 +6,7 @@ export * from './FormField';
 export * from './IconButton';
 export * from './Input';
 export * from './MultiSelect';
+export * from './OtpInput';
 export * from './RadioGroup';
 export * from './Select';
 export * from './Switch';
