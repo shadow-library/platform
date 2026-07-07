@@ -1,0 +1,97 @@
+/*
+ * Top Navigation — surface-card bar with a border-default bottom edge (App Shell's header recipe).
+ * Full-height links; the active one draws a 2px accent underline over the bottom border. No background
+ * wash on links — the underline zone stays clean.
+ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  height: 56px;
+  padding: 0 24px;
+  background: var(--sh-surface-card);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+}
+[data-density='compact'] .bar {
+  height: 48px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.links {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.link:hover {
+  color: var(--sh-text-primary);
+}
+.link[data-active] {
+  color: var(--sh-text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--sh-accent);
+}
+.link:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -4px;
+  border-radius: var(--sh-radius-md);
+}
+
+.utility {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── More menu (inside a Popover surface; padding/min-width set inline) ── */
+.moreMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.moreItem {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  text-decoration: none;
+}
+.moreItem:hover {
+  background: var(--sh-bg-hover);
+}
+.moreItem[data-active] {
+  color: var(--sh-accent);
+  font-weight: 500;
+}
