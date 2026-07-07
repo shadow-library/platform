@@ -1,0 +1,232 @@
+/*
+ * Select — the trigger inherits Input's field surface; the listbox defines the shared overlay
+ * surface reused by Dropdown Menu, Autocomplete, Command Palette, and pickers. Tokens only.
+ */
+
+/* ── Trigger (Input field surface + chevron) ─────────────── */
+.trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 0 10px 0 12px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  color: var(--sh-text-primary);
+  font-family: inherit;
+  cursor: pointer;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.trigger[data-size='sm'] {
+  height: var(--sh-control-height-sm);
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+}
+.trigger[data-size='md'] {
+  height: var(--sh-control-height-md);
+  border-radius: var(--sh-radius-md);
+  font-size: var(--sh-text-body-sm);
+}
+.trigger[data-size='lg'] {
+  height: var(--sh-control-height-lg);
+  border-radius: var(--sh-radius-md);
+  font-size: var(--sh-text-body);
+}
+.trigger:not(:disabled):hover {
+  border-color: var(--sh-border-interactive);
+}
+.trigger:focus-visible,
+.trigger[data-state='open'] {
+  outline: none;
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+.trigger[data-invalid] {
+  border-color: var(--sh-danger-solid);
+}
+.trigger[data-invalid]:focus-visible,
+.trigger[data-invalid][data-state='open'] {
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
+.trigger[data-placeholder] {
+  color: var(--sh-text-placeholder);
+}
+.trigger:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.chevron svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+  border-radius: var(--sh-radius-full);
+  animation: sh-select-spin 800ms linear infinite;
+}
+
+/* ── Listbox surface (the shared overlay) ────────────────── */
+.content {
+  z-index: var(--sh-z-dropdown);
+  min-width: var(--radix-select-trigger-width);
+  max-height: min(256px, var(--radix-select-content-available-height));
+  overflow: hidden;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  transform-origin: var(--radix-select-content-transform-origin);
+}
+.content[data-state='open'] {
+  animation: sh-select-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.content[data-state='closed'] {
+  animation: sh-select-out var(--sh-duration-fast-exit) var(--sh-ease-standard);
+}
+
+.viewport {
+  padding: 4px;
+}
+
+.scrollButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  color: var(--sh-text-tertiary);
+  cursor: default;
+}
+.scrollButton svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.scrollChevronUp {
+  display: inline-flex;
+  transform: rotate(180deg);
+}
+
+/* ── Items ───────────────────────────────────────────────── */
+.item {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: var(--sh-control-height-md);
+  padding: 4px 8px 4px 10px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.item[data-highlighted] {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.item[data-state='checked'] {
+  color: var(--sh-text-primary);
+  font-weight: 500;
+}
+.item[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  pointer-events: none;
+}
+
+.itemBody {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+.itemDescription {
+  font-weight: 400;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.itemIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.itemIcon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.itemIndicator {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-accent);
+}
+.itemIndicator svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Group label & separator ─────────────────────────────── */
+.groupLabel {
+  display: block;
+  padding: 6px 10px 4px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--sh-text-tertiary);
+}
+
+.separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--sh-border-subtle);
+}
+
+@keyframes sh-select-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes sh-select-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sh-select-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}

@@ -30,6 +30,7 @@
 | Tests | Vitest — `unit` project (happy-dom) + `storybook` project (Playwright/Chromium) + Testing Library |
 | Docs / visual QA | Storybook 10 (`@storybook/react-vite`) |
 | Composition | `@radix-ui/react-slot` (the sanctioned `asChild` Slot) |
+| Overlays / behavior | **Radix UI primitives** (`@radix-ui/react-select`, and the sibling packages added per component: dropdown-menu, popover, dialog, tooltip, …). Overlay, menu, and disclosure components wrap the matching Radix primitive 1:1 and skin it with a CSS Module; Radix owns focus management, positioning/flip, and ARIA. Keep the primitive **external** in the build (declare it a dependency), never fork it. |
 | Package manager | Bun (`bun.lock`) |
 | Releases | release-it + conventional-changelog; commitlint + Husky |
 
