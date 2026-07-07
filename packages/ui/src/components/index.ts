@@ -43,3 +43,4 @@ export * from './Toast';
 export * from './TokenInput';
 export * from './Tooltip';
 export * from './TopNavigation';
+export * from './TreeView';
