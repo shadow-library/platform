@@ -15,6 +15,7 @@ export * from './Popover';
 export * from './RadioGroup';
 export * from './Select';
 export * from './Switch';
+export * from './Table';
 export * from './Tabs';
 export * from './Tag';
 export * from './Textarea';

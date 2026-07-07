@@ -1,0 +1,193 @@
+/*
+ * Table — low-contrast chrome, high-contrast content. Container reads surface-card + border-default;
+ * header fills surface-app and sticks; dividers are border-subtle; hover/selection use bg-hover /
+ * accent-soft. Every value is a neutral or accent token, so dark mode needs no special rules.
+ */
+
+.wrapper {
+  overflow: hidden;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+}
+.scroll {
+  overflow-x: auto;
+}
+
+.table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+.caption {
+  padding: 12px 16px;
+  text-align: left;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.headerRow {
+  height: 40px;
+}
+.th {
+  position: sticky;
+  top: 0;
+  z-index: var(--sh-z-sticky);
+  padding: 0 16px;
+  background: var(--sh-surface-app);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+  text-align: left;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
+}
+.th[data-align='end'] {
+  text-align: right;
+}
+.th[data-align='center'] {
+  text-align: center;
+}
+.sortButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.th[data-align='end'] .sortButton {
+  flex-direction: row-reverse;
+}
+.sortButton:hover {
+  color: var(--sh-text-primary);
+}
+.sortButton[data-active] {
+  color: var(--sh-text-primary);
+}
+.sortButton:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--sh-radius-sm);
+}
+.sortArrow {
+  width: 12px;
+  height: 12px;
+  color: var(--sh-accent);
+}
+
+/* ── Rows ────────────────────────────────────────────────── */
+.row {
+  height: var(--sh-row-height);
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.table[data-density='compact'] .row {
+  height: 32px;
+}
+.table[data-density='relaxed'] .row {
+  height: 48px;
+}
+.row:not(:last-child) .td {
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.row[data-clickable] {
+  cursor: pointer;
+}
+.row:hover .td {
+  background: var(--sh-bg-hover);
+}
+.row[data-selected] .td {
+  background: var(--sh-accent-soft);
+}
+.row[data-clickable]:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
+.td {
+  padding: 0 16px;
+  color: var(--sh-text-primary);
+  white-space: nowrap;
+}
+.td[data-align='end'] {
+  text-align: right;
+}
+.td[data-align='center'] {
+  text-align: center;
+}
+.td[data-numeric] {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ── Selection column ────────────────────────────────────── */
+.checkboxCell {
+  width: 44px;
+  padding: 0 0 0 14px;
+}
+
+/* ── Bulk bar ────────────────────────────────────────────── */
+.bulkBar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 44px;
+  padding: 0 12px 0 16px;
+  background: var(--sh-accent-soft);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+  animation: sh-bulkbar-in var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.bulkCount {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.bulkActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+/* ── Empty / skeleton ────────────────────────────────────── */
+.empty {
+  padding: 40px 16px;
+  text-align: center;
+  color: var(--sh-text-tertiary);
+}
+.skeleton {
+  display: block;
+  height: 12px;
+  width: 60%;
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-bg-hover);
+  animation: sh-skeleton var(--sh-duration-slow) var(--sh-ease-standard) infinite alternate;
+}
+
+@keyframes sh-bulkbar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sh-skeleton {
+  from {
+    opacity: 0.5;
+  }
+  to {
+    opacity: 1;
+  }
+}
