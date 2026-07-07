@@ -76,9 +76,12 @@
   --sh-red-900: #7f1d1d;
 
   /* ── Semantic · Surfaces (light) ──────────────────────────── */
-  --sh-surface-app: var(--sh-neutral-50);
+  /* Paper canvas: a tinted grey below white cards/controls so secondary buttons and
+     cards read against the background instead of vanishing into near-white. The
+     elevation order is well (recessed) < app (canvas) < card/raised (white). */
+  --sh-surface-app: var(--sh-neutral-100);
   --sh-surface-card: var(--sh-neutral-white);
-  --sh-surface-well: var(--sh-neutral-100);
+  --sh-surface-well: var(--sh-neutral-150);
   --sh-surface-raised: var(--sh-neutral-white);
   --sh-surface-tooltip: var(--sh-neutral-800);
 
