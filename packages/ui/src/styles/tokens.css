@@ -1,0 +1,340 @@
+/*
+ * Shadow UI v1.1 — Design Tokens (runtime source of truth)
+ *
+ * Three tiers per Foundations §01: primitive → semantic → component.
+ * Components consume semantic tokens only; they never reference primitives or raw values.
+ * Every semantic color declares a light value (:root) and a dark value ([data-theme='dark'], .dark),
+ * so theme flips cascade automatically without per-component dark variants.
+ *
+ * Values are transcribed verbatim from "Shadow UI — Foundations v1.1".
+ */
+
+:root {
+  /* ── Primitive · Neutral ramp ─────────────────────────────── */
+  --sh-neutral-white: #ffffff;
+  --sh-neutral-50: #fafafb;
+  --sh-neutral-100: #f5f6f8;
+  --sh-neutral-150: #f0f0f3; /* C1: promoted hover/hairline gray */
+  --sh-neutral-200: #e5e7eb;
+  --sh-neutral-300: #c8cdd4;
+  --sh-neutral-400: #9ca3af;
+  --sh-neutral-500: #707784;
+  --sh-neutral-600: #525866;
+  --sh-neutral-700: #343842;
+  --sh-neutral-800: #202226;
+  --sh-neutral-850: #17181b;
+  --sh-neutral-900: #111214;
+  --sh-neutral-950: #09090b;
+
+  /* ── Primitive · Indigo (brand) ───────────────────────────── */
+  --sh-indigo-50: #f0f1fe;
+  --sh-indigo-100: #e1e2fd;
+  --sh-indigo-200: #c7c8fa;
+  --sh-indigo-300: #a5a6f5;
+  --sh-indigo-400: #8283f0;
+  --sh-indigo-500: #5b5ceb;
+  --sh-indigo-600: #4f46e5;
+  --sh-indigo-700: #4338ca;
+  --sh-indigo-800: #3730a3;
+  --sh-indigo-900: #312e81;
+  --sh-indigo-950: #1e1b4e;
+
+  /* ── Primitive · Green (success) ──────────────────────────── */
+  --sh-green-50: #f0fdf4;
+  --sh-green-100: #dcfce7;
+  --sh-green-200: #bbf7d0;
+  --sh-green-300: #86efac;
+  --sh-green-400: #4ade80;
+  --sh-green-500: #22c55e;
+  --sh-green-600: #16a34a;
+  --sh-green-700: #15803d;
+  --sh-green-800: #166534;
+  --sh-green-900: #14532d;
+
+  /* ── Primitive · Amber (warning) ──────────────────────────── */
+  --sh-amber-50: #fffbeb;
+  --sh-amber-100: #fef3c7;
+  --sh-amber-200: #fde68a;
+  --sh-amber-300: #fcd34d;
+  --sh-amber-400: #fbbf24;
+  --sh-amber-500: #f59e0b;
+  --sh-amber-600: #d97706;
+  --sh-amber-700: #b45309;
+  --sh-amber-800: #92400e;
+  --sh-amber-900: #78350f;
+
+  /* ── Primitive · Red (danger) ─────────────────────────────── */
+  --sh-red-50: #fef2f2;
+  --sh-red-100: #fee2e2;
+  --sh-red-200: #fecaca;
+  --sh-red-300: #fca5a5;
+  --sh-red-400: #f87171;
+  --sh-red-500: #ef4444;
+  --sh-red-600: #dc2626;
+  --sh-red-700: #b91c1c;
+  --sh-red-800: #991b1b;
+  --sh-red-900: #7f1d1d;
+
+  /* ── Semantic · Surfaces (light) ──────────────────────────── */
+  --sh-surface-app: var(--sh-neutral-50);
+  --sh-surface-card: var(--sh-neutral-white);
+  --sh-surface-well: var(--sh-neutral-100);
+  --sh-surface-raised: var(--sh-neutral-white);
+  --sh-surface-tooltip: var(--sh-neutral-800);
+
+  /* ── Semantic · Interactive backgrounds (light) ───────────── */
+  --sh-bg-hover: var(--sh-neutral-150);
+  --sh-bg-pressed: var(--sh-neutral-200);
+
+  /* ── Semantic · Text (light) ──────────────────────────────── */
+  --sh-text-primary: var(--sh-neutral-900);
+  --sh-text-secondary: var(--sh-neutral-600);
+  --sh-text-tertiary: var(--sh-neutral-500);
+  --sh-text-placeholder: var(--sh-neutral-400);
+  --sh-text-on-tooltip: var(--sh-neutral-50);
+
+  /* ── Semantic · Brand / accent (light) ────────────────────── */
+  --sh-accent: var(--sh-indigo-600);
+  --sh-accent-hover: var(--sh-indigo-700);
+  --sh-accent-active: var(--sh-indigo-800);
+  --sh-accent-soft: var(--sh-indigo-50);
+  --sh-on-accent: var(--sh-neutral-white);
+
+  /* ── Semantic · Borders (light) ───────────────────────────── */
+  --sh-border-subtle: var(--sh-neutral-150);
+  --sh-border-default: var(--sh-neutral-200);
+  --sh-border-strong: var(--sh-neutral-300);
+  --sh-border-interactive: var(--sh-neutral-400);
+  --sh-border-focus: var(--sh-indigo-500);
+
+  /* ── Semantic · Intent · Neutral (light) ──────────────────── */
+  --sh-neutral-solid: var(--sh-neutral-800);
+  --sh-neutral-solid-hover: var(--sh-neutral-700);
+  --sh-neutral-solid-active: var(--sh-neutral-900);
+  --sh-neutral-on-solid: var(--sh-neutral-white);
+  --sh-neutral-bg-subtle: var(--sh-neutral-100);
+  --sh-neutral-text-on-subtle: var(--sh-neutral-700);
+  --sh-neutral-text: var(--sh-neutral-600);
+  --sh-neutral-border: var(--sh-neutral-200);
+
+  /* ── Semantic · Intent · Success (light) ──────────────────── */
+  --sh-success-solid: var(--sh-green-600);
+  --sh-success-solid-hover: var(--sh-green-700);
+  --sh-success-solid-active: var(--sh-green-800);
+  --sh-success-on-solid: var(--sh-neutral-white);
+  --sh-success-bg-subtle: var(--sh-green-50);
+  --sh-success-text-on-subtle: var(--sh-green-700);
+  --sh-success-text: var(--sh-green-600);
+  --sh-success-border: var(--sh-green-200);
+
+  /* ── Semantic · Intent · Warning (light) ──────────────────── */
+  --sh-warning-solid: var(--sh-amber-600);
+  --sh-warning-solid-hover: var(--sh-amber-700);
+  --sh-warning-solid-active: var(--sh-amber-800);
+  --sh-warning-on-solid: var(--sh-neutral-white);
+  --sh-warning-bg-subtle: var(--sh-amber-50);
+  --sh-warning-text-on-subtle: var(--sh-amber-700);
+  --sh-warning-text: var(--sh-amber-600);
+  --sh-warning-border: var(--sh-amber-200);
+
+  /* ── Semantic · Intent · Danger (light) ───────────────────── */
+  --sh-danger-solid: var(--sh-red-600);
+  --sh-danger-solid-hover: var(--sh-red-700);
+  --sh-danger-solid-active: var(--sh-red-800);
+  --sh-danger-on-solid: var(--sh-neutral-white);
+  --sh-danger-bg-subtle: var(--sh-red-50);
+  --sh-danger-text-on-subtle: var(--sh-red-700);
+  --sh-danger-text: var(--sh-red-600);
+  --sh-danger-border: var(--sh-red-200);
+
+  /* ── Semantic · Intent · Info (alias of indigo, light) ────── */
+  --sh-info-solid: var(--sh-indigo-600);
+  --sh-info-solid-hover: var(--sh-indigo-700);
+  --sh-info-solid-active: var(--sh-indigo-800);
+  --sh-info-on-solid: var(--sh-neutral-white);
+  --sh-info-bg-subtle: var(--sh-indigo-50);
+  --sh-info-text-on-subtle: var(--sh-indigo-700);
+  --sh-info-text: var(--sh-indigo-600);
+  --sh-info-border: var(--sh-indigo-200);
+
+  /* ── Semantic · Focus (light) ─────────────────────────────── */
+  --sh-focus-ring: var(--sh-indigo-500);
+  --sh-focus-ring-width: 2px;
+  --sh-focus-ring-offset: 2px;
+  --sh-focus-field-ring: rgb(91 92 235 / 0.15);
+  --sh-focus-field-ring-error: rgb(220 38 38 / 0.12);
+
+  /* ── Semantic · Scrim (light) ─────────────────────────────── */
+  --sh-scrim: rgb(9 9 11 / 0.4);
+
+  /* ── Elevation · Shadows (light) ──────────────────────────── */
+  --sh-shadow-e1: 0 1px 2px rgb(9 9 11 / 0.06), 0 1px 3px rgb(9 9 11 / 0.1);
+  --sh-shadow-e2: 0 4px 8px -2px rgb(9 9 11 / 0.1), 0 2px 4px -2px rgb(9 9 11 / 0.06);
+  --sh-shadow-e3: 0 12px 24px -6px rgb(9 9 11 / 0.12), 0 4px 8px -4px rgb(9 9 11 / 0.08);
+
+  /* ── Typography ───────────────────────────────────────────── */
+  --sh-font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --sh-font-mono: 'JetBrains Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+  --sh-text-display: 2rem; /* 32/40 · 700 · -0.02em */
+  --sh-text-display--line-height: 2.5rem;
+  --sh-text-h1: 1.5rem; /* 24/32 · 600 · -0.01em */
+  --sh-text-h1--line-height: 2rem;
+  --sh-text-h2: 1.25rem; /* 20/28 · 600 · -0.01em */
+  --sh-text-h2--line-height: 1.75rem;
+  --sh-text-h3: 1rem; /* 16/24 · 600 */
+  --sh-text-h3--line-height: 1.5rem;
+  --sh-text-body-lg: 1rem; /* 16/24 · 400 */
+  --sh-text-body-lg--line-height: 1.5rem;
+  --sh-text-body: 0.875rem; /* 14/22 · 400 · default */
+  --sh-text-body--line-height: 1.375rem;
+  --sh-text-body-sm: 0.8125rem; /* 13/20 · 400 */
+  --sh-text-body-sm--line-height: 1.25rem;
+  --sh-text-caption: 0.75rem; /* 12/16 · 500 */
+  --sh-text-caption--line-height: 1rem;
+  --sh-text-code: 0.8125rem; /* 13/20 · mono */
+  --sh-text-code--line-height: 1.25rem;
+
+  /* ── Borders (all borders are 1px — Foundations §06) ──────── */
+  --sh-border-width: 1px;
+
+  /* ── Radius (Foundations · concentric: inner = outer − padding) */
+  --sh-radius-sm: 4px;
+  --sh-radius-md: 6px; /* buttons, inputs — default */
+  --sh-radius-lg: 8px; /* cards, popovers */
+  --sh-radius-xl: 12px; /* modals */
+  --sh-radius-2xl: 16px; /* sheets */
+  --sh-radius-full: 9999px;
+
+  /* ── Motion ───────────────────────────────────────────────── */
+  --sh-duration-fast: 150ms;
+  --sh-duration-normal: 200ms;
+  --sh-duration-slow: 250ms;
+  --sh-duration-fast-exit: 100ms;
+  --sh-duration-normal-exit: 120ms;
+  --sh-duration-slow-exit: 150ms;
+  --sh-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --sh-ease-emphasized: cubic-bezier(0.3, 0, 0, 1);
+
+  /* ── Z-index ladder (Foundations §10) ─────────────────────── */
+  --sh-z-base: 0;
+  --sh-z-sticky: 100;
+  --sh-z-shell: 200;
+  --sh-z-dropdown: 1000;
+  --sh-z-scrim: 1100;
+  --sh-z-modal: 1200;
+  --sh-z-command-palette: 1250;
+  --sh-z-popover: 1300;
+  --sh-z-toast: 1400;
+  --sh-z-tooltip: 1500;
+  --sh-z-dev-overlay: 1600;
+
+  /* ── Density · control heights (comfortable default) ──────── */
+  --sh-control-height-sm: 28px;
+  --sh-control-height-md: 32px;
+  --sh-control-height-lg: 40px;
+  --sh-row-height: 40px;
+  --sh-disabled-opacity: 0.45;
+
+  /*
+   * Breakpoints (reference) — matching the Foundations grid (xs–2xl).
+   * CSS custom properties cannot be used inside media queries, so these document the
+   * scale; a component media query uses the literal px value and cites the token name
+   * in an adjacent comment (see CLAUDE.md · Design Tokens).
+   */
+  --sh-breakpoint-sm: 640px;
+  --sh-breakpoint-md: 768px;
+  --sh-breakpoint-lg: 1024px;
+  --sh-breakpoint-xl: 1280px;
+  --sh-breakpoint-2xl: 1536px;
+}
+
+/* Compact density — set app-wide via [data-density='compact']; never mixed within a view. */
+[data-density='compact'] {
+  --sh-control-height-sm: 24px;
+  --sh-control-height-md: 28px;
+  --sh-control-height-lg: 32px;
+  --sh-row-height: 32px;
+}
+
+/*
+ * Dark theme — semantic overrides only. Primitives are theme-independent.
+ * Dark elevates with lighter surfaces (neutral-850) instead of shadow (Foundations §08).
+ */
+:root[data-theme='dark'],
+.dark {
+  color-scheme: dark;
+
+  --sh-surface-app: var(--sh-neutral-950);
+  --sh-surface-card: var(--sh-neutral-900);
+  --sh-surface-well: var(--sh-neutral-850);
+  --sh-surface-raised: var(--sh-neutral-850);
+  --sh-surface-tooltip: var(--sh-neutral-200);
+
+  --sh-bg-hover: var(--sh-neutral-800);
+  --sh-bg-pressed: var(--sh-neutral-700);
+
+  --sh-text-primary: var(--sh-neutral-100);
+  --sh-text-secondary: var(--sh-neutral-400);
+  --sh-text-tertiary: var(--sh-neutral-500);
+  --sh-text-placeholder: var(--sh-neutral-500);
+  --sh-text-on-tooltip: var(--sh-neutral-900);
+
+  --sh-accent: var(--sh-indigo-500);
+  --sh-accent-hover: var(--sh-indigo-400);
+  --sh-accent-active: var(--sh-indigo-300);
+  --sh-accent-soft: rgb(91 92 235 / 0.15);
+
+  --sh-border-subtle: var(--sh-neutral-850);
+  --sh-border-default: var(--sh-neutral-800);
+  --sh-border-strong: var(--sh-neutral-700);
+  --sh-border-interactive: var(--sh-neutral-600);
+  --sh-border-focus: var(--sh-indigo-400);
+
+  --sh-neutral-solid: var(--sh-neutral-200);
+  --sh-neutral-solid-hover: var(--sh-neutral-300);
+  --sh-neutral-solid-active: var(--sh-neutral-100);
+  --sh-neutral-on-solid: var(--sh-neutral-900);
+  --sh-neutral-bg-subtle: var(--sh-neutral-800);
+  --sh-neutral-text-on-subtle: var(--sh-neutral-300);
+  --sh-neutral-text: var(--sh-neutral-400);
+  --sh-neutral-border: var(--sh-neutral-700);
+
+  --sh-success-solid-hover: var(--sh-green-500);
+  --sh-success-solid-active: var(--sh-green-400);
+  --sh-success-bg-subtle: rgb(22 163 74 / 0.15);
+  --sh-success-text-on-subtle: var(--sh-green-300);
+  --sh-success-text: var(--sh-green-400);
+  --sh-success-border: rgb(34 197 94 / 0.3);
+
+  --sh-warning-solid-hover: var(--sh-amber-500);
+  --sh-warning-solid-active: var(--sh-amber-400);
+  --sh-warning-bg-subtle: rgb(217 119 6 / 0.15);
+  --sh-warning-text-on-subtle: var(--sh-amber-300);
+  --sh-warning-text: var(--sh-amber-400);
+  --sh-warning-border: rgb(245 158 11 / 0.3);
+
+  --sh-danger-solid-hover: var(--sh-red-500);
+  --sh-danger-solid-active: var(--sh-red-400);
+  --sh-danger-bg-subtle: rgb(220 38 38 / 0.15);
+  --sh-danger-text-on-subtle: var(--sh-red-300);
+  --sh-danger-text: var(--sh-red-400);
+  --sh-danger-border: rgb(239 68 68 / 0.3);
+
+  --sh-info-solid-hover: var(--sh-indigo-500);
+  --sh-info-solid-active: var(--sh-indigo-400);
+  --sh-info-bg-subtle: rgb(91 92 235 / 0.15);
+  --sh-info-text-on-subtle: var(--sh-indigo-300);
+  --sh-info-text: var(--sh-indigo-400);
+  --sh-info-border: rgb(91 92 235 / 0.3);
+
+  --sh-focus-ring: var(--sh-indigo-400);
+  --sh-focus-field-ring: rgb(130 131 240 / 0.2);
+
+  --sh-scrim: rgb(9 9 11 / 0.55);
+
+  /* Dark elevates with surface tint, not shadow. */
+  --sh-shadow-e1: none;
+  --sh-shadow-e2: none;
+  --sh-shadow-e3: none;
+}

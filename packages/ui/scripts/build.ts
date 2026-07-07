@@ -6,6 +6,7 @@ import path from 'node:path';
 
 import alias from '@rollup/plugin-alias';
 import nodeResolve from '@rollup/plugin-node-resolve';
+import postcssImport from 'postcss-import';
 import { type OutputOptions, rollup } from 'rollup';
 import banner2 from 'rollup-plugin-banner2';
 import esbuild from 'rollup-plugin-esbuild';
@@ -47,7 +48,14 @@ async function build() {
       alias({ entries: [{ find: /^@\/(.*)/, replacement: path.resolve(srcDir, '$1') }] }),
       nodeResolve({ extensions: ['.ts', '.tsx', '.js', '.jsx'] }),
       esbuild({ target: 'es2022', jsx: 'automatic', tsconfig: path.join(rootDir, 'tsconfig.build.json') }),
-      postcss({ modules: true, extract: 'styles.css', sourceMap: true, minimize: true }),
+      postcss({
+        plugins: [postcssImport()],
+        autoModules: true,
+        modules: { generateScopedName: 'sh-[local]_[hash:base64:5]' },
+        extract: 'styles.css',
+        minimize: true,
+        sourceMap: true,
+      }),
       banner2(chunk => {
         const id = chunk.facadeModuleId ?? '';
         if (id.endsWith('.tsx') || id.includes('/hooks/')) return "'use client';\n";
@@ -64,18 +72,9 @@ async function build() {
   if (result.exitCode === 0) result = Bun.spawnSync(['bunx', 'tsc-alias', '-p', 'tsconfig.build.json'], { cwd: rootDir, stdio: ['inherit', 'inherit', 'inherit'] });
   if (result.exitCode !== 0) error('TypeScript declaration generation failed');
 
-  /** CSS post-processing */
+  /** Emitting a @layer-wrapped variant so consumers can de-prioritize library styles */
   const stylesContent = fs.readFileSync(path.join(distDir, 'styles.css'), 'utf-8');
   fs.writeFileSync(path.join(distDir, 'styles.layer.css'), `@layer shadow-library {\n${stylesContent}\n}\n`);
-
-  const stylesDir = path.join(distDir, 'styles');
-  fs.mkdirSync(stylesDir, { recursive: true });
-  const cssGlob = new Bun.Glob('**/*.module.css');
-  for await (const file of cssGlob.scan(srcDir)) {
-    const srcPath = path.resolve(srcDir, file);
-    const destName = path.basename(file);
-    fs.copyFileSync(srcPath, path.join(stylesDir, destName));
-  }
 
   /** Generating dist/package.json */
   const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf-8'));
@@ -87,8 +86,8 @@ async function build() {
     '.': { types: './index.d.ts', default: './index.js' },
     './styles.css': './styles.css',
     './styles.layer.css': './styles.layer.css',
-    './styles/*': './styles/*',
   };
+  distPackageJson.sideEffects = ['*.css'];
   delete distPackageJson.scripts;
   delete distPackageJson.devDependencies;
   fs.writeFileSync(path.join(distDir, 'package.json'), JSON.stringify(distPackageJson, null, 2));

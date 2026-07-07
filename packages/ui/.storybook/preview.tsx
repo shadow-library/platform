@@ -1,18 +1,17 @@
 /**
  * Importing npm packages
  */
-
+import { withThemeByClassName } from '@storybook/addon-themes';
 import { definePreview } from '@storybook/react-vite';
 
 /**
  * Importing user defined packages
  */
+import '@/styles/index.css';
 
 /**
  * Defining types
  */
-
-export type Theme = 'light' | 'dark';
 
 /**
  * Declaring the constants
@@ -20,6 +19,13 @@ export type Theme = 'light' | 'dark';
 
 export const preview = definePreview({
   addons: [],
+
+  decorators: [
+    withThemeByClassName({
+      themes: { light: '', dark: 'dark' },
+      defaultTheme: 'light',
+    }),
+  ],
 
   parameters: {
     controls: {
@@ -34,21 +40,6 @@ export const preview = definePreview({
       // 'error' - fail CI on a11y violations
       // 'off' - skip a11y checks entirely
       test: 'todo',
-    },
-  },
-
-  globalTypes: {
-    theme: {
-      name: 'Theme',
-      description: 'Mantine color scheme',
-      defaultValue: 'light',
-      toolbar: {
-        icon: 'mirror',
-        items: [
-          { value: 'light', title: 'Light' },
-          { value: 'dark', title: 'Dark' },
-        ],
-      },
     },
   },
 });
