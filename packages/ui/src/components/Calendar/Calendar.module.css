@@ -1,0 +1,127 @@
+/*
+ * Calendar — 36px day cells (30px visual target), fixed 6-week height so adjacent UI never shifts.
+ * Day states map to tokens: selected accent + on-accent, in-range accent-soft band (square edges),
+ * today accent inset, outside text-tertiary. Reuses the Date Picker day grammar.
+ */
+
+.root {
+  display: inline-block;
+}
+.months {
+  display: flex;
+  gap: 24px;
+}
+.months[data-count='1'] {
+  display: block;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.monthLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.nav {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.nav:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.nav:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+.nav svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+.navSpacer {
+  width: 28px;
+  height: 28px;
+}
+
+.grid {
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.weekday {
+  width: 36px;
+  height: 32px;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
+}
+.cell {
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  text-align: center;
+}
+.cell[data-in-range] {
+  background: var(--sh-accent-soft);
+}
+
+.day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--sh-radius-md);
+  font: inherit;
+  font-size: 12px;
+  color: var(--sh-text-primary);
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.day:hover:not(:disabled):not([data-selected]) {
+  background: var(--sh-bg-hover);
+}
+.day[data-outside] {
+  color: var(--sh-text-tertiary);
+}
+.day[data-in-range] {
+  border-radius: 0;
+}
+.day[data-today] {
+  border-color: var(--sh-accent);
+}
+.day[data-selected] {
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+  border-color: var(--sh-accent);
+  border-radius: var(--sh-radius-md);
+}
+.day:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 1px;
+}
+.day:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+@media (max-width: 768px) {
+  .months {
+    flex-direction: column;
+  }
+}
