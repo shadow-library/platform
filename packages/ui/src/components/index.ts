@@ -8,6 +8,7 @@ export * from './Card';
 export * from './Checkbox';
 export * from './Combobox';
 export * from './CommandPalette';
+export * from './DataGrid';
 export * from './DatePicker';
 export * from './Dialog';
 export * from './Drawer';
