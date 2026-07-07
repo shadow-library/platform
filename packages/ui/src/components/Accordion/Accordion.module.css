@@ -1,0 +1,123 @@
+/*
+ * Accordion — page structure, one size. Hairlines border-subtle, hover bg-hover, titles
+ * text-secondary → text-primary. Disclosure is not selection: no accent, just weight + chevron. The
+ * contained variant borrows Card chrome. Panel height animates via Radix's content-height var.
+ */
+
+.item {
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.root[data-variant='contained'] {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.root[data-variant='contained'] .item {
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+}
+
+.header {
+  margin: 0;
+  font: inherit;
+}
+.trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 48px;
+  padding: 0 16px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+[data-density='compact'] .trigger {
+  height: 40px;
+}
+.trigger:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.trigger:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--sh-radius-md);
+}
+.trigger[data-state='open'] {
+  color: var(--sh-text-primary);
+}
+.trigger[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.title {
+  flex: 1;
+  min-width: 0;
+}
+.meta {
+  flex-shrink: 0;
+}
+.chevron {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--sh-text-tertiary);
+  transition: transform var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.trigger[data-state='open'] .chevron {
+  transform: rotate(180deg);
+}
+
+/* ── Content ─────────────────────────────────────────────── */
+.content {
+  overflow: hidden;
+}
+.content[data-state='open'] {
+  animation: sh-accordion-down var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.content[data-state='closed'] {
+  animation: sh-accordion-up var(--sh-duration-fast-exit) var(--sh-ease-standard);
+}
+.contentInner {
+  padding: 0 16px 16px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+@keyframes sh-accordion-down {
+  from {
+    height: 0;
+  }
+  to {
+    height: var(--radix-accordion-content-height);
+  }
+}
+@keyframes sh-accordion-up {
+  from {
+    height: var(--radix-accordion-content-height);
+  }
+  to {
+    height: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content[data-state='open'],
+  .content[data-state='closed'] {
+    animation: none;
+  }
+  .chevron {
+    transition: none;
+  }
+}
