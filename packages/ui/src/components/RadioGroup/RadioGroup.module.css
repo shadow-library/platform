@@ -1,0 +1,88 @@
+/*
+ * Radio — the circular sibling of Checkbox. Same 16px metrics and accent fill, radius-full, with a
+ * 6px white dot. Uses the offset focus-ring. Tokens only.
+ */
+
+.group {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.groupLabel {
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+
+.item {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+.item[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.circle {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  padding: 0;
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-raised);
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.circle:not(:disabled):hover {
+  border-color: var(--sh-border-interactive);
+}
+.circle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+.circle[data-invalid='true'] {
+  border-color: var(--sh-danger-solid);
+}
+.circle[data-state='checked'] {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+.circle:disabled {
+  cursor: not-allowed;
+}
+
+/* Radix Indicator only renders when checked — style it as the 6px dot. */
+.dot {
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-on-accent);
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.label {
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--sh-text-primary);
+  cursor: pointer;
+}
+.description {
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-text-tertiary);
+}
