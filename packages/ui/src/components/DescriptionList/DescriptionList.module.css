@@ -1,0 +1,148 @@
+.root {
+  display: flex;
+  flex-direction: column;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.title {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.headerAction {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.list {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+}
+
+/* Row — fixed term column, hairline dividers */
+.list[data-layout='row'] {
+  display: flex;
+  flex-direction: column;
+}
+.list[data-layout='row'] .item {
+  display: grid;
+  grid-template-columns: var(--dl-term-width) 1fr;
+  gap: 16px;
+  align-items: baseline;
+  padding: 9px 0;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.list[data-layout='row'] .item:last-child {
+  border-bottom: none;
+}
+
+/* Column — term stacked above value */
+.list[data-layout='column'] {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.list[data-layout='column'] .item,
+.list[data-layout='grid'] .item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+/* Grid — a matrix of column-style items */
+.list[data-layout='grid'] {
+  display: grid;
+  grid-template-columns: repeat(var(--dl-columns), minmax(0, 1fr));
+  gap: 16px 32px;
+}
+
+.item {
+  min-width: 0;
+}
+
+.term {
+  color: var(--sh-text-tertiary);
+}
+
+.detail {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0;
+  min-width: 0;
+  color: var(--sh-text-primary);
+}
+
+.value {
+  min-width: 0;
+}
+.value[data-mono] {
+  font-family: var(--sh-font-mono);
+}
+.value[data-hidden] {
+  display: none;
+}
+
+/* Grid cells truncate; row/column wrap */
+.list[data-layout='grid'] .value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.empty {
+  color: var(--sh-text-tertiary);
+}
+
+.masked {
+  letter-spacing: 0.12em;
+  color: var(--sh-text-secondary);
+}
+
+.action {
+  flex-shrink: 0;
+  align-self: center;
+}
+
+/* Copy button is revealed on row hover or its own focus */
+.copy {
+  opacity: 0;
+  transition: opacity var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item:hover .copy,
+.copy:focus-visible {
+  opacity: 1;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+/* Row collapses to stacked term/value where the fixed column can't fit */
+@media (max-width: 640px) {
+  .list[data-layout='row'] .item {
+    grid-template-columns: 1fr;
+    gap: 2px;
+  }
+  .list[data-layout='grid'] {
+    grid-template-columns: 1fr;
+  }
+}

@@ -14,6 +14,7 @@ export * from './CommandPalette';
 export * from './DataGrid';
 export * from './DatePicker';
 export * from './DateRangePicker';
+export * from './DescriptionList';
 export * from './Dialog';
 export * from './Drawer';
 export * from './DropdownMenu';
