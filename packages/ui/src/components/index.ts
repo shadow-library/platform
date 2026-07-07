@@ -4,6 +4,7 @@ export * from './Button';
 export * from './ButtonGroup';
 export * from './Card';
 export * from './Checkbox';
+export * from './Dialog';
 export * from './DropdownMenu';
 export * from './FormField';
 export * from './IconButton';

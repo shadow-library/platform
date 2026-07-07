@@ -1,0 +1,142 @@
+/*
+ * Dialog — modal task surface. Scrim + centered panel (layer-modal: raised fill, radius-xl, e3 in
+ * light / border + no shadow in dark). A flex positioner centers the panel so the panel's own
+ * transform is free for the enter animation (fade + 8px rise). Shared by Dialog and ConfirmDialog.
+ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sh-z-scrim);
+  background: var(--sh-scrim);
+  animation: sh-scrim-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.scrim[data-state='closed'] {
+  animation: sh-scrim-out var(--sh-duration-normal-exit) var(--sh-ease-standard);
+}
+
+.positioner {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sh-z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.panel {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-height: calc(100vh - 32px);
+  padding: 24px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-xl);
+  box-shadow: var(--sh-shadow-e3);
+  color: var(--sh-text-primary);
+}
+[data-density='compact'] .panel {
+  padding: 20px;
+}
+.panel[data-size='sm'] {
+  max-width: 400px;
+}
+.panel[data-size='md'] {
+  max-width: 560px;
+}
+.panel[data-size='lg'] {
+  max-width: 720px;
+}
+.panel[data-state='open'] {
+  animation: sh-dialog-in var(--sh-duration-slow) var(--sh-ease-standard);
+}
+.panel[data-state='closed'] {
+  animation: sh-dialog-out var(--sh-duration-slow-exit) var(--sh-ease-standard);
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+.heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  line-height: var(--sh-text-h3--line-height);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.description {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  color: var(--sh-text-tertiary);
+}
+.close {
+  flex-shrink: 0;
+  margin: -4px -6px 0 0;
+}
+
+/* ── Body ────────────────────────────────────────────────── */
+.body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+@keyframes sh-scrim-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@keyframes sh-scrim-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sh-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sh-dialog-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
