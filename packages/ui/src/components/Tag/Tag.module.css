@@ -1,0 +1,87 @@
+/*
+ * Tag — neutral metadata rectangle. Reuses neutral subtle/border/text tokens (which flip in dark),
+ * radius-4 to stay visually distinct from the Badge pill. The swatch is the only color slot and takes
+ * a runtime user color via inline style.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 24px;
+  padding: 0 8px;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-neutral-bg-subtle);
+  color: var(--sh-neutral-text-on-subtle);
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.root[data-size='sm'] {
+  height: 20px;
+  padding: 0 6px;
+}
+.root[data-size='lg'] {
+  height: 28px;
+  padding: 0 10px;
+}
+.root[data-removable] {
+  padding-right: 4px;
+}
+
+/* ── Clickable (asChild link) ────────────────────────────── */
+.root[data-interactive='true'] {
+  cursor: pointer;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root[data-interactive='true']:hover {
+  border-color: var(--sh-border-strong);
+  background: var(--sh-bg-hover);
+}
+.root[data-interactive='true']:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+/* ── Swatch ──────────────────────────────────────────────── */
+.swatch {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 2px;
+}
+
+/* ── Remove button ───────────────────────────────────────── */
+.remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.remove:hover {
+  background: var(--sh-bg-pressed);
+  color: var(--sh-text-primary);
+}
+.remove:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.remove svg {
+  display: block;
+  width: 10px;
+  height: 10px;
+}
