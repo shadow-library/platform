@@ -23,6 +23,7 @@ export * from './DropdownMenu';
 export * from './EmptyState';
 export * from './FileUpload';
 export * from './FormField';
+export * from './HoverCard';
 export * from './IconButton';
 export * from './Input';
 export * from './Kbd';
