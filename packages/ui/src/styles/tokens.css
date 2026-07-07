@@ -84,6 +84,9 @@
   --sh-surface-well: var(--sh-neutral-150);
   --sh-surface-raised: var(--sh-neutral-white);
   --sh-surface-tooltip: var(--sh-neutral-800);
+  /* Raised "thumb" resting on a well (segmented control): white + e1 in light; a lighter surface,
+     no shadow, in dark (elevation by surface, Foundations §08). */
+  --sh-surface-thumb: var(--sh-neutral-white);
 
   /* ── Semantic · Interactive backgrounds (light) ───────────── */
   --sh-bg-hover: var(--sh-neutral-150);
@@ -273,6 +276,7 @@
   --sh-surface-well: var(--sh-neutral-850);
   --sh-surface-raised: var(--sh-neutral-850);
   --sh-surface-tooltip: var(--sh-neutral-200);
+  --sh-surface-thumb: var(--sh-neutral-700);
 
   --sh-bg-hover: var(--sh-neutral-800);
   --sh-bg-pressed: var(--sh-neutral-700);

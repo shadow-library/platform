@@ -17,6 +17,7 @@ export * from './OtpInput';
 export * from './Popover';
 export * from './Progress';
 export * from './RadioGroup';
+export * from './SegmentedControl';
 export * from './Select';
 export * from './Skeleton';
 export * from './Spinner';
