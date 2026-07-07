@@ -11,6 +11,7 @@ export * from './DropdownMenu';
 export * from './FormField';
 export * from './IconButton';
 export * from './Input';
+export * from './Kbd';
 export * from './MultiSelect';
 export * from './OtpInput';
 export * from './Popover';
