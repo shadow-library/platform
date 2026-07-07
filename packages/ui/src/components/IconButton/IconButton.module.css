@@ -1,0 +1,149 @@
+/*
+ * Icon Button — a square, icon-only Button. Ghost-first; shares Button's tokens.
+ */
+
+.root {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: var(--sh-border-width) solid transparent;
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.root:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+.root:disabled,
+.root[aria-disabled='true'] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.root[data-loading='true'] {
+  cursor: wait;
+}
+
+/* ── Sizes (square footprints) ────────────────────────────── */
+.root[data-size='sm'] {
+  width: var(--sh-control-height-sm);
+  height: var(--sh-control-height-sm);
+  border-radius: var(--sh-radius-sm);
+}
+
+.root[data-size='md'] {
+  width: var(--sh-control-height-md);
+  height: var(--sh-control-height-md);
+  border-radius: var(--sh-radius-md);
+}
+
+.root[data-size='lg'] {
+  width: var(--sh-control-height-lg);
+  height: var(--sh-control-height-lg);
+  border-radius: var(--sh-radius-md);
+}
+
+/* ── Variants ─────────────────────────────────────────────── */
+.root[data-variant='ghost'] {
+  background-color: transparent;
+}
+.root[data-variant='ghost']:not(:disabled):hover {
+  background-color: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.root[data-variant='ghost']:not(:disabled):active {
+  background-color: var(--sh-bg-pressed);
+}
+
+.root[data-variant='secondary'] {
+  background-color: var(--sh-surface-card);
+  border-color: var(--sh-border-default);
+}
+.root[data-variant='secondary']:not(:disabled):hover {
+  background-color: var(--sh-surface-well);
+  border-color: var(--sh-border-strong);
+  color: var(--sh-text-primary);
+}
+.root[data-variant='secondary']:not(:disabled):active {
+  background-color: var(--sh-bg-pressed);
+}
+
+.root[data-variant='primary'] {
+  background-color: var(--sh-accent);
+  color: var(--sh-on-accent);
+}
+.root[data-variant='primary']:not(:disabled):hover {
+  background-color: var(--sh-accent-hover);
+}
+.root[data-variant='primary']:not(:disabled):active {
+  background-color: var(--sh-accent-active);
+}
+
+/* Danger is a ghost that only reveals a red surface on hover. */
+.root[data-variant='danger'] {
+  background-color: transparent;
+}
+.root[data-variant='danger']:not(:disabled):hover {
+  background-color: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+}
+.root[data-variant='danger']:not(:disabled):active {
+  background-color: color-mix(in srgb, var(--sh-danger-solid) 18%, transparent);
+  color: var(--sh-danger-text-on-subtle);
+}
+
+/* ── Selected (toggle) — overrides the variant fill ───────── */
+.root[data-pressed='true'] {
+  background-color: var(--sh-accent-soft);
+  border-color: transparent;
+  color: var(--sh-accent);
+}
+.root[data-pressed='true']:not(:disabled):hover {
+  background-color: color-mix(in srgb, var(--sh-accent) 20%, transparent);
+}
+
+/* ── Icon & spinner ───────────────────────────────────────── */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.root[data-size='lg'] .icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
+  border-top-color: currentColor;
+  border-radius: var(--sh-radius-full);
+  animation: spin 800ms linear infinite;
+}
+
+.root[data-size='lg'] .spinner {
+  width: 16px;
+  height: 16px;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
