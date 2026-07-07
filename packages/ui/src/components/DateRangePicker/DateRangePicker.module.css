@@ -1,0 +1,137 @@
+/*
+ * Date Range Picker — Input field surface for the trigger; the popover holds a preset rail + the
+ * Calendar (range mode). No new tokens; grid states are Calendar's, field states are Input's.
+ */
+
+.field {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 260px;
+  padding: 0 10px 0 12px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  color: var(--sh-text-primary);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.field[data-size='sm'] {
+  height: var(--sh-control-height-sm);
+  border-radius: var(--sh-radius-sm);
+}
+.field[data-size='md'] {
+  height: var(--sh-control-height-md);
+  border-radius: var(--sh-radius-md);
+}
+.field[data-size='lg'] {
+  height: var(--sh-control-height-lg);
+  border-radius: var(--sh-radius-md);
+}
+.field:not(:disabled):hover {
+  border-color: var(--sh-border-interactive);
+}
+.field:focus-visible {
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+  outline: none;
+}
+.field:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+.field[data-empty] .value {
+  color: var(--sh-text-placeholder);
+}
+.value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.icon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Popover ─────────────────────────────────────────────── */
+.content {
+  z-index: var(--sh-z-dropdown);
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.content[data-state='open'] {
+  animation: sh-rangepicker-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.body {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+}
+.rail {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 148px;
+  flex-shrink: 0;
+  border-right: var(--sh-border-width) solid var(--sh-border-subtle);
+  padding-right: 12px;
+}
+.preset {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  border-radius: var(--sh-radius-sm);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  text-align: left;
+  cursor: pointer;
+}
+.preset:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.preset[data-selected] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-weight: 500;
+}
+.preset:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 8px 12px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+@keyframes sh-rangepicker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
