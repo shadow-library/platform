@@ -13,6 +13,7 @@ export * from './Checkbox';
 export * from './ColorPicker';
 export * from './Combobox';
 export * from './CommandPalette';
+export * from './ContextMenu';
 export * from './DataGrid';
 export * from './DatePicker';
 export * from './DateRangePicker';
