@@ -1,0 +1,94 @@
+/*
+ * Shell — the app scaffold. Chrome reads surface-app (no contrasting panels). The shell root carries
+ * theme (.dark) and density (data-density) so the token layer cascades app-wide from one place.
+ */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+}
+
+.main {
+  flex: 1;
+  min-width: 0;
+  overflow-y: auto;
+}
+
+/* ── Skip link (first tab stop) ──────────────────────────── */
+.skipLink {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: var(--sh-z-tooltip);
+  padding: 8px 12px;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-md);
+  box-shadow: var(--sh-shadow-e2);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  text-decoration: none;
+  transition: top var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.skipLink:focus-visible {
+  top: 8px;
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Page ────────────────────────────────────────────────── */
+.page {
+  padding: 32px;
+}
+[data-density='compact'] .page {
+  padding: 24px;
+}
+.pageInner {
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+.breadcrumbs {
+  margin-bottom: 12px;
+}
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.titleGroup {
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+.description {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-secondary);
+  max-width: 640px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}

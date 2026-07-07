@@ -24,6 +24,7 @@ export * from './Progress';
 export * from './RadioGroup';
 export * from './SegmentedControl';
 export * from './Select';
+export * from './Shell';
 export * from './Skeleton';
 export * from './Spinner';
 export * from './Switch';
