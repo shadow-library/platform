@@ -1,0 +1,180 @@
+/*
+ * Date Picker — field per Input, calendar per the overlay surface. Day states map to existing tokens:
+ * hover bg-hover, selected accent + on-accent, today accent border, outside-month text-placeholder,
+ * disabled dimmed. No local values in either theme.
+ */
+
+.fieldWrap {
+  width: 100%;
+}
+
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.trigger:hover:not(:disabled) {
+  color: var(--sh-text-primary);
+}
+.trigger:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.trigger svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Calendar surface ────────────────────────────────────── */
+.content {
+  z-index: var(--sh-z-dropdown);
+  width: 260px;
+  padding: 12px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.content[data-state='open'] {
+  animation: sh-datepicker-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.monthLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.navButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.navButton:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.navButton:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+.navButton svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.grid {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.weekday {
+  height: 28px;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
+}
+.cell {
+  padding: 0;
+  text-align: center;
+}
+
+.day {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 28px;
+  border: 1px solid transparent;
+  background: transparent;
+  border-radius: var(--sh-radius-sm);
+  font: inherit;
+  font-size: 12px;
+  color: var(--sh-text-primary);
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.day:hover:not(:disabled):not([data-selected]) {
+  background: var(--sh-bg-hover);
+}
+.day[data-outside] {
+  color: var(--sh-text-placeholder);
+}
+.day[data-today] {
+  border-color: var(--sh-accent);
+}
+.day[data-selected] {
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+  border-color: var(--sh-accent);
+}
+.day:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.day:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.footer {
+  display: flex;
+  justify-content: flex-start;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.today {
+  height: 28px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--sh-accent);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.today:hover:not(:disabled) {
+  background: var(--sh-accent-soft);
+}
+.today:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+@keyframes sh-datepicker-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
