@@ -14,6 +14,7 @@ export * from './Input';
 export * from './Kbd';
 export * from './MultiSelect';
 export * from './OtpInput';
+export * from './Pagination';
 export * from './Popover';
 export * from './Progress';
 export * from './RadioGroup';
