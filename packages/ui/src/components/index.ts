@@ -29,6 +29,7 @@ export * from './Pagination';
 export * from './Popover';
 export * from './Progress';
 export * from './RadioGroup';
+export * from './Rating';
 export * from './SegmentedControl';
 export * from './Select';
 export * from './Shell';

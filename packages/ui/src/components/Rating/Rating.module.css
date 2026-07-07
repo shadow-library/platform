@@ -1,0 +1,107 @@
+/*
+ * Rating — warning-600 fill for committed stars, border-strong outline when empty. Input is one focus
+ * ring around the group; display supports fractional fills via a clipped overlay. All tokens.
+ */
+
+.wrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.root[data-size='sm'] {
+  font-size: 14px;
+}
+.root[data-size='md'] {
+  font-size: 16px;
+}
+.root[data-size='lg'] {
+  font-size: 20px;
+}
+
+/* ── Display (fractional) ────────────────────────────────── */
+.star {
+  position: relative;
+  display: inline-flex;
+  width: 1em;
+  height: 1em;
+}
+.outline,
+.fill {
+  position: absolute;
+  inset: 0;
+  display: inline-flex;
+  overflow: hidden;
+}
+.outline {
+  color: var(--sh-bg-pressed);
+}
+.fill {
+  color: var(--sh-warning-solid);
+}
+.star svg,
+.starButton svg {
+  display: block;
+  width: 1em;
+  height: 1em;
+}
+
+/* ── Input ───────────────────────────────────────────────── */
+.input {
+  border-radius: var(--sh-radius-sm);
+  font-size: 22px;
+}
+.input:focus-within {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 4px;
+}
+.input[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+}
+
+.starButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: transparent;
+  cursor: pointer;
+}
+.starButton svg {
+  stroke: var(--sh-border-strong);
+  stroke-width: 1px;
+  fill: transparent;
+}
+.input[data-invalid] .starButton svg {
+  stroke: var(--sh-danger-solid);
+}
+.starButton[data-filled] svg {
+  fill: var(--sh-warning-solid);
+  stroke: var(--sh-warning-solid);
+}
+.starButton[data-preview] svg {
+  fill: color-mix(in srgb, var(--sh-warning-solid) 50%, transparent);
+  stroke: var(--sh-warning-solid);
+}
+.starButton:focus-visible {
+  outline: none;
+}
+
+.meaning {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .starButton {
+    transition: none;
+  }
+}
