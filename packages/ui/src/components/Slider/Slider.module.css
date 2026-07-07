@@ -1,0 +1,108 @@
+/*
+ * Slider — track/fill are the Progress pair (bg-pressed / accent); the thumb reads surface-card +
+ * border-strong + e1 in light, no shadow in dark. One size; the 16px thumb keeps a large drag target.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  width: 100%;
+}
+.root[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+}
+
+.header {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+}
+.label {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+.value {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.slider {
+  position: relative;
+  display: flex;
+  align-items: center;
+  user-select: none;
+  touch-action: none;
+  min-height: 20px;
+}
+.slider[data-orientation='horizontal'] {
+  width: 100%;
+  min-width: 160px;
+}
+.slider[data-orientation='vertical'] {
+  flex-direction: column;
+  height: 160px;
+  min-height: 160px;
+}
+
+.track {
+  position: relative;
+  flex-grow: 1;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-bg-pressed);
+}
+.slider[data-orientation='horizontal'] .track {
+  height: 4px;
+}
+.slider[data-orientation='vertical'] .track {
+  width: 4px;
+}
+
+.range {
+  position: absolute;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}
+.slider[data-orientation='horizontal'] .range {
+  height: 100%;
+}
+.slider[data-orientation='vertical'] .range {
+  width: 100%;
+}
+
+.mark {
+  position: absolute;
+  top: 50%;
+  width: 2px;
+  height: 2px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-text-placeholder);
+  transform: translate(-50%, -50%);
+}
+
+.thumb {
+  display: block;
+  width: 16px;
+  height: 16px;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-full);
+  box-shadow: var(--sh-shadow-e1);
+  cursor: grab;
+  transition: border-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.thumb:hover {
+  border-color: var(--sh-border-interactive);
+}
+.thumb[data-state='active'],
+.thumb:active {
+  border-color: var(--sh-accent);
+  cursor: grabbing;
+}
+.thumb:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
