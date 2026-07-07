@@ -1,0 +1,179 @@
+/*
+ * Toast — calm surface, loud icon. The card is never intent-tinted; intent lives in one 16px glyph
+ * whose color binds per intent from the token layer. Fixed viewport in the chosen corner at z-toast.
+ */
+
+.viewport {
+  position: fixed;
+  z-index: var(--sh-z-toast);
+  display: flex;
+  gap: 8px;
+  width: 360px;
+  max-width: calc(100vw - 32px);
+  pointer-events: none;
+}
+.viewport > * {
+  pointer-events: auto;
+}
+.viewport[data-placement='bottom-end'] {
+  right: 16px;
+  bottom: 16px;
+  flex-direction: column-reverse;
+}
+.viewport[data-placement='bottom-center'] {
+  left: 50%;
+  bottom: 16px;
+  transform: translateX(-50%);
+  flex-direction: column-reverse;
+}
+.viewport[data-placement='top-end'] {
+  right: 16px;
+  top: 16px;
+  flex-direction: column;
+}
+.viewport[data-placement='top-center'] {
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  flex-direction: column;
+}
+
+/* ── Card ────────────────────────────────────────────────── */
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 12px 14px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  animation: sh-toast-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+
+/* ── Intent glyph (the only colored element) ─────────────── */
+.toast[data-intent='neutral'] {
+  --toast-accent: var(--sh-neutral-solid);
+}
+.toast[data-intent='info'] {
+  --toast-accent: var(--sh-info-solid);
+}
+.toast[data-intent='success'] {
+  --toast-accent: var(--sh-success-solid);
+}
+.toast[data-intent='warning'] {
+  --toast-accent: var(--sh-warning-solid);
+}
+.toast[data-intent='danger'] {
+  --toast-accent: var(--sh-danger-solid);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: var(--sh-radius-full);
+  background: var(--toast-accent);
+  color: var(--sh-neutral-white);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+.spinner {
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border: 2px solid color-mix(in srgb, var(--toast-accent) 35%, transparent);
+  border-top-color: var(--toast-accent);
+  border-radius: var(--sh-radius-full);
+  animation: sh-toast-spin 800ms linear infinite;
+}
+
+/* ── Content ─────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--sh-text-primary);
+}
+.body {
+  margin-top: 2px;
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-text-tertiary);
+}
+
+/* ── Action + dismiss ────────────────────────────────────── */
+.action {
+  flex-shrink: 0;
+  height: 24px;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  color: var(--sh-accent);
+  font: inherit;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.action:hover {
+  background: var(--sh-accent-soft);
+}
+.action:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 1px;
+}
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+}
+.dismiss:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.dismiss:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.dismiss svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes sh-toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sh-toast-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
