@@ -1,15 +1,12 @@
 /**
  * Importing npm packages
  */
-import { ColorSchemeScript, MantineProvider } from '@mantine/core';
-import '@mantine/core/styles.css';
 
 import { definePreview } from '@storybook/react-vite';
 
 /**
  * Importing user defined packages
  */
-import { shadowTheme } from '@/theme';
 
 /**
  * Defining types
@@ -54,18 +51,6 @@ export const preview = definePreview({
       },
     },
   },
-
-  decorators: [
-    (Story, context) => {
-      const scheme: Theme = context.globals.theme || 'light';
-      return (
-        <MantineProvider theme={shadowTheme} forceColorScheme={scheme}>
-          <ColorSchemeScript />
-          <Story />
-        </MantineProvider>
-      );
-    },
-  ],
 });
 
 export default preview;

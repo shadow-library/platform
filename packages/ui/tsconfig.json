@@ -24,7 +24,6 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
