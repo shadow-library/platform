@@ -41,6 +41,7 @@ export * from './Tabs';
 export * from './Tag';
 export * from './Textarea';
 export * from './Timeline';
+export * from './TimePicker';
 export * from './Toast';
 export * from './TokenInput';
 export * from './Tooltip';
