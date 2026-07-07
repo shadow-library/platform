@@ -1,0 +1,93 @@
+/*
+ * Textarea — Input's field surface stretched vertically. Border, fill, focus, and error hues mirror
+ * Input (the token layer is the shared source; CSS Modules can't share classes). Adds row height,
+ * a disabled resize handle, and the character counter.
+ */
+
+.root {
+  display: block;
+  width: 100%;
+}
+
+.field {
+  display: block;
+  width: 100%;
+  padding: 8px 12px;
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-raised);
+  color: var(--sh-text-primary);
+  font-family: inherit;
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  resize: none;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+/* ── Sizes ────────────────────────────────────────────────── */
+.field[data-size='sm'] {
+  padding: 6px 10px;
+  border-radius: var(--sh-radius-sm);
+}
+.field[data-size='lg'] {
+  font-size: var(--sh-text-body);
+  line-height: 22px;
+}
+
+/* Manual resize is vertical-only; horizontal never — it breaks the layout grid. */
+.field[data-autogrow='false'] {
+  resize: vertical;
+}
+
+.field::placeholder {
+  color: var(--sh-text-placeholder);
+}
+
+/* ── Interaction states (inherited from Input) ───────────── */
+.field:not(:disabled):not(:read-only):hover {
+  border-color: var(--sh-border-interactive);
+}
+
+.field:focus {
+  outline: none;
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+
+.field[data-invalid='true'] {
+  border-color: var(--sh-danger-solid);
+}
+.field[data-invalid='true']:focus {
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
+
+.field:read-only {
+  background: var(--sh-surface-well);
+  border-color: transparent;
+}
+
+.field:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* ── Character counter (below-right, quiet until the last 20%) */
+.counter {
+  margin-top: 4px;
+  text-align: right;
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-placeholder);
+  opacity: 0;
+  transition:
+    opacity var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.counter[data-visible='true'] {
+  opacity: 1;
+}
+.counter[data-state='limit'] {
+  color: var(--sh-danger-text);
+}
