@@ -1,0 +1,143 @@
+/*
+ * Dropdown Menu — reuses Select's overlay surface with action semantics. Tokens only.
+ */
+
+.content {
+  z-index: var(--sh-z-dropdown);
+  min-width: 180px;
+  max-width: 320px;
+  padding: 4px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  transform-origin: var(--radix-dropdown-menu-content-transform-origin);
+}
+.content[data-state='open'] {
+  animation: sh-menu-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.content[data-state='closed'] {
+  animation: sh-menu-out var(--sh-duration-fast-exit) var(--sh-ease-standard);
+}
+
+/* ── Items ───────────────────────────────────────────────── */
+.item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: var(--sh-control-height-md);
+  padding: 0 10px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  user-select: none;
+  outline: none;
+}
+.item[data-highlighted] {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.item[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  pointer-events: none;
+}
+.item[data-destructive] {
+  color: var(--sh-danger-text);
+}
+.item[data-destructive][data-highlighted] {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text);
+}
+.item[data-state='open'] {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+
+.itemIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.itemIcon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.shortcut {
+  flex-shrink: 0;
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+/* Checkbox/radio indicator occupies the icon column. */
+.indicator {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--sh-accent);
+}
+.indicator svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.subChevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.subChevron svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── Label & separator ───────────────────────────────────── */
+.label {
+  padding: 6px 10px 4px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  color: var(--sh-text-tertiary);
+}
+
+.separator {
+  height: 1px;
+  margin: 4px 0;
+  background: var(--sh-border-subtle);
+}
+
+@keyframes sh-menu-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sh-menu-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
