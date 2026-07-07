@@ -25,6 +25,7 @@ export * from './IconButton';
 export * from './Input';
 export * from './Kbd';
 export * from './MultiSelect';
+export * from './NotificationCenter';
 export * from './NumberStepper';
 export * from './OtpInput';
 export * from './Pagination';

@@ -1,0 +1,199 @@
+.bell {
+  position: relative;
+  display: inline-flex;
+}
+
+/* danger-500 count badge with a surface ring — the notification-dot recipe from Top Navigation */
+.badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-danger-solid);
+  color: var(--sh-danger-on-solid);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+  box-shadow: 0 0 0 2px var(--sh-surface-app);
+  pointer-events: none;
+}
+.badge[data-dot] {
+  min-width: 8px;
+  width: 8px;
+  height: 8px;
+  padding: 0;
+  top: 0;
+  right: 0;
+}
+
+/* Panel — 360×480, fixed header/tabs/footer, scrolling list. Overrides Popover's padded content. */
+.panel[data-state] {
+  width: 360px;
+  max-width: 360px;
+  max-height: 480px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 16px;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.panelTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.tabs {
+  padding: 0 16px;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+  flex-shrink: 0;
+}
+
+.scroll {
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+.feed {
+  display: flex;
+  flex-direction: column;
+}
+.feedEmpty {
+  padding: 24px 16px;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+}
+
+.groupLabel {
+  padding: 10px 16px 4px;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.item {
+  position: relative;
+  display: flex;
+  gap: 10px;
+  padding: 10px 16px;
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item:hover {
+  background-color: var(--sh-bg-hover);
+}
+.item:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: calc(var(--sh-focus-ring-offset) * -1);
+}
+.item[data-unread] {
+  background-color: var(--sh-accent-soft);
+}
+
+/* Gutter unread dot */
+.dot {
+  position: absolute;
+  left: 6px;
+  top: 18px;
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}
+
+.leading {
+  flex-shrink: 0;
+}
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-secondary);
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.title {
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+  color: var(--sh-text-primary);
+}
+.actor {
+  font-weight: 600;
+}
+.item[data-unread] .actor {
+  font-weight: 600;
+}
+
+.time {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.receipt {
+  margin-top: 4px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.footer {
+  display: block;
+  padding: 10px 16px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-accent);
+  text-align: center;
+  flex-shrink: 0;
+}
+.footer:hover {
+  background-color: var(--sh-bg-hover);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
