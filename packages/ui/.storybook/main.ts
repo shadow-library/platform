@@ -20,7 +20,7 @@ import { mergeConfig } from 'vite';
 
 export default defineMain({
   stories: ['../src/**/*.stories.@(ts|tsx)', './foundations/**/*.stories.@(ts|tsx)'],
-  addons: ['@storybook/addon-vitest', '@storybook/addon-a11y', '@storybook/addon-docs', '@storybook/addon-themes'],
+  addons: ['@storybook/addon-vitest', '@storybook/addon-a11y', '@storybook/addon-docs'],
   framework: '@storybook/react-vite',
   async viteFinal(config) {
     return mergeConfig(config, {

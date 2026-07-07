@@ -1,8 +1,9 @@
 /**
  * Importing npm packages
  */
-import { withThemeByClassName } from '@storybook/addon-themes';
-import { definePreview } from '@storybook/react-vite';
+
+import { type Decorator, definePreview } from '@storybook/react-vite';
+import { useEffect } from 'react';
 
 /**
  * Importing user defined packages
@@ -10,22 +11,41 @@ import { definePreview } from '@storybook/react-vite';
 import '@/styles/index.css';
 
 /**
- * Defining types
- */
-
-/**
  * Declaring the constants
  */
+
+/** Applies the toolbar-selected theme to the preview root, exactly as a consumer would. */
+const withTheme: Decorator = (Story, context) => {
+  const theme = context.globals.theme === 'dark' ? 'dark' : 'light';
+  useEffect(() => {
+    const root = document.documentElement;
+    if (theme === 'dark') root.setAttribute('data-theme', 'dark');
+    else root.removeAttribute('data-theme');
+    return () => root.removeAttribute('data-theme');
+  }, [theme]);
+  return <Story />;
+};
 
 export const preview = definePreview({
   addons: [],
 
-  decorators: [
-    withThemeByClassName({
-      themes: { light: '', dark: 'dark' },
-      defaultTheme: 'light',
-    }),
-  ],
+  decorators: [withTheme],
+
+  globalTypes: {
+    theme: {
+      description: 'Shadow UI color theme',
+      defaultValue: 'light',
+      toolbar: {
+        title: 'Theme',
+        icon: 'contrast',
+        items: [
+          { value: 'light', title: 'Light', icon: 'sun' },
+          { value: 'dark', title: 'Dark', icon: 'moon' },
+        ],
+        dynamicTitle: true,
+      },
+    },
+  },
 
   parameters: {
     controls: {
