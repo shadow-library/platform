@@ -1,0 +1,61 @@
+/*
+ * Popover — the shared overlay surface (raised fill, default border, e2 shadow in light / none in
+ * dark), radius-lg, hug width clamped 240–360. Enters with a fade + 4px rise from the trigger side
+ * using Radix's data-state/data-side hooks; opacity + transform only, never `all`.
+ */
+
+.content {
+  z-index: var(--sh-z-dropdown);
+  min-width: 240px;
+  max-width: 360px;
+  padding: 16px;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e2);
+  color: var(--sh-text-primary);
+  transform-origin: var(--radix-popover-content-transform-origin);
+}
+.content[data-state='open'] {
+  animation: sh-popover-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.content[data-state='closed'] {
+  animation: sh-popover-out var(--sh-duration-normal-exit) var(--sh-ease-standard);
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: 12px;
+}
+.title {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.description {
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-text-tertiary);
+}
+
+@keyframes sh-popover-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sh-popover-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
