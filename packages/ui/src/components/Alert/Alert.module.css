@@ -1,0 +1,140 @@
+/*
+ * Alert — the one intent-tinted surface. Each intent binds local custom properties from the semantic
+ * role tokens (bg-subtle / border / text-on-subtle / solid), so the whole component recolors by token
+ * and dark mode needs no special rules. No left accent bar — the tint + border carry intent.
+ */
+
+.root {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-height: 44px;
+  padding: 12px 14px;
+  border: var(--sh-border-width) solid var(--alert-border);
+  border-radius: var(--sh-radius-lg);
+  background: var(--alert-subtle);
+  animation: sh-alert-in var(--sh-duration-fast) var(--sh-ease-standard);
+}
+[data-density='compact'] .root {
+  padding: 10px 12px;
+}
+
+.root[data-intent='info'] {
+  --alert-subtle: var(--sh-info-bg-subtle);
+  --alert-border: var(--sh-info-border);
+  --alert-text: var(--sh-info-text-on-subtle);
+  --alert-solid: var(--sh-info-solid);
+}
+.root[data-intent='success'] {
+  --alert-subtle: var(--sh-success-bg-subtle);
+  --alert-border: var(--sh-success-border);
+  --alert-text: var(--sh-success-text-on-subtle);
+  --alert-solid: var(--sh-success-solid);
+}
+.root[data-intent='warning'] {
+  --alert-subtle: var(--sh-warning-bg-subtle);
+  --alert-border: var(--sh-warning-border);
+  --alert-text: var(--sh-warning-text-on-subtle);
+  --alert-solid: var(--sh-warning-solid);
+}
+.root[data-intent='danger'] {
+  --alert-subtle: var(--sh-danger-bg-subtle);
+  --alert-border: var(--sh-danger-border);
+  --alert-text: var(--sh-danger-text-on-subtle);
+  --alert-solid: var(--sh-danger-solid);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin-top: 1px;
+  border-radius: var(--sh-radius-full);
+  background: var(--alert-solid);
+  color: var(--sh-neutral-white);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.content {
+  flex: 1;
+  min-width: 0;
+}
+.title {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  line-height: 18px;
+  color: var(--alert-text);
+}
+.body {
+  font-size: var(--sh-text-body-sm);
+  line-height: 19px;
+  color: var(--alert-text);
+}
+.title + .body {
+  margin-top: 2px;
+  opacity: 0.85;
+}
+
+.action {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 10px;
+  border: var(--sh-border-width) solid var(--alert-border);
+  border-radius: var(--sh-radius-sm);
+  background: transparent;
+  color: var(--alert-text);
+  font: inherit;
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.action:hover {
+  background: color-mix(in srgb, var(--alert-solid) 12%, transparent);
+}
+.action:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 1px;
+}
+
+.dismiss {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--alert-text);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  opacity: 0.7;
+}
+.dismiss:hover {
+  opacity: 1;
+}
+.dismiss:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.dismiss svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes sh-alert-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
