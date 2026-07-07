@@ -21,8 +21,13 @@ export interface ButtonProps extends Omit<ButtonHTMLAttributes<HTMLButtonElement
   variant?: ButtonVariant;
   /** Control height/typography scale. @default 'md' */
   size?: ButtonSize;
-  /** Shows a spinner, preserves measured width, sets `aria-busy`, and blocks activation. */
+  /** Shows a spinner, sets `aria-busy`, and blocks activation. */
   loading?: boolean;
+  /**
+   * Optional label shown beside the spinner while `loading` (e.g. "Saving…").
+   * When omitted, the spinner replaces the label and the button's width is preserved.
+   */
+  loadingText?: ReactNode;
   /** Stretches the button to fill its container (form/dialog action contexts). */
   fullWidth?: boolean;
   /** Adornment before the label — icon, spinner, kbd (Foundations adornment grammar). */

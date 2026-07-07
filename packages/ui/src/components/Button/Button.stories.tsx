@@ -93,8 +93,14 @@ export const WithIcons: Story = {
   ),
 };
 
+/** Spinner-only — the label is hidden while the button's width is preserved. */
 export const Loading: Story = {
-  args: { variant: 'primary', loading: true, children: 'Saving' },
+  args: { variant: 'primary', loading: true, children: 'Save changes' },
+};
+
+/** With `loadingText` — the label is swapped for the spinner and a status label. */
+export const LoadingWithLabel: Story = {
+  args: { variant: 'primary', loading: true, loadingText: 'Saving…', children: 'Save changes' },
 };
 
 export const Disabled: Story = {
@@ -119,26 +125,4 @@ export const AsChild: Story = {
       <a href='https://example.com'>Anchor button</a>
     </Button>
   ),
-};
-
-/** Both themes share one token set — dark flips via the `dark` class ancestor. */
-export const Themes: Story = {
-  parameters: { layout: 'fullscreen' },
-  render: () => {
-    const Panel = ({ className }: { className?: string }) => (
-      <div className={className} style={{ display: 'flex', gap: 12, padding: 32, background: 'var(--sh-surface-app)', flexWrap: 'wrap', alignItems: 'center' }}>
-        <Button variant='primary'>Primary</Button>
-        <Button variant='secondary'>Secondary</Button>
-        <Button variant='ghost'>Ghost</Button>
-        <Button variant='text'>Text</Button>
-        <Button variant='danger'>Danger</Button>
-      </div>
-    );
-    return (
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr' }}>
-        <Panel />
-        <Panel className='dark' />
-      </div>
-    );
-  },
 };

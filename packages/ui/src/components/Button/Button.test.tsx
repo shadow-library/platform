@@ -107,6 +107,19 @@ describe('Button', () => {
     expect(onClick).not.toHaveBeenCalled();
   });
 
+  it('shows the loadingText label beside the spinner and replaces the original label', () => {
+    render(
+      <Button loading loadingText='Saving…'>
+        Save changes
+      </Button>,
+    );
+    const button = screen.getByRole('button');
+    expect(button).toHaveAttribute('aria-busy', 'true');
+    expect(button).toBeDisabled();
+    expect(button).toHaveTextContent('Saving…');
+    expect(button).not.toHaveTextContent('Save changes');
+  });
+
   it('stretches to full width via data-full-width', () => {
     render(<Button fullWidth>Wide</Button>);
     expect(screen.getByRole('button')).toHaveAttribute('data-full-width', 'true');

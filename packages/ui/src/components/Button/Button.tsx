@@ -22,7 +22,7 @@ import { type ButtonProps } from './Button.types';
  * from which every other interactive control inherits sizing, radius, focus, and motion.
  */
 export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button(
-  { variant = 'secondary', size = 'md', loading = false, fullWidth = false, prefix, suffix, asChild = false, type, disabled, className, children, ...props },
+  { variant = 'secondary', size = 'md', loading = false, loadingText, fullWidth = false, prefix, suffix, asChild = false, type, disabled, className, children, ...props },
   ref,
 ) {
   const rootClassName = cn(styles.root, className);
@@ -37,6 +37,10 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
     );
   }
 
+  // Two loading modes: with loadingText the label is swapped for the spinner + new label;
+  // without it the spinner overlays and the original content is hidden to preserve width.
+  const showLoadingText = loading && loadingText != null;
+
   return (
     <button
       ref={ref}
@@ -50,13 +54,22 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading ? <span className={styles.spinner} aria-hidden='true' /> : null}
-      <span className={styles.content}>
-        {prefix != null ? <span className={styles.affix}>{prefix}</span> : null}
-        {children}
-        {suffix != null ? <span className={styles.affix}>{suffix}</span> : null}
+      {loading && !showLoadingText ? <span className={styles.spinner} data-overlay='true' aria-hidden='true' /> : null}
+      <span className={styles.content} data-hidden={loading && !showLoadingText ? 'true' : undefined}>
+        {showLoadingText ? (
+          <>
+            <span className={styles.spinner} aria-hidden='true' />
+            {loadingText}
+          </>
+        ) : (
+          <>
+            {prefix != null ? <span className={styles.affix}>{prefix}</span> : null}
+            {children}
+            {suffix != null ? <span className={styles.affix}>{suffix}</span> : null}
+          </>
+        )}
       </span>
-      {loading ? <span className={styles.srOnly}>Loading</span> : null}
+      {loading && !showLoadingText ? <span className={styles.srOnly}>Loading</span> : null}
     </button>
   );
 });

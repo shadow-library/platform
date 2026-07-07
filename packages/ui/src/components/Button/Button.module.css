@@ -135,7 +135,7 @@
   gap: 6px;
 }
 
-.root[data-loading='true'] .content {
+.content[data-hidden='true'] {
   visibility: hidden;
 }
 
@@ -151,18 +151,25 @@
   height: 16px;
 }
 
-/* ── Loading spinner — centered overlay; width is preserved by the hidden content ── */
+/*
+ * Loading spinner. Inline by default (sits beside loadingText); with data-overlay it centers
+ * over the button while the hidden content preserves the measured width.
+ */
 .spinner {
-  position: absolute;
-  top: 50%;
-  left: 50%;
   width: 14px;
   height: 14px;
-  margin: -7px 0 0 -7px;
+  flex-shrink: 0;
   border: 2px solid color-mix(in srgb, currentColor 35%, transparent);
   border-top-color: currentColor;
   border-radius: var(--sh-radius-full);
   animation: spin 800ms linear infinite;
+}
+
+.spinner[data-overlay='true'] {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  margin: -7px 0 0 -7px;
 }
 
 @keyframes spin {
