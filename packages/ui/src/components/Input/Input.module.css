@@ -1,0 +1,176 @@
+/*
+ * Input — the field-surface reference. The wrapper carries the border, fill, and focus-within ring;
+ * the inner input is transparent so adornments sit inside the clickable field. All values are tokens.
+ */
+
+.root {
+  display: flex;
+  align-items: stretch;
+  width: 100%;
+  overflow: hidden;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  color: var(--sh-text-primary);
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+/* ── Sizes (height / radius / type — shared with Button) ──── */
+.root[data-size='sm'] {
+  height: var(--sh-control-height-sm);
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+}
+.root[data-size='md'] {
+  height: var(--sh-control-height-md);
+  border-radius: var(--sh-radius-md);
+  font-size: var(--sh-text-body-sm);
+}
+.root[data-size='lg'] {
+  height: var(--sh-control-height-lg);
+  border-radius: var(--sh-radius-md);
+  font-size: var(--sh-text-body);
+}
+
+/* ── Interaction states ──────────────────────────────────── */
+.root:not([data-disabled='true']):not([data-readonly='true']):hover {
+  border-color: var(--sh-border-interactive);
+}
+
+.root:focus-within {
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+
+.root[data-invalid='true'] {
+  border-color: var(--sh-danger-solid);
+}
+.root[data-invalid='true']:focus-within {
+  border-color: var(--sh-danger-solid);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
+
+.root[data-readonly='true'] {
+  background: var(--sh-surface-well);
+  border-color: transparent;
+}
+
+.root[data-disabled='true'] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* ── The field itself ────────────────────────────────────── */
+.field {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: inherit;
+  color: inherit;
+  outline: none;
+}
+.root[data-size='sm'] .field {
+  padding: 0 10px;
+}
+.field::placeholder {
+  color: var(--sh-text-placeholder);
+}
+.field:disabled {
+  cursor: not-allowed;
+}
+
+/* A leading/trailing icon adornment owns the edge padding; the field keeps only a small gap. */
+.root[data-lead='icon'] .field {
+  padding-left: 8px;
+}
+.root[data-trail='icon'] .field {
+  padding-right: 8px;
+}
+
+/* ── Icon adornments (decorative, inside the field) ──────── */
+.adornment {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.adornment[data-side='before'] {
+  padding-left: 12px;
+}
+.adornment[data-side='after'] {
+  padding-right: 12px;
+}
+.root[data-size='sm'] .adornment[data-side='before'] {
+  padding-left: 10px;
+}
+.root[data-size='sm'] .adornment[data-side='after'] {
+  padding-right: 10px;
+}
+.adornment svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+/* ── String addons (fused segments with a shared divider) ── */
+.addon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  padding: 0 10px;
+  background: var(--sh-surface-well);
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
+}
+.addon[data-side='before'] {
+  border-right: var(--sh-border-width) solid var(--sh-border-strong);
+}
+.addon[data-side='after'] {
+  border-left: var(--sh-border-width) solid var(--sh-border-strong);
+}
+
+/* ── Clear button (revealed on hover/focus) ──────────────── */
+.clear {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard),
+    background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root:hover .clear,
+.root:focus-within .clear {
+  opacity: 1;
+}
+.clear:hover {
+  color: var(--sh-text-primary);
+  background: var(--sh-bg-hover);
+}
+.clear:focus-visible {
+  opacity: 1;
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.clear svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
