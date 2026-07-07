@@ -37,6 +37,7 @@ export * from './Popover';
 export * from './Progress';
 export * from './RadioGroup';
 export * from './Rating';
+export * from './RTEField';
 export * from './SegmentedControl';
 export * from './Select';
 export * from './Shell';

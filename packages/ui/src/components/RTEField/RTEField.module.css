@@ -1,0 +1,222 @@
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.labelRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.label {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+.required {
+  color: var(--sh-danger-text);
+}
+
+.counter {
+  font-size: var(--sh-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-tertiary);
+}
+.counter[data-state='warning'] {
+  color: var(--sh-warning-text);
+}
+.counter[data-state='error'] {
+  color: var(--sh-danger-text);
+  font-weight: 600;
+}
+
+.description {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+/* Frame — the field boundary; takes focus-field whenever focus is anywhere inside */
+.frame {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-card);
+  overflow: hidden;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.frame:focus-within {
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+.frame[aria-invalid='true'] {
+  border-color: var(--sh-danger-solid);
+}
+.frame[aria-invalid='true']:focus-within {
+  border-color: var(--sh-danger-solid);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
+.frame[data-readonly] {
+  background: var(--sh-surface-well);
+  border-color: var(--sh-border-default);
+}
+.frame[data-disabled] {
+  background: var(--sh-surface-well);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+.fullscreenToggle {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+}
+.fullscreenToggle:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-secondary);
+}
+.fullscreenToggle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Toolbar — surface-sunken, one tab stop */
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 6px 8px;
+  background: var(--sh-surface-well);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.toolbarButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 28px;
+  height: 28px;
+  padding: 0 6px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.toolbarButton:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.toolbarButton[data-pressed] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}
+.toolbarButton:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 1px;
+}
+.toolbarButton:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.toolbarDivider {
+  width: 1px;
+  align-self: stretch;
+  margin: 2px 4px;
+  background: var(--sh-border-subtle);
+}
+
+.content {
+  min-height: 120px;
+  max-height: 360px;
+  overflow-y: auto;
+  padding: 12px;
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-primary);
+}
+
+.attachments {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.errorLine {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-danger-text);
+}
+
+/* CSS-only fullscreen — the frame repositions without remounting, preserving the engine instance */
+.field[data-fullscreen] .frame {
+  position: fixed;
+  inset: 16px;
+  z-index: var(--sh-z-modal);
+  max-height: none;
+}
+.field[data-fullscreen] .content {
+  max-height: none;
+  flex: 1;
+}
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sh-z-scrim);
+  border: none;
+  padding: 0;
+  background: var(--sh-scrim);
+  cursor: default;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .frame {
+    transition: border-color var(--sh-duration-fast) var(--sh-ease-standard);
+  }
+}
