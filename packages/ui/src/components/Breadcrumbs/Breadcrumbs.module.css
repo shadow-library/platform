@@ -1,0 +1,89 @@
+/*
+ * Breadcrumbs — header chrome, one size (24px pills, body-small). Links are ghost pills (text-secondary
+ * → hover bg-hover + text-primary); the current page is plain weight-500 text. Separators are
+ * border-strong-toned chevrons. All existing tokens.
+ */
+
+.list {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.crumb {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.link,
+.overflow,
+.current {
+  display: inline-flex;
+  align-items: center;
+  height: 24px;
+  padding: 0 6px;
+  max-width: 200px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+}
+
+.link,
+.overflow {
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  text-decoration: none;
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.link:hover,
+.overflow:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.link:focus-visible,
+.overflow:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+
+.current {
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+
+.separator {
+  display: block;
+  flex-shrink: 0;
+  width: 14px;
+  height: 14px;
+  color: var(--sh-border-strong);
+}
+
+/* ── Overflow menu (inside a Popover surface; padding/min-width set inline to beat .content) ── */
+.overflowMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.overflowItem {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  text-decoration: none;
+}
+.overflowItem:hover {
+  background: var(--sh-bg-hover);
+}
