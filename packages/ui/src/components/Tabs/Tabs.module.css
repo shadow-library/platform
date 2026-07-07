@@ -1,0 +1,97 @@
+/*
+ * Tabs — the quiet underline. The tab row sits directly on the page over a 1px baseline; the active
+ * tab draws a 2px accent border that overlaps the baseline (−1px). No container, no fill. All tokens.
+ */
+
+.list {
+  display: flex;
+  gap: 4px;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+}
+.list[data-orientation='vertical'] {
+  flex-direction: column;
+  border-bottom: none;
+  border-right: var(--sh-border-width) solid var(--sh-border-default);
+}
+
+.tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 40px;
+  padding: 0 12px;
+  margin-bottom: -1px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.list[data-orientation='vertical'] .tab {
+  margin-bottom: 0;
+  margin-right: -1px;
+  border-bottom: none;
+  border-right: 2px solid transparent;
+}
+.tab:hover:not(:disabled) {
+  color: var(--sh-text-primary);
+}
+.tab[data-state='active'] {
+  color: var(--sh-text-primary);
+  border-bottom-color: var(--sh-accent);
+}
+.list[data-orientation='vertical'] .tab[data-state='active'] {
+  border-right-color: var(--sh-accent);
+}
+.tab:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+.tab:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--sh-radius-sm);
+}
+[data-density='compact'] .tab {
+  height: 32px;
+  padding: 0 10px;
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+}
+.icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.count {
+  display: inline-flex;
+  align-items: center;
+  height: 18px;
+  padding: 0 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-bg-hover);
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.panel {
+  padding-top: 20px;
+}
+.panel:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--sh-radius-sm);
+}
