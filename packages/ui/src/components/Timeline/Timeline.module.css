@@ -1,0 +1,135 @@
+/*
+ * Timeline — a vertical rail of 20px markers with a connecting line. The future is gray, the past is
+ * accent (process). Markers read the neutral/accent/intent tokens; the rail is border-default. All
+ * existing tokens.
+ */
+
+.root {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  padding-bottom: 24px;
+}
+[data-density='compact'] .item {
+  padding-bottom: 16px;
+}
+.item:last-child {
+  padding-bottom: 0;
+}
+/* Connecting rail between markers. */
+.item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 20px;
+  bottom: 0;
+  width: 2px;
+  background: var(--sh-border-default);
+}
+.item[data-status='completed']:not(:last-child)::before,
+.item[data-status='success']:not(:last-child)::before {
+  background: var(--sh-accent);
+}
+
+/* ── Marker vocabulary ───────────────────────────────────── */
+.marker {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  color: var(--sh-neutral-white);
+}
+.marker svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.item[data-status='default'] .marker::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-text-tertiary);
+}
+.item[data-status='upcoming'] .marker {
+  background: var(--sh-surface-card);
+}
+.item[data-status='current'] .marker {
+  border: 2px solid var(--sh-accent);
+}
+.item[data-status='current'] .marker::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-accent);
+}
+.item[data-status='completed'] .marker {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+.item[data-status='success'] .marker {
+  background: var(--sh-success-solid);
+  border-color: var(--sh-success-solid);
+}
+.item[data-status='warning'] .marker {
+  background: var(--sh-warning-solid);
+  border-color: var(--sh-warning-solid);
+}
+.item[data-status='danger'] .marker {
+  background: var(--sh-danger-solid);
+  border-color: var(--sh-danger-solid);
+}
+
+/* ── Content ─────────────────────────────────────────────── */
+.content {
+  flex: 1;
+  min-width: 0;
+  padding-top: 1px;
+}
+.head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.title {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+.timestamp {
+  flex-shrink: 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+.detail {
+  margin-top: 4px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
