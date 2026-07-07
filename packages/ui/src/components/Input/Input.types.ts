@@ -26,6 +26,8 @@ export interface InputProps extends Omit<InputHTMLAttributes<HTMLInputElement>, 
   invalid?: boolean;
   /** Show a clear (×) button while the field has a value (revealed on hover/focus). */
   clearable?: boolean;
+  /** For `type='password'`: show the eye toggle that reveals the entered characters. @default true */
+  revealable?: boolean;
   /** Convenience change handler receiving the string value directly (fires alongside native `onChange`). */
   onValueChange?: (value: string) => void;
   /** Escape hatch for props on the raw `<input>` when `className`/`style` are claimed by the wrapper. */

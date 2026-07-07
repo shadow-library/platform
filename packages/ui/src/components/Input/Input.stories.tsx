@@ -96,6 +96,11 @@ export const Clearable: Story = {
   },
 };
 
+/** `type='password'` adds an eye toggle that reveals the entered characters. */
+export const Password: Story = {
+  args: { type: 'password', defaultValue: 'hunter2', 'aria-label': 'Password', placeholder: 'Password' },
+};
+
 /** Danger border and ring — presentation only; the message is rendered by Form Field. */
 export const Invalid: Story = {
   args: { invalid: true, defaultValue: 'invalid@' },

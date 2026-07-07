@@ -86,6 +86,27 @@ describe('Input', () => {
     expect(screen.getByRole('textbox')).toHaveAttribute('readonly');
   });
 
+  it('reveals and hides a password through the eye toggle', async () => {
+    const user = userEvent.setup();
+    render(<Input aria-label='Password' type='password' defaultValue='hunter2' />);
+    const input = screen.getByLabelText('Password');
+    expect(input).toHaveAttribute('type', 'password');
+    await user.click(screen.getByRole('button', { name: 'Show password' }));
+    expect(input).toHaveAttribute('type', 'text');
+    await user.click(screen.getByRole('button', { name: 'Hide password' }));
+    expect(input).toHaveAttribute('type', 'password');
+  });
+
+  it('omits the reveal toggle when revealable is false', () => {
+    render(<Input aria-label='Password' type='password' revealable={false} />);
+    expect(screen.queryByRole('button', { name: 'Show password' })).not.toBeInTheDocument();
+  });
+
+  it('shows no reveal toggle for non-password inputs', () => {
+    render(<Input aria-label='Field' type='text' />);
+    expect(screen.queryByRole('button', { name: 'Show password' })).not.toBeInTheDocument();
+  });
+
   it('routes className to the wrapper and forwards the ref to the input', () => {
     const ref = createRef<HTMLInputElement>();
     render(<Input ref={ref} aria-label='Field' className='w-full' />);

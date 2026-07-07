@@ -174,3 +174,37 @@
   width: 14px;
   height: 14px;
 }
+
+/* ── Password reveal toggle (always visible while the field is a password) ── */
+.reveal {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  align-self: center;
+  width: 24px;
+  height: 24px;
+  margin-right: 6px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  border-radius: var(--sh-radius-sm);
+  cursor: pointer;
+  transition:
+    color var(--sh-duration-fast) var(--sh-ease-standard),
+    background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.reveal:hover {
+  color: var(--sh-text-secondary);
+  background: var(--sh-bg-hover);
+}
+.reveal:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+}
+.reveal svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
