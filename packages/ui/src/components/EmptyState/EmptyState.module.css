@@ -1,0 +1,57 @@
+/*
+ * Empty State — pure text tokens, no surface. Centered column; text caps at 320px. Page size allows
+ * an illustration and roomy padding; inline is compact for cards, table bodies, and combobox lists.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 16px;
+}
+.root[data-size='page'] {
+  padding: 48px 32px;
+}
+.root[data-size='inline'] {
+  padding: 24px;
+  gap: 12px;
+}
+
+.illustration {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 120px;
+  max-height: 120px;
+  color: var(--sh-text-tertiary);
+}
+.illustration svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.text {
+  max-width: 320px;
+}
+.title {
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.description {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  color: var(--sh-text-tertiary);
+}
+.root[data-size='inline'] .title {
+  font-size: var(--sh-text-body-sm);
+}
+
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
