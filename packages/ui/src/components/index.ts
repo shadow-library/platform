@@ -44,6 +44,7 @@ export * from './Sidebar';
 export * from './Skeleton';
 export * from './Slider';
 export * from './Spinner';
+export * from './SplitPane';
 export * from './Statistic';
 export * from './Stepper';
 export * from './Switch';
