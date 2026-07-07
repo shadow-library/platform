@@ -2,6 +2,7 @@ export * from './Button';
 export * from './ButtonGroup';
 export * from './Checkbox';
 export * from './DropdownMenu';
+export * from './FormField';
 export * from './IconButton';
 export * from './Input';
 export * from './MultiSelect';
