@@ -1,0 +1,81 @@
+/*
+ * Switch — instant-effect toggle. One size (36×20). Indigo = on, neutral = off, plus thumb
+ * position (never colour alone). Offset focus-ring. Tokens only.
+ */
+
+.root {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 44px;
+}
+.root[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.label {
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--sh-text-primary);
+  cursor: pointer;
+}
+.description {
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-text-tertiary);
+}
+
+.switch {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  width: 36px;
+  height: 20px;
+  padding: 2px;
+  border: none;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-border-strong);
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.switch:not(:disabled):hover {
+  background: var(--sh-border-interactive);
+}
+.switch:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+.switch[data-state='checked'] {
+  background: var(--sh-accent);
+}
+.switch[data-state='checked']:not(:disabled):hover {
+  background: var(--sh-accent-hover);
+}
+.switch[data-pending] {
+  opacity: 0.7;
+}
+.switch:disabled {
+  cursor: not-allowed;
+}
+
+.thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-on-accent);
+  box-shadow: var(--sh-shadow-e1);
+  transition: transform var(--sh-duration-fast) var(--sh-ease-standard);
+  transform: translateX(0);
+}
+.thumb[data-state='checked'] {
+  transform: translateX(16px);
+}

@@ -7,4 +7,5 @@ export * from './Input';
 export * from './MultiSelect';
 export * from './RadioGroup';
 export * from './Select';
+export * from './Switch';
 export * from './Textarea';
