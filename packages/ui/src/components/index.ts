@@ -9,6 +9,7 @@ export * from './Checkbox';
 export * from './Combobox';
 export * from './DatePicker';
 export * from './Dialog';
+export * from './Drawer';
 export * from './DropdownMenu';
 export * from './FormField';
 export * from './IconButton';
