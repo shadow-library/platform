@@ -1,10 +1,16 @@
 /**
  * Importing npm packages
  */
+import path from 'node:path';
 
 import { storybookTest } from '@storybook/addon-vitest/vitest-plugin';
 import { playwright } from '@vitest/browser-playwright';
 import { defineConfig } from 'vitest/config';
+
+/**
+ * Declaring the constants
+ */
+const alias = { '@': path.resolve(import.meta.dirname, 'src') };
 
 /**
  * Importing user defined packages
@@ -23,6 +29,7 @@ export default defineConfig({
     projects: [
       {
         /** Unit tests — headless happy-dom, no browser required (default `test` gate). */
+        resolve: { alias },
         test: {
           name: 'unit',
           environment: 'happy-dom',

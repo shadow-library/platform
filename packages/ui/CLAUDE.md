@@ -29,6 +29,7 @@
 | Lint / format | Biome |
 | Tests | Vitest — `unit` project (happy-dom) + `storybook` project (Playwright/Chromium) + Testing Library |
 | Docs / visual QA | Storybook 10 (`@storybook/react-vite`) |
+| Composition | `@radix-ui/react-slot` (the sanctioned `asChild` Slot) |
 | Package manager | Bun (`bun.lock`) |
 | Releases | release-it + conventional-changelog; commitlint + Husky |
 
@@ -125,7 +126,7 @@ Every component must be keyboard-operable, expose correct roles/ARIA, manage foc
 
 ### Composition patterns
 - `forwardRef` on every component that renders a DOM node; forward the ref to the primary element.
-- Support an `asChild`/Slot pattern for trigger-like components when the design calls for it, so consumers can compose (e.g. a button that renders a router link).
+- Support an `asChild`/Slot pattern for trigger-like components when the design calls for it, so consumers can compose (e.g. a button that renders a router link). Use `@radix-ui/react-slot` (`Slot`) — do not hand-roll ref/prop merging.
 - Prefer **compound components** (`Tabs`, `Tabs.List`, `Tabs.Trigger`) for multi-part widgets, sharing state via context.
 - Always spread a caller's `...props` onto the root and merge `className` via `cn(styles.root, className)` so callers can extend.
 
