@@ -16,45 +16,43 @@ bun add @shadow-library/ui
 
 ```sh
 # npm
-npm install react react-dom @mantine/core @mantine/hooks @tanstack/react-router lucide-react
+npm install react react-dom
 
 # bun
-bun add react react-dom @mantine/core @mantine/hooks @tanstack/react-router lucide-react
+bun add react react-dom
 ```
+
+`@tanstack/react-router` is an optional peer, required only if you use the `useSearchParams` hook.
 
 ## Setup
 
-Wrap your app with Mantine's `MantineProvider` using the exported `shadowTheme`:
+Shadow UI is styled with **CSS Modules and CSS-variable design tokens** — there is no provider to mount. Import the stylesheet once at your app root:
 
-```tsx
-import { MantineProvider } from '@mantine/core';
-import { shadowTheme } from '@shadow-library/ui';
+```ts
+import '@shadow-library/ui/styles.css';
+```
 
-function App() {
-  return <MantineProvider theme={shadowTheme}>{/* your app */}</MantineProvider>;
+This ships the `--sh-*` design tokens, a minimal reset, and every component's scoped styles.
+
+### Theming
+
+Switch theme by toggling `data-theme` (or the `dark` class) on `<html>`, and set density with `data-density`:
+
+```html
+<html data-theme="dark" data-density="compact">
+```
+
+Retheme by overriding any token at any scope — the tokens are the single source of truth:
+
+```css
+:root {
+  --sh-accent: #7c3aed;
 }
 ```
+
+An `@layer`-wrapped variant (`@shadow-library/ui/styles.layer.css`) is also published for consumers who want to de-prioritize the library's styles in the cascade.
 
 ## What's Included
-
-### Layout
-
-A full application shell with a collapsible sidebar, top navigation bar, and optional footer.
-
-```tsx
-import { AppLayout } from '@shadow-library/ui';
-import { LayoutDashboard } from 'lucide-react';
-
-const navItems = [{ label: 'Dashboard', path: '/', icon: LayoutDashboard }];
-
-function Shell({ children }) {
-  return (
-    <AppLayout appName='My App' navItems={navItems} user={{ name: 'Jane Doe', email: 'jane@example.com' }}>
-      {children}
-    </AppLayout>
-  );
-}
-```
 
 ### API Client
 
