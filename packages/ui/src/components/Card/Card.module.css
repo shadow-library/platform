@@ -1,0 +1,96 @@
+/*
+ * Card — bounded content surface. White fill, 1px default border, radius-lg, no resting shadow (e0).
+ * The root clips (overflow hidden) so section hairlines meet the rounded corners cleanly. Sections
+ * carry their own padding from the shared scale; the root is unpadded so hairlines run full-bleed.
+ */
+
+.root {
+  overflow: hidden;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  color: var(--sh-text-primary);
+}
+
+/* ── Interactive (whole card is a link/button) ───────────── */
+.root[data-interactive] {
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root[data-interactive]:hover {
+  border-color: var(--sh-border-strong);
+  box-shadow: var(--sh-shadow-e1);
+}
+.root[data-interactive]:active {
+  box-shadow: none;
+}
+.root[data-interactive]:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+/* ── Selected (card radio / pickers) ─────────────────────── */
+.root[data-selected] {
+  border-color: var(--sh-accent);
+}
+
+/* ── Header ──────────────────────────────────────────────── */
+.header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.title {
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.action {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* ── Body ────────────────────────────────────────────────── */
+.body {
+  min-width: 0;
+}
+
+/* ── Footer ──────────────────────────────────────────────── */
+.footer {
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+/* ── Padding scale (16 / 20 / 24) ────────────────────────── */
+.header[data-padding='sm'] {
+  padding: 12px 16px;
+}
+.header[data-padding='md'] {
+  padding: 16px 20px;
+}
+.header[data-padding='lg'] {
+  padding: 16px 24px;
+}
+.body[data-padding='sm'] {
+  padding: 16px;
+}
+.body[data-padding='md'] {
+  padding: 20px;
+}
+.body[data-padding='lg'] {
+  padding: 24px;
+}
+.footer[data-padding='sm'] {
+  padding: 10px 16px;
+}
+.footer[data-padding='md'] {
+  padding: 12px 20px;
+}
+.footer[data-padding='lg'] {
+  padding: 12px 24px;
+}
