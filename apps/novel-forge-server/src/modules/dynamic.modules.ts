@@ -21,6 +21,7 @@ import { JobsModule } from '@modules/jobs';
 import { PipelineModule } from '@modules/pipeline';
 import { PlanningModule } from '@modules/planning';
 import { ProjectModule } from '@modules/project';
+import { RefinementModule } from '@modules/refinement';
 import { SourceModule } from '@modules/source';
 import { CUSTOM_DATA_TRANSFORMERS } from '@server/common';
 
@@ -48,6 +49,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     PipelineModule,
     PlanningModule,
     ProjectModule,
+    RefinementModule,
     SourceModule,
     BibleModule,
   ],

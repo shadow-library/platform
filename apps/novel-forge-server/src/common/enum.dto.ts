@@ -45,3 +45,7 @@ export const ToolCallStatus = EnumType.create('ToolCallStatus', schema.toolCallS
 export const DraftRevisionSource = EnumType.create('DraftRevisionSource', schema.draftRevisionSource.enumValues);
 export const UserFeedbackArtifactType = EnumType.create('UserFeedbackArtifactType', schema.userFeedbackArtifactType.enumValues);
 export const UserFeedbackDisposition = EnumType.create('UserFeedbackDisposition', schema.userFeedbackDisposition.enumValues);
+export const ChatScope = EnumType.create('ChatScope', schema.chatScope.enumValues);
+export const ChatSessionStatus = EnumType.create('ChatSessionStatus', schema.chatSessionStatus.enumValues);
+export const RefinementKind = EnumType.create('RefinementKind', schema.refinementKind.enumValues);
+export const RefinementProposalStatus = EnumType.create('RefinementProposalStatus', schema.refinementProposalStatus.enumValues);

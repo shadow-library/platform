@@ -37,3 +37,11 @@ export function computeContentHash(content: Record<string, unknown>): string {
     .update(JSON.stringify(canonicalize(content)))
     .digest('hex');
 }
+
+// Deliberately NOT canonicalized: bible_documents rows already store hashes computed with this exact
+// fixed-key-order formula, and changing it would spuriously re-version every document on next write.
+export function computeBibleDocHash(frontmatter: unknown, body: unknown): string {
+  return createHash('sha256')
+    .update(JSON.stringify({ frontmatter: frontmatter ?? null, body: body ?? null }))
+    .digest('hex');
+}

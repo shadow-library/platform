@@ -5,8 +5,6 @@
 /**
  * Importing npm packages
  */
-import { createHash } from 'node:crypto';
-
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
@@ -15,6 +13,7 @@ import { and, eq, sql } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
+import { computeBibleDocHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type PrimaryDatabase, schema } from '@server/database';
 
@@ -47,9 +46,7 @@ export class BibleDocumentService {
 
   async upsert(projectId: bigint, section: Bible.Section, slug: string, body: UpsertBibleDocBody): Promise<Bible.Document> {
     const existing = await this.get(projectId, section, slug);
-    const contentHash = createHash('sha256')
-      .update(JSON.stringify({ frontmatter: body.frontmatter ?? null, body: body.body ?? null }))
-      .digest('hex');
+    const contentHash = computeBibleDocHash(body.frontmatter, body.body);
     const contentChanged = !existing || existing.contentHash !== contentHash;
 
     // Canon that already exists and did not change must not bump its revision or invalidate chapters.
