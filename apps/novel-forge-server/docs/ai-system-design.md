@@ -676,6 +676,8 @@ New dependencies (installed in A1–A5 as needed): `langchain`, `@langchain/core
 9. Review state lives in `drafts.reviewStatus`, not in paused graphs; feedback starts a new run.
 10. Prompt text lives in versioned code modules; every call logs `promptKey@promptVersion`.
 11. `runId` correlates everything; a failed generation is debuggable from the database alone.
+12. Chat is turn-based stateless chains: every turn is a fresh `workflow_runs` row; conversation state lives in `chat_sessions`/`chat_messages`, never in checkpoints. *(Added by `docs/interactive-refinement-design.md` §2.2.)*
+13. Chat, audit, premise, and arc-plan output never writes domain tables directly — only through a `refinement_proposals` apply. *(Added by `docs/interactive-refinement-design.md` §2.2.)*
 
 ---
 

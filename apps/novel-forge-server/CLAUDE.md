@@ -12,6 +12,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 
 - `docs/python-cli-to-node-api-migration-plan.md` — product behavior, schema, API, jobs/concurrency. Its §1.1 decisions override everything else.
 - `docs/ai-system-design.md` — the AI subsystem blueprint. **Supersedes migration-doc §8** and the AI parts of Phases 5/7. Appendix A is a list of hard rules that must never be violated; Appendix B specifies the AI tables.
+- `docs/interactive-refinement-design.md` — premise enhancement, bible audit, chat refinement, arc tier, ending-contract briefs, prompt caching. **Amends migration-doc §1.1.16 and adds Appendix A rules 12–13** (its §2 lists all amendments); drives tasks R1–R10.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -49,7 +50,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 4. Verify green: `bun run type-check && bun run lint && bun test`.
 5. Tick the checkbox here (and remove any progress note if done), then commit everything with a conventional message.
 
-**Checklist** (M = migration doc §10, A = ai-system-design §10):
+**Checklist** (M = migration doc §10, A = ai-system-design §10, R = interactive-refinement-design):
 
 - [x] M1 — Project structure & dependencies (migration §10 Phase 1)
 - [x] M2 — PostgreSQL schema & Drizzle migrations, template-DB test setup (Phase 2, §6)
@@ -69,5 +70,15 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] M6 — Source pipeline: acquire, extract, consolidate, assets, skeleton (migration Phase 6)
 - [x] M7 — Illustration + manuscript modules (non-AI remainder of migration Phase 7)
 - [x] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table
+- [ ] R1 — Refinement schema & error codes: `arcs`, `chat_sessions`, `chat_messages`, `refinement_proposals` tables + `volumes`/`briefs` column additions, enums, `ARC_`/`CHT_`/`RFN_`/`PRM_` codes, `content-hash` util (refinement §3). Verify: migration applies to template DB, schema tests green.
+- [ ] R2 — Proposal apply engine (no AI): op registry, baseline conflict 409 → `conflicted`, staleness propagation, supersession, proposal endpoints (refinement §6). Verify: transaction tests incl. rollback.
+- [ ] R3 — Arc module & gates: arc CRUD/approve/backfill, `targetChapterCount` volume approve with cumulative chapter mapping, generation precheck (refinement §4, §8). Verify: gate-matrix tests (legacy vs arc projects).
+- [ ] R4 — Prompt modules: `premise-enhance`, `bible-audit`, `chat-refine` + `SCOPE_PLAYBOOKS`, `chat-compact`, `arc-plan`; `outline`/`generation`/`judge` v2 for ending contracts; roles in both `AI_PROFILE`s; render goldens (refinement §5.2, §9, §11).
+- [ ] R5 — ContextAssembler: `segment` stable/volatile split, `renderedStable`/`renderedVolatile`, `forChatTurn`/`forArcPlanning`/`forPremise`, purpose budgets (refinement §10.1, §10.3–10.4). Verify: stable segment byte-identical across assemblies with unchanged canon.
+- [ ] R6 — Router prompt caching: `cacheStrategy` on PromptModule, Anthropic `cache_control` injection at 3 breakpoints, provider no-op matrix (refinement §10.2). Verify: mocked-provider block-injection tests.
+- [ ] R7 — Chat subsystem: session/message services + endpoints, turn pipeline, history compaction watermark, `WorkflowRunService.runChain` helper (refinement §5). Verify: e2e turn with mocked model.
+- [ ] R8 — Premise enhance + bible audit: endpoints, `REQUIRED_BIBLE_DOCS` manifest, `audit`/`compact` into `CACHEABLE_ROLES` (refinement §7). Verify: audit idempotence via llm_cache.
+- [ ] R9 — Arc planner + arc-scoped outline + ending-contract enforcement: `arcs/plan` chain with coverage postValidate, `arcs/:arcKey/outline`, judge → repairPatch routing on `endingCompliance`, staleness clears (refinement §8–9). Verify: coverage-invariant + judge-routing tests.
+- [ ] R10 — Refinement smoke & polish: rung-3 Ollama chat/arc/premise smoke, `/context/preview` for new purposes, doc cross-links, hardening (refinement §13). Verify: full suite + `ai:smoke`.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
