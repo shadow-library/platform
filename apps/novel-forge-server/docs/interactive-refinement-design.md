@@ -311,7 +311,7 @@ Whether to fold the audit into bible-builder as a stage was considered and rejec
 
 - The model decides arc count (unless `arcCount` pins it) and **must fill exactly** the volume's chapter range — where material is thin it expands (subplots, character beats, world-building payoffs aligned with the premise and `skeletonCharacterArcs`) rather than padding; `ideas[]` carries the suggested materials, folded into `body`.
 - `postValidate`: arcs contiguous, non-overlapping, exact coverage of `[startChapter..endChapter]` — violations re-enter the repair ladder.
-- The service upserts rows as `status: draft` via keyed upserts (idempotent re-plan); refinement continues in `arc_plan`/`arc`-scoped chat; `POST /volumes/:volumeKey/arcs/approve` closes the gate.
+- Per Appendix A rule 13 the plan is **staged as an `arc_plan` proposal** (arc.upsert ops, `ideas[]` folded into `body`); applying it writes the arcs as `status: draft` (re-planning stages a fresh proposal). Refinement continues in `arc_plan`/`arc`-scoped chat; `POST /volumes/:volumeKey/arcs/approve` closes the gate.
 
 **Other endpoints** (module `src/modules/bible/arc/`): `GET /volumes/:volumeKey/arcs`, `GET /arcs/:arcKey`, `PUT /arcs/:arcKey` (manual edit; bumps revision/contentHash), `POST /volumes/:volumeKey/arcs/backfill` (deterministic single-arc adoption for legacy projects — no AI).
 

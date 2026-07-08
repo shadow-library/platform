@@ -15,6 +15,7 @@ import {
   AiUsageResponse,
   ApproveDraftBody,
   ApprovePlanResponse,
+  ArcOutlineParams,
   BriefResponse,
   ChapterParams,
   ChapterReviewResponse,
@@ -33,6 +34,7 @@ import {
   ListGenerationJobResponse,
   ListWorkflowRunResponse,
   MarkdownResponse,
+  OutlineArcBody,
   OutlineBody,
   OutlineResponse,
   PlanBody,
@@ -92,6 +94,12 @@ export class GenerationController {
   @RespondFor(200, OutlineResponse)
   outline(@Params() params: ProjectParams, @Body() body: OutlineBody): Promise<OutlineResponse> {
     return this.generationService.outline(params.projectId, body) as unknown as Promise<OutlineResponse>;
+  }
+
+  @Post('/arcs/:arcKey/outline')
+  @RespondFor(200, OutlineResponse)
+  outlineArc(@Params() params: ArcOutlineParams, @Body() body: OutlineArcBody): Promise<OutlineResponse> {
+    return this.generationService.outlineArc(params.projectId, params.arcKey, body) as unknown as Promise<OutlineResponse>;
   }
 
   @Get('/briefs/:n')

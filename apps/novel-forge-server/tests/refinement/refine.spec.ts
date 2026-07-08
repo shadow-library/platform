@@ -130,6 +130,48 @@ describe.if(pgAvailable)('RefineService', () => {
     expect(await codeOf(refine.enhancePremise(bare?.id as bigint))).toBe('PRM_001');
   });
 
+  it('stages an arc_plan proposal with exact coverage enforced through the repair ladder', async () => {
+    await db.insert(schema.volumes).values([
+      { projectId, volumeKey: 'v1', ordinal: 1, objective: 'trial', status: 'approved', targetChapterCount: 10, startChapter: 1, endChapter: 10 },
+      { projectId, volumeKey: 'v2', ordinal: 2, objective: 'war', status: 'approved', targetChapterCount: 10, startChapter: 11, endChapter: 20 },
+    ]);
+
+    const arc = (arcKey: string, chapterStart: number, chapterEnd: number) => ({
+      arcKey,
+      title: 't',
+      objective: 'o',
+      escalation: 'e',
+      payoff: 'p',
+      hook: 'h',
+      chapterStart,
+      chapterEnd,
+      cast: [],
+      body: 'beats',
+      ideas: ['a rival subplot'],
+    });
+
+    // First response leaves a gap → coverage postValidate rejects → ladder retries → good response.
+    llmInvoke.mockImplementationOnce(async () => ({ content: JSON.stringify({ arcs: [arc('v1_a1', 1, 4), arc('v1_a2', 6, 10)] }) }));
+    llmInvoke.mockImplementationOnce(async () => ({ content: JSON.stringify({ arcs: [arc('v1_a1', 1, 5), arc('v1_a2', 6, 10)] }) }));
+
+    const result = await refine.planArcs(projectId, 'v1', { arcCount: 2 });
+    expect(result.arcs).toHaveLength(2);
+    expect(result.proposal).toMatchObject({ kind: 'arc_plan', status: 'pending', scopeType: 'arc_plan', scopeRef: 'volume:v1' });
+
+    const ops = result.proposal.changeSet as { op: string; arcKey: string; body: string }[];
+    expect(ops.every(op => op.op === 'arc.upsert')).toBe(true);
+    expect(ops[0]?.body).toContain('Ideas:\n- a rival subplot');
+  });
+
+  it('rejects arc planning while the volume plan has draft volumes', async () => {
+    const [gated] = await db
+      .insert(schema.projects)
+      .values({ name: `refine-gated-${Date.now()}`, kind: 'new_novel', brief: 'x' })
+      .returning();
+    await db.insert(schema.volumes).values({ projectId: gated?.id as bigint, volumeKey: 'v1', ordinal: 1, status: 'draft' });
+    expect(await codeOf(refine.planArcs(gated?.id as bigint, 'v1'))).toBe('ARC_003');
+  });
+
   it('stages a bible_audit proposal and serves the repeat audit from llm_cache', async () => {
     const callsBefore = llmInvoke.mock.calls.length;
 

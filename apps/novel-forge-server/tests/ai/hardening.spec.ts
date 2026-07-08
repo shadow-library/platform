@@ -184,6 +184,15 @@ describe('routeAfterJudge', () => {
   it('routes to "repairPatch" when previousFindings is empty (never trips dedup)', () => {
     expect(routeAfterJudge({ ...base, previousFindings: [] })).toBe('repairPatch');
   });
+
+  it('routes an ending-contract violation into the repair ladder even on a consistent verdict', () => {
+    expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: false })).toBe('repairPatch');
+    expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: false, autoFix: false })).toBe('awaitReview');
+    expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: false, attempt: 3 })).toBe('acceptAsIs');
+    expect(routeAfterJudge({ ...base, verdict: 'consistent', endingCompliant: true })).toBe('accept');
+    // Legacy callers without the flag keep today's behavior.
+    expect(routeAfterJudge({ ...base, verdict: 'consistent' })).toBe('accept');
+  });
 });
 
 // ─── routeAfterPatch ─────────────────────────────────────────────────────────

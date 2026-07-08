@@ -56,6 +56,7 @@ const ChapterGenAnnotation = Annotation.Root({
   summary: Annotation<string>({ reducer: (_, n) => n, default: () => '' }),
   continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
   verdict: Annotation<'consistent' | 'contradiction' | null>({ reducer: (_, n) => n, default: () => null }),
+  endingCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   previousFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
@@ -90,9 +91,13 @@ export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFin
   return false;
 }
 
-// Routing function after judge — exported for testing.
-export function routeAfterJudge(state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'>): string {
-  if (state.verdict === 'consistent') return 'accept';
+// Routing function after judge — exported for testing. An ending-contract violation rides the same
+// repair ladder as continuity findings (refinement design §9.2) but never hardens the verdict.
+export function routeAfterJudge(
+  state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & { endingCompliant?: boolean },
+): string {
+  const endingCompliant = state.endingCompliant !== false;
+  if (state.verdict === 'consistent' && endingCompliant) return 'accept';
   if (!state.autoFix) return 'awaitReview';
   if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
   return 'repairPatch';
@@ -259,7 +264,10 @@ export function createChapterGenerationGraph(services: GraphServices) {
   // ─── judge ────────────────────────────────────────────────────────────────────
   async function judge(state: ChapterGenState) {
     const projectId = BigInt(state.projectId);
-    const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    const [projectRow, brief] = await Promise.all([
+      db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, state.chapter)) }),
+    ]);
 
     let renderedPack = '';
     if (state.contextPackId) {
@@ -280,9 +288,13 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const rawTools = toolRegistry.getRaw('judge');
     const model = modelRouter.chatFor('judge', projectRow as ProjectConfig | undefined);
 
+    const renderedContract = renderEndingContract(brief?.endingContract);
+    const contractBlock = renderedContract
+      ? `\n\n## ENDING CONTRACT\n${renderedContract}\n\nAlso assess the draft ending against this contract and include endingCompliance in your JSON.`
+      : '';
     const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
     const humanMsg = new HumanMessage(
-      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
+      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${contractBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
     );
 
     const { messages } = await runToolLoop(model, tools, rawTools, [systemMsg, humanMsg], toolCtx, db as never);
@@ -294,7 +306,12 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const judgeResult = parseJudgeOutput(rawContent);
 
     const verdict = judgeResult?.verdict ?? 'consistent';
-    const findings = judgeResult?.findings ?? [];
+    const findings = [...(judgeResult?.findings ?? [])];
+
+    // Contract violations ride the repair ladder as soft findings — they never harden the verdict.
+    const compliance = renderedContract ? judgeResult?.endingCompliance : undefined;
+    const endingCompliant = compliance ? compliance.compliant : true;
+    if (compliance && !compliance.compliant) findings.push(...compliance.issues.map(issue => ({ severity: 'soft' as const, text: `ending contract: ${issue}` })));
 
     // Update draft with judge result.
     if (state.draftId) {
@@ -306,7 +323,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
 
-    return { verdict, findings };
+    return { verdict, findings, endingCompliant };
   }
 
   // ─── repairPatch ──────────────────────────────────────────────────────────────

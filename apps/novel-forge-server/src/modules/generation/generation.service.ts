@@ -25,6 +25,7 @@ import {
   type GenerateBody,
   type GenerateGrokBody,
   type ImportDraftBody,
+  type OutlineArcBody,
   type OutlineBody,
   type PlanBody,
   type ReviseDraftBody,
@@ -252,6 +253,78 @@ export class GenerationService {
             target: [schema.briefs.projectId, schema.briefs.chapter],
             set: { volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never, endingContract: c.endingContract, updatedAt: new Date() },
           })
+          .returning()
+          .then(rows => rows[0]);
+      }),
+    );
+
+    return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
+  }
+
+  /**
+   * Arc-scoped outlining (refinement design §9.2): briefs for exactly the arc's chapter range, with
+   * the arc's escalation/hook and the next arc's intent in view so ending contracts chain across the
+   * boundary. Gated on the whole volume's arcs being approved (design §4 gate 2).
+   */
+  async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
+    const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
+    if (!arc) throw new ServerError(AppErrorCode.ARC_001);
+    if (arc.chapterStart === null || arc.chapterEnd === null) throw new ServerError(AppErrorCode.ARC_002);
+
+    const [catalog, volume, siblings, project] = await Promise.all([
+      this.contextAssembler.catalog(projectId),
+      this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, arc.volumeKey)) }),
+      this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+    ]);
+    if (siblings.some(a => a.status !== 'approved')) throw new ServerError(AppErrorCode.ARC_004);
+
+    const nextArc = siblings.find(a => a.ordinal > arc.ordinal);
+    const volumePlan = [
+      `## Arc: ${arc.title ?? arc.arcKey} (${arc.arcKey})\nChs ${arc.chapterStart}–${arc.chapterEnd}\nObjective: ${arc.objective ?? ''}\nEscalation: ${arc.escalation ?? ''}\nPayoff: ${arc.payoff ?? ''}\nArc hook (the final chapter's handoff): ${arc.hook ?? ''}`,
+      volume ? `## Volume: ${volume.title ?? volume.volumeKey}\nObjective: ${volume.objective ?? ''}\nConflict: ${volume.conflict ?? ''}\nPayoff: ${volume.payoff ?? ''}` : '',
+      nextArc ? `## Next arc intent (contracts must chain into it): ${nextArc.objective ?? ''} (opens at ch ${nextArc.chapterStart ?? '?'})` : '',
+      arc.body ? `## Arc material\n${arc.body}` : '',
+    ]
+      .filter(Boolean)
+      .join('\n\n');
+
+    const ctx = { projectId, promptKey: PROMPT_REGISTRY.outline.key, promptVersion: PROMPT_REGISTRY.outline.version, role: PROMPT_REGISTRY.outline.key };
+    const outlineOutput = await this.modelRouter.structured(
+      PROMPT_REGISTRY.outline,
+      { catalog, volumePlan, startChapter: arc.chapterStart, endChapter: arc.chapterEnd, extraContext: body.context ?? '' },
+      ctx,
+      project as never,
+    );
+
+    const chapters = (
+      outlineOutput as {
+        chapter: number;
+        volumeKey: string;
+        title: string;
+        objective: string;
+        events: string[];
+        requiredContext: string[];
+        endingContract?: Record<string, unknown>;
+      }[]
+    ).filter(c => c.chapter >= (arc.chapterStart as number) && c.chapter <= (arc.chapterEnd as number));
+
+    const upserted = await Promise.all(
+      chapters.map(c => {
+        const briefBody = renderBriefBody(c);
+        const values = {
+          volumeKey: arc.volumeKey,
+          arcKey,
+          title: c.title,
+          body: briefBody,
+          contextRefs: c.requiredContext as never,
+          endingContract: c.endingContract,
+          staleReason: null,
+        };
+        return this.db
+          .insert(schema.briefs)
+          .values({ projectId, chapter: c.chapter, ...values })
+          .onConflictDoUpdate({ target: [schema.briefs.projectId, schema.briefs.chapter], set: { ...values, updatedAt: new Date() } })
           .returning()
           .then(rows => rows[0]);
       }),

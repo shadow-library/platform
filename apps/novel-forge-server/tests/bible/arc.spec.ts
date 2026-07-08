@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 import { SQL } from 'bun';
@@ -160,6 +160,44 @@ describe.if(pgAvailable)('arc module & gates', () => {
     const again = await arcService.backfill(projectId, 'v1');
     expect(again).toHaveLength(1);
     expect(again[0]?.id).toBe(arcs[0]?.id);
+  });
+
+  it('outlines an arc into briefs carrying arcKey and ending contracts, gated on sibling approval', async () => {
+    const projectId = await createProject();
+    await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 5, objective: 'survive' });
+    await volumeService.approve(projectId);
+    await arcService.upsert(projectId, 'v1_a1', { volumeKey: 'v1', ordinal: 1, chapterStart: 1, chapterEnd: 3, hook: 'war horns' });
+    await arcService.upsert(projectId, 'v1_a2', { volumeKey: 'v1', ordinal: 2, chapterStart: 4, chapterEnd: 5 });
+
+    const contract = { hookType: 'cliffhanger', emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered' };
+    const brief = (chapter: number) => ({ chapter, volumeKey: 'v1', title: `Ch ${chapter}`, objective: 'obj', events: ['e'], requiredContext: [], endingContract: contract });
+    const structured = mock(async () => [brief(1), brief(2), brief(3), brief(99)]);
+    const outliner = new GenerationService(
+      { getPostgresClient: () => db } as never,
+      {} as never,
+      { structured } as never,
+      { catalog: async () => 'CATALOG' } as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+      {} as never,
+    );
+
+    // Gate 2: all arcs of the volume must be approved first.
+    expect(await codeOf(outliner.outlineArc(projectId, 'v1_a1', {}))).toBe('ARC_004');
+    await arcService.approve(projectId, 'v1');
+
+    const result = await outliner.outlineArc(projectId, 'v1_a1', {});
+    expect(result.briefs.map(b => b.chapter)).toEqual([1, 2, 3]);
+    expect(result.briefs[0]).toMatchObject({ arcKey: 'v1_a1', volumeKey: 'v1', staleReason: null });
+    expect(result.briefs[0]?.endingContract).toMatchObject({ hookType: 'cliffhanger' });
+
+    // The outliner saw the arc structure and the next arc's intent for contract chaining.
+    const input = structured.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, unknown>;
+    expect(String(input['volumePlan'])).toContain('war horns');
+    expect(String(input['volumePlan'])).toContain('Next arc intent');
   });
 
   it('gates generation on arc approval only for volumes that have arcs', async () => {

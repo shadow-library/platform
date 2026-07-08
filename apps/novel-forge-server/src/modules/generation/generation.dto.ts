@@ -42,6 +42,22 @@ export class ChapterParams {
 }
 
 @Schema()
+export class ArcOutlineParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field()
+  arcKey: string;
+}
+
+@Schema()
+export class OutlineArcBody {
+  @Field({ optional: true })
+  context?: string;
+}
+
+@Schema()
 export class RevisionParams {
   @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')

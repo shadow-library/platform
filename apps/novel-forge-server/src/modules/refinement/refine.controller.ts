@@ -10,7 +10,7 @@ import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/
 /**
  * Importing user defined packages
  */
-import { AuditBibleResponse, EnhancePremiseBody, EnhancePremiseResponse, RefineProjectParams } from './refine.dto';
+import { AuditBibleResponse, EnhancePremiseBody, EnhancePremiseResponse, PlanArcsBody, PlanArcsParams, PlanArcsResponse, RefineProjectParams } from './refine.dto';
 import { RefineService } from './refine.service';
 
 /**
@@ -35,5 +35,11 @@ export class RefineController {
   @RespondFor(200, AuditBibleResponse)
   auditBible(@Params() params: RefineProjectParams): Promise<AuditBibleResponse> {
     return this.refineService.auditBible(params.projectId) as unknown as Promise<AuditBibleResponse>;
+  }
+
+  @Post('/volumes/:volumeKey/arcs/plan')
+  @RespondFor(200, PlanArcsResponse)
+  planArcs(@Params() params: PlanArcsParams, @Body() body: PlanArcsBody): Promise<PlanArcsResponse> {
+    return this.refineService.planArcs(params.projectId, params.volumeKey, body) as unknown as Promise<PlanArcsResponse>;
   }
 }

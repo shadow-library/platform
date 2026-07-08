@@ -24,8 +24,8 @@ import { renderManifest } from './required-bible-docs';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY } from '../ai/prompts';
-import { type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
+import { PROMPT_REGISTRY, buildArcPlanPrompt } from '../ai/prompts';
+import { type ArcPlanOutput, type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
 
 /**
  * Defining types
@@ -40,6 +40,12 @@ export interface PremiseEnhanceResult {
 export interface BibleAuditResult {
   proposal: Refinement.Proposal | null;
   findings: BibleAuditOutput['findings'];
+  runId: string;
+}
+
+export interface ArcPlanResult {
+  proposal: Refinement.Proposal;
+  arcs: ArcPlanOutput['arcs'];
   runId: string;
 }
 
@@ -137,6 +143,72 @@ export class RefineService {
         runId,
       });
       return { proposal, findings: output.findings };
+    });
+
+    return { ...result, runId };
+  }
+
+  /**
+   * Plans the arcs of one volume (design §8): the model must partition the volume's chapter range
+   * exactly (coverage re-enters the repair ladder) and expand thin material with suggested ideas.
+   * Per Appendix A rule 13 the plan is STAGED as an arc_plan proposal — applying it writes the arcs.
+   */
+  async planArcs(projectId: bigint, volumeKey: string, opts?: { arcCount?: number; guidance?: string }): Promise<ArcPlanResult> {
+    const [project, volumes] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId) }),
+    ]);
+    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+
+    const volume = volumes.find(v => v.volumeKey === volumeKey);
+    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
+    // Gate 1 (design §4): the whole plan is approved with laid-out ranges before arcs are planned.
+    const planReady = volumes.every(v => v.status !== 'draft') && volume.startChapter !== null && volume.endChapter !== null;
+    if (!planReady) throw new ServerError(AppErrorCode.ARC_003);
+
+    const startChapter = volume.startChapter as number;
+    const endChapter = volume.endChapter as number;
+    const prompt = buildArcPlanPrompt(startChapter, endChapter);
+    const pack = await this.contextAssembler.forArcPlanning(projectId, volumeKey);
+
+    const { runId, result } = await this.workflowRunService.runChain(projectId, 'arc-plan', `volume:${volumeKey}`, { arcCount: opts?.arcCount }, async runId => {
+      const ctx = { projectId, runId, node: 'arc-plan', promptKey: prompt.key, promptVersion: prompt.version, role: 'arc' };
+      const input = {
+        stableContext: pack.rendered,
+        volumeKey,
+        startChapter,
+        endChapter,
+        arcCount: opts?.arcCount ?? 'decide from the material',
+        guidance: opts?.guidance ?? '',
+      };
+      const output = (await this.modelRouter.structured(prompt, input, ctx, project as ProjectConfig)) as ArcPlanOutput;
+
+      const changeSet: ChangeOp[] = output.arcs.map((arc, index) => ({
+        op: 'arc.upsert',
+        arcKey: arc.arcKey,
+        volumeKey,
+        ordinal: index + 1,
+        title: arc.title,
+        objective: arc.objective,
+        escalation: arc.escalation,
+        payoff: arc.payoff,
+        hook: arc.hook,
+        chapterStart: arc.chapterStart,
+        chapterEnd: arc.chapterEnd,
+        cast: arc.cast,
+        body: arc.ideas.length > 0 ? `${arc.body}\n\nIdeas:\n${arc.ideas.map(idea => `- ${idea}`).join('\n')}` : arc.body,
+      }));
+
+      const proposal = await this.proposalService.create(projectId, {
+        scopeType: 'arc_plan',
+        scopeRef: `volume:${volumeKey}`,
+        kind: 'arc_plan',
+        summary: `${output.arcs.length} arc(s) planned for ${volumeKey} (chs ${startChapter}–${endChapter})`,
+        changeSet,
+        allowedOps: ['arc.upsert', 'arc.remove'],
+        runId,
+      });
+      return { proposal, arcs: output.arcs };
     });
 
     return { ...result, runId };
