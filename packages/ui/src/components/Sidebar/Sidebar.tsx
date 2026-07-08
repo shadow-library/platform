@@ -17,6 +17,11 @@ import { type SidebarGroupProps, type SidebarItemProps, type SidebarProps, type 
 /**
  * Declaring the constants
  */
+/** Read the sidebar's collapsed state — lets a custom header/footer mark render icon-only in rail. */
+export function useSidebar(): { collapsed: boolean } {
+  return useContext(SidebarContext);
+}
+
 function ChevronDown() {
   return (
     <svg className={styles.chevron} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
@@ -25,10 +30,11 @@ function ChevronDown() {
   );
 }
 
-function CollapseIcon() {
+/** Chevron for the collapse toggle — points left to collapse, right to expand back out. */
+function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
     <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6 4L2.5 8 6 12M13.5 8H3' />
+      {collapsed ? <path d='M6 4l4 4-4 4' /> : <path d='M10 4L6 8l4 4' />}
     </svg>
   );
 }
@@ -54,10 +60,11 @@ const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
                 <button
                   type='button'
                   className={styles.collapseToggle}
+                  data-direction={collapsed ? 'right' : 'left'}
                   aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
                   onClick={() => onCollapsedChange(!collapsed)}
                 >
-                  <CollapseIcon />
+                  <CollapseChevron collapsed={collapsed} />
                 </button>
               ) : null}
             </div>

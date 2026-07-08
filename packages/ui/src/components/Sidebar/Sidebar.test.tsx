@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from 'vitest';
 /**
  * Importing user defined packages
  */
-import { Sidebar } from './Sidebar';
+import { Sidebar, useSidebar } from './Sidebar';
 
 /**
  * Declaring the constants
@@ -42,6 +42,13 @@ describe('Sidebar', () => {
     expect(onCollapsedChange).toHaveBeenCalledWith(true);
   });
 
+  it('points the collapse chevron the right way for each mode', () => {
+    const { rerender } = render(<Sidebar workspace='acme-prod' onCollapsedChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Collapse navigation' })).toHaveAttribute('data-direction', 'left');
+    rerender(<Sidebar workspace='acme-prod' collapsed onCollapsedChange={() => {}} />);
+    expect(screen.getByRole('button', { name: 'Expand navigation' })).toHaveAttribute('data-direction', 'right');
+  });
+
   it('expands and collapses a group', async () => {
     const user = userEvent.setup();
     render(
@@ -57,6 +64,17 @@ describe('Sidebar', () => {
     await user.click(trigger);
     expect(trigger).toHaveAttribute('aria-expanded', 'true');
     expect(screen.getByRole('link', { name: 'General' })).toBeInTheDocument();
+  });
+
+  it('keeps the header identity mark visible in rail mode', () => {
+    function Mark() {
+      const { collapsed } = useSidebar();
+      return <span data-testid='mark'>{collapsed ? 'A' : 'acme-prod'}</span>;
+    }
+    render(<Sidebar collapsed workspace={<Mark />} onCollapsedChange={() => {}} />);
+    // The logo mark stays mounted (icon-only) rather than being dropped when minimised.
+    expect(screen.getByTestId('mark')).toHaveTextContent('A');
+    expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument();
   });
 
   it('hides labels but keeps accessible names in rail mode', () => {

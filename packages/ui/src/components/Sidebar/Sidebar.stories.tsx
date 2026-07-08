@@ -9,7 +9,7 @@ import { useState } from 'react';
  * Importing user defined packages
  */
 import { Badge } from '../Badge';
-import { Sidebar } from './Sidebar';
+import { Sidebar, useSidebar } from './Sidebar';
 
 /**
  * Declaring the constants
@@ -19,6 +19,33 @@ function Dot() {
     <svg width='16' height='16' viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
       <circle cx='8' cy='8' r='4' />
     </svg>
+  );
+}
+
+// A compact identity mark — the monogram stays visible (centered) in rail; the label only shows expanded.
+function WorkspaceMark() {
+  const { collapsed } = useSidebar();
+  return (
+    <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+      <span
+        style={{
+          display: 'inline-flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: 24,
+          height: 24,
+          flexShrink: 0,
+          borderRadius: 6,
+          background: 'var(--sh-accent)',
+          color: 'var(--sh-on-accent)',
+          fontSize: 12,
+          fontWeight: 700,
+        }}
+      >
+        A
+      </span>
+      {!collapsed ? <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>acme-prod</span> : null}
+    </span>
   );
 }
 
@@ -38,7 +65,7 @@ export const Default: Story = {
     return (
       <div style={{ display: 'flex', height: 480 }}>
         <Sidebar
-          workspace='acme-prod'
+          workspace={<WorkspaceMark />}
           collapsed={collapsed}
           onCollapsedChange={setCollapsed}
           footer={
