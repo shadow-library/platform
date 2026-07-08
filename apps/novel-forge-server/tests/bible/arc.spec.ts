@@ -88,7 +88,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
     await db.insert(schema.volumes).values([
       { projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 10 },
       { projectId, volumeKey: 'v2', ordinal: 2, targetChapterCount: 15 },
-      // Legacy row: no count, but an explicit range to derive it from.
+      // Range-only row (the bible-builder emits ranges, not counts) — approve derives the count.
       { projectId, volumeKey: 'v3', ordinal: 3, startChapter: 26, endChapter: 30 },
     ]);
 
@@ -148,20 +148,6 @@ describe.if(pgAvailable)('arc module & gates', () => {
     expect(await codeOf(arcService.upsert(projectId, 'v9_a1', { volumeKey: 'v9' }))).toBe('VOL_001');
   });
 
-  it('backfills a single approved volume-spanning arc, idempotently', async () => {
-    const projectId = await createProject();
-    await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 12, objective: 'legacy objective' });
-    await volumeService.approve(projectId);
-
-    const arcs = await arcService.backfill(projectId, 'v1');
-    expect(arcs).toHaveLength(1);
-    expect(arcs[0]).toMatchObject({ arcKey: 'v1_arc_1', chapterStart: 1, chapterEnd: 12, status: 'approved', objective: 'legacy objective' });
-
-    const again = await arcService.backfill(projectId, 'v1');
-    expect(again).toHaveLength(1);
-    expect(again[0]?.id).toBe(arcs[0]?.id);
-  });
-
   it('outlines an arc into briefs carrying arcKey and ending contracts, gated on sibling approval', async () => {
     const projectId = await createProject();
     await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 5, objective: 'survive' });
@@ -200,13 +186,13 @@ describe.if(pgAvailable)('arc module & gates', () => {
     expect(String(input['volumePlan'])).toContain('Next arc intent');
   });
 
-  it('gates generation on arc approval only for volumes that have arcs', async () => {
+  it('gates generation on arc approval only for volumes that have arcs (arc-less volumes keep the volume-scoped path)', async () => {
     const projectId = await createProject();
     await db.insert(schema.volumes).values({ projectId, volumeKey: 'v1', ordinal: 1, targetChapterCount: 5 });
     await volumeService.approve(projectId);
     await db.insert(schema.briefs).values({ projectId, chapter: 1, volumeKey: 'v1', body: 'brief one' });
 
-    // Legacy path: no arcs at all — generation proceeds.
+    // Arc-less volume — generation proceeds on the volume-scoped path.
     expect(await codeOf(generationService.generate(projectId, {}))).toBe('NO_ERROR');
 
     // Draft arc covering the chapter — generation blocked until arcs are approved.

@@ -135,40 +135,4 @@ export class ArcService {
     }
     return expectedStart === endChapter + 1;
   }
-
-  /**
-   * Deterministic legacy adoption (design §2.1): creates one approved arc spanning the whole volume
-   * so pre-arc projects pass the arc gates without an AI re-plan. Idempotent — a volume that already
-   * has arcs is returned untouched.
-   */
-  async backfill(projectId: bigint, volumeKey: string): Promise<Plan.Arc[]> {
-    const volume = await this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)) });
-    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
-    if (volume.startChapter === null || volume.endChapter === null) throw new ServerError(AppErrorCode.ARC_003);
-
-    const existing = await this.list(projectId, volumeKey);
-    if (existing.length > 0) return existing;
-
-    const arcKey = `${volumeKey}_arc_1`;
-    const content = {
-      volumeKey,
-      ordinal: 1,
-      title: volume.title,
-      objective: volume.objective,
-      escalation: volume.conflict,
-      payoff: volume.payoff,
-      hook: null,
-      chapterStart: volume.startChapter,
-      chapterEnd: volume.endChapter,
-      cast: volume.cast,
-      body: volume.body,
-    };
-    const [arc] = await this.db
-      .insert(schema.arcs)
-      .values({ projectId, arcKey, ...content, status: 'approved', contentHash: arcContentHash({ arcKey, ...content }) })
-      .returning()
-      .catch(err => this.databaseService.translateError(err));
-    if (!arc) throw new ServerError(AppErrorCode.ARC_001);
-    return [arc];
-  }
 }

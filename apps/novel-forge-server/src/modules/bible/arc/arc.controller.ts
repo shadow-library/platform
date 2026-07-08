@@ -38,13 +38,6 @@ export class ArcController {
     return this.arcService.approve(params.projectId, params.volumeKey);
   }
 
-  @Post('/volumes/:volumeKey/arcs/backfill')
-  @RespondFor(200, ListArcResponse)
-  async backfillArcs(@Params() params: VolumeArcsParams): Promise<ListArcResponse> {
-    const arcs = await this.arcService.backfill(params.projectId, params.volumeKey);
-    return { arcs } as unknown as ListArcResponse;
-  }
-
   @Get('/arcs/:arcKey')
   @RespondFor(200, ArcResponse)
   getArc(@Params() params: ArcKeyParams): Promise<ArcResponse> {

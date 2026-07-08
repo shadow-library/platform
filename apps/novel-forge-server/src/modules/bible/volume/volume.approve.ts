@@ -32,8 +32,8 @@ export interface ApprovePlanResult {
  * Approves the volume plan and lays out chapter ranges as cumulative `targetChapterCount` sums in
  * ordinal order (refinement design §2.1). Shared by the `/approve` and `/volumes/approve` endpoints
  * so the two routes cannot drift. Rows imported from a source novel (`status: source`) keep their
- * original ranges and are never touched. A volume without a count falls back to its explicit range
- * (legacy rows); a volume with neither rejects the whole approve.
+ * original ranges and are never touched. A volume without a count derives it from its explicit
+ * range (writers like the bible-builder emit ranges only); a volume with neither rejects the approve.
  */
 export async function approveVolumePlan(db: PrimaryDatabase, projectId: bigint): Promise<ApprovePlanResult> {
   const volumes = await db.query.volumes.findMany({

@@ -162,6 +162,7 @@ export class GenerationService {
             payoff: v.payoff,
             startChapter: v.startChapter,
             endChapter: v.endChapter,
+            targetChapterCount: v.endChapter - v.startChapter + 1,
             cast: v.cast as never,
             status: 'draft',
           })
@@ -175,6 +176,7 @@ export class GenerationService {
               payoff: v.payoff,
               startChapter: v.startChapter,
               endChapter: v.endChapter,
+              targetChapterCount: v.endChapter - v.startChapter + 1,
               cast: v.cast as never,
               status: 'draft',
               updatedAt: new Date(),
@@ -382,7 +384,7 @@ export class GenerationService {
     }
 
     // Guard: when a chapter's volume has arcs, the covering arc must be approved (refinement design §4 gate 3).
-    // Volumes without arcs keep the legacy path untouched.
+    // Arc-less volumes (e.g. source-imported ones) keep the volume-scoped path.
     const arcs = await this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId) });
     for (const chapter of arcs.length > 0 ? chapters : []) {
       const volume = approvedVolumes.find(v => v.startChapter !== null && v.endChapter !== null && chapter >= v.startChapter && chapter <= v.endChapter);

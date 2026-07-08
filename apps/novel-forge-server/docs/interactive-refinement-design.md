@@ -40,7 +40,7 @@ Design invariants, in order of precedence:
 - A new **`Arc`** sub-tier is added *inside* volumes. It is not the Python "arc" (which was the generation unit); it is a narrative-structure unit that partitions a volume's chapters into escalation blocks, each with its own objective, escalation, payoff, and handoff hook.
 - The deterministic chapter→volume mapping changes from a global `chapters_per_volume` constant to **cumulative per-volume `targetChapterCount`**: on `/volumes/approve`, volume ranges are computed as running sums in ordinal order (`vol1 = [1..n1]`, `vol2 = [n1+1..n1+n2]`, …). `generate.chapters_per_volume` remains only as the default seed for `targetChapterCount`.
 - *Character arcs* keep their name and JSONB home (`projects.skeletonCharacterArcs`), unchanged.
-- Projects without arcs keep today's behavior end-to-end (volume-scoped outlining, no arc gate). `POST /volumes/:volumeKey/arcs/backfill` deterministically creates one volume-spanning arc for legacy projects that want to adopt the tier.
+- Arcs are optional per volume: an arc-less volume (e.g. source-imported) keeps volume-scoped outlining and no arc gate. This is a new project with no legacy data, so no adoption/migration machinery exists — adopting arcs on a volume simply means planning them.
 
 ### 2.2 ai-system-design Appendix A — rules 12 and 13
 
@@ -183,7 +183,7 @@ New `AppErrorCode` groups (per migration-doc §7.6 conventions): `ARC_0xx` (not 
 
 1. All volumes `approved` **and** every volume has `targetChapterCount` → arc planning allowed.
 2. All arcs of a volume `approved` → arc-scoped outlining allowed for that volume.
-3. Generation (existing brief gate) additionally requires the chapter's arc `approved` **when the volume has arcs**; volumes with zero arcs keep today's path (legacy).
+3. Generation (existing brief gate) additionally requires the chapter's arc `approved` **when the volume has arcs**; arc-less volumes keep the volume-scoped path.
 
 Staleness (`staleReason`) never demotes an `approved` status; it is a signal surfaced by list endpoints and cleared by re-approving arcs or re-outlining briefs.
 
@@ -313,7 +313,7 @@ Whether to fold the audit into bible-builder as a stage was considered and rejec
 - `postValidate`: arcs contiguous, non-overlapping, exact coverage of `[startChapter..endChapter]` — violations re-enter the repair ladder.
 - Per Appendix A rule 13 the plan is **staged as an `arc_plan` proposal** (arc.upsert ops, `ideas[]` folded into `body`); applying it writes the arcs as `status: draft` (re-planning stages a fresh proposal). Refinement continues in `arc_plan`/`arc`-scoped chat; `POST /volumes/:volumeKey/arcs/approve` closes the gate.
 
-**Other endpoints** (module `src/modules/bible/arc/`): `GET /volumes/:volumeKey/arcs`, `GET /arcs/:arcKey`, `PUT /arcs/:arcKey` (manual edit; bumps revision/contentHash), `POST /volumes/:volumeKey/arcs/backfill` (deterministic single-arc adoption for legacy projects — no AI).
+**Other endpoints** (module `src/modules/bible/arc/`): `GET /volumes/:volumeKey/arcs`, `GET /arcs/:arcKey`, `PUT /arcs/:arcKey` (manual edit; bumps revision/contentHash).
 
 **Volume changes:** `PATCH /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` requires every count present and computes `startChapter`/`endChapter` as cumulative sums in ordinal order (§2.1).
 
@@ -339,7 +339,7 @@ Every brief carries `endingContract` (§3.5). Enforcement is three-point:
 - **`generation` v2**: the template renders `## ENDING CONTRACT` in the volatile tail; system text instructs that the closing scene must satisfy hookType/emotionalBeat/openQuestion/handoffState, must not resolve `mustNotResolve` items, and must never wrap up conclusively unless the contract says so.
 - **`judge` v2**: input gains the contract; output gains `endingCompliance: { compliant, issues[] }`. The judge node in `chapter-generation.graph.ts` routes non-compliance into the existing `repairPatch` path with the issues as fix instructions (soft, patch-first — same ladder as continuity findings).
 
-`POST /arcs/:arcKey/outline` writes briefs with `arcKey` + `endingContract`; the legacy `/outline` endpoint keeps working for arc-less projects (contract optional there).
+`POST /arcs/:arcKey/outline` writes briefs with `arcKey` + `endingContract`; the volume-scoped `/outline` endpoint keeps working for arc-less volumes.
 
 ---
 
@@ -422,7 +422,7 @@ Everything under `/projects/:projectId`:
 | Proposals | `GET /proposals`, `GET/PATCH /proposals/:id`, `POST /proposals/:id/apply|discard` |
 | Premise | `POST /premise/enhance` |
 | Bible audit | `POST /bible/audit` |
-| Arcs | `POST /volumes/:volumeKey/arcs/plan`, `GET /volumes/:volumeKey/arcs`, `GET/PUT /arcs/:arcKey`, `POST /volumes/:volumeKey/arcs/approve`, `POST /arcs/:arcKey/outline`, `POST /volumes/:volumeKey/arcs/backfill` |
+| Arcs | `POST /volumes/:volumeKey/arcs/plan`, `GET /volumes/:volumeKey/arcs`, `GET/PUT /arcs/:arcKey`, `POST /volumes/:volumeKey/arcs/approve`, `POST /arcs/:arcKey/outline` |
 | Volumes (changed) | `PATCH /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` computes cumulative ranges |
 | Preview (new) | `GET /context/preview?purpose=generation|outline|chat|arc_plan|premise|audit` with `chapter`, `scopeType`/`scopeRef`, or `volumeKey` per purpose |
 
@@ -432,7 +432,7 @@ Everything under `/projects/:projectId`:
 
 - **Render goldens** for all new/bumped modules, asserting the stable/volatile message ordering (the cache contract).
 - **Apply-engine transaction tests**: happy path per op type, baseline-mismatch 409 + `conflicted`, partial-failure rollback, staleness propagation, supersession, finalized-chapter guard.
-- **Gate-matrix tests**: legacy (zero-arc) vs arc projects across plan/outline/generate.
+- **Gate-matrix tests**: arc-less vs arc-bearing volumes across plan/outline/generate.
 - **Assembler tests**: stable segment byte-identical across two assemblies with unchanged canon; budget splits respected; compaction watermark math.
 - **Router tests**: mocked Anthropic asserting injected `cache_control` blocks; xai/ollama unchanged.
 - **Rung-3 Ollama smoke** (extends A10 suite): one chat turn per scope family, one arc plan with coverage check, one premise enhance — weak-model tolerance via scope playbooks shrinking the op vocabulary.
