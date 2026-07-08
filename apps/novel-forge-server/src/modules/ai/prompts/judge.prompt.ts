@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { AIMessage, HumanMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 
 /**
@@ -23,7 +23,7 @@ import { type JudgeOutput, JudgeSchema } from '../schemas/judge.schema';
  */
 
 const system =
-  'You are a continuity judge for a serialized novel. You receive a newly drafted chapter and the established canon. Your task: identify any contradiction between the draft and canon facts. A contradiction is a HARD finding if it directly contradicts an established fact (character ability, location, relationship, or event) — it blocks acceptance. A SOFT finding is a stylistic wrinkle or minor inconsistency that does not contradict canon. Return structured JSON. If the chapter is consistent with canon, return an empty findings array and verdict: consistent. Be strict: invented canon in the draft (character has a power not established) counts as a hard finding.\n\nWhen the task includes an "## ENDING CONTRACT", additionally assess the draft ending against it and return endingCompliance: compliant only when the ending lands the contracted hookType, leaves the openQuestion unanswered, ends in the handoffState, and resolves nothing listed in mustNotResolve. A hurried or conclusive ending against a contract is non-compliant — list each violated field in issues. Ending-contract violations do not change the continuity verdict; report them only in endingCompliance. Omit endingCompliance entirely when no contract is provided.';
+  'You are a continuity judge for a serialized novel. You receive a newly drafted chapter and the established canon. Your task: identify any contradiction between the draft and canon facts. A contradiction is a HARD finding if it directly contradicts an established fact (character ability, location, relationship, or event) — it blocks acceptance. A SOFT finding is a stylistic wrinkle or minor inconsistency that does not contradict canon. Return structured JSON. If the chapter is consistent with canon, return an empty findings array and verdict: consistent. Be strict: invented canon in the draft (character has a power not established) counts as a hard finding.\n\nWhen the task includes an "## ENDING CONTRACT", additionally assess the draft ending against it and return endingCompliance: compliant only when the ending lands the contracted hookType, leaves the openQuestion unanswered, ends in the handoffState, and resolves nothing listed in mustNotResolve. A hurried or conclusive ending against a contract is non-compliant — list each violated field in issues. Ending-contract violations do not change the continuity verdict; report them only in endingCompliance. Omit endingCompliance entirely when no contract is provided.\n\nRespond with ONLY one valid JSON object — nothing outside the JSON, no markdown fences — of exactly this shape:\n{"verdict": "consistent" or "contradiction", "findings": [{"severity": "hard" or "soft", "text": "..."}], "endingCompliance": {"compliant": true/false, "issues": ["..."]} (only when a contract was provided)}';
 
 const fewShots = [
   new HumanMessage('Canon: Li Wei cannot fly. Draft chapter has Li Wei jumping across rooftops but not flying. Findings?'),
@@ -66,13 +66,12 @@ const fewShots = [
 
 export const judgePrompt: PromptModule<JudgeOutput> = {
   key: 'judge',
-  version: '2.0.0',
+  version: '2.1.0',
   kind: 'analytical',
   system,
-  template: ChatPromptTemplate.fromMessages([
-    ['system', system],
-    ['human', '{contextPack}\n\n{task}'],
-  ]),
+  // The few-shots ride inside the template — they are the strongest shape signal weak local models
+  // get, and a fewShots field the router never injects teaches nothing.
+  template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ...fewShots, ['human', '{contextPack}\n\n{task}']]),
   schema: JudgeSchema,
   fewShots,
 };
