@@ -33,6 +33,30 @@ describe('Combobox', () => {
     expect(screen.queryByRole('option', { name: 'Maya Kim' })).not.toBeInTheDocument();
   });
 
+  it('opens and closes the listbox from the chevron button', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={people} aria-label='Owner' />);
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Open options' }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Close options' }));
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    // Third click must reopen even though the input still holds focus from before.
+    await user.click(screen.getByRole('button', { name: 'Open options' }));
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
+  it('stays open after clicking within the field', async () => {
+    const user = userEvent.setup();
+    render(<Combobox options={people} aria-label='Owner' />);
+    const input = screen.getByRole('combobox');
+    await user.click(input);
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+    // A second click on the field is the trigger, not an outside dismiss — it must not close the popover.
+    await user.click(input);
+    expect(screen.getByRole('listbox')).toBeInTheDocument();
+  });
+
   it('commits the highlighted option with Enter', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();

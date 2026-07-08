@@ -112,9 +112,17 @@
 .chevron {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   flex-shrink: 0;
-  padding-right: 10px;
+  height: 100%;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
   color: var(--sh-text-tertiary);
+  cursor: pointer;
+}
+.chevron:disabled {
+  cursor: not-allowed;
 }
 .chevron svg {
   display: block;

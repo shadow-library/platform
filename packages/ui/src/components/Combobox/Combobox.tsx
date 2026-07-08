@@ -89,8 +89,14 @@ export function Combobox({
   const [searching, setSearching] = useState(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
+  const fieldRef = useRef<HTMLDivElement>(null);
   const listId = useId();
   const isAsync = onSearch != null;
+
+  // Interactions on the field itself (input, chevron, clear) are the trigger, not an outside dismiss —
+  // without this guard Radix closes the popover on the same pointer-down that opened it, so it flickers
+  // shut unless typing keeps reopening it.
+  const isInsideField = (target: EventTarget | null): boolean => target instanceof Node && (fieldRef.current?.contains(target) ?? false);
 
   // Keep the field's committed label in sync with a value we can resolve from static options.
   useEffect(() => {
@@ -213,6 +219,7 @@ export function Combobox({
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Anchor asChild>
         <div
+          ref={fieldRef}
           className={cn(styles.field, className)}
           data-size={size}
           data-invalid={invalid || undefined}
@@ -255,14 +262,43 @@ export function Combobox({
               <ClearIcon />
             </button>
           ) : null}
-          <span className={styles.chevron} aria-hidden='true'>
+          <button
+            type='button'
+            className={styles.chevron}
+            tabIndex={-1}
+            aria-label={open ? 'Close options' : 'Open options'}
+            disabled={disabled}
+            onPointerDown={event => event.preventDefault()}
+            onClick={() => {
+              if (disabled || readOnly) return;
+              // Open explicitly rather than leaning on the input's focus handler: after a close the input
+              // still holds focus, so focus() fires no focus event and the popover would never reopen.
+              if (open) {
+                setOpen(false);
+              } else {
+                setOpen(true);
+                inputRef.current?.focus();
+              }
+            }}
+          >
             <ChevronIcon />
-          </span>
+          </button>
         </div>
       </Popover.Anchor>
 
       <Popover.Portal>
-        <Popover.Content className={cn(styles.content, contentClassName)} align='start' sideOffset={4} onOpenAutoFocus={event => event.preventDefault()}>
+        <Popover.Content
+          className={cn(styles.content, contentClassName)}
+          align='start'
+          sideOffset={4}
+          onOpenAutoFocus={event => event.preventDefault()}
+          onPointerDownOutside={event => {
+            if (isInsideField(event.detail.originalEvent.target)) event.preventDefault();
+          }}
+          onFocusOutside={event => {
+            if (isInsideField(event.detail.originalEvent.target)) event.preventDefault();
+          }}
+        >
           <div className={styles.srOnly} aria-live='polite'>
             {busy ? 'Searching…' : `${filtered.length} results`}
           </div>
