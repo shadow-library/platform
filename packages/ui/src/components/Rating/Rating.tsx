@@ -127,7 +127,8 @@ export function Rating({
           </button>
         ))}
       </div>
-      {meaning != null ? <span className={styles.meaning}>{meaning}</span> : null}
+      {/* Out of flow so the label appearing on hover never reflows the stars (which would land hover on the wrong star). */}
+      {labels != null ? <span className={styles.meaning}>{meaning ?? ''}</span> : null}
     </div>
   );
 }

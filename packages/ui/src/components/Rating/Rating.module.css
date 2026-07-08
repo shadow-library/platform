@@ -4,9 +4,9 @@
  */
 
 .wrap {
+  position: relative;
   display: inline-flex;
   align-items: center;
-  gap: 8px;
 }
 .root {
   display: inline-flex;
@@ -96,6 +96,10 @@
 }
 
 .meaning {
+  position: absolute;
+  left: 100%;
+  margin-left: 8px;
+  white-space: nowrap;
   font-size: var(--sh-text-body-sm);
   color: var(--sh-text-secondary);
 }

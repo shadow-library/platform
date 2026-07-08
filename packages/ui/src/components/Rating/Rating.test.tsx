@@ -49,6 +49,18 @@ describe('Rating', () => {
     expect(onValueChange).toHaveBeenLastCalledWith(3);
   });
 
+  it('reserves the label slot so hovering never reflows the stars', async () => {
+    const user = userEvent.setup();
+    const labels = ['Poor', 'Fair', 'Good', 'Great', 'Excellent'];
+    render(<Rating value={0} labels={labels} aria-label='Quality' />);
+    const wrap = screen.getByRole('radiogroup', { name: 'Quality' }).parentElement;
+    // The label element exists even at rest (no hover), so it can't pop in and shift the stars.
+    expect(wrap?.childElementCount).toBe(2);
+    await user.hover(screen.getByRole('radio', { name: '3 stars' }));
+    expect(screen.getByText('Good')).toBeInTheDocument();
+    expect(wrap?.childElementCount).toBe(2);
+  });
+
   it('renders read-only mode as a single image with an accessible name', () => {
     render(<Rating value={4.3} readOnly reviewCount={128} />);
     expect(screen.getByRole('img', { name: 'Rated 4.3 out of 5, 128 reviews' })).toBeInTheDocument();
