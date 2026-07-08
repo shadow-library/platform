@@ -5,12 +5,22 @@
 /**
  * Importing npm packages
  */
-import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { AuditBibleResponse, EnhancePremiseBody, EnhancePremiseResponse, PlanArcsBody, PlanArcsParams, PlanArcsResponse, RefineProjectParams } from './refine.dto';
+import {
+  AuditBibleResponse,
+  ContextPreviewQuery,
+  ContextPreviewResponse,
+  EnhancePremiseBody,
+  EnhancePremiseResponse,
+  PlanArcsBody,
+  PlanArcsParams,
+  PlanArcsResponse,
+  RefineProjectParams,
+} from './refine.dto';
 import { RefineService } from './refine.service';
 
 /**
@@ -41,5 +51,11 @@ export class RefineController {
   @RespondFor(200, PlanArcsResponse)
   planArcs(@Params() params: PlanArcsParams, @Body() body: PlanArcsBody): Promise<PlanArcsResponse> {
     return this.refineService.planArcs(params.projectId, params.volumeKey, body) as unknown as Promise<PlanArcsResponse>;
+  }
+
+  @Get('/context/preview')
+  @RespondFor(200, ContextPreviewResponse)
+  previewContext(@Params() params: RefineProjectParams, @Query() query: ContextPreviewQuery): Promise<ContextPreviewResponse> {
+    return this.refineService.previewContext(params.projectId, query) as unknown as Promise<ContextPreviewResponse>;
   }
 }

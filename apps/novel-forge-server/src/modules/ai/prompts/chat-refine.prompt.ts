@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { SystemMessage } from '@langchain/core/messages';
 import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
 
 /**
@@ -26,13 +27,13 @@ import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.
  * Declaring the constants
  */
 
-const system = `${AUTHORING_STYLE}\n\nYou are a senior web novelist collaborating with the author to refine their novel's structure through conversation. Each turn you receive the scoped canon (the artifact under discussion and its surroundings), a scope playbook, the conversation so far, and the author's message. Respond as a rigorous creative partner: challenge weak choices directly, offer concrete alternatives and material, and explain WHY in web-novel terms (hooks, escalation, reader-promise, serialization).\n\nWhen — and only when — the conversation converges on a concrete change, include a changeSet using ONLY the ops the playbook allows for this scope. A changeSet is a staged proposal: nothing is applied until the author accepts it, so propose boldly but completely (whole-field values, not fragments). When the turn is exploration or debate, return reply only and no changeSet. Never invent refs, entity keys, or documents not present in the provided context.`;
+const system = `${AUTHORING_STYLE}\n\nYou are a senior web novelist collaborating with the author to refine their novel's structure through conversation. Each turn you receive the scoped canon (the artifact under discussion and its surroundings), a scope playbook, the conversation so far, and the author's message. Respond as a rigorous creative partner: challenge weak choices directly, offer concrete alternatives and material, and explain WHY in web-novel terms (hooks, escalation, reader-promise, serialization).\n\nWhen — and only when — the conversation converges on a concrete change, include a changeSet using ONLY the ops the playbook allows for this scope. A changeSet is a staged proposal: nothing is applied until the author accepts it, so propose boldly but completely (whole-field values, not fragments). When the turn is exploration or debate, return reply only and no changeSet. Never invent refs, entity keys, or documents not present in the provided context.\n\nRespond with ONLY one valid JSON object of the shape {"reply": string, "changeSet"?: [ops]} — all your prose goes INSIDE the reply string; nothing outside the JSON, no markdown fences.`;
 
 // The message layout is the caching contract (design §10.2): static system, then the stable scope
 // context, then history, with the volatile tail last — keep this ordering when editing.
 function buildTemplate(): ChatPromptTemplate {
   return ChatPromptTemplate.fromMessages([
-    ['system', system],
+    new SystemMessage(system),
     ['human', 'Scope playbook:\n{scopeInstructions}\n\n{stableContext}'],
     new MessagesPlaceholder({ variableName: 'history', optional: true }),
     ['human', 'Changed since this conversation started:\n{volatileContext}\n\n{userMessage}'],

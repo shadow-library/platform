@@ -182,6 +182,8 @@ Map-reduce so whole-novel validation fits any context window: `planWindows` (spl
 
 ## 3. Context Management
 
+> Amended by `docs/interactive-refinement-design.md` §2.4: purposes gain `chat`, `arc_plan`, `premise`, `audit`, and every section carries a `segment: stable | volatile` marker (the provider prompt-cache contract).
+
 ### 3.1 The tier model
 
 Every piece of context has a **canon status**; the assembler never mixes tiers silently:
@@ -355,6 +357,8 @@ No `save_draft`, no `update_index`, no `fetch_project_context` — saving and in
 ---
 
 ## 5. Prompt Architecture
+
+> Amended by `docs/interactive-refinement-design.md` §2.5: `PromptModule` gains `role` (routing when it differs from the key) and `cacheStrategy` (stable-first message ordering with Anthropic cache breakpoints injected by the router).
 
 ### 5.1 Folder structure
 

@@ -49,6 +49,14 @@ export interface ArcPlanResult {
   runId: string;
 }
 
+export interface ContextPreviewInput {
+  purpose: string;
+  chapter?: number;
+  scopeType?: string;
+  scopeRef?: string;
+  volumeKey?: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -212,5 +220,41 @@ export class RefineService {
     });
 
     return { ...result, runId };
+  }
+
+  /** Dry-run window into exactly what a model call would see — the debugging seam of design §12. */
+  async previewContext(projectId: bigint, query: ContextPreviewInput): Promise<Record<string, unknown>> {
+    const pack = await this.assemblePreview(projectId, query);
+    return {
+      purpose: pack.purpose,
+      budgetTokens: pack.budgetTokens,
+      usedTokens: pack.usedTokens,
+      sections: pack.sections.map(s => ({ key: s.key, tier: s.tier, segment: s.segment, tokens: s.tokens, truncated: s.truncated })),
+      unresolvedRefs: pack.unresolvedRefs,
+      renderedStable: pack.renderedStable,
+      renderedVolatile: pack.renderedVolatile,
+      rendered: pack.rendered,
+    };
+  }
+
+  private assemblePreview(projectId: bigint, query: ContextPreviewInput): ReturnType<ContextAssembler['forChatTurn']> {
+    switch (query.purpose) {
+      case 'generation':
+        return this.contextAssembler.forChapter(projectId, query.chapter ?? 1, { dryRun: true });
+      case 'outline':
+        return this.contextAssembler.forOutline(projectId, query.chapter ?? 1);
+      case 'chat': {
+        if (!query.scopeType) throw new ServerError(AppErrorCode.CHT_003);
+        return this.contextAssembler.forChatTurn(projectId, { scopeType: query.scopeType as Refinement.ChatScope, scopeRef: query.scopeRef ?? null, createdAt: new Date() });
+      }
+      case 'arc_plan': {
+        if (!query.volumeKey) throw new ServerError(AppErrorCode.VOL_001);
+        return this.contextAssembler.forArcPlanning(projectId, query.volumeKey);
+      }
+      case 'premise':
+        return this.contextAssembler.forPremise(projectId);
+      default:
+        return this.contextAssembler.forAudit(projectId);
+    }
   }
 }

@@ -11,7 +11,7 @@
  */
 import { type Refinement } from '@server/database';
 
-import { type OpType } from '../../refinement/change-set';
+import { type OpType, renderOpVocabulary } from '../../refinement/change-set';
 
 /**
  * Defining types
@@ -66,3 +66,9 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
     allowedOps: ['brief.update'],
   },
 };
+
+/** Guidance + the exact op shapes — what ChatService feeds the {scopeInstructions} template var. */
+export function renderScopeInstructions(scope: Refinement.ChatScope): string {
+  const playbook = SCOPE_PLAYBOOKS[scope];
+  return `${playbook.guidance}\n\n${renderOpVocabulary(playbook.allowedOps)}`;
+}

@@ -163,3 +163,66 @@ export class PlanArcsResponse {
   @Field()
   runId: string;
 }
+
+@Schema()
+export class ContextPreviewQuery {
+  @Field({ enum: ['generation', 'outline', 'chat', 'arc_plan', 'premise', 'audit'] })
+  purpose: string;
+
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'required for generation/outline' })
+  chapter?: number;
+
+  @Field({ optional: true, description: 'chat scope type (novel, volume, arc, brief, …)' })
+  scopeType?: string;
+
+  @Field({ optional: true, description: 'chat scope ref (volume:v1, arc:a1, chapter:3, doc:section/slug)' })
+  scopeRef?: string;
+
+  @Field({ optional: true, description: 'volume for arc_plan previews' })
+  volumeKey?: string;
+}
+
+@Schema()
+export class ContextSectionPreview {
+  @Field()
+  key: string;
+
+  @Field()
+  tier: string;
+
+  @Field()
+  segment: string;
+
+  @Field(() => Integer)
+  tokens: number;
+
+  @Field()
+  truncated: boolean;
+}
+
+@Schema()
+export class ContextPreviewResponse {
+  @Field()
+  purpose: string;
+
+  @Field(() => Integer)
+  budgetTokens: number;
+
+  @Field(() => Integer)
+  usedTokens: number;
+
+  @Field(() => [ContextSectionPreview])
+  sections: ContextSectionPreview[];
+
+  @Field(() => [String])
+  unresolvedRefs: string[];
+
+  @Field()
+  renderedStable: string;
+
+  @Field()
+  renderedVolatile: string;
+
+  @Field()
+  rendered: string;
+}

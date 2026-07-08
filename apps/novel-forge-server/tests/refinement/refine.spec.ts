@@ -187,4 +187,19 @@ describe.if(pgAvailable)('RefineService', () => {
 
     expect(REQUIRED_BIBLE_DOCS.some(doc => `${doc.section}/${doc.slug}` === 'power/progression-ladder')).toBe(true);
   });
+
+  it('previews context packs for the refinement purposes without touching a model', async () => {
+    const chat = await refine.previewContext(projectId, { purpose: 'chat', scopeType: 'volume', scopeRef: 'volume:v1' });
+    expect(chat['purpose']).toBe('chat');
+    expect(String(chat['renderedStable'])).toContain('trial');
+
+    const arcPlan = await refine.previewContext(projectId, { purpose: 'arc_plan', volumeKey: 'v1' });
+    expect(arcPlan['purpose']).toBe('arc_plan');
+
+    const premise = await refine.previewContext(projectId, { purpose: 'premise' });
+    expect(premise['purpose']).toBe('premise');
+    expect(String(premise['rendered'])).toContain('cultivator');
+
+    expect(await codeOf(refine.previewContext(projectId, { purpose: 'chat' }))).toBe('CHT_003');
+  });
 });

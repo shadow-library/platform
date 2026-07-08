@@ -195,6 +195,20 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
   return errors;
 }
 
+/**
+ * Renders the exact JSON shape of each allowed op for prompt use — weak local models return
+ * malformed change-sets when the vocabulary is named but never shown (design §14 risk).
+ */
+export function renderOpVocabulary(ops: readonly OpType[]): string {
+  const lines = ops.map(op => {
+    const spec = OP_SPECS[op];
+    const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
+    const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
+    return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}`;
+  });
+  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}`;
+}
+
 /** The artifact refs a change-set touches — the keys used for baselines, conflict checks, and supersession. */
 export function changeSetRefs(ops: ChangeOp[]): string[] {
   const refs = ops.map(op => {

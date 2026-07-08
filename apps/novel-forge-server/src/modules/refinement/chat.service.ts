@@ -25,7 +25,7 @@ import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-ass
 import { countTokens } from '../ai/context/token-budget';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt } from '../ai/prompts';
+import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt, renderScopeInstructions } from '../ai/prompts';
 import { type ChatCompactOutput, type ChatRefineOutput } from '../ai/schemas';
 
 /**
@@ -190,7 +190,7 @@ export class ChatService {
 
     const prompt = buildChatRefinePrompt(session.scopeType);
     const input = {
-      scopeInstructions: SCOPE_PLAYBOOKS[session.scopeType].guidance,
+      scopeInstructions: renderScopeInstructions(session.scopeType),
       stableContext: pack.renderedStable,
       history,
       volatileContext: pack.renderedVolatile || 'nothing',

@@ -17,9 +17,13 @@ import { Config } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { ModelRouterService } from '@modules/ai/model-router.service';
+import { buildArcPlanPrompt } from '@modules/ai/prompts/arc-plan.prompt';
 import { foundationPrompt } from '@modules/ai/prompts/bible-builder/foundation.prompt';
+import { buildChatRefinePrompt } from '@modules/ai/prompts/chat-refine.prompt';
 import { fixPrompt } from '@modules/ai/prompts/fix.prompt';
 import { judgePrompt } from '@modules/ai/prompts/judge.prompt';
+import { premiseEnhancePrompt } from '@modules/ai/prompts/premise-enhance.prompt';
+import { renderScopeInstructions } from '@modules/ai/prompts/scope-playbooks';
 import { titlePrompt } from '@modules/ai/prompts/title.prompt';
 import { type TelemetryHandler } from '@modules/ai/telemetry.handler';
 import { runToolLoop } from '@modules/ai/tools/tool-loop';
@@ -205,5 +209,53 @@ describe('Rung-3 Ollama integration', () => {
     // Require ≥50% pass rate — a local model that can't sustain this is too flaky to use.
     expect(titlePass).toBeGreaterThanOrEqual(Math.ceil(runs / 2));
     expect(judgePass).toBeGreaterThanOrEqual(Math.ceil(runs / 2));
+  });
+
+  // ─── 7. refinement chains (design R10) ───────────────────────────────────────
+  // One chat turn, one premise enhancement, and one arc plan against the local
+  // model — weak-model tolerance comes from the scope playbooks shrinking the op
+  // vocabulary and the repair ladder re-prompting on structural failures.
+
+  it('chat-refine: a volume-scoped turn returns a reply (and only in-scope ops when proposing)', async () => {
+    const prompt = buildChatRefinePrompt('volume');
+    const input = {
+      scopeInstructions: renderScopeInstructions('volume'),
+      stableContext: '## VOLUME\n**The Trial** (v1, approved, chs 1–10)\nObjective: survive the sect trials\nConflict: the rival heir\nPayoff: first breakthrough',
+      history: [],
+      volatileContext: 'nothing',
+      userMessage: 'The objective feels flat. Sharpen it and propose the change.',
+    };
+    const ctx = { projectId: BigInt(1), promptKey: 'chat-refine', promptVersion: '1.0.0', role: 'chat' };
+    const result = await router.structured(prompt, input, ctx);
+    expect(result.reply.length).toBeGreaterThan(10);
+    if (result.changeSet) expect(result.changeSet.every(op => op['op'] === 'volume.upsert')).toBe(true);
+  });
+
+  it('premise-enhance: returns rationale fields and an in-vocabulary changeSet', async () => {
+    const input = {
+      stableContext: '## PREMISE\nA street thief discovers she can rewrite history by touching old coins.',
+      overview: 'A street thief discovers she can rewrite history by touching old coins.',
+    };
+    const ctx = { projectId: BigInt(1), promptKey: 'premise-enhance', promptVersion: '1.0.0', role: 'premise' };
+    const result = await router.structured(premiseEnhancePrompt, input, ctx);
+    expect(result.enhancedPremise.length).toBeGreaterThan(20);
+    expect(result.changeSet.length).toBeGreaterThan(0);
+  });
+
+  it('arc-plan: partitions a 6-chapter volume exactly', async () => {
+    const prompt = buildArcPlanPrompt(1, 6);
+    const input = {
+      stableContext: '## VOLUME\n**The Trial** (v1, approved, chs 1–6)\nObjective: survive the sect trials\n\n## PREMISE\nA revenge cultivation story.',
+      volumeKey: 'v1',
+      startChapter: 1,
+      endChapter: 6,
+      arcCount: 2,
+      guidance: '',
+    };
+    const ctx = { projectId: BigInt(1), promptKey: 'arc-plan', promptVersion: '1.0.0', role: 'arc' };
+    const result = await router.structured(prompt, input, ctx);
+    const sorted = [...result.arcs].sort((a, b) => a.chapterStart - b.chapterStart);
+    expect(sorted[0]?.chapterStart).toBe(1);
+    expect(sorted[sorted.length - 1]?.chapterEnd).toBe(6);
   });
 });

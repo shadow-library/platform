@@ -79,6 +79,6 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] R7 — Chat subsystem: session/message services + endpoints, turn pipeline, history compaction watermark, `WorkflowRunService.runChain` helper (refinement §5). Verify: e2e turn with mocked model.
 - [x] R8 — Premise enhance + bible audit: endpoints, `REQUIRED_BIBLE_DOCS` manifest, `audit`/`compact` into `CACHEABLE_ROLES` (refinement §7). Verify: audit idempotence via llm_cache.
 - [x] R9 — Arc planner + arc-scoped outline + ending-contract enforcement: `arcs/plan` chain with coverage postValidate, `arcs/:arcKey/outline`, judge → repairPatch routing on `endingCompliance`, staleness clears (refinement §8–9). Verify: coverage-invariant + judge-routing tests.
-- [ ] R10 — Refinement smoke & polish: rung-3 Ollama chat/arc/premise smoke, `/context/preview` for new purposes, doc cross-links, hardening (refinement §13). Verify: full suite + `ai:smoke`.
+- [x] R10 — Refinement smoke & polish: rung-3 Ollama chat/arc/premise smoke, `/context/preview` for new purposes, doc cross-links, hardening (refinement §13). Verify: full suite + `ai:smoke`.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

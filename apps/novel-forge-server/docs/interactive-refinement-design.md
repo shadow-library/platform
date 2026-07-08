@@ -315,7 +315,7 @@ Whether to fold the audit into bible-builder as a stage was considered and rejec
 
 **Other endpoints** (module `src/modules/bible/arc/`): `GET /volumes/:volumeKey/arcs`, `GET /arcs/:arcKey`, `PUT /arcs/:arcKey` (manual edit; bumps revision/contentHash), `POST /volumes/:volumeKey/arcs/backfill` (deterministic single-arc adoption for legacy projects — no AI).
 
-**Volume changes:** `PUT /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` requires every count present and computes `startChapter`/`endChapter` as cumulative sums in ordinal order (§2.1).
+**Volume changes:** `PATCH /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` requires every count present and computes `startChapter`/`endChapter` as cumulative sums in ordinal order (§2.1).
 
 ---
 
@@ -423,8 +423,8 @@ Everything under `/projects/:projectId`:
 | Premise | `POST /premise/enhance` |
 | Bible audit | `POST /bible/audit` |
 | Arcs | `POST /volumes/:volumeKey/arcs/plan`, `GET /volumes/:volumeKey/arcs`, `GET/PUT /arcs/:arcKey`, `POST /volumes/:volumeKey/arcs/approve`, `POST /arcs/:arcKey/outline`, `POST /volumes/:volumeKey/arcs/backfill` |
-| Volumes (changed) | `PUT /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` computes cumulative ranges |
-| Preview (extended) | `GET /context/preview` supports `purpose=chat|arc_plan|premise|audit` |
+| Volumes (changed) | `PATCH /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` computes cumulative ranges |
+| Preview (new) | `GET /context/preview?purpose=generation|outline|chat|arc_plan|premise|audit` with `chapter`, `scopeType`/`scopeRef`, or `volumeKey` per purpose |
 
 ---
 
