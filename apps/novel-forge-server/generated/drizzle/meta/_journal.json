@@ -5,57 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783154296870,
-      "tag": "0000_eminent_norman_osborn",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1783157225127,
-      "tag": "0001_sticky_freak",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783346463972,
-      "tag": "0002_futuristic_lake",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1783363961545,
-      "tag": "0003_add_chapter_locked",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1783364610144,
-      "tag": "0004_add_feedback_reviewer_idempotency",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1783364905671,
-      "tag": "0005_add_llm_cache",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1783365438309,
-      "tag": "0006_add_bible_revision_and_revalidation",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1783523951343,
-      "tag": "0007_add_refinement_and_arcs",
+      "when": 1783531109141,
+      "tag": "0000_initial_schema",
       "breakpoints": true
     }
   ]
