@@ -48,3 +48,24 @@ export const CustomPalette: Story = {
     );
   },
 };
+
+export const PaletteOnly: Story = {
+  render: () => {
+    const [value, setValue] = useState('#16a34a');
+    return <ColorPicker value={value} onValueChange={setValue} allowCustom={false} aria-label='Status color' />;
+  },
+};
+
+export const SpectrumOnly: Story = {
+  render: () => {
+    const [value, setValue] = useState('#4f46e5');
+    return <ColorPicker value={value} onValueChange={setValue} palette={[]} aria-label='Theme color' />;
+  },
+};
+
+export const WithContrastGuard: Story = {
+  render: () => {
+    const [value, setValue] = useState('#4f46e5');
+    return <ColorPicker value={value} onValueChange={setValue} onCommit={setValue} contrastAgainst='#ffffff' aria-label='Label background' />;
+  },
+};

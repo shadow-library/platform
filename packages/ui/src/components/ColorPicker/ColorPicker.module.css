@@ -7,8 +7,9 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+  min-width: 132px;
   height: var(--sh-control-height-md);
-  padding: 0 10px 0 6px;
+  padding: 0 8px 0 6px;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-strong);
   border-radius: var(--sh-radius-md);
@@ -46,7 +47,19 @@
   box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.1);
 }
 .triggerHex {
+  flex: 1;
+  text-align: left;
   text-transform: uppercase;
+}
+.triggerChevron {
+  display: inline-flex;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.triggerChevron svg {
+  display: block;
+  width: 16px;
+  height: 16px;
 }
 
 /* ── Panel ───────────────────────────────────────────────── */
@@ -95,6 +108,109 @@
 .swatchCheck svg {
   width: 12px;
   height: 12px;
+}
+
+/* ── Custom disclosure + spectrum ────────────────────────── */
+.customToggle {
+  align-self: flex-start;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-accent);
+  cursor: pointer;
+}
+.customToggle:hover {
+  color: var(--sh-accent-hover);
+}
+.customToggle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--sh-radius-sm);
+}
+
+.spectrum {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.field2d {
+  position: relative;
+  width: 100%;
+  height: 88px;
+  border-radius: var(--sh-radius-md);
+  background-image:
+    linear-gradient(to top, #000, rgb(0 0 0 / 0)),
+    linear-gradient(to right, #fff, rgb(255 255 255 / 0));
+  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.1);
+  cursor: crosshair;
+  touch-action: none;
+}
+.field2d:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+.field2dThumb {
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--sh-radius-full);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(9 9 11 / 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.hue {
+  position: relative;
+  width: 100%;
+  height: 10px;
+  border-radius: var(--sh-radius-full);
+  background: linear-gradient(to right, #f00 0%, #ff0 17%, #0f0 33%, #0ff 50%, #00f 67%, #f0f 83%, #f00 100%);
+  cursor: pointer;
+  touch-action: none;
+}
+.hue:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+.hueThumb {
+  position: absolute;
+  top: 50%;
+  width: 14px;
+  height: 14px;
+  border-radius: var(--sh-radius-full);
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1px rgb(9 9 11 / 0.35);
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+}
+
+.contrast {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--sh-text-caption);
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-secondary);
+}
+.contrast[data-verdict='pass'] {
+  color: var(--sh-success-text);
+}
+.contrast[data-verdict='fail'] {
+  color: var(--sh-danger-text);
+}
+.contrast[data-verdict='large'] {
+  color: var(--sh-warning-text);
+}
+.contrastDot {
+  width: 12px;
+  height: 12px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-full);
+  box-shadow: inset 0 0 0 1px rgb(9 9 11 / 0.15);
 }
 
 .hexRow {

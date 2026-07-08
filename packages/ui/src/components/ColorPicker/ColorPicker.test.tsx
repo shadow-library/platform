@@ -52,4 +52,33 @@ describe('ColorPicker', () => {
     await user.type(hex, 'zzz');
     expect(hex).toHaveAttribute('data-invalid');
   });
+
+  it('hides the spectrum behind Custom… and reveals a hue + saturation slider', async () => {
+    const user = userEvent.setup();
+    const onValueChange = vi.fn();
+    render(<ColorPicker defaultValue='#4f46e5' onValueChange={onValueChange} aria-label='Color' />);
+    await user.click(screen.getByRole('button', { name: /Color:/i }));
+    expect(screen.queryByRole('slider', { name: 'Hue' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Custom…' }));
+    expect(screen.getByRole('slider', { name: 'Saturation and brightness' })).toBeInTheDocument();
+    const hue = screen.getByRole('slider', { name: 'Hue' });
+    hue.focus();
+    await user.keyboard('{ArrowRight}');
+    expect(onValueChange).toHaveBeenCalled();
+  });
+
+  it('makes the spectrum the whole panel when no palette is given', async () => {
+    const user = userEvent.setup();
+    render(<ColorPicker defaultValue='#4f46e5' palette={[]} aria-label='Color' />);
+    await user.click(screen.getByRole('button', { name: /Color:/i }));
+    expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
+    expect(screen.getByRole('slider', { name: 'Saturation and brightness' })).toBeInTheDocument();
+  });
+
+  it('shows a contrast chip when contrastAgainst is set', async () => {
+    const user = userEvent.setup();
+    render(<ColorPicker value='#111214' contrastAgainst='#ffffff' aria-label='Color' />);
+    await user.click(screen.getByRole('button', { name: /Color:/i }));
+    expect(screen.getByRole('status')).toHaveTextContent(/:1/);
+  });
 });
