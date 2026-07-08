@@ -77,6 +77,13 @@
 .cell[data-in-range] {
   background: var(--sh-accent-soft);
 }
+/* Endpoint cells paint the band on the side facing the range so the selected pill joins the strip with no gap. */
+.cell[data-range-edge='start'] {
+  background: linear-gradient(to right, transparent 0 50%, var(--sh-accent-soft) 50% 100%);
+}
+.cell[data-range-edge='end'] {
+  background: linear-gradient(to left, transparent 0 50%, var(--sh-accent-soft) 50% 100%);
+}
 
 .day {
   display: inline-flex;

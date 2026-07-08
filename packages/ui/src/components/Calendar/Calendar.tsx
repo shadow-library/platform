@@ -54,10 +54,13 @@ export function Calendar({
   max,
   disabledDates,
   months = 1,
+  showOutsideDays,
   weekStartsOn = 0,
   className,
   'aria-label': ariaLabel = 'Calendar',
 }: CalendarProps) {
+  // Multi-month views hide adjacent-month days by default so a boundary date never appears in both grids.
+  const renderOutsideDays = showOutsideDays ?? months === 1;
   const isControlled = value !== undefined;
   const [internal, setInternal] = useState<CalendarValue>(defaultValue ?? (mode === 'multiple' ? [] : mode === 'range' ? { start: null, end: null } : null));
   const current = isControlled ? value : internal;
@@ -163,6 +166,19 @@ export function Calendar({
     return date > lo && date < hi;
   }
 
+  // The trailing/leading half-band the endpoint cell paints so its pill connects to the in-range strip.
+  function rangeEdge(date: Date): 'start' | 'end' | undefined {
+    if (mode !== 'range' || !rangeStart) return undefined;
+    const end = rangeEnd ?? (hoverDate && !rangeEnd ? hoverDate : null);
+    if (!end) return undefined;
+    const lo = rangeStart < end ? rangeStart : end;
+    const hi = rangeStart < end ? end : rangeStart;
+    if (isSameDay(lo, hi)) return undefined;
+    if (isSameDay(date, lo)) return 'start';
+    if (isSameDay(date, hi)) return 'end';
+    return undefined;
+  }
+
   const weekdays = weekdayLabels(weekStartsOn);
   const today = new Date();
 
@@ -212,12 +228,14 @@ export function Calendar({
                       {week.map(day => {
                         const iso = toISODate(day);
                         const outside = day.getMonth() !== monthDate.getMonth();
+                        if (outside && !renderOutsideDays) return <td key={iso} className={styles.cell} aria-hidden='true' />;
                         const dayDisabled = isDisabled(day);
                         const selected = isSelected(day);
                         const within = inRange(day);
+                        const edge = rangeEdge(day);
                         const isToday = isSameDay(day, today);
                         return (
-                          <td key={iso} className={styles.cell} data-in-range={within || undefined}>
+                          <td key={iso} className={styles.cell} data-in-range={within || undefined} data-range-edge={edge}>
                             <button
                               ref={node => {
                                 if (node) dayRefs.current.set(iso, node);

@@ -40,6 +40,16 @@ describe('Calendar', () => {
     expect(onValueChange).toHaveBeenCalledWith({ start: '2026-06-05', end: '2026-06-10' });
   });
 
+  it('bands the range endpoints so their pills touch the in-range strip', () => {
+    render(<Calendar mode='range' value={{ start: '2026-06-10', end: '2026-06-14' }} aria-label='Range' />);
+    const startCell = document.querySelector<HTMLButtonElement>('[aria-label*="June 10, 2026"], [aria-label*="10 June 2026"]')?.closest('td');
+    const endCell = document.querySelector<HTMLButtonElement>('[aria-label*="June 14, 2026"], [aria-label*="14 June 2026"]')?.closest('td');
+    const middleCell = document.querySelector<HTMLButtonElement>('[aria-label*="June 12, 2026"], [aria-label*="12 June 2026"]')?.closest('td');
+    expect(startCell).toHaveAttribute('data-range-edge', 'start');
+    expect(endCell).toHaveAttribute('data-range-edge', 'end');
+    expect(middleCell).toHaveAttribute('data-in-range');
+  });
+
   it('navigates and selects with the keyboard', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
@@ -48,6 +58,19 @@ describe('Calendar', () => {
     focused?.focus();
     await user.keyboard('{ArrowRight}{Enter}');
     expect(onValueChange).toHaveBeenCalledWith('2026-06-16');
+  });
+
+  it('hides adjacent-month days in a multi-month view so a date never repeats', () => {
+    render(<Calendar value='2026-06-15' months={2} aria-label='Range' />);
+    // July 1 is a trailing outside day of June and a real day of July — it must render exactly once.
+    const julyFirst = document.querySelectorAll('[aria-label*="July 1, 2026"], [aria-label*=", 1 July 2026"]');
+    expect(julyFirst).toHaveLength(1);
+  });
+
+  it('still shows outside days in a single-month view', () => {
+    render(<Calendar value='2026-06-15' months={1} aria-label='Date' />);
+    const julyFirst = document.querySelectorAll('[aria-label*="July 1, 2026"], [aria-label*=", 1 July 2026"]');
+    expect(julyFirst.length).toBeGreaterThanOrEqual(1);
   });
 
   it('disables dates before min', () => {

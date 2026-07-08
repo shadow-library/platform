@@ -25,6 +25,8 @@ export interface CalendarProps {
   disabledDates?: string[];
   /** Months shown side by side. @default 1 */
   months?: 1 | 2 | 3;
+  /** Show leading/trailing days from adjacent months. Off by default in multi-month views so a date never repeats. @default months === 1 */
+  showOutsideDays?: boolean;
   /** 0 = Sunday, 1 = Monday. @default 0 */
   weekStartsOn?: 0 | 1;
   className?: string;
