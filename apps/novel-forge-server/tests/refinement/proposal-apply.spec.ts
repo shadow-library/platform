@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { SQL } from 'bun';
 import { and, eq } from 'drizzle-orm';
@@ -76,6 +76,9 @@ describe.if(pgAvailable)('proposal engine', () => {
     ]);
     await db.insert(schema.chapters).values({ projectId, number: 1, content: 'ch1', status: 'done' });
   });
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   function createProposal(changeSet: ChangeOp[], overrides: Partial<Parameters<ProposalService['create']>[1]> = {}): Promise<Refinement.Proposal> {
     return proposals.create(projectId, { scopeType: 'novel', kind: 'chat', changeSet, ...overrides });

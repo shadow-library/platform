@@ -9,15 +9,17 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq } from 'drizzle-orm';
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Plan, type PrimaryDatabase, schema } from '@server/database';
 
+import { approveVolumePlan } from './volume.approve';
 import { type ApprovePlanResponse, type CreateVolumeBody, type ListVolumesQuery, type UpdateVolumeBody } from './volume.dto';
 
 /**
@@ -38,9 +40,10 @@ export class VolumeService {
   }
 
   async create(projectId: bigint, body: CreateVolumeBody): Promise<Plan.Volume> {
+    const contentHash = volumeContentHash(body as unknown as Record<string, unknown>);
     const [volume] = await this.db
       .insert(schema.volumes)
-      .values({ projectId, ...body })
+      .values({ projectId, ...body, contentHash })
       .onConflictDoUpdate({
         target: [schema.volumes.projectId, schema.volumes.volumeKey],
         set: {
@@ -51,9 +54,12 @@ export class VolumeService {
           payoff: body.payoff,
           startChapter: body.startChapter,
           endChapter: body.endChapter,
+          targetChapterCount: body.targetChapterCount,
           status: body.status,
           cast: body.cast,
           body: body.body,
+          contentHash,
+          revision: sql`${schema.volumes.revision} + 1`,
           updatedAt: new Date(),
         },
       })
@@ -90,10 +96,14 @@ export class VolumeService {
   }
 
   async update(projectId: bigint, volumeKey: string, update: UpdateVolumeBody): Promise<Plan.Volume> {
+    const existing = await this.get(projectId, volumeKey);
+    if (!existing) throw new ServerError(AppErrorCode.VOL_001);
+
+    const contentHash = volumeContentHash({ ...existing, ...update } as Record<string, unknown>);
     const [result] = await this.db
       .update(schema.volumes)
-      .set({ ...update, updatedAt: new Date() })
-      .where(and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)))
+      .set({ ...update, contentHash, revision: existing.revision + 1, updatedAt: new Date() })
+      .where(eq(schema.volumes.id, existing.id))
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
@@ -110,9 +120,7 @@ export class VolumeService {
     if (result.length === 0) throw new ServerError(AppErrorCode.VOL_001);
   }
 
-  async approve(projectId: bigint): Promise<ApprovePlanResponse> {
-    const result = await this.db.update(schema.volumes).set({ status: 'approved', updatedAt: new Date() }).where(eq(schema.volumes.projectId, projectId)).returning();
-
-    return { volumesApproved: result.length, approved: result.length > 0 };
+  approve(projectId: bigint): Promise<ApprovePlanResponse> {
+    return approveVolumePlan(this.db, projectId);
   }
 }

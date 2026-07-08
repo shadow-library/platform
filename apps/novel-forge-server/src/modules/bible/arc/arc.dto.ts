@@ -5,14 +5,13 @@
 /**
  * Importing npm packages
  */
-import { Field, Integer, OmitType, PartialType, Schema } from '@shadow-library/class-schema';
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
 import { Transform } from '@shadow-library/fastify';
-import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 
 /**
  * Importing user defined packages
  */
-import { PlanStatus, SortByTime } from '@server/common';
+import { PlanStatus } from '@server/common';
 import { type Plan } from '@server/database';
 
 /**
@@ -24,14 +23,7 @@ import { type Plan } from '@server/database';
  */
 
 @Schema()
-export class VolumeProjectParams {
-  @Field(() => String, { pattern: '^[0-9]+$' })
-  @Transform('bigint:parse')
-  projectId: bigint;
-}
-
-@Schema()
-export class VolumeKeyParams {
+export class VolumeArcsParams {
   @Field(() => String, { pattern: '^[0-9]+$' })
   @Transform('bigint:parse')
   projectId: bigint;
@@ -41,7 +33,17 @@ export class VolumeKeyParams {
 }
 
 @Schema()
-export class CreateVolumeBody {
+export class ArcKeyParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field()
+  arcKey: string;
+}
+
+@Schema()
+export class UpsertArcBody {
   @Field()
   volumeKey: string;
 
@@ -55,37 +57,37 @@ export class CreateVolumeBody {
   objective?: string;
 
   @Field({ optional: true })
-  conflict?: string;
+  escalation?: string;
 
   @Field({ optional: true })
   payoff?: string;
 
-  @Field(() => Integer, { optional: true })
-  startChapter?: number;
+  @Field({ optional: true })
+  hook?: string;
 
   @Field(() => Integer, { optional: true })
-  endChapter?: number;
+  chapterStart?: number;
 
-  @Field(() => Integer, { optional: true, minimum: 1 })
-  targetChapterCount?: number;
+  @Field(() => Integer, { optional: true })
+  chapterEnd?: number;
 
-  @Field(() => PlanStatus, { optional: true })
-  status?: Plan.Status;
-
-  @Field(() => Object, { optional: true })
-  cast?: Record<string, unknown>;
+  @Field(() => [String], { optional: true })
+  cast?: string[];
 
   @Field({ optional: true })
   body?: string;
 }
 
 @Schema()
-export class VolumeResponse {
+export class ArcResponse {
   @Field(() => String)
   id: bigint;
 
   @Field(() => String)
   projectId: bigint;
+
+  @Field()
+  arcKey: string;
 
   @Field()
   volumeKey: string;
@@ -100,34 +102,34 @@ export class VolumeResponse {
   objective?: string | null;
 
   @Field({ optional: true, nullable: true })
-  conflict?: string | null;
+  escalation?: string | null;
 
   @Field({ optional: true, nullable: true })
   payoff?: string | null;
 
-  @Field(() => Integer, { optional: true, nullable: true })
-  startChapter?: number | null;
+  @Field({ optional: true, nullable: true })
+  hook?: string | null;
 
   @Field(() => Integer, { optional: true, nullable: true })
-  endChapter?: number | null;
+  chapterStart?: number | null;
 
   @Field(() => Integer, { optional: true, nullable: true })
-  targetChapterCount?: number | null;
+  chapterEnd?: number | null;
+
+  @Field(() => [String], { optional: true, nullable: true })
+  cast?: string[] | null;
+
+  @Field(() => PlanStatus)
+  status: Plan.Status;
+
+  @Field({ optional: true, nullable: true })
+  body?: string | null;
 
   @Field(() => Integer)
   revision: number;
 
   @Field({ optional: true, nullable: true })
   staleReason?: string | null;
-
-  @Field(() => PlanStatus)
-  status: Plan.Status;
-
-  @Field(() => Object, { optional: true, nullable: true })
-  cast?: Record<string, unknown> | null;
-
-  @Field({ optional: true, nullable: true })
-  body?: string | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
@@ -136,22 +138,16 @@ export class VolumeResponse {
   updatedAt: Date;
 }
 
-@Schema({ minProperties: 1 })
-export class UpdateVolumeBody extends PartialType(OmitType(CreateVolumeBody, ['volumeKey'] as const)) {}
-
 @Schema()
-export class ListVolumesQuery extends PaginationQuery(SortByTime) {
-  @Field(() => PlanStatus, { optional: true })
-  status?: Plan.Status;
+export class ListArcResponse {
+  @Field(() => [ArcResponse])
+  arcs: ArcResponse[];
 }
 
 @Schema()
-export class ListVolumeResponse extends Paginated(VolumeResponse) {}
-
-@Schema()
-export class ApprovePlanResponse {
+export class ApproveArcsResponse {
   @Field(() => Integer)
-  volumesApproved: number;
+  arcsApproved: number;
 
   @Field()
   approved: boolean;

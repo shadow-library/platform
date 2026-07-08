@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { SQL } from 'bun';
 import { eq } from 'drizzle-orm';
@@ -65,6 +65,9 @@ describe.if(pgAvailable)('refinement & arc schemas', () => {
     if (!project) throw new Error('failed to seed project');
     projectId = project.id;
   });
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   it('should default volume and brief versioning columns', async () => {
     const [volume] = await db.insert(schema.volumes).values({ projectId, volumeKey: 'vol_1', targetChapterCount: 12 }).returning();

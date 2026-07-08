@@ -45,3 +45,25 @@ export function computeBibleDocHash(frontmatter: unknown, body: unknown): string
     .update(JSON.stringify({ frontmatter: frontmatter ?? null, body: body ?? null }))
     .digest('hex');
 }
+
+// The field lists below are the hashing contract for proposal baselines: every writer of these rows
+// (apply engine, CRUD services, planners) must hash the same fields or conflict detection misfires.
+const VOLUME_HASH_FIELDS = ['volumeKey', 'ordinal', 'title', 'objective', 'conflict', 'payoff', 'targetChapterCount', 'cast', 'body', 'startChapter', 'endChapter'] as const;
+const ARC_HASH_FIELDS = ['arcKey', 'volumeKey', 'ordinal', 'title', 'objective', 'escalation', 'payoff', 'hook', 'chapterStart', 'chapterEnd', 'cast', 'body'] as const;
+const BRIEF_HASH_FIELDS = ['chapter', 'volumeKey', 'arcKey', 'title', 'body', 'contextRefs', 'endingContract'] as const;
+
+function pickAndHash(record: Record<string, unknown>, fields: readonly string[]): string {
+  return computeContentHash(Object.fromEntries(fields.map(field => [field, record[field] ?? null])));
+}
+
+export function volumeContentHash(volume: Record<string, unknown>): string {
+  return pickAndHash(volume, VOLUME_HASH_FIELDS);
+}
+
+export function arcContentHash(arc: Record<string, unknown>): string {
+  return pickAndHash(arc, ARC_HASH_FIELDS);
+}
+
+export function briefContentHash(brief: Record<string, unknown>): string {
+  return pickAndHash(brief, BRIEF_HASH_FIELDS);
+}

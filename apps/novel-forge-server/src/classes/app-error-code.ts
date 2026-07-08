@@ -42,6 +42,11 @@ export class AppErrorCode extends ServerErrorCode {
    * Planning Errors
    */
   static readonly PLN_001 = new AppErrorCode('PLN_001', ErrorType.CLIENT_ERROR, 'Volume plan is not approved — approve all volumes before generating');
+  static readonly PLN_002 = new AppErrorCode(
+    'PLN_002',
+    ErrorType.CLIENT_ERROR,
+    'Every volume needs a target chapter count (or an explicit chapter range) before the plan can be approved',
+  );
 
   /*!
    * Draft Errors

@@ -15,7 +15,7 @@ import { and, asc, eq, gte, inArray, lte, sql } from 'drizzle-orm';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { computeBibleDocHash, computeContentHash } from '@server/common';
+import { arcContentHash, briefContentHash, computeBibleDocHash, volumeContentHash } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -234,12 +234,7 @@ export class ProposalApplyService {
       cast: op.cast ?? existing?.cast ?? null,
       body: op.body ?? existing?.body ?? null,
     };
-    const contentHash = computeContentHash({
-      volumeKey: op.volumeKey,
-      ...merged,
-      startChapter: existing?.startChapter ?? null,
-      endChapter: existing?.endChapter ?? null,
-    });
+    const contentHash = volumeContentHash({ volumeKey: op.volumeKey, ...merged, startChapter: existing?.startChapter ?? null, endChapter: existing?.endChapter ?? null });
 
     let revision: number;
     if (existing) {
@@ -285,19 +280,7 @@ export class ProposalApplyService {
       nextStart = endChapter + 1;
       if (volume.startChapter === startChapter && volume.endChapter === endChapter) continue;
 
-      const contentHash = computeContentHash({
-        volumeKey: volume.volumeKey,
-        ordinal: volume.ordinal,
-        title: volume.title,
-        objective: volume.objective,
-        conflict: volume.conflict,
-        payoff: volume.payoff,
-        targetChapterCount: volume.targetChapterCount,
-        cast: volume.cast,
-        body: volume.body,
-        startChapter,
-        endChapter,
-      });
+      const contentHash = volumeContentHash({ ...volume, startChapter, endChapter } as Record<string, unknown>);
       await ctx.tx
         .update(schema.volumes)
         .set({ startChapter, endChapter, revision: volume.revision + 1, contentHash, updatedAt: new Date() })
@@ -344,7 +327,7 @@ export class ProposalApplyService {
       (merged.chapterStart >= volume.startChapter && merged.chapterEnd <= volume.endChapter);
     if (!withinVolume) throw new ServerError(AppErrorCode.ARC_002);
 
-    const contentHash = computeContentHash({ arcKey: op.arcKey, ...merged });
+    const contentHash = arcContentHash({ arcKey: op.arcKey, ...merged });
     let revision: number;
     if (existing) {
       revision = existing.revision + 1;
@@ -400,7 +383,7 @@ export class ProposalApplyService {
       contextRefs: op.contextRefs ?? existing.contextRefs,
       endingContract: op.endingContract ?? existing.endingContract,
     };
-    const contentHash = computeContentHash({ chapter: op.chapter, volumeKey: existing.volumeKey, arcKey: existing.arcKey, ...merged });
+    const contentHash = briefContentHash({ chapter: op.chapter, volumeKey: existing.volumeKey, arcKey: existing.arcKey, ...merged });
     const revision = existing.revision + 1;
 
     await ctx.tx

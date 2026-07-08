@@ -45,6 +45,7 @@ import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
+import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 
@@ -186,13 +187,8 @@ export class GenerationService {
     return { volumes: upserted.filter(Boolean) as never };
   }
 
-  async approvePlan(projectId: bigint): Promise<{ volumesApproved: number; approved: boolean }> {
-    const result = await this.db
-      .update(schema.volumes)
-      .set({ status: 'approved', updatedAt: new Date() })
-      .where(and(eq(schema.volumes.projectId, projectId), ne(schema.volumes.status, 'source')))
-      .returning();
-    return { volumesApproved: result.length, approved: result.length > 0 };
+  approvePlan(projectId: bigint): Promise<{ volumesApproved: number; approved: boolean }> {
+    return approveVolumePlan(this.db, projectId);
   }
 
   // ─── Outlines / Briefs ───────────────────────────────────────────────────────
@@ -301,6 +297,18 @@ export class GenerationService {
       chapters = [firstVolume?.startChapter ?? 1];
     } else {
       chapters = chaptersToGenerate.map(b => b.chapter);
+    }
+
+    // Guard: when a chapter's volume has arcs, the covering arc must be approved (refinement design §4 gate 3).
+    // Volumes without arcs keep the legacy path untouched.
+    const arcs = await this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId) });
+    for (const chapter of arcs.length > 0 ? chapters : []) {
+      const volume = approvedVolumes.find(v => v.startChapter !== null && v.endChapter !== null && chapter >= v.startChapter && chapter <= v.endChapter);
+      if (!volume) continue;
+      const volumeArcs = arcs.filter(a => a.volumeKey === volume.volumeKey);
+      if (volumeArcs.length === 0) continue;
+      const covering = volumeArcs.find(a => a.chapterStart !== null && a.chapterEnd !== null && chapter >= a.chapterStart && chapter <= a.chapterEnd);
+      if (!covering || covering.status !== 'approved') throw new ServerError(AppErrorCode.ARC_004);
     }
 
     const target = [...chapters].sort((a, b) => a - b).join(',');
