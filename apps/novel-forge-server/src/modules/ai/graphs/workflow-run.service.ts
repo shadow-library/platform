@@ -158,6 +158,24 @@ export class WorkflowRunService {
       .where(eq(schema.workflowRuns.id, runId));
   }
 
+  /**
+   * Runs a plain (non-graph, non-checkpointed) chain under workflow_runs bookkeeping — the rule-11
+   * seam for the refinement chains (chat-turn, premise-enhance, bible-audit, arc-plan): every turn
+   * gets a fresh runId that correlates its model_calls and context pack, and failures land in the
+   * same audit trail as graph runs.
+   */
+  async runChain<T>(projectId: bigint, graph: string, target: string, input: unknown, fn: (runId: string) => Promise<T>): Promise<{ runId: string; result: T }> {
+    const runId = await this.createRun(projectId, graph, target, input);
+    try {
+      const result = await fn(runId);
+      await this.completeRun(runId, 'completed', 'completed', [graph]);
+      return { runId, result };
+    } catch (err) {
+      await this.failRun(runId, err, graph);
+      throw err;
+    }
+  }
+
   async runChapterGeneration(input: ChapterGenerationInput): Promise<WorkflowRunResult> {
     const runId = await this.createRun(input.projectId, 'chapter-generation', `chapter-${input.chapter}`, input, input.jobId);
     const nodeTrace: string[] = [];
