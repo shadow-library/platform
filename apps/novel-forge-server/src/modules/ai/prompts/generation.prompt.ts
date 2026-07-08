@@ -27,16 +27,18 @@ const system = `${AUTHORING_STYLE}\n\nYou are a skilled author writing a chapter
 Whether the chapter should resolve or continue is decided by the brief, not by you:
 - If the brief marks "[CONTINUES INTO NEXT CHAPTER]", do not resolve the chapter's central conflict, question, or action. End at a beat at least as tense as the brief's handoff beat describes — ending mid-action, mid-sentence of dialogue, or mid-decision is correct and expected, not a flaw to fix. Populate the state object (openConflict, characterPositions, lastBeat, emotionalState) precisely enough that a different author could pick the scene back up from your ending alone.
 - If the brief marks "[STARTS FROM PREVIOUS CHAPTER]", open in the exact physical and emotional moment described in the "## CONTINUATION STATE" / "## PREVIOUS CHAPTER ENDING" sections — no time skip, no re-establishing shot, no recap of what just happened.
-- Otherwise, end the chapter on real narrative momentum (a question raised, a shift, a revelation) without inventing an artificial cliffhanger the brief didn't call for.`;
+- Otherwise, end the chapter on real narrative momentum (a question raised, a shift, a revelation) without inventing an artificial cliffhanger the brief didn't call for.
+
+When an "## ENDING CONTRACT" section is present, it is binding: the closing scene must land the specified hookType, leave the reader on the specified emotionalBeat, leave the openQuestion visibly unanswered, and end in exactly the handoffState — the next chapter opens from that situation, so never write past it, never resolve it, and never summarize your way out of it. Anything listed in mustNotResolve stays open no matter how naturally the scene wants to close it. Never end a chapter conclusively unless the contract itself says so.`;
 
 export const generationPrompt: PromptModule<GenerationOutput> = {
   key: 'generation',
-  version: '1.0.0',
+  version: '2.0.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],
-    ['human', '{contextPack}\n\nChapter brief:\n{chapterBrief}\n\nAdditional guidance: {guidance}'],
+    ['human', '{contextPack}\n\nChapter brief:\n{chapterBrief}\n\n## ENDING CONTRACT\n{endingContract}\n\nAdditional guidance: {guidance}'],
   ]),
   schema: GenerationSchema,
 };

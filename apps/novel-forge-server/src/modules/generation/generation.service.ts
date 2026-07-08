@@ -231,6 +231,7 @@ export class GenerationService {
       continuesIntoNextChapter?: boolean;
       startsFromPreviousChapter?: boolean;
       handoffBeat?: string;
+      endingContract?: Record<string, unknown>;
     }[];
 
     const upserted = await Promise.all(
@@ -238,10 +239,18 @@ export class GenerationService {
         const briefBody = renderBriefBody(c);
         return this.db
           .insert(schema.briefs)
-          .values({ projectId, chapter: c.chapter, volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never })
+          .values({
+            projectId,
+            chapter: c.chapter,
+            volumeKey: c.volumeKey,
+            title: c.title,
+            body: briefBody,
+            contextRefs: c.requiredContext as never,
+            endingContract: c.endingContract,
+          })
           .onConflictDoUpdate({
             target: [schema.briefs.projectId, schema.briefs.chapter],
-            set: { volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never, updatedAt: new Date() },
+            set: { volumeKey: c.volumeKey, title: c.title, body: briefBody, contextRefs: c.requiredContext as never, endingContract: c.endingContract, updatedAt: new Date() },
           })
           .returning()
           .then(rows => rows[0]);

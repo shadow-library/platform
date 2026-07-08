@@ -26,3 +26,5 @@ export const FixAction = EnumType.create('FixAction', ['patch', 'rewrite']);
 export const ReviewDisposition = EnumType.create('ReviewDisposition', ['approve', 'revision_requested']);
 export const ReviewSeverity = EnumType.create('ReviewSeverity', ['blocking', 'suggestion']);
 export const ValidationSeverity = EnumType.create('ValidationSeverity', ['error', 'warning']);
+export const HookType = EnumType.create('HookType', ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn']);
+export const AuditAction = EnumType.create('AuditAction', ['add', 'revise', 'remove', 'keep']);

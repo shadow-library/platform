@@ -10,6 +10,7 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { EndingContractSchema } from './ending-contract.schema';
 
 /**
  * Defining types
@@ -60,6 +61,11 @@ export class ChapterBriefSchema {
     description: 'the specific moment/action/line where continuation picks up — required when continuesIntoNextChapter or startsFromPreviousChapter is true',
   })
   handoffBeat?: string;
+
+  @Field(() => EndingContractSchema, {
+    description: 'how the chapter must end — never conclusively unless it is the final chapter of its arc, and even then it hands off via the arc hook',
+  })
+  endingContract: EndingContractSchema;
 }
 
 export const OutlineSchema = [ChapterBriefSchema] as [typeof ChapterBriefSchema];

@@ -28,6 +28,11 @@ export type AiRole =
   | 'plan'
   | 'skeleton'
   | 'bible'
+  | 'premise'
+  | 'audit'
+  | 'chat'
+  | 'compact'
+  | 'arc'
   | 'embedding'
   | 'image';
 
@@ -60,6 +65,11 @@ export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = {
   plan: { provider: 'xai', model: 'grok-3' },
   skeleton: { provider: 'xai', model: 'grok-3' },
   bible: { provider: 'xai', model: 'grok-3' },
+  premise: { provider: 'xai', model: 'grok-3' },
+  audit: { provider: 'xai', model: 'grok-3' },
+  chat: { provider: 'xai', model: 'grok-3' },
+  compact: { provider: 'xai', model: 'grok-3-mini' },
+  arc: { provider: 'xai', model: 'grok-3' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
   image: { provider: 'xai', model: 'grok-2-image' },
 };
@@ -79,6 +89,11 @@ export const LOCAL_TEST_DEFAULTS: Record<AiRole, ResolvedModel> = {
   plan: { provider: 'ollama', model: 'qwen3:8b' },
   skeleton: { provider: 'ollama', model: 'qwen3:14b' },
   bible: { provider: 'ollama', model: 'qwen3:14b' },
+  premise: { provider: 'ollama', model: 'qwen3:14b' },
+  audit: { provider: 'ollama', model: 'qwen3:8b' },
+  chat: { provider: 'ollama', model: 'qwen3:14b' },
+  compact: { provider: 'ollama', model: 'qwen3:8b' },
+  arc: { provider: 'ollama', model: 'qwen3:14b' },
   embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
   image: { provider: 'ollama', model: 'qwen3:8b' },
 };

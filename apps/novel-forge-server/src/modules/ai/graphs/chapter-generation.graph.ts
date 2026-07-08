@@ -19,7 +19,7 @@ import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
 import { type IndexingService } from '../retrieval/indexing.service';
-import { type FixOutput, type JudgeOutput, JudgeSchema } from '../schemas';
+import { type FixOutput, type JudgeOutput, JudgeSchema, renderEndingContract } from '../schemas';
 import { parseSchema } from '../schemas/validate';
 import { type TelemetryContext, type TelemetryHandler } from '../telemetry.handler';
 import { runToolLoop } from '../tools/tool-loop';
@@ -168,11 +168,18 @@ export function createChapterGenerationGraph(services: GraphServices) {
       renderedPack = pack?.rendered ?? '';
     }
 
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'draftChapter', promptKey: 'generation', promptVersion: '1.0.0', role: 'generation' };
+    const ctx: TelemetryContext = {
+      projectId,
+      runId: state.runId,
+      node: 'draftChapter',
+      promptKey: 'generation',
+      promptVersion: PROMPT_REGISTRY.generation.version,
+      role: 'generation',
+    };
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', guidance: state.guidance },
+      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance: state.guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };
@@ -364,11 +371,18 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const findingsStr = state.findings.map(f => `[${f.severity}] ${f.text}`).join('\n');
     const guidance = state.guidance ? `${state.guidance}\n\nPrevious judge findings to avoid:\n${findingsStr}` : `Avoid these issues from the previous draft:\n${findingsStr}`;
 
-    const ctx: TelemetryContext = { projectId, runId: state.runId, node: 'repairRewrite', promptKey: 'generation', promptVersion: '1.0.0', role: 'generation' };
+    const ctx: TelemetryContext = {
+      projectId,
+      runId: state.runId,
+      node: 'repairRewrite',
+      promptKey: 'generation',
+      promptVersion: PROMPT_REGISTRY.generation.version,
+      role: 'generation',
+    };
 
     const result = (await modelRouter.structured(
       PROMPT_REGISTRY.generation,
-      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', guidance },
+      { contextPack: renderedPack, chapterBrief: brief?.body ?? '', endingContract: renderEndingContract(brief?.endingContract), guidance },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as { title: string; body: string; summary: string; state?: Record<string, string> };

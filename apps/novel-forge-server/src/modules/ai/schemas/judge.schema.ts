@@ -32,6 +32,15 @@ export class JudgeFinding {
   text: string;
 }
 
+@Schema()
+export class EndingComplianceSchema {
+  @Field({ description: 'true when the draft ending satisfies every field of the brief ending contract' })
+  compliant: boolean;
+
+  @Field(() => [String], { description: 'each contract violation, citing the field it breaks (hookType, emotionalBeat, openQuestion, handoffState, mustNotResolve)' })
+  issues: string[];
+}
+
 // A contradiction verdict must include at least one hard finding — expressed declaratively as a
 // JSON Schema if/then so AJV enforces the same cross-field rule zod's `.refine()` used to.
 @Schema({
@@ -47,6 +56,9 @@ export class JudgeSchema {
 
   @Field(() => [JudgeFinding])
   findings: JudgeFinding[];
+
+  @Field(() => EndingComplianceSchema, { optional: true, description: 'assessment of the draft ending against the brief ending contract; omit when the task provided no contract' })
+  endingCompliance?: EndingComplianceSchema;
 }
 
 export type JudgeOutput = JudgeSchema;

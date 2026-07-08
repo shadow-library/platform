@@ -36,7 +36,12 @@ export type PromptKey =
   | 'bible:factions-locations'
   | 'bible:characters'
   | 'bible:plot'
-  | 'bible:volumes';
+  | 'bible:volumes'
+  | 'premise-enhance'
+  | 'bible-audit'
+  | 'chat-refine'
+  | 'chat-compact'
+  | 'arc-plan';
 
 export interface PromptModule<TOut> {
   key: PromptKey;

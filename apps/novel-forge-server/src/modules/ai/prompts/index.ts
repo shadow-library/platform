@@ -9,12 +9,16 @@
 /**
  * Importing user defined packages
  */
+import { arcPlanPrompt } from './arc-plan.prompt';
+import { bibleAuditPrompt } from './bible-audit.prompt';
 import { charactersPrompt } from './bible-builder/characters.prompt';
 import { factionsLocationsPrompt } from './bible-builder/factions-locations.prompt';
 import { foundationPrompt } from './bible-builder/foundation.prompt';
 import { plotPrompt } from './bible-builder/plot.prompt';
 import { volumesPrompt } from './bible-builder/volumes.prompt';
 import { worldPowerPrompt } from './bible-builder/world-power.prompt';
+import { chatCompactPrompt } from './chat-compact.prompt';
+import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
 import { extractionPrompt } from './extraction.prompt';
 import { fixPrompt } from './fix.prompt';
@@ -23,6 +27,7 @@ import { judgePrompt } from './judge.prompt';
 import { newNovelPrompt } from './new-novel.prompt';
 import { outlinePrompt } from './outline.prompt';
 import { planPrompt } from './plan.prompt';
+import { premiseEnhancePrompt } from './premise-enhance.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
 import { skeletonPrompt } from './skeleton.prompt';
@@ -58,7 +63,15 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'bible:characters': charactersPrompt as PromptModule<unknown>,
   'bible:plot': plotPrompt as PromptModule<unknown>,
   'bible:volumes': volumesPrompt as PromptModule<unknown>,
+  'premise-enhance': premiseEnhancePrompt as PromptModule<unknown>,
+  'bible-audit': bibleAuditPrompt as PromptModule<unknown>,
+  'chat-refine': chatRefinePrompt as PromptModule<unknown>,
+  'chat-compact': chatCompactPrompt as PromptModule<unknown>,
+  'arc-plan': arcPlanPrompt as PromptModule<unknown>,
 };
 
 export * from './types';
 export * from './authoring-preamble';
+export * from './scope-playbooks';
+export { buildChatRefinePrompt } from './chat-refine.prompt';
+export { buildArcPlanPrompt } from './arc-plan.prompt';

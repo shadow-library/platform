@@ -6,9 +6,9 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { PROMPT_REGISTRY } from '@modules/ai/prompts';
+import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
-import { ExtractionSchema, FixSchema, JudgeSchema, PlanSchema, validatePlanContiguity } from '@modules/ai/schemas';
+import { ChatRefineSchema, ExtractionSchema, FixSchema, JudgeSchema, PlanSchema, validateArcCoverage, validatePlanContiguity } from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
 
 /**
@@ -79,6 +79,89 @@ describe('Prompt modules', () => {
       ];
       const parsed = parseSchema(PlanSchema, vols);
       expect(parsed.success && validatePlanContiguity(parsed.data as never).length === 0).toBe(true);
+    });
+  });
+
+  describe('refinement prompt modules', () => {
+    it('registers the five new prompt keys', () => {
+      for (const key of ['premise-enhance', 'bible-audit', 'chat-refine', 'chat-compact', 'arc-plan'] as const) {
+        expect(PROMPT_REGISTRY[key]).toBeDefined();
+        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
+      }
+    });
+
+    it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
+      const messages = await PROMPT_REGISTRY['chat-refine'].template.formatMessages({
+        scopeInstructions: SCOPE_PLAYBOOKS.volume.guidance,
+        stableContext: 'STABLE-CANON-BLOCK',
+        history: [],
+        volatileContext: 'VOLATILE-DELTA',
+        userMessage: 'raise the stakes',
+      });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toContain('STABLE-CANON-BLOCK');
+      expect(String(messages[1]?.content)).toContain(SCOPE_PLAYBOOKS.volume.guidance.slice(0, 40));
+      expect(String(messages[2]?.content)).toContain('VOLATILE-DELTA');
+      expect(String(messages[2]?.content)).toContain('raise the stakes');
+    });
+
+    it('chat-refine scope factory rejects ops outside the scope allowlist', () => {
+      const scoped = buildChatRefinePrompt('brief');
+      const offScope = { reply: 'done', changeSet: [{ op: 'volume.upsert', volumeKey: 'v1' }] };
+      expect(scoped.postValidate?.(offScope as never)[0]).toMatch(/not allowed for this scope/);
+      const onScope = { reply: 'done', changeSet: [{ op: 'brief.update', chapter: 3, title: 'sharper' }] };
+      expect(scoped.postValidate?.(onScope as never)).toEqual([]);
+      expect(scoped.postValidate?.({ reply: 'just talking' } as never)).toEqual([]);
+    });
+
+    it('validates chat-refine output shape', () => {
+      expect(parseSchema(ChatRefineSchema, { reply: 'thoughts on pacing' }).success).toBe(true);
+      expect(parseSchema(ChatRefineSchema, { changeSet: [] }).success).toBe(false);
+    });
+
+    it('arc coverage validator enforces contiguity and exact range', () => {
+      const arc = (arcKey: string, chapterStart: number, chapterEnd: number) => ({
+        arcKey,
+        title: 't',
+        objective: 'o',
+        escalation: 'e',
+        payoff: 'p',
+        hook: 'h',
+        chapterStart,
+        chapterEnd,
+        cast: [],
+        body: 'b',
+        ideas: [],
+      });
+      expect(validateArcCoverage([arc('a1', 1, 5), arc('a2', 6, 12)], 1, 12)).toEqual([]);
+      expect(validateArcCoverage([arc('a1', 1, 5), arc('a2', 7, 12)], 1, 12)[0]).toMatch(/must start at chapter 6/);
+      expect(validateArcCoverage([arc('a1', 2, 12)], 1, 12)[0]).toMatch(/must start at chapter 1/);
+      expect(validateArcCoverage([arc('a1', 1, 11)], 1, 12)[0]).toMatch(/must end at chapter 12/);
+    });
+  });
+
+  describe('ending contract (v2 bumps)', () => {
+    it('outline v2 requires an ending contract per brief', () => {
+      const brief = { chapter: 1, volumeKey: 'v1', title: 'T', objective: 'obj', events: ['e1'], requiredContext: [] };
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [brief]).success).toBe(false);
+      const withContract = { ...brief, endingContract: { hookType: 'cliffhanger', emotionalBeat: 'dread', openQuestion: 'who?', handoffState: 'cornered on the roof' } };
+      expect(parseSchema(PROMPT_REGISTRY.outline.schema, [withContract]).success).toBe(true);
+    });
+
+    it('judge v2 accepts endingCompliance and keeps it optional', () => {
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], endingCompliance: { compliant: false, issues: ['hookType missed'] } }).success).toBe(true);
+    });
+
+    it('generation v2 renders the ending contract in the volatile tail', async () => {
+      const messages = await PROMPT_REGISTRY.generation.template.formatMessages({
+        contextPack: 'PACK',
+        chapterBrief: 'BRIEF',
+        endingContract: 'Hook type: cliffhanger',
+        guidance: '',
+      });
+      expect(String(messages[messages.length - 1]?.content)).toContain('## ENDING CONTRACT\nHook type: cliffhanger');
     });
   });
 
