@@ -36,4 +36,20 @@ describe('AppErrorCode', () => {
     expect(AppErrorCode.CNT_001).toBeDefined();
     expect(AppErrorCode.ENT_001).toBeDefined();
   });
+
+  it('should define refinement error codes', () => {
+    expect(AppErrorCode.ARC_001).toBeDefined();
+    expect(AppErrorCode.ARC_002).toBeDefined();
+    expect(AppErrorCode.ARC_003).toBeDefined();
+    expect(AppErrorCode.ARC_004).toBeDefined();
+    expect(AppErrorCode.CHT_001).toBeDefined();
+    expect(AppErrorCode.CHT_002).toBeDefined();
+    expect(AppErrorCode.CHT_003).toBeDefined();
+    expect(AppErrorCode.RFN_001).toBeDefined();
+    expect(AppErrorCode.RFN_002).toBeDefined();
+    expect(AppErrorCode.RFN_003).toBeDefined();
+    expect(AppErrorCode.RFN_004).toBeDefined();
+    expect(AppErrorCode.RFN_005).toBeDefined();
+    expect(AppErrorCode.PRM_001).toBeDefined();
+  });
 });

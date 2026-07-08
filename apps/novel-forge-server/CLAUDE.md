@@ -70,7 +70,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] M6 — Source pipeline: acquire, extract, consolidate, assets, skeleton (migration Phase 6)
 - [x] M7 — Illustration + manuscript modules (non-AI remainder of migration Phase 7)
 - [x] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table
-- [ ] R1 — Refinement schema & error codes: `arcs`, `chat_sessions`, `chat_messages`, `refinement_proposals` tables + `volumes`/`briefs` column additions, enums, `ARC_`/`CHT_`/`RFN_`/`PRM_` codes, `content-hash` util (refinement §3). Verify: migration applies to template DB, schema tests green.
+- [x] R1 — Refinement schema & error codes: `arcs`, `chat_sessions`, `chat_messages`, `refinement_proposals` tables + `volumes`/`briefs` column additions, enums, `ARC_`/`CHT_`/`RFN_`/`PRM_` codes, `content-hash` util (refinement §3). Verify: migration applies to template DB, schema tests green.
 - [ ] R2 — Proposal apply engine (no AI): op registry, baseline conflict 409 → `conflicted`, staleness propagation, supersession, proposal endpoints (refinement §6). Verify: transaction tests incl. rollback.
 - [ ] R3 — Arc module & gates: arc CRUD/approve/backfill, `targetChapterCount` volume approve with cumulative chapter mapping, generation precheck (refinement §4, §8). Verify: gate-matrix tests (legacy vs arc projects).
 - [ ] R4 — Prompt modules: `premise-enhance`, `bible-audit`, `chat-refine` + `SCOPE_PLAYBOOKS`, `chat-compact`, `arc-plan`; `outline`/`generation`/`judge` v2 for ending contracts; roles in both `AI_PROFILE`s; render goldens (refinement §5.2, §9, §11).

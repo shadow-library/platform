@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, index, integer, jsonb, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -71,13 +71,18 @@ export const briefs = pgTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     chapter: integer('chapter').notNull(),
     volumeKey: varchar('volume_key'),
+    arcKey: varchar('arc_key'),
     title: varchar('title'),
     body: text('body').notNull(),
     contextRefs: jsonb('context_refs'),
+    endingContract: jsonb('ending_contract'),
+    revision: integer('revision').notNull().default(1),
+    contentHash: varchar('content_hash'),
+    staleReason: varchar('stale_reason'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
-  t => [unique('briefs_project_id_chapter_unique').on(t.projectId, t.chapter)],
+  t => [unique('briefs_project_id_chapter_unique').on(t.projectId, t.chapter), index('briefs_project_id_arc_key_idx').on(t.projectId, t.arcKey)],
 );
 
 export const continuityProposals = pgTable(

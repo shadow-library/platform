@@ -97,4 +97,41 @@ export class AppErrorCode extends ServerErrorCode {
    * Job Errors
    */
   static readonly JOB_001 = new AppErrorCode('JOB_001', ErrorType.NOT_FOUND, 'Job not found');
+
+  /*!
+   * Arc Errors
+   */
+  static readonly ARC_001 = new AppErrorCode('ARC_001', ErrorType.NOT_FOUND, 'Arc not found');
+  static readonly ARC_002 = new AppErrorCode('ARC_002', ErrorType.CLIENT_ERROR, 'Arcs must be contiguous, non-overlapping, and exactly cover the volume chapter range');
+  static readonly ARC_003 = new AppErrorCode(
+    'ARC_003',
+    ErrorType.CLIENT_ERROR,
+    'Volume plan is not approved or is missing target chapter counts — approve volumes before planning arcs',
+  );
+  static readonly ARC_004 = new AppErrorCode('ARC_004', ErrorType.CLIENT_ERROR, 'Arcs are not approved — approve all arcs of the volume before outlining');
+
+  /*!
+   * Chat Errors
+   */
+  static readonly CHT_001 = new AppErrorCode('CHT_001', ErrorType.NOT_FOUND, 'Chat session not found');
+  static readonly CHT_002 = new AppErrorCode('CHT_002', ErrorType.CLIENT_ERROR, 'Chat session is archived');
+  static readonly CHT_003 = new AppErrorCode('CHT_003', ErrorType.CLIENT_ERROR, 'Invalid chat scope reference');
+
+  /*!
+   * Refinement Proposal Errors
+   */
+  static readonly RFN_001 = new AppErrorCode('RFN_001', ErrorType.NOT_FOUND, 'Refinement proposal not found');
+  static readonly RFN_002 = new AppErrorCode('RFN_002', ErrorType.CLIENT_ERROR, 'Refinement proposal is not pending');
+  static readonly RFN_003 = new AppErrorCode(
+    'RFN_003',
+    ErrorType.CONFLICT,
+    'Refinement proposal conflicts with the current artifact state — the artifact changed since the proposal was made',
+  );
+  static readonly RFN_004 = new AppErrorCode('RFN_004', ErrorType.CLIENT_ERROR, 'Change-set operation not allowed for this scope');
+  static readonly RFN_005 = new AppErrorCode('RFN_005', ErrorType.CLIENT_ERROR, 'Finalized chapters are immutable — briefs at or before the story cursor cannot be modified');
+
+  /*!
+   * Premise Errors
+   */
+  static readonly PRM_001 = new AppErrorCode('PRM_001', ErrorType.CLIENT_ERROR, 'No overview available — provide an overview or set the project brief or premise first');
 }
