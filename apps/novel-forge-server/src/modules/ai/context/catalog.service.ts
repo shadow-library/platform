@@ -7,7 +7,7 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, eq, ne } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -35,7 +35,9 @@ export class CatalogService {
     const [chapters, volumes, entities, worldFacts, plotThreads, mysteries] = await Promise.all([
       this.db.query.chapters.findMany({ where: eq(schema.chapters.projectId, projectId), orderBy: asc(schema.chapters.number) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: asc(schema.volumes.ordinal) }),
-      this.db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), ne(schema.entities.origin, 'deleted' as never)) }),
+      // Entity deletion is a hard delete; a `ne(origin, 'deleted')` filter here previously crashed
+      // every real render — 'deleted' is not an entity_origin enum value.
+      this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId) }),
       this.db.query.worldFacts.findMany({ where: eq(schema.worldFacts.projectId, projectId) }),
       this.db.query.plotThreads.findMany({ where: and(eq(schema.plotThreads.projectId, projectId), eq(schema.plotThreads.status, 'open')) }),
       this.db.query.mysteries.findMany({ where: and(eq(schema.mysteries.projectId, projectId), eq(schema.mysteries.status, 'open')) }),

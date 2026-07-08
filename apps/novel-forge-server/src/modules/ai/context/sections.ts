@@ -15,11 +15,17 @@
  */
 
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
-export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline';
+export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'arc_plan' | 'premise' | 'audit';
+
+// Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
+// = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
+// unchanged canon — it is the provider prompt-cache key (refinement design §10.1).
+export type ContextSegment = 'stable' | 'volatile';
 
 export interface ContextSection {
   key: string;
   tier: ContextTier;
+  segment: ContextSegment;
   tokens: number;
   truncated: boolean;
   sourceRefs: string[];
@@ -34,6 +40,8 @@ export interface AssembledPack {
   usedTokens: number;
   sections: ContextSection[];
   unresolvedRefs: string[];
+  renderedStable: string;
+  renderedVolatile: string;
   rendered: string;
 }
 
@@ -52,6 +60,19 @@ export const SECTION_LABELS: Record<string, string> = {
   catalog: '## CANON CATALOG',
   lore_retrieved: '## LORE REFERENCES',
   prose_retrieved: '## PROSE REFERENCES',
+  premise: '## PREMISE',
+  doc_inventory: '## BIBLE DOCUMENT INVENTORY',
+  document: '## DOCUMENT',
+  volume_plan: '## VOLUME PLAN',
+  volume: '## VOLUME',
+  arc: '## ARC',
+  arcs: '## ARCS',
+  sibling_hooks: '## SIBLING ARC HOOKS',
+  briefs_list: '## CHAPTER BRIEFS',
+  skeleton: '## CHARACTER ARCS & POWER CURVE',
+  prev_hook: '## PREVIOUS VOLUME HANDOFF',
+  next_volume: '## NEXT VOLUME OBJECTIVE',
+  changed_since: '## CHANGED SINCE THIS CONVERSATION STARTED',
 };
 
 export function sectionLabel(key: string): string {
