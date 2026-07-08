@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { AIMessage } from '@langchain/core/messages';
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
@@ -75,6 +75,9 @@ function buildServices(db: PrimaryDatabase, checkpointer: PostgresSaver, calls: 
 
 describe.if(pgAvailable)('LangGraph checkpoint resume', () => {
   let db: PrimaryDatabase;
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
   let checkpointer: PostgresSaver;
 
   beforeAll(async () => {

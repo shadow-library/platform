@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { SQL } from 'bun';
 import { and, eq } from 'drizzle-orm';
@@ -43,6 +43,9 @@ const pgAvailable = await (async () => {
 
 describe.if(pgAvailable)('BibleDocumentService versioning + invalidation', () => {
   let db: PrimaryDatabase;
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
   let service: BibleDocumentService;
 
   beforeAll(async () => {

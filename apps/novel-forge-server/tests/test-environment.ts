@@ -49,8 +49,13 @@ export class TestEnvironment {
     TestEnvironment.logger.info(`Setting up test environment with database: '${databaseName}'`);
     Config['cache'].set('database.postgres.url', `${baseConnectionString}_${this.databaseSuffix}`);
 
+    // beforeAll runs before any beforeEach, so the database must exist before the app boots —
+    // otherwise a fresh machine (no leftover DB from a prior run) fails the boot-time SELECT 1.
+    beforeAll(async () => {
+      await createDatabaseFromTemplate(databaseName);
+      await this.app.init();
+    });
     beforeEach(() => createDatabaseFromTemplate(databaseName));
-    beforeAll(() => this.app.init());
     afterAll(() => this.app.stop());
   }
 

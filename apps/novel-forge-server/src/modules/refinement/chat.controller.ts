@@ -65,7 +65,7 @@ export class ChatController {
   @Post('/:sessionId/messages')
   @RespondFor(201, ChatTurnResponse)
   turn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
-    return this.chatService.turn(params.projectId, params.sessionId, body.content) as unknown as Promise<ChatTurnResponse>;
+    return this.chatService.turn(params.projectId, params.sessionId, body.content).then(r => ({ ...r, proposal: r.proposal ?? undefined })) as unknown as Promise<ChatTurnResponse>;
   }
 
   @Post('/:sessionId/archive')

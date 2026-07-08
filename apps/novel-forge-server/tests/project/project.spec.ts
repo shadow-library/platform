@@ -24,7 +24,7 @@ import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
 const pgAvailable = await (async () => {
   try {
-    const sql = new SQL('postgresql://postgres:postgres@localhost/postgres');
+    const sql = new SQL(process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge');
     await sql`SELECT 1`;
     await sql.close();
     return true;

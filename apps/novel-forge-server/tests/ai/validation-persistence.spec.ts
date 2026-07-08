@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { SQL } from 'bun';
@@ -44,6 +44,9 @@ const pgAvailable = await (async () => {
 
 describe.if(pgAvailable)('novel-validation persistReport', () => {
   let db: PrimaryDatabase;
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
   let checkpointer: PostgresSaver;
 
   beforeAll(async () => {

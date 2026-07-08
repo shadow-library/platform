@@ -38,7 +38,9 @@ export class ChatSessionParams {
   @Transform('bigint:parse')
   projectId: bigint;
 
-  @Field({ format: 'uuid' })
+  // A pattern, not `format: 'uuid'` — fastify's route schema compiler has no uuid format registered
+  // and fails to build the route with one.
+  @Field({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' })
   sessionId: string;
 }
 
@@ -158,8 +160,8 @@ export class ChatTurnResponse {
   @Field(() => ChatMessageResponse)
   assistantMessage: ChatMessageResponse;
 
-  @Field(() => ProposalResponse, { optional: true, nullable: true })
-  proposal?: ProposalResponse | null;
+  @Field(() => ProposalResponse, { optional: true })
+  proposal?: ProposalResponse;
 
   @Field()
   runId: string;

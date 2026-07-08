@@ -6,11 +6,12 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { AnyPgColumn, bigint, bigserial, boolean, integer, jsonb, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { AnyPgColumn, bigint, bigserial, boolean, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
  */
+import { jsonb } from './jsonb';
 
 /**
  * Defining types

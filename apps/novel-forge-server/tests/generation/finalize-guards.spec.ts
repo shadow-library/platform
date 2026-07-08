@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { AppError } from '@shadow-library/common';
 import { SQL } from 'bun';
@@ -52,6 +52,9 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
 
 describe.if(pgAvailable)('GenerationService.finalize consistency guards', () => {
   let db: PrimaryDatabase;
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
   let service: GenerationService;
 
   beforeAll(async () => {

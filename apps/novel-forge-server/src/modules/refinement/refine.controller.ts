@@ -44,7 +44,7 @@ export class RefineController {
   @Post('/bible/audit')
   @RespondFor(200, AuditBibleResponse)
   auditBible(@Params() params: RefineProjectParams): Promise<AuditBibleResponse> {
-    return this.refineService.auditBible(params.projectId) as unknown as Promise<AuditBibleResponse>;
+    return this.refineService.auditBible(params.projectId).then(r => ({ ...r, proposal: r.proposal ?? undefined })) as unknown as Promise<AuditBibleResponse>;
   }
 
   @Post('/volumes/:volumeKey/arcs/plan')

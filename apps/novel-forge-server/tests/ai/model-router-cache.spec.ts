@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { SQL } from 'bun';
 import { eq } from 'drizzle-orm';
@@ -50,6 +50,9 @@ function judgePrompt(chain: { invoke: (...args: unknown[]) => Promise<{ content:
 
 describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
   let db: PrimaryDatabase;
+
+  // Leaving the pool open starves later spec files of connections and silently skips their suites.
+  afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);

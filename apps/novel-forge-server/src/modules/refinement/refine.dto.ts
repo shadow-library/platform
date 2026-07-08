@@ -87,8 +87,8 @@ export class AuditFindingResponse {
 
 @Schema()
 export class AuditBibleResponse {
-  @Field(() => ProposalResponse, { optional: true, nullable: true })
-  proposal?: ProposalResponse | null;
+  @Field(() => ProposalResponse, { optional: true })
+  proposal?: ProposalResponse;
 
   @Field(() => [AuditFindingResponse])
   findings: AuditFindingResponse[];

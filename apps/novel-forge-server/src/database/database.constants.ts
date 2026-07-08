@@ -5,11 +5,12 @@
 /**
  * Importing npm packages
  */
-import { type ServerError } from '@shadow-library/fastify';
+import { ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { AppErrorCode } from '../classes/app-error-code';
 
 /**
  * Defining types
@@ -19,5 +20,8 @@ import { type ServerError } from '@shadow-library/fastify';
  * Declaring the constants
  */
 
-// AppErrorCode mappings are added in M2 when constraint names are known
-export const constraintErrorMap: Record<string, ServerError> = {};
+// Maps postgres constraint names to user-facing errors; anything unmapped surfaces as a 500 from
+// DatabaseService.translateError, so every user-triggerable constraint belongs here.
+export const constraintErrorMap: Record<string, ServerError> = {
+  projects_name_unique: new ServerError(AppErrorCode.PRJ_002),
+};
