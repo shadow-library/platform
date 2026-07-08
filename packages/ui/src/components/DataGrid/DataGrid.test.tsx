@@ -41,6 +41,15 @@ describe('DataGrid', () => {
     expect(screen.getByText('checkout')).toBeInTheDocument();
   });
 
+  it('lays out one col per column so the table can fill its container', () => {
+    // The grid fills its wrapper via .grid { width: 100% }; the fixed layout needs a <col> per column.
+    // (Pixel width is a CSS concern jsdom can't measure — this guards the column template that fill depends on.)
+    render(<DataGrid data={rows} columns={columns} rowKey='id' aria-label='Services' />);
+    const table = screen.getByRole('grid', { name: 'Services' });
+    expect(table.querySelectorAll('colgroup > col')).toHaveLength(columns.length);
+    expect(screen.getAllByRole('columnheader')).toHaveLength(columns.length);
+  });
+
   it('navigates cells with arrow keys', async () => {
     const user = userEvent.setup();
     render(<DataGrid data={rows} columns={columns} rowKey='id' aria-label='Services' />);
