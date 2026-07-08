@@ -27,6 +27,7 @@ import { type PrimaryDatabase, schema } from '@server/database';
 
 import { type AiRole, type ResolvedModel, getProfileDefaults } from './defaults';
 import { MODEL_MAP } from './models';
+import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
 import { type SchemaIssue, type SchemaParseResult, parseSchema, renderSchemaIssues } from './schemas/validate';
 import { ChatClaudeCode, ChatCodex } from './subprocess-providers';
@@ -147,10 +148,10 @@ export class ModelRouterService {
   }
 
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig): Promise<T> {
-    const role = promptModule.key as AiRole;
+    const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = this.resolveModel(role, project);
     const llm = this.buildClient(resolved);
-    const chain = promptModule.template.pipe(llm);
+    const chain = this.buildChain(promptModule, llm, resolved);
 
     // ─── Cache read-through (deterministic roles only) ────────────────────────
     const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input) : null;
@@ -204,6 +205,25 @@ export class ModelRouterService {
     // ─── Fail ────────────────────────────────────────────────────────────────
     this.logger.error('All parse attempts failed', { role, rawOutput1: rawOutput1.slice(0, 200) });
     throw new ServerError(AppErrorCode.AI_001);
+  }
+
+  // Modules that declare a cacheStrategy follow the stable-first message convention, so the router
+  // formats the template itself and — for Anthropic — injects cache_control breakpoints before
+  // invoking. Every other provider (and every legacy module) keeps the plain template→llm pipe;
+  // xAI/OpenAI still benefit from the stable-first ordering via their automatic prefix caching.
+  private buildChain<T>(
+    promptModule: PromptModule<T>,
+    llm: BaseChatModel,
+    resolved: ResolvedModel,
+  ): { invoke: (input: Record<string, unknown>, config: object) => Promise<{ content: unknown }> } {
+    if (!promptModule.cacheStrategy) return promptModule.template.pipe(llm);
+    const provider = MODEL_MAP[resolved.model]?.provider ?? resolved.provider;
+    return {
+      invoke: async (input, config) => {
+        const messages = await promptModule.template.formatMessages(input);
+        return llm.invoke(provider === 'anthropic' ? applyAnthropicCacheControl(messages) : messages, config);
+      },
+    };
   }
 
   // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).

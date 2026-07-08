@@ -29,6 +29,8 @@ export const bibleAuditPrompt: PromptModule<BibleAuditOutput> = {
   key: 'bible-audit',
   version: '1.0.0',
   kind: 'analytical',
+  role: 'audit',
+  cacheStrategy: { stableVars: ['stableContext'] },
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],

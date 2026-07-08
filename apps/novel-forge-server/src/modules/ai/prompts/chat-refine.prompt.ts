@@ -43,6 +43,8 @@ export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
   key: 'chat-refine',
   version: '1.0.0',
   kind: 'authoring',
+  role: 'chat',
+  cacheStrategy: { stableVars: ['scopeInstructions', 'stableContext'] },
   system,
   template: buildTemplate(),
   schema: ChatRefineSchema,

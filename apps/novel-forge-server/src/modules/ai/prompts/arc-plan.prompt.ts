@@ -28,6 +28,8 @@ export const arcPlanPrompt: PromptModule<ArcPlanOutput> = {
   key: 'arc-plan',
   version: '1.0.0',
   kind: 'authoring',
+  role: 'arc',
+  cacheStrategy: { stableVars: ['stableContext'] },
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],

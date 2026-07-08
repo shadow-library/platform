@@ -24,6 +24,7 @@ export const chatCompactPrompt: PromptModule<ChatCompactOutput> = {
   key: 'chat-compact',
   version: '1.0.0',
   kind: 'analytical',
+  role: 'compact',
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],

@@ -12,6 +12,7 @@ import { type SchemaClass } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { type AiRole } from '../defaults';
 
 /**
  * Defining types
@@ -50,6 +51,12 @@ export interface PromptModule<TOut> {
   system: string;
   template: ChatPromptTemplate;
   schema: SchemaClass;
+  // Model-routing role when it differs from the key (e.g. key 'chat-refine' routes as role 'chat').
+  role?: AiRole;
+  // Declares that the template follows the stable-first message convention (refinement design §10.2):
+  // static system, then all `stableVars` content in the FIRST human message, volatile content last.
+  // The router injects provider cache breakpoints only when this is present.
+  cacheStrategy?: { stableVars: string[] };
   // Cross-field/cross-item business rules JSON Schema can't express declaratively (e.g. comparing
   // adjacent array items). Runs after schema validation succeeds; a non-empty return re-enters the repair ladder.
   postValidate?: (data: TOut) => string[];

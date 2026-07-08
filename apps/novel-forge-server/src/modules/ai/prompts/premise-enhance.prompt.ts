@@ -29,6 +29,8 @@ export const premiseEnhancePrompt: PromptModule<PremiseEnhanceOutput> = {
   key: 'premise-enhance',
   version: '1.0.0',
   kind: 'authoring',
+  role: 'premise',
+  cacheStrategy: { stableVars: ['stableContext'] },
   system,
   template: ChatPromptTemplate.fromMessages([
     ['system', system],
