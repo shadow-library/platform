@@ -77,7 +77,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] R5 — ContextAssembler: `segment` stable/volatile split, `renderedStable`/`renderedVolatile`, `forChatTurn`/`forArcPlanning`/`forPremise`, purpose budgets (refinement §10.1, §10.3–10.4). Verify: stable segment byte-identical across assemblies with unchanged canon.
 - [x] R6 — Router prompt caching: `cacheStrategy` on PromptModule, Anthropic `cache_control` injection at 3 breakpoints, provider no-op matrix (refinement §10.2). Verify: mocked-provider block-injection tests.
 - [x] R7 — Chat subsystem: session/message services + endpoints, turn pipeline, history compaction watermark, `WorkflowRunService.runChain` helper (refinement §5). Verify: e2e turn with mocked model.
-- [ ] R8 — Premise enhance + bible audit: endpoints, `REQUIRED_BIBLE_DOCS` manifest, `audit`/`compact` into `CACHEABLE_ROLES` (refinement §7). Verify: audit idempotence via llm_cache.
+- [x] R8 — Premise enhance + bible audit: endpoints, `REQUIRED_BIBLE_DOCS` manifest, `audit`/`compact` into `CACHEABLE_ROLES` (refinement §7). Verify: audit idempotence via llm_cache.
 - [ ] R9 — Arc planner + arc-scoped outline + ending-contract enforcement: `arcs/plan` chain with coverage postValidate, `arcs/:arcKey/outline`, judge → repairPatch routing on `endingCompliance`, staleness clears (refinement §8–9). Verify: coverage-invariant + judge-routing tests.
 - [ ] R10 — Refinement smoke & polish: rung-3 Ollama chat/arc/premise smoke, `/context/preview` for new purposes, doc cross-links, hardening (refinement §13). Verify: full suite + `ai:smoke`.
 

@@ -16,6 +16,8 @@ import { ChatService } from './chat.service';
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalController } from './proposal.controller';
 import { ProposalService } from './proposal.service';
+import { RefineController } from './refine.controller';
+import { RefineService } from './refine.service';
 import { AiModule } from '../ai/ai.module';
 
 /**
@@ -28,8 +30,8 @@ import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [DatabaseModule, AiModule],
-  controllers: [ProposalController, ChatController],
-  providers: [ProposalService, ProposalApplyService, ChatService],
-  exports: [ProposalService, ProposalApplyService, ChatService],
+  controllers: [ProposalController, ChatController, RefineController],
+  providers: [ProposalService, ProposalApplyService, ChatService, RefineService],
+  exports: [ProposalService, ProposalApplyService, ChatService, RefineService],
 })
 export class RefinementModule {}

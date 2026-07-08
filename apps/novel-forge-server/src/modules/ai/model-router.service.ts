@@ -47,9 +47,9 @@ export interface ProjectConfig {
  */
 
 // Deterministic verification/extraction roles: identical input must yield identical output, so their
-// results are safe to cache. Creative roles (generation, revision, plan, outline…) are never cached —
-// caching them would make a re-request return byte-identical prose.
-const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review']);
+// results are safe to cache. Creative roles (generation, revision, plan, outline, chat…) are never
+// cached — caching them would make a re-request return byte-identical prose.
+const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review', 'audit', 'compact']);
 const LLM_TIMEOUT_MS = Number(process.env['AI_LLM_TIMEOUT_MS'] ?? 120_000);
 const LLM_MAX_RETRIES = Number(process.env['AI_LLM_MAX_RETRIES'] ?? 2);
 const LLM_BACKOFF_MS = Number(process.env['AI_LLM_BACKOFF_MS'] ?? 500);
