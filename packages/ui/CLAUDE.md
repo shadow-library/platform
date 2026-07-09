@@ -12,7 +12,7 @@
 
 **High-level architecture.**
 - A **design-token layer** of CSS custom properties (`--sh-*`) is the single runtime source of truth for all themeable values (colors, type, spacing, radius, elevation, motion, z-index, density). Light and dark are the same tokens with different values; theme flips cascade automatically.
-- Each **component** is a self-contained folder pairing a React `.tsx` with a scoped **CSS Module** (`.module.css`) that consumes tokens. There are no global utility classes.
+- Each **component** is a self-contained folder pairing a React `.tsx` with a scoped **CSS Module** (`.module.css`) that consumes tokens. No component depends on a global class — see the one documented exception below.
 - The **package entry** (`src/index.ts`) imports the global stylesheet and re-exports every public component, hook, and type.
 - The **build** (`scripts/build.ts`) bundles ESM with Rollup, extracts all CSS Modules + globals into one `dist/styles.css`, and emits type declarations.
 
@@ -34,7 +34,7 @@
 | Package manager | Bun (`bun.lock`) |
 | Releases | release-it + conventional-changelog; commitlint + Husky |
 
-**Do not introduce Tailwind CSS, CSS-in-JS runtimes, or any other styling system.** See *Styling Guidelines*.
+**Do not introduce Tailwind CSS, CSS-in-JS runtimes, or any other styling system.** Components style exclusively through CSS Modules; the library also ships one hand-authored, token-backed, **unprefixed** global utility layer (`src/styles/utilities.css`) for consumers' own layout markup — see *Styling Guidelines* rule 4.
 
 ---
 
@@ -56,7 +56,8 @@ ui/
 │   ├── styles/               # The ONLY global CSS
 │   │   ├── tokens.css        # --sh-* design tokens (light + dark + compact density)
 │   │   ├── reset.css         # Minimal, opinionated reset + base body styles
-│   │   └── index.css         # Aggregates tokens.css + reset.css (the global entry)
+│   │   ├── utilities.css     # Unprefixed layout/spacing/typography utility classes (consumer opt-in only)
+│   │   └── index.css         # Aggregates tokens.css + reset.css + utilities.css (the global entry)
 │   ├── types.ts              # Shared public types
 │   └── index.ts              # Package entry: imports global CSS, re-exports public API
 ├── biome.json                # Lint + format config (2-space, single quote, width 180)
@@ -73,14 +74,17 @@ Path alias: `@/*` → `src/*` (configured in `tsconfig.json`, the Rollup build, 
 
 These are **hard rules**, not preferences:
 
-1. **CSS Modules are the only styling approach.** Every component has a colocated `ComponentName.module.css`. Class names are scoped by the build; there is no leakage.
-2. **Tailwind CSS must never be reintroduced** — no utility classes, no `@tailwind`/`@theme`/`@apply`, no `tailwind-merge`, no Tailwind config. This was deliberately removed.
+1. **CSS Modules are the only styling approach for components.** Every component has a colocated `ComponentName.module.css`. Class names are scoped by the build; there is no leakage.
+2. **Tailwind CSS must never be reintroduced** — no `@tailwind`/`@theme`/`@apply`, no `tailwind-merge`, no Tailwind config, no Tailwind dependency. This was deliberately removed. (The utility classes in `src/styles/utilities.css` are a separate, hand-authored, token-backed layer — see rule 4 — not a reintroduction of Tailwind.)
 3. **CSS custom properties are the design tokens.** All themeable values (color, type, spacing, radius, shadow, border, transition, z-index) come from `--sh-*` variables. Never hardcode a hex, px font size, shadow, or duration in a component; reference the token.
-4. **No global utility classes.** Components must not depend on any ambient/global class. The only global CSS the library ships is `src/styles/` (tokens + reset).
-5. **Shared styles live in the token layer.** If several components need the same value, it belongs in `tokens.css` as a token, not duplicated or hoisted into a global class.
-6. **Semantic class names** (`.root`, `.icon`, `.label`, `.trailing`) — never utility-style names (`.mt-2`, `.flex`).
+4. **Components never depend on a global/utility class.** Every component's own markup is styled exclusively through its CSS Module — this is non-negotiable and keeps components tree-shakeable and stylable in isolation. The one exception is a **consumer-facing** utility layer: `src/styles/utilities.css` ships a small set of layout/spacing/typography/composition helpers (`flex`, `p-16`, `text-h2`, `center`, `stack`, …), documented in the README, for consumers composing layout in their *own* markup around library components. These classes are global CSS the library intentionally ships (alongside tokens + reset) — but no `.tsx` file under `src/components/` may reference one. If you need a class for a component's own layout, that's what the CSS Module is for.
+   - **Deliberately unprefixed.** Earlier revisions of this layer used an `sh-` prefix to avoid collisions with a consumer's own global classes; that was dropped by explicit request so app developers reach for these names first rather than rolling their own `.flex`/`.container`/`.center`. This trades collision-safety for ergonomics — know that a consumer app defining its own global `.container` or `.center` will conflict. Consumers who need to de-risk that can import `@shadow-library/ui/styles.layer.css` instead of `styles.css`: it wraps everything (tokens, reset, utilities, components) in `@layer shadow-library`, so any of the consumer's own *unlayered* rules win regardless of source order or specificity.
+   - Names that imply a different established behavior than they have here are avoided (e.g. no bare `.row`/`.col`, since those read as a 12-column grid system to anyone who's used Bootstrap; use `.flex-row` / `.grid-cols-*` instead).
+5. **Shared styles live in the token layer.** If several components need the same value, it belongs in `tokens.css` as a token, not duplicated or hoisted into a component-facing global class.
+6. **Semantic class names inside components** (`.root`, `.icon`, `.label`, `.trailing`) — never utility-style names (`.mt-2`, `.flex`) inside a `.module.css`. (Utility-style names are expected and correct inside `utilities.css` itself.)
 7. **Avoid unnecessary nesting.** Prefer flat selectors; express variants/sizes/states with `data-*` attribute selectors on `.root` (see *Variant/Size implementation*).
 8. **Ship no `!important`** except the documented reduced-motion reset.
+9. **Extending the utility layer:** new utilities must consume an existing `--sh-*` token or the documented 4px spacing scale (never a raw hex/px not already on the scale), stay presentational (layout/spacing/typography/color-from-token — no component behavior), avoid a name that already means something different in a widely-known CSS framework, and be added to the README's utility table. One blank line between every rule; group related rules under a `/* ── Section ── */` comment, matching the existing sections in `utilities.css`.
 
 ---
 
@@ -298,7 +302,7 @@ Commit as a **single logical unit** using Conventional Commits (`feat: add butto
 - **Preserve the existing architecture** — token layer + colocated CSS Modules + barrel exports + Rollup/PostCSS build. Do not restructure it without a compelling, documented architectural reason agreed with the user.
 - **Follow the documented folder structure** exactly (the six-file component folder).
 - **Follow the documented styling conventions** — semantic classes, token consumption, `data-*` variant/state selectors, no nesting bloat.
-- **Use CSS Modules exclusively.** Never add Tailwind or any other styling system. If you find yourself reaching for utility classes, stop.
+- **Use CSS Modules exclusively for component styling.** Never add Tailwind or any other styling system, and never make a component reach into `utilities.css`. The unprefixed utility layer exists only for consumers' own layout markup (Styling Guidelines rule 4) — if you find a component reaching for a utility class, stop.
 - **Reuse existing design tokens.** Need a value? Add a token to `tokens.css` first (light + dark), then consume it — don't hardcode.
 - **Avoid introducing new patterns** unless there is a compelling architectural reason; when in doubt, mirror the most recently shipped, reviewed component.
 - **Keep APIs consistent** with existing components and the Foundations API standards (`variant`/`size`/`intent`/`onXChange`/`asChild`/…).

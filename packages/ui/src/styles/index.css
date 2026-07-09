@@ -1,8 +1,9 @@
 /*
- * Shadow UI — global stylesheet entry (design tokens + reset).
+ * Shadow UI — global stylesheet entry (design tokens + reset + utilities).
  *
- * This is the only global CSS the library ships. Everything else is a scoped
- * CSS Module colocated with its component. Consumers import it once at the app root:
+ * This is the only global CSS the library ships. Every component is a scoped
+ * CSS Module colocated with its component and never depends on these classes.
+ * Consumers import it once at the app root:
  *   import '@shadow-library/ui/styles.css';
  * Theme is switched by toggling `data-theme="dark"` (or the `dark` class) on <html>;
  * density via `data-density="compact"`.
@@ -10,3 +11,4 @@
 
 @import './tokens.css';
 @import './reset.css';
+@import './utilities.css';
