@@ -15,8 +15,24 @@
 .viewport > * {
   pointer-events: auto;
 }
-.viewport[data-placement='bottom-end'] {
+.viewport[data-placement='top-start'] {
+  left: 16px;
+  top: 16px;
+  flex-direction: column;
+}
+.viewport[data-placement='top-center'] {
+  left: 50%;
+  top: 16px;
+  transform: translateX(-50%);
+  flex-direction: column;
+}
+.viewport[data-placement='top-end'] {
   right: 16px;
+  top: 16px;
+  flex-direction: column;
+}
+.viewport[data-placement='bottom-start'] {
+  left: 16px;
   bottom: 16px;
   flex-direction: column-reverse;
 }
@@ -26,16 +42,10 @@
   transform: translateX(-50%);
   flex-direction: column-reverse;
 }
-.viewport[data-placement='top-end'] {
+.viewport[data-placement='bottom-end'] {
   right: 16px;
-  top: 16px;
-  flex-direction: column;
-}
-.viewport[data-placement='top-center'] {
-  left: 50%;
-  top: 16px;
-  transform: translateX(-50%);
-  flex-direction: column;
+  bottom: 16px;
+  flex-direction: column-reverse;
 }
 
 /* ── Card ────────────────────────────────────────────────── */

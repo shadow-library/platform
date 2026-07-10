@@ -18,15 +18,23 @@ const meta = {
   title: 'Components/Toast',
   component: Toaster,
   parameters: { layout: 'centered' },
+  argTypes: {
+    placement: {
+      control: 'select',
+      options: ['top-start', 'top-center', 'top-end', 'bottom-start', 'bottom-center', 'bottom-end'],
+      description: 'Corner (and edge alignment) the toast stack is anchored to.',
+    },
+  },
+  args: { placement: 'top-end' },
 } satisfies Meta<typeof Toaster>;
 
 export default meta;
 
 type Story = StoryObj<typeof meta>;
 
-/** Spawn toasts through the imperative API; the Toaster lives once at the app root. */
+/** Spawn toasts through the imperative API; the Toaster lives once at the app root. Change `placement` in the controls to anchor the stack to any corner. */
 export const Playground: Story = {
-  render: () => (
+  render: args => (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
       <Button variant='secondary' onClick={() => toast.success('Environment created')}>
         Success
@@ -46,7 +54,7 @@ export const Playground: Story = {
       >
         Promise
       </Button>
-      <Toaster />
+      <Toaster {...args} />
     </div>
   ),
 };

@@ -90,7 +90,7 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
  * stack into `document.body`, newest nearest the anchored corner, capped at `max`. Toasts never steal
  * focus; each carries its own live-region role (assertive for danger, polite otherwise).
  */
-export function Toaster({ placement = 'bottom-end', max = 3 }: ToasterProps): ReactElement | null {
+export function Toaster({ placement = 'top-end', max = 3 }: ToasterProps): ReactElement | null {
   const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot, () => []);
   if (typeof document === 'undefined') return null;
 

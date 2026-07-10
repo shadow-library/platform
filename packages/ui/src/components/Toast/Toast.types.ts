@@ -7,7 +7,7 @@ import { type ReactNode } from 'react';
  * Defining types
  */
 export type ToastIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger';
-export type ToastPlacement = 'bottom-end' | 'bottom-center' | 'top-end' | 'top-center';
+export type ToastPlacement = 'top-start' | 'top-center' | 'top-end' | 'bottom-start' | 'bottom-center' | 'bottom-end';
 
 export interface ToastAction {
   label: string;
@@ -37,7 +37,7 @@ export interface ToastPromiseMessages<T> {
 }
 
 export interface ToasterProps {
-  /** Corner the stack lives in. @default 'bottom-end' */
+  /** Corner the stack lives in. @default 'top-end' */
   placement?: ToastPlacement;
   /** Maximum toasts shown at once; older ones stay in the queue. @default 3 */
   max?: number;

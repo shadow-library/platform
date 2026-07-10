@@ -65,6 +65,15 @@ describe('Toast', () => {
     expect(screen.queryByText('Workspace deleted')).not.toBeInTheDocument();
   });
 
+  it('anchors the viewport to the configured placement', () => {
+    render(<Toaster placement='top-start' />);
+    act(() => {
+      toast.info('Positioned');
+    });
+    const viewport = screen.getByText('Positioned').closest('[data-placement]');
+    expect(viewport).toHaveAttribute('data-placement', 'top-start');
+  });
+
   it('caps the visible stack at max', () => {
     render(<Toaster max={2} />);
     act(() => {
