@@ -64,6 +64,54 @@ export function AiTag({ children = 'AI', icon = true }: AiTagProps): ReactElemen
   );
 }
 
+/**
+ * Shared layout dimensions. Every screen draws from these so navigating between
+ * pages never shifts the content column or the split-pane rail — keeping the
+ * spatial rhythm constant is what keeps the app from feeling "jumpy".
+ */
+export const PAGE_MAX_WIDTH = 1120; // centered content column (overview, volumes, settings, …)
+export const RAIL_WIDTH = 380; // the list rail in split-pane screens (review, chat, proposals, runs, bible)
+export const DETAIL_MIN_WIDTH = 480; // detail pane min width before the split-pane scrolls horizontally
+
+/** The outer flex container for a split-pane screen: a fixed list rail beside a fluid detail pane. */
+export const splitPaneStyle: CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  display: 'flex',
+  overflowX: 'auto',
+  overflowY: 'hidden',
+  background: 'var(--sh-surface-app)',
+};
+
+/** The list rail itself — a card-surfaced, bordered column of a shared width. */
+export const railStyle: CSSProperties = {
+  width: RAIL_WIDTH,
+  flexShrink: 0,
+  borderRight: '1px solid var(--sh-border-subtle)',
+  background: 'var(--sh-surface-card)',
+  display: 'flex',
+  flexDirection: 'column',
+};
+
+/** The detail pane beside the rail — fluid, but never narrower than `DETAIL_MIN_WIDTH`. */
+export const detailPaneStyle: CSSProperties = {
+  flex: 1,
+  minWidth: DETAIL_MIN_WIDTH,
+  display: 'flex',
+  flexDirection: 'column',
+  background: 'var(--sh-surface-app)',
+};
+
+interface PageContainerProps {
+  children: ReactNode;
+  style?: CSSProperties;
+}
+
+/** The centered content column shared by the non-split-pane screens. */
+export function PageContainer({ children, style }: PageContainerProps): ReactElement {
+  return <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '28px 28px 80px', ...style }}>{children}</div>;
+}
+
 interface PageHeaderProps {
   title: ReactNode;
   subtitle?: ReactNode;

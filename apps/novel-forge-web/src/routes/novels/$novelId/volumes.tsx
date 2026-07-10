@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronRightIcon, SparkIcon } from '@/components/icons';
-import { PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
+import { PAGE_MAX_WIDTH, PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type ArcResponse,
@@ -187,7 +187,7 @@ function VolumesList({ novelId, onOpen }: VolumesListProps): React.JSX.Element {
   const anyDraft = volumes.some(v => v.status === 'draft');
 
   return (
-    <div style={{ maxWidth: 840, margin: '0 auto', padding: '32px 32px 120px' }}>
+    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 120px' }}>
       <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 8 }}>
         <div style={{ flex: 1 }}>
           <h1 style={{ margin: '0 0 5px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>Story Plan</h1>
@@ -290,7 +290,7 @@ function VolumeDetail({ novelId, volumeKey, onOpenArc }: VolumeDetailProps): Rea
   };
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 32px 130px' }}>
+    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 130px' }}>
       <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>VOLUME {roman(v.ordinal)}</div>
       <h1 style={{ margin: '0 0 6px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{v.title ?? `Volume ${v.ordinal}`}</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--sh-text-tertiary)', marginBottom: 30 }}>
@@ -416,7 +416,7 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
   };
 
   return (
-    <div style={{ maxWidth: 860, margin: '0 auto', padding: '32px 32px 130px' }}>
+    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 130px' }}>
       <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>ARC {arc.ordinal}</div>
       <h1 style={{ margin: '0 0 6px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{arc.title ?? arc.arcKey}</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--sh-text-tertiary)', marginBottom: 30 }}>
@@ -531,7 +531,7 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
   if (briefQuery.isLoading) return <PaneLoader />;
 
   return (
-    <div style={{ maxWidth: 760, margin: '0 auto', padding: '32px 32px 130px' }}>
+    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 130px' }}>
       <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>CHAPTER {chapter} · BRIEF</div>
       <h1 style={{ margin: '0 0 10px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{brief?.title ?? `Chapter ${chapter}`}</h1>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>

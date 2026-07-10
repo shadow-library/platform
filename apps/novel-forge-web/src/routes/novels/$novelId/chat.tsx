@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
  * Importing user defined modules
  */
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
-import { PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { PaneError, PaneLoader, RowAction, StatusChip, detailPaneStyle, railStyle, splitPaneStyle } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChatScope,
@@ -20,7 +20,6 @@ import {
   useListArcsQuery,
   useListBibleDocsQuery,
   useListChatSessionsQuery,
-  useListProposalsQuery,
   useListVolumesQuery,
   useDeleteChatSessionMutation,
   useSetSessionStatusMutation,
@@ -244,7 +243,7 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
     setInput('');
     turn.mutate(content, {
       onSuccess: result => {
-        if (result.proposal) toast.success('Forge drafted a proposal — review it on the right.');
+        if (result.proposal) toast.success('Forge drafted a proposal — review it below the reply.');
       },
       onError: err => {
         toast.danger(err.message);
@@ -412,15 +411,12 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
 
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const navigate = useNavigate();
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
   const sessionsQuery = useListChatSessionsQuery(novelId, { status: statusFilter, limit: 50 });
   const setStatus = useSetSessionStatusMutation(novelId);
   const deleteSession = useDeleteChatSessionMutation(novelId);
-  const proposalsQuery = useListProposalsQuery(novelId, { status: 'pending', limit: 50 });
 
   const sessions = sessionsQuery.data?.items ?? [];
-  const proposals = proposalsQuery.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
@@ -448,12 +444,12 @@ function ChatScreen(): React.JSX.Element {
   };
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', background: 'var(--sh-surface-app)' }}>
+    <div style={splitPaneStyle}>
       {/* sessions */}
-      <div style={{ width: 270, flexShrink: 0, borderRight: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--sh-border-subtle)' }}>
+      <div style={railStyle}>
+        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700 }}>Refinement chats</span>
+            <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Refinement chats</span>
             <div style={{ flex: 1 }} />
             <Button variant="secondary" size="sm" onClick={() => setNewChatOpen(true)}>
               New
@@ -547,44 +543,17 @@ function ChatScreen(): React.JSX.Element {
       </div>
 
       {/* thread */}
-      {selected ? (
-        <ChatThread key={selected.id} novelId={novelId} session={selected} />
-      ) : (
-        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--sh-text-tertiary)' }}>
-          <p style={{ margin: 0 }}>Start a refinement chat to talk through changes to your novel.</p>
-          <Button variant="primary" onClick={() => setNewChatOpen(true)}>
-            New chat
-          </Button>
-        </div>
-      )}
-
-      {/* proposals */}
-      <div style={{ width: 340, flexShrink: 0, borderLeft: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ flexShrink: 0, padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700 }}>Proposals</span>
-        </div>
-        <div className="nf-scroll" style={{ flex: 1, padding: 16 }}>
-          {proposals.length === 0 ? (
-            <p style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>No pending proposals. Refinements you request will appear here.</p>
-          ) : (
-            proposals.map(p => (
-              <button
-                key={p.id}
-                onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })}
-                className="nf-selrow"
-                style={{ flexDirection: 'column', alignItems: 'stretch', gap: 5, padding: 12, marginBottom: 8, border: '1px solid var(--sh-border-subtle)' }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <StatusChip intent="warning">{p.status}</StatusChip>
-                  <StatusChip intent="neutral">{p.kind}</StatusChip>
-                  <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{relativeTime(p.createdAt)}</span>
-                </div>
-                <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, textAlign: 'left' }}>{p.summary?.trim() || `${p.kind} · ${p.scopeType}`}</div>
-              </button>
-            ))
-          )}
-        </div>
+      <div style={detailPaneStyle}>
+        {selected ? (
+          <ChatThread key={selected.id} novelId={novelId} session={selected} />
+        ) : (
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--sh-text-tertiary)' }}>
+            <p style={{ margin: 0 }}>Start a refinement chat to talk through changes to your novel.</p>
+            <Button variant="primary" onClick={() => setNewChatOpen(true)}>
+              New chat
+            </Button>
+          </div>
+        )}
       </div>
 
       <NewChatDialog

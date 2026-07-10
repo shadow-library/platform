@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { AssetBox, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { AssetBox, PaneError, PaneLoader, RowAction, StatusChip, detailPaneStyle, railStyle, splitPaneStyle } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type CreateEntityBody,
@@ -555,9 +555,9 @@ function StoryBibleScreen(): React.JSX.Element {
   };
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', background: 'var(--sh-surface-app)' }}>
-      <div style={{ width: 320, flexShrink: 0, borderRight: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)', display: 'flex', flexDirection: 'column' }}>
-        <div style={{ padding: '18px 16px 12px' }}>
+    <div style={splitPaneStyle}>
+      <div style={railStyle}>
+        <div style={{ padding: '14px 16px 12px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 13 }}>
             <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Story Bible</span>
             <div style={{ flex: 1 }} />
@@ -623,7 +623,7 @@ function StoryBibleScreen(): React.JSX.Element {
         </div>
       </div>
 
-      <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', background: 'var(--sh-surface-app)', position: 'relative' }}>
+      <div style={{ ...detailPaneStyle, position: 'relative' }}>
         {selectedKey ? (
           <EntityDetail
             novelId={novelId}

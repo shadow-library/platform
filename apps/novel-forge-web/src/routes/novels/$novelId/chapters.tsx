@@ -10,7 +10,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, WarningIcon } from '@/components/icons';
-import { PaneError, PaneLoader, QueryState, StatusChip, type ChipIntent } from '@/components/nf';
+import { PAGE_MAX_WIDTH, PaneError, PaneLoader, QueryState, StatusChip, type ChipIntent } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type DraftResponse,
@@ -213,7 +213,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
 
   return (
     <div className="nf-scroll" style={{ position: 'absolute', inset: 0, background: 'var(--sh-surface-app)' }}>
-      <div style={{ maxWidth: 780, margin: '0 auto', padding: '44px 32px 90px' }}>
+      <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '44px 32px 90px' }}>
         <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 6 }}>
           <div style={{ flex: 1 }}>
             <h1 style={{ margin: '0 0 5px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>Chapters</h1>

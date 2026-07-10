@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
+import { PaneError, PaneLoader, StatusChip, detailPaneStyle, railStyle, splitPaneStyle, type ChipIntent } from '@/components/nf';
 import { type RunModelCallResponse, type WorkflowRunDetailResponse, useListRunsQuery, useRunQuery } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
@@ -270,8 +270,8 @@ function RunsScreen(): React.JSX.Element {
   }, [runs, selectedId]);
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', background: 'var(--sh-surface-app)' }}>
-      <div style={{ width: 380, flexShrink: 0, borderRight: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)', display: 'flex', flexDirection: 'column' }}>
+    <div style={splitPaneStyle}>
+      <div style={railStyle}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Workflow Runs</span>
           <div style={{ flex: 1 }} />
@@ -286,7 +286,7 @@ function RunsScreen(): React.JSX.Element {
           ))}
         </div>
       </div>
-      <div style={{ flex: 1, minWidth: 480, display: 'flex', flexDirection: 'column', background: 'var(--sh-surface-app)' }}>
+      <div style={detailPaneStyle}>
         {selectedId ? (
           <RunDetail novelId={novelId} runId={selectedId} />
         ) : (

@@ -8,7 +8,7 @@ import { useEffect, useMemo, useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
+import { PaneError, PaneLoader, StatusChip, detailPaneStyle, railStyle, splitPaneStyle, type ChipIntent } from '@/components/nf';
 import { type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useListProposalsQuery } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
@@ -133,8 +133,8 @@ function ProposalsScreen(): React.JSX.Element {
   const pendingCount = proposals.filter(p => p.status === 'pending').length;
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', background: 'var(--sh-surface-app)' }}>
-      <div style={{ width: 384, flexShrink: 0, borderRight: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)', display: 'flex', flexDirection: 'column' }}>
+    <div style={splitPaneStyle}>
+      <div style={railStyle}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
             <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Proposals Center</span>
@@ -179,7 +179,7 @@ function ProposalsScreen(): React.JSX.Element {
           })}
         </div>
       </div>
-      <div style={{ flex: 1, minWidth: 460, display: 'flex', flexDirection: 'column', background: 'var(--sh-surface-app)' }}>
+      <div style={detailPaneStyle}>
         {selected ? (
           <ProposalDetail novelId={novelId} proposal={selected} />
         ) : (

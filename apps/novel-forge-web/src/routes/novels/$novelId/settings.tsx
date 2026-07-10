@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { PageHeader, QueryState, SectionCard } from '@/components/nf';
+import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import {
   type AiModelOption,
   type ContentMode,
@@ -207,7 +207,7 @@ function SettingsScreen(): React.JSX.Element {
   const defaultsMap = new Map((modelsQuery.data?.defaults ?? []).map(d => [d.role, d.model]));
 
   return (
-    <div style={{ maxWidth: 920, margin: '0 auto', padding: '28px 28px 80px' }}>
+    <PageContainer>
       <QueryState isLoading={projectQuery.isLoading} error={projectQuery.error} isEmpty={!project} emptyTitle="Project not found">
         <>
           <PageHeader title="Project settings" subtitle={project ? `${projectTitle(project)} · configure defaults and the models each AI operation uses.` : ''} />
@@ -343,6 +343,6 @@ function SettingsScreen(): React.JSX.Element {
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

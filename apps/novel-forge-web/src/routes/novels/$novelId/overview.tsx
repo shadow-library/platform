@@ -8,8 +8,8 @@ import { useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { BookIcon, CheckIcon, CloseIcon, CopyIcon, ListIcon, ProposalsIcon, ResetIcon } from '@/components/icons';
-import { SectionCard, StatusChip } from '@/components/nf';
+import { CheckIcon, CloseIcon, CopyIcon, ResetIcon } from '@/components/icons';
+import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import {
   type ResetBody,
   type WorkflowRunDetailResponse,
@@ -145,27 +145,6 @@ function RunRow({ run }: RunRowProps): React.JSX.Element {
   );
 }
 
-interface QuickLinkProps {
-  icon: React.ReactNode;
-  title: string;
-  subtitle: string;
-  onClick: () => void;
-}
-
-function QuickLink({ icon, title, subtitle, onClick }: QuickLinkProps): React.JSX.Element {
-  return (
-    <button
-      onClick={onClick}
-      className="nf-cardhover"
-      style={{ textAlign: 'left', background: 'var(--sh-surface-card)', border: '1px solid var(--sh-border-subtle)', borderRadius: 'var(--sh-radius-lg)', padding: 16, cursor: 'pointer' }}
-    >
-      <span style={{ color: 'var(--sh-accent)', display: 'inline-flex' }}>{icon}</span>
-      <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, marginTop: 10 }}>{title}</div>
-      <div style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)', marginTop: 2 }}>{subtitle}</div>
-    </button>
-  );
-}
-
 function OverviewScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const navigate = useNavigate();
@@ -244,7 +223,7 @@ function OverviewScreen(): React.JSX.Element {
   };
 
   return (
-    <div style={{ maxWidth: 1120, margin: '0 auto', padding: '28px 28px 60px' }}>
+    <PageContainer>
       {projectQuery.isLoading ? (
         <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
           <Spinner size="lg" label="Loading" />
@@ -374,14 +353,6 @@ function OverviewScreen(): React.JSX.Element {
               )}
             </SectionCard>
           </div>
-
-          <h3 style={{ margin: '0 0 12px', fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>Jump into</h3>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
-            <QuickLink icon={<BookIcon size={20} />} title="Story Bible" subtitle="Entities & canon" onClick={() => navigate({ to: '/novels/$novelId/story-bible', params: { novelId } })} />
-            <QuickLink icon={<ListIcon size={20} />} title="Volumes & Arcs" subtitle="Structure & briefs" onClick={() => navigate({ to: '/novels/$novelId/volumes', params: { novelId } })} />
-            <QuickLink icon={<BookIcon size={20} />} title="Chapters" subtitle="Draft & edit" onClick={() => navigate({ to: '/novels/$novelId/chapters', params: { novelId } })} />
-            <QuickLink icon={<ProposalsIcon size={20} />} title="Proposals" subtitle="Canon edits" onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })} />
-          </div>
         </>
       )}
 
@@ -429,6 +400,6 @@ function OverviewScreen(): React.JSX.Element {
           </Dialog.Footer>
         </Dialog.Content>
       </Dialog>
-    </div>
+    </PageContainer>
   );
 }

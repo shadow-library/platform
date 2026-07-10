@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
  * Importing user defined modules
  */
 import { WarningIcon } from '@/components/icons';
-import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
+import { PaneError, PaneLoader, StatusChip, detailPaneStyle, railStyle, splitPaneStyle, type ChipIntent } from '@/components/nf';
 import { type DraftResponse, type FeedbackBody, useApproveDraftMutation, useDraftFeedbackMutation, useReviewQueueQuery, useReviseDraftMutation } from '@/lib/apis';
 
 export const Route = createFileRoute('/novels/$novelId/review')({
@@ -230,8 +230,8 @@ function ReviewScreen(): React.JSX.Element {
   const selected = drafts.find(d => d.chapter === selectedChapter);
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', overflowX: 'auto', overflowY: 'hidden', background: 'var(--sh-surface-app)' }}>
-      <div style={{ width: 372, flexShrink: 0, borderRight: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)', display: 'flex', flexDirection: 'column' }}>
+    <div style={splitPaneStyle}>
+      <div style={railStyle}>
         <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
           <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Review Queue</span>
           {drafts.length > 0 && <StatusChip intent="warning">{drafts.length} open</StatusChip>}
@@ -273,7 +273,7 @@ function ReviewScreen(): React.JSX.Element {
           })}
         </div>
       </div>
-      <div style={{ flex: 1, minWidth: 460, display: 'flex', flexDirection: 'column', background: 'var(--sh-surface-app)' }}>
+      <div style={detailPaneStyle}>
         {selected ? (
           <ReviewDetail novelId={novelId} draft={selected} />
         ) : (
