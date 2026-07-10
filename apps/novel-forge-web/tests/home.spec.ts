@@ -4,21 +4,27 @@
 import { expect, test } from '@playwright/test';
 
 /**
- * Importing user defined packages
- */
-
-/**
- * Defining types
- */
-
-/**
  * Declaring the constants
  */
 
-test.describe('Dashboard page', () => {
+test.describe('Application shell', () => {
   test.beforeEach(({ page }) => page.goto('/'));
 
-  test('should load successfully', async ({ page }) => {
+  test('loads with the correct document title', async ({ page }) => {
     await expect(page).toHaveTitle(/Novel Forge/);
+  });
+
+  test('renders the Shadow UI sidebar and dashboard chrome', async ({ page }) => {
+    // Brand in the sidebar
+    await expect(page.getByText('Novel Forge')).toBeVisible();
+    // Global-mode nav lands on the Projects screen
+    await expect(page.getByRole('heading', { level: 1, name: 'Projects' })).toBeVisible();
+    // The command-palette trigger is present in the top bar
+    await expect(page.getByText('Search or run a command…')).toBeVisible();
+  });
+
+  test('the command palette opens on its trigger', async ({ page }) => {
+    await page.getByText('Search or run a command…').click();
+    await expect(page.getByPlaceholder('Search screens, projects, commands…')).toBeVisible();
   });
 });
