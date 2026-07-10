@@ -93,7 +93,7 @@ const PROVIDER_GROUPS: ProviderGroup[] = [
   { label: 'Anthropic · API key', providers: ['anthropic'] },
   { label: 'OpenAI · API key', providers: ['openai'] },
   { label: 'Ollama · local', providers: ['ollama'] },
-  { label: 'CLI · uses local auth', providers: ['anthropic-claude-code', 'openai-codex'] },
+  { label: 'CLI · uses local auth', providers: ['anthropic-claude-code', 'openai-codex', 'xai-grok-build'] },
 ];
 
 interface ModelPickerProps {
