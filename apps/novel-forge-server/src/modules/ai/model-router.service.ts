@@ -32,7 +32,7 @@ import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
 import { type SchemaIssue, type SchemaParseResult, parseSchema, renderSchemaIssues, toJsonSchemaFormat } from './schemas/validate';
-import { ChatClaudeCode, ChatCodex } from './subprocess-providers';
+import { ChatClaudeCode, ChatCodex, ChatGrokBuild } from './subprocess-providers';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
 /**
@@ -164,6 +164,9 @@ export class ModelRouterService {
       case 'openai-codex':
         if (!Config.get('ai.codex.enabled')) throw new ServerError(AppErrorCode.AI_002);
         return new ChatCodex(Config.get('ai.codex.bin'));
+      case 'xai-grok-build':
+        if (!Config.get('ai.grok-build.enabled')) throw new ServerError(AppErrorCode.AI_002);
+        return new ChatGrokBuild(Config.get('ai.grok-build.bin'));
       default:
         throw new ServerError(AppErrorCode.AI_002);
     }

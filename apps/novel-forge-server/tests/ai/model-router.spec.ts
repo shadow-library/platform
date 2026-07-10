@@ -10,10 +10,13 @@ import { describe, expect, it, mock } from 'bun:test';
 /**
  * Importing user defined packages
  */
+import { Config } from '@shadow-library/common';
+
 import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
+import { ChatGrokBuild } from '@modules/ai/subprocess-providers';
 
 /**
  * Defining types
@@ -79,6 +82,11 @@ describe('ModelRouterService.resolveModel', () => {
 
   it('maps every fine-grained role to a model group', () => {
     for (const role of Object.keys(PRODUCTION_DEFAULTS)) expect(ROLE_GROUP[role as keyof typeof ROLE_GROUP]).toBeDefined();
+  });
+
+  it('builds the grok-build CLI client when its enabled flag is set', () => {
+    (Config as unknown as { cache: Map<string, unknown> })['cache'].set('ai.grok-build.enabled', true);
+    expect(router.buildClient({ provider: 'xai-grok-build', model: 'grok-build' })).toBeInstanceOf(ChatGrokBuild);
   });
 });
 

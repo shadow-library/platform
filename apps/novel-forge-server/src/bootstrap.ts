@@ -41,6 +41,8 @@ declare module '@shadow-library/common' {
     'ai.claude-code.bin': string;
     'ai.codex.enabled': boolean;
     'ai.codex.bin': string;
+    'ai.grok-build.enabled': boolean;
+    'ai.grok-build.bin': string;
 
     /** Observability configs */
     'ai.langsmith.api.key': string | undefined;
@@ -72,6 +74,8 @@ Config.load('ai.claude-code.enabled', { defaultValue: 'false', validateType: 'bo
 Config.load('ai.claude-code.bin', { defaultValue: 'claude' });
 Config.load('ai.codex.enabled', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('ai.codex.bin', { defaultValue: 'codex' });
+Config.load('ai.grok-build.enabled', { defaultValue: 'false', validateType: 'boolean' });
+Config.load('ai.grok-build.bin', { defaultValue: 'grok' });
 Config.load('ai.langsmith.api.key');
 
 Config.load('storage.driver', { defaultValue: 'local', allowedValues: ['local'] });

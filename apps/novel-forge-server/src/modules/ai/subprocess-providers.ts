@@ -69,6 +69,27 @@ export class ChatClaudeCode extends SimpleChatModel {
   }
 }
 
+// Grok Build subprocess provider — runs the `grok` CLI non-interactively. Like Claude Code / Codex it
+// authenticates through the local CLI session (no API key). The `-p` flag is the assumed one-shot prompt
+// switch; adjust `_call` if the installed `grok` CLI uses a different non-interactive invocation.
+export class ChatGrokBuild extends SimpleChatModel {
+  private readonly bin: string;
+
+  constructor(bin: string) {
+    super({});
+    this.bin = bin;
+  }
+
+  _llmType(): string {
+    return 'xai-grok-build';
+  }
+
+  async _call(messages: BaseMessage[]): Promise<string> {
+    const prompt = formatMessagesAsPrompt(messages);
+    return spawnAndCapture(this.bin, ['-p', prompt]);
+  }
+}
+
 // Codex subprocess provider — runs `codex exec` (the CLI's configured GPT model) non-interactively.
 export class ChatCodex extends SimpleChatModel {
   private readonly bin: string;
