@@ -118,23 +118,26 @@ describe('ModelRouterService.structured (repair ladder)', () => {
   function makeRouter(fakeChain: { invoke: ReturnType<typeof mock> }): ModelRouterService {
     const stubTelemetry = {} as never;
     const router = new ModelRouterService(stubTelemetry, stubDatabaseService());
-    // Patch buildClient so no real provider is instantiated (no API keys needed in tests).
-    (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ pipe: () => fakeChain });
+    // Patch buildClient so no real provider is instantiated (no API keys needed in tests) — the router
+    // invokes the returned client directly with the formatted messages.
+    (router as unknown as Record<string, unknown>)['buildClient'] = () => fakeChain;
     return router;
   }
+
+  // A prompt whose template yields no messages of its own — buildMessages appends the schema
+  // instruction — so the fake chain drives the repair ladder deterministically.
+  const fakePrompt = {
+    key: 'judge' as const,
+    version: '1.0.0',
+    kind: 'analytical' as const,
+    system: 'test',
+    template: { formatMessages: async () => [] } as never,
+    schema: JudgeSchema,
+  };
 
   it('returns parsed result on first success', async () => {
     const fakeChain = { invoke: mock(async () => ({ content: JSON.stringify({ verdict: 'consistent', findings: [] }) })) };
     const router = makeRouter(fakeChain);
-
-    const fakePrompt = {
-      key: 'judge' as const,
-      version: '1.0.0',
-      kind: 'analytical' as const,
-      system: 'test',
-      template: { pipe: () => fakeChain } as never,
-      schema: JudgeSchema,
-    };
 
     const result = await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
     expect(result.verdict).toBe('consistent');
@@ -152,15 +155,6 @@ describe('ModelRouterService.structured (repair ladder)', () => {
     };
     const router = makeRouter(fakeChain);
 
-    const fakePrompt = {
-      key: 'judge' as const,
-      version: '1.0.0',
-      kind: 'analytical' as const,
-      system: 'test',
-      template: { pipe: () => fakeChain } as never,
-      schema: JudgeSchema,
-    };
-
     const result = await router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
     expect(result.verdict).toBe('consistent');
     expect(callCount).toBe(2);
@@ -169,15 +163,6 @@ describe('ModelRouterService.structured (repair ladder)', () => {
   it('throws when all attempts fail', async () => {
     const fakeChain = { invoke: mock(async () => ({ content: 'not json' })) };
     const router = makeRouter(fakeChain);
-
-    const fakePrompt = {
-      key: 'judge' as const,
-      version: '1.0.0',
-      kind: 'analytical' as const,
-      system: 'test',
-      template: { pipe: () => fakeChain } as never,
-      schema: JudgeSchema,
-    };
 
     await expect(router.structured<JudgeOutput>(fakePrompt, {}, { projectId: BigInt(1), promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' })).rejects.toThrow();
   });

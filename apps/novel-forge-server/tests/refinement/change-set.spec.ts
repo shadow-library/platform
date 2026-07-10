@@ -35,7 +35,7 @@ describe('validateChangeSet', () => {
   });
 
   it('should reject unknown ops and unexpected fields', () => {
-    expect(validateChangeSet([{ op: 'entity.upsert', entityKey: 'x' }])[0]).toMatch(/unknown op 'entity.upsert'/);
+    expect(validateChangeSet([{ op: 'chapter.delete', chapter: 1 }])[0]).toMatch(/unknown op 'chapter.delete'/);
     expect(validateChangeSet([{ op: 'volume.remove', volumeKey: 'vol_1', extra: true }])[0]).toMatch(/unexpected field 'extra'/);
   });
 

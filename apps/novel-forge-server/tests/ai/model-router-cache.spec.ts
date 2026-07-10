@@ -44,8 +44,8 @@ const pgAvailable = await (async () => {
   }
 })();
 
-function judgePrompt(chain: { invoke: (...args: unknown[]) => Promise<{ content: string }> }) {
-  return { key: 'judge' as const, version: '1.0.0', kind: 'analytical' as const, system: 'test', template: { pipe: () => chain } as never, schema: JudgeSchema };
+function judgePrompt() {
+  return { key: 'judge' as const, version: '1.0.0', kind: 'analytical' as const, system: 'test', template: { formatMessages: async () => [] } as never, schema: JudgeSchema };
 }
 
 describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
@@ -61,7 +61,7 @@ describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
 
   function makeRouter(chain: { invoke: (...args: unknown[]) => Promise<{ content: string }> }): ModelRouterService {
     const router = new ModelRouterService({} as never, { getPostgresClient: () => db } as never);
-    (router as unknown as Record<string, unknown>)['buildClient'] = () => ({ pipe: () => chain });
+    (router as unknown as Record<string, unknown>)['buildClient'] = () => chain;
     return router;
   }
 
@@ -86,11 +86,11 @@ describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
     const router = makeRouter(chain);
     const ctx = { projectId, promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' };
 
-    await router.structured<JudgeOutput>(judgePrompt(chain), { prose: 'same' }, ctx);
-    await router.structured<JudgeOutput>(judgePrompt(chain), { prose: 'same' }, ctx);
+    await router.structured<JudgeOutput>(judgePrompt(), { prose: 'same' }, ctx);
+    await router.structured<JudgeOutput>(judgePrompt(), { prose: 'same' }, ctx);
     expect(calls).toBe(1); // second call is a cache hit
 
-    await router.structured<JudgeOutput>(judgePrompt(chain), { prose: 'different' }, ctx);
+    await router.structured<JudgeOutput>(judgePrompt(), { prose: 'different' }, ctx);
     expect(calls).toBe(2); // different input misses the cache
 
     const rows = await db.query.llmCache.findMany({ where: eq(schema.llmCache.projectId, projectId) });
@@ -109,7 +109,7 @@ describe.if(pgAvailable)('ModelRouterService cache + resilience', () => {
     };
     const router = makeRouter(chain);
 
-    const result = await router.structured<JudgeOutput>(judgePrompt(chain), { prose: 'retry-me' }, { projectId, promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
+    const result = await router.structured<JudgeOutput>(judgePrompt(), { prose: 'retry-me' }, { projectId, promptKey: 'judge', promptVersion: '1.0.0', role: 'judge' });
     expect(result.verdict).toBe('consistent');
     expect(calls).toBe(2);
   });
