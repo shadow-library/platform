@@ -1,190 +1,363 @@
-@import 'tailwindcss';
+/* Shadow UI design system: tokens, reset, utilities, and component styles. */
+@import '@shadow-library/ui/styles.css';
 
-/* ========================================
-   Theme CSS Variables
-   These match Ant Design token colors
-   ======================================== */
-
+/* The DS z-scale places dropdown (1000) below scrim (1100) and modal (1200), so a Select/menu opened
+   inside a Dialog renders behind the dialog scrim and its options become unclickable. Lift dropdowns
+   to the popover layer (which already sits above modals) so they work inside dialogs. */
 :root {
-  /* Brand / Primary Colors: palette — Novel Forge teal */
-  --color-primary-light: #009e98;
-  --color-primary-hover-light: #12b1aa;
-  --color-primary-active-light: #007c77;
-  --color-primary-bg-light: #e2f4f2;
-  --color-primary-border-light: #8fcfc9;
-  --color-primary-dark: #2bbab2;
-  --color-primary-hover-dark: #45c9c1;
-  --color-primary-active-dark: #1e938d;
-  --color-primary-bg-dark: #12332f;
-  --color-primary-border-dark: #245049;
-
-  /* Novel Forge semantic accents (shared across themes) */
-  --nf-ai: #b5613a;
-  --nf-ai-bg: #fbeee7;
-  --nf-ai-border: #e6b49c;
-  --nf-conflict: #df7c56;
-  --nf-canon: #2f7d52;
-  --nf-canon-bg: #e6f2ea;
-  --nf-canon-border: #9dcbaf;
-
-  /* Background Colors: palette */
-  --color-bg-base-light: #f7f7fa;
-  --color-bg-container-light: #ffffff;
-  --color-bg-elevated-light: #ffffff;
-  --color-bg-layout-light: #f2f3f8;
-  --color-bg-header-light: #141418;
-  --color-bg-sider-light: #141418;
-  --color-bg-footer-light: #141418;
-  --color-bg-input-light: #ffffff;
-  --color-bg-base-dark: #0f0f14;
-  --color-bg-container-dark: #1a1a22;
-  --color-bg-elevated-dark: #1f1f2a;
-  --color-bg-layout-dark: #0d0d12;
-  --color-bg-header-dark: #141418;
-  --color-bg-sider-dark: #141418;
-  --color-bg-footer-dark: #141418;
-  --color-bg-input-dark: #1a1a22;
-
-  /* Text Colors: palette */
-  --color-text-light: #1f1f1f;
-  --color-text-secondary-light: #595959;
-  --color-text-tertiary-light: #8c8c8c;
-  --color-text-disabled-light: #bfbfbf;
-  --color-text-lighter-light: #cfcfdc;
-  --color-text-inverse-light: #ffffff;
-  --color-text-dark: #ededed;
-  --color-text-secondary-dark: #b0b0c3;
-  --color-text-tertiary-dark: #8a8aa3;
-  --color-text-disabled-dark: #5a5a6e;
-  --color-text-lighter-dark: #cfcfdc;
-  --color-text-inverse-dark: #ffffff;
-
-  /* Border Colors: palette */
-  --color-border-light: #d9d9d9;
-  --color-border-secondary-light: #e6e6eb;
-  --color-border-dark: #2a2a35;
-  --color-border-secondary-dark: #343445;
-
-  /* Status Colors: palette */
-  --color-success-light: #3cb371;
-  --color-warning-light: #faad14;
-  --color-error-light: #d9363e;
-  --color-info-light: #5b8ff9;
-  --color-success-dark: #4fd6a2;
-  --color-warning-dark: #f5c043;
-  --color-error-dark: #ff5c5c;
-  --color-info-dark: #6daafb;
-
-  /* Component-specific: palette */
-  --color-menu-item-light: #cfcfdc;
-  --color-menu-item-hover-light: #ffffff;
-  --color-menu-item-hover-bg-light: rgba(0, 158, 152, 0.28);
-  --color-menu-item-selected-bg-light: #009e98;
-  --color-menu-item-dark: #cfcfdc;
-  --color-menu-item-hover-dark: #ffffff;
-  --color-menu-item-hover-bg-dark: rgba(0, 158, 152, 0.28);
-  --color-menu-item-selected-bg-dark: #009e98;
-}
-
-[data-theme='light'] {
-  /* Active theme tokens switch to light */
-  --color-primary: var(--color-primary-light);
-  --color-primary-hover: var(--color-primary-hover-light);
-  --color-primary-active: var(--color-primary-active-light);
-  --color-primary-bg: var(--color-primary-bg-light);
-  --color-primary-border: var(--color-primary-border-light);
-
-  --color-bg-base: var(--color-bg-base-light);
-  --color-bg-container: var(--color-bg-container-light);
-  --color-bg-elevated: var(--color-bg-elevated-light);
-  --color-bg-layout: var(--color-bg-layout-light);
-  --color-bg-header: var(--color-bg-header-light);
-  --color-bg-sider: var(--color-bg-sider-light);
-  --color-bg-footer: var(--color-bg-footer-light);
-  --color-bg-input: var(--color-bg-input-light);
-
-  --color-text: var(--color-text-light);
-  --color-text-secondary: var(--color-text-secondary-light);
-  --color-text-tertiary: var(--color-text-tertiary-light);
-  --color-text-disabled: var(--color-text-disabled-light);
-  --color-text-lighter: var(--color-text-lighter-light);
-  --color-text-inverse: var(--color-text-inverse-light);
-
-  --color-border: var(--color-border-light);
-  --color-border-secondary: var(--color-border-secondary-light);
-
-  --color-success: var(--color-success-light);
-  --color-warning: var(--color-warning-light);
-  --color-error: var(--color-error-light);
-  --color-info: var(--color-info-light);
-
-  --color-menu-item: var(--color-menu-item-light);
-  --color-menu-item-hover: var(--color-menu-item-hover-light);
-  --color-menu-item-hover-bg: var(--color-menu-item-hover-bg-light);
-  --color-menu-item-selected-bg: var(--color-menu-item-selected-bg-light);
-}
-
-[data-theme='dark'] {
-  /* Active theme tokens switch to dark */
-  --color-primary: var(--color-primary-dark);
-  --color-primary-hover: var(--color-primary-hover-dark);
-  --color-primary-active: var(--color-primary-active-dark);
-  --color-primary-bg: var(--color-primary-bg-dark);
-  --color-primary-border: var(--color-primary-border-dark);
-
-  --color-bg-base: var(--color-bg-base-dark);
-  --color-bg-container: var(--color-bg-container-dark);
-  --color-bg-elevated: var(--color-bg-elevated-dark);
-  --color-bg-layout: var(--color-bg-layout-dark);
-  --color-bg-header: var(--color-bg-header-dark);
-  --color-bg-sider: var(--color-bg-sider-dark);
-  --color-bg-footer: var(--color-bg-footer-dark);
-  --color-bg-input: var(--color-bg-input-dark);
-
-  --color-text: var(--color-text-dark);
-  --color-text-secondary: var(--color-text-secondary-dark);
-  --color-text-tertiary: var(--color-text-tertiary-dark);
-  --color-text-disabled: var(--color-text-disabled-dark);
-  --color-text-lighter: var(--color-text-lighter-dark);
-  --color-text-inverse: var(--color-text-inverse-dark);
-
-  --color-border: var(--color-border-dark);
-  --color-border-secondary: var(--color-border-secondary-dark);
-
-  --color-success: var(--color-success-dark);
-  --color-warning: var(--color-warning-dark);
-  --color-error: var(--color-error-dark);
-  --color-info: var(--color-info-dark);
-
-  --color-menu-item: var(--color-menu-item-dark);
-  --color-menu-item-hover: var(--color-menu-item-hover-dark);
-  --color-menu-item-hover-bg: var(--color-menu-item-hover-bg-dark);
-  --color-menu-item-selected-bg: var(--color-menu-item-selected-bg-dark);
+  --sh-z-dropdown: 1300;
 }
 
 /* ========================================
-   Base Styles
+   App base
    ======================================== */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
 
 body {
-  @apply m-0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  font-family: var(--sh-font-sans);
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--color-bg-layout);
-  color: var(--color-text);
 }
 
-code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
+a {
+  color: var(--sh-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--sh-accent-hover);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sh-border-default);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sh-border-strong);
+  background-clip: content-box;
 }
 
 /* ========================================
-   Utility Classes
+   Responsive shell — sidebar collapses to an off-canvas drawer under the tablet breakpoint
    ======================================== */
+.nf-sidebar {
+  width: 250px;
+  flex-shrink: 0;
+}
+.nf-hamburger {
+  display: none;
+}
+.nf-shell-scrim {
+  display: none;
+}
 
-.flex-center {
-  @apply flex justify-center items-center;
+@media (max-width: 900px) {
+  .nf-hamburger {
+    display: inline-flex;
+  }
+  .nf-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--sh-z-modal);
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: var(--sh-shadow-e3);
+  }
+  .nf-sidebar[data-open='true'] {
+    transform: translateX(0);
+  }
+  .nf-shell-scrim[data-open='true'] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--sh-z-scrim);
+    background: rgba(0, 0, 0, 0.42);
+  }
+  /* Let the command-palette trigger shrink instead of overflowing the bar (!important beats the inline min-width). */
+  .nf-search {
+    min-width: 0 !important;
+  }
+}
+
+/* ========================================
+   Novel Forge helpers (from the design comps)
+   ======================================== */
+.nf-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 10px;
+  border-radius: var(--sh-radius-md);
+  color: var(--sh-text-secondary);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.nf-nav:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+
+.nf-nav[data-active='true'] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}
+
+.nf-nav[data-active='true'] svg {
+  color: var(--sh-accent);
+}
+
+.nf-ib {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: var(--sh-radius-md);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border 0.12s;
+}
+
+.nf-ib:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+  border-color: var(--sh-border-subtle);
+}
+
+.nf-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--sh-radius-full);
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.nf-scroll {
+  overflow-y: auto;
+}
+
+.nf-selrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.nf-selrow:hover {
+  background: var(--sh-bg-hover);
+}
+
+.nf-selrow[data-active='true'] {
+  background: var(--sh-accent-soft);
+}
+
+.nf-selrow[data-active='true'] .nf-entname {
+  color: var(--sh-accent);
+}
+
+/* Row actions (archive/delete) hidden until the row is hovered or focused. */
+.nf-rowactions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.nf-selrow:hover .nf-rowactions,
+.nf-selrow:focus-within .nf-rowactions {
+  opacity: 1;
+}
+
+.nf-rowaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.nf-rowaction:hover {
+  background: var(--sh-bg-pressed);
+  color: var(--sh-text-primary);
+}
+
+.nf-rowaction[data-danger]:hover {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-solid);
+}
+
+.nf-cardhover {
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
+}
+
+/* Prominent "Showing" trigger for the story-bible type selector. */
+.nf-btrigger {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  width: 100%;
+  padding: 11px 12px;
+  border-radius: var(--sh-radius-lg);
+  border: 1.5px solid var(--sh-border-interactive);
+  background: var(--sh-surface-app);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.nf-btrigger:hover {
+  border-color: var(--sh-accent);
+  background: var(--sh-surface-raised);
+}
+
+.nf-menuitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.nf-menuitem:hover {
+  background: var(--sh-bg-hover);
+}
+
+.nf-menuitem[data-active='true'] {
+  background: var(--sh-accent-soft);
+}
+
+.nf-catcard {
+  text-align: left;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 15px;
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.nf-catcard:hover {
+  border-color: var(--sh-accent);
+  box-shadow: var(--sh-shadow-e2);
+  transform: translateY(-2px);
+}
+
+.nf-cardhover:hover {
+  border-color: var(--sh-border-strong);
+  box-shadow: var(--sh-shadow-e2);
+}
+
+@keyframes nf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes nf-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+@keyframes nf-swap {
+  from {
+    opacity: 0;
+    transform: translateX(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.nf-swap {
+  animation: nf-swap 0.22s ease;
+}
+
+.nf-spin {
+  animation: nf-spin 0.8s linear infinite;
+}
+
+.nf-pulse {
+  animation: nf-pulse 1.4s ease-in-out infinite;
 }
 
 /* Streaming caret used by the AI generation screen */

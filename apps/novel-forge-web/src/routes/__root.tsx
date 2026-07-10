@@ -4,14 +4,14 @@
 import { TanStackDevtools } from '@tanstack/react-devtools';
 import type { QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { EmptyState } from '@shadow-library/ui';
 import { HeadContent, Outlet, createRootRouteWithContext, useNavigate } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
-import { Button, Result } from 'antd';
 
 /**
  *  Importing user defined modules
  */
-import Layout from '../components/Layout';
+import { AppShell } from '../components/Layout';
 
 /**
  * Declaring types
@@ -28,18 +28,16 @@ interface RouterContext {
 function NotFound() {
   const navigate = useNavigate();
   return (
-    <Layout>
-      <Result
-        status="404"
-        title="Page not found"
-        subTitle="That page doesn’t exist. Head back to your dashboard."
-        extra={
-          <Button type="primary" onClick={() => navigate({ to: '/' })}>
-            Go to dashboard
-          </Button>
-        }
-      />
-    </Layout>
+    <AppShell>
+      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '48px 28px' }}>
+        <EmptyState
+          size="page"
+          title="Page not found"
+          description="That page doesn’t exist. Head back to your projects."
+          action={{ label: 'Go to projects', onClick: () => navigate({ to: '/' }) }}
+        />
+      </div>
+    </AppShell>
   );
 }
 
@@ -49,13 +47,15 @@ export const Route = createRootRouteWithContext<RouterContext>()({
     <>
       <HeadContent />
       <Outlet />
-      <TanStackDevtools
-        config={{ position: 'bottom-right' }}
-        plugins={[
-          { name: 'Tanstack Router', render: <TanStackRouterDevtools /> },
-          { name: 'React Query', render: <ReactQueryDevtools /> },
-        ]}
-      />
+      {import.meta.env.DEV && (
+        <TanStackDevtools
+          config={{ position: 'bottom-right' }}
+          plugins={[
+            { name: 'Tanstack Router', render: <TanStackRouterDevtools /> },
+            { name: 'React Query', render: <ReactQueryDevtools /> },
+          ]}
+        />
+      )}
     </>
   ),
 });

@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { Toaster, TooltipProvider } from '@shadow-library/ui';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 /**
@@ -21,10 +22,13 @@ export interface AppProviderProps {
  */
 export const queryClient = new QueryClient();
 
-export default function AppProvider(props: AppProviderProps) {
+export default function AppProvider(props: AppProviderProps): React.JSX.Element {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider>{props.children}</ThemeProvider>
+      <ThemeProvider>
+        <TooltipProvider>{props.children}</TooltipProvider>
+        <Toaster placement="bottom-end" />
+      </ThemeProvider>
     </QueryClientProvider>
   );
 }

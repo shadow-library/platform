@@ -6,12 +6,12 @@ import { Outlet, createFileRoute } from '@tanstack/react-router';
 /**
  * Importing user defined modules
  */
-import { GlobalShell } from '@/components/Layout';
+import { AppShell } from '@/components/Layout';
 
 export const Route = createFileRoute('/_app')({
   component: () => (
-    <GlobalShell>
+    <AppShell>
       <Outlet />
-    </GlobalShell>
+    </AppShell>
   ),
 });
