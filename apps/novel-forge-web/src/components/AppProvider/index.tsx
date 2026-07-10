@@ -27,7 +27,7 @@ export default function AppProvider(props: AppProviderProps): React.JSX.Element 
     <QueryClientProvider client={queryClient}>
       <ThemeProvider>
         <TooltipProvider>{props.children}</TooltipProvider>
-        <Toaster placement="bottom-end" />
+        <Toaster placement="top-end" />
       </ThemeProvider>
     </QueryClientProvider>
   );
