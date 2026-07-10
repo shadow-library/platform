@@ -89,11 +89,39 @@ export interface BriefUpdateOp {
   chapter: number;
   title?: string;
   body?: string;
+  volumeKey?: string;
+  arcKey?: string;
   contextRefs?: string[];
   endingContract?: EndingContract;
 }
 
-export type ChangeOp = PremiseUpdateOp | BibleDocumentUpsertOp | BibleDocumentRemoveOp | VolumeUpsertOp | VolumeRemoveOp | ArcUpsertOp | ArcRemoveOp | BriefUpdateOp;
+export interface EntityUpsertOp {
+  op: 'entity.upsert';
+  entityKey: string;
+  type: 'character' | 'faction' | 'location' | 'power_rule' | 'item' | 'concept';
+  name?: string;
+  status?: string;
+  motivation?: string;
+  notes?: string;
+  body?: string;
+}
+
+export interface EntityRemoveOp {
+  op: 'entity.remove';
+  entityKey: string;
+}
+
+export type ChangeOp =
+  | PremiseUpdateOp
+  | BibleDocumentUpsertOp
+  | BibleDocumentRemoveOp
+  | VolumeUpsertOp
+  | VolumeRemoveOp
+  | ArcUpsertOp
+  | ArcRemoveOp
+  | BriefUpdateOp
+  | EntityUpsertOp
+  | EntityRemoveOp;
 export type OpType = ChangeOp['op'];
 
 type FieldKind = 'string' | 'number' | 'string[]' | 'object';
@@ -108,6 +136,7 @@ interface OpSpec {
 
 const HOOK_TYPES = ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn'];
 const BIBLE_SECTIONS = ['project', 'world', 'power', 'plot', 'story_state', 'ai', 'lore'];
+const ENTITY_TYPES = ['character', 'faction', 'location', 'power_rule', 'item', 'concept'];
 
 const OP_SPECS: Record<OpType, OpSpec> = {
   'premise.update': { required: {}, optional: { premise: 'string', brief: 'string', themes: 'string[]', instructions: 'string' } },
@@ -134,7 +163,15 @@ const OP_SPECS: Record<OpType, OpSpec> = {
     },
   },
   'arc.remove': { required: { arcKey: 'string' }, optional: {} },
-  'brief.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', contextRefs: 'string[]', endingContract: 'object' } },
+  'brief.update': {
+    required: { chapter: 'number' },
+    optional: { title: 'string', body: 'string', volumeKey: 'string', arcKey: 'string', contextRefs: 'string[]', endingContract: 'object' },
+  },
+  'entity.upsert': {
+    required: { entityKey: 'string', type: 'string' },
+    optional: { name: 'string', status: 'string', motivation: 'string', notes: 'string', body: 'string' },
+  },
+  'entity.remove': { required: { entityKey: 'string' }, optional: {} },
 };
 
 export const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
@@ -186,6 +223,7 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     }
 
     if (op.startsWith('bible_document') && !BIBLE_SECTIONS.includes(record['section'] as string)) errors.push(`${path}: section must be one of ${BIBLE_SECTIONS.join(', ')}`);
+    if (op === 'entity.upsert' && !ENTITY_TYPES.includes(record['type'] as string)) errors.push(`${path}: type must be one of ${ENTITY_TYPES.join(', ')}`);
     if (op === 'brief.update' && record['endingContract'] !== undefined) validateEndingContract(record['endingContract'], path, errors);
     if (op === 'arc.upsert' && typeof record['chapterStart'] === 'number' && typeof record['chapterEnd'] === 'number' && record['chapterStart'] > record['chapterEnd']) {
       errors.push(`${path}: chapterStart must be <= chapterEnd`);
@@ -206,7 +244,10 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
     const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
     return `- {"op": "${op}"${[...required, ...optional].map(f => `, ${f}`).join('')}}`;
   });
-  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}`;
+  const contractShape = ops.includes('brief.update')
+    ? `\nendingContract, when present, must be exactly: {"hookType": <one of: ${HOOK_TYPES.join(' | ')}>, "emotionalBeat": <non-empty string>, "openQuestion": <non-empty string>, "handoffState": <non-empty string>, "mustNotResolve": <string[], optional>} — hookType is an enum, never free text.`
+    : '';
+  return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}${contractShape}`;
 }
 
 /** The artifact refs a change-set touches — the keys used for baselines, conflict checks, and supersession. */
@@ -216,6 +257,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'bible_document.upsert' || op.op === 'bible_document.remove') return `doc:${op.section}/${op.slug}`;
     if (op.op === 'volume.upsert' || op.op === 'volume.remove') return `volume:${op.volumeKey}`;
     if (op.op === 'arc.upsert' || op.op === 'arc.remove') return `arc:${op.arcKey}`;
+    if (op.op === 'entity.upsert' || op.op === 'entity.remove') return `entity:${op.entityKey}`;
     return `chapter:${op.chapter}`;
   });
   return [...new Set(refs)];

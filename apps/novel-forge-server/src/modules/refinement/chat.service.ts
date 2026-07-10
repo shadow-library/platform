@@ -23,6 +23,7 @@ import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
+import { type AiRole, type ResolvedModel, getProfileDefaults } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt, renderScopeInstructions } from '../ai/prompts';
@@ -63,6 +64,19 @@ interface SessionListFilter {
 // KEEP_VERBATIM_TURNS messages always stay verbatim.
 const MAX_VERBATIM_TURNS = 12;
 const KEEP_VERBATIM_TURNS = 6;
+
+// Which planning discipline each chat scope belongs to. A chat scoped to an arc IS arc-planning
+// work, so it defaults to the model the author configured for arc planning in the project settings —
+// not to a one-size-fits-all chat model. See resolveSessionModel for the full resolution ladder.
+export const SCOPE_CHAT_ROLE: Record<Refinement.ChatScope, AiRole> = {
+  novel: 'chat',
+  volume_plan: 'plan',
+  volume: 'plan',
+  arc_plan: 'arc',
+  arc: 'arc',
+  brief: 'outline',
+  bible_document: 'bible',
+};
 
 @Injectable()
 export class ChatService {
@@ -162,6 +176,25 @@ export class ChatService {
     return updated;
   }
 
+  /** Deletes a chat and its whole history (messages cascade); staged proposals survive with the session detached. */
+  async deleteSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
+    const session = await this.getSession(projectId, sessionId);
+    await this.db.delete(schema.chatSessions).where(eq(schema.chatSessions.id, session.id));
+    return session;
+  }
+
+  /** Sets (or clears, with nulls) the per-session model override used for every turn in this chat. */
+  async updateSessionModel(projectId: bigint, sessionId: string, provider: string | null, model: string | null): Promise<Refinement.ChatSession> {
+    const session = await this.getSession(projectId, sessionId);
+    const [updated] = await this.db
+      .update(schema.chatSessions)
+      .set({ modelProvider: provider, modelId: model, updatedAt: new Date() })
+      .where(eq(schema.chatSessions.id, session.id))
+      .returning();
+    if (!updated) throw new ServerError(AppErrorCode.CHT_001);
+    return updated;
+  }
+
   async listMessages(projectId: bigint, sessionId: string, opts: { before?: number; limit?: number }): Promise<Refinement.ChatMessage[]> {
     await this.getSession(projectId, sessionId);
     const conditions = [eq(schema.chatMessages.sessionId, sessionId)];
@@ -197,16 +230,43 @@ export class ChatService {
       userMessage: content,
     };
 
+    // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
+    // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
+    const resolvedModel = this.resolveSessionModel(session, project as ProjectConfig | undefined);
+    const baseConfig = (project?.config as { models?: Record<string, unknown> } | null) ?? {};
+    const effectiveProject = { ...project, config: { ...baseConfig, models: { ...(baseConfig.models ?? {}), chat: resolvedModel } } } as typeof project;
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
-      const output = (await this.modelRouter.structured(prompt, input, ctx, project as ProjectConfig | undefined)) as ChatRefineOutput;
-      return this.persistTurn(projectId, session, content, output, runId);
+      const output = (await this.modelRouter.structured(prompt, input, ctx, effectiveProject as ProjectConfig | undefined)) as ChatRefineOutput;
+      return this.persistTurn(projectId, session, content, output, runId, resolvedModel);
     });
 
     return { ...result, runId };
   }
 
-  private async persistTurn(projectId: bigint, session: Refinement.ChatSession, content: string, output: ChatRefineOutput, runId: string): Promise<Omit<ChatTurnResult, 'runId'>> {
+  /**
+   * The chat model resolution ladder, most specific first:
+   *  1. the chat's own override (the author picked a model for this conversation),
+   *  2. the project setting for the scope's planning role (arc chat → the arc-planning model),
+   *  3. the project setting for the generic chat role,
+   *  4. the AI profile default for the scope's role, then for chat.
+   */
+  private resolveSessionModel(session: Refinement.ChatSession, project?: ProjectConfig): ResolvedModel {
+    if (session.modelProvider && session.modelId) return { provider: session.modelProvider, model: session.modelId };
+    const scopeRole = SCOPE_CHAT_ROLE[session.scopeType];
+    const configured = (project?.config?.models ?? {}) as Partial<Record<AiRole, ResolvedModel>>;
+    const defaults = getProfileDefaults();
+    return configured[scopeRole] ?? configured['chat'] ?? defaults[scopeRole] ?? defaults['chat'];
+  }
+
+  private async persistTurn(
+    projectId: bigint,
+    session: Refinement.ChatSession,
+    content: string,
+    output: ChatRefineOutput,
+    runId: string,
+    model: { provider: string; model: string },
+  ): Promise<Omit<ChatTurnResult, 'runId'>> {
     const lastOrdinal = await this.latestOrdinal(session.id);
 
     const [userMessage] = await this.db
@@ -215,7 +275,17 @@ export class ChatService {
       .returning();
     const [assistantMessage] = await this.db
       .insert(schema.chatMessages)
-      .values({ sessionId: session.id, projectId, ordinal: lastOrdinal + 2, role: 'assistant', content: output.reply, runId, tokens: countTokens(output.reply) })
+      .values({
+        sessionId: session.id,
+        projectId,
+        ordinal: lastOrdinal + 2,
+        role: 'assistant',
+        content: output.reply,
+        runId,
+        modelProvider: model.provider,
+        modelId: model.model,
+        tokens: countTokens(output.reply),
+      })
       .returning();
     if (!userMessage || !assistantMessage) throw new ServerError(AppErrorCode.CHT_001);
 

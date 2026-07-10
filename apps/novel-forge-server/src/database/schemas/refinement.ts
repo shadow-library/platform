@@ -50,6 +50,10 @@ export const chatSessions = pgTable(
     scopeRef: varchar('scope_ref'),
     title: varchar('title', { length: 500 }),
     status: chatSessionStatus('status').notNull().default('active'),
+    // Per-session model override (null → the project/profile default). Lets one chat run on a different
+    // provider/model without changing the project defaults; new sessions inherit the default.
+    modelProvider: varchar('model_provider'),
+    modelId: varchar('model_id'),
     summary: text('summary'),
     summaryThroughOrdinal: integer('summary_through_ordinal').notNull().default(0),
     lastTurnAt: timestamp('last_turn_at'),
@@ -76,6 +80,10 @@ export const chatMessages = pgTable(
     // message it belongs to, and a FK here would be circular with refinement_proposals.message_id.
     proposalId: bigint('proposal_id', { mode: 'bigint' }),
     runId: varchar('run_id'),
+    // The resolved provider/model that produced an assistant message (null on user messages), so the
+    // transcript can attribute every reply even after the session's override or the defaults change.
+    modelProvider: varchar('model_provider'),
+    modelId: varchar('model_id'),
     tokens: integer('tokens'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },

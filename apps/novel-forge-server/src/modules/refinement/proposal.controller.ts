@@ -13,6 +13,7 @@ import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor } fro
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { ApplyProposalResponse, ListProposalResponse, ListProposalsQuery, ProposalIdParams, ProposalProjectParams, ProposalResponse, UpdateProposalBody } from './refinement.dto';
+import { serialiseProposal } from './serialise';
 
 /**
  * Defining types
@@ -32,30 +33,32 @@ export class ProposalController {
   @Get()
   @RespondFor(200, ListProposalResponse)
   listProposals(@Params() params: ProposalProjectParams, @Query() query: ListProposalsQuery): Promise<ListProposalResponse> {
-    return this.proposalService.list(params.projectId, query) as unknown as Promise<ListProposalResponse>;
+    return this.proposalService.list(params.projectId, query).then(r => ({ ...r, items: r.items.map(serialiseProposal) })) as unknown as Promise<ListProposalResponse>;
   }
 
   @Get('/:proposalId')
   @RespondFor(200, ProposalResponse)
   getProposal(@Params() params: ProposalIdParams): Promise<ProposalResponse> {
-    return this.proposalService.get(params.projectId, params.proposalId) as unknown as Promise<ProposalResponse>;
+    return this.proposalService.get(params.projectId, params.proposalId).then(serialiseProposal) as unknown as Promise<ProposalResponse>;
   }
 
   @Patch('/:proposalId')
   @RespondFor(200, ProposalResponse)
   updateProposal(@Params() params: ProposalIdParams, @Body() body: UpdateProposalBody): Promise<ProposalResponse> {
-    return this.proposalService.updateChangeSet(params.projectId, params.proposalId, body.changeSet) as unknown as Promise<ProposalResponse>;
+    return this.proposalService.updateChangeSet(params.projectId, params.proposalId, body.changeSet).then(serialiseProposal) as unknown as Promise<ProposalResponse>;
   }
 
   @Post('/:proposalId/apply')
   @RespondFor(200, ApplyProposalResponse)
   applyProposal(@Params() params: ProposalIdParams): Promise<ApplyProposalResponse> {
-    return this.proposalApplyService.apply(params.projectId, params.proposalId) as unknown as Promise<ApplyProposalResponse>;
+    return this.proposalApplyService
+      .apply(params.projectId, params.proposalId)
+      .then(r => ({ ...r, proposal: serialiseProposal(r.proposal) })) as unknown as Promise<ApplyProposalResponse>;
   }
 
   @Post('/:proposalId/discard')
   @RespondFor(200, ProposalResponse)
   discardProposal(@Params() params: ProposalIdParams): Promise<ProposalResponse> {
-    return this.proposalService.discard(params.projectId, params.proposalId) as unknown as Promise<ProposalResponse>;
+    return this.proposalService.discard(params.projectId, params.proposalId).then(serialiseProposal) as unknown as Promise<ProposalResponse>;
   }
 }

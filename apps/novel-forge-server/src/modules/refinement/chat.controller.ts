@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -22,8 +22,10 @@ import {
   ListChatMessagesResponse,
   ListChatSessionResponse,
   ListChatSessionsQuery,
+  UpdateSessionModelBody,
 } from './chat.dto';
 import { ChatService } from './chat.service';
+import { serialiseMessage, serialiseProposal } from './serialise';
 
 /**
  * Defining types
@@ -59,13 +61,30 @@ export class ChatController {
   @RespondFor(200, ListChatMessagesResponse)
   async listMessages(@Params() params: ChatSessionParams, @Query() query: ListChatMessagesQuery): Promise<ListChatMessagesResponse> {
     const messages = await this.chatService.listMessages(params.projectId, params.sessionId, query);
-    return { messages: messages as unknown as ChatMessageResponse[] };
+    return { messages: messages.map(serialiseMessage) as unknown as ChatMessageResponse[] };
   }
 
   @Post('/:sessionId/messages')
   @RespondFor(201, ChatTurnResponse)
   turn(@Params() params: ChatSessionParams, @Body() body: ChatTurnBody): Promise<ChatTurnResponse> {
-    return this.chatService.turn(params.projectId, params.sessionId, body.content).then(r => ({ ...r, proposal: r.proposal ?? undefined })) as unknown as Promise<ChatTurnResponse>;
+    return this.chatService.turn(params.projectId, params.sessionId, body.content).then(r => ({
+      userMessage: serialiseMessage(r.userMessage),
+      assistantMessage: serialiseMessage(r.assistantMessage),
+      proposal: r.proposal ? serialiseProposal(r.proposal) : undefined,
+      runId: r.runId,
+    })) as unknown as Promise<ChatTurnResponse>;
+  }
+
+  @Patch('/:sessionId/model')
+  @RespondFor(200, ChatSessionResponse)
+  updateSessionModel(@Params() params: ChatSessionParams, @Body() body: UpdateSessionModelBody): Promise<ChatSessionResponse> {
+    return this.chatService.updateSessionModel(params.projectId, params.sessionId, body.provider ?? null, body.model ?? null) as unknown as Promise<ChatSessionResponse>;
+  }
+
+  @Delete('/:sessionId')
+  @RespondFor(200, ChatSessionResponse)
+  deleteSession(@Params() params: ChatSessionParams): Promise<ChatSessionResponse> {
+    return this.chatService.deleteSession(params.projectId, params.sessionId) as unknown as Promise<ChatSessionResponse>;
   }
 
   @Post('/:sessionId/archive')

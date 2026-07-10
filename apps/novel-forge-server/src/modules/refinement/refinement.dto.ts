@@ -58,8 +58,19 @@ export class ListProposalsQuery extends PaginationQuery(SortByTime) {
 
 @Schema({ minProperties: 1 })
 export class UpdateProposalBody {
-  @Field(() => [Object])
+  // A discriminated union of ~10 op shapes (see `change-set.ts`), each keyed by `op`. It's kept as an
+  // open `ChangeOpItem` array rather than a modelled union because the ops are validated structurally
+  // server-side (`validateChangeSet`) and the client renders them generically — `additionalProperties`
+  // preserves each op's fields on the wire.
+  @Field(() => [ChangeOpItem])
   changeSet: Record<string, unknown>[];
+}
+
+// A change-set operation on the wire: op plus whatever fields that op carries (validated server-side).
+@Schema({ additionalProperties: true })
+export class ChangeOpItem {
+  @Field()
+  op: string;
 }
 
 @Schema()
@@ -91,10 +102,14 @@ export class ProposalResponse {
   @Field({ optional: true, nullable: true })
   summary?: string | null;
 
-  @Field(() => [Object])
+  // Loose-object items keep the nested op fields intact; a bare `[Object]` makes the response
+  // serialiser strip every nested key and the review UI would render empty change-sets.
+  @Field(() => [ChangeOpItem])
   changeSet: Record<string, unknown>[];
 
-  @Field(() => Object)
+  // Snapshot of the artifacts the change-set was drafted against (keyed by artifact ref) — an open map
+  // whose shape follows those refs, so it keeps `additionalProperties` to preserve every key.
+  @Field(() => Object, { additionalProperties: true })
   baseline: Record<string, unknown>;
 
   @Field({ optional: true, nullable: true })
@@ -106,7 +121,9 @@ export class ProposalResponse {
   @Field(() => String, { format: 'date-time', optional: true, nullable: true })
   appliedAt?: Date | null;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  // Failure detail recorded when an apply fails — an open, error-source-specific blob, so it keeps
+  // `additionalProperties` to preserve its nested keys.
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   error?: Record<string, unknown> | null;
 
   @Field(() => String, { format: 'date-time' })

@@ -57,6 +57,16 @@ export class CreateChatSessionBody {
 }
 
 @Schema()
+export class UpdateSessionModelBody {
+  // Both null (or omitted) clears the override so the session falls back to the project/profile default.
+  @Field({ optional: true, nullable: true })
+  provider?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  model?: string | null;
+}
+
+@Schema()
 export class ListChatSessionsQuery extends PaginationQuery(SortByTime) {
   @Field(() => ChatScope, { optional: true })
   scopeType?: Refinement.ChatScope;
@@ -84,6 +94,12 @@ export class ChatSessionResponse {
 
   @Field(() => ChatSessionStatus)
   status: Refinement.ChatSessionStatus;
+
+  @Field({ optional: true, nullable: true })
+  modelProvider?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  modelId?: string | null;
 
   @Field({ optional: true, nullable: true })
   summary?: string | null;
@@ -135,6 +151,12 @@ export class ChatMessageResponse {
 
   @Field({ optional: true, nullable: true })
   runId?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  modelProvider?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  modelId?: string | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

@@ -27,6 +27,8 @@ import {
   type BibleDocumentUpsertOp,
   type BriefUpdateOp,
   type ChangeOp,
+  type EntityRemoveOp,
+  type EntityUpsertOp,
   type PremiseUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
@@ -170,6 +172,10 @@ export class ProposalApplyService {
         return this.applyArcRemove(ctx, op);
       case 'brief.update':
         return this.applyBriefUpdate(ctx, op);
+      case 'entity.upsert':
+        return this.applyEntityUpsert(ctx, op);
+      case 'entity.remove':
+        return this.applyEntityRemove(ctx, op);
     }
   }
 
@@ -375,21 +381,63 @@ export class ProposalApplyService {
     if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw new ServerError(AppErrorCode.RFN_005);
 
     const existing = await ctx.tx.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)) });
-    if (!existing) throw new ServerError(AppErrorCode.RFN_004);
+
+    // A missing brief is creatable — refinement is a first-class authoring path — but only with a body;
+    // without one there is nothing for the chapter author to draft from.
+    if (!existing && op.body === undefined) throw new ServerError(AppErrorCode.RFN_004);
 
     const merged = {
-      title: op.title ?? existing.title,
-      body: op.body ?? existing.body,
-      contextRefs: op.contextRefs ?? existing.contextRefs,
-      endingContract: op.endingContract ?? existing.endingContract,
+      title: op.title ?? existing?.title ?? null,
+      body: op.body ?? existing?.body ?? '',
+      volumeKey: op.volumeKey ?? existing?.volumeKey ?? null,
+      arcKey: op.arcKey ?? existing?.arcKey ?? null,
+      contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
+      endingContract: op.endingContract ?? existing?.endingContract ?? null,
     };
-    const contentHash = briefContentHash({ chapter: op.chapter, volumeKey: existing.volumeKey, arcKey: existing.arcKey, ...merged });
-    const revision = existing.revision + 1;
+    const contentHash = briefContentHash({ chapter: op.chapter, ...merged });
+    const revision = (existing?.revision ?? 0) + 1;
 
-    await ctx.tx
-      .update(schema.briefs)
-      .set({ ...merged, revision, contentHash, staleReason: null, updatedAt: new Date() })
-      .where(eq(schema.briefs.id, existing.id));
+    if (existing) {
+      await ctx.tx
+        .update(schema.briefs)
+        .set({ ...merged, revision, contentHash, staleReason: null, updatedAt: new Date() })
+        .where(eq(schema.briefs.id, existing.id));
+    } else {
+      await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash });
+    }
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: revision });
+  }
+
+  private async applyEntityUpsert(ctx: ApplyContext, op: EntityUpsertOp): Promise<void> {
+    const existing = await ctx.tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)) });
+    if (!existing && !op.name) throw new ServerError(AppErrorCode.RFN_004);
+
+    const merged = {
+      type: op.type,
+      name: op.name ?? existing?.name ?? op.entityKey,
+      status: op.status ?? existing?.status ?? null,
+      motivation: op.motivation ?? existing?.motivation ?? null,
+      notes: op.notes ?? existing?.notes ?? null,
+      body: op.body ?? existing?.body ?? null,
+    };
+
+    if (existing) {
+      await ctx.tx
+        .update(schema.entities)
+        .set({ ...merged, updatedAt: new Date() })
+        .where(eq(schema.entities.id, existing.id));
+    } else {
+      await ctx.tx.insert(schema.entities).values({ projectId: ctx.projectId, entityKey: op.entityKey, ...merged, origin: 'generated' });
+    }
+    ctx.applied.push({ artifactRef: `entity:${op.entityKey}`, newRevision: null });
+  }
+
+  private async applyEntityRemove(ctx: ApplyContext, op: EntityRemoveOp): Promise<void> {
+    const deleted = await ctx.tx
+      .delete(schema.entities)
+      .where(and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)))
+      .returning();
+    if (deleted.length === 0) throw new ServerError(AppErrorCode.RFN_004);
+    ctx.applied.push({ artifactRef: `entity:${op.entityKey}`, newRevision: null });
   }
 }

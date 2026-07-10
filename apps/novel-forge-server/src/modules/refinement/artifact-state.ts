@@ -29,6 +29,7 @@ interface ParsedRefs {
   volumeKeys: string[];
   arcKeys: string[];
   chapters: number[];
+  entityKeys: string[];
 }
 
 /**
@@ -38,7 +39,7 @@ interface ParsedRefs {
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [] };
+  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], entityKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
     else if (ref.startsWith('doc:')) {
@@ -47,6 +48,7 @@ function parseRefs(refs: string[]): ParsedRefs {
     } else if (ref.startsWith('volume:')) parsed.volumeKeys.push(ref.slice(7));
     else if (ref.startsWith('arc:')) parsed.arcKeys.push(ref.slice(4));
     else if (ref.startsWith('chapter:')) parsed.chapters.push(Number(ref.slice(8)));
+    else if (ref.startsWith('entity:')) parsed.entityKeys.push(ref.slice(7));
   }
   return parsed;
 }
@@ -99,6 +101,15 @@ export async function loadArtifactStates(db: PrimaryDatabase, projectId: bigint,
   if (parsed.chapters.length > 0) {
     const rows = await db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, parsed.chapters)) });
     for (const row of rows) states[`chapter:${row.chapter}`] = { exists: true, revision: row.revision, contentHash: row.contentHash };
+  }
+
+  // Entities carry no revision column — their state is a content hash over the refinable fields.
+  if (parsed.entityKeys.length > 0) {
+    const rows = await db.query.entities.findMany({ where: and(eq(schema.entities.projectId, projectId), inArray(schema.entities.entityKey, parsed.entityKeys)) });
+    for (const row of rows) {
+      const contentHash = computeContentHash({ name: row.name, type: row.type, status: row.status, motivation: row.motivation, notes: row.notes, body: row.body });
+      states[`entity:${row.entityKey}`] = { exists: true, revision: null, contentHash };
+    }
   }
 
   return states;
