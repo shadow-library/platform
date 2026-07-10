@@ -12,7 +12,7 @@ import { Body, Get, HttpController, Params, Put, RespondFor, ServerError } from 
  */
 import { AppErrorCode } from '@server/classes';
 
-import { BibleDocParams, BibleDocResponse, UpsertBibleDocBody } from './bible-document.dto';
+import { BibleDocParams, BibleDocProjectParams, BibleDocResponse, ListBibleDocResponse, UpsertBibleDocBody } from './bible-document.dto';
 import { BibleDocumentService } from './bible-document.service';
 
 /**
@@ -26,6 +26,13 @@ import { BibleDocumentService } from './bible-document.service';
 @HttpController('/projects/:projectId/bible')
 export class BibleDocumentController {
   constructor(private readonly bibleDocumentService: BibleDocumentService) {}
+
+  @Get()
+  @RespondFor(200, ListBibleDocResponse)
+  async listBibleDocs(@Params() params: BibleDocProjectParams): Promise<ListBibleDocResponse> {
+    const docs = await this.bibleDocumentService.list(params.projectId);
+    return { docs } as unknown as ListBibleDocResponse;
+  }
 
   @Get('/:section/:slug')
   @RespondFor(200, BibleDocResponse)

@@ -77,7 +77,9 @@ export class AssetsResponse {
 
 @Schema()
 export class SkeletonResponse {
-  @Field(() => Object)
+  // Source-derived skeleton of each character's arc — an open, model-produced map with no fixed key
+  // set, so it stays an object with `additionalProperties` to preserve every nested key.
+  @Field(() => Object, { additionalProperties: true })
   characterArcs: unknown;
 
   @Field()

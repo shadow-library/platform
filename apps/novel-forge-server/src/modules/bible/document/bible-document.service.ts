@@ -36,6 +36,14 @@ export class BibleDocumentService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
+  list(projectId: bigint): Promise<{ section: Bible.Section; slug: string; updatedAt: Date }[]> {
+    return this.db.query.bibleDocuments.findMany({
+      where: eq(schema.bibleDocuments.projectId, projectId),
+      columns: { section: true, slug: true, updatedAt: true },
+      orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug],
+    });
+  }
+
   get(projectId: bigint, section: Bible.Section, slug: string): Promise<Bible.Document | null> {
     return this.db.query.bibleDocuments
       .findFirst({

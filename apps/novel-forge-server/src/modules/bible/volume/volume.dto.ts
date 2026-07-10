@@ -72,8 +72,9 @@ export class CreateVolumeBody {
   @Field(() => PlanStatus, { optional: true })
   status?: Plan.Status;
 
-  @Field(() => Object, { optional: true })
-  cast?: Record<string, unknown>;
+  // The volume's cast — the entity keys of the characters it features (see `VolumeUpsertOp.cast`).
+  @Field(() => [String], { optional: true })
+  cast?: string[];
 
   @Field({ optional: true })
   body?: string;
@@ -123,8 +124,9 @@ export class VolumeResponse {
   @Field(() => PlanStatus)
   status: Plan.Status;
 
-  @Field(() => Object, { optional: true, nullable: true })
-  cast?: Record<string, unknown> | null;
+  // Entity keys of the characters this volume features (see the body DTO).
+  @Field(() => [String], { optional: true, nullable: true })
+  cast?: string[] | null;
 
   @Field({ optional: true, nullable: true })
   body?: string | null;

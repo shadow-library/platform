@@ -44,11 +44,31 @@ export class BibleDocParams {
 
 @Schema()
 export class UpsertBibleDocBody {
-  @Field(() => Object, { optional: true })
+  // Author-authored YAML frontmatter: an open key/value map with no fixed schema (keys vary per
+  // document and section), so it stays an object with `additionalProperties` to keep every key.
+  @Field(() => Object, { optional: true, additionalProperties: true })
   frontmatter?: Record<string, unknown>;
 
   @Field({ optional: true })
   body?: string;
+}
+
+@Schema()
+export class BibleDocListItem {
+  @Field(() => BibleSection)
+  section: Bible.Section;
+
+  @Field()
+  slug: string;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ListBibleDocResponse {
+  @Field(() => [BibleDocListItem])
+  docs: BibleDocListItem[];
 }
 
 @Schema()
@@ -65,7 +85,9 @@ export class BibleDocResponse {
   @Field()
   slug: string;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  // Open YAML frontmatter (see UpsertBibleDocBody). `additionalProperties` is required here — without
+  // it the response serialiser strips every nested key and returns `{}`.
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   frontmatter?: Record<string, unknown> | null;
 
   @Field({ optional: true, nullable: true })

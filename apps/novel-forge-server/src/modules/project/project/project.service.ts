@@ -9,7 +9,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, inArray, ne, notInArray } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -47,6 +47,12 @@ export class ProjectService {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
+  // The `ProjectResponse.config` schema is a non-nullable object; a fresh project stores `config = null`,
+  // so map that to `undefined` (an omitted field) before it reaches the serialiser.
+  private present<T extends Project.Row>(project: T): T {
+    return project.config == null ? { ...project, config: undefined } : project;
+  }
+
   async create(body: CreateProjectBody): Promise<Project.Row> {
     if (body.kind === 'source' && !body.url) throw new ServerError(AppErrorCode.SRC_001);
 
@@ -65,7 +71,7 @@ export class ProjectService {
         .catch(err => this.databaseService.translateError(err));
     }
 
-    return project;
+    return this.present(project);
   }
 
   async list(filter: ListProjectsQuery): Promise<OffsetPaginationResult<Project.Row>> {
@@ -83,11 +89,15 @@ export class ProjectService {
       this.db.query.projects.findMany({ where, limit: query.limit, offset: query.offset, orderBy: order }),
     ]);
 
-    return utils.pagination.createResult(query, items, total);
+    return utils.pagination.createResult(
+      query,
+      items.map(item => this.present(item)),
+      total,
+    );
   }
 
   get(id: bigint): Promise<Project.Row | null> {
-    return this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) }).then(r => r ?? null);
+    return this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) }).then(r => (r ? this.present(r) : null));
   }
 
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Row> {
@@ -99,7 +109,7 @@ export class ProjectService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!result) throw new ServerError(AppErrorCode.PRJ_001);
-    return result;
+    return this.present(result);
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Row> {
@@ -118,7 +128,7 @@ export class ProjectService {
           kind: source.kind,
           title: source.title,
           contentMode: body.contentMode ?? source.contentMode,
-          config: (body.config ?? source.config) as Record<string, unknown> | null,
+          config: body.config ?? source.config ?? null,
           sourceUrl: source.sourceUrl,
           sourceAdapter: source.sourceAdapter,
           sourceNovelId: source.sourceNovelId,
@@ -177,7 +187,7 @@ export class ProjectService {
         }
       }
 
-      return newProject;
+      return this.present(newProject);
     });
   }
 
@@ -231,14 +241,39 @@ export class ProjectService {
     const project = await this.get(id);
     if (!project) throw new ServerError(AppErrorCode.PRJ_001);
 
-    const [chaptersTotal, chaptersExtracted, draftsTotal, draftsFinal, volumesTotal, unapprovedVolumes] = await Promise.all([
-      this.db.$count(schema.chapters, eq(schema.chapters.projectId, id)),
-      this.db.$count(schema.chapters, and(eq(schema.chapters.projectId, id), eq(schema.chapters.status, 'done'))),
-      this.db.$count(schema.drafts, eq(schema.drafts.projectId, id)),
-      this.db.$count(schema.drafts, and(eq(schema.drafts.projectId, id), eq(schema.drafts.status, 'final'))),
-      this.db.$count(schema.volumes, eq(schema.volumes.projectId, id)),
-      this.db.$count(schema.volumes, and(eq(schema.volumes.projectId, id), ne(schema.volumes.status, 'approved'))),
+    // Three single-row aggregate queries with conditional counts, rather than six concurrent `$count`
+    // calls: fewer connections under load (drizzle's `$count` intermittently crashed on `res[0].count`
+    // when the pool was contended by in-flight generation writes), and each `?? 0` is crash-proof.
+    const [chapterRow, draftRow, volumeRow] = await Promise.all([
+      this.db
+        .select({
+          total: sql<number>`count(*)::int`,
+          extracted: sql<number>`(count(*) filter (where ${schema.chapters.status} = 'done'))::int`,
+        })
+        .from(schema.chapters)
+        .where(eq(schema.chapters.projectId, id)),
+      this.db
+        .select({
+          total: sql<number>`count(*)::int`,
+          final: sql<number>`(count(*) filter (where ${schema.drafts.status} = 'final'))::int`,
+        })
+        .from(schema.drafts)
+        .where(eq(schema.drafts.projectId, id)),
+      this.db
+        .select({
+          total: sql<number>`count(*)::int`,
+          unapproved: sql<number>`(count(*) filter (where ${schema.volumes.status} <> 'approved'))::int`,
+        })
+        .from(schema.volumes)
+        .where(eq(schema.volumes.projectId, id)),
     ]);
+
+    const chaptersTotal = chapterRow[0]?.total ?? 0;
+    const chaptersExtracted = chapterRow[0]?.extracted ?? 0;
+    const draftsTotal = draftRow[0]?.total ?? 0;
+    const draftsFinal = draftRow[0]?.final ?? 0;
+    const volumesTotal = volumeRow[0]?.total ?? 0;
+    const unapprovedVolumes = volumeRow[0]?.unapproved ?? 0;
 
     const planApproved = volumesTotal > 0 && unapprovedVolumes === 0;
 
