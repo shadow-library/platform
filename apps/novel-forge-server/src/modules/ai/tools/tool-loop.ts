@@ -55,6 +55,15 @@ export async function runToolLoop(
   opts?: ToolLoopOptions,
 ): Promise<ToolLoopResult> {
   const maxRounds = opts?.maxRounds ?? 6;
+
+  // Subprocess providers (the Codex / Claude Code CLIs) can't do native tool-calling — they have no
+  // bindTools. Run them tool-free: they answer from the context already assembled in the prompt rather
+  // than looking canon up via tools. Degraded but functional, so these providers remain selectable.
+  if (typeof model.bindTools !== 'function') {
+    const response = await model.invoke(messages);
+    return { messages: [...messages, response], toolCallCount: 0 };
+  }
+
   const boundModel = (model as ToolCapableModel).bindTools(tools);
   const callCounts = new Map<string, number>();
   const resultMessages: BaseMessage[] = [...messages];

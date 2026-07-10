@@ -31,6 +31,9 @@ export const factionsLocationsPrompt: PromptModule<BibleStageOutput> = {
   kind: 'authoring',
   role: 'bible',
   system,
-  template: ChatPromptTemplate.fromMessages([new SystemMessage(system), ['human', 'Foundation:\n{foundation}\nWorld and power:\n{worldPower}\n\nProject brief:\n{projectBrief}']]),
+  template: ChatPromptTemplate.fromMessages([
+    new SystemMessage(system),
+    ['human', 'Foundation:\n{foundation}\nWorld and power:\n{worldAndPower}\n\nProject brief:\n{projectBrief}'],
+  ]),
   schema: BibleStageSchema,
 };

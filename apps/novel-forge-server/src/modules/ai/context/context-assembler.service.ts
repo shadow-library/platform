@@ -707,6 +707,13 @@ export class ContextAssembler {
             unresolvedRefs = unresolved;
             for (const section of resolved) sections.push(asStable(section));
           }
+          // The chapter's actual prose: refining a drafted chapter is meaningless if the model can only
+          // see the brief, so the current draft rides along (working tier — it is not canon yet).
+          const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
+          if (draft?.body) {
+            const { text } = truncateAtParagraph(draft.body, 8_000);
+            sections.push(asStable(makeSection('current_draft', `Ch ${chapter} draft (rev ${draft.revision}):\n\n${text}`, 'working', [`chapter:${chapter}`])));
+          }
         }
         break;
       }

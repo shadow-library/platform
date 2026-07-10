@@ -18,6 +18,8 @@ import { DatabaseService } from '@shadow-library/modules';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
+import { countTokens } from './context/token-budget';
+
 /**
  * Defining types
  */
@@ -37,6 +39,7 @@ interface PendingCall {
   provider: string;
   model: string;
   attempt: number;
+  promptTokensEstimate: number;
 }
 
 /**
@@ -61,7 +64,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
   // is what keeps every model_calls row tagged with its project/run/node/attempt.
   override async handleLLMStart(
     _llm: Serialized,
-    _messages: unknown[],
+    prompts: unknown[],
     runId: string,
     _parentRunId?: string,
     _extraParams?: Record<string, unknown>,
@@ -70,10 +73,14 @@ export class TelemetryHandler extends BaseCallbackHandler {
   ): Promise<void> {
     if (this.pending.has(runId)) return;
 
+    // CLI-subprocess providers (claude-code, codex) report no token usage at all, so the prompt is
+    // measured up front and used as a fallback estimate when the provider stays silent.
+    const promptTokensEstimate = countTokens(prompts.map(p => (typeof p === 'string' ? p : JSON.stringify(p))).join('\n'));
+
     const nf = metadata?.['nfTelemetry'] as (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number }) | undefined;
     if (nf) {
       const { provider, model, attempt, projectId, ...ctx } = nf;
-      this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt });
+      this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt, promptTokensEstimate });
       return;
     }
 
@@ -83,6 +90,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
       provider: 'unknown',
       model: 'unknown',
       attempt: 0,
+      promptTokensEstimate,
     });
   }
 
@@ -95,8 +103,18 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const generation = output.generations?.[0]?.[0];
     const rawOutput = generation ? (typeof generation.text === 'string' ? generation.text : JSON.stringify(generation)) : '';
     const usage = output.llmOutput?.usage ?? output.llmOutput?.tokenUsage ?? null;
-    const inputTokens: number | undefined = usage?.input_tokens ?? usage?.prompt_tokens;
-    const outputTokens: number | undefined = usage?.output_tokens ?? usage?.completion_tokens;
+    // Token counts live in different places by provider: cloud SDKs put them on `llmOutput.usage`;
+    // LangChain normalises them onto the message's `usage_metadata`; Ollama reports raw `*_eval_count`
+    // on the generation info. Fall through all three so local runs report real token usage too.
+    const meta = generation as
+      | { message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number } }; generationInfo?: { prompt_eval_count?: number; eval_count?: number } }
+      | undefined;
+    // When no layer reports usage (CLI subprocess models), fall back to tokenizer estimates so the
+    // run detail and usage dashboards never show blank counts.
+    const inputTokens: number =
+      usage?.input_tokens ?? usage?.prompt_tokens ?? meta?.message?.usage_metadata?.input_tokens ?? meta?.generationInfo?.prompt_eval_count ?? call.promptTokensEstimate;
+    const outputTokens: number =
+      usage?.output_tokens ?? usage?.completion_tokens ?? meta?.message?.usage_metadata?.output_tokens ?? meta?.generationInfo?.eval_count ?? countTokens(rawOutput);
 
     try {
       await this.db.insert(schema.modelCalls).values({

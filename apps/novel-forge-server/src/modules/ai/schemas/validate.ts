@@ -91,3 +91,32 @@ export function parseSchema<T>(Class: SchemaClass, data: unknown): SchemaParseRe
 export function renderSchemaIssues(issues: SchemaIssue[]): string {
   return issues.map(i => `- ${i.path.join('.') || '(root)'}: ${i.message}`).join('\n');
 }
+
+// Validation-only keywords that constrain values but not structure. llama.cpp's schema→grammar
+// converter (used by Ollama structured outputs) either ignores or chokes on these, so they are
+// stripped — the router's own AJV pass still enforces them after generation.
+const CONSTRAINT_KEYWORDS = new Set(['minLength', 'maxLength', 'minimum', 'maximum', 'minItems', 'maxItems', 'pattern', 'format', 'description', 'default', '$schema']);
+
+// Produce a self-contained JSON Schema (every `$ref` dereferenced, ids/definitions/constraint keywords
+// stripped) suitable for Ollama's structured-output `format`. Grammar-constrained decoding needs the
+// whole schema inline, and the `class-schema:` `$id` scheme confuses the converter, so we flatten it.
+export function toJsonSchemaFormat(Class: SchemaClass): Record<string, unknown> {
+  const raw = inlinePrimitiveRefs(ClassSchema.generate(Class)) as Record<string, unknown>;
+  const definitions = (raw['definitions'] ?? {}) as Record<string, Record<string, unknown>>;
+
+  function deref(node: unknown): unknown {
+    if (Array.isArray(node)) return node.map(deref);
+    if (!node || typeof node !== 'object') return node;
+    const obj = node as Record<string, unknown>;
+    const ref = obj['$ref'];
+    if (typeof ref === 'string' && definitions[ref]) return deref(definitions[ref]);
+    const out: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (key === '$id' || key === 'definitions' || CONSTRAINT_KEYWORDS.has(key)) continue;
+      out[key] = deref(value);
+    }
+    return out;
+  }
+
+  return deref(raw) as Record<string, unknown>;
+}

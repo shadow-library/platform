@@ -32,8 +32,8 @@ export interface ScopePlaybook {
 export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
   novel: {
     guidance:
-      'Scope: the whole novel. Judge everything as a serialized web novel: is the hook strong enough to survive chapter one? Are the stakes personal and escalating? Does the progression system give readers a visible ladder to anticipate? Does the premise leave room for hundreds of chapters without going stale? Push the author on reader-promise, update cadence assumptions, and genre conventions. You may reshape the premise, bible documents, and the volume plan.',
-    allowedOps: ['premise.update', 'bible_document.upsert', 'bible_document.remove', 'volume.upsert', 'volume.remove'],
+      'Scope: the whole novel. Judge everything as a serialized web novel: is the hook strong enough to survive chapter one? Are the stakes personal and escalating? Does the progression system give readers a visible ladder to anticipate? Does the premise leave room for hundreds of chapters without going stale? Push the author on reader-promise, update cadence assumptions, and genre conventions. You may reshape the premise, bible documents, the volume plan, and the cast — characters, factions, locations, and the other catalog entities.',
+    allowedOps: ['premise.update', 'bible_document.upsert', 'bible_document.remove', 'volume.upsert', 'volume.remove', 'entity.upsert', 'entity.remove'],
   },
   bible_document: {
     guidance:
@@ -57,8 +57,8 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
   },
   arc: {
     guidance:
-      "Scope: a single arc. Tighten its objective/escalation/payoff, verify its chapter span fits the material, and make its hook a specific moment, not a vibe. Keep it aligned with the volume objective and the author's stated vision. Only this arc may change.",
-    allowedOps: ['arc.upsert'],
+      "Scope: a single arc. Tighten its objective/escalation/payoff, verify its chapter span fits the material, and make its hook a specific moment, not a vibe. Keep it aligned with the volume objective and the author's stated vision. You may also write or refine the chapter briefs inside this arc's span (brief.update creates a missing brief; always set volumeKey/arcKey and an ending contract on new briefs).",
+    allowedOps: ['arc.upsert', 'brief.update'],
   },
   brief: {
     guidance:

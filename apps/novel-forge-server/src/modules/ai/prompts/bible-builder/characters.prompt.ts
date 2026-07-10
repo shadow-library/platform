@@ -33,7 +33,7 @@ export const charactersPrompt: PromptModule<BibleStageOutput> = {
   system,
   template: ChatPromptTemplate.fromMessages([
     new SystemMessage(system),
-    ['human', 'Foundation:\n{foundation}\nWorld and power:\n{worldPower}\nFactions and locations:\n{factionsLocations}\n\nProject brief:\n{projectBrief}'],
+    ['human', 'Foundation:\n{foundation}\nWorld and power:\n{worldAndPower}\nFactions and locations:\n{factionsAndLocations}\n\nProject brief:\n{projectBrief}'],
   ]),
   schema: BibleStageSchema,
 };

@@ -152,7 +152,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
 
     const delta = (await modelRouter.structured(
       PROMPT_REGISTRY.continuity,
-      { prose: state.prose, entityRoster },
+      { contextPack: `## ENTITY ROSTER\n${entityRoster || 'none'}`, chapterNumber: state.chapter, chapterProse: state.prose },
       ctx,
       projectRow as ProjectConfig | undefined,
     )) as ContinuityOutput;

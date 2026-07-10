@@ -85,6 +85,12 @@ export interface WorkflowRunResult {
 
 const DB_URL = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 
+// jsonb columns serialise via JSON.stringify, which throws on bigint. Every workflow input carries
+// bigint identifiers (projectId, draftId), so coerce them to strings before the row is persisted.
+function toJsonSafe(value: unknown): unknown {
+  return JSON.parse(JSON.stringify(value, (_key, val) => (typeof val === 'bigint' ? val.toString() : val)));
+}
+
 @Injectable()
 export class WorkflowRunService {
   private readonly logger = Logger.getLogger(APP_NAME, WorkflowRunService.name);
@@ -137,7 +143,7 @@ export class WorkflowRunService {
 
     const [run] = await this.db
       .insert(schema.workflowRuns)
-      .values({ projectId, graph, target, status: 'running', input: input as never, jobId: jobId ?? null, nodeTrace: [] })
+      .values({ projectId, graph, target, status: 'running', input: toJsonSafe(input) as never, jobId: jobId ?? null, nodeTrace: [] })
       .returning({ id: schema.workflowRuns.id });
     if (!run) throw new Error(`[WorkflowRunService] Failed to create workflow_run row`);
     return run.id;

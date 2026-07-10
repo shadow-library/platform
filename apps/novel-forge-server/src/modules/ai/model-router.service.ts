@@ -9,10 +9,12 @@ import { createHash } from 'node:crypto';
 
 import { ChatAnthropic } from '@langchain/anthropic';
 import { type BaseChatModel } from '@langchain/core/language_models/chat_models';
+import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatXAI } from '@langchain/xai';
 import { Injectable } from '@shadow-library/app';
+import { type SchemaClass } from '@shadow-library/class-schema';
 import { Config, Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
@@ -29,7 +31,7 @@ import { type AiRole, type ResolvedModel, getProfileDefaults } from './defaults'
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
-import { type SchemaIssue, type SchemaParseResult, parseSchema, renderSchemaIssues } from './schemas/validate';
+import { type SchemaIssue, type SchemaParseResult, parseSchema, renderSchemaIssues, toJsonSchemaFormat } from './schemas/validate';
 import { ChatClaudeCode, ChatCodex } from './subprocess-providers';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 
@@ -50,7 +52,9 @@ export interface ProjectConfig {
 // results are safe to cache. Creative roles (generation, revision, plan, outline, chat…) are never
 // cached — caching them would make a re-request return byte-identical prose.
 const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review', 'audit', 'compact']);
-const LLM_TIMEOUT_MS = Number(process.env['AI_LLM_TIMEOUT_MS'] ?? 120_000);
+// Local models (e.g. qwen3:14b) legitimately spend 60–120s on the heavier authoring stages, so the
+// per-call budget defaults generously; override AI_LLM_TIMEOUT_MS downward for fast hosted providers.
+const LLM_TIMEOUT_MS = Number(process.env['AI_LLM_TIMEOUT_MS'] ?? 300_000);
 const LLM_MAX_RETRIES = Number(process.env['AI_LLM_MAX_RETRIES'] ?? 2);
 const LLM_BACKOFF_MS = Number(process.env['AI_LLM_BACKOFF_MS'] ?? 500);
 
@@ -85,6 +89,16 @@ function tryParseJson(raw: string): unknown {
   }
 }
 
+// Ollama's JSON mode biases toward objects, so a schema expecting a top-level array frequently arrives
+// wrapped as `{ <key>: [...] }`. When the schema is a top-level array and the parsed value is an object
+// with exactly one array-valued property, unwrap that array so it validates.
+function normalizeForSchema(schema: SchemaClass, data: unknown): unknown {
+  if (!Array.isArray(schema)) return data;
+  if (!data || typeof data !== 'object' || Array.isArray(data)) return data;
+  const arrays = Object.values(data as Record<string, unknown>).filter(Array.isArray);
+  return arrays.length === 1 ? arrays[0] : data;
+}
+
 // Runs postValidate (if declared) after schema validation succeeds, folding any returned issue
 // messages into the same success/failure shape so the repair ladder treats them identically.
 function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data: T) => string[]): SchemaParseResult<T> {
@@ -117,7 +131,7 @@ export class ModelRouterService {
     return getProfileDefaults()[role] ?? { provider: 'xai', model: Config.get('ai.grok.llm.model') };
   }
 
-  buildClient(resolved: ResolvedModel): BaseChatModel {
+  buildClient(resolved: ResolvedModel, opts?: { format?: string | Record<string, unknown> }): BaseChatModel {
     const entry = MODEL_MAP[resolved.model];
     const provider = entry?.provider ?? resolved.provider;
 
@@ -129,10 +143,20 @@ export class ModelRouterService {
       case 'openai':
         return new ChatOpenAI({ model: resolved.model, apiKey: Config.get('ai.openai.api.key') });
       case 'ollama':
-        return new ChatOllama({ model: resolved.model, baseUrl: Config.get('ai.ollama.host'), temperature: 0 });
+        // Local reasoning models (e.g. qwen3) otherwise wrap answers in <think> blocks and prose that
+        // make structured output unparseable. Disable thinking on every call, and — for structured
+        // requests — grammar-constrain decoding to the exact JSON schema so field names/shape match.
+        // Prose roles (generation/revision) pass no format and stay free-form.
+        return new ChatOllama({
+          model: resolved.model,
+          baseUrl: Config.get('ai.ollama.host'),
+          temperature: 0,
+          think: false,
+          ...(opts?.format ? { format: opts.format } : {}),
+        });
       case 'anthropic-claude-code':
         if (!Config.get('ai.claude-code.enabled')) throw new ServerError(AppErrorCode.AI_002);
-        return new ChatClaudeCode(Config.get('ai.claude-code.bin'));
+        return new ChatClaudeCode(Config.get('ai.claude-code.bin'), resolved.model);
       case 'openai-codex':
         if (!Config.get('ai.codex.enabled')) throw new ServerError(AppErrorCode.AI_002);
         return new ChatCodex(Config.get('ai.codex.bin'));
@@ -150,15 +174,15 @@ export class ModelRouterService {
   async structured<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, ctx: TelemetryContext, project?: ProjectConfig): Promise<T> {
     const role = promptModule.role ?? (promptModule.key as AiRole);
     const resolved = this.resolveModel(role, project);
-    const llm = this.buildClient(resolved);
-    const chain = this.buildChain(promptModule, llm, resolved);
+    const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema) });
+    const messages = await this.buildMessages(promptModule, input, resolved);
 
     // ─── Cache read-through (deterministic roles only) ────────────────────────
     const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input) : null;
     if (requestHash) {
       const cached = await this.db.query.llmCache.findFirst({ where: eq(schema.llmCache.requestHash, requestHash) });
       if (cached) {
-        const parsedCached = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(cached.response)), promptModule.postValidate);
+        const parsedCached = this.parseOutput(promptModule, tryParseJson(cached.response));
         if (parsedCached.success) {
           this.logger.debug('LLM cache hit — skipping model call', { role, requestHash });
           return parsedCached.data;
@@ -167,8 +191,8 @@ export class ModelRouterService {
     }
 
     // ─── Attempt 1: invoke ───────────────────────────────────────────────────
-    const rawOutput1 = await this.invokeResilient(chain, input, this.invokeConfig(ctx, resolved, 0), role);
-    const parsed1 = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(rawOutput1)), promptModule.postValidate);
+    const rawOutput1 = await this.invokeResilient(llm, messages, this.invokeConfig(ctx, resolved, 0), role);
+    const parsed1 = this.parseOutput(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
       return parsed1.data;
@@ -176,16 +200,17 @@ export class ModelRouterService {
 
     this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.issues.length });
 
-    // ─── Attempt 2: repair ───────────────────────────────────────────────────
-    const repairInput = {
-      ...input,
-      priorOutput: rawOutput1,
-      parseIssues: renderSchemaIssues(parsed1.issues),
-      instruction: 'The previous response could not be parsed. Fix the JSON so it matches the required schema. Output ONLY valid JSON.',
-    };
+    // ─── Attempt 2: repair — continue the conversation with the actual issues ──
+    const repairMessages: BaseMessage[] = [
+      ...messages,
+      new AIMessage(rawOutput1),
+      new HumanMessage(
+        `That response could not be used. Issues:\n${renderSchemaIssues(parsed1.issues)}\n\nRespond again with ONLY one valid JSON object matching the required schema — fix the listed issues, keep the content, no prose outside the JSON, no markdown fences.`,
+      ),
+    ];
 
-    const rawOutput2 = await this.invokeResilient(chain, repairInput, this.invokeConfig(ctx, resolved, 1), role);
-    const parsed2 = applyPostValidate(parseSchema<T>(promptModule.schema, tryParseJson(rawOutput2)), promptModule.postValidate);
+    const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1), role);
+    const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput2);
       return parsed2.data;
@@ -195,7 +220,7 @@ export class ModelRouterService {
     this.logger.warn('Repair parse failed — trying tolerant extraction', { role });
     const extracted = extractJsonBlock(rawOutput2);
     if (extracted) {
-      const parsed3 = applyPostValidate(parseSchema<T>(promptModule.schema, extracted), promptModule.postValidate);
+      const parsed3 = this.parseOutput(promptModule, extracted);
       if (parsed3.success) {
         await this.cacheResponse(requestHash, ctx, resolved, promptModule, JSON.stringify(extracted));
         return parsed3.data;
@@ -207,23 +232,31 @@ export class ModelRouterService {
     throw new ServerError(AppErrorCode.AI_001);
   }
 
-  // Modules that declare a cacheStrategy follow the stable-first message convention, so the router
-  // formats the template itself and — for Anthropic — injects cache_control breakpoints before
-  // invoking. Every other provider (and every legacy module) keeps the plain template→llm pipe;
-  // xAI/OpenAI still benefit from the stable-first ordering via their automatic prefix caching.
-  private buildChain<T>(
-    promptModule: PromptModule<T>,
-    llm: BaseChatModel,
-    resolved: ResolvedModel,
-  ): { invoke: (input: Record<string, unknown>, config: object) => Promise<{ content: unknown }> } {
-    if (!promptModule.cacheStrategy) return promptModule.template.pipe(llm);
+  // Normalise the raw parsed value for the module's schema (unwrapping object-wrapped arrays from
+  // local JSON mode), validate it, then fold in any postValidate business rules.
+  private parseOutput<T>(promptModule: PromptModule<T>, data: unknown): SchemaParseResult<T> {
+    const normalized = normalizeForSchema(promptModule.schema, data);
+    return applyPostValidate(parseSchema<T>(promptModule.schema, normalized), promptModule.postValidate);
+  }
+
+  // Formats the module's template into messages, applying two provider-specific adjustments:
+  // Anthropic gets cache_control breakpoints on cacheStrategy modules, and every provider EXCEPT
+  // Ollama gets the required JSON schema appended in-band — grammar-constrained decoding only exists
+  // on Ollama, so API and CLI-subprocess models must be told the exact output shape or the creative
+  // roles (whose prompts never mention JSON) answer with plain prose.
+  private async buildMessages<T>(promptModule: PromptModule<T>, input: Record<string, unknown>, resolved: ResolvedModel): Promise<BaseMessage[]> {
     const provider = MODEL_MAP[resolved.model]?.provider ?? resolved.provider;
-    return {
-      invoke: async (input, config) => {
-        const messages = await promptModule.template.formatMessages(input);
-        return llm.invoke(provider === 'anthropic' ? applyAnthropicCacheControl(messages) : messages, config);
-      },
-    };
+    let messages = await promptModule.template.formatMessages(input);
+    if (promptModule.cacheStrategy && provider === 'anthropic') messages = applyAnthropicCacheControl(messages);
+    if (provider !== 'ollama') {
+      messages = [
+        ...messages,
+        new HumanMessage(
+          `Respond with ONLY one valid JSON object matching this JSON schema — all prose goes inside the JSON string fields, nothing outside the JSON, no markdown fences:\n${JSON.stringify(toJsonSchemaFormat(promptModule.schema))}`,
+        ),
+      ];
+    }
+    return messages;
   }
 
   // Invoke config: telemetry callback + attribution metadata (read by TelemetryHandler.handleLLMStart).
@@ -234,18 +267,13 @@ export class ModelRouterService {
     };
   }
 
-  // Invoke the chain with a per-call timeout budget and transient-error backoff. Retries only cover
+  // Invoke the model with a per-call timeout budget and transient-error backoff. Retries only cover
   // transport/timeout failures; a returned (parseable-or-not) response is never retried here.
-  private async invokeResilient(
-    chain: { invoke: (input: Record<string, unknown>, config: object) => Promise<{ content: unknown }> },
-    input: Record<string, unknown>,
-    config: object,
-    role: string,
-  ): Promise<string> {
+  private async invokeResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string): Promise<string> {
     let lastErr: unknown;
     for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
       try {
-        const result = await this.withTimeout(chain.invoke(input, config), LLM_TIMEOUT_MS);
+        const result = await this.withTimeout(llm.invoke(messages, config), LLM_TIMEOUT_MS);
         return typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
       } catch (err) {
         lastErr = err;

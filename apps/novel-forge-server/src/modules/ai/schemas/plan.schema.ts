@@ -57,7 +57,11 @@ export type PlanOutput = VolumeSpecSchema[];
 // kept as a plain post-validation check, wired into ModelRouterService.structured() via
 // PromptModule.postValidate, the same way zod's `.refine()` used to gate this.
 export function validatePlanContiguity(vols: VolumeSpecSchema[]): string[] {
-  const sorted = [...vols].sort((a, b) => a.ordinal - b.ordinal);
+  // Local models sometimes emit the same volume several times; collapse duplicate ordinals (the plan
+  // upsert is keyed by volumeKey, so repeats become one row anyway) before checking contiguity.
+  const byOrdinal = new Map<number, VolumeSpecSchema>();
+  for (const v of vols) if (!byOrdinal.has(v.ordinal)) byOrdinal.set(v.ordinal, v);
+  const sorted = [...byOrdinal.values()].sort((a, b) => a.ordinal - b.ordinal);
   const ok = sorted.every((v, i) => i === 0 || v.startChapter === (sorted[i - 1]?.endChapter ?? 0) + 1);
   return ok ? [] : ['volume chapter spans must be contiguous'];
 }

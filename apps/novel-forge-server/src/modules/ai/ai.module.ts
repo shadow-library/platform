@@ -11,6 +11,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AiController } from './ai.controller';
 import { CatalogService } from './context/catalog.service';
 import { ContextAssembler } from './context/context-assembler.service';
 import { WorkflowRunService } from './graphs/workflow-run.service';
@@ -31,6 +32,7 @@ import { ToolRegistryService } from './tools/tool-registry.service';
 
 @Module({
   imports: [DatabaseModule],
+  controllers: [AiController],
   providers: [TelemetryHandler, ModelRouterService, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler, ToolRegistryService, WorkflowRunService],
   exports: [ModelRouterService, TelemetryHandler, EmbeddingService, IndexingService, RetrievalService, CatalogService, ContextAssembler, ToolRegistryService, WorkflowRunService],
 })
