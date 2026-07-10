@@ -19,7 +19,7 @@ import { defineConfig } from 'drizzle-kit';
  * Declaring the constants
  */
 
-const url = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
+const url = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 
 export default defineConfig({
   out: './generated/drizzle',
