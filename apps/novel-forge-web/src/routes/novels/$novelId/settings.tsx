@@ -30,13 +30,26 @@ type ModelKind = 'llm' | 'embedding' | 'image';
 // The backend keys per-role overrides by `AiRole`; `ProjectModelOverrides` is that exact, closed set.
 type AiRole = keyof ProjectModelOverrides;
 
-// The router resolves each role from `config.models[role]` as a `{ provider, model }` pair, falling
-// back to the active server profile's default when a role is unset. A role left on INHERIT is simply
-// omitted from the persisted map.
+// The author picks a model per *group*, not per fine-grained role. Selecting a group's model fans that
+// choice out across every role it owns (GROUP_ROLES) so the backend — which still resolves per role —
+// routes them identically. `embedding` is intentionally absent: it's locked to the pgvector schema.
+type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image';
+
+const GROUP_ROLES: Record<ModelGroup, AiRole[]> = {
+  writing: ['generation', 'revision', 'fix'],
+  planning: ['premise', 'plan', 'arc', 'outline', 'skeleton', 'bible', 'extraction'],
+  review: ['judge', 'validation', 'continuity', 'review', 'audit'],
+  chat: ['chat'],
+  helper: ['title', 'compact'],
+  image: ['image'],
+};
+
+// The router resolves each role from `config.models[role]` as a `{ provider, model }` pair, falling back
+// to the active server profile's default when unset. A group left on INHERIT omits all its roles.
 const INHERIT = 'inherit';
 
 interface RoleDef {
-  key: AiRole;
+  key: ModelGroup;
   label: string;
   hint: string;
   kind: ModelKind;
@@ -52,56 +65,22 @@ interface ProviderGroup {
   providers: string[];
 }
 
-// The backend `AiRole` set, grouped into product-facing sections. Every routable role is configurable;
-// unlisted-to-the-user roles would silently inherit, so we surface them all.
+// Product-facing model groups — one dial each. Picking a model fans out across the group's roles
+// (GROUP_ROLES). Embeddings are omitted: locked to the pgvector schema.
 const ROLE_GROUPS: RoleGroup[] = [
   {
-    title: 'Authoring',
+    title: 'Text generation',
     roles: [
-      { key: 'generation', label: 'Draft generation', hint: 'Prose for each chapter', kind: 'llm' },
-      { key: 'revision', label: 'Revision pass', hint: 'Rewrites against review notes', kind: 'llm' },
-      { key: 'fix', label: 'Repair', hint: 'Fixes flagged contradictions', kind: 'llm' },
-      { key: 'title', label: 'Title generation', hint: 'Chapter & work titles', kind: 'llm' },
+      { key: 'writing', label: 'Writing', hint: 'Chapter prose — drafts, revisions, and repairs', kind: 'llm' },
+      { key: 'planning', label: 'Planning & canon', hint: 'Premise, plan, arcs, outlines, skeletons, bible & extraction', kind: 'llm' },
+      { key: 'review', label: 'Review & QA', hint: 'Continuity judge, validation, editorial review & bible audit', kind: 'llm' },
+      { key: 'chat', label: 'Refinement chat', hint: 'Conversational proposals · defaults to the Planning model', kind: 'llm' },
+      { key: 'helper', label: 'Fast helpers', hint: 'Titles & context compaction — small, cheap calls', kind: 'llm' },
     ],
   },
   {
-    title: 'Planning',
-    roles: [
-      { key: 'premise', label: 'Premise enhancement', hint: 'Expands the project brief', kind: 'llm' },
-      { key: 'plan', label: 'Story planning', hint: 'Top-level story structure', kind: 'llm' },
-      { key: 'arc', label: 'Arc planning', hint: 'Narrative arcs + coverage', kind: 'llm' },
-      { key: 'outline', label: 'Chapter outline', hint: 'Beat-level outline from brief', kind: 'llm' },
-      { key: 'skeleton', label: 'Chapter skeleton', hint: 'Scene scaffold before prose', kind: 'llm' },
-    ],
-  },
-  {
-    title: 'Knowledge & chat',
-    roles: [
-      { key: 'bible', label: 'Bible synthesis', hint: 'World / plot / timeline docs', kind: 'llm' },
-      { key: 'extraction', label: 'Bible extraction', hint: 'Entities from source chapters', kind: 'llm' },
-      { key: 'chat', label: 'Refinement chat', hint: 'Conversational proposals', kind: 'llm' },
-    ],
-  },
-  {
-    title: 'Quality & review',
-    roles: [
-      { key: 'judge', label: 'Continuity judge', hint: 'consistent / contradiction verdicts', kind: 'llm' },
-      { key: 'continuity', label: 'Continuity proposals', hint: 'Suggests canon fixes', kind: 'llm' },
-      { key: 'validation', label: 'Validation', hint: 'Structural checks', kind: 'llm' },
-      { key: 'review', label: 'Review', hint: 'Editorial review pass', kind: 'llm' },
-      { key: 'audit', label: 'Bible audit', hint: 'Consistency sweep of the bible', kind: 'llm' },
-    ],
-  },
-  {
-    title: 'Utility',
-    roles: [{ key: 'compact', label: 'Context compaction', hint: 'Summarises long context', kind: 'llm' }],
-  },
-  {
-    title: 'Media & retrieval',
-    roles: [
-      { key: 'embedding', label: 'Embeddings', hint: 'Vector index for retrieval', kind: 'embedding' },
-      { key: 'image', label: 'Illustrations', hint: 'Cover & scene art', kind: 'image' },
-    ],
+    title: 'Media',
+    roles: [{ key: 'image', label: 'Illustrations', hint: 'Cover & scene art', kind: 'image' }],
   },
 ];
 
@@ -158,7 +137,7 @@ function SettingsScreen(): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('standard');
-  const [models, setModels] = useState<Partial<Record<AiRole, string>>>({});
+  const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
@@ -167,26 +146,32 @@ function SettingsScreen(): React.JSX.Element {
     setBrief(project.brief ?? '');
     setContentMode(project.contentMode);
     const overrides = project.config?.models ?? {};
-    const next: Partial<Record<AiRole, string>> = {};
-    for (const role of ALL_ROLES) {
-      const entry = overrides[role.key];
-      next[role.key] = entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
+    const next: Partial<Record<ModelGroup, string>> = {};
+    for (const group of ALL_ROLES) {
+      // The UI writes a group's choice across all its roles, so any set member reflects the group value.
+      const entry = GROUP_ROLES[group.key].map(role => overrides[role]).find(Boolean);
+      next[group.key] = entry ? encodeModelRef(entry.provider, entry.model) : INHERIT;
     }
     setModels(next);
   }, [project]);
 
-  const setModel = (key: AiRole, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
+  const setModel = (key: ModelGroup, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
 
   const saveGeneral = (): void => {
     updateProject.mutate({ title: title.trim(), brief, contentMode }, { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) });
   };
 
   const saveModels = (): void => {
-    // INHERIT rows are omitted so the router falls back to the active profile's default for that role.
+    // A group's choice fans out across every role it owns; INHERIT groups are omitted so the router
+    // falls back to the profile default. The locked embedding override (if any) is preserved untouched.
     const overrides: ProjectModelOverrides = {};
-    for (const role of ALL_ROLES) {
-      const value = models[role.key];
-      if (value && value !== INHERIT) overrides[role.key] = decodeModelRef(value);
+    const existingEmbedding = project?.config?.models?.embedding;
+    if (existingEmbedding) overrides.embedding = existingEmbedding;
+    for (const group of ALL_ROLES) {
+      const value = models[group.key];
+      if (!value || value === INHERIT) continue;
+      const ref = decodeModelRef(value);
+      for (const role of GROUP_ROLES[group.key]) overrides[role] = ref;
     }
     const config: ProjectConfig = { models: overrides };
     updateProject.mutate({ config }, { onSuccess: () => toast.success('Models saved'), onError: err => toast.danger(err.message) });

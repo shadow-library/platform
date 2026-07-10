@@ -22,14 +22,16 @@ import {
 import { decodeModelRef, encodeModelRef } from '@/lib/format';
 
 /**
- * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService):
+ * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService / resolveModel):
  *  1. the chat's own override (picked inline in the composer),
- *  2. the project setting for the scope's planning role (an arc chat IS arc-planning work),
- *  3. the project setting for the generic chat role,
- *  4. the AI profile default for the scope's role, then for chat.
+ *  2. the project setting for the scope's role (an arc chat IS planning work, so it follows Planning),
+ *  3. refinement chat with no explicit model follows the Planning selection,
+ *  4. the active profile's default for the scope's model group.
  * New chats always start on the resolved default; an override sticks to that chat alone.
  */
 
+// The fine-grained role each chat scope maps to (config overrides are stored per role — the settings
+// UI fans a group's choice across its roles, so reading the scope's role reflects the group value).
 const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
   novel: 'chat',
   volume_plan: 'plan',
@@ -40,18 +42,26 @@ const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
   bible_document: 'bible',
 };
 
-const ROLE_LABEL: Record<string, string> = {
-  chat: 'chat',
-  plan: 'story planning',
-  arc: 'arc planning',
-  outline: 'chapter outline',
-  bible: 'bible synthesis',
+// The model group each scope inherits its profile default from ('planning' for every structural scope).
+const SCOPE_GROUP: Record<ChatScope, string> = {
+  novel: 'chat',
+  volume_plan: 'planning',
+  volume: 'planning',
+  arc_plan: 'planning',
+  arc: 'planning',
+  brief: 'planning',
+  bible_document: 'planning',
+};
+
+const GROUP_LABEL: Record<string, string> = {
+  chat: 'refinement chat',
+  planning: 'planning',
 };
 
 interface ResolvedDefault {
   provider: string;
   model: string;
-  role: string;
+  group: string;
 }
 
 /** Human-friendly name for a provider/model pair, preferring the registry label. */
@@ -63,11 +73,15 @@ export function modelLabel(models: AiModelOption[], provider?: string | null, mo
 
 function resolveDefault(scopeType: ChatScope, config: ProjectConfig | undefined, defaults: AiRoleDefault[]): ResolvedDefault | undefined {
   const scopeRole = SCOPE_CHAT_ROLE[scopeType];
+  const group = SCOPE_GROUP[scopeType];
   const configured = config?.models ?? {};
-  const fromConfig = configured[scopeRole] ?? configured.chat;
-  if (fromConfig) return { ...fromConfig, role: configured[scopeRole] ? scopeRole : 'chat' };
-  const fromProfile = defaults.find(d => d.role === scopeRole) ?? defaults.find(d => d.role === 'chat');
-  return fromProfile ? { provider: fromProfile.provider, model: fromProfile.model, role: fromProfile.role } : undefined;
+  // Explicit project override for this scope's role.
+  if (configured[scopeRole]) return { ...configured[scopeRole], group };
+  // Refinement chat with no explicit chat model follows the Planning selection.
+  if (group === 'chat' && configured.plan) return { ...configured.plan, group: 'planning' };
+  // Otherwise the profile default for the group (the /ai/models `defaults` are keyed by group).
+  const fromProfile = defaults.find(d => d.role === group);
+  return fromProfile ? { provider: fromProfile.provider, model: fromProfile.model, group } : undefined;
 }
 
 /**
@@ -95,7 +109,7 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   const value = overridden ? encodeModelRef(session?.modelProvider ?? '', session?.modelId ?? '') : 'default';
   const triggerLabel = overridden ? modelLabel(models, session?.modelProvider, session?.modelId) : modelLabel(models, resolvedDefault?.provider, resolvedDefault?.model);
   const defaultCaption = resolvedDefault
-    ? `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · from ${ROLE_LABEL[resolvedDefault.role] ?? resolvedDefault.role} settings`
+    ? `${modelLabel(models, resolvedDefault.provider, resolvedDefault.model)} · from ${GROUP_LABEL[resolvedDefault.group] ?? resolvedDefault.group} settings`
     : undefined;
 
   const onChange = (next: string): void => {
