@@ -1518,6 +1518,7 @@ export interface components {
       };
       volumeKey?: null | string;
       reviewStatus: components['schemas']['DraftReviewStatus'];
+      generator: string;
       judge?: null | string;
       judgeNote?: null | string;
       /** Format: date-time */

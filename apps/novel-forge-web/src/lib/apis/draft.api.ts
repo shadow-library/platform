@@ -12,12 +12,14 @@ import {
   type FeedbackBody,
   type GenerateBody,
   type JobEnqueueResponse,
+  type JudgeResponse,
   type ListDraftResponse,
   type ListDraftRevisionResponse,
   type OutlineBody,
   type OutlineResponse,
   type PlanBody,
   type PlanResponse,
+  type ProposalResponse,
   type ReviewQueueResponse,
   type SeedFromBriefBody,
   type UpdateDraftBody,
@@ -82,6 +84,15 @@ export function useUpdateDraftMutation(projectId: string, n: number): UseMutatio
   });
 }
 
+/** Deletes a chapter draft (and its revisions); used by the chapter list's delete action. */
+export function useDeleteDraftMutation(projectId: string): UseMutationResult<undefined, ApiError, number> {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, ApiError, number>({
+    mutationFn: n => APIRequest.delete(`/projects/${projectId}/drafts/${n}`).execute(),
+    onSuccess: () => invalidateDraft(queryClient, projectId),
+  });
+}
+
 export function useApproveDraftMutation(projectId: string): UseMutationResult<DraftResponse, ApiError, number> {
   const queryClient = useQueryClient();
   return useMutation<DraftResponse, ApiError, number>({
@@ -116,6 +127,27 @@ export function useGenerateMutation(projectId: string): UseMutationResult<JobEnq
     onSuccess: () => {
       invalidateDraft(queryClient, projectId);
       queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'jobs'] });
+    },
+  });
+}
+
+/** Runs the continuity judge on a chapter on demand (the manual "Verify" action) and records its verdict. */
+export function useJudgeDraftMutation(projectId: string, n: number): UseMutationResult<JudgeResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<JudgeResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.post(`/projects/${projectId}/drafts/${n}/judge`).body({}).execute(),
+    onSuccess: () => invalidateDraft(queryClient, projectId),
+  });
+}
+
+/** Folds the canon a chapter establishes back into the bible as a reviewable refinement proposal. */
+export function useExtractToBibleMutation(projectId: string, n: number): UseMutationResult<ProposalResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<ProposalResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.post(`/projects/${projectId}/chapters/${n}/extract-to-bible`).body({}).execute(),
+    onSuccess: () => {
+      invalidateDraft(queryClient, projectId);
+      queryClient.invalidateQueries({ queryKey: ['projects', projectId, 'proposals'] });
     },
   });
 }

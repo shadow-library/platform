@@ -366,3 +366,47 @@ a:hover {
     opacity: 0;
   }
 }
+
+/* Rendered chapter Markdown (reading view + editor Preview tab) */
+.nf-md > *:first-child {
+  margin-top: 0;
+}
+.nf-md p {
+  margin: 0 0 1.1em;
+}
+.nf-md strong {
+  font-weight: 700;
+}
+.nf-md em {
+  font-style: italic;
+}
+.nf-md ul,
+.nf-md ol {
+  margin: 0 0 1.1em;
+  padding-left: 1.6em;
+}
+.nf-md li {
+  margin: 0 0 0.35em;
+}
+.nf-md hr {
+  border: none;
+  border-top: 1px solid var(--sh-border-default);
+  margin: 1.8em 0;
+}
+.nf-md table {
+  border-collapse: collapse;
+  margin: 0 0 1.2em;
+  font-size: 0.82em;
+  font-family: var(--sh-font-sans);
+}
+.nf-md th,
+.nf-md td {
+  border: 1px solid var(--sh-border-default);
+  padding: 7px 12px;
+  text-align: left;
+  vertical-align: top;
+}
+.nf-md th {
+  background: var(--sh-surface-well);
+  font-weight: 700;
+}

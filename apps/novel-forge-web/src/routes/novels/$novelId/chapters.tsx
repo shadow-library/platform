@@ -1,25 +1,32 @@
 /**
  * Importing npm packages
  */
-import { Button, Drawer, IconButton, SegmentedControl, Spinner, Tooltip, toast } from '@shadow-library/ui';
+import { Button, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, Tooltip, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import DOMPurify from 'dompurify';
+import { marked } from 'marked';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined modules
  */
-import { ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, WarningIcon } from '@/components/icons';
-import { PAGE_MAX_WIDTH, PaneError, PaneLoader, QueryState, StatusChip, type ChipIntent } from '@/components/nf';
+import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
+import { PAGE_MAX_WIDTH, PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type DraftResponse,
   useApproveDraftMutation,
+  useDeleteDraftMutation,
   useDraftQuery,
+  useExtractToBibleMutation,
   useGenerateMutation,
+  useJudgeDraftMutation,
+  useListBriefsQuery,
   useListDraftsQuery,
   useListJobsQuery,
   useListRunsQuery,
+  useProjectStatusQuery,
   useUpdateDraftMutation,
 } from '@/lib/apis';
 
@@ -52,25 +59,21 @@ function wordCount(body?: string | null): number {
   return body.trim().split(/\s+/).filter(Boolean).length;
 }
 
-// ─── Inline prose formatting ────────────────────────────────────────────────────
-// Prose is stored as plain text with lightweight inline marks (**bold**, *italic*, <u>underline</u>)
-// so it stays readable to the LLM pipeline and the manuscript, while the reader renders real styles.
+// ─── Prose formatting ───────────────────────────────────────────────────────────
+// Chapter prose is authored and stored as GitHub-flavored Markdown (bold, italic, lists, tables); the
+// reading view and the editor's Preview tab render it the same way.
+marked.setOptions({ gfm: true, breaks: true });
 
-function renderInline(text: string): React.ReactNode[] {
-  const pattern = /\*\*([^*]+)\*\*|\*([^*\n]+)\*|<u>([\s\S]*?)<\/u>/g;
-  const nodes: React.ReactNode[] = [];
-  let last = 0;
-  let match: RegExpExecArray | null;
-  let key = 0;
-  while ((match = pattern.exec(text)) !== null) {
-    if (match.index > last) nodes.push(text.slice(last, match.index));
-    if (match[1] !== undefined) nodes.push(<strong key={key++}>{renderInline(match[1])}</strong>);
-    else if (match[2] !== undefined) nodes.push(<em key={key++}>{renderInline(match[2])}</em>);
-    else if (match[3] !== undefined) nodes.push(<u key={key++}>{renderInline(match[3])}</u>);
-    last = match.index + match[0].length;
-  }
-  if (last < text.length) nodes.push(text.slice(last));
-  return nodes;
+// Rendered Markdown is sanitized (DOMPurify) so an imported/AI chapter carrying raw <script>/handlers
+// can never execute in the author's browser.
+function renderMarkdown(md: string | null | undefined): { __html: string } {
+  return { __html: DOMPurify.sanitize(marked.parse(md ?? '', { async: false }) as string) };
+}
+
+// Defense in depth: strip dangerous HTML from the Markdown source before it is persisted, so the stored
+// manuscript stays clean regardless of where the prose came from.
+function sanitizeSource(md: string): string {
+  return DOMPurify.sanitize(md);
 }
 
 const RUN_INTENT: Record<string, ChipIntent> = {
@@ -188,14 +191,55 @@ interface ChapterListProps {
 
 function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.JSX.Element {
   const draftsQuery = useListDraftsQuery(novelId);
+  const briefsQuery = useListBriefsQuery(novelId);
+  const statusQuery = useProjectStatusQuery(novelId);
   const generate = useGenerateMutation(novelId);
   const jobsQuery = useListJobsQuery(novelId);
   const [filter, setFilter] = useState<Filter>('all');
   const drafts = useMemo(() => [...(draftsQuery.data?.items ?? [])].sort((a, b) => a.chapter - b.chapter), [draftsQuery.data]);
   const activeJob = jobsQuery.data?.items.find(j => j.kind === 'generate' && (j.status === 'pending' || j.status === 'in_progress'));
 
+  // The next chapter is the lowest brief with no draft yet — exactly what the backend's `generate`
+  // targets — so a manually-written chapter automatically advances the target to the next hole.
+  const drafted = useMemo(() => new Set(drafts.map(d => d.chapter)), [drafts]);
+  const briefs = useMemo(() => [...(briefsQuery.data?.items ?? [])].sort((a, b) => a.chapter - b.chapter), [briefsQuery.data]);
+  const nextBriefChapter = briefs.find(b => !drafted.has(b.chapter))?.chapter;
+  const lastChapter = Math.max(0, ...drafts.map(d => d.chapter), ...briefs.map(b => b.chapter));
+  const nextManualChapter = lastChapter + 1;
+  const hasContradiction = drafts.some(d => d.reviewStatus === 'contradiction');
+  const planApproved = statusQuery.data?.planApproved ?? false;
+
+  // Generation gates mirror the backend (PLN_001 / DRF_003); surface the reason rather than let the call throw.
+  const generateReason = !nextBriefChapter ? 'No brief to generate from — write it yourself' : !planApproved ? 'Approve the volume plan first' : hasContradiction ? 'Resolve the flagged contradiction first' : undefined;
+  const canGenerate = !generateReason;
+
+  const createManual = useUpdateDraftMutation(novelId, nextManualChapter);
+
   const startGeneration = (): void => {
     generate.mutate({ limit: 1 }, { onSuccess: job => onProgress(job.jobId), onError: e => toast.danger(e.message) });
+  };
+
+  const startBatch = (): void => {
+    generate.mutate({ limit: 5 }, { onSuccess: job => onProgress(job.jobId), onError: e => toast.danger(e.message) });
+  };
+
+  // "Write manually" seeds a blank human-authored draft (generator='human' on the backend) and drops
+  // straight into the editor.
+  const writeManually = (): void => {
+    createManual.mutate({ body: '' }, { onSuccess: () => onOpen(nextManualChapter), onError: e => toast.danger(e.message) });
+  };
+
+  const deleteDraft = useDeleteDraftMutation(novelId);
+  const [deleteTarget, setDeleteTarget] = useState<DraftResponse | undefined>();
+  const doDelete = (): void => {
+    if (!deleteTarget) return;
+    deleteDraft.mutate(deleteTarget.chapter, {
+      onSuccess: () => {
+        toast.success(`Chapter ${deleteTarget.chapter} deleted`);
+        setDeleteTarget(undefined);
+      },
+      onError: e => toast.danger(e.message),
+    });
   };
 
   const counts = {
@@ -221,9 +265,38 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
               {drafts.length} drafts · {totalWords.toLocaleString()} words
             </p>
           </div>
-          <Button variant="primary" loading={generate.isPending} prefix={<PlusIcon />} onClick={startGeneration}>
-            Generate next
-          </Button>
+          <div style={{ display: 'flex' }}>
+            <Button
+              variant="primary"
+              loading={generate.isPending || createManual.isPending}
+              prefix={<PlusIcon />}
+              onClick={canGenerate ? startGeneration : writeManually}
+              style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
+            >
+              {canGenerate ? `Generate ch ${nextBriefChapter}` : 'Write chapter'}
+            </Button>
+            <DropdownMenu>
+              <DropdownMenu.Trigger asChild>
+                <Button variant="primary" aria-label="Chapter creation options" style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, paddingInline: 8, boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.25)' }}>
+                  <ChevronDownIcon size={14} />
+                </Button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end">
+                <DropdownMenu.Item disabled={!canGenerate} onSelect={startGeneration}>
+                  Generate ch {nextBriefChapter ?? nextManualChapter} from its brief
+                </DropdownMenu.Item>
+                <DropdownMenu.Item onSelect={writeManually}>Write ch {nextManualChapter} yourself</DropdownMenu.Item>
+                {!canGenerate && generateReason && (
+                  <div style={{ padding: '4px 10px 6px', fontSize: 11, color: 'var(--sh-text-tertiary)', maxWidth: 240 }}>{generateReason}</div>
+                )}
+                <DropdownMenu.Separator />
+                <DropdownMenu.Label>Advanced</DropdownMenu.Label>
+                <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
+                  Draft the next 5 chapters (no review)
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu>
+          </div>
         </div>
 
         {activeJob && (
@@ -269,10 +342,13 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
             {visible.map(draft => {
               const meta = statusMeta(draft);
               return (
-                <button
+                <div
                   key={draft.id}
+                  role="button"
+                  tabIndex={0}
                   className="nf-selrow"
                   onClick={() => onOpen(draft.chapter)}
+                  onKeyDown={e => e.key === 'Enter' && onOpen(draft.chapter)}
                   style={{ gap: 16, padding: '15px 12px', borderRadius: 0, borderBottom: '1px solid var(--sh-border-subtle)' }}
                 >
                   <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-text-tertiary)', width: 22, flexShrink: 0 }}>
@@ -292,6 +368,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                   >
                     {draft.title ?? 'Untitled chapter'}
                   </span>
+                  <StatusChip intent={draft.generator === 'human' ? 'neutral' : 'accent'}>{draft.generator === 'human' ? 'You' : 'AI'}</StatusChip>
                   <span style={{ fontSize: 12, color: 'var(--sh-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 80, textAlign: 'right' }}>
                     {wordCount(draft.body).toLocaleString()} words
                   </span>
@@ -300,13 +377,35 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                       {meta.label}
                     </StatusChip>
                   </span>
+                  <div className="nf-rowactions">
+                    <RowAction label={`Delete chapter ${draft.chapter}`} danger onClick={() => setDeleteTarget(draft)}>
+                      <TrashIcon size={14} />
+                    </RowAction>
+                  </div>
                   <ChevronRightIcon size={16} style={{ color: 'var(--sh-text-placeholder)', flexShrink: 0 }} />
-                </button>
+                </div>
               );
             })}
           </div>
         </QueryState>
       </div>
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
+        <Dialog.Content size="sm">
+          <Dialog.Header
+            title={`Delete chapter ${deleteTarget?.chapter}?`}
+            description={`“${deleteTarget?.title ?? 'Untitled chapter'}” and its revision history will be permanently removed. This cannot be undone.`}
+          />
+          <Dialog.Footer>
+            <Dialog.Close asChild>
+              <Button variant="ghost">Cancel</Button>
+            </Dialog.Close>
+            <Button variant="danger" loading={deleteDraft.isPending} onClick={doDelete}>
+              Delete chapter
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
     </div>
   );
 }
@@ -423,12 +522,15 @@ function ChapterSwitchDrawer({ open, onOpenChange, novelId, current, onPick }: C
 }
 
 /**
- * The prose editor's formatting toolbar: wraps the current selection in the inline marks the reader
- * renders (bold / italic / underline), plus the punctuation novelists reach for constantly.
+ * The Markdown formatting toolbar: the small set of marks a novelist actually reaches for — bold,
+ * italic, bulleted / numbered lists, and tables. Each acts on the write-tab textarea's selection.
  */
 interface ProseToolbarProps {
-  onWrap: (prefix: string, suffix: string) => void;
-  onInsert: (text: string) => void;
+  onBold: () => void;
+  onItalic: () => void;
+  onBulleted: () => void;
+  onNumbered: () => void;
+  onTable: () => void;
 }
 
 interface ToolbarButton {
@@ -437,15 +539,13 @@ interface ToolbarButton {
   action: () => void;
 }
 
-function ProseToolbar({ onWrap, onInsert }: ProseToolbarProps): React.JSX.Element {
+function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable }: ProseToolbarProps): React.JSX.Element {
   const buttons: ToolbarButton[] = [
-    { label: <strong>B</strong>, title: 'Bold (⌘B)', action: () => onWrap('**', '**') },
-    { label: <em>I</em>, title: 'Italic (⌘I)', action: () => onWrap('*', '*') },
-    { label: <u>U</u>, title: 'Underline (⌘U)', action: () => onWrap('<u>', '</u>') },
-    { label: '—', title: 'Em dash', action: () => onInsert('—') },
-    { label: '…', title: 'Ellipsis', action: () => onInsert('…') },
-    { label: '“ ”', title: 'Curly quotes', action: () => onWrap('“', '”') },
-    { label: '＊＊＊', title: 'Scene break', action: () => onInsert('\n\n***\n\n') },
+    { label: <strong>B</strong>, title: 'Bold (⌘B)', action: onBold },
+    { label: <em>I</em>, title: 'Italic (⌘I)', action: onItalic },
+    { label: '•', title: 'Bulleted list', action: onBulleted },
+    { label: '1.', title: 'Numbered list', action: onNumbered },
+    { label: '▦', title: 'Table', action: onTable },
   ];
   return (
     <div
@@ -486,7 +586,7 @@ function ProseToolbar({ onWrap, onInsert }: ProseToolbarProps): React.JSX.Elemen
         </Tooltip>
       ))}
       <div style={{ flex: 1 }} />
-      <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>**bold** · *italic* · &lt;u&gt;underline&lt;/u&gt;</span>
+      <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>Markdown supported</span>
     </div>
   );
 }
@@ -502,24 +602,30 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   const draftQuery = useDraftQuery(novelId, chapter);
   const updateDraft = useUpdateDraftMutation(novelId, chapter);
   const approveDraft = useApproveDraftMutation(novelId);
+  const judge = useJudgeDraftMutation(novelId, chapter);
+  const extract = useExtractToBibleMutation(novelId, chapter);
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [editing, setEditing] = useState(false);
-  const editorRef = useRef<HTMLDivElement>(null);
+  const [tab, setTab] = useState<'write' | 'preview'>('write');
+  const [text, setText] = useState('');
+  const editorRef = useRef<HTMLTextAreaElement>(null);
 
   const draft = draftQuery.data;
 
-  // The editor is the reading view made editable — same typography, no field chrome. Text lives in
-  // the DOM while editing (plaintext-only contentEditable) so the caret survives keystrokes; React
-  // only seeds it when editing starts and reads it back on save.
+  // Seed the Markdown buffer whenever the chapter changes. A chapter with no prose yet (a fresh "write
+  // it yourself" draft) opens straight in the Write tab; one that already has prose opens as a read.
   useEffect(() => {
-    if (editing && editorRef.current) {
-      editorRef.current.textContent = draft?.body ?? '';
-      editorRef.current.focus();
-    }
+    setText(draft?.body ?? '');
+    setTab('write');
+    setEditing(draft ? !(draft.body ?? '').trim() : false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [editing]);
+  }, [draft?.id]);
+
+  useEffect(() => {
+    if (editing && tab === 'write') editorRef.current?.focus();
+  }, [editing, tab]);
 
   if (draftQuery.isLoading) return <PaneLoader />;
   if (draftQuery.error) return <PaneError error={draftQuery.error} />;
@@ -528,39 +634,69 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   const meta = statusMeta(draft);
   const canApprove = draft.reviewStatus !== 'contradiction' && draft.reviewStatus !== 'generating' && draft.status !== 'final';
 
-  // Formatting operates on the live selection; execCommand keeps the browser's undo stack intact.
-  const selectionInEditor = (): Selection | null => {
-    const sel = window.getSelection();
+  const enterEdit = (): void => {
+    setText(draft.body ?? '');
+    setTab('write');
+    setEditing(true);
+  };
+
+  // ─── Markdown toolbar actions — operate on the Write textarea's current selection ────────────────
+  const surround = (before: string, after: string): void => {
     const el = editorRef.current;
-    if (!sel || !el || sel.rangeCount === 0 || !el.contains(sel.anchorNode)) return null;
-    return sel;
+    if (!el) return;
+    const s = el.selectionStart;
+    const e = el.selectionEnd;
+    const next = text.slice(0, s) + before + text.slice(s, e) + after + text.slice(e);
+    setText(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(s + before.length, e + before.length);
+    });
   };
 
-  const wrapSelection = (prefix: string, suffix: string): void => {
-    const sel = selectionInEditor();
-    if (!sel) return void editorRef.current?.focus();
-    document.execCommand('insertText', false, prefix + sel.toString() + suffix);
+  const prefixLines = (prefix: (i: number) => string): void => {
+    const el = editorRef.current;
+    if (!el) return;
+    const from = text.lastIndexOf('\n', el.selectionStart - 1) + 1;
+    const nl = text.indexOf('\n', el.selectionEnd);
+    const to = nl === -1 ? text.length : nl;
+    const out = text
+      .slice(from, to)
+      .split('\n')
+      .map((line, i) => prefix(i) + line)
+      .join('\n');
+    const next = text.slice(0, from) + out + text.slice(to);
+    setText(next);
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(from, from + out.length);
+    });
   };
 
-  const insertText = (text: string): void => {
-    if (!selectionInEditor()) editorRef.current?.focus();
-    document.execCommand('insertText', false, text);
+  const insertTable = (): void => {
+    const el = editorRef.current;
+    if (!el) return;
+    const at = el.selectionStart;
+    const tpl = '\n| Column A | Column B |\n| --- | --- |\n| Cell 1 | Cell 2 |\n| Cell 3 | Cell 4 |\n';
+    setText(text.slice(0, at) + tpl + text.slice(at));
+    requestAnimationFrame(() => {
+      el.focus();
+      el.setSelectionRange(at + tpl.length, at + tpl.length);
+    });
   };
 
   const onEditorKeyDown = (e: React.KeyboardEvent): void => {
     if (!(e.metaKey || e.ctrlKey)) return;
     const key = e.key.toLowerCase();
-    if (key === 'b') wrapSelection('**', '**');
-    else if (key === 'i') wrapSelection('*', '*');
-    else if (key === 'u') wrapSelection('<u>', '</u>');
+    if (key === 'b') surround('**', '**');
+    else if (key === 'i') surround('*', '*');
     else return;
     e.preventDefault();
   };
 
   const save = (): void => {
-    const body = editorRef.current?.textContent ?? draft.body ?? '';
     updateDraft.mutate(
-      { body, title: draft.title ?? undefined },
+      { body: sanitizeSource(text), title: draft.title ?? undefined },
       {
         onSuccess: () => {
           toast.success('Draft saved');
@@ -573,6 +709,22 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
   const approve = (): void => {
     approveDraft.mutate(chapter, { onSuccess: () => toast.success(`Chapter ${chapter} approved`), onError: err => toast.danger(err.message) });
+  };
+
+  // The manual "Verify" pass: run the continuity judge against the bible on demand.
+  const runJudge = (): void => {
+    judge.mutate(undefined, {
+      onSuccess: r => (r.verdict === 'contradiction' ? toast.danger('Judge flagged a contradiction — open review for details') : toast.success('Judge verdict: consistent')),
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  // Fold the canon this chapter establishes back into the bible as a reviewable proposal.
+  const runExtract = (): void => {
+    extract.mutate(undefined, {
+      onSuccess: () => toast.success('Canon proposal drafted — review it on the Proposals page'),
+      onError: err => toast.danger(err.message),
+    });
   };
 
   return (
@@ -619,8 +771,16 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
         ) : (
           <>
             <Tooltip content="Edit prose">
-              <IconButton variant="ghost" aria-label="Edit prose" icon={<EditIcon size={17} />} onClick={() => setEditing(true)} />
+              <IconButton variant="ghost" aria-label="Edit prose" icon={<EditIcon size={17} />} onClick={enterEdit} />
             </Tooltip>
+            <Tooltip content="Add this chapter's new canon to the bible as a proposal">
+              <Button variant="ghost" size="sm" loading={extract.isPending} disabled={!draft.body?.trim()} onClick={runExtract}>
+                Add to bible
+              </Button>
+            </Tooltip>
+            <Button variant="secondary" size="sm" loading={judge.isPending} disabled={!draft.body?.trim()} onClick={runJudge}>
+              Verify
+            </Button>
             <Button variant="primary" size="sm" disabled={!canApprove} loading={approveDraft.isPending} onClick={approve}>
               Approve draft
             </Button>
@@ -631,64 +791,81 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
       <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
         {editing ? (
           <div className="nf-scroll" style={{ position: 'absolute', inset: 0 }}>
-            <div style={{ maxWidth: 648, margin: '0 auto', padding: '20px 32px 120px' }} onKeyDown={onEditorKeyDown}>
-              <ProseToolbar onWrap={wrapSelection} onInsert={insertText} />
-              <div
-                ref={editorRef}
-                contentEditable="plaintext-only"
-                suppressContentEditableWarning
-                spellCheck
-                aria-label="Chapter prose"
-                style={{
-                  outline: 'none',
-                  whiteSpace: 'pre-wrap',
-                  minHeight: '60vh',
-                  fontSize: 19,
-                  lineHeight: 1.85,
-                  fontFamily: "'Iowan Old Style','Palatino Linotype',Georgia,serif",
-                  caretColor: 'var(--sh-accent)',
-                }}
-              />
+            <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '16px 32px 120px' }}>
+              {/* Write / Preview tabs — GitHub-style */}
+              <div style={{ display: 'flex', gap: 4, marginBottom: 12, borderBottom: '1px solid var(--sh-border-subtle)' }}>
+                {(['write', 'preview'] as const).map(t => (
+                  <button
+                    key={t}
+                    onClick={() => setTab(t)}
+                    style={{
+                      padding: '7px 14px',
+                      border: 'none',
+                      borderBottom: `2px solid ${tab === t ? 'var(--sh-accent)' : 'transparent'}`,
+                      background: 'transparent',
+                      cursor: 'pointer',
+                      fontSize: 'var(--sh-text-body-sm)',
+                      fontWeight: tab === t ? 700 : 500,
+                      color: tab === t ? 'var(--sh-text-primary)' : 'var(--sh-text-tertiary)',
+                      textTransform: 'capitalize',
+                    }}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
+              {tab === 'write' ? (
+                <>
+                  <ProseToolbar
+                    onBold={() => surround('**', '**')}
+                    onItalic={() => surround('*', '*')}
+                    onBulleted={() => prefixLines(() => '- ')}
+                    onNumbered={() => prefixLines(i => `${i + 1}. `)}
+                    onTable={insertTable}
+                  />
+                  <textarea
+                    ref={editorRef}
+                    value={text}
+                    onChange={e => setText(e.target.value)}
+                    onKeyDown={onEditorKeyDown}
+                    spellCheck
+                    aria-label="Chapter prose (Markdown)"
+                    placeholder="Write your chapter in Markdown…"
+                    style={{
+                      display: 'block',
+                      width: '100%',
+                      minHeight: '62vh',
+                      resize: 'vertical',
+                      outline: 'none',
+                      border: '1px solid var(--sh-border-subtle)',
+                      borderRadius: 'var(--sh-radius-md)',
+                      background: 'var(--sh-surface-app)',
+                      padding: '14px 16px',
+                      fontSize: 15,
+                      lineHeight: 1.7,
+                      fontFamily: 'var(--sh-font-mono)',
+                      color: 'var(--sh-text-primary)',
+                      caretColor: 'var(--sh-accent)',
+                    }}
+                  />
+                </>
+              ) : (
+                <div
+                  className="nf-md"
+                  style={{ minHeight: '62vh', fontSize: 19, lineHeight: 1.85, fontFamily: "'Iowan Old Style','Palatino Linotype',Georgia,serif" }}
+                  dangerouslySetInnerHTML={renderMarkdown(text)}
+                />
+              )}
             </div>
           </div>
         ) : (
           <div className="nf-scroll" style={{ position: 'absolute', inset: 0 }}>
-            <article
-              style={{
-                maxWidth: 648,
-                margin: '0 auto',
-                padding: '64px 32px 120px',
-                fontSize: 19,
-                lineHeight: 1.85,
-                fontFamily: "'Iowan Old Style','Palatino Linotype',Georgia,serif",
-              }}
-            >
+            <article style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '64px 32px 120px', fontSize: 19, lineHeight: 1.85, fontFamily: "'Iowan Old Style','Palatino Linotype',Georgia,serif" }}>
               {draft.title && (
-                <div
-                  style={{
-                    fontFamily: 'var(--sh-font-sans)',
-                    fontSize: 12,
-                    letterSpacing: '0.14em',
-                    textTransform: 'uppercase',
-                    color: 'var(--sh-text-tertiary)',
-                    marginBottom: 26,
-                  }}
-                >
-                  Chapter {chapter}
-                </div>
+                <div style={{ fontFamily: 'var(--sh-font-sans)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--sh-text-tertiary)', marginBottom: 26 }}>Chapter {chapter}</div>
               )}
-              {draft.body ? (
-                draft.body.split(/\n{2,}/).map((para, i) =>
-                  para.trim() === '***' ? (
-                    <div key={i} style={{ textAlign: 'center', letterSpacing: '0.6em', color: 'var(--sh-text-tertiary)', margin: '0 0 26px' }}>
-                      ***
-                    </div>
-                  ) : (
-                    <p key={i} style={{ margin: '0 0 26px' }}>
-                      {renderInline(para)}
-                    </p>
-                  ),
-                )
+              {draft.body?.trim() ? (
+                <div className="nf-md" dangerouslySetInnerHTML={renderMarkdown(draft.body)} />
               ) : (
                 <p style={{ color: 'var(--sh-text-tertiary)' }}>This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.</p>
               )}
