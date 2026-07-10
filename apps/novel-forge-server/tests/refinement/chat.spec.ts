@@ -68,7 +68,7 @@ describe.if(pgAvailable)('ChatService', () => {
 
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop);
-    const modelRouter = { structured: structuredMock } as never;
+    const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'xai', model: 'grok-3' }) } as never;
     chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService));
 
     const [project] = await db

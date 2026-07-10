@@ -23,7 +23,7 @@ import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
-import { type AiRole, type ResolvedModel, getProfileDefaults } from '../ai/defaults';
+import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt, renderScopeInstructions } from '../ai/prompts';
@@ -247,16 +247,12 @@ export class ChatService {
   /**
    * The chat model resolution ladder, most specific first:
    *  1. the chat's own override (the author picked a model for this conversation),
-   *  2. the project setting for the scope's planning role (arc chat → the arc-planning model),
-   *  3. the project setting for the generic chat role,
-   *  4. the AI profile default for the scope's role, then for chat.
+   *  2. otherwise the model routed for the scope's role — the router folds in the project's group
+   *     selection and the chat → planning default (arc chat → the planning model, and so on).
    */
   private resolveSessionModel(session: Refinement.ChatSession, project?: ProjectConfig): ResolvedModel {
     if (session.modelProvider && session.modelId) return { provider: session.modelProvider, model: session.modelId };
-    const scopeRole = SCOPE_CHAT_ROLE[session.scopeType];
-    const configured = (project?.config?.models ?? {}) as Partial<Record<AiRole, ResolvedModel>>;
-    const defaults = getProfileDefaults();
-    return configured[scopeRole] ?? configured['chat'] ?? defaults[scopeRole] ?? defaults['chat'];
+    return this.modelRouter.resolveModel(SCOPE_CHAT_ROLE[session.scopeType], project);
   }
 
   private async persistTurn(

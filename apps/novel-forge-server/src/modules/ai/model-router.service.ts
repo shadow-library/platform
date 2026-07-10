@@ -124,10 +124,14 @@ export class ModelRouterService {
   resolveModel(role: AiRole, project?: ProjectConfig): ResolvedModel {
     // 1. grok_only forces xAI on every role
     if (project?.contentMode === 'grok_only') return { provider: 'xai', model: Config.get('ai.grok.llm.model') };
-    // 2. per-project config override
-    const projectModel = (project?.config?.models as Record<string, ResolvedModel> | undefined)?.[role];
+    // 2. per-project config override (stored per fine-grained role; the settings UI writes one value
+    //    across every role in a group, so a group's members resolve identically).
+    const models = project?.config?.models as Record<string, ResolvedModel> | undefined;
+    const projectModel = models?.[role];
     if (projectModel) return projectModel;
-    // 3. AI_PROFILE defaults
+    // 3. refinement chat is its own dial but, left unset, follows the author's planning selection
+    if (role === 'chat' && models?.['plan']) return models['plan'];
+    // 4. AI_PROFILE defaults
     return getProfileDefaults()[role] ?? { provider: 'xai', model: Config.get('ai.grok.llm.model') };
   }
 

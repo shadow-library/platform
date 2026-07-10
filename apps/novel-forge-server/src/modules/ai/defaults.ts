@@ -50,53 +50,66 @@ export interface AiProfile {
  * Declaring the constants
  */
 
-// Production defaults: all analytical + authoring roles default to grok-3; image to grok-2-image.
-export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = {
-  extraction: { provider: 'xai', model: 'grok-3' },
-  generation: { provider: 'xai', model: 'grok-3' },
-  judge: { provider: 'xai', model: 'grok-3' },
-  fix: { provider: 'xai', model: 'grok-3' },
-  outline: { provider: 'xai', model: 'grok-3' },
-  revision: { provider: 'xai', model: 'grok-3' },
-  title: { provider: 'xai', model: 'grok-3-mini' },
-  continuity: { provider: 'xai', model: 'grok-3' },
-  validation: { provider: 'xai', model: 'grok-3' },
+export type ModelGroup = 'writing' | 'planning' | 'review' | 'chat' | 'helper' | 'image' | 'embedding';
+
+// Every fine-grained role maps to exactly one user-facing model group. Roles stay fine-grained
+// internally (prompts + telemetry + routing); the group is only the unit the author selects a model
+// for. `chat` is its own group but, when unset, follows the planning selection (see resolveModel).
+export const ROLE_GROUP: Record<AiRole, ModelGroup> = {
+  generation: 'writing',
+  revision: 'writing',
+  fix: 'writing',
+  premise: 'planning',
+  plan: 'planning',
+  arc: 'planning',
+  outline: 'planning',
+  skeleton: 'planning',
+  bible: 'planning',
+  extraction: 'planning',
+  judge: 'review',
+  validation: 'review',
+  continuity: 'review',
+  review: 'review',
+  audit: 'review',
+  chat: 'chat',
+  title: 'helper',
+  compact: 'helper',
+  image: 'image',
+  embedding: 'embedding',
+};
+
+// Group-level defaults are the single source of truth; the per-role maps below derive from them so the
+// router (which resolves per role) and the settings UI (which picks per group) never drift. `chat`
+// mirrors `planning`. Production keeps today's resolution byte-for-byte (writing/planning/review/chat →
+// grok-3, helper → grok-3-mini, image → grok-2-image).
+const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
+  writing: { provider: 'xai', model: 'grok-3' },
+  planning: { provider: 'xai', model: 'grok-3' },
   review: { provider: 'xai', model: 'grok-3' },
-  plan: { provider: 'xai', model: 'grok-3' },
-  skeleton: { provider: 'xai', model: 'grok-3' },
-  bible: { provider: 'xai', model: 'grok-3' },
-  premise: { provider: 'xai', model: 'grok-3' },
-  audit: { provider: 'xai', model: 'grok-3' },
   chat: { provider: 'xai', model: 'grok-3' },
-  compact: { provider: 'xai', model: 'grok-3-mini' },
-  arc: { provider: 'xai', model: 'grok-3' },
-  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  helper: { provider: 'xai', model: 'grok-3-mini' },
   image: { provider: 'xai', model: 'grok-2-image' },
+  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
 
 // Local-test profile: routes everything to Ollama (used in smoke tests / dev without API keys).
-export const LOCAL_TEST_DEFAULTS: Record<AiRole, ResolvedModel> = {
-  extraction: { provider: 'ollama', model: 'qwen3:14b' },
-  generation: { provider: 'ollama', model: 'qwen3:14b' },
-  judge: { provider: 'ollama', model: 'qwen3:8b' },
-  fix: { provider: 'ollama', model: 'qwen3:14b' },
-  outline: { provider: 'ollama', model: 'qwen3:8b' },
-  revision: { provider: 'ollama', model: 'qwen3:14b' },
-  title: { provider: 'ollama', model: 'qwen3:8b' },
-  continuity: { provider: 'ollama', model: 'qwen3:8b' },
-  validation: { provider: 'ollama', model: 'qwen3:8b' },
+const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
+  writing: { provider: 'ollama', model: 'qwen3:14b' },
+  planning: { provider: 'ollama', model: 'qwen3:14b' },
   review: { provider: 'ollama', model: 'qwen3:8b' },
-  plan: { provider: 'ollama', model: 'qwen3:8b' },
-  skeleton: { provider: 'ollama', model: 'qwen3:14b' },
-  bible: { provider: 'ollama', model: 'qwen3:14b' },
-  premise: { provider: 'ollama', model: 'qwen3:14b' },
-  audit: { provider: 'ollama', model: 'qwen3:8b' },
   chat: { provider: 'ollama', model: 'qwen3:14b' },
-  compact: { provider: 'ollama', model: 'qwen3:8b' },
-  arc: { provider: 'ollama', model: 'qwen3:14b' },
-  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
+  helper: { provider: 'ollama', model: 'qwen3:8b' },
   image: { provider: 'ollama', model: 'qwen3:8b' },
+  embedding: { provider: 'ollama', model: 'qwen3-embedding:8b' },
 };
+
+function deriveRoleDefaults(groups: Record<ModelGroup, ResolvedModel>): Record<AiRole, ResolvedModel> {
+  const entries = (Object.keys(ROLE_GROUP) as AiRole[]).map(role => [role, groups[ROLE_GROUP[role]]] as const);
+  return Object.fromEntries(entries) as Record<AiRole, ResolvedModel>;
+}
+
+export const PRODUCTION_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(PRODUCTION_GROUP_DEFAULTS);
+export const LOCAL_TEST_DEFAULTS: Record<AiRole, ResolvedModel> = deriveRoleDefaults(LOCAL_TEST_GROUP_DEFAULTS);
 
 // Read directly from process.env so smoke scripts can override it at runtime
 // without needing to re-bootstrap Config (which caches at load time).
@@ -104,4 +117,11 @@ export function getProfileDefaults(): Record<AiRole, ResolvedModel> {
   const profile = process.env['AI_PROFILE'] ?? 'production';
   if (profile === 'local-test') return LOCAL_TEST_DEFAULTS;
   return PRODUCTION_DEFAULTS;
+}
+
+// The group-level defaults for the active profile — what the settings UI shows as each group's inherited model.
+export function getGroupDefaults(): Record<ModelGroup, ResolvedModel> {
+  const profile = process.env['AI_PROFILE'] ?? 'production';
+  if (profile === 'local-test') return LOCAL_TEST_GROUP_DEFAULTS;
+  return PRODUCTION_GROUP_DEFAULTS;
 }

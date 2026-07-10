@@ -10,7 +10,7 @@ import { describe, expect, it, mock } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS } from '@modules/ai/defaults';
+import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
@@ -61,6 +61,24 @@ describe('ModelRouterService.resolveModel', () => {
       config: { models: { generation: { provider: 'anthropic', model: 'claude-sonnet-4-6' } } },
     });
     expect(resolved.provider).toBe('xai');
+  });
+
+  it('refinement chat inherits the planning selection when no chat model is set', () => {
+    const resolved = router.resolveModel('chat', { contentMode: 'standard', config: { models: { plan: { provider: 'anthropic', model: 'claude-sonnet-4-6' } } } });
+    expect(resolved.provider).toBe('anthropic');
+    expect(resolved.model).toBe('claude-sonnet-4-6');
+  });
+
+  it('an explicit chat model overrides the planning inheritance', () => {
+    const resolved = router.resolveModel('chat', {
+      contentMode: 'standard',
+      config: { models: { plan: { provider: 'anthropic', model: 'claude-sonnet-4-6' }, chat: { provider: 'xai', model: 'grok-3' } } },
+    });
+    expect(resolved.model).toBe('grok-3');
+  });
+
+  it('maps every fine-grained role to a model group', () => {
+    for (const role of Object.keys(PRODUCTION_DEFAULTS)) expect(ROLE_GROUP[role as keyof typeof ROLE_GROUP]).toBeDefined();
   });
 });
 
