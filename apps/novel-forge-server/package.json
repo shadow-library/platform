@@ -12,6 +12,7 @@
     "dev": "bun run --watch src/main.ts",
     "db:create-template": "bun run scripts/create-template-db.ts",
     "db:migrate": "bun run scripts/migrate-db.ts",
+    "db:generate": "bun run drizzle-kit generate",
     "db:seed": "bun run scripts/seed.ts",
     "ai:smoke": "bun run scripts/ai-smoke.ts",
     "ai:pull-models": "bun run scripts/ai-pull-models.ts",

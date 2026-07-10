@@ -27,16 +27,17 @@ const url = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postg
 const migrationsFolder = process.env['MIGRATIONS_FOLDER'] ?? 'generated/drizzle';
 const logger = Logger.getLogger(APP_NAME, 'migrate-db');
 
-Logger.attachTransport('console:json');
+Logger.attachTransport('console:pretty');
 
 try {
   const db = drizzle(url);
   await migrate(db, { migrationsFolder });
   logger.info('Drizzle migrations applied');
-  const checkpointer = PostgresSaver.fromConnString(url);
-  await checkpointer.setup();
-  logger.info('LangGraph checkpointer tables created');
+  const checkPointer = PostgresSaver.fromConnString(url);
+  await checkPointer.setup();
+  logger.info('LangGraph check pointer tables created');
   logger.info('Database migration completed successfully');
+  await db.$client.close();
 } catch (error: any) {
   logger.error('Database migration failed', { error });
   if ('cause' in error) logger.error('Cause', { cause: error.cause });
