@@ -12,31 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AppRouteImport } from './routes/_app'
 import { Route as AppIndexRouteImport } from './routes/_app/index'
 import { Route as NovelsNovelIdRouteImport } from './routes/novels/$novelId'
-import { Route as AppSettingsRouteImport } from './routes/_app/settings'
-import { Route as AppProjectsRouteImport } from './routes/_app/projects'
 import { Route as NovelsNovelIdIndexRouteImport } from './routes/novels/$novelId/index'
-import { Route as NovelsNovelIdWorldRouteImport } from './routes/novels/$novelId/world'
 import { Route as NovelsNovelIdVolumesRouteImport } from './routes/novels/$novelId/volumes'
-import { Route as NovelsNovelIdVersionsRouteImport } from './routes/novels/$novelId/versions'
-import { Route as NovelsNovelIdTimelineRouteImport } from './routes/novels/$novelId/timeline'
 import { Route as NovelsNovelIdStoryBibleRouteImport } from './routes/novels/$novelId/story-bible'
-import { Route as NovelsNovelIdSpeciesRouteImport } from './routes/novels/$novelId/species'
-import { Route as NovelsNovelIdPlotRouteImport } from './routes/novels/$novelId/plot'
+import { Route as NovelsNovelIdSourceRouteImport } from './routes/novels/$novelId/source'
+import { Route as NovelsNovelIdSettingsRouteImport } from './routes/novels/$novelId/settings'
+import { Route as NovelsNovelIdRunsRouteImport } from './routes/novels/$novelId/runs'
+import { Route as NovelsNovelIdReviewRouteImport } from './routes/novels/$novelId/review'
+import { Route as NovelsNovelIdProposalsRouteImport } from './routes/novels/$novelId/proposals'
 import { Route as NovelsNovelIdOverviewRouteImport } from './routes/novels/$novelId/overview'
-import { Route as NovelsNovelIdMagicRouteImport } from './routes/novels/$novelId/magic'
-import { Route as NovelsNovelIdLoreRouteImport } from './routes/novels/$novelId/lore'
-import { Route as NovelsNovelIdLocationsRouteImport } from './routes/novels/$novelId/locations'
-import { Route as NovelsNovelIdFactionsRouteImport } from './routes/novels/$novelId/factions'
-import { Route as NovelsNovelIdContinuityRouteImport } from './routes/novels/$novelId/continuity'
-import { Route as NovelsNovelIdCharactersRouteImport } from './routes/novels/$novelId/characters'
+import { Route as NovelsNovelIdChatRouteImport } from './routes/novels/$novelId/chat'
 import { Route as NovelsNovelIdChaptersRouteImport } from './routes/novels/$novelId/chapters'
-import { Route as NovelsNovelIdChapterReviewRouteImport } from './routes/novels/$novelId/chapter-review'
-import { Route as NovelsNovelIdChapterGenerateRouteImport } from './routes/novels/$novelId/chapter-generate'
-import { Route as NovelsNovelIdChapterEditorRouteImport } from './routes/novels/$novelId/chapter-editor'
-import { Route as NovelsNovelIdChapterBriefRouteImport } from './routes/novels/$novelId/chapter-brief'
-import { Route as NovelsNovelIdAssetsRouteImport } from './routes/novels/$novelId/assets'
-import { Route as NovelsNovelIdApprovalsRouteImport } from './routes/novels/$novelId/approvals'
-import { Route as NovelsNovelIdCharacterCharacterIdRouteImport } from './routes/novels/$novelId/character.$characterId'
 
 const AppRoute = AppRouteImport.update({
   id: '/_app',
@@ -52,24 +38,9 @@ const NovelsNovelIdRoute = NovelsNovelIdRouteImport.update({
   path: '/novels/$novelId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRoute,
-} as any)
-const AppProjectsRoute = AppProjectsRouteImport.update({
-  id: '/projects',
-  path: '/projects',
-  getParentRoute: () => AppRoute,
-} as any)
 const NovelsNovelIdIndexRoute = NovelsNovelIdIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdWorldRoute = NovelsNovelIdWorldRouteImport.update({
-  id: '/world',
-  path: '/world',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
 const NovelsNovelIdVolumesRoute = NovelsNovelIdVolumesRouteImport.update({
@@ -77,29 +48,34 @@ const NovelsNovelIdVolumesRoute = NovelsNovelIdVolumesRouteImport.update({
   path: '/volumes',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
-const NovelsNovelIdVersionsRoute = NovelsNovelIdVersionsRouteImport.update({
-  id: '/versions',
-  path: '/versions',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdTimelineRoute = NovelsNovelIdTimelineRouteImport.update({
-  id: '/timeline',
-  path: '/timeline',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
 const NovelsNovelIdStoryBibleRoute = NovelsNovelIdStoryBibleRouteImport.update({
   id: '/story-bible',
   path: '/story-bible',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
-const NovelsNovelIdSpeciesRoute = NovelsNovelIdSpeciesRouteImport.update({
-  id: '/species',
-  path: '/species',
+const NovelsNovelIdSourceRoute = NovelsNovelIdSourceRouteImport.update({
+  id: '/source',
+  path: '/source',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
-const NovelsNovelIdPlotRoute = NovelsNovelIdPlotRouteImport.update({
-  id: '/plot',
-  path: '/plot',
+const NovelsNovelIdSettingsRoute = NovelsNovelIdSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => NovelsNovelIdRoute,
+} as any)
+const NovelsNovelIdRunsRoute = NovelsNovelIdRunsRouteImport.update({
+  id: '/runs',
+  path: '/runs',
+  getParentRoute: () => NovelsNovelIdRoute,
+} as any)
+const NovelsNovelIdReviewRoute = NovelsNovelIdReviewRouteImport.update({
+  id: '/review',
+  path: '/review',
+  getParentRoute: () => NovelsNovelIdRoute,
+} as any)
+const NovelsNovelIdProposalsRoute = NovelsNovelIdProposalsRouteImport.update({
+  id: '/proposals',
+  path: '/proposals',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
 const NovelsNovelIdOverviewRoute = NovelsNovelIdOverviewRouteImport.update({
@@ -107,34 +83,9 @@ const NovelsNovelIdOverviewRoute = NovelsNovelIdOverviewRouteImport.update({
   path: '/overview',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
-const NovelsNovelIdMagicRoute = NovelsNovelIdMagicRouteImport.update({
-  id: '/magic',
-  path: '/magic',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdLoreRoute = NovelsNovelIdLoreRouteImport.update({
-  id: '/lore',
-  path: '/lore',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdLocationsRoute = NovelsNovelIdLocationsRouteImport.update({
-  id: '/locations',
-  path: '/locations',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdFactionsRoute = NovelsNovelIdFactionsRouteImport.update({
-  id: '/factions',
-  path: '/factions',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdContinuityRoute = NovelsNovelIdContinuityRouteImport.update({
-  id: '/continuity',
-  path: '/continuity',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdCharactersRoute = NovelsNovelIdCharactersRouteImport.update({
-  id: '/characters',
-  path: '/characters',
+const NovelsNovelIdChatRoute = NovelsNovelIdChatRouteImport.update({
+  id: '/chat',
+  path: '/chat',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
 const NovelsNovelIdChaptersRoute = NovelsNovelIdChaptersRouteImport.update({
@@ -142,223 +93,99 @@ const NovelsNovelIdChaptersRoute = NovelsNovelIdChaptersRouteImport.update({
   path: '/chapters',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
-const NovelsNovelIdChapterReviewRoute =
-  NovelsNovelIdChapterReviewRouteImport.update({
-    id: '/chapter-review',
-    path: '/chapter-review',
-    getParentRoute: () => NovelsNovelIdRoute,
-  } as any)
-const NovelsNovelIdChapterGenerateRoute =
-  NovelsNovelIdChapterGenerateRouteImport.update({
-    id: '/chapter-generate',
-    path: '/chapter-generate',
-    getParentRoute: () => NovelsNovelIdRoute,
-  } as any)
-const NovelsNovelIdChapterEditorRoute =
-  NovelsNovelIdChapterEditorRouteImport.update({
-    id: '/chapter-editor',
-    path: '/chapter-editor',
-    getParentRoute: () => NovelsNovelIdRoute,
-  } as any)
-const NovelsNovelIdChapterBriefRoute =
-  NovelsNovelIdChapterBriefRouteImport.update({
-    id: '/chapter-brief',
-    path: '/chapter-brief',
-    getParentRoute: () => NovelsNovelIdRoute,
-  } as any)
-const NovelsNovelIdAssetsRoute = NovelsNovelIdAssetsRouteImport.update({
-  id: '/assets',
-  path: '/assets',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdApprovalsRoute = NovelsNovelIdApprovalsRouteImport.update({
-  id: '/approvals',
-  path: '/approvals',
-  getParentRoute: () => NovelsNovelIdRoute,
-} as any)
-const NovelsNovelIdCharacterCharacterIdRoute =
-  NovelsNovelIdCharacterCharacterIdRouteImport.update({
-    id: '/character/$characterId',
-    path: '/character/$characterId',
-    getParentRoute: () => NovelsNovelIdRoute,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
-  '/projects': typeof AppProjectsRoute
-  '/settings': typeof AppSettingsRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
-  '/novels/$novelId/approvals': typeof NovelsNovelIdApprovalsRoute
-  '/novels/$novelId/assets': typeof NovelsNovelIdAssetsRoute
-  '/novels/$novelId/chapter-brief': typeof NovelsNovelIdChapterBriefRoute
-  '/novels/$novelId/chapter-editor': typeof NovelsNovelIdChapterEditorRoute
-  '/novels/$novelId/chapter-generate': typeof NovelsNovelIdChapterGenerateRoute
-  '/novels/$novelId/chapter-review': typeof NovelsNovelIdChapterReviewRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
-  '/novels/$novelId/characters': typeof NovelsNovelIdCharactersRoute
-  '/novels/$novelId/continuity': typeof NovelsNovelIdContinuityRoute
-  '/novels/$novelId/factions': typeof NovelsNovelIdFactionsRoute
-  '/novels/$novelId/locations': typeof NovelsNovelIdLocationsRoute
-  '/novels/$novelId/lore': typeof NovelsNovelIdLoreRoute
-  '/novels/$novelId/magic': typeof NovelsNovelIdMagicRoute
+  '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
-  '/novels/$novelId/plot': typeof NovelsNovelIdPlotRoute
-  '/novels/$novelId/species': typeof NovelsNovelIdSpeciesRoute
+  '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
+  '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
+  '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
+  '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
+  '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
-  '/novels/$novelId/timeline': typeof NovelsNovelIdTimelineRoute
-  '/novels/$novelId/versions': typeof NovelsNovelIdVersionsRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
-  '/novels/$novelId/world': typeof NovelsNovelIdWorldRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
-  '/novels/$novelId/character/$characterId': typeof NovelsNovelIdCharacterCharacterIdRoute
 }
 export interface FileRoutesByTo {
-  '/projects': typeof AppProjectsRoute
-  '/settings': typeof AppSettingsRoute
   '/': typeof AppIndexRoute
-  '/novels/$novelId/approvals': typeof NovelsNovelIdApprovalsRoute
-  '/novels/$novelId/assets': typeof NovelsNovelIdAssetsRoute
-  '/novels/$novelId/chapter-brief': typeof NovelsNovelIdChapterBriefRoute
-  '/novels/$novelId/chapter-editor': typeof NovelsNovelIdChapterEditorRoute
-  '/novels/$novelId/chapter-generate': typeof NovelsNovelIdChapterGenerateRoute
-  '/novels/$novelId/chapter-review': typeof NovelsNovelIdChapterReviewRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
-  '/novels/$novelId/characters': typeof NovelsNovelIdCharactersRoute
-  '/novels/$novelId/continuity': typeof NovelsNovelIdContinuityRoute
-  '/novels/$novelId/factions': typeof NovelsNovelIdFactionsRoute
-  '/novels/$novelId/locations': typeof NovelsNovelIdLocationsRoute
-  '/novels/$novelId/lore': typeof NovelsNovelIdLoreRoute
-  '/novels/$novelId/magic': typeof NovelsNovelIdMagicRoute
+  '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
-  '/novels/$novelId/plot': typeof NovelsNovelIdPlotRoute
-  '/novels/$novelId/species': typeof NovelsNovelIdSpeciesRoute
+  '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
+  '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
+  '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
+  '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
+  '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
-  '/novels/$novelId/timeline': typeof NovelsNovelIdTimelineRoute
-  '/novels/$novelId/versions': typeof NovelsNovelIdVersionsRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
-  '/novels/$novelId/world': typeof NovelsNovelIdWorldRoute
   '/novels/$novelId': typeof NovelsNovelIdIndexRoute
-  '/novels/$novelId/character/$characterId': typeof NovelsNovelIdCharacterCharacterIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
-  '/_app/projects': typeof AppProjectsRoute
-  '/_app/settings': typeof AppSettingsRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
-  '/novels/$novelId/approvals': typeof NovelsNovelIdApprovalsRoute
-  '/novels/$novelId/assets': typeof NovelsNovelIdAssetsRoute
-  '/novels/$novelId/chapter-brief': typeof NovelsNovelIdChapterBriefRoute
-  '/novels/$novelId/chapter-editor': typeof NovelsNovelIdChapterEditorRoute
-  '/novels/$novelId/chapter-generate': typeof NovelsNovelIdChapterGenerateRoute
-  '/novels/$novelId/chapter-review': typeof NovelsNovelIdChapterReviewRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
-  '/novels/$novelId/characters': typeof NovelsNovelIdCharactersRoute
-  '/novels/$novelId/continuity': typeof NovelsNovelIdContinuityRoute
-  '/novels/$novelId/factions': typeof NovelsNovelIdFactionsRoute
-  '/novels/$novelId/locations': typeof NovelsNovelIdLocationsRoute
-  '/novels/$novelId/lore': typeof NovelsNovelIdLoreRoute
-  '/novels/$novelId/magic': typeof NovelsNovelIdMagicRoute
+  '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
-  '/novels/$novelId/plot': typeof NovelsNovelIdPlotRoute
-  '/novels/$novelId/species': typeof NovelsNovelIdSpeciesRoute
+  '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
+  '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
+  '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
+  '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
+  '/novels/$novelId/source': typeof NovelsNovelIdSourceRoute
   '/novels/$novelId/story-bible': typeof NovelsNovelIdStoryBibleRoute
-  '/novels/$novelId/timeline': typeof NovelsNovelIdTimelineRoute
-  '/novels/$novelId/versions': typeof NovelsNovelIdVersionsRoute
   '/novels/$novelId/volumes': typeof NovelsNovelIdVolumesRoute
-  '/novels/$novelId/world': typeof NovelsNovelIdWorldRoute
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
-  '/novels/$novelId/character/$characterId': typeof NovelsNovelIdCharacterCharacterIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/projects'
-    | '/settings'
     | '/novels/$novelId'
-    | '/novels/$novelId/approvals'
-    | '/novels/$novelId/assets'
-    | '/novels/$novelId/chapter-brief'
-    | '/novels/$novelId/chapter-editor'
-    | '/novels/$novelId/chapter-generate'
-    | '/novels/$novelId/chapter-review'
     | '/novels/$novelId/chapters'
-    | '/novels/$novelId/characters'
-    | '/novels/$novelId/continuity'
-    | '/novels/$novelId/factions'
-    | '/novels/$novelId/locations'
-    | '/novels/$novelId/lore'
-    | '/novels/$novelId/magic'
+    | '/novels/$novelId/chat'
     | '/novels/$novelId/overview'
-    | '/novels/$novelId/plot'
-    | '/novels/$novelId/species'
+    | '/novels/$novelId/proposals'
+    | '/novels/$novelId/review'
+    | '/novels/$novelId/runs'
+    | '/novels/$novelId/settings'
+    | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
-    | '/novels/$novelId/timeline'
-    | '/novels/$novelId/versions'
     | '/novels/$novelId/volumes'
-    | '/novels/$novelId/world'
     | '/novels/$novelId/'
-    | '/novels/$novelId/character/$characterId'
   fileRoutesByTo: FileRoutesByTo
   to:
-    | '/projects'
-    | '/settings'
     | '/'
-    | '/novels/$novelId/approvals'
-    | '/novels/$novelId/assets'
-    | '/novels/$novelId/chapter-brief'
-    | '/novels/$novelId/chapter-editor'
-    | '/novels/$novelId/chapter-generate'
-    | '/novels/$novelId/chapter-review'
     | '/novels/$novelId/chapters'
-    | '/novels/$novelId/characters'
-    | '/novels/$novelId/continuity'
-    | '/novels/$novelId/factions'
-    | '/novels/$novelId/locations'
-    | '/novels/$novelId/lore'
-    | '/novels/$novelId/magic'
+    | '/novels/$novelId/chat'
     | '/novels/$novelId/overview'
-    | '/novels/$novelId/plot'
-    | '/novels/$novelId/species'
+    | '/novels/$novelId/proposals'
+    | '/novels/$novelId/review'
+    | '/novels/$novelId/runs'
+    | '/novels/$novelId/settings'
+    | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
-    | '/novels/$novelId/timeline'
-    | '/novels/$novelId/versions'
     | '/novels/$novelId/volumes'
-    | '/novels/$novelId/world'
     | '/novels/$novelId'
-    | '/novels/$novelId/character/$characterId'
   id:
     | '__root__'
     | '/_app'
-    | '/_app/projects'
-    | '/_app/settings'
     | '/novels/$novelId'
     | '/_app/'
-    | '/novels/$novelId/approvals'
-    | '/novels/$novelId/assets'
-    | '/novels/$novelId/chapter-brief'
-    | '/novels/$novelId/chapter-editor'
-    | '/novels/$novelId/chapter-generate'
-    | '/novels/$novelId/chapter-review'
     | '/novels/$novelId/chapters'
-    | '/novels/$novelId/characters'
-    | '/novels/$novelId/continuity'
-    | '/novels/$novelId/factions'
-    | '/novels/$novelId/locations'
-    | '/novels/$novelId/lore'
-    | '/novels/$novelId/magic'
+    | '/novels/$novelId/chat'
     | '/novels/$novelId/overview'
-    | '/novels/$novelId/plot'
-    | '/novels/$novelId/species'
+    | '/novels/$novelId/proposals'
+    | '/novels/$novelId/review'
+    | '/novels/$novelId/runs'
+    | '/novels/$novelId/settings'
+    | '/novels/$novelId/source'
     | '/novels/$novelId/story-bible'
-    | '/novels/$novelId/timeline'
-    | '/novels/$novelId/versions'
     | '/novels/$novelId/volumes'
-    | '/novels/$novelId/world'
     | '/novels/$novelId/'
-    | '/novels/$novelId/character/$characterId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -389,32 +216,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/_app/settings': {
-      id: '/_app/settings'
-      path: '/settings'
-      fullPath: '/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRoute
-    }
-    '/_app/projects': {
-      id: '/_app/projects'
-      path: '/projects'
-      fullPath: '/projects'
-      preLoaderRoute: typeof AppProjectsRouteImport
-      parentRoute: typeof AppRoute
-    }
     '/novels/$novelId/': {
       id: '/novels/$novelId/'
       path: '/'
       fullPath: '/novels/$novelId/'
       preLoaderRoute: typeof NovelsNovelIdIndexRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/world': {
-      id: '/novels/$novelId/world'
-      path: '/world'
-      fullPath: '/novels/$novelId/world'
-      preLoaderRoute: typeof NovelsNovelIdWorldRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/volumes': {
@@ -424,20 +230,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdVolumesRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
-    '/novels/$novelId/versions': {
-      id: '/novels/$novelId/versions'
-      path: '/versions'
-      fullPath: '/novels/$novelId/versions'
-      preLoaderRoute: typeof NovelsNovelIdVersionsRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/timeline': {
-      id: '/novels/$novelId/timeline'
-      path: '/timeline'
-      fullPath: '/novels/$novelId/timeline'
-      preLoaderRoute: typeof NovelsNovelIdTimelineRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
     '/novels/$novelId/story-bible': {
       id: '/novels/$novelId/story-bible'
       path: '/story-bible'
@@ -445,18 +237,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdStoryBibleRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
-    '/novels/$novelId/species': {
-      id: '/novels/$novelId/species'
-      path: '/species'
-      fullPath: '/novels/$novelId/species'
-      preLoaderRoute: typeof NovelsNovelIdSpeciesRouteImport
+    '/novels/$novelId/source': {
+      id: '/novels/$novelId/source'
+      path: '/source'
+      fullPath: '/novels/$novelId/source'
+      preLoaderRoute: typeof NovelsNovelIdSourceRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
-    '/novels/$novelId/plot': {
-      id: '/novels/$novelId/plot'
-      path: '/plot'
-      fullPath: '/novels/$novelId/plot'
-      preLoaderRoute: typeof NovelsNovelIdPlotRouteImport
+    '/novels/$novelId/settings': {
+      id: '/novels/$novelId/settings'
+      path: '/settings'
+      fullPath: '/novels/$novelId/settings'
+      preLoaderRoute: typeof NovelsNovelIdSettingsRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
+    '/novels/$novelId/runs': {
+      id: '/novels/$novelId/runs'
+      path: '/runs'
+      fullPath: '/novels/$novelId/runs'
+      preLoaderRoute: typeof NovelsNovelIdRunsRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
+    '/novels/$novelId/review': {
+      id: '/novels/$novelId/review'
+      path: '/review'
+      fullPath: '/novels/$novelId/review'
+      preLoaderRoute: typeof NovelsNovelIdReviewRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
+    '/novels/$novelId/proposals': {
+      id: '/novels/$novelId/proposals'
+      path: '/proposals'
+      fullPath: '/novels/$novelId/proposals'
+      preLoaderRoute: typeof NovelsNovelIdProposalsRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/overview': {
@@ -466,46 +279,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdOverviewRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
-    '/novels/$novelId/magic': {
-      id: '/novels/$novelId/magic'
-      path: '/magic'
-      fullPath: '/novels/$novelId/magic'
-      preLoaderRoute: typeof NovelsNovelIdMagicRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/lore': {
-      id: '/novels/$novelId/lore'
-      path: '/lore'
-      fullPath: '/novels/$novelId/lore'
-      preLoaderRoute: typeof NovelsNovelIdLoreRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/locations': {
-      id: '/novels/$novelId/locations'
-      path: '/locations'
-      fullPath: '/novels/$novelId/locations'
-      preLoaderRoute: typeof NovelsNovelIdLocationsRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/factions': {
-      id: '/novels/$novelId/factions'
-      path: '/factions'
-      fullPath: '/novels/$novelId/factions'
-      preLoaderRoute: typeof NovelsNovelIdFactionsRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/continuity': {
-      id: '/novels/$novelId/continuity'
-      path: '/continuity'
-      fullPath: '/novels/$novelId/continuity'
-      preLoaderRoute: typeof NovelsNovelIdContinuityRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/characters': {
-      id: '/novels/$novelId/characters'
-      path: '/characters'
-      fullPath: '/novels/$novelId/characters'
-      preLoaderRoute: typeof NovelsNovelIdCharactersRouteImport
+    '/novels/$novelId/chat': {
+      id: '/novels/$novelId/chat'
+      path: '/chat'
+      fullPath: '/novels/$novelId/chat'
+      preLoaderRoute: typeof NovelsNovelIdChatRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
     '/novels/$novelId/chapters': {
@@ -515,123 +293,45 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdChaptersRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
-    '/novels/$novelId/chapter-review': {
-      id: '/novels/$novelId/chapter-review'
-      path: '/chapter-review'
-      fullPath: '/novels/$novelId/chapter-review'
-      preLoaderRoute: typeof NovelsNovelIdChapterReviewRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/chapter-generate': {
-      id: '/novels/$novelId/chapter-generate'
-      path: '/chapter-generate'
-      fullPath: '/novels/$novelId/chapter-generate'
-      preLoaderRoute: typeof NovelsNovelIdChapterGenerateRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/chapter-editor': {
-      id: '/novels/$novelId/chapter-editor'
-      path: '/chapter-editor'
-      fullPath: '/novels/$novelId/chapter-editor'
-      preLoaderRoute: typeof NovelsNovelIdChapterEditorRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/chapter-brief': {
-      id: '/novels/$novelId/chapter-brief'
-      path: '/chapter-brief'
-      fullPath: '/novels/$novelId/chapter-brief'
-      preLoaderRoute: typeof NovelsNovelIdChapterBriefRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/assets': {
-      id: '/novels/$novelId/assets'
-      path: '/assets'
-      fullPath: '/novels/$novelId/assets'
-      preLoaderRoute: typeof NovelsNovelIdAssetsRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/approvals': {
-      id: '/novels/$novelId/approvals'
-      path: '/approvals'
-      fullPath: '/novels/$novelId/approvals'
-      preLoaderRoute: typeof NovelsNovelIdApprovalsRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
-    '/novels/$novelId/character/$characterId': {
-      id: '/novels/$novelId/character/$characterId'
-      path: '/character/$characterId'
-      fullPath: '/novels/$novelId/character/$characterId'
-      preLoaderRoute: typeof NovelsNovelIdCharacterCharacterIdRouteImport
-      parentRoute: typeof NovelsNovelIdRoute
-    }
   }
 }
 
 interface AppRouteChildren {
-  AppProjectsRoute: typeof AppProjectsRoute
-  AppSettingsRoute: typeof AppSettingsRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
-  AppProjectsRoute: AppProjectsRoute,
-  AppSettingsRoute: AppSettingsRoute,
   AppIndexRoute: AppIndexRoute,
 }
 
 const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 interface NovelsNovelIdRouteChildren {
-  NovelsNovelIdApprovalsRoute: typeof NovelsNovelIdApprovalsRoute
-  NovelsNovelIdAssetsRoute: typeof NovelsNovelIdAssetsRoute
-  NovelsNovelIdChapterBriefRoute: typeof NovelsNovelIdChapterBriefRoute
-  NovelsNovelIdChapterEditorRoute: typeof NovelsNovelIdChapterEditorRoute
-  NovelsNovelIdChapterGenerateRoute: typeof NovelsNovelIdChapterGenerateRoute
-  NovelsNovelIdChapterReviewRoute: typeof NovelsNovelIdChapterReviewRoute
   NovelsNovelIdChaptersRoute: typeof NovelsNovelIdChaptersRoute
-  NovelsNovelIdCharactersRoute: typeof NovelsNovelIdCharactersRoute
-  NovelsNovelIdContinuityRoute: typeof NovelsNovelIdContinuityRoute
-  NovelsNovelIdFactionsRoute: typeof NovelsNovelIdFactionsRoute
-  NovelsNovelIdLocationsRoute: typeof NovelsNovelIdLocationsRoute
-  NovelsNovelIdLoreRoute: typeof NovelsNovelIdLoreRoute
-  NovelsNovelIdMagicRoute: typeof NovelsNovelIdMagicRoute
+  NovelsNovelIdChatRoute: typeof NovelsNovelIdChatRoute
   NovelsNovelIdOverviewRoute: typeof NovelsNovelIdOverviewRoute
-  NovelsNovelIdPlotRoute: typeof NovelsNovelIdPlotRoute
-  NovelsNovelIdSpeciesRoute: typeof NovelsNovelIdSpeciesRoute
+  NovelsNovelIdProposalsRoute: typeof NovelsNovelIdProposalsRoute
+  NovelsNovelIdReviewRoute: typeof NovelsNovelIdReviewRoute
+  NovelsNovelIdRunsRoute: typeof NovelsNovelIdRunsRoute
+  NovelsNovelIdSettingsRoute: typeof NovelsNovelIdSettingsRoute
+  NovelsNovelIdSourceRoute: typeof NovelsNovelIdSourceRoute
   NovelsNovelIdStoryBibleRoute: typeof NovelsNovelIdStoryBibleRoute
-  NovelsNovelIdTimelineRoute: typeof NovelsNovelIdTimelineRoute
-  NovelsNovelIdVersionsRoute: typeof NovelsNovelIdVersionsRoute
   NovelsNovelIdVolumesRoute: typeof NovelsNovelIdVolumesRoute
-  NovelsNovelIdWorldRoute: typeof NovelsNovelIdWorldRoute
   NovelsNovelIdIndexRoute: typeof NovelsNovelIdIndexRoute
-  NovelsNovelIdCharacterCharacterIdRoute: typeof NovelsNovelIdCharacterCharacterIdRoute
 }
 
 const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
-  NovelsNovelIdApprovalsRoute: NovelsNovelIdApprovalsRoute,
-  NovelsNovelIdAssetsRoute: NovelsNovelIdAssetsRoute,
-  NovelsNovelIdChapterBriefRoute: NovelsNovelIdChapterBriefRoute,
-  NovelsNovelIdChapterEditorRoute: NovelsNovelIdChapterEditorRoute,
-  NovelsNovelIdChapterGenerateRoute: NovelsNovelIdChapterGenerateRoute,
-  NovelsNovelIdChapterReviewRoute: NovelsNovelIdChapterReviewRoute,
   NovelsNovelIdChaptersRoute: NovelsNovelIdChaptersRoute,
-  NovelsNovelIdCharactersRoute: NovelsNovelIdCharactersRoute,
-  NovelsNovelIdContinuityRoute: NovelsNovelIdContinuityRoute,
-  NovelsNovelIdFactionsRoute: NovelsNovelIdFactionsRoute,
-  NovelsNovelIdLocationsRoute: NovelsNovelIdLocationsRoute,
-  NovelsNovelIdLoreRoute: NovelsNovelIdLoreRoute,
-  NovelsNovelIdMagicRoute: NovelsNovelIdMagicRoute,
+  NovelsNovelIdChatRoute: NovelsNovelIdChatRoute,
   NovelsNovelIdOverviewRoute: NovelsNovelIdOverviewRoute,
-  NovelsNovelIdPlotRoute: NovelsNovelIdPlotRoute,
-  NovelsNovelIdSpeciesRoute: NovelsNovelIdSpeciesRoute,
+  NovelsNovelIdProposalsRoute: NovelsNovelIdProposalsRoute,
+  NovelsNovelIdReviewRoute: NovelsNovelIdReviewRoute,
+  NovelsNovelIdRunsRoute: NovelsNovelIdRunsRoute,
+  NovelsNovelIdSettingsRoute: NovelsNovelIdSettingsRoute,
+  NovelsNovelIdSourceRoute: NovelsNovelIdSourceRoute,
   NovelsNovelIdStoryBibleRoute: NovelsNovelIdStoryBibleRoute,
-  NovelsNovelIdTimelineRoute: NovelsNovelIdTimelineRoute,
-  NovelsNovelIdVersionsRoute: NovelsNovelIdVersionsRoute,
   NovelsNovelIdVolumesRoute: NovelsNovelIdVolumesRoute,
-  NovelsNovelIdWorldRoute: NovelsNovelIdWorldRoute,
   NovelsNovelIdIndexRoute: NovelsNovelIdIndexRoute,
-  NovelsNovelIdCharacterCharacterIdRoute:
-    NovelsNovelIdCharacterCharacterIdRoute,
 }
 
 const NovelsNovelIdRouteWithChildren = NovelsNovelIdRoute._addFileChildren(

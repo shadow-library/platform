@@ -1,104 +1,117 @@
 /**
  * Importing npm packages
  */
-import { App, Flex, Form, Input, Modal, Segmented, Typography } from 'antd';
+import { Button, Dialog, FormField, Input, SegmentedControl, toast } from '@shadow-library/ui';
+import { useState } from 'react';
 
 /**
  * Importing user defined modules
  */
 import { AiTag } from '@/components/nf';
-import { nf } from '@/constants';
-import { useCreateProjectMutation, type CreateProjectBody, type ProjectResponse } from '@/lib/apis';
+import { type CreateProjectBody, type ProjectResponse, useCreateProjectMutation } from '@/lib/apis';
 
-const { Text } = Typography;
-
-interface FormValues {
-  title: string;
-  kind: CreateProjectBody['kind'];
-  contentMode: NonNullable<CreateProjectBody['contentMode']>;
-  url?: string;
-}
+type Kind = CreateProjectBody['kind'];
+type Mode = NonNullable<CreateProjectBody['contentMode']>;
 
 export interface NewNovelModalProps {
   open: boolean;
-  onCancel: () => void;
-  onCreated: (project: ProjectResponse) => void;
+  onOpenChange: (open: boolean) => void;
+  onCreated?: (project: ProjectResponse) => void;
+  initialKind?: Kind;
 }
 
-/** The "New novel" modal (wireframe 1e), wired to POST /projects. */
-export function NewNovelModal({ open, onCancel, onCreated }: NewNovelModalProps) {
-  const [form] = Form.useForm<FormValues>();
-  const { message } = App.useApp();
+/** The "New novel" dialog, wired to POST /projects. */
+export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'new_novel' }: NewNovelModalProps): React.JSX.Element {
   const createProject = useCreateProjectMutation();
-  const kind = Form.useWatch('kind', form);
+  const [title, setTitle] = useState('');
+  const [kind, setKind] = useState<Kind>(initialKind);
+  const [contentMode, setContentMode] = useState<Mode>('standard');
+  const [url, setUrl] = useState('');
+  const [touched, setTouched] = useState(false);
 
-  const submit = async () => {
-    const values = await form.validateFields().catch(() => null);
-    if (!values) return;
+  const titleError = touched && !title.trim() ? 'Give your novel a working title' : undefined;
+  const urlError = touched && kind === 'source' && !url.trim() ? 'Enter the URL to adapt from' : undefined;
+
+  const reset = (): void => {
+    setTitle('');
+    setKind(initialKind);
+    setContentMode('standard');
+    setUrl('');
+    setTouched(false);
+  };
+
+  const submit = (): void => {
+    setTouched(true);
+    if (!title.trim() || (kind === 'source' && !url.trim())) return;
     const body: CreateProjectBody = {
-      name: values.title,
-      title: values.title,
-      kind: values.kind,
-      contentMode: values.contentMode,
-      ...(values.kind === 'source' && values.url ? { url: values.url } : {}),
+      name: title.trim(),
+      title: title.trim(),
+      kind,
+      contentMode,
+      ...(kind === 'source' && url.trim() ? { url: url.trim() } : {}),
     };
     createProject.mutate(body, {
       onSuccess: project => {
-        message.success(`Created “${project.title || project.name}”`);
-        onCancel();
-        form.resetFields();
-        onCreated(project);
+        toast.success(`Created “${project.title || project.name}”`);
+        onOpenChange(false);
+        reset();
+        onCreated?.(project);
       },
-      onError: err => message.error(err.message),
+      onError: err => toast.danger(err.message),
     });
   };
 
   return (
-    <Modal
-      title="Start a new novel"
+    <Dialog
       open={open}
-      onCancel={onCancel}
-      okText="Create novel"
-      confirmLoading={createProject.isPending}
-      onOk={submit}
-      destroyOnHidden
+      onOpenChange={next => {
+        onOpenChange(next);
+        if (!next) reset();
+      }}
     >
-      <Form form={form} layout="vertical" requiredMark={false} initialValues={{ kind: 'new_novel', contentMode: 'standard' }} style={{ marginTop: 8 }}>
-        <Form.Item label="Working title" name="title" rules={[{ required: true, message: 'Give your novel a working title' }]}>
-          <Input placeholder="e.g. The Ashfall Chronicles" />
-        </Form.Item>
-        <Form.Item label="Kind" name="kind">
-          <Segmented
-            block
-            options={[
-              { label: 'Original novel', value: 'new_novel' },
-              { label: 'Adapt from source', value: 'source' },
-            ]}
-          />
-        </Form.Item>
-        {kind === 'source' && (
-          <Form.Item label="Source URL" name="url" rules={[{ required: true, type: 'url', message: 'Enter the URL to adapt from' }]}>
-            <Input placeholder="https://…" />
-          </Form.Item>
-        )}
-        <Form.Item label="Content mode" name="contentMode">
-          <Segmented
-            block
-            options={[
-              { label: 'Standard', value: 'standard' },
-              { label: 'Grok only', value: 'grok_only' },
-            ]}
-          />
-        </Form.Item>
-        <div style={{ border: `1.5px dashed ${nf.tealBorder}`, background: nf.tealBg, borderRadius: 8, padding: 12 }}>
-          <Flex align="center" gap={8}>
-            <AiTag>AI</AiTag>
-            <Text type="secondary" style={{ fontSize: 12 }}>
-              After creating, open the novel and run <Text strong>Plan</Text> to have AI draft the Story Bible, cast, and outline.
-            </Text>
-          </Flex>
-        </div>
-      </Form>
-    </Modal>
+      <Dialog.Content size="md">
+        <Dialog.Header title="Start a new novel" description="Create an original novel or adapt one from a source." />
+        <Dialog.Body>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            <FormField label="Working title" required error={titleError}>
+              <Input placeholder="e.g. The Ashfall Chronicles" value={title} onValueChange={setTitle} invalid={Boolean(titleError)} autoFocus />
+            </FormField>
+            <FormField label="Kind">
+              <SegmentedControl value={kind} onValueChange={v => setKind(v as Kind)} fullWidth>
+                <SegmentedControl.Item value="new_novel">Original novel</SegmentedControl.Item>
+                <SegmentedControl.Item value="source">Adapt from source</SegmentedControl.Item>
+              </SegmentedControl>
+            </FormField>
+            {kind === 'source' && (
+              <FormField label="Source URL" required error={urlError}>
+                <Input placeholder="https://…" value={url} onValueChange={setUrl} invalid={Boolean(urlError)} />
+              </FormField>
+            )}
+            <FormField label="Content mode">
+              <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as Mode)} fullWidth>
+                <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
+                <SegmentedControl.Item value="grok_only">Grok only</SegmentedControl.Item>
+              </SegmentedControl>
+            </FormField>
+            <div style={{ border: '1.5px dashed var(--sh-accent-soft)', background: 'var(--sh-accent-soft)', borderRadius: 'var(--sh-radius-md)', padding: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <AiTag>AI</AiTag>
+                <span style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-secondary)' }}>
+                  After creating, open the novel and run <strong>Plan</strong> to have AI draft the Story Bible, cast, and outline.
+                </span>
+              </div>
+            </div>
+          </div>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Close asChild>
+            <Button variant="ghost">Cancel</Button>
+          </Dialog.Close>
+          <Button variant="primary" loading={createProject.isPending} onClick={submit}>
+            Create novel
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
   );
 }
