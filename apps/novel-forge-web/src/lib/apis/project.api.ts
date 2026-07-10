@@ -8,11 +8,14 @@ import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, use
  */
 import { APIRequest, ApiError } from './api-request';
 import {
+  type CloneProjectBody,
   type CreateProjectBody,
   type ListProjectResponse,
   type ListProjectsQueryParams,
   type ProjectResponse,
   type ProjectStatusResponse,
+  type ResetBody,
+  type ResetResponse,
   type UpdateProjectBody,
 } from './api-types.gen';
 
@@ -77,5 +80,23 @@ export function useDeleteProjectMutation(): UseMutationResult<undefined, ApiErro
   return useMutation<undefined, ApiError, string>({
     mutationFn: projectId => APIRequest.delete(`/projects/${projectId}`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: projectKeys.lists() }),
+  });
+}
+
+/** Clones a project into a fresh copy, optionally resetting derived artefacts. */
+export function useCloneProjectMutation(projectId: string): UseMutationResult<ProjectResponse, ApiError, CloneProjectBody> {
+  const queryClient = useQueryClient();
+  return useMutation<ProjectResponse, ApiError, CloneProjectBody>({
+    mutationFn: data => APIRequest.post(`/projects/${projectId}/clone`).body(data).execute(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectKeys.lists() }),
+  });
+}
+
+/** Resets a project's derived state up to a lifecycle stage (extract / plan / generate / all). */
+export function useResetProjectMutation(projectId: string): UseMutationResult<ResetResponse, ApiError, ResetBody> {
+  const queryClient = useQueryClient();
+  return useMutation<ResetResponse, ApiError, ResetBody>({
+    mutationFn: data => APIRequest.post(`/projects/${projectId}/reset`).body(data).execute(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: projectKeys.all }),
   });
 }

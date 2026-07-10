@@ -1,4 +1,21 @@
 export interface paths {
+  '/api/v1/ai/models': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Models */
+    get: operations['listModels'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/seed-from-brief': {
     parameters: {
       query?: never;
@@ -61,6 +78,40 @@ export interface paths {
     put?: never;
     /** Outline */
     post: operations['outline'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/arcs/{arcKey}/outline': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Outline Arc */
+    post: operations['outlineArc'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/briefs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Briefs */
+    get: operations['listBriefs'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -874,6 +925,248 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/proposals': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Proposals */
+    get: operations['listProposals'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Proposal */
+    get: operations['getProposal'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Proposal */
+    patch: operations['updateProposal'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/apply': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Apply Proposal */
+    post: operations['applyProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/proposals/{proposalId}/discard': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Discard Proposal */
+    post: operations['discardProposal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Sessions */
+    get: operations['listSessions'];
+    put?: never;
+    /** Create Session */
+    post: operations['createSession'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Session */
+    get: operations['getSession'];
+    put?: never;
+    post?: never;
+    /** Delete Session */
+    delete: operations['deleteSession'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Messages */
+    get: operations['listMessages'];
+    put?: never;
+    /** Turn */
+    post: operations['turn'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/model': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Session Model */
+    patch: operations['updateSessionModel'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/archive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Archive Session */
+    post: operations['archiveSession'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/unarchive': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Unarchive Session */
+    post: operations['unarchiveSession'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/premise/enhance': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Enhance Premise */
+    post: operations['enhancePremise'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible/audit': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Audit Bible */
+    post: operations['auditBible'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs/plan': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Plan Arcs */
+    post: operations['planArcs'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/context/preview': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Preview Context */
+    get: operations['previewContext'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/entities': {
     parameters: {
       query?: never;
@@ -965,6 +1258,75 @@ export interface paths {
     patch: operations['updateVolume'];
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Arcs */
+    get: operations['listArcs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs/approve': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Approve Arcs */
+    post: operations['approveArcs'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/arcs/{arcKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Arc */
+    get: operations['getArc'];
+    /** Upsert Arc */
+    put: operations['upsertArc'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/bible': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Bible Docs */
+    get: operations['listBibleDocs'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/bible/{section}/{slug}': {
     parameters: {
       query?: never;
@@ -987,14 +1349,28 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
-    SeedFromBriefBody: {
-      brief: string;
-      force?: boolean;
+    AiModelsResponse: {
+      profile: string;
+      models: components['schemas']['AiModelOption'][];
+      defaults: components['schemas']['AiRoleDefault'][];
     };
-    WorkflowRunResponse: {
-      runId: string;
-      outcome: string;
-      status: string;
+    AiModelOption: {
+      id: string;
+      provider: string;
+      label: string;
+      /** @enum {string} */
+      kind: 'llm' | 'embedding' | 'image';
+      enabled: boolean;
+      contextWindow?: number;
+      inputPricePerMToken?: number;
+      outputPricePerMToken?: number;
+      supportsTools?: boolean;
+      supportsStructuredOutput?: boolean;
+    };
+    AiRoleDefault: {
+      role: string;
+      provider: string;
+      model: string;
     };
     DevErrorResponseDto: {
       code: string;
@@ -1006,6 +1382,15 @@ export interface components {
     ErrorFieldDto: {
       field: string;
       msg: string;
+    };
+    SeedFromBriefBody: {
+      brief: string;
+      force?: boolean;
+    };
+    WorkflowRunResponse: {
+      runId: string;
+      outcome: string;
+      status: string;
     };
     PlanBody: {
       volumeCount: number;
@@ -1053,9 +1438,24 @@ export interface components {
       volumeKey?: null | string;
       title?: null | string;
       body: string;
-      contextRefs?: null | Record<string, never>;
+      contextRefs?: null | string[];
       /** Format: date-time */
       createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    OutlineArcBody: {
+      context?: string;
+    };
+    ListBriefSummaryResponse: {
+      items: components['schemas']['BriefSummaryResponse'][];
+    };
+    BriefSummaryResponse: {
+      chapter: number;
+      volumeKey?: null | string;
+      arcKey?: null | string;
+      title?: null | string;
+      staleReason?: null | string;
       /** Format: date-time */
       updatedAt: string;
     };
@@ -1086,8 +1486,12 @@ export interface components {
       status: components['schemas']['JobStatus'];
       attempts: number;
       lastError?: null | string;
-      payload?: null | Record<string, never>;
-      progress?: null | Record<string, never>;
+      payload?: null | {
+        [key: string]: unknown;
+      };
+      progress?: null | {
+        [key: string]: unknown;
+      };
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -1109,7 +1513,9 @@ export interface components {
       revision: number;
       summary?: null | string;
       body?: null | string;
-      state?: null | Record<string, never>;
+      state?: null | {
+        [key: string]: unknown;
+      };
       volumeKey?: null | string;
       reviewStatus: components['schemas']['DraftReviewStatus'];
       judge?: null | string;
@@ -1127,7 +1533,9 @@ export interface components {
       title?: string;
       body: string;
       summary?: string;
-      state?: Record<string, never>;
+      state?: {
+        [key: string]: unknown;
+      };
     };
     ReviseDraftBody: {
       note: string;
@@ -1156,6 +1564,10 @@ export interface components {
       /** Format: date-time */
       createdAt: string;
     };
+    ApproveDraftBody: {
+      reviewerId?: string;
+      idempotencyKey?: string;
+    };
     ListDraftRevisionResponse: {
       items: components['schemas']['DraftRevisionResponse'][];
     };
@@ -1166,7 +1578,9 @@ export interface components {
       source: components['schemas']['DraftRevisionSource'];
       body: string;
       summary?: null | string;
-      state?: null | Record<string, never>;
+      state?: null | {
+        [key: string]: unknown;
+      };
       runId?: null | string;
       /** Format: date-time */
       createdAt: string;
@@ -1192,7 +1606,9 @@ export interface components {
       projectId: string;
       chapter: number;
       status: string;
-      proposal: Record<string, never>;
+      proposal: {
+        [key: string]: unknown;
+      };
       model?: null | string;
       /** Format: date-time */
       appliedAt?: null | string;
@@ -1202,7 +1618,9 @@ export interface components {
       updatedAt: string;
     };
     UpdateContinuityBody: {
-      proposal: Record<string, never>;
+      proposal: {
+        [key: string]: unknown;
+      };
     };
     ChapterReviewResponse: {
       disposition: string;
@@ -1219,12 +1637,19 @@ export interface components {
     WorkflowRunDetailResponse: {
       id: string;
       projectId: string;
+      jobId?: null | string;
       graph: string;
       target: string;
       status: components['schemas']['WorkflowRunStatus'];
       outcome?: null | string;
-      input?: null | Record<string, never>;
-      error?: null | Record<string, never>;
+      input?: null | {
+        [key: string]: unknown;
+      };
+      error?: null | {
+        [key: string]: unknown;
+      };
+      nodeTrace?: null | string[];
+      modelCalls?: components['schemas']['RunModelCallResponse'][];
       /** Format: date-time */
       startedAt: string;
       /** Format: date-time */
@@ -1232,11 +1657,30 @@ export interface components {
     };
     /** @enum {string} */
     WorkflowRunStatus: 'running' | 'completed' | 'awaiting_review' | 'failed' | 'cancelled';
+    RunModelCallResponse: {
+      id: string;
+      node?: null | string;
+      role: string;
+      provider: string;
+      model: string;
+      promptKey: string;
+      status: string;
+      inputTokens?: null | number;
+      outputTokens?: null | number;
+      latencyMs?: null | number;
+      costUsd?: null | string;
+      attempt: number;
+      /** Format: date-time */
+      createdAt: string;
+    };
     AiUsageResponse: {
       totalInputTokens: number;
       totalOutputTokens: number;
       totalCostUsd: number;
-      callsPerRole: Record<string, never>;
+      callsPerRole: components['schemas']['RoleCallCounts'];
+    };
+    RoleCallCounts: {
+      [key: string]: number;
     };
     SearchResponse: {
       hits: components['schemas']['SearchHitResponse'][];
@@ -1244,7 +1688,9 @@ export interface components {
     SearchHitResponse: {
       text: string;
       score: number;
-      metadata: Record<string, never>;
+      metadata: {
+        [key: string]: unknown;
+      };
     };
     JobResponse: {
       id: string;
@@ -1254,8 +1700,12 @@ export interface components {
       status: components['schemas']['JobStatus'];
       attempts: number;
       lastError?: null | string;
-      payload?: null | Record<string, never>;
-      progress?: null | Record<string, never>;
+      payload?: null | {
+        [key: string]: unknown;
+      };
+      progress?: null | {
+        [key: string]: unknown;
+      };
       /** Format: date-time */
       nextAttemptAt?: null | string;
       /** Format: date-time */
@@ -1366,7 +1816,9 @@ export interface components {
       markdown: string;
     };
     SkeletonResponse: {
-      characterArcs: Record<string, never>;
+      characterArcs: {
+        [key: string]: unknown;
+      };
       powerCurve: string;
     };
     ResumeResponse: {
@@ -1389,7 +1841,7 @@ export interface components {
       kind: components['schemas']['ProjectKind'];
       title?: null | string;
       contentMode: components['schemas']['ContentMode'];
-      config?: null | Record<string, never>;
+      config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
       sourceUrl?: null | string;
       scrapeComplete: boolean;
@@ -1398,6 +1850,35 @@ export interface components {
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    ProjectConfig: {
+      models?: components['schemas']['ProjectModelOverrides'];
+    };
+    ProjectModelOverrides: {
+      extraction?: components['schemas']['ProjectModelRef'];
+      generation?: components['schemas']['ProjectModelRef'];
+      judge?: components['schemas']['ProjectModelRef'];
+      fix?: components['schemas']['ProjectModelRef'];
+      outline?: components['schemas']['ProjectModelRef'];
+      revision?: components['schemas']['ProjectModelRef'];
+      title?: components['schemas']['ProjectModelRef'];
+      continuity?: components['schemas']['ProjectModelRef'];
+      validation?: components['schemas']['ProjectModelRef'];
+      review?: components['schemas']['ProjectModelRef'];
+      plan?: components['schemas']['ProjectModelRef'];
+      skeleton?: components['schemas']['ProjectModelRef'];
+      bible?: components['schemas']['ProjectModelRef'];
+      premise?: components['schemas']['ProjectModelRef'];
+      audit?: components['schemas']['ProjectModelRef'];
+      chat?: components['schemas']['ProjectModelRef'];
+      compact?: components['schemas']['ProjectModelRef'];
+      arc?: components['schemas']['ProjectModelRef'];
+      embedding?: components['schemas']['ProjectModelRef'];
+      image?: components['schemas']['ProjectModelRef'];
+    };
+    ProjectModelRef: {
+      provider: string;
+      model: string;
     };
     ListProjectResponse: {
       total: number;
@@ -1416,13 +1897,13 @@ export interface components {
     };
     UpdateProjectBody: {
       title?: string;
-      config?: Record<string, never>;
+      config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       brief?: string;
     };
     CloneProjectBody: {
       name: string;
-      config?: Record<string, never>;
+      config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       resetDerived?: boolean;
     };
@@ -1437,6 +1918,189 @@ export interface components {
     CostResponse: {
       estimate: null | string;
       message: string;
+    };
+    /** @enum {string} */
+    RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted';
+    /** @enum {string} */
+    RefinementKind: 'chat' | 'premise_enhance' | 'bible_audit' | 'arc_plan';
+    /** @enum {string} */
+    ChatScope: 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
+    ListProposalResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ProposalResponse'][];
+    };
+    ProposalResponse: {
+      id: string;
+      projectId: string;
+      sessionId?: null | string;
+      messageId?: null | string;
+      scopeType: components['schemas']['ChatScope'];
+      scopeRef?: null | string;
+      kind: components['schemas']['RefinementKind'];
+      status: components['schemas']['RefinementProposalStatus'];
+      summary?: null | string;
+      changeSet: components['schemas']['ChangeOpItem'][];
+      baseline: {
+        [key: string]: unknown;
+      };
+      model?: null | string;
+      runId?: null | string;
+      /** Format: date-time */
+      appliedAt?: null | string;
+      error?: null | {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ChangeOpItem: {
+      op: string;
+    } & {
+      [key: string]: unknown;
+    };
+    UpdateProposalBody: {
+      changeSet: components['schemas']['ChangeOpItem'][];
+    };
+    ApplyProposalResponse: {
+      proposal: components['schemas']['ProposalResponse'];
+      applied: components['schemas']['AppliedArtifactItem'][];
+      staleMarked: string[];
+    };
+    AppliedArtifactItem: {
+      artifactRef: string;
+      newRevision?: null | number;
+    };
+    CreateChatSessionBody: {
+      scopeType: components['schemas']['ChatScope'];
+      scopeRef?: string;
+      title?: string;
+    };
+    ChatSessionResponse: {
+      id: string;
+      projectId: string;
+      scopeType: components['schemas']['ChatScope'];
+      scopeRef?: null | string;
+      title?: null | string;
+      status: components['schemas']['ChatSessionStatus'];
+      modelProvider?: null | string;
+      modelId?: null | string;
+      summary?: null | string;
+      summaryThroughOrdinal: number;
+      /** Format: date-time */
+      lastTurnAt?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ChatSessionStatus: 'active' | 'archived';
+    ListChatSessionResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ChatSessionResponse'][];
+    };
+    ListChatMessagesResponse: {
+      messages: components['schemas']['ChatMessageResponse'][];
+    };
+    ChatMessageResponse: {
+      id: string;
+      sessionId: string;
+      ordinal: number;
+      role: string;
+      content: string;
+      proposalId?: null | string;
+      runId?: null | string;
+      modelProvider?: null | string;
+      modelId?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    ChatTurnBody: {
+      content: string;
+    };
+    ChatTurnResponse: {
+      userMessage: components['schemas']['ChatMessageResponse'];
+      assistantMessage: components['schemas']['ChatMessageResponse'];
+      proposal?: components['schemas']['ProposalResponse'];
+      runId: string;
+    };
+    UpdateSessionModelBody: {
+      provider?: string | null;
+      model?: string | null;
+    };
+    EnhancePremiseBody: {
+      /** @description rough overview to enhance; falls back to the project brief/premise when omitted */
+      overview?: string;
+    };
+    EnhancePremiseResponse: {
+      proposal: components['schemas']['ProposalResponse'];
+      rationale: components['schemas']['PremiseRationaleResponse'];
+      runId: string;
+    };
+    PremiseRationaleResponse: {
+      enhancedPremise: string;
+      hook: string;
+      stakes: string;
+      protagonistDrive: string;
+      progressionSystem: string;
+      serializationNotes: string;
+      genre: string;
+      themes: string[];
+    };
+    AuditBibleResponse: {
+      proposal?: components['schemas']['ProposalResponse'];
+      findings: components['schemas']['AuditFindingResponse'][];
+      runId: string;
+    };
+    AuditFindingResponse: {
+      docRef: string;
+      action: string;
+      finding: string;
+    };
+    PlanArcsBody: {
+      arcCount?: number;
+      guidance?: string;
+    };
+    PlanArcsResponse: {
+      proposal: components['schemas']['ProposalResponse'];
+      arcs: components['schemas']['PlannedArcItem'][];
+      runId: string;
+    };
+    PlannedArcItem: {
+      arcKey: string;
+      title: string;
+      objective: string;
+      escalation: string;
+      payoff: string;
+      hook: string;
+      chapterStart: number;
+      chapterEnd: number;
+      cast: string[];
+      body: string;
+      ideas: string[];
+    };
+    ContextPreviewResponse: {
+      purpose: string;
+      budgetTokens: number;
+      usedTokens: number;
+      sections: components['schemas']['ContextSectionPreview'][];
+      unresolvedRefs: string[];
+      renderedStable: string;
+      renderedVolatile: string;
+      rendered: string;
+    };
+    ContextSectionPreview: {
+      key: string;
+      tier: string;
+      segment: string;
+      tokens: number;
+      truncated: boolean;
     };
     CreateEntityBody: {
       entityKey: string;
@@ -1505,8 +2169,9 @@ export interface components {
       payoff?: string;
       startChapter?: number;
       endChapter?: number;
+      targetChapterCount?: number;
       status?: components['schemas']['PlanStatus'];
-      cast?: Record<string, never>;
+      cast?: string[];
       body?: string;
     };
     VolumeResponse: {
@@ -1520,8 +2185,11 @@ export interface components {
       payoff?: null | string;
       startChapter?: null | number;
       endChapter?: null | number;
+      targetChapterCount?: null | number;
+      revision: number;
+      staleReason?: null | string;
       status: components['schemas']['PlanStatus'];
-      cast?: null | Record<string, never>;
+      cast?: null | string[];
       body?: null | string;
       /** Format: date-time */
       createdAt: string;
@@ -1542,9 +2210,62 @@ export interface components {
       payoff?: string;
       startChapter?: number;
       endChapter?: number;
+      targetChapterCount?: number;
       status?: components['schemas']['PlanStatus'];
-      cast?: Record<string, never>;
+      cast?: string[];
       body?: string;
+    };
+    ListArcResponse: {
+      arcs: components['schemas']['ArcResponse'][];
+    };
+    ArcResponse: {
+      id: string;
+      projectId: string;
+      arcKey: string;
+      volumeKey: string;
+      ordinal: number;
+      title?: null | string;
+      objective?: null | string;
+      escalation?: null | string;
+      payoff?: null | string;
+      hook?: null | string;
+      chapterStart?: null | number;
+      chapterEnd?: null | number;
+      cast?: null | string[];
+      status: components['schemas']['PlanStatus'];
+      body?: null | string;
+      revision: number;
+      staleReason?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ApproveArcsResponse: {
+      arcsApproved: number;
+      approved: boolean;
+    };
+    UpsertArcBody: {
+      volumeKey: string;
+      ordinal?: number;
+      title?: string;
+      objective?: string;
+      escalation?: string;
+      payoff?: string;
+      hook?: string;
+      chapterStart?: number;
+      chapterEnd?: number;
+      cast?: string[];
+      body?: string;
+    };
+    ListBibleDocResponse: {
+      docs: components['schemas']['BibleDocListItem'][];
+    };
+    BibleDocListItem: {
+      section: components['schemas']['BibleSection'];
+      slug: string;
+      /** Format: date-time */
+      updatedAt: string;
     };
     /** @enum {string} */
     BibleSection: 'project' | 'world' | 'power' | 'plot' | 'story_state' | 'ai' | 'lore';
@@ -1553,7 +2274,9 @@ export interface components {
       projectId: string;
       section: components['schemas']['BibleSection'];
       slug: string;
-      frontmatter?: null | Record<string, never>;
+      frontmatter?: null | {
+        [key: string]: unknown;
+      };
       body?: null | string;
       /** Format: date-time */
       createdAt: string;
@@ -1561,7 +2284,9 @@ export interface components {
       updatedAt: string;
     };
     UpsertBibleDocBody: {
-      frontmatter?: Record<string, never>;
+      frontmatter?: {
+        [key: string]: unknown;
+      };
       body?: string;
     };
   };
@@ -1573,6 +2298,44 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+  listModels: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AiModelsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   seedFromBrief: {
     parameters: {
       query?: never;
@@ -1723,6 +2486,91 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['OutlineResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  outlineArc: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        arcKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['OutlineArcBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OutlineResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  listBriefs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListBriefSummaryResponse'];
         };
       };
       /** @description Default Response */
@@ -2182,7 +3030,11 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ApproveDraftBody'];
+      };
+    };
     responses: {
       /** @description Default Response */
       200: {
@@ -4047,6 +4899,792 @@ export interface operations {
       };
     };
   };
+  listProposals: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        status?: components['schemas']['RefinementProposalStatus'];
+        kind?: components['schemas']['RefinementKind'];
+        scopeType?: components['schemas']['ChatScope'];
+        sessionId?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  updateProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UpdateProposalBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  applyProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplyProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  discardProposal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        proposalId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  listSessions: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        scopeType?: components['schemas']['ChatScope'];
+        status?: components['schemas']['ChatSessionStatus'];
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  createSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CreateChatSessionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  deleteSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  listMessages: {
+    parameters: {
+      query?: {
+        /** @description return messages with ordinal strictly below this value */
+        before?: number | string;
+        limit?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChatMessagesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  turn: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ChatTurnBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatTurnResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  updateSessionModel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UpdateSessionModelBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  archiveSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  unarchiveSession: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        sessionId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChatSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  enhancePremise: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['EnhancePremiseBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EnhancePremiseResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  auditBible: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuditBibleResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  planArcs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        volumeKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['PlanArcsBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PlanArcsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  previewContext: {
+    parameters: {
+      query: {
+        purpose: 'generation' | 'outline' | 'chat' | 'arc_plan' | 'premise' | 'audit';
+        /** @description required for generation/outline */
+        chapter?: number | string;
+        /** @description chat scope type (novel, volume, arc, brief, …) */
+        scopeType?: string;
+        /** @description chat scope ref (volume:v1, arc:a1, chapter:3, doc:section/slug) */
+        scopeRef?: string;
+        /** @description volume for arc_plan previews */
+        volumeKey?: string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ContextPreviewResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   listEntities: {
     parameters: {
       query?: {
@@ -4504,6 +6142,214 @@ export interface operations {
       };
     };
   };
+  listArcs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        volumeKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListArcResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  approveArcs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        volumeKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApproveArcsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getArc: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        arcKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ArcResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  upsertArc: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        arcKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UpsertArcBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ArcResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  listBibleDocs: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListBibleDocResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   getBibleDoc: {
     parameters: {
       query?: never;
@@ -4593,10 +6439,13 @@ export interface operations {
     };
   };
 }
-export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
-export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
+export type AiModelsResponse = components['schemas']['AiModelsResponse'];
+export type AiModelOption = components['schemas']['AiModelOption'];
+export type AiRoleDefault = components['schemas']['AiRoleDefault'];
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
+export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
+export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
 export type PlanBody = components['schemas']['PlanBody'];
 export type PlanResponse = components['schemas']['PlanResponse'];
 export type PlanVolumeItem = components['schemas']['PlanVolumeItem'];
@@ -4605,6 +6454,9 @@ export type ApprovePlanResponse = components['schemas']['ApprovePlanResponse'];
 export type OutlineBody = components['schemas']['OutlineBody'];
 export type OutlineResponse = components['schemas']['OutlineResponse'];
 export type BriefResponse = components['schemas']['BriefResponse'];
+export type OutlineArcBody = components['schemas']['OutlineArcBody'];
+export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
+export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
 export type GenerateBody = components['schemas']['GenerateBody'];
 export type JobEnqueueResponse = components['schemas']['JobEnqueueResponse'];
@@ -4623,6 +6475,7 @@ export type JudgeFindingResponse = components['schemas']['JudgeFindingResponse']
 export type FeedbackBody = components['schemas']['FeedbackBody'];
 export type UserFeedbackDisposition = components['schemas']['UserFeedbackDisposition'];
 export type UserFeedbackResponse = components['schemas']['UserFeedbackResponse'];
+export type ApproveDraftBody = components['schemas']['ApproveDraftBody'];
 export type ListDraftRevisionResponse = components['schemas']['ListDraftRevisionResponse'];
 export type DraftRevisionResponse = components['schemas']['DraftRevisionResponse'];
 export type DraftRevisionSource = components['schemas']['DraftRevisionSource'];
@@ -4637,7 +6490,9 @@ export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
 export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResponse'];
 export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
 export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
+export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
 export type AiUsageResponse = components['schemas']['AiUsageResponse'];
+export type RoleCallCounts = components['schemas']['RoleCallCounts'];
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SearchHitResponse = components['schemas']['SearchHitResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
@@ -4667,6 +6522,9 @@ export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
 export type ProjectResponse = components['schemas']['ProjectResponse'];
+export type ProjectConfig = components['schemas']['ProjectConfig'];
+export type ProjectModelOverrides = components['schemas']['ProjectModelOverrides'];
+export type ProjectModelRef = components['schemas']['ProjectModelRef'];
 export type ListProjectResponse = components['schemas']['ListProjectResponse'];
 export type ProjectStatusResponse = components['schemas']['ProjectStatusResponse'];
 export type UpdateProjectBody = components['schemas']['UpdateProjectBody'];
@@ -4674,6 +6532,34 @@ export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
+export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
+export type RefinementKind = components['schemas']['RefinementKind'];
+export type ChatScope = components['schemas']['ChatScope'];
+export type ListProposalResponse = components['schemas']['ListProposalResponse'];
+export type ProposalResponse = components['schemas']['ProposalResponse'];
+export type ChangeOpItem = components['schemas']['ChangeOpItem'];
+export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
+export type ApplyProposalResponse = components['schemas']['ApplyProposalResponse'];
+export type AppliedArtifactItem = components['schemas']['AppliedArtifactItem'];
+export type CreateChatSessionBody = components['schemas']['CreateChatSessionBody'];
+export type ChatSessionResponse = components['schemas']['ChatSessionResponse'];
+export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
+export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
+export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
+export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
+export type ChatTurnBody = components['schemas']['ChatTurnBody'];
+export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
+export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
+export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];
+export type EnhancePremiseResponse = components['schemas']['EnhancePremiseResponse'];
+export type PremiseRationaleResponse = components['schemas']['PremiseRationaleResponse'];
+export type AuditBibleResponse = components['schemas']['AuditBibleResponse'];
+export type AuditFindingResponse = components['schemas']['AuditFindingResponse'];
+export type PlanArcsBody = components['schemas']['PlanArcsBody'];
+export type PlanArcsResponse = components['schemas']['PlanArcsResponse'];
+export type PlannedArcItem = components['schemas']['PlannedArcItem'];
+export type ContextPreviewResponse = components['schemas']['ContextPreviewResponse'];
+export type ContextSectionPreview = components['schemas']['ContextSectionPreview'];
 export type CreateEntityBody = components['schemas']['CreateEntityBody'];
 export type EntityType = components['schemas']['EntityType'];
 export type EntitySignificance = components['schemas']['EntitySignificance'];
@@ -4686,9 +6572,16 @@ export type CreateVolumeBody = components['schemas']['CreateVolumeBody'];
 export type VolumeResponse = components['schemas']['VolumeResponse'];
 export type ListVolumeResponse = components['schemas']['ListVolumeResponse'];
 export type UpdateVolumeBody = components['schemas']['UpdateVolumeBody'];
+export type ListArcResponse = components['schemas']['ListArcResponse'];
+export type ArcResponse = components['schemas']['ArcResponse'];
+export type ApproveArcsResponse = components['schemas']['ApproveArcsResponse'];
+export type UpsertArcBody = components['schemas']['UpsertArcBody'];
+export type ListBibleDocResponse = components['schemas']['ListBibleDocResponse'];
+export type BibleDocListItem = components['schemas']['BibleDocListItem'];
 export type BibleSection = components['schemas']['BibleSection'];
 export type BibleDocResponse = components['schemas']['BibleDocResponse'];
 export type UpsertBibleDocBody = components['schemas']['UpsertBibleDocBody'];
+export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs']['get']['parameters']['path'], undefined>;
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
 export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;
 export type ListDraftsPathParams = Exclude<paths['/api/v1/projects/{projectId}/drafts']['get']['parameters']['path'], undefined>;
@@ -4713,10 +6606,23 @@ export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
 export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
+export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
+export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
+export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
+export type ListSessionsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['query'], undefined>;
+export type ListSessionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions']['get']['parameters']['path'], undefined>;
+export type GetSessionPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}']['get']['parameters']['path'], undefined>;
+export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['query'], undefined>;
+export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
+export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
+export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;
 export type ListVolumesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/volumes']['get']['parameters']['query'], undefined>;
 export type ListVolumesPathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes']['get']['parameters']['path'], undefined>;
 export type GetVolumePathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes/{volumeKey}']['get']['parameters']['path'], undefined>;
+export type ListArcsPathParams = Exclude<paths['/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs']['get']['parameters']['path'], undefined>;
+export type GetArcPathParams = Exclude<paths['/api/v1/projects/{projectId}/arcs/{arcKey}']['get']['parameters']['path'], undefined>;
+export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible']['get']['parameters']['path'], undefined>;
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;

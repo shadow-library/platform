@@ -6,8 +6,8 @@ import { type UseQueryResult, useQuery } from '@tanstack/react-query';
 /**
  * Importing user defined packages
  */
-import { APIRequest, ApiError } from './api-request';
-import { type AiUsageResponse, type AssetsResponse, type ListGenerationJobResponse, type MarkdownResponse } from './api-types.gen';
+import { APIRequest, ApiError, type PollingOptions } from './api-request';
+import { type AiUsageResponse, type AssetsResponse, type CostResponse, type ListGenerationJobResponse } from './api-types.gen';
 
 /**
  * Cross-cutting project insights: AI spend, background jobs, and rendered output.
@@ -15,9 +15,18 @@ import { type AiUsageResponse, type AssetsResponse, type ListGenerationJobRespon
 const insightKeys = {
   aiUsage: (projectId: string) => ['projects', projectId, 'ai-usage'] as const,
   jobs: (projectId: string) => ['projects', projectId, 'jobs'] as const,
-  manuscript: (projectId: string) => ['projects', projectId, 'manuscript'] as const,
   assets: (projectId: string) => ['projects', projectId, 'assets'] as const,
+  cost: (projectId: string) => ['projects', projectId, 'cost'] as const,
 };
+
+export function useCostQuery(projectId: string, enabled = true): UseQueryResult<CostResponse, ApiError> {
+  return useQuery<CostResponse, ApiError>({
+    queryKey: insightKeys.cost(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/cost`).execute(),
+    enabled: enabled && Boolean(projectId),
+    retry: false,
+  });
+}
 
 export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResult<AiUsageResponse, ApiError> {
   return useQuery<AiUsageResponse, ApiError>({
@@ -27,20 +36,12 @@ export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResu
   });
 }
 
-export function useListJobsQuery(projectId: string, enabled = true): UseQueryResult<ListGenerationJobResponse, ApiError> {
+export function useListJobsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListGenerationJobResponse, ApiError> {
   return useQuery<ListGenerationJobResponse, ApiError>({
     queryKey: insightKeys.jobs(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/jobs`).execute(),
     enabled: enabled && Boolean(projectId),
-  });
-}
-
-export function useManuscriptQuery(projectId: string, enabled = true): UseQueryResult<MarkdownResponse, ApiError> {
-  return useQuery<MarkdownResponse, ApiError>({
-    queryKey: insightKeys.manuscript(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/manuscript`).execute(),
-    enabled: enabled && Boolean(projectId),
-    retry: false,
+    refetchInterval: opts?.refetchInterval,
   });
 }
 

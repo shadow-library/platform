@@ -16,6 +16,12 @@ type SearchParams = Record<string, string>;
 
 type SearchInput = Record<string, string | boolean | number | undefined>;
 
+interface SearchParamsApi {
+  search: SearchParams;
+  appendSearch: (params: SearchInput) => void;
+  setSearch: (params: SearchInput) => void;
+}
+
 /**
  * Declaring the constants
  */
@@ -28,7 +34,7 @@ function cleanParams(params: SearchInput): SearchParams {
   return cleaned;
 }
 
-export function useSearchParams(): { search: SearchParams; appendSearch: (params: SearchInput) => void; setSearch: (params: SearchInput) => void } {
+export function useSearchParams(): SearchParamsApi {
   const router = useRouter();
   const search = router.state.location.search as SearchParams;
   // Read the current search from the router at call time so the callback stays

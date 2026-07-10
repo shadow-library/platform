@@ -27,6 +27,11 @@ export interface ErrorResponseDto {
 
 export type QueryValue = string | number | boolean;
 
+/** Options for query hooks that poll — e.g. following a job or workflow run to completion. */
+export interface PollingOptions {
+  refetchInterval?: number;
+}
+
 interface APIRequestOptions {
   path: string;
   method: string;
@@ -115,8 +120,11 @@ export class APIRequest {
     return this;
   }
 
-  body(data: JsonObject): this {
-    this.options.data = data;
+  // Accepts any request DTO. Generated bodies may carry open-object fields (typed `{ [k]: unknown }`
+  // for freeform blobs like frontmatter or workflow state), which aren't assignable to `JsonValue`;
+  // they're still JSON-serialisable, so the object is stored as-is for `JSON.stringify`.
+  body(data: object): this {
+    this.options.data = data as JsonObject;
     return this;
   }
 
