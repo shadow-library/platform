@@ -150,7 +150,9 @@ export class UpdateDraftBody {
   @Field({ optional: true })
   summary?: string;
 
-  @Field(() => Object, { optional: true })
+  // Opaque draft state snapshot produced by the generation graph; its keys vary by workflow, so it
+  // stays an open object with `additionalProperties` to preserve them.
+  @Field(() => Object, { optional: true, additionalProperties: true })
   state?: Record<string, unknown>;
 }
 
@@ -204,7 +206,9 @@ export class GenerateGrokBody {
 
 @Schema()
 export class UpdateContinuityBody {
-  @Field(() => Object)
+  // A continuity proposal blob whose shape is set by the continuity model (findings + suggested edits);
+  // kept as an open object with `additionalProperties` so its nested keys survive.
+  @Field(() => Object, { additionalProperties: true })
   proposal: Record<string, unknown>;
 }
 
@@ -260,7 +264,7 @@ export class DraftResponse {
   @Field({ optional: true, nullable: true })
   body: string;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   state?: Record<string, unknown> | null;
 
   @Field({ optional: true, nullable: true })
@@ -302,14 +306,43 @@ export class BriefResponse {
   @Field()
   body: string;
 
-  @Field(() => Object, { optional: true, nullable: true })
-  contextRefs?: Record<string, unknown> | null;
+  // The retrieval refs a draft was built from — a list of artifact keys (see `BriefUpdateOp.contextRefs`).
+  @Field(() => [String], { optional: true, nullable: true })
+  contextRefs?: string[] | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+// A brief's identity + freshness, without its body — what the plan hierarchy lists per chapter.
+@Schema()
+export class BriefSummaryResponse {
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field({ optional: true, nullable: true })
+  volumeKey?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  arcKey?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  staleReason?: string | null;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ListBriefSummaryResponse {
+  @Field(() => [BriefSummaryResponse])
+  items: BriefSummaryResponse[];
 }
 
 @Schema()
@@ -332,7 +365,7 @@ export class DraftRevisionResponse {
   @Field({ optional: true, nullable: true })
   summary?: string | null;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   state?: Record<string, unknown> | null;
 
   @Field({ optional: true, nullable: true })
@@ -380,7 +413,7 @@ export class ContinuityProposalResponse {
   @Field()
   status: string;
 
-  @Field(() => Object)
+  @Field(() => Object, { additionalProperties: true })
   proposal: Record<string, unknown>;
 
   @Field({ optional: true, nullable: true })
@@ -397,12 +430,57 @@ export class ContinuityProposalResponse {
 }
 
 @Schema()
+export class RunModelCallResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field({ optional: true, nullable: true })
+  node?: string | null;
+
+  @Field()
+  role: string;
+
+  @Field()
+  provider: string;
+
+  @Field()
+  model: string;
+
+  @Field()
+  promptKey: string;
+
+  @Field()
+  status: string;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  inputTokens?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  outputTokens?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  latencyMs?: number | null;
+
+  @Field({ optional: true, nullable: true })
+  costUsd?: string | null;
+
+  @Field(() => Integer)
+  attempt: number;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+}
+
+@Schema()
 export class WorkflowRunDetailResponse {
   @Field()
   id: string;
 
   @Field(() => String)
   projectId: bigint;
+
+  @Field({ optional: true, nullable: true })
+  jobId?: string | null;
 
   @Field()
   graph: string;
@@ -416,11 +494,20 @@ export class WorkflowRunDetailResponse {
   @Field({ optional: true, nullable: true })
   outcome?: string | null;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  // `additionalProperties: true` keeps the nested run input/error intact; without it the response
+  // serialiser strips every nested key and returns `{}` (an empty, useless "context input").
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   input?: Record<string, unknown> | null;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   error?: Record<string, unknown> | null;
+
+  @Field(() => [String], { optional: true, nullable: true })
+  nodeTrace?: string[] | null;
+
+  // Present only on the run-detail endpoint (the list omits it): every model call this run made.
+  @Field(() => [RunModelCallResponse], { optional: true })
+  modelCalls?: RunModelCallResponse[];
 
   @Field(() => String, { format: 'date-time' })
   startedAt: Date;
@@ -572,6 +659,12 @@ export class ListWorkflowRunResponse {
   items: WorkflowRunDetailResponse[];
 }
 
+// A per-role model-call-count map: keys are the open `AiRole` vocabulary, values are integers.
+// `patternProperties` types the values (the normaliser rewrites refs under patternProperties, unlike
+// `additionalProperties`), while still allowing any role key.
+@Schema({ patternProperties: { '^[a-z_]+$': Integer } })
+export class RoleCallCounts {}
+
 @Schema()
 export class AiUsageResponse {
   @Field(() => Integer)
@@ -583,8 +676,8 @@ export class AiUsageResponse {
   @Field()
   totalCostUsd: number;
 
-  @Field(() => Object)
-  callsPerRole: Record<string, number>;
+  @Field(() => RoleCallCounts)
+  callsPerRole: RoleCallCounts;
 }
 
 @Schema()
@@ -595,7 +688,9 @@ export class SearchHitResponse {
   @Field()
   score: number;
 
-  @Field(() => Object)
+  // Per-hit vector metadata (source refs, chunk info) — an open map from the index, so it keeps
+  // `additionalProperties` to preserve every key through serialisation.
+  @Field(() => Object, { additionalProperties: true })
   metadata: Record<string, unknown>;
 }
 
@@ -628,10 +723,11 @@ export class GenerationJobItem {
   @Field({ optional: true, nullable: true })
   lastError?: string | null;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  // `additionalProperties: true` keeps the nested keys; without it the serialiser strips them to `{}`.
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   payload?: unknown;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   progress?: unknown;
 
   @Field(() => String, { format: 'date-time' })

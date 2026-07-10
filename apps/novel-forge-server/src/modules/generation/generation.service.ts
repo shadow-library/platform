@@ -335,6 +335,14 @@ export class GenerationService {
     return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
   }
 
+  listBriefs(projectId: bigint): Promise<Pick<Generation.Brief, 'chapter' | 'volumeKey' | 'arcKey' | 'title' | 'staleReason' | 'updatedAt'>[]> {
+    return this.db.query.briefs.findMany({
+      where: eq(schema.briefs.projectId, projectId),
+      columns: { chapter: true, volumeKey: true, arcKey: true, title: true, staleReason: true, updatedAt: true },
+      orderBy: asc(schema.briefs.chapter),
+    });
+  }
+
   async getBrief(projectId: bigint, chapter: number): Promise<Generation.Brief> {
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
     if (!brief) throw new ServerError(AppErrorCode.DRF_001);
@@ -363,25 +371,29 @@ export class GenerationService {
     const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });
     if (approvedVolumes.length === 0) throw new ServerError(AppErrorCode.PLN_001);
 
+    // Ordering guard: never run two generation streams at once. Overlapping streams both pick "the next
+    // chapter" and persist drafts out of order (the cause of chapters landing as 9,10,11 with 1–8 missing).
+    // If a generation job is already active, return it unchanged instead of starting a competing one.
+    const activeJob = await this.db.query.jobs.findFirst({
+      where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
+    });
+    if (activeJob) return { jobId: activeJob.id, kind: 'generate', status: activeJob.status, target: activeJob.target ?? '' };
+
     // Guard: no unresolved contradiction drafts.
     const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
     if (contradiction) throw new ServerError(AppErrorCode.DRF_003);
 
-    // Find next chapters to generate (have briefs, no final draft).
-    const briefs = await this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter), limit: limit * 2 });
-    const finalDrafts = await this.db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.status, 'final')) });
-    const finalChapters = new Set(finalDrafts.map(d => d.chapter));
+    // Generate strictly in ascending chapter order: the next chapters that have a brief but no draft yet.
+    // Because each chapter is drafted before the next begins, generation only advances once the previous
+    // chapter is done — no gaps, no skipping ahead.
+    const allBriefs = await this.db.query.briefs.findMany({ where: eq(schema.briefs.projectId, projectId), orderBy: asc(schema.briefs.chapter) });
+    const existingDrafts = await this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), columns: { chapter: true } });
+    const started = new Set(existingDrafts.map(d => d.chapter));
+    const pending = allBriefs.map(b => b.chapter).filter(chapter => !started.has(chapter));
 
-    const chaptersToGenerate = briefs.filter(b => !finalChapters.has(b.chapter)).slice(0, limit);
-
-    // Determine the concrete list of chapter numbers to enqueue.
-    let chapters: number[];
-    if (chaptersToGenerate.length === 0) {
-      const firstVolume = approvedVolumes[0];
-      chapters = [firstVolume?.startChapter ?? 1];
-    } else {
-      chapters = chaptersToGenerate.map(b => b.chapter);
-    }
+    // Fall back to the first volume's opening chapter only when there is no outline to generate from.
+    let chapters = pending.slice(0, limit);
+    if (chapters.length === 0 && allBriefs.length === 0) chapters = [approvedVolumes[0]?.startChapter ?? 1];
 
     // Guard: when a chapter's volume has arcs, the covering arc must be approved (refinement design §4 gate 3).
     // Arc-less volumes (e.g. source-imported ones) keep the volume-scoped path.
@@ -935,14 +947,19 @@ export class GenerationService {
     return { drafts, proposals };
   }
 
+  // The runs screen is a reference view — only the latest 20 matter; older runs stay queryable by id.
   async listRuns(projectId: bigint): Promise<Ai.WorkflowRun[]> {
-    return this.db.query.workflowRuns.findMany({ where: eq(schema.workflowRuns.projectId, projectId), orderBy: [asc(schema.workflowRuns.startedAt)] });
+    return this.db.query.workflowRuns.findMany({ where: eq(schema.workflowRuns.projectId, projectId), orderBy: [desc(schema.workflowRuns.startedAt)], limit: 20 });
   }
 
-  async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun> {
+  async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[] }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
     if (!run) throw new ServerError(AppErrorCode.PRJ_001);
-    return run;
+    const modelCalls = await this.db.query.modelCalls.findMany({
+      where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId)),
+      orderBy: asc(schema.modelCalls.createdAt),
+    });
+    return { ...run, modelCalls };
   }
 
   async getAiUsage(projectId: bigint): Promise<AiUsageResult> {

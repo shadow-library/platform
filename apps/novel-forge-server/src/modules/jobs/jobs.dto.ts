@@ -57,10 +57,12 @@ export class JobResponse {
   @Field({ optional: true, nullable: true })
   lastError?: string | null;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  // Job input and progress snapshots: their shape depends on the job kind (generate, extract, plan, …),
+  // so both stay open objects with `additionalProperties` to keep every nested key through serialisation.
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   payload?: unknown;
 
-  @Field(() => Object, { optional: true, nullable: true })
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
   progress?: unknown;
 
   @Field(() => String, { optional: true, nullable: true, format: 'date-time' })

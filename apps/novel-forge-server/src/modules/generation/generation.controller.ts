@@ -29,6 +29,7 @@ import {
   ImportDraftBody,
   JobEnqueueResponse,
   JudgeResponse,
+  ListBriefSummaryResponse,
   ListDraftResponse,
   ListDraftRevisionResponse,
   ListGenerationJobResponse,
@@ -100,6 +101,13 @@ export class GenerationController {
   @RespondFor(200, OutlineResponse)
   outlineArc(@Params() params: ArcOutlineParams, @Body() body: OutlineArcBody): Promise<OutlineResponse> {
     return this.generationService.outlineArc(params.projectId, params.arcKey, body) as unknown as Promise<OutlineResponse>;
+  }
+
+  @Get('/briefs')
+  @RespondFor(200, ListBriefSummaryResponse)
+  async listBriefs(@Params() params: ProjectParams): Promise<ListBriefSummaryResponse> {
+    const items = await this.generationService.listBriefs(params.projectId);
+    return { items } as unknown as ListBriefSummaryResponse;
   }
 
   @Get('/briefs/:n')

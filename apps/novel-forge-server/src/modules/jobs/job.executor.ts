@@ -129,7 +129,10 @@ export class JobExecutor {
 
     for (const [i, chapter] of chapters.entries()) {
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating' });
-      await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
+      const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
+      // The run service swallows its own errors into a `failed` result; surface that as a job failure
+      // instead of quietly marking the job done with no draft persisted.
+      if (result.status === 'failed') throw new Error(`chapter ${chapter} generation failed (run ${result.runId})`);
     }
   }
 
@@ -139,7 +142,8 @@ export class JobExecutor {
 
     for (const [i, chapter] of chapters.entries()) {
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'extracting' });
-      await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter });
+      const result = await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter });
+      if (result.status === 'failed') throw new Error(`chapter ${chapter} extraction failed (run ${result.runId})`);
     }
   }
 
