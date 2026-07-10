@@ -273,6 +273,9 @@ export class DraftResponse {
   @Field(() => DraftReviewStatus)
   reviewStatus: Generation.DraftReviewStatus;
 
+  @Field(() => String)
+  generator: Generation.Draft['generator'];
+
   @Field(() => String, { optional: true, nullable: true })
   judge?: Generation.JudgeVerdict | null;
 

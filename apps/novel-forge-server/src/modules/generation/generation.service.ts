@@ -10,14 +10,14 @@ import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, inArray, lt, ne, sql, sum } from 'drizzle-orm';
+import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { type Ai, type Generation, type PrimaryDatabase, schema } from '@server/database';
+import { type Ai, type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import {
   type FeedbackBody,
@@ -40,6 +40,7 @@ import { ModelRouterService } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RetrievalService } from '../ai/retrieval/retrieval.service';
+import { type ChapterExtractOutput } from '../ai/schemas/chapter-extract.schema';
 import { type ContinuityOutput } from '../ai/schemas/continuity.schema';
 import { type JudgeOutput, JudgeSchema } from '../ai/schemas/judge.schema';
 import { parseSchema } from '../ai/schemas/validate';
@@ -49,6 +50,8 @@ import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
+import { type ChangeOp } from '../refinement/change-set';
+import { ProposalService } from '../refinement/proposal.service';
 
 /**
  * Defining types
@@ -112,6 +115,7 @@ export class GenerationService {
     private readonly toolRegistry: ToolRegistryService,
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
+    private readonly proposalService: ProposalService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -430,7 +434,17 @@ export class GenerationService {
     // Upsert draft and log a hand_edited revision.
     const [draft] = await this.db
       .insert(schema.drafts)
-      .values({ projectId, chapter, title: body.title, body: body.body, summary: body.summary, state: body.state as never, status: 'draft', reviewStatus: 'needs_review' })
+      .values({
+        projectId,
+        chapter,
+        title: body.title,
+        body: body.body,
+        summary: body.summary,
+        state: body.state as never,
+        status: 'draft',
+        reviewStatus: 'needs_review',
+        generator: 'human',
+      })
       .onConflictDoUpdate({
         target: [schema.drafts.projectId, schema.drafts.chapter],
         set: {
@@ -616,10 +630,47 @@ export class GenerationService {
     return { markdown: pack.rendered };
   }
 
+  /**
+   * Deletes a drafted chapter and closes the gap so the chapter list stays contiguous: every later
+   * chapter (and its continuity review) shifts down by one. The whole thing runs in a transaction so a
+   * failed shift can never leave the manuscript half-renumbered. Scope is the drafted chapters — the
+   * plan (briefs/arcs/volumes) and derived indexes are deliberately left alone.
+   */
+  async deleteDraft(projectId: bigint, chapter: number): Promise<void> {
+    await this.db.transaction(async tx => {
+      const deleted = await tx
+        .delete(schema.drafts)
+        .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
+        .returning({ id: schema.drafts.id });
+      if (deleted.length === 0) throw new ServerError(AppErrorCode.DRF_001);
+
+      // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
+      await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
+
+      // Shift later chapters down one at a time in ascending order, so each freed slot is reused
+      // immediately and the (project, chapter) unique constraint is never transiently violated.
+      const later = await tx
+        .select({ chapter: schema.drafts.chapter })
+        .from(schema.drafts)
+        .where(and(eq(schema.drafts.projectId, projectId), gt(schema.drafts.chapter, chapter)))
+        .orderBy(asc(schema.drafts.chapter));
+      for (const row of later) {
+        await tx
+          .update(schema.drafts)
+          .set({ chapter: row.chapter - 1, updatedAt: new Date() })
+          .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, row.chapter)));
+        await tx
+          .update(schema.continuityProposals)
+          .set({ chapter: row.chapter - 1, updatedAt: new Date() })
+          .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, row.chapter)));
+      }
+    });
+  }
+
   async importDraft(projectId: bigint, chapter: number, body: ImportDraftBody): Promise<Generation.Draft> {
     const [draft] = await this.db
       .insert(schema.drafts)
-      .values({ projectId, chapter, title: body.title, body: body.prose, summary: body.summary, status: 'draft', reviewStatus: 'needs_review', generator: 'standard' })
+      .values({ projectId, chapter, title: body.title, body: body.prose, summary: body.summary, status: 'draft', reviewStatus: 'needs_review', generator: 'human' })
       .onConflictDoUpdate({
         target: [schema.drafts.projectId, schema.drafts.chapter],
         set: { title: body.title, body: body.prose, summary: body.summary, revision: sql`${schema.drafts.revision} + 1`, reviewStatus: 'needs_review', updatedAt: new Date() },
@@ -768,6 +819,40 @@ export class GenerationService {
       .returning();
     if (!row) throw new ServerError(AppErrorCode.CNT_001);
     return row;
+  }
+
+  /**
+   * Folds the canon a (usually hand-authored) chapter establishes back into the story bible. Runs the
+   * chapter-extract prompt to derive a change-set of entity/bible ops, then stages it as a normal
+   * refinement proposal so the author reviews it on the Proposals page alongside every other canon edit
+   * — rather than the parallel continuity-proposal path. Throws DRF_005 when the chapter adds nothing new.
+   */
+  async extractChapterToBible(projectId: bigint, chapter: number): Promise<Refinement.Proposal> {
+    const draft = await this.getDraft(projectId, chapter);
+    const pack = await this.contextAssembler.forChapter(projectId, chapter);
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+
+    const promptModule = PROMPT_REGISTRY['chapter-extract'];
+    const ctx = { projectId, promptKey: promptModule.key, promptVersion: promptModule.version, role: promptModule.role ?? promptModule.key };
+    const output = (await this.modelRouter.structured(
+      promptModule,
+      { contextPack: pack.rendered, chapterNumber: chapter, chapterProse: draft.body },
+      ctx,
+      project as never,
+    )) as ChapterExtractOutput;
+
+    const changeSet = (output.changeSet ?? []) as unknown as ChangeOp[];
+    if (changeSet.length === 0) throw new ServerError(AppErrorCode.DRF_005);
+
+    return this.proposalService.create(projectId, {
+      scopeType: 'brief',
+      scopeRef: `chapter:${chapter}`,
+      kind: 'chapter_extract',
+      summary: output.summary?.trim() || `Canon from chapter ${chapter}`,
+      changeSet,
+      allowedOps: ['entity.upsert', 'entity.remove', 'bible_document.upsert', 'bible_document.remove'],
+      model: this.modelRouter.resolveModel(promptModule.role ?? 'extraction', project as never).model,
+    });
   }
 
   async getContinuityProposal(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {

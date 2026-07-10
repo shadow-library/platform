@@ -61,7 +61,7 @@ describe.if(pgAvailable)('GenerationService.finalize consistency guards', () => 
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     const noop = {} as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   });
 
   async function createProject(): Promise<bigint> {

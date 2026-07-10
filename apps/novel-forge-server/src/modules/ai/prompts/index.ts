@@ -17,6 +17,7 @@ import { foundationPrompt } from './bible-builder/foundation.prompt';
 import { plotPrompt } from './bible-builder/plot.prompt';
 import { volumesPrompt } from './bible-builder/volumes.prompt';
 import { worldPowerPrompt } from './bible-builder/world-power.prompt';
+import { chapterExtractPrompt } from './chapter-extract.prompt';
 import { chatCompactPrompt } from './chat-compact.prompt';
 import { chatRefinePrompt } from './chat-refine.prompt';
 import { continuityPrompt } from './continuity.prompt';
@@ -68,6 +69,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'chat-refine': chatRefinePrompt as PromptModule<unknown>,
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
+  'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
 };
 
 export * from './types';

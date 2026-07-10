@@ -30,7 +30,7 @@ export namespace Project {
 
 export const projectKind = pgEnum('project_kind', ['source', 'new_novel']);
 export const contentMode = pgEnum('content_mode', ['standard', 'grok_only']);
-export const contentGenerator = pgEnum('content_generator', ['standard', 'grok']);
+export const contentGenerator = pgEnum('content_generator', ['standard', 'grok', 'human']);
 
 export const projects = pgTable('projects', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),

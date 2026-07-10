@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -56,6 +56,7 @@ import {
   WorkflowRunResponse,
 } from './generation.dto';
 import { GenerationService } from './generation.service';
+import { ProposalResponse } from '../refinement/refinement.dto';
 
 /**
  * Defining types
@@ -157,6 +158,12 @@ export class GenerationController {
     return this.generationService.updateDraft(params.projectId, params.n, body) as unknown as Promise<DraftResponse>;
   }
 
+  @Delete('/drafts/:n')
+  @HttpStatus(204)
+  deleteDraft(@Params() params: ChapterParams): Promise<void> {
+    return this.generationService.deleteDraft(params.projectId, params.n);
+  }
+
   @Post('/drafts/:n/revise')
   @RespondFor(200, DraftResponse)
   reviseDraft(@Params() params: ChapterParams, @Body() body: ReviseDraftBody): Promise<DraftResponse> {
@@ -227,6 +234,12 @@ export class GenerationController {
   @RespondFor(200, ContinuityProposalResponse)
   proposeContinuity(@Params() params: ChapterParams): Promise<ContinuityProposalResponse> {
     return this.generationService.proposeContinuity(params.projectId, params.n) as unknown as Promise<ContinuityProposalResponse>;
+  }
+
+  @Post('/chapters/:n/extract-to-bible')
+  @RespondFor(200, ProposalResponse)
+  extractToBible(@Params() params: ChapterParams): Promise<ProposalResponse> {
+    return this.generationService.extractChapterToBible(params.projectId, params.n) as unknown as Promise<ProposalResponse>;
   }
 
   @Get('/chapters/:n/continuity-proposal')

@@ -42,7 +42,8 @@ export type PromptKey =
   | 'bible-audit'
   | 'chat-refine'
   | 'chat-compact'
-  | 'arc-plan';
+  | 'arc-plan'
+  | 'chapter-extract';
 
 export interface PromptModule<TOut> {
   key: PromptKey;

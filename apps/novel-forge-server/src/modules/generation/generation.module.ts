@@ -15,6 +15,7 @@ import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
 import { AiModule } from '../ai/ai.module';
 import { JobsModule } from '../jobs/jobs.module';
+import { RefinementModule } from '../refinement/refinement.module';
 
 /**
  * Defining types
@@ -25,7 +26,7 @@ import { JobsModule } from '../jobs/jobs.module';
  */
 
 @Module({
-  imports: [DatabaseModule, AiModule, JobsModule],
+  imports: [DatabaseModule, AiModule, JobsModule, RefinementModule],
   controllers: [GenerationController],
   providers: [GenerationService],
   exports: [GenerationService],
