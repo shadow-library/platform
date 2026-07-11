@@ -7,6 +7,7 @@ import { forwardRef, useId } from 'react';
 /**
  * Importing user defined packages
  */
+import { CheckIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Checkbox.module.css';
@@ -15,14 +16,6 @@ import { type CheckboxProps } from './Checkbox.types';
 /**
  * Declaring the constants
  */
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
-}
-
 function DashIcon() {
   return (
     <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' aria-hidden='true'>
@@ -54,7 +47,7 @@ export const Checkbox = forwardRef<HTMLButtonElement, CheckboxProps>(function Ch
       aria-describedby={descriptionId}
       {...props}
     >
-      <CheckboxPrimitive.Indicator className={styles.indicator}>{isIndeterminate ? <DashIcon /> : <CheckIcon />}</CheckboxPrimitive.Indicator>
+      <CheckboxPrimitive.Indicator className={styles.indicator}>{isIndeterminate ? <DashIcon /> : <CheckIcon strokeWidth={2.5} />}</CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>
   );
 

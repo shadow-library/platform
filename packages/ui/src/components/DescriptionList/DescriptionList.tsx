@@ -6,6 +6,7 @@ import { forwardRef, type ReactNode, useRef, useState } from 'react';
 /**
  * Importing user defined packages
  */
+import { CheckIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import { IconButton } from '../IconButton';
@@ -21,14 +22,6 @@ function CopyIcon() {
     <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
       <rect x='5' y='5' width='8' height='8' rx='1.5' />
       <path d='M11 5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5.5A1.5 1.5 0 0 0 4 11h1' />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
     </svg>
   );
 }
@@ -107,7 +100,14 @@ function DescriptionListItem({ term, mono = false, copyable = false, masked = fa
               />
             ) : null}
             {copyable ? (
-              <IconButton className={cn(styles.action, styles.copy)} size='sm' variant='ghost' icon={copied ? <CheckIcon /> : <CopyIcon />} aria-label={copyLabel} onClick={copy} />
+              <IconButton
+                className={cn(styles.action, styles.copy)}
+                size='sm'
+                variant='ghost'
+                icon={copied ? <CheckIcon width={14} height={14} /> : <CopyIcon />}
+                aria-label={copyLabel}
+                onClick={copy}
+              />
             ) : null}
           </>
         )}

@@ -7,6 +7,7 @@ import { forwardRef } from 'react';
 /**
  * Importing user defined packages
  */
+import { CheckIcon, ChevronRightIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './DropdownMenu.module.css';
@@ -24,26 +25,10 @@ import {
 /**
  * Declaring the constants
  */
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
-}
-
 function DotIcon() {
   return (
     <svg viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
       <circle cx='8' cy='8' r='3' />
-    </svg>
-  );
-}
-
-function ChevronRightIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6.5 4L10.5 8L6.5 12' />
     </svg>
   );
 }

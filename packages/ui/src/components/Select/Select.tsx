@@ -7,6 +7,7 @@ import { type ComponentPropsWithoutRef, forwardRef } from 'react';
 /**
  * Importing user defined packages
  */
+import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Select.module.css';
@@ -15,22 +16,6 @@ import { type SelectGroupProps, type SelectItemProps, type SelectProps } from '.
 /**
  * Declaring the constants
  */
-function ChevronIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4 6.5L8 10.5L12 6.5' />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
-}
-
 /**
  * Single choice from an enumerable list, built on Radix Select. The trigger inherits the Input
  * field surface; the listbox defines the overlay surface (radius 8, e2 shadow, 4px inset, 32px
@@ -82,18 +67,18 @@ function SelectRoot({
         aria-labelledby={ariaLabelledby}
       >
         <SelectPrimitive.Value className={styles.value} placeholder={placeholder} />
-        <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden='true' /> : <ChevronIcon />}</SelectPrimitive.Icon>
+        <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden='true' /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
         <SelectPrimitive.Content className={cn(styles.content, contentClassName)} position='popper' sideOffset={6}>
           <SelectPrimitive.ScrollUpButton className={styles.scrollButton}>
             <span className={styles.scrollChevronUp}>
-              <ChevronIcon />
+              <ChevronDownIcon />
             </span>
           </SelectPrimitive.ScrollUpButton>
           <SelectPrimitive.Viewport className={styles.viewport}>{children}</SelectPrimitive.Viewport>
           <SelectPrimitive.ScrollDownButton className={styles.scrollButton}>
-            <ChevronIcon />
+            <ChevronDownIcon />
           </SelectPrimitive.ScrollDownButton>
         </SelectPrimitive.Content>
       </SelectPrimitive.Portal>
@@ -110,7 +95,7 @@ export const SelectItem = forwardRef<HTMLDivElement, SelectItemProps>(function S
         {description != null ? <span className={styles.itemDescription}>{description}</span> : null}
       </span>
       <SelectPrimitive.ItemIndicator className={styles.itemIndicator}>
-        <CheckIcon />
+        <CheckIcon strokeWidth={1.5} />
       </SelectPrimitive.ItemIndicator>
     </SelectPrimitive.Item>
   );
