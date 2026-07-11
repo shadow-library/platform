@@ -254,3 +254,42 @@ Two-tier authorization (T-601): `iam:roles:manage` platform-wide, or `app:roles:
 - `POST /admin/roles` `{ applicationId, roleName, description? }` · `POST /admin/permissions` `{ applicationId, name, description? }` · `GET /admin/permissions?applicationId=`.
 - `POST /admin/roles/{roleId}/permissions` `{ permissionId }` · `DELETE /admin/roles/{roleId}/permissions/{permissionId}`.
 - `POST /admin/role-assignments` and `POST /admin/role-assignments/revoke` `{ principalType, principalId, roleId, organisationId }` · `GET /admin/role-assignments?…` (platform tier only).
+
+### 6.4 Webhooks (`/admin/webhooks`) — requires `iam:webhooks:manage` — _implemented (M7)_
+
+Platform-tier only (org-scoped subscriptions are a deliberate non-goal for now). Subscriptions receive matching audit events; payloads carry identifiers and event metadata only — never the audit `detail`, addresses, or secrets.
+
+- `POST /admin/webhooks` `{ name, targetUrl, eventTypes[] }` — filters are exact audit actions, `prefix.*`, or `*`; the target must be a public https URL (SSRF-guarded at registration and again at delivery after DNS resolution). Signing secret (`whsec_…`) returned exactly once.
+- `GET /admin/webhooks` · `GET /admin/webhooks/{id}` · `PATCH /admin/webhooks/{id}` (name, target, filters, `isActive`) · `DELETE /admin/webhooks/{id}`.
+- `POST /admin/webhooks/{id}/rotate-secret` — new secret returned once; the outgoing secret keeps signing alongside it for a 24 h overlap.
+- `GET /admin/webhooks/{id}/deliveries?status=` — delivery log (status, attempts, last error, response code).
+- `POST /admin/webhooks/{id}/deliveries/{deliveryId}/redeliver` — puts a settled/dead delivery back into the pool afresh.
+
+Delivery contract: `POST` JSON with headers `x-shadow-webhook-id` (delivery id — receivers deduplicate on it), `x-shadow-webhook-event`, and `x-shadow-webhook-signature: t=<unix>,v1=<hex>[,v1=<hex>]` where each `v1` is HMAC-SHA256 over `<t>.<raw body>` with a currently valid secret. Receivers should reject timestamps older than 5 minutes. Retries back off exponentially and dead-letter after 5 attempts.
+
+## 7. Organisations (`/api/v1/organisations`, `/api/v1/me/organisations`) — _implemented (M7)_
+
+Session cookie + CSRF. Org-level roles (`OWNER > ADMIN > MEMBER`) govern organisation administration only; product permissions stay on the PDP. Absent and foreign organisations answer identically (`ORG_001`, 403). Personal workspaces reject every membership operation (`ORG_003`). Routine administration needs ADMIN at AAL1; owner changes, deletion, and domain operations demand OWNER (or ADMIN for domains) at AAL2.
+
+### 7.1 Lifecycle & membership
+
+- `POST /organisations` `{ name, slug? }` — creates a TEAM org owned by the caller; slug is validated or generated (201). Duplicate slug → 409 `ORG_006`.
+- `GET /organisations/{id}` · `PATCH /organisations/{id}` `{ name }` (ADMIN) · `DELETE /organisations/{id}` (OWNER, AAL2) — soft delete; every org-scoped role assignment is revoked.
+- `GET /organisations/{id}/members` — members with role and primary email.
+- `PATCH /organisations/{id}/members/{userId}` `{ role }` — callers administer only ranks strictly below their own; any change touching OWNER requires an elevated owner. Last-owner demotion → 409 `ORG_004`.
+- `DELETE /organisations/{id}/members/{userId}` — same rank rules; revokes the member's org-scoped grants and notifies them.
+
+### 7.2 Invitations
+
+- `POST /organisations/{id}/invitations` `{ email, role: ADMIN|MEMBER }` (ADMIN) — issues a single-use, 7-day, email-bound token delivered via the notification outbox; re-inviting supersedes the pending invitation. The response never reveals whether the address has an account (D-12). Budget: 20/org/hour → 429. Owners are never invited directly — ownership is granted after joining.
+- `GET /organisations/{id}/invitations` (ADMIN) · `DELETE /organisations/{id}/invitations/{invitationId}` (ADMIN).
+- `POST /me/invitations/accept` `{ token }` — the caller must hold the invited address VERIFIED, so invitations sent before registration resolve after signup; every failure mode answers 404 `ORG_005`. `POST /me/invitations/decline` `{ token }`.
+- `GET /me/organisations` — memberships with role · `DELETE /me/organisations/{id}` — leave (last-owner protected).
+
+### 7.3 Verified domains (`/organisations/{id}/domains`) — mutations require ADMIN + AAL2
+
+- `POST` `{ domain }` → 201 with `txtRecordName` (`_shadow-identity.<domain>`) and `txtRecordValue` (`shadow-identity-verification=<token>`).
+- `POST /{domainId}/verify` — runs the TXT lookup and records evidence; statuses `PENDING → VERIFIED | FAILED`, re-check allowed. Only one org may hold a domain VERIFIED (partial unique index); a VERIFIED domain never demotes on a failed re-check — removal is explicit.
+- `GET` (members) · `DELETE /{domainId}`.
+
+Verified domains are the attachment point for SAML/SCIM/JIT provisioning (M7b); email-domain auto-capture is deliberately deferred to inbound federation (T-702).

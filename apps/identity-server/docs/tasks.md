@@ -267,16 +267,25 @@ Hosted web client under `client/`, built on `@shadow-library/ui` (dark theme ret
 
 ---
 
-## M7 — Enterprise readiness (deferred; designed-for per D-7 & DB §11)
+## M7 — Enterprise readiness
 
-Each is specified at start; schema names are reserved now.
+### T-705 — Team organisations · L — **done**
+
+`/api/v1/organisations` + `/api/v1/me/organisations` (api-contract §7): TEAM orgs with slugs, OWNER/ADMIN/MEMBER administration riding `organisation_members` while product permissions stay on the PDP (one authorization system — ending membership or deleting the org revokes the org-scoped `role_assignments`). Invitations are email-bound single-use tokens (hashed at rest, 7-day expiry, superseded on re-invite, enumeration-neutral, Tier-2 budget 20/org/h); acceptance requires the invited address VERIFIED on the caller, so pre-registration invitations resolve after signup. Last-owner protection on demotion/removal/leave; owner handover and deletion demand an elevated owner. Decisions where docs were silent: owners are never invited directly (promote after joining); callers administer only ranks strictly below their own (owners may touch owners); absent/foreign orgs answer uniformly `ORG_001`. En route fix: `audit_events.organisation_id` was `uuid` and could never hold today's bigint org ids (it assumed the deferred D-8 conversion) — widened to varchar(64) so per-org hash chains actually work. Resource migration personal→team stays deferred (no shared resources exist yet to migrate).
+
+### T-703 — Verified domains · L — **done**
+
+`/api/v1/organisations/{id}/domains` (api-contract §7.3): DNS TXT proof at `_shadow-identity.<domain>` through an injectable resolver seam, re-checkable, evidence retained (`matched_record`, `last_checked_at`). One VERIFIED holder per domain (partial unique index, race-safe); VERIFIED never demotes on failed re-checks. All mutations ADMIN + AAL2. Domain-based routing / email-domain auto-capture deliberately deferred to T-702 — verification here is the attachment point for SAML/SCIM/JIT.
+
+### T-706 — Webhooks / event stream · L — **done**
+
+Platform-tier subscriptions (`/api/v1/admin/webhooks`, `iam:webhooks:manage`, api-contract §6.4) over the audit event stream: fan-out happens inside the audit writer's transaction with `(subscription, event)` uniqueness as the receiver-side idempotency key; payloads carry ids/metadata only, never audit `detail`. Stripe-style HMAC-SHA256 signatures (`t=…,v1=…`) with a 24 h dual-secret rotation overlap; AES-256-GCM secret storage; SSRF guard at registration and again post-DNS-resolution at send time; worker-driven skip-locked dispatch with backoff, dead-letter at 5, crash requeue, and admin redelivery. Decision recorded: org-scoped subscriptions are out of scope until a tenant-facing need appears.
+
+### Remaining (M7b — separate effort)
 
 - **T-701 SAML 2.0 IdP** · XL — signed/encrypted assertions, metadata + cert rotation, replay guard.
 - **T-702 Inbound OIDC/SAML federation** · XL — `identity_providers`, home-realm discovery, JIT provisioning, claim/group mapping, break-glass local admin, tenant-takeover prevention.
-- **T-703 Verified domains** · L — `organisation_domains`, TXT proof, domain-based routing.
 - **T-704 SCIM 2.0** · XL — Users+Groups, `scim_tokens` (per-tenant, rotatable), idempotency, deprovisioning → session/token revocation.
-- **T-705 Team organisations** · L — invitations, membership management, resource migration from personal→team.
-- **T-706 Webhooks / event stream** · L — `webhook_subscriptions`, signed deliveries, retries.
 
 ---
 

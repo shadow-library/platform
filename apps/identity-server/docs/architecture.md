@@ -304,17 +304,21 @@ outage; undecorated routes carry only the general budget and fail open):
   | `security.otp_flooding` (log only) | identifier OTP budget exceeded | delivery suppressed |
   GeoIP / impossible-travel signals require an external location database and are deferred (tasks M5 notes). Alerts on key-rotation failure and audit-chain breaks are monitoring rules over these logs.
 
-### 13.4 Notifications
+### 13.4 Webhooks (T-706)
+
+`WebhookModule` (infrastructure tier) publishes the audit event stream to registered external systems. `AuditService.record` fans out inside its own transaction — an event and its deliveries commit or vanish together — into `webhook_deliveries`, unique per `(subscription, event)`. The worker drains the outbox exactly like notifications/back-channel logout (skip-locked claims, exponential backoff, dead-letter after 5, crash requeue). Deliveries are HMAC-SHA256 signed (`t=<unix>,v1=<hex>` over `<t>.<body>`; 5-minute receiver tolerance) with a 24 h dual-secret rotation overlap; secrets are AES-256-GCM envelopes. Targets pass an SSRF guard twice: syntactic (public https, no credentials, no loopback/link-local/private/CGNAT hosts) at registration and against freshly resolved addresses at send time (DNS rebinding). Payloads carry identifiers and event metadata only — never audit `detail`. Administration is platform-tier (`iam:webhooks:manage`).
+
+### 13.5 Notifications
 
 Provider-agnostic `NotificationModule`: templated email (verification, OTP, security alerts) via a transactional outbox (`notification_outbox` table) drained by the worker — an email is never sent from inside a request transaction that might roll back. SMS is a later adapter behind the same interface. Provider failover is a config-level second adapter.
 
-### 13.5 Background jobs (D-13)
+### 13.6 Background jobs (D-13)
 
 Postgres queue (`jobs` table, `FOR UPDATE SKIP LOCKED`, per-type concurrency, exponential backoff, dead-letter state, idempotency keys). Initial jobs: notification dispatch, key rotation, expiry sweeps (sessions, tokens, challenges, flows), lockout release, audit-chain verification, HIBP password-breach checks.
 
 ## 14. Deferred capabilities (design-compatible, not built)
 
-These MUST NOT be built now, but current decisions keep them additive: SAML 2.0 IdP; inbound OIDC/SAML federation with home-realm discovery (schema reserves `identity_providers`, `organisation_domains`); SCIM 2.0 (+`scim_tokens`); webhooks/event streams (`webhook_subscriptions`); third-party clients + consent screens + publisher verification; team organisations with invitations UI; risk-based/adaptive auth; multi-region residency (activated by D-7 groundwork); DPoP/mTLS sender-constrained tokens.
+Shipped in M7: team organisations with invitations, DNS-verified domains (`organisation_domains`), and signed webhooks (`webhook_subscriptions`/`webhook_deliveries`) — see tasks.md M7. Still deferred and kept additive: SAML 2.0 IdP; inbound OIDC/SAML federation with home-realm discovery (schema reserves `identity_providers`); SCIM 2.0 (+`scim_tokens`); third-party clients + consent screens + publisher verification; team-organisation UI; risk-based/adaptive auth; multi-region residency (activated by D-7 groundwork); DPoP/mTLS sender-constrained tokens.
 
 ## 15. Deployment and operations
 

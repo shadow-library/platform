@@ -134,15 +134,19 @@ Single table for every OTP/link challenge (registration email OTP, recovery OTP,
 
 ### `organisations`
 
-`id` PK, `slug` varchar(64) unique (immutable, generated), `name`, `type` enum (`PERSONAL · TEAM`), `region` varchar(16) NOT NULL default `'default'`, `status` enum (`ACTIVE · SUSPENDED · DELETED`), `deleted_at`, timestamps. **PERSONAL orgs**: exactly one member, not invitable, lifecycle bound to the owning user.
+`id` PK, `slug` varchar(64) unique (immutable; validated client slugs or generated with a random suffix; pre-existing rows backfilled `org-<id>`), `name`, `type` enum (`PERSONAL · TEAM`), `status` enum (`ACTIVE · SUSPENDED · DELETED`), `deleted_at`, timestamps. **PERSONAL orgs**: exactly one member, not invitable, lifecycle bound to the owning user. _(The specified `region` column is deferred with multi-region activation, M9.)_
 
 ### `organisation_members`
 
-PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN · MEMBER`) — governs _org administration only_ (product permissions use `role_assignments`), `status` enum (`ACTIVE · SUSPENDED`), `is_default` boolean (partial unique `(user_id) WHERE is_default`), `joined_at`. Constraint: an org MUST always retain ≥ 1 `OWNER` (enforced in service layer + deferrable trigger).
+PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN · MEMBER`) — governs _org administration only_ (product permissions use `role_assignments`), `is_default` boolean, `joined_at`. Constraint: an org MUST always retain ≥ 1 `OWNER` (enforced in the service layer: demotion, removal, and leave all refuse to strip the last owner). _(The specified member `status` column is deferred until a suspend-member use case exists.)_
 
-### `organisation_invitations` _(TEAM orgs; deferred until team orgs ship, schema reserved)_
+### `organisation_invitations` — _implemented (T-705)_
 
-`id` PK, `organisation_id` FK cascade, `email`, `role`, `token_hash`, `invited_by`, `expires_at`, `accepted_at`, `revoked_at`.
+`id` PK, `organisation_id` FK cascade, `email` (lowercased), `role` (`ADMIN · MEMBER` — owners are never invited), `token_hash` varchar(64) unique (SHA-256; plaintext travels only in the invitation email), `invited_by` FK `SET NULL`, `expires_at` (7 days), `accepted_at`, `declined_at`, `revoked_at`, `created_at`. Partial unique `(organisation_id, email)` over pending rows — re-inviting revokes and supersedes. Acceptance requires the caller to hold the invited email VERIFIED.
+
+### `organisation_domains` — _implemented (T-703)_
+
+`id` PK, `organisation_id` FK cascade, `domain` varchar(253) (lowercased, validated hostname), `verification_token` varchar(64), `status` enum (`PENDING · VERIFIED · FAILED`), `verified_at`, `last_checked_at`, `matched_record` (evidence), `last_check_error`, `created_at`. Unique `(organisation_id, domain)`; partial unique `(domain) WHERE status = 'VERIFIED'` — one verified holder at a time. A VERIFIED row never demotes on failed re-checks.
 
 ## 5. Application and client domain **[global]**
 
@@ -284,7 +288,7 @@ Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-us
 
 ### `audit_events`
 
-`id` uuid PK (UUIDv7 = time-ordered), `occurred_at`, `organisation_id` uuid nullable, `actor_type` enum (`USER · SERVICE_ACCOUNT · SYSTEM · ADMIN`), `actor_id` uuid nullable, `action` varchar (dot-namespaced, e.g. `client.secret.rotated`), `target_type`, `target_id`, `outcome` enum (`SUCCESS · DENIED · FAILURE`), `ip_address`, `correlation_id`, `detail` jsonb (redacted), `prev_hash` bytea, `hash` bytea. Append-only; hash-chained per organisation; chain verified by a worker job. Partitioned by month (native partitioning) from day 1.
+`id` uuid PK (UUIDv7 = time-ordered), `occurred_at`, `organisation_id` varchar(64) nullable _(widened from uuid: org ids stay bigint until the D-8 UUIDv7 conversion, and per-org chains must work either way)_, `actor_type` enum (`USER · SERVICE_ACCOUNT · SYSTEM · ADMIN`), `actor_id` uuid nullable, `action` varchar (dot-namespaced, e.g. `client.secret.rotated`), `target_type`, `target_id`, `outcome` enum (`SUCCESS · DENIED · FAILURE`), `ip_address`, `correlation_id`, `detail` jsonb (redacted), `prev_hash` bytea, `hash` bytea. Append-only; hash-chained per organisation; chain verified by a worker job. Partitioned by month (native partitioning) from day 1.
 
 ## 10. Platform infrastructure tables **[global]**
 
@@ -296,9 +300,17 @@ Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-us
 
 `id` PK, `type`, `payload` jsonb, `idempotency_key` varchar unique nullable, `status` enum (`PENDING · RUNNING · DONE · FAILED · DEAD`), `run_at`, `attempt_count`, `max_attempts`, `last_error`, timestamps. Consumed with `FOR UPDATE SKIP LOCKED`.
 
-## 11. Reserved enterprise tables (schema designed, NOT created yet)
+## 11. Enterprise tables
 
-`identity_providers`, `organisation_domains` (verification tokens, TXT proof), `scim_tokens`, `webhook_subscriptions`, `webhook_deliveries`. These are specified at implementation time (milestone M7) but names are reserved and MUST NOT be repurposed.
+`organisation_domains`, `webhook_subscriptions`, and `webhook_deliveries` shipped with M7 (see §4 and below). Still reserved, NOT created: `identity_providers` and `scim_tokens` (M7b — inbound federation and SCIM); the names MUST NOT be repurposed.
+
+### `webhook_subscriptions` — _implemented (T-706)_
+
+`id` PK, `name`, `target_url` text (SSRF-guarded: public https only), `event_types` text[] (exact actions, `prefix.*`, or `*`), `is_active`, `secret_ciphertext` + `kek_version` (AES-256-GCM envelope like TOTP seeds), `previous_secret_ciphertext` + `previous_secret_expires_at` (24 h rotation overlap), timestamps. Platform-tier only.
+
+### `webhook_deliveries` — _implemented (T-706)_
+
+`id` PK, `subscription_id` FK cascade, `event_id` uuid (audit event), `event_type`, `payload` text (ids + metadata only, never audit `detail`), `status` enum (`PENDING · SENDING · SENT · FAILED · DEAD`), `attempt_count`, `next_attempt_at`, `last_error`, `response_status`, `sent_at`, `created_at`. Unique `(subscription_id, event_id)` — the idempotency key; enqueued inside the audit writer's transaction; claimed `FOR UPDATE SKIP LOCKED`; dead-letters after 5 attempts with admin redelivery.
 
 ## 12. Retention and erasure
 
