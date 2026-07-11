@@ -75,7 +75,10 @@ describe('WebAuthn passkeys', () => {
       expect(credential).toMatchObject({ credentialId: emulator.credentialIdB64, label: 'test key', backupEligible: false });
 
       const list = await request('get', '/api/v1/me/mfa');
-      expect((list.json() as { enrollments: { type: string }[] }).enrollments).toContainEqual(expect.objectContaining({ type: 'WEBAUTHN', label: 'test key' }));
+      // credentialId must ride the list so self-service removal can target one passkey (M6b ui).
+      expect((list.json() as { enrollments: { type: string }[] }).enrollments).toContainEqual(
+        expect.objectContaining({ type: 'WEBAUTHN', label: 'test key', credentialId: emulator.credentialIdB64 }),
+      );
     });
 
     it('should reject a registration response with a tampered challenge', async () => {

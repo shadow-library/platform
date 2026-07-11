@@ -45,6 +45,10 @@ export class MfaEnrollmentItem {
 
   @Field(() => String, { optional: true })
   lastUsedAt?: string;
+
+  /** Present on WEBAUTHN entries — the id `DELETE /me/webauthn/{credentialId}` expects. */
+  @Field(() => String, { optional: true })
+  credentialId?: string;
 }
 
 @Schema()

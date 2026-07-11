@@ -35,6 +35,8 @@ export interface EnrollmentSummary {
   label: string;
   createdAt: Date;
   lastUsedAt: Date | null;
+  /** WEBAUTHN entries carry the credential id so self-service removal can target one passkey. */
+  credentialId?: string;
 }
 
 export interface MfaFactors {
@@ -94,7 +96,13 @@ export class MfaService {
     const credentials = await this.db.query.webauthnCredentials.findMany({ where: eq(schema.webauthnCredentials.userId, userId) });
     return [
       ...enrollments.map(enrollment => ({ type: enrollment.type, label: enrollment.label, createdAt: enrollment.createdAt, lastUsedAt: enrollment.lastUsedAt })),
-      ...credentials.map(credential => ({ type: 'WEBAUTHN' as const, label: credential.label, createdAt: credential.createdAt, lastUsedAt: credential.lastUsedAt })),
+      ...credentials.map(credential => ({
+        type: 'WEBAUTHN' as const,
+        label: credential.label,
+        createdAt: credential.createdAt,
+        lastUsedAt: credential.lastUsedAt,
+        credentialId: credential.credentialId,
+      })),
     ];
   }
 

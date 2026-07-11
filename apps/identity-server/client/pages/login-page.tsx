@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Button, FormField, Input, OtpInput } from '@shadow-library/ui';
-import { type ReactElement, useState } from 'react';
+import { type ReactElement, useEffect, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -11,7 +11,7 @@ import { AuthShell } from '../components/auth-shell';
 import { DeadFlow, FlowStep } from '../components/flow-step';
 import { OtpStep } from '../components/otp-step';
 import { api } from '../lib/api';
-import { deviceId, safeReturnTo } from '../lib/context';
+import { deviceId, isLoggedIn, safeReturnTo } from '../lib/context';
 import { navigate } from '../lib/router';
 import { useFlow } from '../lib/use-flow';
 import { assertPasskey } from '../lib/webauthn';
@@ -35,6 +35,15 @@ export function LoginPage(): ReactElement {
   const [recoveryCode, setRecoveryCode] = useState('');
 
   const finish = (): void => window.location.assign(safeReturnTo() ?? '/account');
+
+  /**
+   * A signed-in browser bounced here with a pending authorize URL means the missing piece is
+   * consent, not authentication (first-party clients never bounce) — hand over to the prompt.
+   */
+  useEffect(() => {
+    const returnTo = safeReturnTo();
+    if (returnTo && isLoggedIn()) window.location.replace(`/consent?return_to=${encodeURIComponent(returnTo)}`);
+  }, []);
 
   const complete = (state: { status: string } | null): void => {
     if (state?.status === 'COMPLETED') finish();

@@ -79,6 +79,7 @@ export interface MfaEnrollment {
   label: string;
   createdAt: string;
   lastUsedAt?: string;
+  credentialId?: string;
 }
 
 export interface TotpEnrollment {

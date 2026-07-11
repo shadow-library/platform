@@ -5,6 +5,8 @@
 /**
  * Importing user defined packages
  */
+import { AccountPage } from './account-page';
+import { ConsentPage } from './consent-page';
 import { ErrorPage } from './error-page';
 import { LoginPage } from './login-page';
 import { RecoverPage } from './recover-page';
@@ -25,5 +27,7 @@ export const routes: RouteDefinition[] = [
   { path: '/login', component: LoginPage },
   { path: '/register', component: RegisterPage },
   { path: '/recover', component: RecoverPage },
+  { path: '/consent', component: ConsentPage },
+  { path: '/account', component: AccountPage },
   { path: '/error', component: ErrorPage },
 ];
