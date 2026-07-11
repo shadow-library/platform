@@ -29,6 +29,7 @@ import { HealthModule } from '@server/modules/infrastructure/health';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { SecurityModule } from '@server/modules/infrastructure/security';
 import { UiModule } from '@server/modules/infrastructure/ui';
+import { ScimModule } from '@server/modules/scim';
 
 /**
  * Defining types
@@ -83,6 +84,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AuditModule,
     NotificationModule,
     AdminModule,
+    ScimModule,
     UiModule,
   ],
 
@@ -90,6 +92,14 @@ export const HttpRouteModule = FastifyModule.forRoot({
   fastifyFactory: async instance => {
     const assetsDir = path.join(Config.get('ui.public-dir'), 'assets');
     if (fs.existsSync(assetsDir)) await instance.register(fastifyStatic, { root: assetsDir, prefix: '/assets/', index: false, maxAge: '1d', etag: true });
+    /** SCIM clients send RFC 7644's dedicated media type; the payload is ordinary JSON. */
+    instance.addContentTypeParser('application/scim+json', { parseAs: 'string' }, (_request, body, done) => {
+      try {
+        done(null, typeof body === 'string' && body.length > 0 ? JSON.parse(body) : {});
+      } catch (error) {
+        done(error as Error);
+      }
+    });
     return instance;
   },
 

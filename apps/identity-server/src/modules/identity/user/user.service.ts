@@ -97,8 +97,17 @@ export class UserService {
   }
 
   async createUserWithPassword(data: CreateUser): Promise<UserDetails> {
+    return this.createUser(data);
+  }
+
+  /** Creates an account with no local credential — SCIM provisioning and federated JIT sign-up. */
+  async createProvisionedUser(data: Omit<CreateUser, 'password'>): Promise<UserDetails> {
+    return this.createUser(data);
+  }
+
+  private async createUser(data: Omit<CreateUser, 'password'> & { password?: string }): Promise<UserDetails> {
     if (!validator.isEmail(data.email)) throw new ValidationError('email', ERROR_MESSAGES.INVALID_EMAIL);
-    this.passwordPolicyService.assertStrong(data.password);
+    if (data.password !== undefined) this.passwordPolicyService.assertStrong(data.password);
     if (data.phoneNumber && !validator.isMobilePhone(data.phoneNumber, 'any', { strictMode: true })) throw new ValidationError('phoneNumber', ERROR_MESSAGES.INVALID_PHONE_NUMBER);
     if (data.username && !REGEX.USERNAME.test(data.username)) throw new ValidationError('username', ERROR_MESSAGES.INVALID_USERNAME);
     if (data.dateOfBirth) {
@@ -139,16 +148,18 @@ export class UserService {
           userDetails.phones.push(phone);
         }
 
-        const [authIdentity] = await tx.insert(schema.userAuthIdentities).values({ userId: user.id, provider: 'PASSWORD', providerKey: email.emailId }).returning();
-        assert(authIdentity, 'User auth identity creation failed');
-        this.logger.debug('user auth identity created', { userId: user.id, authIdentityId: authIdentity.id });
-        userDetails.authIdentities.push(authIdentity);
+        if (data.password !== undefined) {
+          const [authIdentity] = await tx.insert(schema.userAuthIdentities).values({ userId: user.id, provider: 'PASSWORD', providerKey: email.emailId }).returning();
+          assert(authIdentity, 'User auth identity creation failed');
+          this.logger.debug('user auth identity created', { userId: user.id, authIdentityId: authIdentity.id });
+          userDetails.authIdentities.push(authIdentity);
 
-        const { hash: passwordHash, version } = await this.passwordService.hash(data.password);
-        const [password] = await tx.insert(schema.userPasswords).values({ userAuthIdentityId: authIdentity.id, algorithm: 'ARGON2ID', hash: passwordHash, version }).returning();
-        assert(password, 'User password creation failed');
-        await tx.insert(schema.passwordHistory).values({ userId: user.id, hash: passwordHash });
-        this.logger.debug('user password created', { userId: user.id, authIdentityId: password.userAuthIdentityId });
+          const { hash: passwordHash, version } = await this.passwordService.hash(data.password);
+          const [password] = await tx.insert(schema.userPasswords).values({ userAuthIdentityId: authIdentity.id, algorithm: 'ARGON2ID', hash: passwordHash, version }).returning();
+          assert(password, 'User password creation failed');
+          await tx.insert(schema.passwordHistory).values({ userId: user.id, hash: passwordHash });
+          this.logger.debug('user password created', { userId: user.id, authIdentityId: password.userAuthIdentityId });
+        }
 
         const workspaceName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || 'Personal';
         const organisation = await this.organisationService.createPersonalWorkspace(user.id, `${workspaceName} Workspace`, tx);

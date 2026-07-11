@@ -9,6 +9,7 @@ export * from './notification.schema';
 export * from './oauth.schema';
 export * from './refresh-tokens.schema';
 export * from './saml.schema';
+export * from './scim.schema';
 export * from './organisations.schema';
 export * from './applications.schema';
 export * from './users.schema';

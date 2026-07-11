@@ -285,10 +285,13 @@ Platform-tier subscriptions (`/api/v1/admin/webhooks`, `iam:webhooks:manage`, ap
 
 SP-initiated SSO (api-contract §8): HTTP-Redirect in, HTTP-POST out, signed assertions (enveloped XML-DSIG, RSA-SHA256, exclusive c14n via `xml-crypto`) from a dedicated RSA-2048 key lineage (`signing_keys.purpose = SAML`, self-signed X.509 via `@peculiar/x509`, same envelope encryption and rotation states as OIDC keys; metadata publishes every non-retired certificate so rotation never breaks SPs). Replay guard: login detours park the request in Redis under a single-use resume id; assertions live 5 min with `InResponseTo`/`Recipient`/`AudienceRestriction`. Registered SPs are platform-tier (`iam:clients:manage`, https-only exact-match ACS). Decisions recorded: SP AuthnRequest signature verification unsupported (XSW risk of hand-rolled XML-DSIG verification outweighs its value when nothing security-relevant is taken from the request); pairwise `PERSISTENT` NameIDs are master-key-derived HMACs. Deferred: assertion **encryption** (xmlenc), single logout, IdP-initiated SSO.
 
+### T-704 — SCIM 2.0 · XL — **done**
+
+Users + Groups + discovery documents per organisation (api-contract §9). Recorded decisions: `scim_tokens` retired unbuilt — org-bound SERVICE clients carrying `scim:provision` already give per-tenant rotatable credentials (dual-secret overlap), introspection and revocation, and keep ONE token infrastructure; `userName` restricted to the org's VERIFIED domains (a tenant provisions only its own namespace, which also closes the account-enumeration oracle); adopted pre-existing accounts (`managed = false`) can never be deactivated by a tenant — deprovisioning strips org membership and org-scoped refresh-token families only, while SCIM-born accounts (`managed = true`) are DISABLED with full session/token revocation and back-channel logout. SCIM bodies are runtime-validated instead of class-schema DTOs (RFC 7644 PATCH values are polymorphic — Entra sends `"False"` strings for booleans); the SCIM error envelope bypasses the platform error shape by design. Deferred: group→role mapping (groups are provisioning structure only until a tenant needs authorization semantics), bulk operations, eTags.
+
 ### Remaining (M7b — separate effort)
 
 - **T-702 Inbound OIDC/SAML federation** · XL — `identity_providers`, home-realm discovery, JIT provisioning, claim/group mapping, break-glass local admin, tenant-takeover prevention.
-- **T-704 SCIM 2.0** · XL — Users+Groups, `scim_tokens` (per-tenant, rotatable), idempotency, deprovisioning → session/token revocation.
 
 ---
 

@@ -206,6 +206,23 @@ export class RefreshTokenService {
     );
   }
 
+  /** Revokes every active family a user holds in an organisation context (SCIM deprovisioning of adopted accounts). */
+  async revokeForUserOrganisation(userId: bigint, organisationId: bigint): Promise<void> {
+    const families = await this.db
+      .update(schema.refreshTokenFamilies)
+      .set({ status: 'REVOKED', revokeReason: 'ADMIN', revokedAt: new Date() })
+      .where(and(eq(schema.refreshTokenFamilies.userId, userId), eq(schema.refreshTokenFamilies.organisationId, organisationId), eq(schema.refreshTokenFamilies.status, 'ACTIVE')))
+      .returning({ id: schema.refreshTokenFamilies.id });
+    await Promise.all(
+      families.map(family =>
+        this.db
+          .update(schema.refreshTokens)
+          .set({ status: 'REVOKED' })
+          .where(and(eq(schema.refreshTokens.familyId, family.id), ne(schema.refreshTokens.status, 'REVOKED'))),
+      ),
+    );
+  }
+
   /** Revokes every active family a user holds for a specific client (used on consent withdrawal). */
   async revokeForUserClient(userId: bigint, clientId: string): Promise<void> {
     const families = await this.db

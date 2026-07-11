@@ -26,6 +26,7 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
  */
 const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
+const SCIM_PROVISION_SCOPE = 'scim:provision';
 
 const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [ADMIN_PERMISSIONS.usersRead]: 'Read user accounts and their security posture',
@@ -73,6 +74,7 @@ export class BootstrapService implements OnModuleInit {
   private async ensurePlatformScopes(): Promise<void> {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_CHECK_SCOPE);
+    await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, SCIM_PROVISION_SCOPE);
   }
 
   private async ensurePlatformApplication(): Promise<void> {

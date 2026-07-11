@@ -302,7 +302,11 @@ Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-us
 
 ## 11. Enterprise tables
 
-`organisation_domains`, `webhook_subscriptions`, `webhook_deliveries` (M7) and `saml_service_providers` (M7b) are live (see §4 and below). Still reserved, NOT created: `identity_providers` and `scim_tokens` (M7b — inbound federation and SCIM); the names MUST NOT be repurposed.
+`organisation_domains`, `webhook_subscriptions`, `webhook_deliveries` (M7), `saml_service_providers`, `scim_directory`, `scim_groups`, and `scim_group_members` (M7b) are live (see §4 and below). Still reserved, NOT created: `identity_providers` (T-702 inbound federation). `scim_tokens` was retired unbuilt — org-bound SERVICE clients with the `scim:provision` scope subsumed it (recorded decision, T-704).
+
+### `scim_directory` / `scim_groups` / `scim_group_members` — _implemented (T-704)_
+
+`scim_directory`: `id` uuid PK (the SCIM resource id — platform user ids never appear on the wire), `organisation_id` FK, `user_id` FK, `user_name` (email, lower-unique per org), `external_id` (unique per org where set), `active`, `managed` (ownership boundary: true = account born via SCIM, deactivatable at account level; false = adopted account, deprovision strips membership only), timestamps. `scim_groups`: org-scoped, `display_name` lower-unique per org, `external_id`. `scim_group_members`: `(group_id, directory_id)` PK, both cascading — membership references directory entries, never users.
 
 ### `saml_service_providers` — _implemented (T-701)_
 
