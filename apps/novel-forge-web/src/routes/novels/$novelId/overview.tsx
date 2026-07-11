@@ -13,6 +13,7 @@ import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
   type ResetBody,
+  type RoleUsage,
   type WorkflowRunDetailResponse,
   useAiUsageQuery,
   useCloneProjectMutation,
@@ -80,17 +81,32 @@ function StatCard({ label, children, footer }: StatCardProps): React.JSX.Element
   );
 }
 
-interface BarProps {
-  value: number;
-  max: number;
+interface RoleBarProps {
+  usage: RoleUsage;
+  maxTokens: number;
 }
 
-function Bar({ value, max }: BarProps): React.JSX.Element {
-  const pct = max > 0 ? Math.max(6, Math.round((value / max) * 100)) : 6;
+/** Short label under a bar; the tooltip carries the full role and its counts. */
+function roleLabel(role: string): string {
+  return role.replace(/^bible:/, '');
+}
+
+// Each bar's height is the role's total token usage (works even for local models where cost is $0);
+// the tooltip breaks out calls, input/output tokens, and cost.
+function RoleBar({ usage, maxTokens }: RoleBarProps): React.JSX.Element {
+  const tokens = usage.inputTokens + usage.outputTokens;
+  const pct = maxTokens > 0 ? Math.max(4, Math.round((tokens / maxTokens) * 100)) : 4;
+  const cost = usage.costUsd > 0 ? ` · $${usage.costUsd.toFixed(2)}` : '';
+  const tip = `${usage.role} · ${usage.calls} call${usage.calls === 1 ? '' : 's'} · ${usage.inputTokens.toLocaleString()} in / ${usage.outputTokens.toLocaleString()} out${cost}`;
   return (
-    <div className={styles.barCol}>
-      <div className={styles.barFill} style={{ '--pct': `${pct}%` } as React.CSSProperties} />
-    </div>
+    <Tooltip content={tip}>
+      <div className={styles.barCol}>
+        <div className={styles.barTrack}>
+          <div className={styles.barFill} style={{ '--pct': `${pct}%` } as React.CSSProperties} />
+        </div>
+        <span className={styles.barLabel}>{roleLabel(usage.role)}</span>
+      </div>
+    </Tooltip>
   );
 }
 
@@ -173,10 +189,9 @@ function OverviewScreen(): React.JSX.Element {
     navigate({ to: next.to, params: { novelId } });
   };
 
-  const callsPerRole = usage?.callsPerRole ?? {};
-  const roleEntries = Object.entries(callsPerRole);
-  const maxCalls = roleEntries.reduce((m, [, v]) => Math.max(m, v), 0);
-  const totalCalls = roleEntries.reduce((s, [, v]) => s + v, 0);
+  const roles = usage?.roles ?? [];
+  const maxTokens = roles.reduce((m, r) => Math.max(m, r.inputTokens + r.outputTokens), 0);
+  const totalCalls = roles.reduce((s, r) => s + r.calls, 0);
 
   const doClone = (): void => {
     if (!cloneName.trim()) return;
@@ -298,16 +313,16 @@ function OverviewScreen(): React.JSX.Element {
               <div className={styles.usageHead}>
                 <div>
                   <h3 className={styles.usageTitle}>AI Usage &amp; Cost</h3>
-                  <p className={styles.usageSub}>All runs · this project</p>
+                  <p className={styles.usageSub}>Tokens per role · all runs · hover a bar for detail</p>
                 </div>
                 <div className={styles.usageCostWrap}>
                   <div className={styles.usageCost}>${(usage?.totalCostUsd ?? 0).toFixed(2)}</div>
                 </div>
               </div>
-              {roleEntries.length > 0 && (
+              {roles.length > 0 && (
                 <div className={styles.bars}>
-                  {roleEntries.map(([role, v]) => (
-                    <Bar key={role} value={v} max={maxCalls} />
+                  {roles.map(r => (
+                    <RoleBar key={r.role} usage={r} maxTokens={maxTokens} />
                   ))}
                 </div>
               )}

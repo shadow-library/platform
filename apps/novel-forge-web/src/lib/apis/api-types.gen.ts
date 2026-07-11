@@ -1787,9 +1787,17 @@ export interface components {
       totalOutputTokens: number;
       totalCostUsd: number;
       callsPerRole: components['schemas']['RoleCallCounts'];
+      roles: components['schemas']['RoleUsage'][];
     };
     RoleCallCounts: {
       [key: string]: number;
+    };
+    RoleUsage: {
+      role: string;
+      calls: number;
+      inputTokens: number;
+      outputTokens: number;
+      costUsd: number;
     };
     SearchResponse: {
       hits: components['schemas']['SearchHitResponse'][];
@@ -6856,6 +6864,7 @@ export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
 export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
 export type AiUsageResponse = components['schemas']['AiUsageResponse'];
 export type RoleCallCounts = components['schemas']['RoleCallCounts'];
+export type RoleUsage = components['schemas']['RoleUsage'];
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SearchHitResponse = components['schemas']['SearchHitResponse'];
 export type JobResponse = components['schemas']['JobResponse'];
