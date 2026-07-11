@@ -44,8 +44,8 @@ await Bun.write(`${distDir}/package.json`, distPackageJsonString);
 fs.copyFileSync(`${rootDir}/README.md`, `${distDir}/README.md`);
 fs.copyFileSync(`${rootDir}/LICENSE`, `${distDir}/LICENSE`);
 
-const entryPoint = path.join(rootDir, 'src', 'main.ts');
-const result = await Bun.build({ entrypoints: [entryPoint], target: 'bun', minify: { identifiers: false }, outdir: 'dist' });
+const entrypoints = [path.join(rootDir, 'src', 'main.ts'), path.join(rootDir, 'src', 'worker.ts')];
+const result = await Bun.build({ entrypoints, target: 'bun', minify: { identifiers: false }, outdir: 'dist' });
 if (!result.success) error(`Build failed: ${result.logs.join('\n')}`);
 
 const endTime = process.hrtime(startTime);

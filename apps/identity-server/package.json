@@ -10,6 +10,7 @@
     "type-check": "bun run tsc",
     "build": "bun run scripts/build.ts",
     "dev": "bun run --watch src/main.ts",
+    "dev:worker": "bun run --watch src/worker.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:create-template": "bun run scripts/create-template-db.ts"

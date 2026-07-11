@@ -29,6 +29,13 @@
       "when": 1783749913729,
       "tag": "0003_audit_events",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1783750240017,
+      "tag": "0004_notification_outbox",
+      "breakpoints": true
     }
   ]
 }

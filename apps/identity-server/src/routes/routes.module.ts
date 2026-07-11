@@ -11,6 +11,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 import { KeyModule } from '@server/modules/auth/keys';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { HealthModule } from '@server/modules/infrastructure/health';
+import { NotificationModule } from '@server/modules/infrastructure/notification';
 
 /**
  * Defining types
@@ -27,7 +28,7 @@ import { HealthModule } from '@server/modules/infrastructure/health';
 export const AppHttpCoreModule = HttpCoreModule.forRoot({});
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, HealthModule, KeyModule, AuditModule],
+  imports: [AppHttpCoreModule, HealthModule, KeyModule, AuditModule, NotificationModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

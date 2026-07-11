@@ -25,6 +25,13 @@ declare module '@shadow-library/common' {
 
     /** Security configs */
     'security.master-encryption-key': string;
+
+    /** Notification service (pulse-server) */
+    'notification.base-url': string;
+    'notification.service-name': string;
+
+    /** Worker configs */
+    'worker.poll-interval': number;
   }
 }
 
@@ -41,6 +48,11 @@ Config.load('auth.flow.ttl', { defaultValue: '900', validateType: 'number' });
 Config.load('auth.bootstrap.admin-email', { envKey: 'IDENTITY_BOOTSTRAP_ADMIN_EMAIL', defaultValue: 'admin@shadow-apps.com' });
 Config.load('auth.bootstrap.admin-password', { envKey: 'IDENTITY_BOOTSTRAP_ADMIN_PASSWORD', defaultValue: '' });
 Config.load('auth.password.breach-check-enabled', { envKey: 'AUTH_PASSWORD_BREACH_CHECK', defaultValue: 'false', validateType: 'boolean' });
+
+Config.load('notification.base-url', { envKey: 'NOTIFICATION_BASE_URL', defaultValue: 'http://localhost:3000/api/v1' });
+Config.load('notification.service-name', { envKey: 'NOTIFICATION_SERVICE_NAME', defaultValue: 'shadow-identity' });
+
+Config.load('worker.poll-interval', { envKey: 'WORKER_POLL_INTERVAL', defaultValue: '5000', validateType: 'number' });
 
 /**
  * The master encryption key wraps signing/encryption keys at rest. It must never fall back to a
