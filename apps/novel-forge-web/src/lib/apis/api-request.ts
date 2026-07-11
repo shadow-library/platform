@@ -47,7 +47,10 @@ export class ApiError extends Error {
   readonly fields: ErrorResponseDto['fields'];
 
   constructor(status: number, body: ErrorResponseDto) {
-    super(body.message);
+    // Validation errors carry the actual field problems ("body.content: must NOT have more than…");
+    // fold them into the message so toasts explain the rejection instead of the generic sentence.
+    const fieldDetail = body.fields?.length ? ` — ${body.fields.map(f => `${f.field}: ${f.msg}`).join('; ')}` : '';
+    super(`${body.message}${fieldDetail}`);
     this.name = 'ApiError';
     this.status = status;
     this.code = body.code;
