@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { type ChangeOp, changeSetRefs, validateChangeSet } from '@modules/refinement';
+import { ACTION_TYPES, type ChangeOp, changeSetRefs, isActionOp, renderActionVocabulary, validateChangeSet } from '@modules/refinement';
 
 /**
  * Declaring the constants
@@ -76,9 +76,50 @@ describe('validateChangeSet', () => {
   });
 });
 
+describe('hub ops and actions', () => {
+  it('should accept well-formed draft, brief-remove, and action ops', () => {
+    const ops: ChangeOp[] = [
+      { op: 'draft.update', chapter: 4, body: 'rewritten prose' },
+      { op: 'brief.remove', chapter: 9 },
+      { op: 'action.generate_chapters', count: 5 },
+      { op: 'action.plan_arcs', volumeKey: 'vol_1', arcCount: 2 },
+      { op: 'action.revise_draft', chapter: 4, note: 'tighten the pacing' },
+      { op: 'action.validate', scope: 'chapter', chapter: 4 },
+      { op: 'action.finalize', upTo: 3 },
+    ];
+    expect(validateChangeSet(ops)).toEqual([]);
+  });
+
+  it('should reject malformed hub ops', () => {
+    expect(validateChangeSet([{ op: 'draft.update', chapter: 4 }])[0]).toMatch(/at least one of title, body, summary/);
+    expect(validateChangeSet([{ op: 'action.generate_chapters', count: 0 }])[0]).toMatch(/count must be >= 1/);
+    expect(validateChangeSet([{ op: 'action.validate', scope: 'volume' }])[0]).toMatch(/scope must be one of novel, chapter/);
+    expect(validateChangeSet([{ op: 'action.revise_draft', chapter: 4 }])[0]).toMatch(/required field 'note'/);
+    expect(validateChangeSet([{ op: 'action.audit_bible', target: 'all' }])[0]).toMatch(/unexpected field 'target'/);
+  });
+
+  it('should classify action ops and render their vocabulary with purposes', () => {
+    expect(isActionOp({ op: 'action.audit_bible' })).toBe(true);
+    expect(isActionOp({ op: 'draft.update', chapter: 1, body: 'x' })).toBe(false);
+    const rendered = renderActionVocabulary(ACTION_TYPES);
+    for (const action of ACTION_TYPES) expect(rendered).toContain(`"op": "${action}"`);
+    expect(rendered).toContain('never auto-applied');
+  });
+});
+
 describe('changeSetRefs', () => {
   it('should derive deduplicated artifact refs', () => {
     const refs = changeSetRefs([...validOps, { op: 'volume.remove', volumeKey: 'vol_1' }]);
     expect(refs).toEqual(['premise', 'doc:project/reader-promise', 'volume:vol_1', 'arc:vol_1_arc_1', 'chapter:3']);
+  });
+
+  it('should map draft ops to draft: refs and actions to none', () => {
+    const refs = changeSetRefs([
+      { op: 'draft.update', chapter: 4, body: 'x' },
+      { op: 'brief.remove', chapter: 9 },
+      { op: 'action.generate_chapters', count: 5 },
+      { op: 'action.audit_bible' },
+    ]);
+    expect(refs).toEqual(['draft:4', 'chapter:9']);
   });
 });

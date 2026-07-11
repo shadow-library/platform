@@ -14,7 +14,7 @@ import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts
 import { type Refinement } from '@server/database';
 
 import { AUTHORING_STYLE } from './authoring-preamble';
-import { SCOPE_PLAYBOOKS } from './scope-playbooks';
+import { scopeAllowedOps } from './scope-playbooks';
 import { type PromptModule } from './types';
 import { validateChangeSet } from '../../refinement/change-set';
 import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.schema';
@@ -54,7 +54,7 @@ export const chatRefinePrompt: PromptModule<ChatRefineOutput> = {
 
 /** Scope-bound variant: the repair ladder forces the model back inside the scope's op allowlist. */
 export function buildChatRefinePrompt(scope: Refinement.ChatScope): PromptModule<ChatRefineOutput> {
-  const allowedOps = SCOPE_PLAYBOOKS[scope].allowedOps;
+  const allowedOps = scopeAllowedOps(scope);
   return {
     ...chatRefinePrompt,
     template: buildTemplate(),

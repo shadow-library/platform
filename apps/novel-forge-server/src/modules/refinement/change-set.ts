@@ -95,6 +95,19 @@ export interface BriefUpdateOp {
   endingContract?: EndingContract;
 }
 
+export interface BriefRemoveOp {
+  op: 'brief.remove';
+  chapter: number;
+}
+
+export interface DraftUpdateOp {
+  op: 'draft.update';
+  chapter: number;
+  title?: string;
+  body?: string;
+  summary?: string;
+}
+
 export interface EntityUpsertOp {
   op: 'entity.upsert';
   entityKey: string;
@@ -111,7 +124,77 @@ export interface EntityRemoveOp {
   entityKey: string;
 }
 
-export type ChangeOp =
+// Action ops drive the pipeline through existing service code (chat-hub design §4.2). They carry no
+// artifact refs, no baseline, and no inverse — they execute post-commit and their outcome lands in
+// the proposal's opResults, never in domain tables directly.
+export interface GenerateChaptersAction {
+  op: 'action.generate_chapters';
+  count: number;
+}
+
+export interface PlanVolumesAction {
+  op: 'action.plan_volumes';
+  volumeCount?: number;
+  chaptersPerVolume?: number;
+}
+
+export interface PlanArcsAction {
+  op: 'action.plan_arcs';
+  volumeKey: string;
+  arcCount?: number;
+}
+
+export interface OutlineArcAction {
+  op: 'action.outline_arc';
+  arcKey: string;
+}
+
+export interface AuditBibleAction {
+  op: 'action.audit_bible';
+}
+
+export interface EnhancePremiseAction {
+  op: 'action.enhance_premise';
+  overview?: string;
+}
+
+export interface JudgeDraftAction {
+  op: 'action.judge_draft';
+  chapter: number;
+}
+
+export interface ReviseDraftAction {
+  op: 'action.revise_draft';
+  chapter: number;
+  note: string;
+}
+
+export interface ApproveDraftAction {
+  op: 'action.approve_draft';
+  chapter: number;
+}
+
+export interface ApproveVolumePlanAction {
+  op: 'action.approve_volume_plan';
+}
+
+export interface ApproveArcsAction {
+  op: 'action.approve_arcs';
+  volumeKey: string;
+}
+
+export interface ValidateAction {
+  op: 'action.validate';
+  scope: 'novel' | 'chapter';
+  chapter?: number;
+}
+
+export interface FinalizeAction {
+  op: 'action.finalize';
+  upTo?: number;
+}
+
+export type ContentOp =
   | PremiseUpdateOp
   | BibleDocumentUpsertOp
   | BibleDocumentRemoveOp
@@ -120,9 +203,30 @@ export type ChangeOp =
   | ArcUpsertOp
   | ArcRemoveOp
   | BriefUpdateOp
+  | BriefRemoveOp
+  | DraftUpdateOp
   | EntityUpsertOp
   | EntityRemoveOp;
+
+export type ActionOp =
+  | GenerateChaptersAction
+  | PlanVolumesAction
+  | PlanArcsAction
+  | OutlineArcAction
+  | AuditBibleAction
+  | EnhancePremiseAction
+  | JudgeDraftAction
+  | ReviseDraftAction
+  | ApproveDraftAction
+  | ApproveVolumePlanAction
+  | ApproveArcsAction
+  | ValidateAction
+  | FinalizeAction;
+
+export type ChangeOp = ContentOp | ActionOp;
 export type OpType = ChangeOp['op'];
+export type ContentOpType = ContentOp['op'];
+export type ActionType = ActionOp['op'];
 
 type FieldKind = 'string' | 'number' | 'string[]' | 'object';
 interface OpSpec {
@@ -167,14 +271,55 @@ const OP_SPECS: Record<OpType, OpSpec> = {
     required: { chapter: 'number' },
     optional: { title: 'string', body: 'string', volumeKey: 'string', arcKey: 'string', contextRefs: 'string[]', endingContract: 'object' },
   },
+  'brief.remove': { required: { chapter: 'number' }, optional: {} },
+  'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
   'entity.upsert': {
     required: { entityKey: 'string', type: 'string' },
     optional: { name: 'string', status: 'string', motivation: 'string', notes: 'string', body: 'string' },
   },
   'entity.remove': { required: { entityKey: 'string' }, optional: {} },
+  'action.generate_chapters': { required: { count: 'number' }, optional: {} },
+  'action.plan_volumes': { required: {}, optional: { volumeCount: 'number', chaptersPerVolume: 'number' } },
+  'action.plan_arcs': { required: { volumeKey: 'string' }, optional: { arcCount: 'number' } },
+  'action.outline_arc': { required: { arcKey: 'string' }, optional: {} },
+  'action.audit_bible': { required: {}, optional: {} },
+  'action.enhance_premise': { required: {}, optional: { overview: 'string' } },
+  'action.judge_draft': { required: { chapter: 'number' }, optional: {} },
+  'action.revise_draft': { required: { chapter: 'number', note: 'string' }, optional: {} },
+  'action.approve_draft': { required: { chapter: 'number' }, optional: {} },
+  'action.approve_volume_plan': { required: {}, optional: {} },
+  'action.approve_arcs': { required: { volumeKey: 'string' }, optional: {} },
+  'action.validate': { required: { scope: 'string' }, optional: { chapter: 'number' } },
+  'action.finalize': { required: {}, optional: { upTo: 'number' } },
 };
 
 export const OP_TYPES = Object.keys(OP_SPECS) as OpType[];
+export const ACTION_TYPES = OP_TYPES.filter(op => op.startsWith('action.')) as ActionType[];
+export const VALIDATION_SCOPES = ['novel', 'chapter'];
+
+// What each action does, rendered into the hub playbook so the model picks actions by meaning, not by
+// guessing from the name (chat-hub design §4.2/§4.3).
+const ACTION_PURPOSES: Record<ActionType, string> = {
+  'action.generate_chapters': 'enqueue prose generation for the next `count` chapters (drafted, judged, and queued for review)',
+  'action.plan_volumes': 'generate or regenerate the multi-volume story plan from the premise and bible',
+  'action.plan_arcs': 'run the arc planner for one volume — stages an arc-plan proposal covering its chapter range',
+  'action.outline_arc': 'outline chapter briefs for every chapter of an approved arc',
+  'action.audit_bible': 'audit the story bible for missing/pointless documents — stages a bible-audit proposal',
+  'action.enhance_premise': 'evaluate and strengthen the premise as a web novel — stages a premise proposal',
+  'action.judge_draft': 'run the continuity judge on one chapter draft',
+  'action.revise_draft': 'revise one chapter draft using `note` as the revision feedback',
+  'action.approve_draft': 'approve one reviewed chapter draft',
+  'action.approve_volume_plan': 'approve the volume plan (locks volume chapter ranges)',
+  'action.approve_arcs': 'approve all arcs of one volume (unlocks outlining)',
+  'action.validate': 'run continuity validation over the novel or one chapter',
+  'action.finalize': 'finalize drafted chapters into locked canon — irreversible, never auto-applied',
+};
+
+export function isActionOp(op: ChangeOp): op is ActionOp;
+export function isActionOp(op: OpType): boolean;
+export function isActionOp(op: ChangeOp | OpType): boolean {
+  return (typeof op === 'string' ? op : op.op).startsWith('action.');
+}
 
 function isKind(value: unknown, kind: FieldKind): boolean {
   if (kind === 'string') return typeof value === 'string';
@@ -259,6 +404,11 @@ export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]
     if (op === 'arc.upsert' && typeof record['chapterStart'] === 'number' && typeof record['chapterEnd'] === 'number' && record['chapterStart'] > record['chapterEnd']) {
       errors.push(`${path}: chapterStart must be <= chapterEnd`);
     }
+    if (op === 'draft.update' && record['title'] === undefined && record['body'] === undefined && record['summary'] === undefined) {
+      errors.push(`${path}: draft.update must set at least one of title, body, summary`);
+    }
+    if (op === 'action.validate' && !VALIDATION_SCOPES.includes(record['scope'] as string)) errors.push(`${path}: scope must be one of ${VALIDATION_SCOPES.join(', ')}`);
+    if (op === 'action.generate_chapters' && typeof record['count'] === 'number' && record['count'] < 1) errors.push(`${path}: count must be >= 1`);
   });
 
   return errors;
@@ -281,15 +431,28 @@ export function renderOpVocabulary(ops: readonly OpType[]): string {
   return `changeSet, when present, must be an ARRAY of operation objects. Allowed operations and their fields:\n${lines.join('\n')}${contractShape}`;
 }
 
-/** The artifact refs a change-set touches — the keys used for baselines, conflict checks, and supersession. */
+/** Action shapes + what each one does — the pipeline half of the hub playbook (chat-hub design §4.3). */
+export function renderActionVocabulary(actions: readonly ActionType[]): string {
+  const lines = actions.map(action => {
+    const spec = OP_SPECS[action];
+    const required = Object.entries(spec.required).map(([key, kind]) => `"${key}": <${kind}, required>`);
+    const optional = Object.entries(spec.optional).map(([key, kind]) => `"${key}": <${kind}, optional>`);
+    return `- {"op": "${action}"${[...required, ...optional].map(f => `, ${f}`).join('')}} — ${ACTION_PURPOSES[action]}`;
+  });
+  return `Action operations may appear in the same changeSet array; they run the pipeline instead of editing content. Use one only when the author asks for that work to happen:\n${lines.join('\n')}`;
+}
+
+/** The artifact refs a change-set touches — the keys used for baselines, conflict checks, and supersession. Actions touch none. */
 export function changeSetRefs(ops: ChangeOp[]): string[] {
-  const refs = ops.map(op => {
-    if (op.op === 'premise.update') return 'premise';
-    if (op.op === 'bible_document.upsert' || op.op === 'bible_document.remove') return `doc:${op.section}/${op.slug}`;
-    if (op.op === 'volume.upsert' || op.op === 'volume.remove') return `volume:${op.volumeKey}`;
-    if (op.op === 'arc.upsert' || op.op === 'arc.remove') return `arc:${op.arcKey}`;
-    if (op.op === 'entity.upsert' || op.op === 'entity.remove') return `entity:${op.entityKey}`;
-    return `chapter:${op.chapter}`;
+  const refs = ops.flatMap(op => {
+    if (isActionOp(op)) return [];
+    if (op.op === 'premise.update') return ['premise'];
+    if (op.op === 'bible_document.upsert' || op.op === 'bible_document.remove') return [`doc:${op.section}/${op.slug}`];
+    if (op.op === 'volume.upsert' || op.op === 'volume.remove') return [`volume:${op.volumeKey}`];
+    if (op.op === 'arc.upsert' || op.op === 'arc.remove') return [`arc:${op.arcKey}`];
+    if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
+    if (op.op === 'draft.update') return [`draft:${op.chapter}`];
+    return [`chapter:${op.chapter}`];
   });
   return [...new Set(refs)];
 }

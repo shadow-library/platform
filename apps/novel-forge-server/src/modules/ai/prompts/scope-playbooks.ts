@@ -11,7 +11,7 @@
  */
 import { type Refinement } from '@server/database';
 
-import { type OpType, renderOpVocabulary } from '../../refinement/change-set';
+import { ACTION_TYPES, type ActionType, type OpType, renderActionVocabulary, renderOpVocabulary } from '../../refinement/change-set';
 
 /**
  * Defining types
@@ -20,6 +20,7 @@ import { type OpType, renderOpVocabulary } from '../../refinement/change-set';
 export interface ScopePlaybook {
   guidance: string;
   allowedOps: readonly OpType[];
+  allowedActions?: readonly ActionType[];
 }
 
 /**
@@ -32,7 +33,7 @@ export interface ScopePlaybook {
 export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
   project: {
     guidance:
-      "Scope: the entire project — you are the showrunner's right hand with full visibility and full editing power. Judge everything as a serialized web novel AND as a production pipeline: is the canon coherent, is the plan escalating, are drafts moving toward approval, is anything stale or blocked? You may reshape the premise, bible documents, the cast, volumes, arcs, chapter briefs, and draft prose. Prefer the smallest complete change that achieves the author's intent — your change-sets apply to real canon, so propose whole-field values and nothing speculative.",
+      "Scope: the entire project — you are the showrunner's right hand with full visibility and full editing power. Judge everything as a serialized web novel AND as a production pipeline: is the canon coherent, is the plan escalating, are drafts moving toward approval, is anything stale or blocked? You may reshape the premise, bible documents, the cast, volumes, arcs, chapter briefs, and draft prose (finalized chapters are locked — never propose edits to them), and you may run the pipeline itself through action operations. Prefer the smallest complete change that achieves the author's intent — your change-sets apply to real canon, so propose whole-field values and nothing speculative.",
     allowedOps: [
       'premise.update',
       'bible_document.upsert',
@@ -42,9 +43,12 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
       'arc.upsert',
       'arc.remove',
       'brief.update',
+      'brief.remove',
+      'draft.update',
       'entity.upsert',
       'entity.remove',
     ],
+    allowedActions: ACTION_TYPES,
   },
   novel: {
     guidance:
@@ -86,5 +90,13 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
 /** Guidance + the exact op shapes — what ChatService feeds the {scopeInstructions} template var. */
 export function renderScopeInstructions(scope: Refinement.ChatScope): string {
   const playbook = SCOPE_PLAYBOOKS[scope];
-  return `${playbook.guidance}\n\n${renderOpVocabulary(playbook.allowedOps)}`;
+  const sections = [playbook.guidance, renderOpVocabulary(playbook.allowedOps)];
+  if (playbook.allowedActions?.length) sections.push(renderActionVocabulary(playbook.allowedActions));
+  return sections.join('\n\n');
+}
+
+/** The full op allowlist of a scope — content ops plus actions — for change-set validation. */
+export function scopeAllowedOps(scope: Refinement.ChatScope): OpType[] {
+  const playbook = SCOPE_PLAYBOOKS[scope];
+  return [...playbook.allowedOps, ...(playbook.allowedActions ?? [])];
 }

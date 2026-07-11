@@ -26,7 +26,7 @@ import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt, renderScopeInstructions } from '../ai/prompts';
+import { PROMPT_REGISTRY, buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
 import { type ChatCompactOutput, type ChatRefineOutput } from '../ai/schemas';
 
 /**
@@ -297,7 +297,7 @@ export class ChatService {
         kind: 'chat',
         summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
         changeSet: output.changeSet as unknown as ChangeOp[],
-        allowedOps: SCOPE_PLAYBOOKS[session.scopeType].allowedOps,
+        allowedOps: scopeAllowedOps(session.scopeType),
         runId,
       });
       await this.db.update(schema.chatMessages).set({ proposalId: proposal.id }).where(eq(schema.chatMessages.id, assistantMessage.id));

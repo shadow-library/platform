@@ -25,8 +25,10 @@ import {
   type ArcUpsertOp,
   type BibleDocumentRemoveOp,
   type BibleDocumentUpsertOp,
+  type BriefRemoveOp,
   type BriefUpdateOp,
   type ChangeOp,
+  type DraftUpdateOp,
   type EntityRemoveOp,
   type EntityUpsertOp,
   type PremiseUpdateOp,
@@ -172,10 +174,18 @@ export class ProposalApplyService {
         return this.applyArcRemove(ctx, op);
       case 'brief.update':
         return this.applyBriefUpdate(ctx, op);
+      case 'brief.remove':
+        return this.applyBriefRemove(ctx, op);
+      case 'draft.update':
+        return this.applyDraftUpdate(ctx, op);
       case 'entity.upsert':
         return this.applyEntityUpsert(ctx, op);
       case 'entity.remove':
         return this.applyEntityRemove(ctx, op);
+      default:
+        // Actions never reach the content dispatcher — they are filtered out before apply and executed
+        // post-commit (chat-hub design §5.3). Reaching here is a programming error, not bad input.
+        throw new ServerError(AppErrorCode.RFN_004);
     }
   }
 
@@ -406,6 +416,59 @@ export class ProposalApplyService {
       await ctx.tx.insert(schema.briefs).values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, revision, contentHash });
     }
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: revision });
+  }
+
+  private async applyBriefRemove(ctx: ApplyContext, op: BriefRemoveOp): Promise<void> {
+    const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
+    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw new ServerError(AppErrorCode.RFN_005);
+
+    const deleted = await ctx.tx
+      .delete(schema.briefs)
+      .where(and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)))
+      .returning();
+    if (deleted.length === 0) throw new ServerError(AppErrorCode.RFN_004);
+    ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: null });
+  }
+
+  /**
+   * Draft prose is chat-editable only while it is still a draft (chat-hub design decision 2): a final
+   * draft or a chapter at/behind the story cursor is locked canon. Every edit lands as a
+   * draft_revisions row (source chat_edited), so prose history survives independent of proposal revert.
+   */
+  private async applyDraftUpdate(ctx: ApplyContext, op: DraftUpdateOp): Promise<void> {
+    const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
+    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw new ServerError(AppErrorCode.RFN_010);
+
+    const existing = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
+    if (existing?.status === 'final') throw new ServerError(AppErrorCode.RFN_010);
+    if (!existing && op.body === undefined) throw new ServerError(AppErrorCode.RFN_004);
+
+    const merged = { title: op.title ?? existing?.title ?? null, body: op.body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
+    const revision = (existing?.revision ?? 0) + 1;
+
+    let draftId: bigint;
+    if (existing) {
+      await ctx.tx
+        .update(schema.drafts)
+        .set({ ...merged, revision, reviewStatus: 'needs_review', updatedAt: new Date() })
+        .where(eq(schema.drafts.id, existing.id));
+      draftId = existing.id;
+    } else {
+      const [created] = await ctx.tx
+        .insert(schema.drafts)
+        .values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, status: 'draft', revision, reviewStatus: 'needs_review', generator: 'standard' })
+        .returning();
+      if (!created) throw new ServerError(AppErrorCode.DRF_001);
+      draftId = created.id;
+    }
+
+    await ctx.tx
+      .insert(schema.draftRevisions)
+      .values({ projectId: ctx.projectId, draftId, revision, source: 'chat_edited', body: merged.body, summary: merged.summary })
+      .onConflictDoNothing();
+    ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: revision });
   }
 
   private async applyEntityUpsert(ctx: ApplyContext, op: EntityUpsertOp): Promise<void> {

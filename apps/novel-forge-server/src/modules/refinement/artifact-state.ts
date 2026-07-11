@@ -29,6 +29,7 @@ interface ParsedRefs {
   volumeKeys: string[];
   arcKeys: string[];
   chapters: number[];
+  drafts: number[];
   entityKeys: string[];
 }
 
@@ -39,7 +40,7 @@ interface ParsedRefs {
 const MISSING: ArtifactState = { exists: false, revision: null, contentHash: null };
 
 function parseRefs(refs: string[]): ParsedRefs {
-  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], entityKeys: [] };
+  const parsed: ParsedRefs = { premise: false, docs: [], volumeKeys: [], arcKeys: [], chapters: [], drafts: [], entityKeys: [] };
   for (const ref of refs) {
     if (ref === 'premise') parsed.premise = true;
     else if (ref.startsWith('doc:')) {
@@ -48,6 +49,7 @@ function parseRefs(refs: string[]): ParsedRefs {
     } else if (ref.startsWith('volume:')) parsed.volumeKeys.push(ref.slice(7));
     else if (ref.startsWith('arc:')) parsed.arcKeys.push(ref.slice(4));
     else if (ref.startsWith('chapter:')) parsed.chapters.push(Number(ref.slice(8)));
+    else if (ref.startsWith('draft:')) parsed.drafts.push(Number(ref.slice(6)));
     else if (ref.startsWith('entity:')) parsed.entityKeys.push(ref.slice(7));
   }
   return parsed;
@@ -101,6 +103,15 @@ export async function loadArtifactStates(db: PrimaryDatabase, projectId: bigint,
   if (parsed.chapters.length > 0) {
     const rows = await db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), inArray(schema.briefs.chapter, parsed.chapters)) });
     for (const row of rows) states[`chapter:${row.chapter}`] = { exists: true, revision: row.revision, contentHash: row.contentHash };
+  }
+
+  // Drafts store no contentHash — hash the refinable prose fields at read time (like entities below).
+  if (parsed.drafts.length > 0) {
+    const rows = await db.query.drafts.findMany({ where: and(eq(schema.drafts.projectId, projectId), inArray(schema.drafts.chapter, parsed.drafts)) });
+    for (const row of rows) {
+      const contentHash = computeContentHash({ title: row.title, body: row.body, summary: row.summary });
+      states[`draft:${row.chapter}`] = { exists: true, revision: row.revision, contentHash };
+    }
   }
 
   // Entities carry no revision column — their state is a content hash over the refinable fields.
