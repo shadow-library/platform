@@ -25,3 +25,6 @@ npm-debug.log
 .env
 .env.*
 !.env.example
+
+# Local runtime data & working docs (not source)
+/images/
