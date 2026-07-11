@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -25,6 +25,7 @@ export namespace Refinement {
   export type ChatScope = InferEnum<typeof chatScope>;
   export type ChatSessionStatus = InferEnum<typeof chatSessionStatus>;
   export type ChatMessageRole = InferEnum<typeof chatMessageRole>;
+  export type ChatMode = InferEnum<typeof chatMode>;
   export type Kind = InferEnum<typeof refinementKind>;
   export type ProposalStatus = InferEnum<typeof refinementProposalStatus>;
 }
@@ -33,11 +34,12 @@ export namespace Refinement {
  * Declaring the constants
  */
 
-export const chatScope = pgEnum('chat_scope', ['novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief']);
+export const chatScope = pgEnum('chat_scope', ['project', 'novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief']);
 export const chatSessionStatus = pgEnum('chat_session_status', ['active', 'archived']);
 export const chatMessageRole = pgEnum('chat_message_role', ['user', 'assistant']);
-export const refinementKind = pgEnum('refinement_kind', ['chat', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract']);
-export const refinementProposalStatus = pgEnum('refinement_proposal_status', ['pending', 'applied', 'discarded', 'superseded', 'conflicted']);
+export const chatMode = pgEnum('chat_mode', ['manual', 'auto']);
+export const refinementKind = pgEnum('refinement_kind', ['chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract']);
+export const refinementProposalStatus = pgEnum('refinement_proposal_status', ['pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted']);
 
 export const chatSessions = pgTable(
   'chat_sessions',
@@ -50,6 +52,9 @@ export const chatSessions = pgTable(
     scopeRef: varchar('scope_ref'),
     title: varchar('title', { length: 500 }),
     status: chatSessionStatus('status').notNull().default('active'),
+    // How this session lands its change-sets: 'manual' stages proposals for per-op review, 'auto'
+    // applies them in-turn. Switchable mid-conversation; provenance lives on each proposal (autoApplied).
+    mode: chatMode('mode').notNull().default('manual'),
     // Per-session model override (null → the project/profile default). Lets one chat run on a different
     // provider/model without changing the project defaults; new sessions inherit the default.
     modelProvider: varchar('model_provider'),
@@ -106,9 +111,20 @@ export const refinementProposals = pgTable(
     summary: text('summary'),
     changeSet: jsonb('change_set').notNull(),
     baseline: jsonb('baseline').notNull(),
+    // True when an auto-mode chat turn applied this proposal in the same request — provenance for the
+    // change history; manual applies (even of auto-session proposals after a conflict) stay false.
+    autoApplied: boolean('auto_applied').notNull().default(false),
+    // Per-op dispositions recorded at apply time: [{ index, status: applied|declined|failed, error?, result? }].
+    // Cherry-picked declines and post-commit action outcomes both land here (chat-hub design §5.1/§5.3).
+    opResults: jsonb('op_results'),
+    // The ChangeOp[] that undoes the applied content ops (reverse order) and the artifact states right
+    // after apply — together they make the proposal revertible under a strict conflict guard (§5.2/§5.4).
+    inverseOps: jsonb('inverse_ops'),
+    postState: jsonb('post_state'),
     model: varchar('model'),
     runId: varchar('run_id'),
     appliedAt: timestamp('applied_at'),
+    revertedAt: timestamp('reverted_at'),
     error: jsonb('error'),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),

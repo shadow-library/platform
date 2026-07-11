@@ -122,6 +122,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly CHT_001 = new AppErrorCode('CHT_001', ErrorType.NOT_FOUND, 'Chat session not found');
   static readonly CHT_002 = new AppErrorCode('CHT_002', ErrorType.CLIENT_ERROR, 'Chat session is archived');
   static readonly CHT_003 = new AppErrorCode('CHT_003', ErrorType.CLIENT_ERROR, 'Invalid chat scope reference');
+  static readonly CHT_004 = new AppErrorCode('CHT_004', ErrorType.CLIENT_ERROR, 'Lookup budget exhausted — the turn hit its declared-lookup round cap');
+  static readonly CHT_005 = new AppErrorCode('CHT_005', ErrorType.CLIENT_ERROR, 'Invalid chat session mode');
 
   /*!
    * Refinement Proposal Errors
@@ -135,6 +137,12 @@ export class AppErrorCode extends ServerErrorCode {
   );
   static readonly RFN_004 = new AppErrorCode('RFN_004', ErrorType.CLIENT_ERROR, 'Change-set operation not allowed for this scope');
   static readonly RFN_005 = new AppErrorCode('RFN_005', ErrorType.CLIENT_ERROR, 'Finalized chapters are immutable — briefs at or before the story cursor cannot be modified');
+  static readonly RFN_006 = new AppErrorCode('RFN_006', ErrorType.CONFLICT, 'Revert conflict — an artifact changed since this proposal was applied');
+  static readonly RFN_007 = new AppErrorCode('RFN_007', ErrorType.CLIENT_ERROR, 'Proposal is not revertible — it is not applied, has no content ops, or was already reverted');
+  static readonly RFN_008 = new AppErrorCode('RFN_008', ErrorType.SERVER_ERROR, 'Action execution failed — see the per-op results on the proposal');
+  static readonly RFN_009 = new AppErrorCode('RFN_009', ErrorType.CLIENT_ERROR, 'Finalize is never auto-applied — apply the proposal manually to finalize chapters');
+  static readonly RFN_010 = new AppErrorCode('RFN_010', ErrorType.CLIENT_ERROR, 'Draft is final or the chapter is already finalized — prose cannot be modified');
+  static readonly RFN_011 = new AppErrorCode('RFN_011', ErrorType.CLIENT_ERROR, 'Invalid op selection — indexes must reference ops in the change-set and select at least one');
 
   /*!
    * Premise Errors

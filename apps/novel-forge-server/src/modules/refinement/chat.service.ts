@@ -69,6 +69,7 @@ const KEEP_VERBATIM_TURNS = 6;
 // work, so it defaults to the model the author configured for arc planning in the project settings —
 // not to a one-size-fits-all chat model. See resolveSessionModel for the full resolution ladder.
 export const SCOPE_CHAT_ROLE: Record<Refinement.ChatScope, AiRole> = {
+  project: 'chat',
   novel: 'chat',
   volume_plan: 'plan',
   volume: 'plan',
@@ -104,6 +105,7 @@ export class ChatService {
   private async validateScopeRef(projectId: bigint, scopeType: Refinement.ChatScope, scopeRef: string | null): Promise<string | null> {
     const value = scopeRef?.includes(':') ? (scopeRef.split(':')[1] ?? '') : '';
     switch (scopeType) {
+      case 'project':
       case 'novel':
       case 'volume_plan':
         return null;

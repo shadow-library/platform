@@ -59,7 +59,7 @@ function vectorType(dimensions: number) {
 export const workflowRunStatus = pgEnum('workflow_run_status', ['running', 'completed', 'awaiting_review', 'failed', 'cancelled']);
 export const modelCallStatus = pgEnum('model_call_status', ['ok', 'parse_error', 'repaired', 'refused', 'transport_error', 'timeout']);
 export const toolCallStatus = pgEnum('tool_call_status', ['ok', 'invalid_args', 'handler_error', 'budget_exceeded']);
-export const draftRevisionSource = pgEnum('draft_revision_source', ['generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited']);
+export const draftRevisionSource = pgEnum('draft_revision_source', ['generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited']);
 export const userFeedbackArtifactType = pgEnum('user_feedback_artifact_type', [
   'draft',
   'continuity_proposal',

@@ -15,14 +15,15 @@ CREATE TYPE "public"."draft_review_status" AS ENUM('generating', 'needs_review',
 CREATE TYPE "public"."draft_status" AS ENUM('draft', 'final');--> statement-breakpoint
 CREATE TYPE "public"."judge_verdict" AS ENUM('consistent', 'contradiction');--> statement-breakpoint
 CREATE TYPE "public"."chat_message_role" AS ENUM('user', 'assistant');--> statement-breakpoint
-CREATE TYPE "public"."chat_scope" AS ENUM('novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief');--> statement-breakpoint
+CREATE TYPE "public"."chat_mode" AS ENUM('manual', 'auto');--> statement-breakpoint
+CREATE TYPE "public"."chat_scope" AS ENUM('project', 'novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief');--> statement-breakpoint
 CREATE TYPE "public"."chat_session_status" AS ENUM('active', 'archived');--> statement-breakpoint
-CREATE TYPE "public"."refinement_kind" AS ENUM('chat', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract');--> statement-breakpoint
-CREATE TYPE "public"."refinement_proposal_status" AS ENUM('pending', 'applied', 'discarded', 'superseded', 'conflicted');--> statement-breakpoint
+CREATE TYPE "public"."refinement_kind" AS ENUM('chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract');--> statement-breakpoint
+CREATE TYPE "public"."refinement_proposal_status" AS ENUM('pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted');--> statement-breakpoint
 CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('pending', 'in_progress', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."validation_scope" AS ENUM('novel', 'chapter');--> statement-breakpoint
-CREATE TYPE "public"."draft_revision_source" AS ENUM('generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited');--> statement-breakpoint
+CREATE TYPE "public"."draft_revision_source" AS ENUM('generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited');--> statement-breakpoint
 CREATE TYPE "public"."model_call_status" AS ENUM('ok', 'parse_error', 'repaired', 'refused', 'transport_error', 'timeout');--> statement-breakpoint
 CREATE TYPE "public"."tool_call_status" AS ENUM('ok', 'invalid_args', 'handler_error', 'budget_exceeded');--> statement-breakpoint
 CREATE TYPE "public"."user_feedback_artifact_type" AS ENUM('draft', 'continuity_proposal', 'volume', 'bible_document', 'validation_report', 'refinement_proposal');--> statement-breakpoint
@@ -352,6 +353,7 @@ CREATE TABLE "chat_sessions" (
 	"scope_ref" varchar,
 	"title" varchar(500),
 	"status" "chat_session_status" DEFAULT 'active' NOT NULL,
+	"mode" "chat_mode" DEFAULT 'manual' NOT NULL,
 	"model_provider" varchar,
 	"model_id" varchar,
 	"summary" text,
@@ -373,9 +375,14 @@ CREATE TABLE "refinement_proposals" (
 	"summary" text,
 	"change_set" jsonb NOT NULL,
 	"baseline" jsonb NOT NULL,
+	"auto_applied" boolean DEFAULT false NOT NULL,
+	"op_results" jsonb,
+	"inverse_ops" jsonb,
+	"post_state" jsonb,
 	"model" varchar,
 	"run_id" varchar,
 	"applied_at" timestamp,
+	"reverted_at" timestamp,
 	"error" jsonb,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL

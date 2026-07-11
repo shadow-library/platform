@@ -30,6 +30,22 @@ export interface ScopePlaybook {
 // narrows both what good looks like for the scoped artifact and the op vocabulary the model may
 // propose — smaller vocabularies keep weak local models inside the repair ladder's reach.
 export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
+  project: {
+    guidance:
+      "Scope: the entire project — you are the showrunner's right hand with full visibility and full editing power. Judge everything as a serialized web novel AND as a production pipeline: is the canon coherent, is the plan escalating, are drafts moving toward approval, is anything stale or blocked? You may reshape the premise, bible documents, the cast, volumes, arcs, chapter briefs, and draft prose. Prefer the smallest complete change that achieves the author's intent — your change-sets apply to real canon, so propose whole-field values and nothing speculative.",
+    allowedOps: [
+      'premise.update',
+      'bible_document.upsert',
+      'bible_document.remove',
+      'volume.upsert',
+      'volume.remove',
+      'arc.upsert',
+      'arc.remove',
+      'brief.update',
+      'entity.upsert',
+      'entity.remove',
+    ],
+  },
   novel: {
     guidance:
       'Scope: the whole novel. Judge everything as a serialized web novel: is the hook strong enough to survive chapter one? Are the stakes personal and escalating? Does the progression system give readers a visible ladder to anticipate? Does the premise leave room for hundreds of chapters without going stale? Push the author on reader-promise, update cadence assumptions, and genre conventions. You may reshape the premise, bible documents, the volume plan, and the cast — characters, factions, locations, and the other catalog entities.',

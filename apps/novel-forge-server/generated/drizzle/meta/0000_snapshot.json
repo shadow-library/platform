@@ -1,5 +1,5 @@
 {
-  "id": "8c728bd3-8720-4028-85f3-ca1875f2273f",
+  "id": "21c91634-80d9-4080-b28c-d936dfed698d",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2432,6 +2432,14 @@
           "notNull": true,
           "default": "'active'"
         },
+        "mode": {
+          "name": "mode",
+          "type": "chat_mode",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
         "model_provider": {
           "name": "model_provider",
           "type": "varchar",
@@ -2623,6 +2631,31 @@
           "primaryKey": false,
           "notNull": true
         },
+        "auto_applied": {
+          "name": "auto_applied",
+          "type": "boolean",
+          "primaryKey": false,
+          "notNull": true,
+          "default": false
+        },
+        "op_results": {
+          "name": "op_results",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "inverse_ops": {
+          "name": "inverse_ops",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "post_state": {
+          "name": "post_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
         "model": {
           "name": "model",
           "type": "varchar",
@@ -2637,6 +2670,12 @@
         },
         "applied_at": {
           "name": "applied_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reverted_at": {
+          "name": "reverted_at",
           "type": "timestamp",
           "primaryKey": false,
           "notNull": false
@@ -4337,10 +4376,19 @@
         "assistant"
       ]
     },
+    "public.chat_mode": {
+      "name": "chat_mode",
+      "schema": "public",
+      "values": [
+        "manual",
+        "auto"
+      ]
+    },
     "public.chat_scope": {
       "name": "chat_scope",
       "schema": "public",
       "values": [
+        "project",
         "novel",
         "bible_document",
         "volume_plan",
@@ -4363,6 +4411,7 @@
       "schema": "public",
       "values": [
         "chat",
+        "hub",
         "premise_enhance",
         "bible_audit",
         "arc_plan",
@@ -4377,7 +4426,8 @@
         "applied",
         "discarded",
         "superseded",
-        "conflicted"
+        "conflicted",
+        "reverted"
       ]
     },
     "public.job_kind": {
@@ -4419,7 +4469,8 @@
         "rewritten",
         "revised",
         "imported",
-        "hand_edited"
+        "hand_edited",
+        "chat_edited"
       ]
     },
     "public.model_call_status": {
