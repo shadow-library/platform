@@ -7,5 +7,7 @@ export * from './admin-role.dto';
 export * from './admin-user.controller';
 export * from './admin-user.dto';
 export * from './admin-user.service';
+export * from './admin-webhook.controller';
+export * from './admin-webhook.dto';
 export * from './admin.constants';
 export * from './admin.module';

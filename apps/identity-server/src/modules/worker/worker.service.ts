@@ -10,6 +10,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { BackChannelLogoutService } from '@server/modules/auth/token';
 import { NotificationService } from '@server/modules/infrastructure/notification';
+import { WebhookDeliveryService } from '@server/modules/infrastructure/webhook';
 
 import { MaintenanceService } from './maintenance.service';
 
@@ -41,6 +42,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
   constructor(
     private readonly notificationService: NotificationService,
     private readonly backChannelLogoutService: BackChannelLogoutService,
+    private readonly webhookDeliveryService: WebhookDeliveryService,
     private readonly maintenanceService: MaintenanceService,
   ) {}
 
@@ -48,6 +50,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     /** Deliveries interrupted by the previous worker's crash re-enter the claimable pool first. */
     await this.notificationService.recoverStuckDeliveries();
     await this.backChannelLogoutService.recoverStuckDeliveries();
+    await this.webhookDeliveryService.recoverStuckDeliveries();
     this.timer = setInterval(() => void this.tick(), this.intervalMs);
     this.logger.info('Worker started', { intervalMs: this.intervalMs });
   }
@@ -77,6 +80,8 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
       if (sent > 0) this.logger.debug('Dispatched notifications', { sent });
       const logouts = await this.backChannelLogoutService.dispatchPending();
       if (logouts > 0) this.logger.debug('Dispatched back-channel logouts', { logouts });
+      const webhooks = await this.webhookDeliveryService.dispatchPending();
+      if (webhooks > 0) this.logger.debug('Dispatched webhooks', { webhooks });
       if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) await this.maintenanceService.purgeStaleContactClaims();
     } catch (error) {
       this.logger.error('Worker tick failed', { error });

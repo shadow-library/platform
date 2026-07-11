@@ -13,6 +13,7 @@ import { asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
  */
 import { APP_NAME } from '@server/constants';
 import { AuditEvent, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { WebhookService } from '@server/modules/infrastructure/webhook';
 
 /**
  * Defining types
@@ -59,7 +60,10 @@ export class AuditService {
   private readonly logger = Logger.getLogger(APP_NAME, AuditService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    private readonly webhookService: WebhookService,
+  ) {
     this.db = databaseService.getPostgresClient();
   }
 
@@ -104,6 +108,8 @@ export class AuditService {
         .values({ ...record, prevHash, hash })
         .returning();
       assert(inserted, 'Audit event insertion failed');
+      /** Same transaction: an audit event and its webhook deliveries commit or vanish together. */
+      await this.webhookService.fanOut(inserted, tx);
       return inserted;
     });
   }

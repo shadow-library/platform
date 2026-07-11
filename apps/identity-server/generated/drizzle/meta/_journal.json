@@ -169,6 +169,13 @@
       "when": 1783774514517,
       "tag": "0023_organisation_domains",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1783774831020,
+      "tag": "0024_webhooks",
+      "breakpoints": true
     }
   ]
 }

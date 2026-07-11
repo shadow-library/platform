@@ -14,6 +14,7 @@ import { AuthzModule } from '@server/modules/authz';
 import { OrganisationModule } from '@server/modules/identity/organisation';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
+import { WebhookModule } from '@server/modules/infrastructure/webhook';
 import { ApplicationModule } from '@server/modules/system/application';
 
 import { AdminAccessService } from './admin-access.service';
@@ -22,6 +23,7 @@ import { AdminResourceController } from './admin-resource.controller';
 import { AdminRoleController } from './admin-role.controller';
 import { AdminUserController } from './admin-user.controller';
 import { AdminUserService } from './admin-user.service';
+import { AdminWebhookController } from './admin-webhook.controller';
 
 /**
  * Defining types
@@ -32,8 +34,8 @@ import { AdminUserService } from './admin-user.service';
  */
 
 @Module({
-  imports: [DatabaseModule, SessionModule, AuthzModule, OrganisationModule, TokenModule, MfaModule, AuditModule, OAuthModule, ApplicationModule],
-  controllers: [AdminUserController, AdminClientController, AdminResourceController, AdminRoleController],
+  imports: [DatabaseModule, SessionModule, AuthzModule, OrganisationModule, TokenModule, MfaModule, AuditModule, OAuthModule, ApplicationModule, WebhookModule],
+  controllers: [AdminUserController, AdminClientController, AdminResourceController, AdminRoleController, AdminWebhookController],
   providers: [AdminAccessService, AdminUserService],
   exports: [AdminAccessService, AdminUserService],
 })

@@ -30,6 +30,7 @@ export const ADMIN_PERMISSIONS = {
   clientsManage: 'iam:clients:manage',
   rolesManage: 'iam:roles:manage',
   auditRead: 'iam:audit:read',
+  webhooksManage: 'iam:webhooks:manage',
   appRolesManage: 'app:roles:manage',
 } as const;
 

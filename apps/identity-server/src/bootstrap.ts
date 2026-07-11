@@ -29,6 +29,7 @@ declare module '@shadow-library/common' {
     'security.master-encryption-key': string;
     'rate-limit.enabled': boolean;
     'rate-limit.ip-allowlist': string;
+    'webhooks.allow-insecure-targets': boolean;
 
     /** Notification service (pulse-server) */
     'notification.base-url': string;
@@ -72,6 +73,9 @@ Config.load('oauth.login-url', { envKey: 'OAUTH_LOGIN_URL', defaultValue: 'https
 
 Config.load('rate-limit.enabled', { envKey: 'RATE_LIMIT_ENABLED', defaultValue: 'true', validateType: 'boolean' });
 Config.load('rate-limit.ip-allowlist', { envKey: 'RATE_LIMIT_IP_ALLOWLIST', defaultValue: '' });
+
+/** Relaxes the webhook SSRF guard (https-only, public addresses) for local development and tests. */
+Config.load('webhooks.allow-insecure-targets', { envKey: 'WEBHOOKS_ALLOW_INSECURE_TARGETS', defaultValue: 'false', validateType: 'boolean' });
 
 Config.load('ui.public-dir', { envKey: 'UI_PUBLIC_DIR', defaultValue: `${process.cwd()}/public` });
 

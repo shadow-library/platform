@@ -123,6 +123,17 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_010 = new AppErrorCode('ORG_010', ErrorType.NOT_FOUND, 'Domain not found');
 
   /**
+   * Webhook Error Codes
+   */
+
+  /** The webhook subscription does not exist */
+  static readonly WHK_001 = new AppErrorCode('WHK_001', ErrorType.NOT_FOUND, 'Webhook subscription not found');
+  /** The target URL is not a public https endpoint (SSRF guard) */
+  static readonly WHK_002 = new AppErrorCode('WHK_002', ErrorType.VALIDATION_ERROR, 'Webhook target must be a public https url', 400);
+  /** The delivery does not exist under this subscription */
+  static readonly WHK_003 = new AppErrorCode('WHK_003', ErrorType.NOT_FOUND, 'Webhook delivery not found');
+
+  /**
    * OAuth / OIDC Error Codes (mapped to RFC 6749 error identifiers)
    */
 

@@ -11,3 +11,4 @@ export * from './refresh-tokens.schema';
 export * from './organisations.schema';
 export * from './applications.schema';
 export * from './users.schema';
+export * from './webhooks.schema';

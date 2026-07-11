@@ -34,6 +34,7 @@ const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [ADMIN_PERMISSIONS.clientsManage]: 'Register and manage OAuth clients, resources and scopes',
   [ADMIN_PERMISSIONS.rolesManage]: 'Manage roles, permissions and assignments platform-wide',
   [ADMIN_PERMISSIONS.auditRead]: 'Read audit trails',
+  [ADMIN_PERMISSIONS.webhooksManage]: 'Manage webhook subscriptions and deliveries',
   [ADMIN_PERMISSIONS.appRolesManage]: 'Manage roles and assignments of the owning application only',
 };
 
