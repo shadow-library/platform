@@ -17,6 +17,8 @@ import styles from './ImageUpload.module.css';
  */
 type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 const ACCEPTED: UploadMime[] = ['image/png', 'image/jpeg', 'image/webp'];
+// Keep the base64 body under the server's 12MB limit and give oversized files a clear message.
+const MAX_BYTES = 8 * 1024 * 1024;
 
 interface ImageUploadProps {
   src?: string;
@@ -37,6 +39,10 @@ export function ImageUpload({ src, alt, uploading, className, placeholder, onUpl
     if (!file) return;
     if (!ACCEPTED.includes(file.type as UploadMime)) {
       toast.danger('Use a PNG, JPEG, or WebP image');
+      return;
+    }
+    if (file.size > MAX_BYTES) {
+      toast.danger('Image is too large — pick one under 8 MB');
       return;
     }
     const reader = new FileReader();
