@@ -1,32 +1,41 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, Input, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
-import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
+import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
 
 /**
  * Importing user defined modules
  */
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
-import { PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { PaneError, PaneLoader, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
+  type ChangeItemResponse,
   type ChatScope,
   type ChatSessionResponse,
+  useApplyProposalMutation,
   useChatMessagesQuery,
   useChatTurnMutation,
   useCreateChatSessionMutation,
+  useDeleteChatSessionMutation,
+  useDiscardProposalMutation,
   useListArcsQuery,
   useListBibleDocsQuery,
+  useListChangesQuery,
   useListChatSessionsQuery,
   useListVolumesQuery,
-  useDeleteChatSessionMutation,
+  useProposalQuery,
+  useRevertProposalMutation,
+  useRollbackMutation,
   useSetSessionStatusMutation,
+  useUpdateChatSessionMutation,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
+import { opLabel } from './proposals';
 
 export const Route = createFileRoute('/novels/$novelId/chat')({
   component: ChatScreen,
@@ -39,6 +48,7 @@ interface ScopeOption {
 }
 
 const SCOPE_OPTIONS: ScopeOption[] = [
+  { value: 'project', label: 'Control hub', hint: 'everything — canon, prose, and the pipeline itself' },
   { value: 'novel', label: 'Whole novel', hint: 'premise, volume plan, and the full catalog' },
   { value: 'volume_plan', label: 'Volume plan', hint: 'the full multi-volume structure' },
   { value: 'volume', label: 'A volume', hint: 'one volume and its arcs' },
@@ -48,9 +58,17 @@ const SCOPE_OPTIONS: ScopeOption[] = [
   { value: 'bible_document', label: 'A bible document', hint: 'one Story Bible document' },
 ];
 
+const OP_RESULT_INTENT: Record<string, ChipIntent> = {
+  applied: 'success',
+  declined: 'neutral',
+  failed: 'danger',
+  pending: 'warning',
+};
+
 /**
  * The new-chat dialog: the author picks the scope the chat reasons over (and the concrete volume /
  * arc / chapter / document when the scope needs one) so the backend assembles exactly that context.
+ * The Control hub scope sees everything and can also run the pipeline; its mode picks how changes land.
  */
 interface NewChatDialogProps {
   novelId: string;
@@ -61,7 +79,8 @@ interface NewChatDialogProps {
 
 function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialogProps): React.JSX.Element {
   const createSession = useCreateChatSessionMutation(novelId);
-  const [scope, setScope] = useState<ChatScope>('novel');
+  const [scope, setScope] = useState<ChatScope>('project');
+  const [mode, setMode] = useState<'manual' | 'auto'>('manual');
   const [volumeKey, setVolumeKey] = useState('');
   const [arcKey, setArcKey] = useState('');
   const [chapter, setChapter] = useState('');
@@ -81,7 +100,8 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
   );
 
   const reset = (): void => {
-    setScope('novel');
+    setScope('project');
+    setMode('manual');
     setVolumeKey('');
     setArcKey('');
     setChapter('');
@@ -96,7 +116,7 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
     if (scope === 'bible_document') return doc ? `doc:${doc}` : undefined;
     return undefined;
   })();
-  const refRequired = scope !== 'novel' && scope !== 'volume_plan';
+  const refRequired = scope !== 'project' && scope !== 'novel' && scope !== 'volume_plan';
   const canCreate = !refRequired || Boolean(scopeRef);
 
   const defaultTitle = ((): string => {
@@ -105,13 +125,14 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
     if (scope === 'brief') return chapter ? `Chapter ${chapter}` : '';
     if (scope === 'bible_document') return doc;
     if (scope === 'volume_plan') return 'Volume plan';
-    return 'Novel chat';
+    if (scope === 'novel') return 'Novel chat';
+    return 'Control hub';
   })();
 
   const submit = (): void => {
     if (!canCreate) return;
     createSession.mutate(
-      { scopeType: scope, scopeRef, title: title.trim() || defaultTitle || undefined },
+      { scopeType: scope, scopeRef, title: title.trim() || defaultTitle || undefined, mode },
       {
         onSuccess: session => {
           onOpenChange(false);
@@ -132,7 +153,7 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
       }}
     >
       <Dialog.Content size="md">
-        <Dialog.Header title="New refinement chat" description="Pick what the chat should reason over — that scope becomes its context." />
+        <Dialog.Header title="New chat" description="Pick what the chat should reason over — that scope becomes its context." />
         <Dialog.Body>
           <div className={styles.dialogForm}>
             <FormField label="Scope" helper={SCOPE_OPTIONS.find(o => o.value === scope)?.hint}>
@@ -152,6 +173,12 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
                   </Select.Item>
                 ))}
               </Select>
+            </FormField>
+            <FormField label="Mode" helper={mode === 'auto' ? 'Changes apply immediately — everything stays revertible from History' : 'Every change waits for your per-op review'}>
+              <SegmentedControl value={mode} onValueChange={v => setMode(v as 'manual' | 'auto')} size="sm">
+                <SegmentedControl.Item value="manual">Manual review</SegmentedControl.Item>
+                <SegmentedControl.Item value="auto">Auto apply</SegmentedControl.Item>
+              </SegmentedControl>
             </FormField>
             {needsVolume && (
               <FormField label="Volume" required>
@@ -221,19 +248,241 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
   );
 }
 
+/**
+ * The inline review card under an assistant message that staged a change-set: per-op accept/decline
+ * while pending, per-op results after apply, and a revert for applied changes. This is the manual
+ * mode loop and the auto-mode receipt in one component.
+ */
+interface TurnProposalCardProps {
+  novelId: string;
+  proposalId: string;
+}
+
+function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React.JSX.Element | null {
+  const proposalQuery = useProposalQuery(novelId, proposalId);
+  const apply = useApplyProposalMutation(novelId);
+  const discard = useDiscardProposalMutation(novelId);
+  const revert = useRevertProposalMutation(novelId);
+  const [declined, setDeclined] = useState<Set<number>>(new Set());
+  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+
+  const proposal = proposalQuery.data;
+  if (proposalQuery.isLoading) return <Spinner size="sm" />;
+  if (!proposal) return null;
+
+  const isPending = proposal.status === 'pending';
+  const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
+  const revertible = proposal.status === 'applied';
+
+  const toggle = (set: Set<number>, index: number, update: (next: Set<number>) => void): void => {
+    const next = new Set(set);
+    if (next.has(index)) next.delete(index);
+    else next.add(index);
+    update(next);
+  };
+
+  const doApply = (): void => {
+    const selected = proposal.changeSet.map((_, i) => i).filter(i => !declined.has(i));
+    if (selected.length === 0) return void toast.danger('Select at least one operation to apply');
+    const opIndexes = selected.length === proposal.changeSet.length ? undefined : selected;
+    apply.mutate(
+      { proposalId: proposal.id, opIndexes },
+      {
+        onSuccess: r => {
+          const failed = r.opResults.filter(o => o.status === 'failed');
+          if (failed.length > 0) toast.danger(`Applied with ${failed.length} failed action(s)`);
+          else toast.success('Changes applied to canon');
+        },
+        onError: err => toast.danger(err.message),
+      },
+    );
+  };
+
+  return (
+    <div className={styles.turnCard} data-status={proposal.status}>
+      <div className={styles.turnCardHead}>
+        <ProposalsIcon size={14} />
+        <span className={styles.turnCardTitle}>
+          {proposal.changeSet.length} change{proposal.changeSet.length === 1 ? '' : 's'}
+        </span>
+        <StatusChip intent={proposal.status === 'applied' ? 'success' : proposal.status === 'pending' ? 'warning' : proposal.status === 'conflicted' ? 'danger' : 'neutral'}>
+          {proposal.status}
+        </StatusChip>
+        {proposal.autoApplied && <StatusChip intent="info">auto</StatusChip>}
+      </div>
+
+      <div className={styles.turnOps}>
+        {proposal.changeSet.map((op, i) => {
+          const result = opResults.find(r => r.index === i);
+          const isAction = String(op.op).startsWith('action.');
+          return (
+            <div key={i} className={styles.turnOp} data-declined={declined.has(i)}>
+              <div className={styles.turnOpRow}>
+                {isPending && <Checkbox checked={!declined.has(i)} onCheckedChange={() => toggle(declined, i, setDeclined)} aria-label={`include ${opLabel(op)}`} />}
+                <button className={styles.turnOpLabel} onClick={() => toggle(expanded, i, setExpanded)}>
+                  {opLabel(op)}
+                </button>
+                {isAction && <StatusChip intent="info">action</StatusChip>}
+                <div className={styles.spacer} />
+                {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
+              </div>
+              {expanded.has(i) && <pre className={styles.turnOpJson}>{JSON.stringify(op, null, 2)}</pre>}
+              {result?.error && <div className={styles.turnOpError}>{result.error}</div>}
+              {result?.result?.summary !== undefined && <div className={styles.turnOpSummary}>{String(result.result.summary)}</div>}
+            </div>
+          );
+        })}
+      </div>
+
+      {proposal.status === 'conflicted' && <div className={styles.turnCardNote}>The canon moved on since this was drafted — ask again for a fresh change-set.</div>}
+      {(isPending || revertible) && (
+        <div className={styles.turnCardActions}>
+          {isPending && (
+            <>
+              <Button size="sm" variant="primary" loading={apply.isPending} onClick={doApply}>
+                {declined.size > 0 ? `Apply ${proposal.changeSet.length - declined.size} selected` : 'Apply'}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                loading={discard.isPending}
+                onClick={() => discard.mutate(proposal.id, { onSuccess: () => toast.success('Declined'), onError: err => toast.danger(err.message) })}
+              >
+                Decline all
+              </Button>
+            </>
+          )}
+          {revertible && (
+            <Button
+              size="sm"
+              variant="danger"
+              loading={revert.isPending}
+              onClick={() =>
+                revert.mutate(proposal.id, {
+                  onSuccess: r => toast.success(`Reverted ${r.reverted.length} artifact(s)`),
+                  onError: err => toast.danger(err.message),
+                })
+              }
+            >
+              Revert
+            </Button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The project-wide change history: every applied/reverted change with per-change revert and rollback-to-here. */
+interface HistoryDialogProps {
+  novelId: string;
+  open: boolean;
+  onOpenChange: (o: boolean) => void;
+}
+
+function HistoryDialog({ novelId, open, onOpenChange }: HistoryDialogProps): React.JSX.Element {
+  const changesQuery = useListChangesQuery(novelId, open);
+  const revert = useRevertProposalMutation(novelId);
+  const rollback = useRollbackMutation(novelId);
+  const [rollbackTarget, setRollbackTarget] = useState<ChangeItemResponse | undefined>();
+
+  const changes = changesQuery.data?.items ?? [];
+
+  const doRevert = (change: ChangeItemResponse): void => {
+    revert.mutate(change.id, {
+      onSuccess: r => toast.success(`Reverted ${r.reverted.length} artifact(s)`),
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  const doRollback = (): void => {
+    if (!rollbackTarget) return;
+    rollback.mutate(rollbackTarget.id, {
+      onSuccess: r => {
+        setRollbackTarget(undefined);
+        if (r.stoppedAt) toast.danger(`Rolled back ${r.reverted.length} change(s), then stopped: a later change conflicts`);
+        else toast.success(`Rolled back ${r.reverted.length} change(s)${r.skipped.length > 0 ? ` (${r.skipped.length} action-only skipped)` : ''}`);
+      },
+      onError: err => toast.danger(err.message),
+    });
+  };
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog.Content size="lg">
+          <Dialog.Header title="Change history" description="Everything the chat (and the analysis passes) changed — newest first. Revert one change, or roll the project back to a point." />
+          <Dialog.Body>
+            <div className={styles.historyList}>
+              {changesQuery.isLoading && <PaneLoader />}
+              {changesQuery.error && <PaneError error={changesQuery.error} />}
+              {!changesQuery.isLoading && changes.length === 0 && <div className="nf-emptynote">No applied changes yet.</div>}
+              {changes.map(change => (
+                <div key={change.id} className={styles.historyRow} data-reverted={change.status === 'reverted'}>
+                  <div className={styles.historyRowTop}>
+                    <StatusChip intent={change.status === 'applied' ? 'success' : 'info'}>{change.status}</StatusChip>
+                    <StatusChip intent="neutral">{change.kind}</StatusChip>
+                    {change.autoApplied && <StatusChip intent="info">auto</StatusChip>}
+                    <div className={styles.spacer} />
+                    <span className={styles.historyTime}>{change.appliedAt ? relativeTime(change.appliedAt) : ''}</span>
+                  </div>
+                  <div className={styles.historySummary}>{change.summary?.trim() || change.refs.join(', ') || 'pipeline actions'}</div>
+                  {change.refs.length > 0 && <div className={styles.historyRefs}>{change.refs.join(' · ')}</div>}
+                  <div className={styles.historyActions}>
+                    {change.revertible && (
+                      <Button size="sm" variant="ghost" loading={revert.isPending} onClick={() => doRevert(change)}>
+                        Revert
+                      </Button>
+                    )}
+                    {change.status === 'applied' && (
+                      <Button size="sm" variant="ghost" onClick={() => setRollbackTarget(change)}>
+                        Roll back to here
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog>
+
+      <Dialog open={Boolean(rollbackTarget)} onOpenChange={o => !o && setRollbackTarget(undefined)}>
+        <Dialog.Content size="sm">
+          <Dialog.Header
+            title="Roll back to this point?"
+            description="Every change applied after this one is reverted, newest first — across all chats. Action side effects (generated drafts, runs) are not undone."
+          />
+          <Dialog.Footer>
+            <Dialog.Close asChild>
+              <Button variant="ghost">Cancel</Button>
+            </Dialog.Close>
+            <Button variant="danger" loading={rollback.isPending} onClick={doRollback}>
+              Roll back
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
+    </>
+  );
+}
+
 interface ChatThreadProps {
   novelId: string;
   session: ChatSessionResponse;
+  onOpenHistory: () => void;
 }
 
-function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
-  const navigate = useNavigate();
+function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React.JSX.Element {
   const messagesQuery = useChatMessagesQuery(novelId, session.id);
   const turn = useChatTurnMutation(novelId, session.id);
+  const updateSession = useUpdateChatSessionMutation(novelId);
   const [input, setInput] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   const messages = messagesQuery.data?.messages ?? [];
+  const isAuto = session.mode === 'auto';
+  const isHub = session.scopeType === 'project';
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -245,7 +494,9 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
     setInput('');
     turn.mutate(content, {
       onSuccess: result => {
-        if (result.proposal) toast.success('Forge drafted a proposal — review it below the reply.');
+        if (result.applied) toast.success('Changes applied — revert anytime from History');
+        else if (result.applyNote) toast.danger(result.applyNote);
+        else if (result.proposal) toast.success('Forge drafted changes — review them below the reply.');
       },
       onError: err => {
         toast.danger(err.message);
@@ -254,15 +505,23 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
     });
   };
 
+  const switchMode = (mode: 'manual' | 'auto'): void => {
+    updateSession.mutate({ sessionId: session.id, mode }, { onError: err => toast.danger(err.message) });
+  };
+
   return (
     <div className={styles.thread}>
       <div className={styles.threadHead}>
-        <StatusChip intent="info">scope: {session.scopeType}</StatusChip>
+        <StatusChip intent="info">{isHub ? 'control hub' : `scope: ${session.scopeType}`}</StatusChip>
         {session.scopeRef && <StatusChip intent="neutral">{session.scopeRef}</StatusChip>}
         <span className={styles.threadTitle}>{session.title ?? 'Untitled chat'}</span>
         <StatusChip intent={session.status === 'active' ? 'success' : 'neutral'} dot>
           {session.status}
         </StatusChip>
+        <div className={styles.spacer} />
+        <Button variant="ghost" size="sm" onClick={onOpenHistory}>
+          History
+        </Button>
       </div>
 
       <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
@@ -270,7 +529,13 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
           {messagesQuery.isLoading && <PaneLoader />}
           {messagesQuery.error && <PaneError error={messagesQuery.error} />}
           {!messagesQuery.isLoading && messages.length === 0 && (
-            <p className={styles.emptyHint}>Ask Forge to change this {session.scopeType}. It drafts a reviewable proposal — canon isn&apos;t edited directly.</p>
+            <p className={styles.emptyHint}>
+              {isHub
+                ? isAuto
+                  ? 'Ask for anything — edits land immediately and every change is revertible from History.'
+                  : 'Ask for anything — content edits, prose rewrites, or pipeline runs. You accept or decline each change.'
+                : `Ask Forge to change this ${session.scopeType}. It drafts a reviewable proposal — canon isn't edited directly.`}
+            </p>
           )}
           {messages.map(m =>
             m.role === 'user' ? (
@@ -285,22 +550,14 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
                 <div className={styles.assistantCol}>
                   <div className={styles.assistantBubble}>{m.content}</div>
                   <MessageModelTag message={m} />
-                  {m.proposalId && (
-                    <button onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })} className={styles.proposalBtn}>
-                      <ProposalsIcon size={15} className={styles.proposalIcon} />
-                      <div className={styles.proposalMain}>
-                        <div className={styles.proposalTitle}>Refinement proposal · pending</div>
-                        <div className={styles.proposalSub}>Review the change-set before it touches canon</div>
-                      </div>
-                    </button>
-                  )}
+                  {m.proposalId && <TurnProposalCard novelId={novelId} proposalId={m.proposalId} />}
                 </div>
               </div>
             ),
           )}
           {turn.isPending && (
             <div className={styles.thinking}>
-              <Spinner size="sm" /> Forge is thinking…
+              <Spinner size="sm" /> {isAuto ? 'Forge is working…' : 'Forge is thinking…'}
             </div>
           )}
         </div>
@@ -311,7 +568,7 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
           <Textarea
             value={input}
             onValueChange={setInput}
-            placeholder={`Ask for a change to this ${session.scopeType}…`}
+            placeholder={isHub ? 'Ask for anything — edits, prose, pipeline runs…' : `Ask for a change to this ${session.scopeType}…`}
             minRows={1}
             autoGrow
             disabled={session.status !== 'active'}
@@ -325,7 +582,11 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
           />
           <div className={styles.composerBar}>
             <ChatModelMenu novelId={novelId} session={session} scopeType={session.scopeType} disabled={session.status !== 'active'} />
-            <span className={styles.hint}>Proposals only — canon isn&apos;t edited directly</span>
+            <SegmentedControl value={session.mode} onValueChange={v => switchMode(v as 'manual' | 'auto')} size="sm" disabled={session.status !== 'active'}>
+              <SegmentedControl.Item value="manual">Manual</SegmentedControl.Item>
+              <SegmentedControl.Item value="auto">Auto</SegmentedControl.Item>
+            </SegmentedControl>
+            <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
             <div className={styles.spacer} />
             <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={turn.isPending} disabled={session.status !== 'active'} onClick={send}>
               Send
@@ -347,6 +608,7 @@ function ChatScreen(): React.JSX.Element {
   const sessions = sessionsQuery.data?.items ?? [];
   const [selectedId, setSelectedId] = useState<string | undefined>();
   const [newChatOpen, setNewChatOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
   useEffect(() => {
@@ -377,8 +639,11 @@ function ChatScreen(): React.JSX.Element {
       <div className="nf-rail">
         <div className="nf-railhead">
           <div className={styles.railTitleRow}>
-            <span className={styles.railTitle}>Refinement chats</span>
+            <span className={styles.railTitle}>Chats</span>
             <div className={styles.spacer} />
+            <Button variant="ghost" size="sm" onClick={() => setHistoryOpen(true)}>
+              History
+            </Button>
             <Button variant="secondary" size="sm" onClick={() => setNewChatOpen(true)}>
               New
             </Button>
@@ -395,7 +660,7 @@ function ChatScreen(): React.JSX.Element {
           {sessionsQuery.isLoading && <PaneLoader />}
           {sessionsQuery.error && <PaneError error={sessionsQuery.error} />}
           {!sessionsQuery.isLoading && sessions.length === 0 && (
-            <div className="nf-emptynote">{statusFilter === 'active' ? 'No chats yet — start one to refine the novel.' : 'No archived chats.'}</div>
+            <div className="nf-emptynote">{statusFilter === 'active' ? 'No chats yet — start one to run the whole novel.' : 'No archived chats.'}</div>
           )}
           {sessions.map(session => (
             <div
@@ -408,7 +673,8 @@ function ChatScreen(): React.JSX.Element {
               data-active={session.id === selectedId}
             >
               <div className={styles.sessionTop}>
-                <StatusChip intent="neutral">{session.scopeType}</StatusChip>
+                <StatusChip intent="neutral">{session.scopeType === 'project' ? 'hub' : session.scopeType}</StatusChip>
+                {session.mode === 'auto' && <StatusChip intent="info">auto</StatusChip>}
                 <div className={styles.spacer} />
                 <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
                 <div className="nf-rowactions">
@@ -430,10 +696,10 @@ function ChatScreen(): React.JSX.Element {
       {/* thread */}
       <div className="nf-detail">
         {selected ? (
-          <ChatThread key={selected.id} novelId={novelId} session={selected} />
+          <ChatThread key={selected.id} novelId={novelId} session={selected} onOpenHistory={() => setHistoryOpen(true)} />
         ) : (
           <div className={styles.threadEmpty}>
-            <p className={styles.emptyText}>Start a refinement chat to talk through changes to your novel.</p>
+            <p className={styles.emptyText}>Start a chat to control and refine your novel — the Control hub can touch everything.</p>
             <Button variant="primary" onClick={() => setNewChatOpen(true)}>
               New chat
             </Button>
@@ -450,6 +716,8 @@ function ChatScreen(): React.JSX.Element {
           setSelectedId(session.id);
         }}
       />
+
+      <HistoryDialog novelId={novelId} open={historyOpen} onOpenChange={setHistoryOpen} />
 
       <Dialog open={Boolean(deleteTarget)} onOpenChange={o => !o && setDeleteTarget(undefined)}>
         <Dialog.Content size="sm">

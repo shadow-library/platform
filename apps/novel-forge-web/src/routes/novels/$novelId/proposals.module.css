@@ -77,8 +77,38 @@
   color: var(--sh-text-secondary);
 }
 
-.op:not(:first-child) {
+.opRow[data-declined='true'] {
+  opacity: 0.45;
+}
+
+.opRow:not(:first-child) {
   border-top: 1px solid var(--sh-border-subtle);
+}
+
+.opHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 16px 0;
+}
+
+.opLabel {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.opError {
+  padding: 0 16px 12px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.opSummary {
+  padding: 0 16px 12px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
 }
 
 .actions {

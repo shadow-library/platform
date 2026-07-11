@@ -35,6 +35,7 @@ import styles from './ChatModel.module.css';
 // The fine-grained role each chat scope maps to (config overrides are stored per role — the settings
 // UI fans a group's choice across its roles, so reading the scope's role reflects the group value).
 const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
+  project: 'chat',
   novel: 'chat',
   volume_plan: 'plan',
   volume: 'plan',
@@ -46,6 +47,7 @@ const SCOPE_CHAT_ROLE: Record<ChatScope, keyof ProjectModelOverrides> = {
 
 // The model group each scope inherits its profile default from ('planning' for every structural scope).
 const SCOPE_GROUP: Record<ChatScope, string> = {
+  project: 'chat',
   novel: 'chat',
   volume_plan: 'planning',
   volume: 'planning',

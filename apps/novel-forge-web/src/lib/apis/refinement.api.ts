@@ -13,11 +13,14 @@ import {
   type ChatSessionResponse,
   type ChatTurnResponse,
   type CreateChatSessionBody,
+  type ListChangesResponse,
   type ListChatMessagesResponse,
   type ListChatSessionResponse,
   type ListProposalResponse,
   type ListProposalsQueryParams,
   type ProposalResponse,
+  type RevertProposalResponse,
+  type RollbackResponse,
 } from './api-types.gen';
 
 /**
@@ -32,6 +35,7 @@ const refinementKeys = {
   proposals: (projectId: string) => ['projects', projectId, 'refinement-proposals'] as const,
   proposalList: (projectId: string, params?: ListProposalsQueryParams) => [...refinementKeys.proposals(projectId), 'list', params] as const,
   proposal: (projectId: string, proposalId: string) => [...refinementKeys.proposals(projectId), proposalId] as const,
+  changes: (projectId: string) => ['projects', projectId, 'changes'] as const,
 };
 
 interface ListSessionsParams {
@@ -56,11 +60,24 @@ interface SessionModelVariables {
   model: string | null;
 }
 
-/** A chat turn touches the session's messages, the session list (last-turn/summary), and any proposal it staged. */
+interface SessionUpdateVariables {
+  sessionId: string;
+  mode?: 'manual' | 'auto';
+  title?: string;
+}
+
+interface ApplyProposalVariables {
+  proposalId: string;
+  // Cherry-pick: apply only these change-set indexes; the rest are recorded as declined. Absent → all.
+  opIndexes?: number[];
+}
+
+/** A chat turn touches the session's messages, the session list (last-turn/summary), any proposal it staged, and — in auto mode — the change history. */
 function invalidateChat(queryClient: ReturnType<typeof useQueryClient>, projectId: string, sessionId: string): void {
   queryClient.invalidateQueries({ queryKey: refinementKeys.messages(projectId, sessionId) });
   queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) });
   queryClient.invalidateQueries({ queryKey: refinementKeys.proposals(projectId) });
+  queryClient.invalidateQueries({ queryKey: refinementKeys.changes(projectId) });
 }
 
 export function useListChatSessionsQuery(projectId: string, params?: ListSessionsParams, enabled = true): UseQueryResult<ListChatSessionResponse, ApiError> {
@@ -130,6 +147,15 @@ export function useUpdateSessionModelMutation(projectId: string): UseMutationRes
   });
 }
 
+/** Flips the manual ⇄ auto mode (or renames) a chat session mid-conversation. */
+export function useUpdateChatSessionMutation(projectId: string): UseMutationResult<ChatSessionResponse, ApiError, SessionUpdateVariables> {
+  const queryClient = useQueryClient();
+  return useMutation<ChatSessionResponse, ApiError, SessionUpdateVariables>({
+    mutationFn: ({ sessionId, ...body }) => APIRequest.patch(`/projects/${projectId}/chat/sessions/${sessionId}`).body(body).execute(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: refinementKeys.sessions(projectId) }),
+  });
+}
+
 export function useListProposalsQuery(projectId: string, params?: ListProposalsQueryParams, enabled = true): UseQueryResult<ListProposalResponse, ApiError> {
   return useQuery<ListProposalResponse, ApiError>({
     queryKey: refinementKeys.proposalList(projectId, params),
@@ -154,10 +180,40 @@ function invalidateProposals(queryClient: ReturnType<typeof useQueryClient>, pro
   queryClient.invalidateQueries({ queryKey: ['projects', projectId] });
 }
 
-export function useApplyProposalMutation(projectId: string): UseMutationResult<ApplyProposalResponse, ApiError, string> {
+export function useApplyProposalMutation(projectId: string): UseMutationResult<ApplyProposalResponse, ApiError, ApplyProposalVariables> {
   const queryClient = useQueryClient();
-  return useMutation<ApplyProposalResponse, ApiError, string>({
-    mutationFn: proposalId => APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/apply`).execute(),
+  return useMutation<ApplyProposalResponse, ApiError, ApplyProposalVariables>({
+    mutationFn: ({ proposalId, opIndexes }) =>
+      APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/apply`)
+        .body(opIndexes ? { opIndexes } : {})
+        .execute(),
+    onSuccess: () => invalidateProposals(queryClient, projectId),
+  });
+}
+
+/** Undoes an applied proposal from its stored inverse ops; 409 when the artifact moved since. */
+export function useRevertProposalMutation(projectId: string): UseMutationResult<RevertProposalResponse, ApiError, string> {
+  const queryClient = useQueryClient();
+  return useMutation<RevertProposalResponse, ApiError, string>({
+    mutationFn: proposalId => APIRequest.post(`/projects/${projectId}/proposals/${proposalId}/revert`).execute(),
+    onSuccess: () => invalidateProposals(queryClient, projectId),
+  });
+}
+
+/** The project-wide change history: every applied/reverted change, newest first, with revertibility. */
+export function useListChangesQuery(projectId: string, enabled = true): UseQueryResult<ListChangesResponse, ApiError> {
+  return useQuery<ListChangesResponse, ApiError>({
+    queryKey: refinementKeys.changes(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/changes`).query({ limit: 100 }).execute(),
+    enabled: enabled && Boolean(projectId),
+  });
+}
+
+/** Reverts every change applied after the anchor, newest first — "roll back to here". */
+export function useRollbackMutation(projectId: string): UseMutationResult<RollbackResponse, ApiError, string> {
+  const queryClient = useQueryClient();
+  return useMutation<RollbackResponse, ApiError, string>({
+    mutationFn: afterProposalId => APIRequest.post(`/projects/${projectId}/changes/rollback`).body({ afterProposalId }).execute(),
     onSuccess: () => invalidateProposals(queryClient, projectId),
   });
 }

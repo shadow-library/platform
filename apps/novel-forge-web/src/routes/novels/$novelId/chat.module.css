@@ -257,3 +257,161 @@
 .emptyText {
   margin: 0;
 }
+
+.turnCard {
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-raised);
+  overflow: hidden;
+  max-width: 560px;
+}
+
+.turnCard[data-status='applied'] {
+  border-color: var(--sh-success-border, var(--sh-border-default));
+}
+
+.turnCard[data-status='conflicted'] {
+  border-color: var(--sh-danger-border, var(--sh-border-default));
+}
+
+.turnCardHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.turnCardTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.turnOps {
+  display: flex;
+  flex-direction: column;
+}
+
+.turnOp {
+  padding: 8px 12px;
+}
+
+.turnOp[data-declined='true'] {
+  opacity: 0.45;
+}
+
+.turnOp:not(:first-child) {
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.turnOpRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.turnOpLabel {
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  text-align: left;
+}
+
+.turnOpLabel:hover {
+  text-decoration: underline;
+}
+
+.turnOpJson {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-sunken, var(--sh-surface-default));
+  white-space: pre-wrap;
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+  max-height: 240px;
+  overflow: auto;
+}
+
+.turnOpError {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.turnOpSummary {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.turnCardNote {
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.turnCardActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.historyList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.historyRow {
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  padding: 10px 12px;
+}
+
+.historyRow[data-reverted='true'] {
+  opacity: 0.55;
+}
+
+.historyRowTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.historyTime {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.historySummary {
+  margin-top: 6px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+}
+
+.historyRefs {
+  margin-top: 4px;
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.historyActions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
