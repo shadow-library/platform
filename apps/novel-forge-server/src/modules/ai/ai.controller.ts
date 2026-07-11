@@ -32,7 +32,10 @@ const SUBPROCESS_OPTIONS: { id: string; provider: string; label: string; flag: '
   { id: 'opus', provider: 'anthropic-claude-code', label: 'Claude Code · Opus', flag: 'ai.claude-code.enabled' },
   { id: 'sonnet', provider: 'anthropic-claude-code', label: 'Claude Code · Sonnet', flag: 'ai.claude-code.enabled' },
   { id: 'haiku', provider: 'anthropic-claude-code', label: 'Claude Code · Haiku', flag: 'ai.claude-code.enabled' },
-  { id: 'codex', provider: 'openai-codex', label: 'Codex (CLI)', flag: 'ai.codex.enabled' },
+  // The `id` is passed to `codex exec --model <id>`.
+  { id: 'gpt-5.5', provider: 'openai-codex', label: 'Codex · GPT-5.5', flag: 'ai.codex.enabled' },
+  { id: 'gpt-5.5-mini', provider: 'openai-codex', label: 'Codex · GPT-5.5 mini', flag: 'ai.codex.enabled' },
+  { id: 'gpt-4.4', provider: 'openai-codex', label: 'Codex · GPT-4.4', flag: 'ai.codex.enabled' },
   { id: 'grok-build', provider: 'xai-grok-build', label: 'Grok Build (CLI)', flag: 'ai.grok-build.enabled' },
 ];
 

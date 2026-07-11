@@ -90,13 +90,16 @@ export class ChatGrokBuild extends SimpleChatModel {
   }
 }
 
-// Codex subprocess provider — runs `codex exec` (the CLI's configured GPT model) non-interactively.
+// Codex subprocess provider — runs `codex exec` non-interactively. `model` selects the GPT model via
+// `--model`; omit to use the CLI's configured default.
 export class ChatCodex extends SimpleChatModel {
   private readonly bin: string;
+  private readonly model?: string;
 
-  constructor(bin: string) {
+  constructor(bin: string, model?: string) {
     super({});
     this.bin = bin;
+    this.model = model;
   }
 
   _llmType(): string {
@@ -108,8 +111,11 @@ export class ChatCodex extends SimpleChatModel {
     // `codex exec` runs non-interactively; `--output-last-message` writes only the final assistant
     // message to a file, keeping the session banner and token summary out of the parsed response.
     const outFile = join(tmpdir(), `nf-codex-${randomUUID()}.txt`);
+    const args = ['exec', '--skip-git-repo-check', '--color', 'never', '--output-last-message', outFile];
+    if (this.model) args.push('--model', this.model);
+    args.push(prompt); // the prompt is the trailing positional arg
     try {
-      await spawnAndCapture(this.bin, ['exec', '--skip-git-repo-check', '--color', 'never', '--output-last-message', outFile, prompt]);
+      await spawnAndCapture(this.bin, args);
       return (await readFile(outFile, 'utf8')).trim();
     } finally {
       await rm(outFile, { force: true }).catch(() => undefined);

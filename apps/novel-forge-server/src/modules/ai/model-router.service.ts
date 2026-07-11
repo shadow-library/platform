@@ -167,7 +167,7 @@ export class ModelRouterService {
         return new ChatClaudeCode(Config.get('ai.claude-code.bin'), resolved.model);
       case 'openai-codex':
         if (!Config.get('ai.codex.enabled')) throw new ServerError(AppErrorCode.AI_002);
-        return new ChatCodex(Config.get('ai.codex.bin'));
+        return new ChatCodex(Config.get('ai.codex.bin'), resolved.model);
       case 'xai-grok-build':
         if (!Config.get('ai.grok-build.enabled')) throw new ServerError(AppErrorCode.AI_002);
         return new ChatGrokBuild(Config.get('ai.grok-build.bin'));
