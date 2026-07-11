@@ -1,0 +1,18 @@
+.mono {
+  font-family: var(--sh-font-mono);
+  font-size: 0.8125rem;
+  color: var(--sh-text-secondary);
+}
+
+.muted {
+  color: var(--sh-text-tertiary);
+}
+
+.text {
+  color: var(--sh-text-primary);
+}
+
+.any {
+  color: var(--sh-text-tertiary);
+  font-style: italic;
+}

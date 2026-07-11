@@ -1,0 +1,237 @@
+.top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.label {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 6px;
+}
+
+/* ── Source view ── */
+.sourceSubject {
+  font-family: var(--sh-font-mono);
+  font-size: 0.875rem;
+  padding: 10px 12px;
+  background: var(--sh-surface-well);
+  border-radius: var(--sh-radius-md);
+  margin-bottom: 18px;
+}
+
+.sourcePre {
+  font-family: var(--sh-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 14px 16px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  margin: 0;
+  color: var(--sh-text-primary);
+}
+
+.payloadBlock {
+  margin-top: 22px;
+}
+
+.payloadPre {
+  font-family: var(--sh-font-mono);
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  white-space: pre-wrap;
+  word-break: break-word;
+  padding: 14px 16px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  margin: 0;
+  color: var(--sh-text-secondary);
+}
+
+/* ── Email preview ── */
+.emailCard {
+  border: 1px solid var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.emailHeader {
+  padding: 16px 20px;
+  background: var(--sh-surface-well);
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.emailSubject {
+  font-size: 16px;
+  font-weight: 620;
+  color: var(--sh-text-primary);
+  margin-bottom: 10px;
+}
+
+.emailFrom {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.emailAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
+.emailMetaCol {
+  display: flex;
+  flex-direction: column;
+}
+
+.metaRow {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  line-height: 18px;
+}
+
+.metaLabel {
+  color: var(--sh-text-tertiary);
+  min-width: 40px;
+}
+
+.metaValue {
+  color: var(--sh-text-secondary);
+}
+
+.metaValueMono {
+  color: var(--sh-text-secondary);
+  font-family: var(--sh-font-mono);
+}
+
+.emailBodyWrap {
+  background: var(--sh-neutral-white);
+  padding: 4px 0;
+}
+
+.emailBody {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 24px 32px;
+  font-family: var(--sh-font-sans);
+  color: #1a1a1a;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+/* ── SMS preview ── */
+.smsWrap {
+  max-width: 400px;
+  margin: 0 auto;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+  padding: 20px;
+}
+
+.smsHeader {
+  text-align: center;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 16px;
+}
+
+.smsBubbleRow {
+  display: flex;
+  justify-content: flex-start;
+}
+
+.smsBubble {
+  max-width: 85%;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-default);
+  border-radius: 4px 18px 18px 18px;
+  padding: 11px 15px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--sh-text-primary);
+  white-space: pre-wrap;
+  word-break: break-word;
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.smsFooter {
+  margin-top: 12px;
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+  text-align: right;
+}
+
+/* ── Push preview ── */
+.pushWrap {
+  max-width: 420px;
+  margin: 0 auto;
+}
+
+.pushLabel {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  text-align: center;
+  margin-bottom: 12px;
+}
+
+.pushCard {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+  box-shadow: var(--sh-shadow-e2);
+  padding: 14px 16px;
+}
+
+.pushTop {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.pushName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.pushTime {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  margin-left: auto;
+}
+
+.pushTitle {
+  font-size: 15px;
+  font-weight: 620;
+  color: var(--sh-text-primary);
+  margin-bottom: 2px;
+}
+
+.pushBody {
+  font-size: 14px;
+  color: var(--sh-text-secondary);
+  line-height: 1.45;
+  white-space: pre-wrap;
+}
