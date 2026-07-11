@@ -12,7 +12,17 @@ import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor } fro
  */
 import { ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
-import { ApplyProposalResponse, ListProposalResponse, ListProposalsQuery, ProposalIdParams, ProposalProjectParams, ProposalResponse, UpdateProposalBody } from './refinement.dto';
+import {
+  ApplyProposalBody,
+  ApplyProposalResponse,
+  ListProposalResponse,
+  ListProposalsQuery,
+  ProposalIdParams,
+  ProposalProjectParams,
+  ProposalResponse,
+  RevertProposalResponse,
+  UpdateProposalBody,
+} from './refinement.dto';
 import { serialiseProposal } from './serialise';
 
 /**
@@ -50,10 +60,18 @@ export class ProposalController {
 
   @Post('/:proposalId/apply')
   @RespondFor(200, ApplyProposalResponse)
-  applyProposal(@Params() params: ProposalIdParams): Promise<ApplyProposalResponse> {
+  applyProposal(@Params() params: ProposalIdParams, @Body() body: ApplyProposalBody): Promise<ApplyProposalResponse> {
     return this.proposalApplyService
-      .apply(params.projectId, params.proposalId)
+      .apply(params.projectId, params.proposalId, { opIndexes: body.opIndexes })
       .then(r => ({ ...r, proposal: serialiseProposal(r.proposal) })) as unknown as Promise<ApplyProposalResponse>;
+  }
+
+  @Post('/:proposalId/revert')
+  @RespondFor(200, RevertProposalResponse)
+  revertProposal(@Params() params: ProposalIdParams): Promise<RevertProposalResponse> {
+    return this.proposalApplyService
+      .revert(params.projectId, params.proposalId)
+      .then(r => ({ ...r, proposal: serialiseProposal(r.proposal) })) as unknown as Promise<RevertProposalResponse>;
   }
 
   @Post('/:proposalId/discard')

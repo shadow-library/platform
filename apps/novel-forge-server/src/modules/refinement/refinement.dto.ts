@@ -56,6 +56,14 @@ export class ListProposalsQuery extends PaginationQuery(SortByTime) {
   sessionId?: string;
 }
 
+@Schema()
+export class ApplyProposalBody {
+  // Cherry-pick selection: apply only these change-set indexes and record the rest as declined
+  // (chat-hub design §5.1). Absent → apply every op.
+  @Field(() => [Integer], { optional: true })
+  opIndexes?: number[];
+}
+
 @Schema({ minProperties: 1 })
 export class UpdateProposalBody {
   // A discriminated union of ~10 op shapes (see `change-set.ts`), each keyed by `op`. It's kept as an
@@ -71,6 +79,22 @@ export class UpdateProposalBody {
 export class ChangeOpItem {
   @Field()
   op: string;
+}
+
+// One op's apply-time disposition; `result` is an open action-outcome blob (jobId/runId/proposalId).
+@Schema({ additionalProperties: true })
+export class OpResultItem {
+  @Field(() => Integer)
+  index: number;
+
+  @Field()
+  status: string;
+
+  @Field({ optional: true })
+  error?: string;
+
+  @Field(() => Object, { optional: true, additionalProperties: true })
+  result?: Record<string, unknown>;
 }
 
 @Schema()
@@ -112,6 +136,14 @@ export class ProposalResponse {
   @Field(() => Object, { additionalProperties: true })
   baseline: Record<string, unknown>;
 
+  @Field()
+  autoApplied: boolean;
+
+  // Per-op dispositions recorded at apply time — applied/declined/failed (+ action results). Open
+  // objects so the action `result` payloads survive serialisation.
+  @Field(() => [OpResultItem], { optional: true, nullable: true })
+  opResults?: Record<string, unknown>[] | null;
+
   @Field({ optional: true, nullable: true })
   model?: string | null;
 
@@ -120,6 +152,9 @@ export class ProposalResponse {
 
   @Field(() => String, { format: 'date-time', optional: true, nullable: true })
   appliedAt?: Date | null;
+
+  @Field(() => String, { format: 'date-time', optional: true, nullable: true })
+  revertedAt?: Date | null;
 
   // Failure detail recorded when an apply fails — an open, error-source-specific blob, so it keeps
   // `additionalProperties` to preserve its nested keys.
@@ -155,4 +190,97 @@ export class ApplyProposalResponse {
 
   @Field(() => [String])
   staleMarked: string[];
+
+  @Field(() => [OpResultItem])
+  opResults: OpResultItem[];
+}
+
+@Schema()
+export class RevertProposalResponse {
+  @Field(() => ProposalResponse)
+  proposal: ProposalResponse;
+
+  @Field(() => [AppliedArtifactItem])
+  reverted: AppliedArtifactItem[];
+
+  @Field(() => [String])
+  staleMarked: string[];
+}
+
+@Schema()
+export class ChangeItemResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field({ optional: true, nullable: true })
+  sessionId?: string | null;
+
+  @Field(() => RefinementKind)
+  kind: Refinement.Kind;
+
+  @Field(() => ChatScope)
+  scopeType: Refinement.ChatScope;
+
+  @Field(() => RefinementProposalStatus)
+  status: Refinement.ProposalStatus;
+
+  @Field({ optional: true, nullable: true })
+  summary?: string | null;
+
+  @Field()
+  autoApplied: boolean;
+
+  @Field(() => [String])
+  refs: string[];
+
+  @Field()
+  revertible: boolean;
+
+  @Field(() => [OpResultItem], { optional: true, nullable: true })
+  opResults?: Record<string, unknown>[] | null;
+
+  @Field(() => String, { format: 'date-time', optional: true, nullable: true })
+  appliedAt?: Date | null;
+
+  @Field(() => String, { format: 'date-time', optional: true, nullable: true })
+  revertedAt?: Date | null;
+}
+
+@Schema()
+export class ListChangesQuery extends PaginationQuery(SortByTime) {}
+
+@Schema()
+export class ListChangesResponse extends Paginated(ChangeItemResponse) {}
+
+@Schema()
+export class RollbackBody {
+  // The anchor: the newest applied proposal to KEEP — everything applied after it is reverted,
+  // newest first (chat-hub design §5.5).
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  afterProposalId: bigint;
+}
+
+@Schema()
+export class RolledBackItem {
+  @Field(() => String)
+  proposalId: bigint;
+
+  @Field(() => [AppliedArtifactItem])
+  artifacts: AppliedArtifactItem[];
+}
+
+@Schema()
+export class RollbackResponse {
+  @Field(() => [RolledBackItem])
+  reverted: RolledBackItem[];
+
+  @Field(() => [String])
+  skipped: string[];
+
+  @Field(() => String, { optional: true })
+  stoppedAt?: string;
+
+  @Field(() => Object, { optional: true, additionalProperties: true })
+  conflict?: Record<string, unknown>;
 }

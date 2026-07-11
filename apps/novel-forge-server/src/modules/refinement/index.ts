@@ -18,6 +18,7 @@
  * Declaring the constants
  */
 
+export * from './action-registry';
 export * from './change-set';
 export * from './artifact-state';
 export * from './proposal.service';

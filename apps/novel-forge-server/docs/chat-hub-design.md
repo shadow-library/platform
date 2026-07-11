@@ -203,8 +203,11 @@ a DB transaction). Sequentially, in op order:
 `POST /proposals/:id/revert` — deterministic, zero AI:
 
 1. Transaction; lock row; require `applied` with non-empty `inverseOps` (else RFN_007).
-2. **Revert conflict guard:** recompute `loadArtifactStates` over `postState` keys; any mismatch → 409
-   RFN_006 with per-ref mismatches (the artifact moved on — reverting would destroy later work).
+2. **Revert conflict guard:** recompute `loadArtifactStates` over `postState` keys; any `exists`/
+   `contentHash` mismatch → 409 RFN_006 with per-ref mismatches (the artifact moved on — reverting
+   would destroy later work). Revision is deliberately **not** compared: reverting a newer change on
+   the same artifact restores this proposal's content while bumping the revision counter, and rollback
+   chains must keep walking backward through exactly that state. Content identity is the invariant.
    No force flag in v1: the author reverts the newer change first (rollback handles the chain case).
 3. Execute `inverseOps` through the same op appliers (same hashing, revision bumps, staleness propagation).
 4. Flip status to `reverted`, set `revertedAt`; write `user_feedback` (`disposition: 'rejected'`,

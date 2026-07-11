@@ -108,6 +108,11 @@ export interface DraftUpdateOp {
   summary?: string;
 }
 
+export interface DraftRemoveOp {
+  op: 'draft.remove';
+  chapter: number;
+}
+
 export interface EntityUpsertOp {
   op: 'entity.upsert';
   entityKey: string;
@@ -134,8 +139,8 @@ export interface GenerateChaptersAction {
 
 export interface PlanVolumesAction {
   op: 'action.plan_volumes';
-  volumeCount?: number;
-  chaptersPerVolume?: number;
+  volumeCount: number;
+  chaptersPerVolume: number;
 }
 
 export interface PlanArcsAction {
@@ -205,6 +210,7 @@ export type ContentOp =
   | BriefUpdateOp
   | BriefRemoveOp
   | DraftUpdateOp
+  | DraftRemoveOp
   | EntityUpsertOp
   | EntityRemoveOp;
 
@@ -273,13 +279,14 @@ const OP_SPECS: Record<OpType, OpSpec> = {
   },
   'brief.remove': { required: { chapter: 'number' }, optional: {} },
   'draft.update': { required: { chapter: 'number' }, optional: { title: 'string', body: 'string', summary: 'string' } },
+  'draft.remove': { required: { chapter: 'number' }, optional: {} },
   'entity.upsert': {
     required: { entityKey: 'string', type: 'string' },
     optional: { name: 'string', status: 'string', motivation: 'string', notes: 'string', body: 'string' },
   },
   'entity.remove': { required: { entityKey: 'string' }, optional: {} },
   'action.generate_chapters': { required: { count: 'number' }, optional: {} },
-  'action.plan_volumes': { required: {}, optional: { volumeCount: 'number', chaptersPerVolume: 'number' } },
+  'action.plan_volumes': { required: { volumeCount: 'number', chaptersPerVolume: 'number' }, optional: {} },
   'action.plan_arcs': { required: { volumeKey: 'string' }, optional: { arcCount: 'number' } },
   'action.outline_arc': { required: { arcKey: 'string' }, optional: {} },
   'action.audit_bible': { required: {}, optional: {} },
@@ -451,7 +458,7 @@ export function changeSetRefs(ops: ChangeOp[]): string[] {
     if (op.op === 'volume.upsert' || op.op === 'volume.remove') return [`volume:${op.volumeKey}`];
     if (op.op === 'arc.upsert' || op.op === 'arc.remove') return [`arc:${op.arcKey}`];
     if (op.op === 'entity.upsert' || op.op === 'entity.remove') return [`entity:${op.entityKey}`];
-    if (op.op === 'draft.update') return [`draft:${op.chapter}`];
+    if (op.op === 'draft.update' || op.op === 'draft.remove') return [`draft:${op.chapter}`];
     return [`chapter:${op.chapter}`];
   });
   return [...new Set(refs)];

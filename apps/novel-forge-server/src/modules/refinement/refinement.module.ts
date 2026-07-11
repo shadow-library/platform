@@ -11,6 +11,8 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { ActionExecutorRegistry } from './action-registry';
+import { ChangeHistoryController } from './change-history.controller';
 import { ChatController } from './chat.controller';
 import { ChatService } from './chat.service';
 import { ProposalApplyService } from './proposal-apply.service';
@@ -30,8 +32,8 @@ import { AiModule } from '../ai/ai.module';
 
 @Module({
   imports: [DatabaseModule, AiModule],
-  controllers: [ProposalController, ChatController, RefineController],
-  providers: [ProposalService, ProposalApplyService, ChatService, RefineService],
-  exports: [ProposalService, ProposalApplyService, ChatService, RefineService],
+  controllers: [ProposalController, ChangeHistoryController, ChatController, RefineController],
+  providers: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatService, RefineService],
+  exports: [ActionExecutorRegistry, ProposalService, ProposalApplyService, ChatService, RefineService],
 })
 export class RefinementModule {}

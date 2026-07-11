@@ -9,7 +9,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, ne } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -20,11 +20,26 @@ import { type PrimaryDatabase, type Refinement, schema } from '@server/database'
 
 import { loadArtifactStates } from './artifact-state';
 import { type ChangeOp, type OpType, changeSetRefs, validateChangeSet } from './change-set';
-import { type ListProposalsQuery } from './refinement.dto';
+import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 
 /**
  * Defining types
  */
+
+export interface ChangeItem {
+  id: bigint;
+  sessionId: string | null;
+  kind: Refinement.Kind;
+  scopeType: Refinement.ChatScope;
+  status: Refinement.ProposalStatus;
+  summary: string | null;
+  autoApplied: boolean;
+  refs: string[];
+  revertible: boolean;
+  opResults: Record<string, unknown>[] | null;
+  appliedAt: Date | null;
+  revertedAt: Date | null;
+}
 
 export interface CreateProposalInput {
   sessionId?: string;
@@ -122,6 +137,43 @@ export class ProposalService {
     ]);
 
     return utils.pagination.createResult(query, items, total);
+  }
+
+  /**
+   * The project-wide change history (chat-hub design §5.6): every applied/reverted proposal, newest
+   * apply first — the feed the UI timeline renders with per-change revert and rollback-to-here.
+   */
+  async listChanges(projectId: bigint, filter: Partial<ListChangesQuery>): Promise<OffsetPaginationResult<ChangeItem>> {
+    const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 30, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
+    const where = and(eq(schema.refinementProposals.projectId, projectId), inArray(schema.refinementProposals.status, ['applied', 'reverted']));
+
+    const [total, items] = await Promise.all([
+      this.db.$count(schema.refinementProposals, where),
+      this.db.query.refinementProposals.findMany({
+        where,
+        limit: query.limit,
+        offset: query.offset,
+        orderBy: [desc(schema.refinementProposals.appliedAt), desc(schema.refinementProposals.id)],
+      }),
+    ]);
+
+    const changes = items.map(
+      (proposal): ChangeItem => ({
+        id: proposal.id,
+        sessionId: proposal.sessionId,
+        kind: proposal.kind,
+        scopeType: proposal.scopeType,
+        status: proposal.status,
+        summary: proposal.summary,
+        autoApplied: proposal.autoApplied,
+        refs: changeSetRefs(proposal.changeSet as ChangeOp[]),
+        revertible: proposal.status === 'applied' && ((proposal.inverseOps as ChangeOp[] | null)?.length ?? 0) > 0,
+        opResults: proposal.opResults as Record<string, unknown>[] | null,
+        appliedAt: proposal.appliedAt,
+        revertedAt: proposal.revertedAt,
+      }),
+    );
+    return utils.pagination.createResult(query, changes, total);
   }
 
   async get(projectId: bigint, proposalId: bigint): Promise<Refinement.Proposal> {

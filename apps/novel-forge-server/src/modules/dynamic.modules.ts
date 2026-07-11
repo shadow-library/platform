@@ -16,6 +16,7 @@ import { AiModule } from '@modules/ai';
 import { BibleModule } from '@modules/bible';
 import { ExtractionModule } from '@modules/extraction';
 import { GenerationModule } from '@modules/generation';
+import { HubActionsModule } from '@modules/hub';
 import { IllustrationModule } from '@modules/illustration';
 import { JobsModule } from '@modules/jobs';
 import { PipelineModule } from '@modules/pipeline';
@@ -44,6 +45,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AiModule,
     ExtractionModule,
     GenerationModule,
+    HubActionsModule,
     IllustrationModule,
     JobsModule,
     PipelineModule,

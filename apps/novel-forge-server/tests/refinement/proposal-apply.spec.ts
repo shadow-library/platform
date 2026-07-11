@@ -14,7 +14,7 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 /**
  * Importing user defined packages
  */
-import { type ChangeOp, ProposalApplyService, ProposalService } from '@modules/refinement';
+import { ActionExecutorRegistry, type ChangeOp, ProposalApplyService, ProposalService } from '@modules/refinement';
 import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -47,12 +47,13 @@ describe.if(pgAvailable)('proposal engine', () => {
   let projectId: bigint;
 
   const databaseService = () => ({ getPostgresClient: () => db }) as never;
+  const actionRegistry = new ActionExecutorRegistry();
 
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     proposals = new ProposalService(databaseService());
-    applier = new ProposalApplyService(databaseService());
+    applier = new ProposalApplyService(databaseService(), actionRegistry);
 
     const [project] = await db
       .insert(schema.projects)

@@ -45,6 +45,7 @@ export const SCOPE_PLAYBOOKS: Record<Refinement.ChatScope, ScopePlaybook> = {
       'brief.update',
       'brief.remove',
       'draft.update',
+      'draft.remove',
       'entity.upsert',
       'entity.remove',
     ],
