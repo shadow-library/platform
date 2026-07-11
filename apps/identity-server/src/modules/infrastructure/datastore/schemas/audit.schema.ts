@@ -36,7 +36,8 @@ export const auditEvents = pgTable(
   {
     id: uuid('id').primaryKey(),
     occurredAt: timestamp('occurred_at', { withTimezone: true }).notNull().defaultNow(),
-    organisationId: uuid('organisation_id'),
+    /** varchar, not uuid: organisation ids are bigints until the D-8 UUIDv7 conversion lands, and audit rows must be writable either way. */
+    organisationId: varchar('organisation_id', { length: 64 }),
     actorType: auditActorType('actor_type').notNull(),
     actorId: varchar('actor_id', { length: 64 }),
     action: varchar('action', { length: 128 }).notNull(),

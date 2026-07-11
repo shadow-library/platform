@@ -181,4 +181,28 @@ export class PolicyDecisionService {
       );
     await this.bumpAuthzVersion(principal);
   }
+
+  /** Clears every product-role grant a principal holds in the organisation; used when membership ends. */
+  async revokeAllForPrincipalInOrganisation(principal: Principal, organisationId: string): Promise<void> {
+    await this.db
+      .delete(schema.roleAssignments)
+      .where(
+        and(
+          eq(schema.roleAssignments.principalType, principal.type),
+          eq(schema.roleAssignments.principalId, principal.id),
+          eq(schema.roleAssignments.organisationId, BigInt(organisationId)),
+        ),
+      );
+    await this.bumpAuthzVersion(principal);
+  }
+
+  /** Clears every grant scoped to the organisation (org deletion); bumps each affected principal. */
+  async revokeAllForOrganisation(organisationId: string): Promise<void> {
+    const removed = await this.db
+      .delete(schema.roleAssignments)
+      .where(eq(schema.roleAssignments.organisationId, BigInt(organisationId)))
+      .returning({ principalType: schema.roleAssignments.principalType, principalId: schema.roleAssignments.principalId });
+    const principals = new Map(removed.map(row => [`${row.principalType}:${row.principalId}`, { type: row.principalType, id: row.principalId }]));
+    for (const principal of principals.values()) await this.bumpAuthzVersion(principal);
+  }
 }

@@ -105,6 +105,16 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_001 = new AppErrorCode('ORG_001', ErrorType.UNAUTHORIZED, 'Not a member of this organisation');
   /** The organisation does not exist */
   static readonly ORG_002 = new AppErrorCode('ORG_002', ErrorType.NOT_FOUND, 'Organisation not found');
+  /** Personal workspaces are single-user by construction (D-1) and reject membership operations */
+  static readonly ORG_003 = new AppErrorCode('ORG_003', ErrorType.CONFLICT, 'Operation not permitted on a personal workspace');
+  /** An organisation must always retain at least one owner */
+  static readonly ORG_004 = new AppErrorCode('ORG_004', ErrorType.CONFLICT, 'An organisation must retain at least one owner');
+  /** Invitation absent, expired, revoked, already resolved, or not addressed to the caller — indistinguishable by design */
+  static readonly ORG_005 = new AppErrorCode('ORG_005', ErrorType.NOT_FOUND, 'Invitation is invalid or has expired');
+  /** The requested organisation slug is already taken */
+  static readonly ORG_006 = new AppErrorCode('ORG_006', ErrorType.CONFLICT, 'Organisation slug already taken');
+  /** The caller's organisation role does not permit this operation */
+  static readonly ORG_007 = new AppErrorCode('ORG_007', ErrorType.UNAUTHORIZED, 'Insufficient organisation role', 403);
 
   /**
    * OAuth / OIDC Error Codes (mapped to RFC 6749 error identifiers)

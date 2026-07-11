@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, pgEnum, pgTable, primaryKey, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, index, pgEnum, pgTable, primaryKey, timestamp, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -17,6 +17,7 @@ export type Organisation = InferSelectModel<typeof organisations>;
 
 export namespace Organisation {
   export type Member = InferSelectModel<typeof organisationMembers>;
+  export type Invitation = InferSelectModel<typeof organisationInvitations>;
 
   export type Type = InferEnum<typeof organisationType>;
   export type Status = InferEnum<typeof organisationStatus>;
@@ -33,9 +34,11 @@ export const organisationMemberRole = pgEnum('organisation_member_role', ['OWNER
 
 export const organisations = pgTable('organisations', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+  slug: varchar('slug', { length: 64 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   type: organisationType('type').notNull().default('TEAM'),
   status: organisationStatus('status').notNull().default('ACTIVE'),
+  deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -57,11 +60,46 @@ export const organisationMembers = pgTable(
 );
 
 /**
+ * A pending invitation is one with no accepted/declined/revoked timestamp; the partial unique
+ * index keeps at most one live invitation per (organisation, email) while history rows remain.
+ * Tokens are stored as SHA-256 hashes — the plaintext travels only in the invitation email.
+ */
+export const organisationInvitations = pgTable(
+  'organisation_invitations',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    organisationId: bigint('organisation_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => organisations.id, { onDelete: 'cascade' }),
+    email: varchar('email', { length: 255 }).notNull(),
+    role: organisationMemberRole('role').notNull().default('MEMBER'),
+    tokenHash: varchar('token_hash', { length: 64 }).notNull().unique(),
+    invitedBy: bigint('invited_by', { mode: 'bigint' }).references(() => users.id, { onDelete: 'set null' }),
+    expiresAt: timestamp('expires_at', { withTimezone: true }).notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true }),
+    declinedAt: timestamp('declined_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    uniqueIndex('organisation_invitations_pending_unique')
+      .on(t.organisationId, t.email)
+      .where(sql`${t.acceptedAt} IS NULL AND ${t.declinedAt} IS NULL AND ${t.revokedAt} IS NULL`),
+    index('organisation_invitations_email_idx').on(t.email),
+  ],
+);
+
+/**
  * Declaring the relations
  */
 
 export const organisationRelations = relations(organisations, ({ many }) => ({
   members: many(organisationMembers),
+  invitations: many(organisationInvitations),
+}));
+
+export const organisationInvitationRelations = relations(organisationInvitations, ({ one }) => ({
+  organisation: one(organisations, { fields: [organisationInvitations.organisationId], references: [organisations.id] }),
 }));
 
 export const organisationMemberRelations = relations(organisationMembers, ({ one }) => ({
