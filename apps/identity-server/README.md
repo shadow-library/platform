@@ -14,9 +14,14 @@ Built with **[Bun](https://bun.sh/)** for high performance and modern tooling, i
 
 - **PostgreSQL** for persistent data storage
 - **Drizzle ORM** for schema management and migrations
-- **Redis** (optional) for caching
-- **Session-based authentication** for web clients with real-time invalidation
-- **JWT-based access tokens** for API and service-to-service communication
+- **Redis** for caching, auth-flow state, rate limiting, and revocation
+- **Opaque server-side sessions** for the identity domain, with real-time invalidation
+- **OAuth 2.1 / OpenID Connect** (EdDSA-signed JWTs) for application login and service-to-service calls
+
+> **Architecture & build plan:** the target design and development backlog are specified in
+> [`docs/architecture.md`](./docs/architecture.md), [`docs/database.md`](./docs/database.md),
+> [`docs/auth/`](./docs/auth/), [`docs/sdk.md`](./docs/sdk.md), and [`docs/tasks.md`](./docs/tasks.md).
+> These supersede earlier design notes where they disagree.
 
 ---
 
@@ -53,8 +58,8 @@ Built with **[Bun](https://bun.sh/)** for high performance and modern tooling, i
 | Language         | **TypeScript**                 |
 | Database         | **PostgreSQL**                 |
 | ORM              | **Drizzle ORM**                |
-| Cache (Optional) | **Redis**                      |
-| Auth             | **Session-based + JWT tokens** |
+| Cache            | **Redis** (required)           |
+| Auth             | **Opaque sessions + OAuth 2.1 / OIDC (EdDSA JWTs)** |
 | API              | **REST**                       |
 | Docs             | **/dev/api-docs**              |
 
@@ -134,14 +139,16 @@ bun test
 
 ---
 
-## 🔮 Future Enhancements
+## 🔮 Roadmap
 
-- OAuth2 and OpenID Connect support
-- Multi-factor authentication (2FA / OTP / Passkeys)
-- Session and device management dashboard
-- Audit logs and login activity history
-- Email and SMS verification flows
-- Administrative API for service-level access control
+Delivery is planned in ordered milestones (see [`docs/tasks.md`](./docs/tasks.md)):
+
+- **M0** — remediate the correctness/security defects in the current code and repair the build
+- **M1** — production foundation: key management + JWKS, sessions, auth flows, refresh-token rotation, audit, tenancy isolation, notifications/worker
+- **M2** — OAuth 2.1 / OpenID Connect authorization server
+- **M3** — policy decision point + the `@shadow-library/auth` consumer SDK
+- **M4** — MFA (TOTP, passkeys, recovery codes)
+- **M5+** — security intelligence, operations, admin surfaces, then enterprise federation/SCIM (deferred, designed-for)
 
 ---
 

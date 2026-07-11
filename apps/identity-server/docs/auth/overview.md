@@ -1,301 +1,117 @@
-# **Shadow Identity: Scalable Authentication Solution**
+# Shadow Identity — Interactive Authentication Flow Specification
 
-## **1. Architecture Overview**
+| | |
+| :--- | :--- |
+| **Status** | Approved for development |
+| **Version** | 2.0.0 |
+| **Last updated** | 2026-07-11 |
+| **Supersedes** | v1 of this document. The bespoke first-party SSO protocol (former §E) is **withdrawn** in favour of OIDC Authorization Code + PKCE (`docs/architecture.md` §8.3, decision D-4). Conditional refresh rotation (former §D) is **withdrawn** (decision D-11). |
 
-This solution adopts a **State-Based Authentication Architecture** for high performance. The state of a user's journey is stored in **Redis**, while permanent records (Users, Credentials, Logs) reside in **PostgreSQL**.
+This document specifies the browser-facing authentication flows executed on the identity domain. Application login is *not* specified here — applications obtain tokens exclusively through the OAuth/OIDC endpoints; these flows only establish the identity-domain session that `/oauth2/authorize` consumes.
 
-### **High-Level Component Interaction**
+## 1. Flow engine
 
-1. **Client (Web/Mobile)**: Interacts with the API. Relies on **secure, HTTP-only cookies** for tokens and a **browser-readable cookie** for session status.
-2. **Auth Service (API)**: Stateless workers. Reads state from Redis, processes logic, and sets/clears cookies via Set-Cookie headers.
-3. **Redis (Cache)**: Stores ephemeral flowId data with TTL (Time-To-Live).
-4. **PostgreSQL (DB)**: Stores `users`, `credentials`, and finalized `sessions` and `user_sign_in_events`.
+Flows are state machines built on `FlowManager`/`FlowRegistry` from `@shadow-library/common`. The definition (states, transitions, guards) lives in code; Redis persists only the **flow context**.
 
-## **2. Redis Data Model (The "Flow")**
+| Property | Value |
+| :--- | :--- |
+| Redis key | `auth_flow:{flowId}` — `flowId` is UUIDv7, generated server-side |
+| TTL | 15 minutes (`auth.flow.ttl`), refreshed on successful transitions only |
+| Terminal handling | terminal states delete the key; expired flows require restarting |
 
-The core of this scalable design is the flowId. It is a pointer to a user's current authentication context. This flowId is also used as the primary key for the `user_sign_in_events` table once the user attempts a credential submission.
+### Flow context
 
-The Flow Manager handles the logic, state definitions, and transitions in code. Redis is used exclusively to persist the Flow Context—the stateful object containing all data accumulated during a user's specific execution of a flow.
+| Field | Type | Description |
+| :--- | :--- | :--- |
+| `kind` | enum | `REGISTRATION · LOGIN · RECOVERY · STEP_UP` |
+| `identifier` | string | as submitted (email/phone/username) |
+| `userId` | string? | resolved internally; **never returned to the client** |
+| `authMethod` / `mfaMethod` | enum? | populate `sign_in_events` on completion |
+| `device` | object | fingerprint, IP, user agent |
+| `regData` | object? | staged registration fields before the final commit |
+| `failureCount` / `globalFailureCount` | int | limits 3 / 5 (Tier 3) |
+| `resendCount` / `globalResendCount` | int | limits 3 / 5 |
+| `challengeId` | string? | reference to the active `verification_challenges` row — **codes are stored hashed in Postgres, never in Redis** |
+| `oidcResume` | object? | pending `/oauth2/authorize` request to resume after completion |
 
-**Key Pattern:** `auth_flow:{uuid}`
-**Type:** Redis Hash or JSON  
-**TTL:** 10-15 Minutes (The auth flow expires after this and the user has to start again)
+## 2. Enumeration neutrality (decision D-12)
 
-### Context Object Structure
+All three `*/init` endpoints MUST be indistinguishable for known and unknown identifiers:
 
-The stored value is a JSON object representing the FlowContext. It contains the following data categories:
+| Endpoint | Known identifier | Unknown identifier |
+| :--- | :--- | :--- |
+| `register/init` | 200, `AWAITING_EMAIL_OTP`; email sent: *"you already have an account — sign in"* (no OTP issued; any submitted code fails generically) | 200, `AWAITING_EMAIL_OTP`; OTP email sent |
+| `login/init` | 200, `AWAITING_PASSWORD` (+ real method info at later states) | 200, `AWAITING_PASSWORD`; verification always returns `INVALID_CREDENTIALS` |
+| `recover/init` | 200, masked destinations, OTP sent | 200, deterministically masked fake destination derived from the input; nothing sent; verification always fails |
 
-| Field              | Type    | Description                                                                                                                                     |
-| :----------------- | :------ | :---------------------------------------------------------------------------------------------------------------------------------------------- |
-| identifier         | String  | Input provided by user (email/phone).                                                                                                           |
-| userId             | String  | Resolved DB ID (if user exists).                                                                                                                |
-| authModeUsed       | String  | Stores the primary method used in the current attempt (e.g., PASSWORD). Populates user_sign_in_events.auth_mode_used.                           |
-| mfaModeUsed        | String  | Stores the secondary method used (e.g., TOTP). Populates user_sign_in_events.mfa_mode_used.                                                     |
-| device             | JSON    | Device fingerprint, IP, User Agent (for fraud detection).                                                                                       |
-| regData            | JSON    | Temporary storage for registration fields (DOB, Names) before DB commit.                                                                        |
-| globalFailureCount | Integer | **Limit: 5**. Tracks total incorrect attempts across all methods combined. If this hits 5, the entire flow is locked/terminated.                |
-| failureCount       | Integer | **Limit: 3**. Tracks failures for the current method. If this hits 3, the entire flow is locked/terminated.                                     |
-| globalResendCount  | Integer | **Limit: 5.** Tracks total OTP resend requests.                                                                                                 |
-| resendCount        | Integer | **Limit: 3.** Tracks total OTP resend requests.                                                                                                 |
-| activeChallenge    | JSON    | Stores the currently active OTP/secret for verification. Should contain: `{ "code": "123456", "method": "SMS_OTP", "expiresAt": <timestamp> }`. |
+Accepted residual risks: per-account method lists differ once a real password step is passed; timing differences are minimized with constant-work lookups (always execute one argon2id verification against a static dummy hash when the user is unknown).
 
-## **3. Detailed Workflows**
-
-### **A. Authentication (Login)**
-
-The login flow is dynamic. The client reacts to the `status` returned by the server rather than assuming a fixed sequence.
-
-**Mermaid Visualization:**
-
-```mermaid
-flowchart TB
-  USER_IDENTIFIED --> SELECT_AUTH_MODE
-
-  SELECT_AUTH_MODE --> AWAITING_WEBAUTHN & AWAITING_PASSWORD
-  SELECT_AUTH_MODE --> SEND_SMS_OTP & SEND_EMAIL_OTP & AWAITING_TOTP
-
-  SEND_SMS_OTP --> AWAITING_SMS_OTP
-  SEND_EMAIL_OTP --> AWAITING_EMAIL_OTP
-
-  AWAITING_EMAIL_OTP & AWAITING_SMS_OTP --> SELECT_AUTH_MODE & COMPLETED
-  AWAITING_WEBAUTHN & AWAITING_PASSWORD --> SELECT_AUTH_MODE & COMPLETED
-```
-
-**Phase 1: Identification (`POST /auth/login/init`)**
-
-- **DB/Redis Action:** Only Redis flow created. No user_sign_in_events logged yet.
-- **Logic:** If the user does not exist, return 404 Not Found immediately (No sign-in event logged). **Crucially: Before returning methods, check User's Persistent Lock Status (Tier 4). If locked, only include OTP methods in allowedMethods.**
-
-**Phase 2: Challenge (`POST /auth/challenge/resend`)**
-
-- **DB/Redis Action:** Increments resendCount in Redis.
-
-**Phase 3: Credential Submission and Logging (`POST /auth/challenge/verify`)**
-
-This is the point where the `user_sign_in_events` is first created. The checks are as follows:
-
-1.  **Throttle Check (Redis Tier 3):** Check and increment `failureCount` in Redis. If maxed out (3 attempts), terminate flow and log final state (see Tier 3 below).
-2.  **If credential is Invalid:**
-    - **Global Lock Check (PostgreSQL Tier 4):** Query user_sign_in_events for recent failed attempts. If the count exceeds the configured limit (5), execute the lock-out procedure.
-    - **DB Transaction (Failed Log):** Insert into user_sign_in_events.
-      - `id`: `flowId` (from Redis).
-      - `status`: `INVALID_CREDENTIALS`.
-      - `auth_mode_used`, `user_id`, `identifier`, and context fields from Redis.
-    - Return error to client.
-3.  **Logic (Success):**
-    - **DB Transaction (Success Log):** Insert into user_sign_in_events (or update if this was an MFA step).
-      - `id`: `flowId`.
-      - `status`: `SUCCESS`.
-      - All other fields populated.
-    - If MFA required, update Redis flow `status`.
-    - If Login Complete, proceed to Session Creation.
-
-**Phase 4: Session Creation (Final Step)**
-
-- **Token Generation:**
-  - **Access Token:** JWT, valid ~1 hour.
-  - **Refresh Token:** Secure, random Opaque String, long-lived.
-- **DB Transaction:**
-  1. Insert into user_sessions (This becomes the Primary Session).
-     - `user_sign_in_event_id`: Set to the `flowId` UUID.
-     - `application_id`: Set to the ID of the Accounts App/Identity Service.
-  2. Insert into `user_session_tokens`.
-     - `token_hash`: Hash of the Opaque Refresh Token.
-  3. The Access Token and Refresh Token are typically set as secure, HTTP-only cookies on the Identity domain (`identity.shadow-apps.com`).
-  4. Return the JWT Access Token and the Opaque Refresh Token to the client.
-
-- **Client Delivery (Crucial):**
-  - Set **Access Token** as secure, HTTP-only cookie.
-  - Set **Refresh Token** as secure, HTTP-only cookie.
-  - Set **isLoggedIn** (boolean, **NOT HttpOnly**) as secure cookie for client-side session detection.
-
-### **B. Registration (Sign Up)**
-
-The registration flow is a multi-step process designed to collect data sequentially before committing the new user to the database. The final commit occurs in Phase 4.
-
-**Mermaid Visualization:**
+## 3. Registration flow
 
 ```mermaid
 flowchart TB
-  REGISTRATION_INIT --> SEND_EMAIL_OTP --> AWAITING_EMAIL_OTP
-  AWAITING_EMAIL_OTP --> AWAITING_DEMOGRAPHICS --> AWAITING_PROFILE --> COMPLETED
+  REGISTRATION_INIT --> AWAITING_EMAIL_OTP --> AWAITING_DEMOGRAPHICS --> AWAITING_PROFILE --> AWAITING_PASSWORD_SET --> COMPLETED
 ```
 
-**Phase 1: Initiate Registration (`POST /auth/register/init`)**
+1. **Init** (`POST /auth/register/init`) — email + device fingerprint. Creates flow; issues email OTP via `verification_challenges` + `notification_outbox`. Neutral per §2.
+2. **Verify OTP** (`POST /auth/challenge/verify`) — hashed comparison, max 3 attempts per challenge, challenge TTL 10 min.
+3. **Demographics** (`POST /auth/register/demographics`) — DOB (13 ≤ age ≤ 120), gender; staged in `regData`.
+4. **Profile** (`POST /auth/register/profile`) — names; staged.
+5. **Password** (`POST /auth/register/password`) — policy: length ≥ 8 (≤ 128), argon2id, breach-check (HIBP k-anonymity; soft-fail if provider down, queued for async re-check). *(New dedicated state: v1 committed users without any password step.)*
+6. **Commit** — single transaction: `users` (status `ACTIVE`, email verified at creation), `user_profiles`, `user_emails` (`verified_at = now()`, primary), `user_auth_identities` (`PASSWORD`), `user_passwords`, **personal organisation + membership (D-1)**, `sign_in_events` (`SUCCESS`); then session creation (§6).
 
-- **Client Action:** Submits email and deviceFingerprint.
-- **DB/Redis Action:**
-  1. Check `user_emails` table: If email exists, return `409 Conflict`.
-  2. Create Redis Flow key (`auth_flow:{flowId}`) with `status: REGISTRATION_INIT`.
-- **Next Step:** Client requests OTP via /auth/challenge.
-
-**Phase 2: Verify Email OTP (`POST /auth/challenge/verify`)**
-
-- **Client Action:** Submits flowId and OTP_EMAIL code.
-- **DB/Redis Action:**
-  1. Validate OTP against stored code (or external service).
-  2. If successful, update Redis flow `status: AWAITING_DEMOGRAPHICS`.
-  3. If failed, increment `failureCount` and return `401 Unauthorized`.
-- **Next Step:** Client submits demographics via `/auth/register/demographics`.
-
-**Phase 3: Set Demographics (`POST /auth/register/demographics`)**
-
-- **Client Action:** Submits flowId, dateOfBirth, and gender.
-- **DB/Redis Action:**
-  1. Update the Redis Flow `regData` hash with the submitted fields.
-  2. Update Redis flow `status: AWAITING_PROFILE`.
-- **Next Step:** Client submits profile name via `/auth/register/profile`.
-
-**Phase 4: Set Profile & Complete (`POST /auth/register/profile`)**
-
-- **Client Action:** Submits flowId, firstName, and lastName.
-- **DB Transaction (Commit User):** This is a single, atomic transaction.
-  1. Insert into `users` table.
-  2. Insert into `user_emails` (marked as `is_verified=true`, `is_primary=true`).
-  3. Insert into `user_profiles` (using data from flow's `regData` and submitted profile names).
-  4. Insert into `user_auth_identities` (defaulting to `OTP` method).
-  5. Execute **Session Creation** (See Section 3.A, Phase 4).
-  6. The `user_sign_in_events` record is created with `status: SUCCESS` for the final login.
-- **Next Step:** Return `SessionResponse` to client.
-
-### **C. Account Recovery (Forgot Password)**
-
-The recovery flow ensures the user proves ownership of the account before a password reset is permitted, culminating in a successful login after the reset.
-
-**Mermaid Visualization:**
+## 4. Login flow
 
 ```mermaid
 flowchart TB
-  RECOVERY_INIT --> SEND_SMS_OTP & SEND_EMAIL_OTP
-
-  SEND_SMS_OTP --> AWAITING_SMS_OTP
-  SEND_EMAIL_OTP --> AWAITING_EMAIL_OTP
-
-  AWAITING_EMAIL_OTP & AWAITING_SMS_OTP --> AWAITING_NEW_PASSWORD
-  AWAITING_NEW_PASSWORD --> COMPLETED
+  LOGIN_INIT --> SELECT_AUTH_METHOD
+  SELECT_AUTH_METHOD --> AWAITING_PASSWORD & AWAITING_WEBAUTHN & AWAITING_EMAIL_OTP & AWAITING_SMS_OTP
+  AWAITING_PASSWORD & AWAITING_WEBAUTHN --> MFA_REQUIRED & COMPLETED
+  AWAITING_EMAIL_OTP & AWAITING_SMS_OTP --> MFA_REQUIRED & COMPLETED
+  MFA_REQUIRED --> AWAITING_TOTP & AWAITING_MFA_WEBAUTHN & AWAITING_RECOVERY_CODE
+  AWAITING_TOTP & AWAITING_MFA_WEBAUTHN & AWAITING_RECOVERY_CODE --> COMPLETED
 ```
 
-**Phase 1: Initiate Recovery (`POST /auth/recover/init`)**
+- **Init** resolves the user internally, checks `lock_mode` (Tier 4): `OTP_ONLY` restricts offered methods to OTP; the response shape is identical either way.
+- **Method listing/switching** (`GET /auth/challenge/methods`, `POST /auth/challenge/change`) per the API contract.
+- **Verification** (`POST /auth/challenge/verify`): on failure — increment Tier-3 counters, write `sign_in_events` (`INVALID_CREDENTIALS`/`MFA_FAILED`), evaluate Tier 4; on success — either advance to MFA (if enrolled; sessions completing MFA record `AAL2`) or complete.
+- **Completion** writes/updates the `sign_in_events` row (`id = flowId`, `SUCCESS`) and creates the session (§6). If `oidcResume` is present, respond with the resume redirect to `/oauth2/authorize`.
 
-- **Client Action:** Submits `email`.
-- **DB/Redis Action:**
-  1. Look up user ID by email. If not found, return `404 Not Found` (avoids enumeration).
-  2. Create Redis Flow key (`auth_flow:{flowId}`) with `status: RECOVERY_INIT` and associated `userId`.
-  3. Send the OTP via email or phone number of the user and set the flow status as `AWAITING_SMS_OTP` or `AWAITING_EMAIL_OTP`
-- **Next Step:** Client requests OTP via `/auth/challenge`.
+## 5. Recovery flow
 
-**Phase 2: Verify Recovery OTP (`POST /auth/challenge/verify`)**
+```mermaid
+flowchart TB
+  RECOVERY_INIT --> AWAITING_EMAIL_OTP & AWAITING_SMS_OTP
+  AWAITING_EMAIL_OTP & AWAITING_SMS_OTP --> AWAITING_NEW_PASSWORD --> COMPLETED
+```
 
-- **Client Action:** Submits `flowId` and `OTP_EMAIL` code.
-- **DB/Redis Action:**
-  1. DB Logging (Attempt): Create initial entry in `user_sign_in_events` with `status: FAILED` or `INVALID_CREDENTIALS` if incorrect.
-  2. If OTP successful, update Redis flow `status: AWAITING_NEW_PASSWORD`.
-- **Next Step:** Client submits new password to `/auth/recover/reset`.
+- Neutral init per §2. OTP proves control of a **verified** email/phone.
+- If the account has MFA enrolled, recovery additionally requires one MFA factor or a recovery code (**recovery MUST NOT silently downgrade MFA accounts to single-factor takeover**).
+- Reset (`POST /auth/recover/reset`): password policy + history check (last 5); on success — update `user_passwords`, **revoke all sessions and refresh-token families** (`revoke_reason = ADMIN`… reason `PASSWORD_RESET`), send a security notification, create a fresh session (§6), finalize `sign_in_events`.
 
-**Phase 3: Reset Password & Complete (POST /auth/recover/reset)**
+## 6. Session creation (all flows converge here)
 
-- **Client Action:** Submits `flowId` and `newPassword`.
-- **DB Transaction (Reset & Login):**
-  1. Find the user's `PASSWORD` identity ID in `user_auth_identities`. If one does not exist, create a new record.
-  2. Update/Insert the new hash into `user_passwords`.
-  3. Execute Session Creation (See Section 3.A, Phase 4).
-  4. The `user_sign_in_events` record is finalized with `status: SUCCESS`.
-- **Next Step:** Return `SessionResponse` to client.
+In one transaction + cache operations:
 
-### **D. Session Management (Refresh)**
+1. Generate 256-bit session secret; store SHA-256 in `user_sessions` (`aal`, device, IP, UA snapshot; absolute `expires_at = now() + 180d`).
+2. Upsert `devices` row from fingerprint; flag new devices → security email (worker).
+3. Set cookies: `__Host-sid` (Secure, HttpOnly, SameSite=Lax, Path=/), `isLoggedIn=true` (Secure, SameSite=Lax, readable). **No JWT and no refresh token are set as cookies** — OAuth artifacts exist only via `/oauth2/*` (D-10).
+4. Prime the Redis session cache.
 
-This workflow implements conditional Refresh Token rotation.
+Session semantics (idle 30 d, absolute 180 d, fixation, step-up `elevated_until`) are defined in `docs/architecture.md` §8.2.
 
-**Action: Refresh Session (`POST /auth/session/refresh`)**
+## 7. Sign-out
 
-- **Server Action:** Reads Access Token (AT) and Refresh Token (RT) from cookies.
-- **Logic:**
-  1. **Validate RT:** Find token hash in `user_session_tokens`. Check if `revoked_at` is `NULL` and `expires_at` is in the future.
-  2. **Check AT Validity:** Inspect the expiry time (`exp` claim) of the JWT Access Token.
-     - **If AT is VALID (not expired):** Generate a **new AT only**. No RT rotation or revocation.
-     - **If AT is EXPIRED:** Perform full rotation:
-       - **Revoke Old RT:** Set `revoked_at` on the old `user_session_tokens` record.
-       - **Generate New RT:** Create and insert a new token record, linked to the same primary session.
-       - **Generate New AT.** payload contains the `user_session_tokens.id` field of the refresh token.
-- **Security Check: Token Reuse Detection (CRITICAL)**
-  - **Trigger:** If the submitted Refresh Token is found in the database but has a `non-NULL` `revoked_at` timestamp (meaning it has already been used and revoked by a newer token), this indicates a **Refresh Token Theft Attempt**.
-  - **Action:** Immediately terminate the _entire primary session_ associated with this token (the `user_sessions` record). This triggers a global log-out (see Section 3.F).
-- **Client Delivery:** New tokens and `isLoggedIn` cookie are set via `Set-Cookie` headers.
+- **Per-app sign-out** is an application concern (its own session) plus optional RP-initiated logout at `/oauth2/logout`.
+- **Global sign-out** (`POST /auth/signout`, CSRF-protected): terminate the session row, revoke linked refresh-token families, bust the session cache, dispatch OIDC back-channel logout tokens to all registered clients with an active grant for this session, clear cookies.
 
-### **E. First-Party Single Sign-On (SSO)**
+## 8. Brute-force and abuse tiers
 
-This flow describes how users access other services without needing a second login.
-**Mechanism:** The Identity Service acts as the central Session Authority. Sessions are validated by checking a primary session cookie, similar to a simplified OpenID Connect flow.
+| Tier | Scope | Store | Policy |
+| :--- | :--- | :--- | :--- |
+| 1 | IP | Redis | 100 req/min general; `register/init` 5/h; `login/init` 20/h; fail-closed |
+| 2 | Identifier | Redis | OTP sends: 3/flow, 5/identifier/hour |
+| 3 | Flow | Redis (flow context) | 3 failures per method, 5 total → flow terminated (`410`), event logged |
+| 4 | Account (persistent) | PostgreSQL | ≥ 5 failed events in 15 min → `lock_mode = OTP_ONLY`, `locked_until = now() + 15m`; evaluated in the same transaction as the failure insert; success does not reset history but naturally ends the window |
 
-**Scenario 1: User Navigates to a First-Party App (e.g., `blog.shadow-apps.com`)**
-
-1. **App Check:** The First-Party App checks its local session cookie. If missing, it redirects the user to the Identity Service.
-2. **Redirection:** The App redirects the user to a dedicated SSO endpoint on the Identity Service.
-   - **Endpoint:** `GET https://identity.shadow-apps.com/sso/authorize?serviceId={APP_ID}&redirectUri={APP_CALLBACK_URL}`
-3. **Identity Service Check:** The Identity Service checks for the presence of the primary Access Token and Refresh Token cookies established in Phase 4 of the login.
-   - **If Authenticated:** The Identity Service validates the primary session (`user_sessions` status).
-     - It then issues a Service-Specific Access Token (or sets a unique session cookie for the App).
-     - Finally, it redirects the user back to the `redirectUri` provided in the query parameters, often with a temporary authorization code (or the token itself, if secure).
-   - **If NOT Authenticated:** The Identity Service redirects the user to the Login page (`/auth/login`) and stores the original `redirectUri` in a temporary cookie or flow state.
-4. **Post-Login Redirect:** Once the user successfully logs in (completes Phase 4), the Identity Service checks the stored state and redirects them to the original App's `redirectUri`.
-
-### **F. Sign-Out Policy (Local vs. Global)**
-
-This section details the two-tier sign-out policy.
-
-**Action: Local Sign Out (Service-Initiated)**
-
-- **Goal:** Log the user out of a specific First-Party App only.
-- **Mechanism:** The App calls an internal IdS endpoint (e.g., `/sso/revoke?serviceId={APP_ID}`) to revoke its specific token in `user_session_tokens`. The primary IdS cookies (AT, RT, isLoggedIn) **remain untouched**. The user is still logged in to the Identity Service and other First-Party Apps.
-
-**Action: Global Sign Out (`POST /auth/signout`)**
-
-- **Goal:** Terminate all user sessions across all services.
-- **Mechanism:**
-  1. **Identify and Terminate Primary Session:** Use AT from cookie to find and update the primary `user_sessions` status to `TERMINATED`.
-  2. **Clear Identity Cookies:** The API clears the AT, RT, and `isLoggedIn` cookies by setting them with an immediate expiry date in the Set-Cookie headers.
-  3. **Cascade Revocation (CAV):** All service-specific tokens in `user_session_tokens` linked to this primary session are revoked. A mechanism (e.g., a message queue) notifies all First-Party Apps to force log-out (destroy their local tokens/sessions).
-
-## **7. Rate Limiting Strategy (Implementation Guide)**
-
-The rate limiting strategy is now divided into four tiers. Tier 4 uses the persistent database for global account lockout.
-
-**Tier 1: IP-Based Limiting (DDoS & Bot Prevention)**
-
-- **Goal:** Prevent a single IP from flooding the API.
-- **Redis Key:**
-- **Limits:** 100 requests / minute (General), 5 requests / hour (`/auth/register/init`).
-
-**Tier 2: Identifier-Based Limiting (Spam & Harassment Prevention)**
-
-- **Goal:** Prevent "SMS/Email Bombing."
-- **Redis Key:** `rl:id:{email_or_phone}:{action}`
-- **Flow-Based Resend Control:** The resendCount field in the active `auth_flow` key is used to limit resends for that specific login attempt. Max 3 resends per 10 minutes.
-
-**Tier 3: Flow-Based Brute Force Protection (Immediate Lock)**
-
-- **Goal:** Stop rapid password/OTP guessing within a single login attempt.
-- **Redis Key:** The active `auth_flow:{uuid}` hash.
-- **Limit:** Max 3 failed credential submissions (password or OTP) per `flowId`.
-- **Logic:** On the 4th failure, the flow key is deleted (410 Gone) and the final `user_sign_in_events` is logged with status `FAILED` (or `ACCOUNT_LOCKED` if Tier 4 was triggered).
-
-**Tier 4: Persistent Account Lock (Global User Policy via PostgreSQL)**
-
-- **Goal:** Persistently lock the user's primary credential (`PASSWORD`) after repeated failed login attempts from different devices/flows over a time window.
-- **Configuration Source:** `application_configurations` table (Max attempts: 5, Duration: 15 minutes).
-- **Mechanism:** Queries the `user_sign_in_events` table.
-- **Logic (Triggered on any `INVALID_CREDENTIALS` event):**
-  1. **Query DB:** Execute a query to count all sign-in events for the user in the last 15 minutes where `status` is either `INVALID_CREDENTIALS` or `MFA_FAILED`.
-     ```sql
-     -- Example PostgreSQL Query Logic
-     SELECT COUNT(id) FROM user_sign_in_events
-     WHERE user_id = :userId
-     AND created_at > NOW() - INTERVAL '15 minutes'
-     AND status IN ('INVALID_CREDENTIALS', 'MFA_FAILED');
-     ```
-  2. **Lock Check:** If the count is >= 5:
-     - Update a flag on the user's permanent record (e.g., set auth_lock_mode = 'OTP_ONLY' in a dedicated lock table).
-     - Log the final user_sign_in_events status as ACCOUNT_LOCKED.
-     - Subsequent login attempts via /auth/login/init will only offer OTP methods.
-
-  3. **If Login Success:** No database action is required, as the successful login implicitly breaks the 15-minute window of failed attempts.
+All limits return machine-readable codes with `retryAfterSeconds` (never prose), per `docs/standards.md`.
