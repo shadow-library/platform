@@ -259,9 +259,11 @@ Administration rides the ordinary PDP (no bespoke flags): a bootstrap-provisione
 
 `/api/v1/admin/users`: search/detail (never credential material), lock (`OTP_ONLY`/`FULL` — full lock cuts sessions + refresh-token families) / unlock (covers Tier-4), force-password-reset (flags the account; the password step refuses even the correct credential without burning lockout budget until recovery/change clears it), terminate sessions, deactivate/reactivate, right-to-erasure soft delete (PII + credentials scrubbed, numeric skeleton kept so the hash-chained audit trail stays verifiable — regression-tested), per-user audit trail. Client/resource/role administration shipped alongside (`/admin/clients` with dual-secret rotation, `/admin/resources`, `/admin/roles` + `/admin/role-assignments`), plus self-service `GET/DELETE /me/sessions` (api-contract §4.4) and **OIDC back-channel logout** (§5.1: per-client `backchannel_logout_uri`, transactional delivery outbox in the worker, `sid` in ID tokens, discovery flags) — closing the M2 T-204 leftover.
 
-### T-603 — Login/account UI · L
+### T-603 — Login/account UI · L — **done**
 
-Build the hosted login/registration/recovery/consent UI with `@shadow-library/ui`; wire to the auth-flow API.
+Hosted web client under `client/`, built on `@shadow-library/ui` (dark theme retheded through `--sh-*` tokens) and served by the identity service itself: the SPA shell answers `no-store` from `UiController` at `/login`, `/register`, `/recover`, `/consent`, `/account`, `/error`, and `/`; assets ride `@fastify/static` under `/assets/`. Pages render purely from the flow engine's `status` (state-machine contract): login covers password, email/SMS OTP with the resend budget, passkeys (usernameless first factor + MFA step via `@simplewebauthn/browser`), recovery codes, and the admin-forced-reset hand-off; registration and recovery walk the multi-step flows with policy feedback. The consent prompt is driven by two new endpoints (`GET/POST /api/v1/auth/consent`) that describe the client/scopes server-side and validate deny-redirects against registered URIs; `GET /api/v1/me` identifies the session for the account page, whose sensitive actions ride a step-up gate (403 `AUTH_006` → TOTP dialog → retry). CSRF echoes the http-core double-submit cookie; CSP keeps `script-src 'self'` (styles allow inline for Radix positioning). DOM page suites run under happy-dom inside `bun test`; a real-browser E2E pass stays deferred (no Playwright by design).
+
+**M6 exit criteria:** admin surfaces PDP-guarded with actor attribution, lifecycle APIs complete, back-channel logout delivered transactionally, hosted UI serving all interactive flows. ✅ (deferred: real-browser E2E, `acr`/`amr` claims, passkey-based step-up)
 
 ---
 

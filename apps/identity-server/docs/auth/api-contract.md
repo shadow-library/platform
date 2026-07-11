@@ -199,7 +199,18 @@ Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the
 - `POST /auth/webauthn/options` `{ flowId? }` → `{ flowId, options }` — assertion options; without `flowId` begins a usernameless (discoverable) login, with one serves the flow's MFA step. Neutral either way (D-12).
 - `POST /auth/challenge/verify` `{ flowId, webauthn: <assertion> }` — completes the passkey step; also accepts `{ code }` (TOTP at `AWAITING_TOTP`) and `{ recoveryCode }` at any MFA step. Sessions completing MFA (or a user-verified passkey first factor) record `AAL2`.
 
-### 4.7 Emails & phones (under `/me`, session cookie + CSRF) — _implemented (M4)_
+### 4.7 Identity summary — _implemented (M6)_
+
+`GET /me` (session cookie) → `{ userId, firstName?, lastName?, email?, aal, elevated, elevatedUntil? }` — profile basics plus session assurance for first-party surfaces (the account page renders step-up affordances from `elevated`).
+
+### 4.8 Consent interaction (session cookie + CSRF) — _implemented (M6)_
+
+The hosted consent screen's backing endpoints; the UI trusts nothing from the URL beyond the same-origin authorize link.
+
+- `GET /auth/consent?clientId=&scope=` → `{ clientName, isFirstParty, alreadyGranted, scopes: [{ name, description?, isSensitive }] }`. Standard OIDC scopes (`openid`, `profile`, `email`, `offline_access`) are described from a fixed map; resource scopes from their registrations. Unknown/inactive clients → `400`.
+- `POST /auth/consent` `{ clientId, scopeNames, decision: APPROVE|DENY, redirectUri?, state? }` → `{ decision, redirectTo? }`. APPROVE records a `USER`-sourced consent (audited); DENY answers with an `error=access_denied` redirect **only** when `redirectUri` matches the client's registration — the browser never builds one from untrusted input.
+
+### 4.9 Emails & phones (under `/me`, session cookie + CSRF) — _implemented (M4)_
 
 - `GET /me/emails` · `GET /me/phones` — list with `isPrimary` / `verifiedAt`.
 - `POST /me/emails` `{ email }` → `{ verificationId }`; `POST /me/emails/verify` `{ verificationId, code }`. Same pair for `/me/phones` (SMS OTP). Neutral when the address is verified elsewhere (D-12).
