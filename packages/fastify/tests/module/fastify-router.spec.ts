@@ -528,6 +528,31 @@ describe('FastifyRouter', () => {
       expect(handler).toBeCalledTimes(1);
     });
 
+    it('should not share cached handlers between different middleware instances', async () => {
+      const handlerOne = jest.fn().mockReturnValue(() => {});
+      const handlerTwo = jest.fn().mockReturnValue(() => {});
+      const middleware1 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler: handlerOne, instance: {} } as any;
+      const middleware2 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler: handlerTwo, instance: {} } as any;
+      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
+      await router.register([]);
+      expect(handlerOne).toBeCalledTimes(1);
+      expect(handlerTwo).toBeCalledTimes(1);
+    });
+
+    it('should bind the cache key generator to the middleware instance', async () => {
+      const instance = {
+        prefix: 'scoped',
+        cacheKey(this: { prefix: string }) {
+          return this.prefix;
+        },
+      };
+      handler.mockReturnValue(() => {});
+      const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance } as any;
+      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
+      await router.register([]);
+      expect(handler).toBeCalledTimes(1);
+    });
+
     it('should apply the response schema', async () => {
       config.responseSchema = { 200: { type: 'object' } as any };
       await router.register([]);

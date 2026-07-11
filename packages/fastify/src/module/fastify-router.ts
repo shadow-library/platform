@@ -114,7 +114,7 @@ export class FastifyRouter extends Router {
   static override readonly name = 'FastifyRouter';
 
   private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
-  private readonly cachedDynamicMiddlewares = new Map<string, MiddlewareHandler>();
+  private readonly cachedDynamicMiddlewares = new Map<object, Map<string, MiddlewareHandler>>();
   private readonly childRouter: ChildRouter<HTTPVersion.V1> | null = null;
 
   private readonly transformers: Record<string, TransformerFn> = { ...INBUILT_TRANSFORMERS };
@@ -307,15 +307,21 @@ export class FastifyRouter extends Router {
   private async getMiddlewareHandler(middleware: ParsedController<MiddlewareMetadata>, metadata: RouteMetadata): Promise<MiddlewareHandler | undefined> {
     if (!middleware.metadata.generates) return middleware.handler.bind(middleware.instance);
 
-    /** Generating the cache key and getting the cached middleware */
-    const genCacheKey = 'cacheKey' in middleware.instance && typeof middleware.instance.cacheKey === 'function' ? middleware.instance.cacheKey : stringify;
+    /** The cache is scoped per middleware instance so that two generators on the same route never share a handler */
+    const genCacheKey =
+      'cacheKey' in middleware.instance && typeof middleware.instance.cacheKey === 'function' ? middleware.instance.cacheKey.bind(middleware.instance) : stringify;
     const cacheKey = genCacheKey(metadata);
-    const cachedMiddleware = this.cachedDynamicMiddlewares.get(cacheKey);
+    let cache = this.cachedDynamicMiddlewares.get(middleware.instance);
+    if (!cache) {
+      cache = new Map();
+      this.cachedDynamicMiddlewares.set(middleware.instance, cache);
+    }
+    const cachedMiddleware = cache.get(cacheKey);
     if (cachedMiddleware) return cachedMiddleware;
 
     /** Generating the middleware handler */
     const handler = await middleware.handler.apply(middleware.instance, [metadata]);
-    this.cachedDynamicMiddlewares.set(cacheKey, handler);
+    cache.set(cacheKey, handler);
     return handler;
   }
 
