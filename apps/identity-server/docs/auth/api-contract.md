@@ -132,6 +132,8 @@ across flows (the identifier cap suppresses delivery silently — the response s
 // 200 — complete:            { "status": "COMPLETED" } + Set-Cookie
 // 200 — MFA required:        { "status": "AWAITING_TOTP", "attemptsLeft": 3 }
 // 401 — invalid:             { "code": "INVALID_CREDENTIALS", "attemptsLeft": 2 }
+// 401 — admin-forced reset:  { "status": "PASSWORD_RESET_REQUIRED" } — the password was correct
+//        but an administrator forced a reset; recover via §3. Does not burn failure budget.
 // 410 — flow terminated:     { "code": "FLOW_TERMINATED" }
 ```
 
@@ -168,18 +170,18 @@ When a flow was started by a redirect from `/oauth2/authorize`, `COMPLETED` resp
 ### 4.2 `POST /auth/signout`
 
 Requires session + CSRF. `204`; clears the session cookies and revokes the **current** session and
-its refresh-token families. Revoking every other session is `DELETE /me/sessions` (§4.4, M6).
-OIDC back-channel logout to clients is deferred until hosted-UI clients exist (M6).
+its refresh-token families. Revoking every other session is `DELETE /me/sessions` (§4.4).
+Clients registered with a `backchannel_logout_uri` receive an OIDC back-channel logout token (§6).
 
 ### 4.3 `POST /auth/step-up`
 
 Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the current session; on completion sets `elevated_until = now() + 10m`. Same challenge endpoints as login.
 
-### 4.4 Session management (under `/me`)
+### 4.4 Session management (under `/me`, session cookie + CSRF) — _implemented (M6)_
 
-- `GET /me/sessions` — list active sessions/devices (current flagged).
-- `DELETE /me/sessions/{sessionId}` — revoke one (step-up required).
-- `DELETE /me/sessions` — revoke all except current (step-up required).
+- `GET /me/sessions` → `{ sessions: [{ id, aal, createdAt, lastUsedAt, ipAddress?, ipCountry?, userAgent?, deviceName?, isCurrent }] }`.
+- `DELETE /me/sessions/{sessionId}` → `{ revoked: 1 }` — revoke one (step-up required); cascades to the session's refresh-token families and queues back-channel logout. A foreign or unknown session id answers `404` identically.
+- `DELETE /me/sessions` → `{ revoked: n }` — revoke all except current (step-up required).
 
 ### 4.5 MFA management (under `/me/mfa`, session cookie + CSRF) — _implemented (M4)_
 
@@ -207,3 +209,37 @@ Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the
 ## 5. OAuth 2.1 / OIDC endpoints
 
 Specified in `docs/architecture.md` §12; not duplicated here. The interactive flows above are reachable from `/oauth2/authorize` when no valid session exists, via `oidcResume` (§2.6).
+
+### 5.1 Back-channel logout — _implemented (M6)_
+
+Clients registered with a `backchannel_logout_uri` receive an [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) token whenever a session that issued them a refresh-token family terminates (signout, self-service revocation, admin termination, lock, erasure). The logout token is an EdDSA JWT (`iss`, `sub`, `aud` = client id, `iat`, `exp` +120 s, `jti`, `events`, `sid`; never `nonce`), POSTed as `logout_token=<jwt>` (`application/x-www-form-urlencoded`). Delivery is transactional with retries/backoff and dead-letters after 5 attempts; the worker process is the sender. ID tokens carry `sid` so clients can correlate. Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`.
+
+## 6. Administrative APIs (`/api/v1/admin/*`) — _implemented (M6)_
+
+Session cookie + CSRF; every endpoint is PDP-guarded in the platform organisation (T-601): reads need the matching `iam:*:read`/manage permission at AAL1+, mutations demand an AAL2 step-up. All mutations are actor-attributed in the audit chain.
+
+### 6.1 Users (`/admin/users`) — requires `iam:users:read` / `iam:users:manage`
+
+- `GET /admin/users?email=&status=&page=&limit=` — paginated search (email substring matches any address).
+- `GET /admin/users/{id}` — detail: identifiers, MFA summary, lock state, active-session count. Never credential material.
+- `POST /admin/users/{id}/lock` `{ mode: OTP_ONLY|FULL, until? }` — `FULL` also revokes sessions + refresh tokens. `POST …/unlock` clears (including Tier-4 locks).
+- `POST /admin/users/{id}/force-password-reset` — flags the account (§2.5) and revokes everything issued.
+- `POST /admin/users/{id}/sessions/terminate` · `POST …/deactivate` · `POST …/reactivate`.
+- `DELETE /admin/users/{id}` — right-to-erasure: scrubs PII/credentials, closes the account, keeps the audit skeleton.
+- `GET /admin/users/{id}/audit` — recent audit trail (requires `iam:audit:read`).
+
+### 6.2 Clients & resources (`/admin/clients`, `/admin/resources`) — requires `iam:clients:read` / `iam:clients:manage`
+
+- `POST /admin/clients` — register (kind, grant types, redirect URIs, `backchannelLogoutUri?`); confidential clients get their secret exactly once.
+- `GET /admin/clients` · `GET /admin/clients/{id}` · `PATCH /admin/clients/{id}` (name, `isActive`, redirect-URI set replacement, logout URI).
+- `POST /admin/clients/{id}/rotate-secret` — dual-secret rotation; previous secrets expire after a 24 h overlap.
+- `POST /admin/clients/{id}/scopes` `{ scopeId }` · `DELETE /admin/clients/{id}/scopes/{scopeId}`.
+- `GET/POST /admin/resources` · `POST /admin/resources/{id}/scopes` — API resources and their scopes.
+
+### 6.3 Roles & assignments (`/admin/roles`, `/admin/permissions`, `/admin/role-assignments`)
+
+Two-tier authorization (T-601): `iam:roles:manage` platform-wide, or `app:roles:manage` scoped to the owning application. A role can only carry permissions defined by its own application.
+
+- `POST /admin/roles` `{ applicationId, roleName, description? }` · `POST /admin/permissions` `{ applicationId, name, description? }` · `GET /admin/permissions?applicationId=`.
+- `POST /admin/roles/{roleId}/permissions` `{ permissionId }` · `DELETE /admin/roles/{roleId}/permissions/{permissionId}`.
+- `POST /admin/role-assignments` and `POST /admin/role-assignments/revoke` `{ principalType, principalId, roleId, organisationId }` · `GET /admin/role-assignments?…` (platform tier only).

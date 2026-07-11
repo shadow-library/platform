@@ -251,13 +251,13 @@ Non-root, version-pinned Bun image (digest pinned in CI via `--build-arg BUN_IMA
 
 ## M6 — Admin & platform surfaces
 
-### T-601 — Admin vs platform-admin separation · M · Sec: High
+### T-601 — Admin vs platform-admin separation · M · Sec: High — **done**
 
-Platform-admin role distinct from tenant OWNER/ADMIN; all admin actions step-up-gated + audited; break-glass procedure documented.
+Administration rides the ordinary PDP (no bespoke flags): a bootstrap-provisioned **platform organisation** scopes admin role assignments; the `iam:*` permission taxonomy is seeded on the platform application and granted to `IAMAdmin`; the bootstrap admin converges to owner + IAMAdmin on every boot. Two tiers: `iam:roles:manage` platform-wide vs `app:roles:manage` resolved through an application-filtered PDP check (permission names are unique per application, so app admins can never reach across). Reads accept AAL1; every mutation demands AAL2 step-up and is actor-attributed in the audit chain. Break-glass: `docs/runbooks.md` bootstrap-recovery procedure.
 
-### T-602 — Account lifecycle admin APIs · M
+### T-602 — Account lifecycle admin APIs · M — **done**
 
-Suspend/block/close/reactivate, soft-delete + 30-day retention, right-to-erasure workflow (PII scrub, audit skeleton preserved).
+`/api/v1/admin/users`: search/detail (never credential material), lock (`OTP_ONLY`/`FULL` — full lock cuts sessions + refresh-token families) / unlock (covers Tier-4), force-password-reset (flags the account; the password step refuses even the correct credential without burning lockout budget until recovery/change clears it), terminate sessions, deactivate/reactivate, right-to-erasure soft delete (PII + credentials scrubbed, numeric skeleton kept so the hash-chained audit trail stays verifiable — regression-tested), per-user audit trail. Client/resource/role administration shipped alongside (`/admin/clients` with dual-secret rotation, `/admin/resources`, `/admin/roles` + `/admin/role-assignments`), plus self-service `GET/DELETE /me/sessions` (api-contract §4.4) and **OIDC back-channel logout** (§5.1: per-client `backchannel_logout_uri`, transactional delivery outbox in the worker, `sid` in ID tokens, discovery flags) — closing the M2 T-204 leftover.
 
 ### T-603 — Login/account UI · L
 
