@@ -236,7 +236,7 @@ describe('Rung-3 Ollama integration', () => {
       stableContext: '## PREMISE\nA street thief discovers she can rewrite history by touching old coins.',
       overview: 'A street thief discovers she can rewrite history by touching old coins.',
     };
-    const ctx = { projectId: BigInt(1), promptKey: 'premise-enhance', promptVersion: '1.0.0', role: 'premise' };
+    const ctx = { projectId: BigInt(1), promptKey: 'premise-enhance', promptVersion: '1.1.0', role: 'premise' };
     const result = await router.structured(premiseEnhancePrompt, input, ctx);
     expect(result.enhancedPremise.length).toBeGreaterThan(20);
     expect(result.changeSet.length).toBeGreaterThan(0);

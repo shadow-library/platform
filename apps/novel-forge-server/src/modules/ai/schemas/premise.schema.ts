@@ -21,7 +21,11 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
 export class PremiseEnhanceSchema {
-  @Field({ minLength: 1, description: 'the improved premise, written as a compelling web-novel pitch' })
+  @Field({
+    minLength: 1,
+    description:
+      'the enhanced premise as an enticing back-cover-style summary (2-3 paragraphs) — the hook that makes a reader start; NOT a plot synopsis and never reveals how the story ends',
+  })
   enhancedPremise: string;
 
   @Field({ minLength: 1, description: 'the opening hook — why a reader clicks chapter 1' })
