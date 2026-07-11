@@ -82,7 +82,7 @@ Lifecycle: `PENDING → ACTIVE` (email verified) `→ SUSPENDED` (reversible, ad
 ### `user_emails`
 | Column | Notes |
 | :--- | :--- |
-| `id` uuid PK | |
+| PK `(user_id, email)` | composite PK (implementation) — also prevents duplicate claims per user |
 | `user_id` FK cascade | |
 | `email` varchar(255) | stored lowercase; **unique index on `lower(email)` WHERE `verified_at IS NOT NULL`**; a second partial unique `(user_id, email)` prevents duplicates per user |
 | `is_primary` boolean | partial unique `(user_id) WHERE is_primary` — exactly one primary |
@@ -106,10 +106,10 @@ Pivot of login methods. `id` PK, `user_id` FK cascade, `provider` enum (`PASSWOR
 ## 3. Credentials domain
 
 ### `mfa_enrollments`
-`id` PK, `user_id` FK cascade, `type` enum (`TOTP · WEBAUTHN · EMAIL_OTP`), `secret_ciphertext` bytea nullable (TOTP seed, AES-256-GCM), `kek_version`, `label`, `verified_at` (enrollment is unusable until verified), `last_used_at`, `created_at`. Unique `(user_id, type, label)`.
+`id` PK, `user_id` FK cascade, `type` enum (`TOTP · WEBAUTHN · EMAIL_OTP`), `secret_ciphertext` text nullable (TOTP seed, AES-256-GCM envelope serialized as JSON), `kek_version`, `label`, `verified_at` (enrollment is unusable until verified), `last_used_at`, `last_used_counter` bigint (highest accepted TOTP time-step — in-window replay rejection), `created_at`. Unique `(user_id, type, label)`.
 
 ### `webauthn_credentials`
-`id` PK, `user_id` FK cascade, `credential_id` bytea unique, `public_key` bytea, `sign_count` bigint, `transports` text[], `aaguid`, `backup_eligible` bool, `label`, `created_at`, `last_used_at`.
+`id` PK, `user_id` FK cascade, `credential_id` text unique (base64url), `public_key` text (base64url), `sign_count` bigint, `transports` text (comma-separated), `aaguid`, `backup_eligible` bool, `label`, `created_at`, `last_used_at`. *(Implementation stores base64url text instead of bytea: the WebAuthn JSON wire format is base64url end-to-end, so binary round-trips buy nothing.)*
 
 ### `recovery_codes`
 `id` PK, `user_id` FK cascade, `code_hash` (argon2id), `generation` int, `used_at` nullable. Regeneration invalidates the previous generation atomically.

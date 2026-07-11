@@ -154,6 +154,26 @@ Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the
 - `DELETE /me/sessions/{sessionId}` — revoke one (step-up required).
 - `DELETE /me/sessions` — revoke all except current (step-up required).
 
+### 4.5 MFA management (under `/me/mfa`, session cookie + CSRF) — *implemented (M4)*
+- `GET /me/mfa` — list verified enrollments (TOTP + passkeys).
+- `POST /me/mfa/totp/enroll` → `{ secret, uri }` (base32 seed + otpauth URI, shown once). Adding the *first* factor needs only a session; changing factors once MFA exists requires elevation.
+- `POST /me/mfa/totp/activate` `{ code }` → `{ success, recoveryCodes? }` — proof-of-possession activates the enrollment; the account's first factor also returns its one-time recovery-code batch.
+- `DELETE /me/mfa/totp` — step-up required.
+- `POST /me/mfa/step-up` `{ code }` → `{ aal, elevatedUntil }` — elevates the current session to AAL2 via TOTP.
+- `POST /me/mfa/recovery-codes` → `{ recoveryCodes }` — regenerates (step-up required); previous batch is retired atomically.
+
+### 4.6 WebAuthn (passkeys) — *implemented (M4)*
+- `POST /me/webauthn/register/options` / `POST /me/webauthn/register/verify` `{ …attestation, label? }` — registration ceremony; challenges live server-side (Redis, 5 min, single use). First factor returns recovery codes.
+- `DELETE /me/webauthn/{credentialId}` — step-up required.
+- `POST /auth/webauthn/options` `{ flowId? }` → `{ flowId, options }` — assertion options; without `flowId` begins a usernameless (discoverable) login, with one serves the flow's MFA step. Neutral either way (D-12).
+- `POST /auth/challenge/verify` `{ flowId, webauthn: <assertion> }` — completes the passkey step; also accepts `{ code }` (TOTP at `AWAITING_TOTP`) and `{ recoveryCode }` at any MFA step. Sessions completing MFA (or a user-verified passkey first factor) record `AAL2`.
+
+### 4.7 Emails & phones (under `/me`, session cookie + CSRF) — *implemented (M4)*
+- `GET /me/emails` · `GET /me/phones` — list with `isPrimary` / `verifiedAt`.
+- `POST /me/emails` `{ email }` → `{ verificationId }`; `POST /me/emails/verify` `{ verificationId, code }`. Same pair for `/me/phones` (SMS OTP). Neutral when the address is verified elsewhere (D-12).
+- `POST /me/emails/primary` · `POST /me/phones/primary` — verified identifiers only.
+- `DELETE /me/emails` · `DELETE /me/phones` (body carries the identifier) — the primary cannot be removed. Unverified claims expire after 7 days (worker).
+
 ## 5. OAuth 2.1 / OIDC endpoints
 
 Specified in `docs/architecture.md` §12; not duplicated here. The interactive flows above are reachable from `/oauth2/authorize` when no valid session exists, via `oidcResume` (§2.6).

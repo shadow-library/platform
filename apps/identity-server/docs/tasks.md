@@ -172,16 +172,16 @@ This is the authoritative build plan to take Shadow Identity from its current st
 
 ---
 
-## M4 — MFA & credential hardening
-### T-401 — TOTP enrollment + step-up · M · Sec: High
-`mfa_enrollments` (AES-GCM seed), enroll/verify/disable (step-up gated), login MFA state, `AAL2` on sessions, `acr/amr` in tokens.
-### T-402 — WebAuthn / passkeys · L · Sec: High
-`webauthn_credentials`; registration + assertion (login and MFA), sign-count regression detection, backup-eligibility handling.
-### T-403 — Recovery codes + MFA-aware recovery · M · Sec: High
-`recovery_codes` (argon2id, generations); recovery flow requires a factor for MFA accounts (overview §5) — closes the MFA-downgrade takeover.
-### T-404 — Multiple verified emails/phones + management APIs · M · Sec: Medium
-Verified-only uniqueness (DB §2), primary switching, `/me` email/phone add/verify/remove.
-**M4 exit criteria:** users enroll TOTP + passkeys, generate recovery codes; recovery cannot bypass MFA.
+## M4 — MFA & credential hardening ✅ *(implemented; api-contract §4.5–4.7)*
+### T-401 — TOTP enrollment + step-up · M · Sec: High — **done**
+`mfa_enrollments` (AES-GCM seed + `last_used_counter` replay pin), enroll/activate/disable (step-up gated), login MFA state (`AWAITING_TOTP`), `AAL2` on sessions with a bounded elevation window. *(`acr`/`amr` token claims deferred to the OIDC surface as a follow-up.)*
+### T-402 — WebAuthn / passkeys · L · Sec: High — **done**
+`webauthn_credentials`; registration + assertion via `@simplewebauthn/server` (login MFA step `AWAITING_MFA_WEBAUTHN` and usernameless first factor at AAL2), sign-count regression → reject + `security.webauthn.counter_regression` audit, backup-eligibility recorded. Tests drive real ceremonies with a software authenticator.
+### T-403 — Recovery codes + MFA-aware recovery · M · Sec: High — **done**
+`recovery_codes` (argon2id, generations, single-use, consumption alerts the user); recovery flow requires TOTP or a recovery code for MFA accounts (overview §5) — closes the MFA-downgrade takeover.
+### T-404 — Multiple verified emails/phones + management APIs · M · Sec: Medium — **done**
+Verified-only uniqueness (DB §2, partial unique indexes), primary switching (verified-only), `/me` email/phone add/verify/remove, 7-day purge of stale claims (worker), login/recovery resolve verified identifiers only.
+**M4 exit criteria:** users enroll TOTP + passkeys, generate recovery codes; recovery cannot bypass MFA. ✅
 
 ---
 
