@@ -30,6 +30,7 @@ import {
   SourceIcon,
   SunIcon,
 } from '../icons';
+import styles from './Sidebar.module.css';
 
 /**
  * Declaring types
@@ -46,33 +47,18 @@ interface ProjectNavItem {
 /**
  * Declaring constants
  */
-const SECTION_LABEL: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-  color: 'var(--sh-text-tertiary)',
-};
+/** A small square status dot whose colour follows the passed project. */
+function projectDotVar(color: string): React.CSSProperties {
+  return { '--nf-dot': color } as React.CSSProperties;
+}
 
 function Brand(): React.JSX.Element {
   return (
-    <Link to="/" aria-label="Novel Forge — all projects" style={{ height: 52, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, padding: '0 16px', color: 'inherit', textDecoration: 'none' }}>
-      <div
-        style={{
-          width: 26,
-          height: 26,
-          borderRadius: 7,
-          background: 'linear-gradient(140deg,var(--sh-indigo-500),var(--sh-indigo-700))',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          boxShadow: 'var(--sh-shadow-e1)',
-          color: '#fff',
-        }}
-      >
+    <Link to="/" aria-label="Novel Forge — all projects" className={styles.brand}>
+      <div className={styles.brandMark}>
         <BookIcon size={15} />
       </div>
-      <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700, letterSpacing: '-0.01em' }}>Novel Forge</span>
+      <span className={styles.brandName}>Novel Forge</span>
     </Link>
   );
 }
@@ -125,58 +111,33 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
   ];
 
   return (
-    <aside
-      className="nf-sidebar"
-      data-open={open}
-      style={{
-        background: 'var(--sh-surface-card)',
-        borderRight: '1px solid var(--sh-border-subtle)',
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
+    <aside className={`nf-sidebar ${styles.sidebar}`} data-open={open}>
       <Brand />
 
       {/* project switcher */}
-      <div style={{ position: 'relative', padding: '0 12px 12px', borderBottom: '1px solid var(--sh-border-subtle)' }}>
+      <div className={styles.switcher}>
         <Popover open={switcherOpen} onOpenChange={setSwitcherOpen}>
           <Popover.Trigger asChild>
-            <button
-              type="button"
-              style={{
-                width: '100%',
-                display: 'flex',
-                alignItems: 'center',
-                gap: 9,
-                padding: '8px 10px',
-                borderRadius: 'var(--sh-radius-md)',
-                border: '1px solid var(--sh-border-default)',
-                background: 'var(--sh-surface-app)',
-                cursor: 'pointer',
-                color: 'var(--sh-text-primary)',
-              }}
-            >
+            <button type="button" className={styles.switcherTrigger}>
               {inProject && project ? (
                 <>
-                  <span style={{ width: 9, height: 9, borderRadius: 2, background: projectDotColor(project), flexShrink: 0 }} />
-                  <span style={{ flex: 1, minWidth: 0, textAlign: 'left', lineHeight: 1.2 }}>
-                    <span style={{ display: 'block', fontSize: 'var(--sh-text-body-sm)', fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                      {projectTitle(project)}
-                    </span>
-                    <span style={{ display: 'block', fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{projectKindTag(project.kind)}</span>
+                  <span className={styles.projectDot} style={projectDotVar(projectDotColor(project))} />
+                  <span className={styles.projectMeta}>
+                    <span className={styles.projectName}>{projectTitle(project)}</span>
+                    <span className={styles.projectKind}>{projectKindTag(project.kind)}</span>
                   </span>
                 </>
               ) : (
                 <>
-                  <GlobeIcon size={17} style={{ color: 'var(--sh-text-secondary)', flexShrink: 0 }} />
-                  <span style={{ flex: 1, textAlign: 'left', fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, color: 'var(--sh-text-secondary)' }}>All projects</span>
+                  <GlobeIcon size={17} className={styles.iconSecondary} />
+                  <span className={styles.allProjectsLabel}>All projects</span>
                 </>
               )}
-              <ChevronsUpDownIcon size={15} style={{ color: 'var(--sh-text-tertiary)', flexShrink: 0 }} />
+              <ChevronsUpDownIcon size={15} className={styles.iconTertiary} />
             </button>
           </Popover.Trigger>
-          <Popover.Content align="start" sideOffset={6} style={{ width: 226, padding: 6 }}>
-            <div style={{ ...SECTION_LABEL, padding: '6px 10px 4px' }}>Switch project</div>
+          <Popover.Content align="start" sideOffset={6} className={styles.switcherMenu}>
+            <div className={`${styles.sectionLabel} ${styles.sectionLabelSwitcher}`}>Switch project</div>
             {projects.map(p => (
               <button
                 key={p.id}
@@ -186,25 +147,24 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
                   navigate({ to: '/novels/$novelId/overview', params: { novelId: p.id } });
                 }}
               >
-                <span style={{ width: 9, height: 9, borderRadius: 2, background: projectDotColor(p), flexShrink: 0 }} />
-                <span style={{ flex: 1, minWidth: 0 }}>
-                  <span style={{ display: 'block', fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{projectTitle(p)}</span>
-                  <span style={{ display: 'block', fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{projectKindTag(p.kind)}</span>
+                <span className={styles.projectDot} style={projectDotVar(projectDotColor(p))} />
+                <span className={styles.rowMeta}>
+                  <span className={styles.rowName}>{projectTitle(p)}</span>
+                  <span className={styles.projectKind}>{projectKindTag(p.kind)}</span>
                 </span>
-                {p.id === novelId && <CheckIcon size={14} style={{ color: 'var(--sh-accent)' }} />}
+                {p.id === novelId && <CheckIcon size={14} className={styles.iconAccent} />}
               </button>
             ))}
-            <div style={{ height: 1, background: 'var(--sh-border-subtle)', margin: '5px 4px' }} />
+            <div className={styles.menuDivider} />
             <button
-              className="nf-selrow"
-              style={{ color: 'var(--sh-text-secondary)' }}
+              className={`nf-selrow ${styles.rowMuted}`}
               onClick={() => {
                 setSwitcherOpen(false);
                 navigate({ to: '/' });
               }}
             >
-              <GridIcon size={16} style={{ flexShrink: 0 }} />
-              <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 500 }}>View all projects</span>
+              <GridIcon size={16} className={styles.iconShrink} />
+              <span className={styles.rowActionLabel}>View all projects</span>
             </button>
           </Popover.Content>
         </Popover>
@@ -212,7 +172,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
 
       {/* nav */}
       {inProject ? (
-        <nav className="nf-scroll nf-swap" style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 2 }} aria-label="Project navigation">
+        <nav className={`nf-scroll nf-swap ${styles.nav}`} aria-label="Project navigation">
           {projectNav
             .filter(item => !item.sourceOnly || project?.kind === 'source')
             .map(item => {
@@ -220,7 +180,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
               return (
                 <Link key={item.to} to={item.to} params={{ novelId: novelId ?? '' }} className="nf-nav" data-active={active} aria-current={active ? 'page' : undefined}>
                   {item.icon}
-                  <span style={{ flex: 1 }}>{item.label}</span>
+                  <span className={styles.navLabel}>{item.label}</span>
                   {item.badge != null && item.badge > 0 && (
                     <Badge intent={item.warnBadge ? 'warning' : 'neutral'} variant="count">
                       {item.badge}
@@ -229,7 +189,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
                 </Link>
               );
             })}
-          <div style={{ height: 1, background: 'var(--sh-border-subtle)', margin: '12px 4px' }} />
+          <div className={styles.navDivider} />
           <Link
             to="/novels/$novelId/settings"
             params={{ novelId: novelId ?? '' }}
@@ -238,45 +198,37 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
             aria-current={isActive('/novels/$novelId/settings') ? 'page' : undefined}
           >
             <SettingsIcon />
-            <span style={{ flex: 1 }}>Project Settings</span>
+            <span className={styles.navLabel}>Project Settings</span>
           </Link>
 
-          <div style={{ flex: 1 }} />
-          <div style={{ padding: '10px 8px 4px' }}>
-            <div style={{ ...SECTION_LABEL, marginBottom: 8 }}>Lifecycle</div>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 4, marginBottom: 6 }}>
+          <div className={styles.spacer} />
+          <div className={styles.lifecycle}>
+            <div className={`${styles.sectionLabel} ${styles.sectionLabelLifecycle}`}>Lifecycle</div>
+            <div className={styles.lifecycleBar}>
               {Array.from({ length: phase.total }).map((_, i) => (
-                <div
-                  key={i}
-                  style={{
-                    flex: 1,
-                    height: 5,
-                    borderRadius: 99,
-                    background: i < phase.completed ? 'var(--sh-success-solid)' : i === phase.completed ? 'var(--sh-accent)' : 'var(--sh-bg-pressed)',
-                  }}
-                />
+                <div key={i} className={styles.lifecycleSeg} data-state={i < phase.completed ? 'done' : i === phase.completed ? 'current' : 'todo'} />
               ))}
             </div>
-            <div style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>
+            <div className={styles.lifecycleLabel}>
               {phase.label} · {phase.completed} of {phase.total} phases
             </div>
           </div>
         </nav>
       ) : (
-        <nav className="nf-scroll nf-swap" style={{ flex: 1, padding: 12, display: 'flex', flexDirection: 'column', gap: 2 }} aria-label="Global navigation">
+        <nav className={`nf-scroll nf-swap ${styles.nav}`} aria-label="Global navigation">
           <Link to="/" className="nf-nav" data-active={pathname === '/'} aria-current={pathname === '/' ? 'page' : undefined}>
             <GridIcon />
-            <span style={{ flex: 1 }}>Projects</span>
+            <span className={styles.navLabel}>Projects</span>
           </Link>
 
           {projects.length > 0 && (
             <>
-              <div style={{ height: 1, background: 'var(--sh-border-subtle)', margin: '12px 4px' }} />
-              <div style={{ ...SECTION_LABEL, padding: '4px 10px 6px' }}>Pinned</div>
+              <div className={styles.navDivider} />
+              <div className={`${styles.sectionLabel} ${styles.sectionLabelPinned}`}>Pinned</div>
               {projects.slice(0, 3).map(p => (
                 <Link key={p.id} to="/novels/$novelId/overview" params={{ novelId: p.id }} className="nf-nav">
-                  <span style={{ width: 16, display: 'flex', justifyContent: 'center' }}>
-                    <span style={{ width: 8, height: 8, borderRadius: 2, background: projectDotColor(p) }} />
+                  <span className={styles.pinnedDotWrap}>
+                    <span className={styles.pinnedDot} style={projectDotVar(projectDotColor(p))} />
                   </span>
                   {projectTitle(p)}
                 </Link>
@@ -287,11 +239,11 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
       )}
 
       {/* user footer */}
-      <div style={{ flexShrink: 0, padding: '10px 12px', borderTop: '1px solid var(--sh-border-subtle)', display: 'flex', alignItems: 'center', gap: 10 }}>
+      <div className={styles.footer}>
         <Avatar name="Rowan Keller" size="sm" />
-        <div style={{ flex: 1, lineHeight: 1.15, overflow: 'hidden' }}>
-          <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>Rowan Keller</div>
-          <div style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>Author workspace</div>
+        <div className={styles.footerInfo}>
+          <div className={styles.footerName}>Rowan Keller</div>
+          <div className={styles.footerRole}>Author workspace</div>
         </div>
         <Tooltip content={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
           <IconButton variant="ghost" size="sm" aria-label="Toggle theme" icon={theme === 'dark' ? <SunIcon /> : <MoonIcon />} onClick={toggleTheme} />

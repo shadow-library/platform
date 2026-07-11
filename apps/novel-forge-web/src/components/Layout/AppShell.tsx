@@ -9,6 +9,7 @@ import { type PropsWithChildren, useEffect, useState } from 'react';
  */
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
+import styles from './AppShell.module.css';
 
 /**
  * The application chrome shared by every screen: a mode-aware sidebar, the top
@@ -25,14 +26,12 @@ export default function AppShell({ children }: PropsWithChildren): React.JSX.Ele
   useEffect(() => setNavOpen(false), [pathname]);
 
   return (
-    <div style={{ display: 'flex', height: '100vh', width: '100%', overflow: 'hidden', background: 'var(--sh-surface-app)' }}>
+    <div className={styles.shell}>
       <Sidebar open={navOpen} />
       <div className="nf-shell-scrim" data-open={navOpen} onClick={() => setNavOpen(false)} aria-hidden="true" />
-      <main style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+      <main className={styles.main}>
         <Topbar onMenuClick={() => setNavOpen(true)} />
-        <div className="nf-scroll" style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-          {children}
-        </div>
+        <div className={`nf-scroll ${styles.content}`}>{children}</div>
       </main>
     </div>
   );

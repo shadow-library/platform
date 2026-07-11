@@ -1,0 +1,149 @@
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 28px 28px 60px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.toolbarNote {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+}
+
+.card {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.stripe {
+  height: 4px;
+}
+
+.stripe[data-kind='source'] {
+  background: linear-gradient(90deg, var(--sh-indigo-500), var(--sh-indigo-700));
+}
+
+.stripe[data-kind='new_novel'] {
+  background: linear-gradient(90deg, var(--sh-green-400), var(--sh-green-600));
+}
+
+.cardBody {
+  padding: 16px 16px 14px;
+}
+
+.chipRow {
+  margin-bottom: 6px;
+}
+
+.cardTitle {
+  margin: 8px 0 0;
+  font-size: var(--sh-text-body-lg);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.cardSub {
+  margin: 3px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin: 14px 0 12px;
+}
+
+.statValue {
+  font-size: 18px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.statTotal {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  font-weight: 500;
+}
+
+.statLabel {
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
+}
+
+.planValue {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+}
+
+.planValue[data-approved='true'] {
+  color: var(--sh-success-text-on-subtle);
+}
+
+.cardFooter {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.cardTime {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.newCard {
+  background: transparent;
+  border: 1.5px dashed var(--sh-border-default);
+  border-radius: var(--sh-radius-lg);
+  min-height: 210px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  cursor: pointer;
+  color: var(--sh-text-tertiary);
+}
+
+.newIcon {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.newLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.newHint {
+  font-size: var(--sh-text-caption);
+}

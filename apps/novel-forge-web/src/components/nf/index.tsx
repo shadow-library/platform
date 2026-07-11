@@ -10,28 +10,9 @@ import { type CSSProperties, type ReactElement, type ReactNode } from 'react';
 
 import { type ApiError } from '@/lib/apis';
 import { SparkIcon } from '../icons';
+import styles from './nf.module.css';
 
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'ai';
-
-const CHIP_STYLES: Record<ChipIntent, CSSProperties> = {
-  neutral: { background: 'var(--sh-bg-pressed)', color: 'var(--sh-text-secondary)' },
-  info: { background: 'var(--sh-info-bg-subtle)', color: 'var(--sh-info-text-on-subtle)' },
-  success: { background: 'var(--sh-success-bg-subtle)', color: 'var(--sh-success-text-on-subtle)' },
-  warning: { background: 'var(--sh-warning-bg-subtle)', color: 'var(--sh-warning-text-on-subtle)' },
-  danger: { background: 'var(--sh-danger-bg-subtle)', color: 'var(--sh-danger-text-on-subtle)' },
-  accent: { background: 'var(--sh-accent-soft)', color: 'var(--sh-accent)' },
-  ai: { background: 'var(--sh-accent-soft)', color: 'var(--sh-accent)' },
-};
-
-const DOT_COLORS: Record<ChipIntent, string> = {
-  neutral: 'var(--sh-text-tertiary)',
-  info: 'var(--sh-info-solid)',
-  success: 'var(--sh-success-solid)',
-  warning: 'var(--sh-warning-solid)',
-  danger: 'var(--sh-danger-solid)',
-  accent: 'var(--sh-accent)',
-  ai: 'var(--sh-accent)',
-};
 
 interface StatusChipProps {
   intent?: ChipIntent;
@@ -39,11 +20,11 @@ interface StatusChipProps {
   children: ReactNode;
 }
 
-/** A small, colour-coded status chip — the design's `.nf-chip`. */
+/** A small, colour-coded status chip — the design's `.nf-chip` (intent surfaces live in styles.css). */
 export function StatusChip({ intent = 'neutral', dot = false, children }: StatusChipProps): ReactElement {
   return (
-    <span className="nf-chip" style={CHIP_STYLES[intent]}>
-      {dot && <span style={{ width: 6, height: 6, borderRadius: '50%', background: DOT_COLORS[intent] }} />}
+    <span className="nf-chip" data-intent={intent}>
+      {dot && <span className="nf-dot" />}
       {children}
     </span>
   );
@@ -65,51 +46,19 @@ export function AiTag({ children = 'AI', icon = true }: AiTagProps): ReactElemen
 }
 
 /**
- * Shared layout dimensions. Every screen draws from these so navigating between
- * pages never shifts the content column or the split-pane rail — keeping the
- * spatial rhythm constant is what keeps the app from feeling "jumpy".
+ * Shared layout primitives live as global classes in styles.css so navigating between pages never
+ * shifts the content column or the split-pane rail: `.nf-page` (centered column), `.nf-splitpane`,
+ * `.nf-rail`, and `.nf-detail`, all sized from the `--nf-*` dimension variables.
  */
-export const PAGE_MAX_WIDTH = 1120; // centered content column (overview, volumes, settings, …)
-export const RAIL_WIDTH = 380; // the list rail in split-pane screens (review, chat, proposals, runs, bible)
-export const DETAIL_MIN_WIDTH = 480; // detail pane min width before the split-pane scrolls horizontally
-
-/** The outer flex container for a split-pane screen: a fixed list rail beside a fluid detail pane. */
-export const splitPaneStyle: CSSProperties = {
-  position: 'absolute',
-  inset: 0,
-  display: 'flex',
-  overflowX: 'auto',
-  overflowY: 'hidden',
-  background: 'var(--sh-surface-app)',
-};
-
-/** The list rail itself — a card-surfaced, bordered column of a shared width. */
-export const railStyle: CSSProperties = {
-  width: RAIL_WIDTH,
-  flexShrink: 0,
-  borderRight: '1px solid var(--sh-border-subtle)',
-  background: 'var(--sh-surface-card)',
-  display: 'flex',
-  flexDirection: 'column',
-};
-
-/** The detail pane beside the rail — fluid, but never narrower than `DETAIL_MIN_WIDTH`. */
-export const detailPaneStyle: CSSProperties = {
-  flex: 1,
-  minWidth: DETAIL_MIN_WIDTH,
-  display: 'flex',
-  flexDirection: 'column',
-  background: 'var(--sh-surface-app)',
-};
 
 interface PageContainerProps {
   children: ReactNode;
-  style?: CSSProperties;
+  className?: string;
 }
 
 /** The centered content column shared by the non-split-pane screens. */
-export function PageContainer({ children, style }: PageContainerProps): ReactElement {
-  return <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '28px 28px 80px', ...style }}>{children}</div>;
+export function PageContainer({ children, className }: PageContainerProps): ReactElement {
+  return <div className={`nf-page ${styles.pageContainer}${className ? ` ${className}` : ''}`}>{children}</div>;
 }
 
 interface PageHeaderProps {
@@ -122,15 +71,15 @@ interface PageHeaderProps {
 /** The standard page header: title on the left, actions on the right, optional subtitle and tags. */
 export function PageHeader({ title, subtitle, extra, tags }: PageHeaderProps): ReactElement {
   return (
-    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', marginBottom: 20 }}>
-      <div style={{ minWidth: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <h1 style={{ margin: 0, fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{title}</h1>
+    <div className={styles.pageHeader}>
+      <div className={styles.pageHeaderMain}>
+        <div className={styles.pageHeaderTitleRow}>
+          <h1 className={styles.pageTitle}>{title}</h1>
           {tags}
         </div>
-        {subtitle && <p style={{ margin: '4px 0 0', fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)' }}>{subtitle}</p>}
+        {subtitle && <p className={styles.pageSubtitle}>{subtitle}</p>}
       </div>
-      {extra && <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>{extra}</div>}
+      {extra && <div className={styles.pageHeaderExtra}>{extra}</div>}
     </div>
   );
 }
@@ -139,16 +88,16 @@ interface SectionCardProps {
   title?: ReactNode;
   action?: ReactNode;
   children: ReactNode;
-  style?: CSSProperties;
+  className?: string;
 }
 
 /** A titled surface card used to group content on the screens. */
-export function SectionCard({ title, action, children, style }: SectionCardProps): ReactElement {
+export function SectionCard({ title, action, children, className }: SectionCardProps): ReactElement {
   return (
-    <section style={{ background: 'var(--sh-surface-card)', border: '1px solid var(--sh-border-subtle)', borderRadius: 'var(--sh-radius-lg)', padding: '20px 22px', ...style }}>
+    <section className={`${styles.sectionCard}${className ? ` ${className}` : ''}`}>
       {(title || action) && (
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, marginBottom: 16 }}>
-          {title && <h3 style={{ margin: 0, fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>{title}</h3>}
+        <div className={styles.sectionHead}>
+          {title && <h3 className={styles.sectionTitle}>{title}</h3>}
           {action}
         </div>
       )}
@@ -179,7 +128,7 @@ interface QueryStateProps {
 export function QueryState({ isLoading, error, isEmpty, emptyTitle = 'Nothing here yet', emptyDescription, emptyAction, children }: QueryStateProps): ReactElement {
   if (isLoading)
     return (
-      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', padding: 64 }}>
+      <div className={styles.queryLoading}>
         <Spinner size="lg" label="Loading" />
       </div>
     );
@@ -204,18 +153,16 @@ interface AssetBoxProps {
 export function AssetBox({ height = 80, width, radius = 8, color }: AssetBoxProps): ReactElement {
   return (
     <div
-      style={{
-        height,
-        width: width ?? '100%',
-        borderRadius: radius,
-        flex: '0 0 auto',
-        border: '1.5px solid var(--sh-border-subtle)',
-        background: color ?? 'var(--sh-surface-well)',
-        backgroundImage: color
-          ? undefined
-          : `linear-gradient(to top right, transparent calc(50% - 1px), var(--sh-border-default) calc(50% - 1px), var(--sh-border-default) calc(50% + 1px), transparent calc(50% + 1px)),
-             linear-gradient(to top left, transparent calc(50% - 1px), var(--sh-border-default) calc(50% - 1px), var(--sh-border-default) calc(50% + 1px), transparent calc(50% + 1px))`,
-      }}
+      className={styles.assetBox}
+      data-solid={color ? 'true' : undefined}
+      style={
+        {
+          '--nf-asset-h': `${height}px`,
+          '--nf-asset-w': typeof width === 'number' ? `${width}px` : (width ?? '100%'),
+          '--nf-asset-r': `${radius}px`,
+          ...(color ? { '--nf-asset-bg': color } : {}),
+        } as CSSProperties
+      }
     />
   );
 }
@@ -223,7 +170,7 @@ export function AssetBox({ height = 80, width, radius = 8, color }: AssetBoxProp
 /** A full-height centred spinner for suspense-style waits inside a pane. */
 export function PaneLoader(): ReactElement {
   return (
-    <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%', padding: 48 }}>
+    <div className={styles.paneLoader}>
       <Spinner size="lg" label="Loading" />
     </div>
   );
@@ -236,7 +183,7 @@ interface PaneErrorProps {
 /** A retry-capable inline error, for panes that manage their own layout. */
 export function PaneError({ error }: PaneErrorProps): ReactElement {
   return (
-    <div style={{ padding: 24 }}>
+    <div className={styles.paneError}>
       <Alert intent="danger" title="Something went wrong" action={{ label: 'Retry', onClick: () => window.location.reload() }}>
         {error.message}
       </Alert>

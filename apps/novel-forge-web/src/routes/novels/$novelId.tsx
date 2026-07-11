@@ -10,13 +10,15 @@ import { Outlet, createFileRoute, notFound, useNavigate } from '@tanstack/react-
 import { APIRequest, ApiError } from '@/lib/apis';
 import { AppShell } from '@/components/Layout';
 
+import styles from './$novelId.module.css';
+
 // A missing novel is a genuine 404: resolving it in the loader lets us render the standard
 // page-not-found chrome instead of booting the project workspace (sidebar, nav, lifecycle bar)
 // around a project that doesn't exist and then surfacing "Project not found" inside it.
 function NovelNotFound(): React.JSX.Element {
   const navigate = useNavigate();
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 28, background: 'var(--sh-surface-app)' }}>
+    <div className={styles.notFound}>
       <EmptyState
         size="page"
         title="Page not found"

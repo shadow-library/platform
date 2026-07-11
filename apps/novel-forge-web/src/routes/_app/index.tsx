@@ -14,16 +14,13 @@ import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { type ProjectKind, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
 import { projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
+import styles from './index.module.css';
+
 export const Route = createFileRoute('/_app/')({
   component: Dashboard,
 });
 
 type Filter = 'all' | 'source' | 'new_novel';
-
-const STRIPE: Record<ProjectKind, string> = {
-  source: 'linear-gradient(90deg,var(--sh-indigo-500),var(--sh-indigo-700))',
-  new_novel: 'linear-gradient(90deg,var(--sh-green-400),var(--sh-green-600))',
-};
 
 interface StatProps {
   value?: number;
@@ -34,11 +31,11 @@ interface StatProps {
 function Stat({ value, total, label }: StatProps): React.JSX.Element {
   return (
     <div>
-      <div style={{ fontSize: 18, fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>
+      <div className={styles.statValue}>
         {value ?? 0}
-        {total != null && <span style={{ fontSize: 12, color: 'var(--sh-text-tertiary)', fontWeight: 500 }}>/{total}</span>}
+        {total != null && <span className={styles.statTotal}>/{total}</span>}
       </div>
-      <div style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{label}</div>
+      <div className={styles.statLabel}>{label}</div>
     </div>
   );
 }
@@ -59,34 +56,35 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
 
   return (
     <div
-      className="nf-cardhover"
+      className={`nf-cardhover ${styles.card}`}
       role="button"
       tabIndex={0}
       onClick={open}
       onKeyDown={e => {
         if (e.key === 'Enter' || e.key === ' ') open();
       }}
-      style={{ background: 'var(--sh-surface-card)', border: '1px solid var(--sh-border-subtle)', borderRadius: 'var(--sh-radius-lg)', overflow: 'hidden', cursor: 'pointer' }}
     >
-      <div style={{ height: 4, background: STRIPE[project.kind] }} />
-      <div style={{ padding: '16px 16px 14px' }}>
-        <div style={{ marginBottom: 6 }}>
+      <div className={styles.stripe} data-kind={project.kind} />
+      <div className={styles.cardBody}>
+        <div className={styles.chipRow}>
           <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)}</StatusChip>
         </div>
-        <h3 style={{ margin: '8px 0 0', fontSize: 'var(--sh-text-body-lg)', fontWeight: 700, letterSpacing: '-0.01em' }}>{projectTitle(project)}</h3>
-        <p style={{ margin: '3px 0 0', fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>
+        <h3 className={styles.cardTitle}>{projectTitle(project)}</h3>
+        <p className={styles.cardSub}>
           {projectKindLabel(project.kind)}
           {project.storyCurrentChapter ? ` · Chapter ${project.storyCurrentChapter}` : ''}
         </p>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 8, margin: '14px 0 12px' }}>
+        <div className={styles.statGrid}>
           <Stat value={status?.chaptersExtracted} total={status?.chaptersTotal} label={isSource ? 'chapters extracted' : 'chapters planned'} />
           <Stat value={status?.draftsFinal} total={status?.draftsTotal} label="drafts final" />
           <div>
-            <div style={{ fontSize: 14, fontWeight: 600, color: status?.planApproved ? 'var(--sh-success-text-on-subtle)' : 'var(--sh-text-tertiary)' }}>{status?.planApproved ? 'Yes' : 'No'}</div>
-            <div style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>plan approved</div>
+            <div className={styles.planValue} data-approved={status?.planApproved ?? false}>
+              {status?.planApproved ? 'Yes' : 'No'}
+            </div>
+            <div className={styles.statLabel}>plan approved</div>
           </div>
         </div>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', paddingTop: 12, borderTop: '1px solid var(--sh-border-subtle)' }}>
+        <div className={styles.cardFooter}>
           {draftsDone ? (
             <StatusChip intent="success">On track</StatusChip>
           ) : status?.planApproved ? (
@@ -94,7 +92,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
           ) : (
             <StatusChip intent="neutral">Planning</StatusChip>
           )}
-          <span style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>{relativeTime(project.updatedAt)}</span>
+          <span className={styles.cardTime}>{relativeTime(project.updatedAt)}</span>
         </div>
       </div>
     </div>
@@ -119,7 +117,7 @@ function Dashboard(): React.JSX.Element {
   };
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '28px 28px 60px' }}>
+    <div className={styles.page}>
       <PageHeader
         title="Projects"
         subtitle={`${projects.length} project${projects.length === 1 ? '' : 's'} · ${sourceCount} source · ${newCount} original`}
@@ -135,14 +133,14 @@ function Dashboard(): React.JSX.Element {
         }
       />
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 20 }}>
+      <div className={styles.toolbar}>
         <SegmentedControl value={filter} onValueChange={v => setFilter(v as Filter)}>
           <SegmentedControl.Item value="all">All {projects.length}</SegmentedControl.Item>
           <SegmentedControl.Item value="source">Source {sourceCount}</SegmentedControl.Item>
           <SegmentedControl.Item value="new_novel">Original {newCount}</SegmentedControl.Item>
         </SegmentedControl>
-        <div style={{ flex: 1 }} />
-        <span style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>Sorted by last activity</span>
+        <div className={styles.spacer} />
+        <span className={styles.toolbarNote}>Sorted by last activity</span>
       </div>
 
       <QueryState
@@ -153,42 +151,16 @@ function Dashboard(): React.JSX.Element {
         emptyDescription="Create your first novel or import a source to get started."
         emptyAction={{ label: 'New project', onClick: () => openCreate('new_novel') }}
       >
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(340px,1fr))', gap: 16 }}>
+        <div className={styles.grid}>
           {visible.map(project => (
             <ProjectCard key={project.id} project={project} />
           ))}
-          <button
-            onClick={() => openCreate('new_novel')}
-            style={{
-              background: 'transparent',
-              border: '1.5px dashed var(--sh-border-default)',
-              borderRadius: 'var(--sh-radius-lg)',
-              minHeight: 210,
-              display: 'flex',
-              flexDirection: 'column',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 10,
-              cursor: 'pointer',
-              color: 'var(--sh-text-tertiary)',
-            }}
-          >
-            <span
-              style={{
-                width: 40,
-                height: 40,
-                borderRadius: '50%',
-                background: 'var(--sh-surface-card)',
-                border: '1px solid var(--sh-border-subtle)',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}
-            >
+          <button onClick={() => openCreate('new_novel')} className={styles.newCard}>
+            <span className={styles.newIcon}>
               <PlusIcon size={20} />
             </span>
-            <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600 }}>New project</span>
-            <span style={{ fontSize: 'var(--sh-text-caption)' }}>Start from premise or import source</span>
+            <span className={styles.newLabel}>New project</span>
+            <span className={styles.newHint}>Start from premise or import source</span>
           </button>
         </div>
       </QueryState>

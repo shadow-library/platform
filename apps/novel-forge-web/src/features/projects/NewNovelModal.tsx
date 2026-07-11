@@ -10,6 +10,8 @@ import { useState } from 'react';
 import { AiTag } from '@/components/nf';
 import { type CreateProjectBody, type ProjectResponse, useCreateProjectMutation } from '@/lib/apis';
 
+import styles from './NewNovelModal.module.css';
+
 type Kind = CreateProjectBody['kind'];
 type Mode = NonNullable<CreateProjectBody['contentMode']>;
 
@@ -72,7 +74,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'ne
       <Dialog.Content size="md">
         <Dialog.Header title="Start a new novel" description="Create an original novel or adapt one from a source." />
         <Dialog.Body>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className={styles.form}>
             <FormField label="Working title" required error={titleError}>
               <Input placeholder="e.g. The Ashfall Chronicles" value={title} onValueChange={setTitle} invalid={Boolean(titleError)} autoFocus />
             </FormField>
@@ -93,10 +95,10 @@ export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'ne
                 <SegmentedControl.Item value="grok_only">Grok only</SegmentedControl.Item>
               </SegmentedControl>
             </FormField>
-            <div style={{ border: '1.5px dashed var(--sh-accent-soft)', background: 'var(--sh-accent-soft)', borderRadius: 'var(--sh-radius-md)', padding: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className={styles.hint}>
+              <div className={styles.hintRow}>
                 <AiTag>AI</AiTag>
-                <span style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-secondary)' }}>
+                <span className={styles.hintText}>
                   After creating, open the novel and run <strong>Plan</strong> to have AI draft the Story Bible, cast, and outline.
                 </span>
               </div>

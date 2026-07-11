@@ -1,0 +1,259 @@
+.brand {
+  height: 52px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 16px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.brandMark {
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(140deg, var(--sh-indigo-500), var(--sh-indigo-700));
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--sh-shadow-e1);
+  color: #fff;
+}
+
+.brandName {
+  font-size: var(--sh-text-body);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.sidebar {
+  background: var(--sh-surface-card);
+  border-right: 1px solid var(--sh-border-subtle);
+  display: flex;
+  flex-direction: column;
+}
+
+.switcher {
+  position: relative;
+  padding: 0 12px 12px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.switcherTrigger {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-app);
+  cursor: pointer;
+  color: var(--sh-text-primary);
+}
+
+.switcherMenu {
+  width: 226px;
+  padding: 6px;
+}
+
+/* A small square status dot; the caller sets its colour via the `--nf-dot` custom property. */
+.projectDot {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  flex-shrink: 0;
+  background: var(--nf-dot);
+}
+
+.projectMeta {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  line-height: 1.2;
+}
+
+.projectName {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.projectKind {
+  display: block;
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
+}
+
+.allProjectsLabel {
+  flex: 1;
+  text-align: left;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+.iconSecondary {
+  color: var(--sh-text-secondary);
+  flex-shrink: 0;
+}
+
+.iconTertiary {
+  color: var(--sh-text-tertiary);
+  flex-shrink: 0;
+}
+
+.iconAccent {
+  color: var(--sh-accent);
+}
+
+.iconShrink {
+  flex-shrink: 0;
+}
+
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.sectionLabelSwitcher {
+  padding: 6px 10px 4px;
+}
+
+.sectionLabelPinned {
+  padding: 4px 10px 6px;
+}
+
+.sectionLabelLifecycle {
+  margin-bottom: 8px;
+}
+
+.rowMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.rowName {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowMuted {
+  color: var(--sh-text-secondary);
+}
+
+.rowActionLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+}
+
+.menuDivider {
+  height: 1px;
+  background: var(--sh-border-subtle);
+  margin: 5px 4px;
+}
+
+.nav {
+  flex: 1;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.navLabel {
+  flex: 1;
+}
+
+.navDivider {
+  height: 1px;
+  background: var(--sh-border-subtle);
+  margin: 12px 4px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.lifecycle {
+  padding: 10px 8px 4px;
+}
+
+.lifecycleBar {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 6px;
+}
+
+.lifecycleSeg {
+  flex: 1;
+  height: 5px;
+  border-radius: 99px;
+  background: var(--sh-bg-pressed);
+}
+
+.lifecycleSeg[data-state='done'] {
+  background: var(--sh-success-solid);
+}
+
+.lifecycleSeg[data-state='current'] {
+  background: var(--sh-accent);
+}
+
+.lifecycleLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.pinnedDotWrap {
+  width: 16px;
+  display: flex;
+  justify-content: center;
+}
+
+.pinnedDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--nf-dot);
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 10px 12px;
+  border-top: 1px solid var(--sh-border-subtle);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footerInfo {
+  flex: 1;
+  line-height: 1.15;
+  overflow: hidden;
+}
+
+.footerName {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.footerRole {
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
+}

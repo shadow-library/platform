@@ -1,0 +1,73 @@
+.tabPanel {
+  padding-top: 20px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.alertWrap {
+  margin-bottom: 16px;
+}
+
+.modelGroup {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+  margin-bottom: 16px;
+}
+
+.modelGroupHead {
+  padding: 13px 20px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+}
+
+.roleRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 20px;
+}
+
+.roleRow:not(:last-child) {
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.roleInfo {
+  flex: 1;
+}
+
+.roleLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+}
+
+.roleHint {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.rolePicker {
+  min-width: 210px;
+}
+
+.saveRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.dangerText {
+  margin: 0 0 14px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}

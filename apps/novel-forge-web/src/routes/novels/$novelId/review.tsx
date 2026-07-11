@@ -9,8 +9,10 @@ import { useEffect, useState } from 'react';
  * Importing user defined modules
  */
 import { WarningIcon } from '@/components/icons';
-import { PaneError, PaneLoader, StatusChip, detailPaneStyle, railStyle, splitPaneStyle, type ChipIntent } from '@/components/nf';
+import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
 import { type DraftResponse, type FeedbackBody, useApproveDraftMutation, useDraftFeedbackMutation, useReviewQueueQuery, useReviseDraftMutation } from '@/lib/apis';
+
+import styles from './review.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/review')({
   component: ReviewScreen,
@@ -113,84 +115,42 @@ function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element 
 
   return (
     <>
-      <div
-        style={{
-          flexShrink: 0,
-          padding: '14px 24px',
-          borderBottom: '1px solid var(--sh-border-subtle)',
-          background: 'var(--sh-surface-card)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-        }}
-      >
-        <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-text-tertiary)' }}>CH.{String(draft.chapter).padStart(2, '0')}</span>
-        <span style={{ fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>{draft.title ?? 'Untitled chapter'}</span>
+      <div className={styles.head}>
+        <span className={styles.chapNum}>CH.{String(draft.chapter).padStart(2, '0')}</span>
+        <span className={styles.chapTitle}>{draft.title ?? 'Untitled chapter'}</span>
         <StatusChip intent={intent}>{draft.reviewStatus}</StatusChip>
-        <div style={{ flex: 1 }} />
+        <div className={styles.spacer} />
         <Tooltip content="Open in chapters">
           <IconButton
             variant="secondary"
             size="sm"
             aria-label="Open in chapters"
-            icon={<span style={{ fontSize: 15 }}>↗</span>}
+            icon={<span className={styles.glyph}>↗</span>}
             onClick={() => navigate({ to: '/novels/$novelId/chapters', params: { novelId } })}
           />
         </Tooltip>
       </div>
 
-      <div className="nf-scroll" style={{ flex: 1, minHeight: 0, padding: '22px 24px' }}>
-        <div style={{ maxWidth: 680, margin: '0 auto' }}>
-          <div
-            style={{
-              border: `1px solid ${isContradiction ? 'var(--sh-danger-border)' : 'var(--sh-border-subtle)'}`,
-              background: isContradiction ? 'var(--sh-danger-bg-subtle)' : 'var(--sh-surface-card)',
-              borderRadius: 'var(--sh-radius-lg)',
-              padding: '14px 16px',
-              marginBottom: 18,
-            }}
-          >
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
-              <WarningIcon size={16} style={{ color: isContradiction ? 'var(--sh-danger-solid)' : 'var(--sh-warning-solid)' }} />
-              <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700, color: isContradiction ? 'var(--sh-danger-text-on-subtle)' : 'var(--sh-text-primary)' }}>
-                Judge verdict: {draft.judge ?? draft.reviewStatus}
-              </span>
+      <div className={`nf-scroll ${styles.detailScroll}`}>
+        <div className={styles.detailInner}>
+          <div className={styles.verdict} data-contradiction={isContradiction}>
+            <div className={styles.verdictHead}>
+              <WarningIcon size={16} className={styles.verdictIcon} />
+              <span className={styles.verdictTitle}>Judge verdict: {draft.judge ?? draft.reviewStatus}</span>
             </div>
-            <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)', lineHeight: 1.55 }}>
-              {draft.judgeNote ?? 'Awaiting reviewer sign-off. Read the draft and approve, request a revision, or reject.'}
-            </p>
+            <p className={styles.verdictNote}>{draft.judgeNote ?? 'Awaiting reviewer sign-off. Read the draft and approve, request a revision, or reject.'}</p>
           </div>
 
-          <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>Draft excerpt</div>
-          <div
-            style={{
-              border: '1px solid var(--sh-border-subtle)',
-              borderRadius: 'var(--sh-radius-lg)',
-              padding: '16px 18px',
-              fontSize: 15,
-              lineHeight: 1.7,
-              color: 'var(--sh-text-secondary)',
-            }}
-          >
+          <div className={`nf-eyebrow ${styles.excerptLabel}`}>Draft excerpt</div>
+          <div className={styles.excerpt}>
             {(draft.body ?? draft.summary ?? 'No prose available for this draft yet.').slice(0, 900)}
             {(draft.body?.length ?? 0) > 900 ? '…' : ''}
           </div>
         </div>
       </div>
 
-      <div
-        style={{
-          flexShrink: 0,
-          padding: '14px 24px',
-          borderTop: '1px solid var(--sh-border-subtle)',
-          background: 'var(--sh-surface-card)',
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          flexWrap: 'wrap',
-        }}
-      >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 'auto', fontSize: 11, color: 'var(--sh-text-tertiary)' }}>
+      <div className={styles.footer}>
+        <div className={styles.hotkeys}>
           <Kbd keys="A" /> approve <Kbd keys="R" /> revise <Kbd keys="X" /> reject
         </div>
         <Button variant="danger" onClick={() => setDialog('rejected')}>
@@ -230,55 +190,35 @@ function ReviewScreen(): React.JSX.Element {
   const selected = drafts.find(d => d.chapter === selectedChapter);
 
   return (
-    <div style={splitPaneStyle}>
-      <div style={railStyle}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)', display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Review Queue</span>
+    <div className="nf-splitpane">
+      <div className="nf-rail">
+        <div className={`nf-railhead ${styles.railHeadFlex}`}>
+          <span className={styles.railTitle}>Review Queue</span>
           {drafts.length > 0 && <StatusChip intent="warning">{drafts.length} open</StatusChip>}
         </div>
-        <div className="nf-scroll" style={{ flex: 1, padding: 8 }}>
+        <div className="nf-scroll nf-raillist">
           {queueQuery.isLoading && <PaneLoader />}
           {queueQuery.error && <PaneError error={queueQuery.error} />}
-          {!queueQuery.isLoading && drafts.length === 0 && (
-            <div style={{ padding: 16, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>Nothing awaiting review. 🎉</div>
-          )}
+          {!queueQuery.isLoading && drafts.length === 0 && <div className="nf-emptynote">Nothing awaiting review. 🎉</div>}
           {drafts.map(draft => {
-            const selectedRow = draft.chapter === selectedChapter;
             const intent = REVIEW_INTENT[draft.reviewStatus] ?? 'neutral';
             return (
-              <button
-                key={draft.id}
-                className="nf-selrow"
-                onClick={() => setSelectedChapter(draft.chapter)}
-                style={{
-                  flexDirection: 'column',
-                  alignItems: 'stretch',
-                  gap: 5,
-                  padding: 12,
-                  marginBottom: 4,
-                  background: selectedRow ? 'var(--sh-accent-soft)' : undefined,
-                  boxShadow: selectedRow ? 'inset 2px 0 0 var(--sh-accent)' : undefined,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                  <div style={{ flex: 1 }} />
+              <button key={draft.id} className="nf-selrow nf-selrow-stack" data-active={draft.chapter === selectedChapter} onClick={() => setSelectedChapter(draft.chapter)}>
+                <div className={styles.rowTopRow}>
+                  <div className={styles.spacer} />
                   <StatusChip intent={intent}>{draft.reviewStatus}</StatusChip>
                 </div>
-                <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, color: selectedRow ? 'var(--sh-accent)' : 'var(--sh-text-primary)', textAlign: 'left' }}>
+                <div className={styles.rowTitle}>
                   Ch. {draft.chapter} · {draft.title ?? 'Untitled'}
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--sh-text-secondary)', textAlign: 'left' }}>{wordCount(draft.body).toLocaleString()} words</div>
+                <div className={styles.rowWords}>{wordCount(draft.body).toLocaleString()} words</div>
               </button>
             );
           })}
         </div>
       </div>
-      <div style={detailPaneStyle}>
-        {selected ? (
-          <ReviewDetail novelId={novelId} draft={selected} />
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sh-text-tertiary)' }}>Select a chapter to review.</div>
-        )}
+      <div className="nf-detail">
+        {selected ? <ReviewDetail novelId={novelId} draft={selected} /> : <div className="nf-pane-empty">Select a chapter to review.</div>}
       </div>
     </div>
   );

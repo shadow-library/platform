@@ -22,6 +22,8 @@ import {
 } from '@/lib/apis';
 import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
+import styles from './overview.module.css';
+
 export const Route = createFileRoute('/novels/$novelId/overview')({
   component: OverviewScreen,
 });
@@ -38,39 +40,17 @@ interface LifecycleStepperProps {
 
 function LifecycleStepper({ completed }: LifecycleStepperProps): React.JSX.Element {
   return (
-    <div style={{ display: 'flex', alignItems: 'center' }}>
+    <div className={styles.stepper}>
       {LIFECYCLE_PHASES.map((label, i) => {
-        const done = i < completed;
-        const current = i === completed;
+        const state = i < completed ? 'done' : i === completed ? 'current' : 'pending';
         return (
-          <div key={label} style={{ display: 'contents' }}>
-            {i > 0 && <div style={{ flex: 1, height: 2, background: i <= completed ? 'var(--sh-success-solid)' : 'var(--sh-bg-pressed)', margin: '0 6px 22px' }} />}
-            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 8, flex: '0 0 auto' }}>
-              <div
-                style={{
-                  width: 32,
-                  height: 32,
-                  borderRadius: '50%',
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 13,
-                  fontWeight: 700,
-                  background: done ? 'var(--sh-success-solid)' : current ? 'var(--sh-accent)' : 'var(--sh-surface-well)',
-                  color: done ? 'var(--sh-success-on-solid)' : current ? 'var(--sh-on-accent)' : 'var(--sh-text-tertiary)',
-                  border: done || current ? 'none' : '1.5px solid var(--sh-border-default)',
-                  boxShadow: current ? '0 0 0 4px var(--sh-accent-soft)' : undefined,
-                }}
-              >
-                {done ? <CheckIcon size={16} strokeWidth={2.6} /> : i + 1}
+          <div key={label} className={styles.stepContents}>
+            {i > 0 && <div className={styles.connector} data-lit={i <= completed} />}
+            <div className={styles.step}>
+              <div className={styles.stepDot} data-state={state}>
+                {state === 'done' ? <CheckIcon size={16} strokeWidth={2.6} /> : i + 1}
               </div>
-              <span
-                style={{
-                  fontSize: 'var(--sh-text-body-sm)',
-                  fontWeight: current ? 700 : done ? 600 : 500,
-                  color: current ? 'var(--sh-accent)' : done ? 'var(--sh-text-primary)' : 'var(--sh-text-tertiary)',
-                }}
-              >
+              <span className={styles.stepLabel} data-state={state}>
                 {label}
               </span>
             </div>
@@ -89,10 +69,10 @@ interface StatCardProps {
 
 function StatCard({ label, children, footer }: StatCardProps): React.JSX.Element {
   return (
-    <div style={{ background: 'var(--sh-surface-card)', border: '1px solid var(--sh-border-subtle)', borderRadius: 'var(--sh-radius-lg)', padding: '16px 18px' }}>
-      <div style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.04em', marginBottom: 8 }}>{label}</div>
+    <div className={styles.statCard}>
+      <div className={styles.statCardLabel}>{label}</div>
       {children}
-      {footer && <div style={{ marginTop: 10 }}>{footer}</div>}
+      {footer && <div className={styles.statCardFooter}>{footer}</div>}
     </div>
   );
 }
@@ -105,8 +85,8 @@ interface BarProps {
 function Bar({ value, max }: BarProps): React.JSX.Element {
   const pct = max > 0 ? Math.max(6, Math.round((value / max) * 100)) : 6;
   return (
-    <div style={{ flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', height: '100%' }}>
-      <div style={{ height: `${pct}%`, background: 'var(--sh-indigo-400)', borderRadius: '3px 3px 0 0' }} />
+    <div className={styles.barCol}>
+      <div className={styles.barFill} style={{ '--pct': `${pct}%` } as React.CSSProperties} />
     </div>
   );
 }
@@ -131,13 +111,13 @@ interface RunRowProps {
 function RunRow({ run }: RunRowProps): React.JSX.Element {
   const intent = RUN_INTENT[run.status] ?? { color: 'var(--sh-text-tertiary)', label: run.status };
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '9px 0', borderBottom: '1px solid var(--sh-border-subtle)' }}>
-      {run.status === 'running' ? <Spinner size="sm" /> : <span style={{ width: 10, height: 10, borderRadius: '50%', background: intent.color, flexShrink: 0 }} />}
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+    <div className={styles.runRow}>
+      {run.status === 'running' ? <Spinner size="sm" /> : <span className={styles.runDot} style={{ '--nf-dot': intent.color } as React.CSSProperties} />}
+      <div className={styles.runBody}>
+        <div className={styles.runTitle}>
           {run.graph} · {run.target}
         </div>
-        <div style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>
+        <div className={styles.runMeta}>
           {intent.label} · {relativeTime(run.endedAt ?? run.startedAt)}
         </div>
       </div>
@@ -225,7 +205,7 @@ function OverviewScreen(): React.JSX.Element {
   return (
     <PageContainer>
       {projectQuery.isLoading ? (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 64 }}>
+        <div className={styles.loading}>
           <Spinner size="lg" label="Loading" />
         </div>
       ) : projectQuery.error ? (
@@ -236,18 +216,18 @@ function OverviewScreen(): React.JSX.Element {
         <EmptyState size="inline" title="Project not found" />
       ) : (
         <>
-          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 20, marginBottom: 24 }}>
-            <div style={{ minWidth: 0 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+          <div className={styles.header}>
+            <div className={styles.headerMain}>
+              <div className={styles.kindRow}>
                 <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)} project</StatusChip>
-                <span style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>
+                <span className={styles.created}>
                   {projectKindLabel(project.kind)} · created {new Date(project.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
                 </span>
               </div>
-              <h1 style={{ margin: '0 0 6px', fontSize: 'var(--sh-text-display)', fontWeight: 700, letterSpacing: '-0.025em' }}>{projectTitle(project)}</h1>
-              {project.brief && <p style={{ margin: 0, fontSize: 'var(--sh-text-body)', color: 'var(--sh-text-secondary)', maxWidth: 620 }}>{project.brief}</p>}
+              <h1 className={styles.projectTitle}>{projectTitle(project)}</h1>
+              {project.brief && <p className={styles.brief}>{project.brief}</p>}
             </div>
-            <div style={{ display: 'flex', gap: 8, flexShrink: 0 }}>
+            <div className={styles.headerActions}>
               <Tooltip content="Clone project">
                 <IconButton variant="secondary" aria-label="Clone project" icon={<CopyIcon />} onClick={() => setCloneOpen(true)} />
               </Tooltip>
@@ -260,33 +240,33 @@ function OverviewScreen(): React.JSX.Element {
             </div>
           </div>
 
-          <SectionCard style={{ marginBottom: 20 }}>
+          <SectionCard className={styles.sectionSpacer}>
             <LifecycleStepper completed={phase.completed} />
           </SectionCard>
 
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14, marginBottom: 20 }}>
+          <div className={styles.statGrid}>
             <StatCard label="Chapters">
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{status?.chaptersExtracted ?? 0}</span>
-                <span style={{ fontSize: 14, color: 'var(--sh-text-tertiary)' }}>
+              <div className={styles.statBig}>
+                <span className={styles.statNum}>{status?.chaptersExtracted ?? 0}</span>
+                <span className={styles.statUnit}>
                   / {status?.chaptersTotal ?? 0} {isSource ? 'extracted' : 'planned'}
                 </span>
               </div>
             </StatCard>
             <StatCard label="Volumes" footer={<StatusChip intent="info">{status?.volumesTotal ?? 0} total</StatusChip>}>
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{status?.volumesTotal ?? 0}</span>
-                <span style={{ fontSize: 14, color: 'var(--sh-text-tertiary)' }}>total</span>
+              <div className={styles.statBig}>
+                <span className={styles.statNum}>{status?.volumesTotal ?? 0}</span>
+                <span className={styles.statUnit}>total</span>
               </div>
             </StatCard>
             <StatCard label="Drafts">
-              <div style={{ display: 'flex', alignItems: 'baseline', gap: 6 }}>
-                <span style={{ fontSize: 28, fontWeight: 700, fontVariantNumeric: 'tabular-nums', letterSpacing: '-0.02em' }}>{status?.draftsFinal ?? 0}</span>
-                <span style={{ fontSize: 14, color: 'var(--sh-text-tertiary)' }}>/ {status?.draftsTotal ?? 0} final</span>
+              <div className={styles.statBig}>
+                <span className={styles.statNum}>{status?.draftsFinal ?? 0}</span>
+                <span className={styles.statUnit}>/ {status?.draftsTotal ?? 0} final</span>
               </div>
             </StatCard>
             <StatCard label="Plan status">
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
+              <div className={styles.planRow}>
                 {status?.planApproved ? (
                   <StatusChip intent="success" dot>
                     Approved
@@ -300,36 +280,36 @@ function OverviewScreen(): React.JSX.Element {
             </StatCard>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 20, marginBottom: 20 }}>
+          <div className={styles.mainGrid}>
             <SectionCard>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+              <div className={styles.usageHead}>
                 <div>
-                  <h3 style={{ margin: 0, fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>AI Usage &amp; Cost</h3>
-                  <p style={{ margin: '3px 0 0', fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>All runs · this project</p>
+                  <h3 className={styles.usageTitle}>AI Usage &amp; Cost</h3>
+                  <p className={styles.usageSub}>All runs · this project</p>
                 </div>
-                <div style={{ textAlign: 'right' }}>
-                  <div style={{ fontSize: 26, fontWeight: 700, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>${(usage?.totalCostUsd ?? 0).toFixed(2)}</div>
+                <div className={styles.usageCostWrap}>
+                  <div className={styles.usageCost}>${(usage?.totalCostUsd ?? 0).toFixed(2)}</div>
                 </div>
               </div>
               {roleEntries.length > 0 && (
-                <div style={{ display: 'flex', alignItems: 'flex-end', gap: 6, height: 88, marginBottom: 14 }}>
+                <div className={styles.bars}>
                   {roleEntries.map(([role, v]) => (
                     <Bar key={role} value={v} max={maxCalls} />
                   ))}
                 </div>
               )}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, paddingTop: 14, borderTop: '1px solid var(--sh-border-subtle)' }}>
+              <div className={styles.tokenGrid}>
                 <div>
-                  <div style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>Input tokens</div>
-                  <div style={{ fontSize: 'var(--sh-text-body-lg)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{(usage?.totalInputTokens ?? 0).toLocaleString()}</div>
+                  <div className={styles.tokenLabel}>Input tokens</div>
+                  <div className={styles.tokenValue}>{(usage?.totalInputTokens ?? 0).toLocaleString()}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>Output tokens</div>
-                  <div style={{ fontSize: 'var(--sh-text-body-lg)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{(usage?.totalOutputTokens ?? 0).toLocaleString()}</div>
+                  <div className={styles.tokenLabel}>Output tokens</div>
+                  <div className={styles.tokenValue}>{(usage?.totalOutputTokens ?? 0).toLocaleString()}</div>
                 </div>
                 <div>
-                  <div style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)' }}>Model calls</div>
-                  <div style={{ fontSize: 'var(--sh-text-body-lg)', fontWeight: 700, fontVariantNumeric: 'tabular-nums' }}>{totalCalls.toLocaleString()}</div>
+                  <div className={styles.tokenLabel}>Model calls</div>
+                  <div className={styles.tokenValue}>{totalCalls.toLocaleString()}</div>
                 </div>
               </div>
             </SectionCard>
@@ -343,7 +323,7 @@ function OverviewScreen(): React.JSX.Element {
               }
             >
               {runs.length === 0 ? (
-                <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>No runs yet.</p>
+                <p className={styles.emptyRuns}>No runs yet.</p>
               ) : (
                 <div>
                   {runs.slice(0, 5).map(run => (

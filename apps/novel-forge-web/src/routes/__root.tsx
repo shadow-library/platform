@@ -12,6 +12,7 @@ import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
  *  Importing user defined modules
  */
 import { AppShell } from '../components/Layout';
+import styles from './__root.module.css';
 
 /**
  * Declaring types
@@ -29,7 +30,7 @@ function NotFound() {
   const navigate = useNavigate();
   return (
     <AppShell>
-      <div style={{ maxWidth: 1120, margin: '0 auto', padding: '48px 28px' }}>
+      <div className={styles.notFound}>
         <EmptyState
           size="page"
           title="Page not found"

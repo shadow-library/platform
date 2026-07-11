@@ -1,0 +1,23 @@
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.hint {
+  border: 1.5px dashed var(--sh-accent-soft);
+  background: var(--sh-accent-soft);
+  border-radius: var(--sh-radius-md);
+  padding: 12px;
+}
+
+.hintRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hintText {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-secondary);
+}

@@ -21,6 +21,8 @@ import {
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
 
+import styles from './settings.module.css';
+
 export const Route = createFileRoute('/novels/$novelId/settings')({
   component: SettingsScreen,
 });
@@ -204,9 +206,9 @@ function SettingsScreen(): React.JSX.Element {
               <Tabs.Tab value="danger">Danger zone</Tabs.Tab>
             </Tabs.List>
 
-            <Tabs.Panel value="general" style={{ paddingTop: 20 }}>
+            <Tabs.Panel value="general" className={styles.tabPanel}>
               <SectionCard title="General">
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                <div className={styles.form}>
                   <FormField label="Working title">
                     <Input value={title} onValueChange={setTitle} />
                   </FormField>
@@ -228,8 +230,8 @@ function SettingsScreen(): React.JSX.Element {
               </SectionCard>
             </Tabs.Panel>
 
-            <Tabs.Panel value="models" style={{ paddingTop: 20 }}>
-              <div style={{ marginBottom: 16 }}>
+            <Tabs.Panel value="models" className={styles.tabPanel}>
+              <div className={styles.alertWrap}>
                 <Alert intent="info" title="Model changes apply to new runs only">
                   Each operation picks a provider and model together; the provider follows the model you choose. Operations set to “Inherit default” use the
                   <strong>{profile ? ` ${profile}` : ''}</strong> server profile. In-flight jobs keep the model they started with.
@@ -243,40 +245,20 @@ function SettingsScreen(): React.JSX.Element {
               ) : (
                 <>
                   {ROLE_GROUPS.map(section => (
-                    <div
-                      key={section.title}
-                      style={{
-                        background: 'var(--sh-surface-card)',
-                        border: '1px solid var(--sh-border-subtle)',
-                        borderRadius: 'var(--sh-radius-lg)',
-                        overflow: 'hidden',
-                        marginBottom: 16,
-                      }}
-                    >
-                      <div style={{ padding: '13px 20px', borderBottom: '1px solid var(--sh-border-subtle)', fontSize: 'var(--sh-text-body-sm)', fontWeight: 700 }}>
-                        {section.title}
-                      </div>
-                      {section.roles.map((role, i) => {
+                    <div key={section.title} className={styles.modelGroup}>
+                      <div className={styles.modelGroupHead}>{section.title}</div>
+                      {section.roles.map(role => {
                         const inheritedDefault = defaultsMap.get(role.key);
                         return (
-                          <div
-                            key={role.key}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              gap: 16,
-                              padding: '14px 20px',
-                              borderBottom: i < section.roles.length - 1 ? '1px solid var(--sh-border-subtle)' : undefined,
-                            }}
-                          >
-                            <div style={{ flex: 1 }}>
-                              <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600 }}>{role.label}</div>
-                              <div style={{ fontSize: 11, color: 'var(--sh-text-tertiary)' }}>
+                          <div key={role.key} className={styles.roleRow}>
+                            <div className={styles.roleInfo}>
+                              <div className={styles.roleLabel}>{role.label}</div>
+                              <div className={styles.roleHint}>
                                 {role.hint}
                                 {models[role.key] === INHERIT && inheritedDefault ? ` · inherits ${inheritedDefault}` : ''}
                               </div>
                             </div>
-                            <div style={{ minWidth: 210 }}>
+                            <div className={styles.rolePicker}>
                               <ModelPicker
                                 value={models[role.key] ?? INHERIT}
                                 onChange={v => setModel(role.key, v)}
@@ -291,8 +273,8 @@ function SettingsScreen(): React.JSX.Element {
                     </div>
                   ))}
 
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                    <div style={{ flex: 1 }} />
+                  <div className={styles.saveRow}>
+                    <div className={styles.spacer} />
                     <Button variant="primary" loading={updateProject.isPending} onClick={saveModels}>
                       Save changes
                     </Button>
@@ -301,9 +283,9 @@ function SettingsScreen(): React.JSX.Element {
               )}
             </Tabs.Panel>
 
-            <Tabs.Panel value="danger" style={{ paddingTop: 20 }}>
+            <Tabs.Panel value="danger" className={styles.tabPanel}>
               <SectionCard title="Delete project">
-                <p style={{ margin: '0 0 14px', fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)' }}>
+                <p className={styles.dangerText}>
                   Permanently delete this project and every draft, entity, and run it contains. This cannot be undone.
                 </p>
                 <Button variant="danger" onClick={() => setConfirmDelete(true)}>

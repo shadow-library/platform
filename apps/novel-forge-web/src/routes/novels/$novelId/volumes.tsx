@@ -9,7 +9,7 @@ import { useEffect, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronRightIcon, SparkIcon } from '@/components/icons';
-import { PAGE_MAX_WIDTH, PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
+import { PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type ArcResponse,
@@ -27,6 +27,8 @@ import {
   useVolumeQuery,
 } from '@/lib/apis';
 
+import styles from './volumes.module.css';
+
 export const Route = createFileRoute('/novels/$novelId/volumes')({
   component: VolumesScreen,
 });
@@ -37,15 +39,6 @@ function roman(ordinal: number): string {
   return ROMAN[ordinal - 1] ?? String(ordinal);
 }
 
-const SECTION_LABEL: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-  color: 'var(--sh-text-tertiary)',
-  marginBottom: 9,
-};
-
 interface CrumbProps {
   label: string;
   onClick?: () => void;
@@ -53,21 +46,9 @@ interface CrumbProps {
 }
 
 function Crumb({ label, onClick, current }: CrumbProps): React.JSX.Element {
-  if (current || !onClick) return <span style={{ color: 'var(--sh-text-primary)', fontSize: 'var(--sh-text-body-sm)', fontWeight: 700, padding: '5px 7px' }}>{label}</span>;
+  if (current || !onClick) return <span className={styles.crumbCurrent}>{label}</span>;
   return (
-    <button
-      onClick={onClick}
-      style={{
-        border: 'none',
-        background: 'transparent',
-        color: 'var(--sh-text-secondary)',
-        fontSize: 'var(--sh-text-body-sm)',
-        fontWeight: 600,
-        cursor: 'pointer',
-        padding: '5px 7px',
-        borderRadius: 6,
-      }}
-    >
+    <button onClick={onClick} className={styles.crumbBtn}>
       {label}
     </button>
   );
@@ -82,8 +63,8 @@ function Field({ label, value }: FieldProps): React.JSX.Element | null {
   if (!value) return null;
   return (
     <>
-      <div style={SECTION_LABEL}>{label}</div>
-      <p style={{ margin: '0 0 30px', fontSize: 'var(--sh-text-body)', lineHeight: 1.7, maxWidth: 660 }}>{value}</p>
+      <div className={styles.sectionLabel}>{label}</div>
+      <p className={styles.fieldText}>{value}</p>
     </>
   );
 }
@@ -97,18 +78,7 @@ interface ForgeDockAreaProps {
 /** The floating Forge composer, centered at the bottom of the pane, above the scrolled content. */
 function ForgeDockArea({ novelId, scope, placeholder }: ForgeDockAreaProps): React.JSX.Element {
   return (
-    <div
-      style={{
-        position: 'absolute',
-        left: '50%',
-        transform: 'translateX(-50%)',
-        bottom: 22,
-        width: 'min(680px, calc(100% - 60px))',
-        display: 'flex',
-        justifyContent: 'center',
-        zIndex: 5,
-      }}
-    >
+    <div className={styles.forgeDock}>
       <ForgeBar novelId={novelId} scope={scope} placeholder={placeholder} />
     </div>
   );
@@ -152,11 +122,11 @@ function PlanDialog({ novelId, open, onOpenChange }: PlanDialogProps): React.JSX
           description="Forge drafts a contiguous volume structure from your brief and story bible. You can refine or approve it afterwards."
         />
         <Dialog.Body>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <FormField label="Volumes" style={{ flex: 1 }}>
+          <div className={styles.dialogRow}>
+            <FormField label="Volumes" className={styles.formCol}>
               <Input type="number" min={1} max={12} value={volumeCount} onValueChange={setVolumeCount} />
             </FormField>
-            <FormField label="Chapters per volume" style={{ flex: 1 }}>
+            <FormField label="Chapters per volume" className={styles.formCol}>
               <Input type="number" min={1} max={40} value={chaptersPerVolume} onValueChange={setChaptersPerVolume} />
             </FormField>
           </div>
@@ -187,11 +157,11 @@ function VolumesList({ novelId, onOpen }: VolumesListProps): React.JSX.Element {
   const anyDraft = volumes.some(v => v.status === 'draft');
 
   return (
-    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 120px' }}>
-      <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 8 }}>
-        <div style={{ flex: 1 }}>
-          <h1 style={{ margin: '0 0 5px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>Story Plan</h1>
-          <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)' }}>Volumes → arcs → chapter briefs · {volumes.length} volumes planned</p>
+    <div className={`nf-page ${styles.pageVolumes}`}>
+      <div className={styles.listHead}>
+        <div className={styles.listHeadMain}>
+          <h1 className={styles.title}>Story Plan</h1>
+          <p className={styles.subtitle}>Volumes → arcs → chapter briefs · {volumes.length} volumes planned</p>
         </div>
         {anyDraft && (
           <Button
@@ -214,38 +184,25 @@ function VolumesList({ novelId, onOpen }: VolumesListProps): React.JSX.Element {
         emptyDescription="Generate a volume plan to structure your novel, then approve it to unlock arcs and chapter briefs."
         emptyAction={{ label: 'Generate volumes', onClick: () => setPlanOpen(true) }}
       >
-        <div style={{ marginTop: 20, borderTop: '1px solid var(--sh-border-subtle)' }}>
+        <div className={styles.list}>
           {volumes.map(v => (
-            <button
-              key={v.id}
-              className="nf-selrow"
-              onClick={() => onOpen(v)}
-              style={{ gap: 18, padding: '16px 12px', borderRadius: 0, borderBottom: '1px solid var(--sh-border-subtle)' }}
-            >
-              <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 15, fontWeight: 700, width: 32, flexShrink: 0, textAlign: 'center' }}>{roman(v.ordinal)}</span>
-              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                <span style={{ display: 'block', fontSize: 'var(--sh-text-body)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {v.title ?? `Volume ${v.ordinal}`}
-                </span>
-                {v.objective && (
-                  <span
-                    style={{ display: 'block', fontSize: 12, color: 'var(--sh-text-tertiary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                  >
-                    {v.objective}
-                  </span>
-                )}
+            <button key={v.id} className={`${styles.row} ${styles.rowVolume}`} onClick={() => onOpen(v)}>
+              <span className={styles.volNum}>{roman(v.ordinal)}</span>
+              <span className={styles.rowMain}>
+                <span className={styles.rowName}>{v.title ?? `Volume ${v.ordinal}`}</span>
+                {v.objective && <span className={styles.rowSub}>{v.objective}</span>}
               </span>
               {v.startChapter != null && v.endChapter != null && (
-                <span style={{ fontSize: 12, color: 'var(--sh-text-tertiary)', width: 86, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                <span className={styles.rowRange}>
                   Ch {v.startChapter}–{v.endChapter}
                 </span>
               )}
-              <span style={{ width: 110, flexShrink: 0 }}>
+              <span className={styles.statusCol}>
                 <StatusChip intent={v.status === 'approved' ? 'success' : v.status === 'source' ? 'info' : 'neutral'} dot>
                   {v.status}
                 </StatusChip>
               </span>
-              <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)', flexShrink: 0 }} />
+              <ChevronRightIcon size={15} className={styles.iconTertiary} />
             </button>
           ))}
         </div>
@@ -290,10 +247,10 @@ function VolumeDetail({ novelId, volumeKey, onOpenArc }: VolumeDetailProps): Rea
   };
 
   return (
-    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 130px' }}>
-      <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>VOLUME {roman(v.ordinal)}</div>
-      <h1 style={{ margin: '0 0 6px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{v.title ?? `Volume ${v.ordinal}`}</h1>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--sh-text-tertiary)', marginBottom: 30 }}>
+    <div className={`nf-page ${styles.pageDetail}`}>
+      <div className={styles.recordKind}>VOLUME {roman(v.ordinal)}</div>
+      <h1 className={styles.title}>{v.title ?? `Volume ${v.ordinal}`}</h1>
+      <div className={styles.metaRow}>
         <span>
           Ch {start}–{end}
         </span>
@@ -308,9 +265,9 @@ function VolumeDetail({ novelId, volumeKey, onOpenArc }: VolumeDetailProps): Rea
       <Field label="Payoff" value={v.payoff} />
       {v.body && <Field label="Notes" value={v.body} />}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>Arcs</h2>
-        <div style={{ flex: 1 }} />
+      <div className={styles.sectionHeadRow}>
+        <h2 className={styles.sectionH2}>Arcs</h2>
+        <div className={styles.spacer} />
         {anyDraftArc && (
           <Button
             variant="secondary"
@@ -327,54 +284,38 @@ function VolumeDetail({ novelId, volumeKey, onOpenArc }: VolumeDetailProps): Rea
       </div>
 
       {arcs.length === 0 ? (
-        <p style={{ margin: '0 0 30px', fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)', lineHeight: 1.6 }}>
+        <p className={styles.emptyArcs}>
           No arcs yet. Generate arcs to split this volume&apos;s {end - start + 1} chapters into escalating story units — the plan lands as a proposal you review before it becomes
           canon.
           {planArcs.isSuccess && (
             <>
               {' '}
-              <button
-                onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })}
-                style={{ border: 'none', background: 'transparent', color: 'var(--sh-accent)', cursor: 'pointer', fontSize: 'inherit', padding: 0, fontWeight: 600 }}
-              >
+              <button onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })} className={styles.inlineLink}>
                 Open Proposals →
               </button>
             </>
           )}
         </p>
       ) : (
-        <div style={{ borderTop: '1px solid var(--sh-border-subtle)', marginBottom: 30 }}>
+        <div className={`${styles.listBordered} ${styles.listSpaced}`}>
           {arcs.map(arc => (
-            <button
-              key={arc.arcKey}
-              className="nf-selrow"
-              onClick={() => onOpenArc(arc)}
-              style={{ gap: 14, padding: '14px 12px', borderRadius: 0, borderBottom: '1px solid var(--sh-border-subtle)' }}
-            >
-              <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-text-tertiary)', width: 22, flexShrink: 0 }}>{arc.ordinal}</span>
-              <span style={{ flex: 1, minWidth: 0, textAlign: 'left' }}>
-                <span style={{ display: 'block', fontSize: 'var(--sh-text-body)', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {arc.title ?? arc.arcKey}
-                </span>
-                {arc.objective && (
-                  <span
-                    style={{ display: 'block', fontSize: 12, color: 'var(--sh-text-tertiary)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}
-                  >
-                    {arc.objective}
-                  </span>
-                )}
+            <button key={arc.arcKey} className={`${styles.row} ${styles.rowArc}`} onClick={() => onOpenArc(arc)}>
+              <span className={styles.arcNum}>{arc.ordinal}</span>
+              <span className={styles.rowMain}>
+                <span className={styles.rowName}>{arc.title ?? arc.arcKey}</span>
+                {arc.objective && <span className={styles.rowSub}>{arc.objective}</span>}
               </span>
               {arc.chapterStart != null && arc.chapterEnd != null && (
-                <span style={{ fontSize: 12, color: 'var(--sh-text-tertiary)', width: 86, flexShrink: 0, fontVariantNumeric: 'tabular-nums' }}>
+                <span className={styles.rowRange}>
                   Ch {arc.chapterStart}–{arc.chapterEnd}
                 </span>
               )}
-              <span style={{ width: 100, flexShrink: 0 }}>
+              <span className={styles.statusColSm}>
                 <StatusChip intent={arc.status === 'approved' ? 'success' : 'neutral'} dot>
                   {arc.staleReason ? 'stale' : arc.status}
                 </StatusChip>
               </span>
-              <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)', flexShrink: 0 }} />
+              <ChevronRightIcon size={15} className={styles.iconTertiary} />
             </button>
           ))}
         </div>
@@ -416,10 +357,10 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
   };
 
   return (
-    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 130px' }}>
-      <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>ARC {arc.ordinal}</div>
-      <h1 style={{ margin: '0 0 6px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{arc.title ?? arc.arcKey}</h1>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16, fontSize: 12, color: 'var(--sh-text-tertiary)', marginBottom: 30 }}>
+    <div className={`nf-page ${styles.pageDetail}`}>
+      <div className={styles.recordKind}>ARC {arc.ordinal}</div>
+      <h1 className={styles.title}>{arc.title ?? arc.arcKey}</h1>
+      <div className={styles.metaRow}>
         <span>
           Ch {start}–{end}
         </span>
@@ -436,47 +377,25 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
       <Field label="Hook (handoff to next arc)" value={arc.hook} />
       {arc.body && <Field label="Notes" value={arc.body} />}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>Chapter briefs</h2>
-        <span style={{ fontSize: 12, color: 'var(--sh-text-tertiary)' }}>
+      <div className={styles.sectionHeadRow}>
+        <h2 className={styles.sectionH2}>Chapter briefs</h2>
+        <span className={styles.written}>
           {chapters.length - missing} of {chapters.length} written
         </span>
-        <div style={{ flex: 1 }} />
+        <div className={styles.spacer} />
         <Button variant={missing > 0 ? 'primary' : 'ghost'} size="sm" prefix={<SparkIcon />} loading={outlineArc.isPending} onClick={generateBriefs}>
           {missing > 0 ? 'Generate briefs' : 'Regenerate briefs'}
         </Button>
       </div>
-      {arc.status !== 'approved' && (
-        <p style={{ margin: '0 0 14px', fontSize: 12, color: 'var(--sh-text-tertiary)' }}>
-          Brief generation needs every arc in this volume approved first — approve arcs from the volume page.
-        </p>
-      )}
-      <div style={{ borderTop: '1px solid var(--sh-border-subtle)' }}>
+      {arc.status !== 'approved' && <p className={styles.approveNote}>Brief generation needs every arc in this volume approved first — approve arcs from the volume page.</p>}
+      <div className={styles.listBordered}>
         {chapters.map(n => {
           const brief = briefByChapter.get(n);
           return (
-            <button
-              key={n}
-              className="nf-selrow"
-              onClick={() => onOpenBrief(n)}
-              style={{ gap: 14, padding: '13px 12px', borderRadius: 0, borderBottom: '1px solid var(--sh-border-subtle)' }}
-            >
-              <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-text-tertiary)', width: 30, flexShrink: 0 }}>{String(n).padStart(2, '0')}</span>
-              <span
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  textAlign: 'left',
-                  fontSize: 'var(--sh-text-body-sm)',
-                  fontWeight: 500,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                }}
-              >
-                {brief?.title ?? `Chapter ${n}`}
-              </span>
-              <span style={{ width: 110, flexShrink: 0 }}>
+            <button key={n} className={`${styles.row} ${styles.rowBrief}`} onClick={() => onOpenBrief(n)}>
+              <span className={styles.briefNum}>{String(n).padStart(2, '0')}</span>
+              <span className={styles.briefName}>{brief?.title ?? `Chapter ${n}`}</span>
+              <span className={styles.statusCol}>
                 {brief ? (
                   <StatusChip intent={brief.staleReason ? 'warning' : 'success'} dot>
                     {brief.staleReason ? 'stale' : 'brief ready'}
@@ -487,7 +406,7 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
                   </StatusChip>
                 )}
               </span>
-              <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)', flexShrink: 0 }} />
+              <ChevronRightIcon size={15} className={styles.iconTertiary} />
             </button>
           );
         })}
@@ -531,10 +450,10 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
   if (briefQuery.isLoading) return <PaneLoader />;
 
   return (
-    <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '32px 32px 130px' }}>
-      <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, letterSpacing: '0.06em', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>CHAPTER {chapter} · BRIEF</div>
-      <h1 style={{ margin: '0 0 10px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>{brief?.title ?? `Chapter ${chapter}`}</h1>
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 24 }}>
+    <div className={`nf-page ${styles.pageDetail}`}>
+      <div className={styles.recordKind}>CHAPTER {chapter} · BRIEF</div>
+      <h1 className={`${styles.title} ${styles.titleBrief}`}>{brief?.title ?? `Chapter ${chapter}`}</h1>
+      <div className={styles.briefMeta}>
         {brief ? (
           <StatusChip intent="success" dot>
             Brief ready
@@ -546,7 +465,7 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
         )}
       </div>
 
-      <div style={{ display: 'flex', gap: 10, marginBottom: 34 }}>
+      <div className={styles.briefActions}>
         <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/chapters', params: { novelId } })}>
           Open in chapters →
         </Button>
@@ -557,11 +476,11 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
         )}
       </div>
 
-      <div style={SECTION_LABEL}>Premise / synopsis</div>
+      <div className={styles.sectionLabel}>Premise / synopsis</div>
       {editing ? (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 30 }}>
+        <div className={styles.editWrap}>
           <Textarea value={draft} onValueChange={setDraft} minRows={8} autoGrow />
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className={styles.editActions}>
             <Button variant="primary" loading={updateBrief.isPending} onClick={save}>
               Save
             </Button>
@@ -571,9 +490,7 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
           </div>
         </div>
       ) : (
-        <p style={{ margin: '0 0 30px', fontSize: 'var(--sh-text-body)', lineHeight: 1.7, whiteSpace: 'pre-wrap' }}>
-          {brief?.body || 'No brief has been written for this chapter yet.'}
-        </p>
+        <p className={styles.briefBody}>{brief?.body || 'No brief has been written for this chapter yet.'}</p>
       )}
     </div>
   );
@@ -599,12 +516,12 @@ function VolumesScreen(): React.JSX.Element {
   })();
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--sh-surface-app)', overflow: 'hidden' }}>
-      <div style={{ height: 60, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 4, padding: '0 22px' }}>
+    <div className={styles.screen}>
+      <div className={styles.crumbBar}>
         <Crumb label="Story Plan" onClick={view.level !== 'volumes' ? () => setView({ level: 'volumes' }) : undefined} current={view.level === 'volumes'} />
         {view.level !== 'volumes' && (
           <>
-            <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)' }} />
+            <ChevronRightIcon size={15} className={styles.iconTertiary} />
             <Crumb
               label={view.volume.title ?? `Volume ${view.volume.ordinal}`}
               onClick={view.level !== 'volume' ? () => setView({ level: 'volume', volume: view.volume }) : undefined}
@@ -614,7 +531,7 @@ function VolumesScreen(): React.JSX.Element {
         )}
         {(view.level === 'arc' || (view.level === 'brief' && view.arc)) && (
           <>
-            <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)' }} />
+            <ChevronRightIcon size={15} className={styles.iconTertiary} />
             <Crumb
               label={(view.level === 'arc' ? view.arc : view.arc!).title ?? (view.level === 'arc' ? view.arc : view.arc!).arcKey}
               onClick={view.level === 'brief' ? () => setView({ level: 'arc', volume: view.volume, arc: view.arc! }) : undefined}
@@ -624,14 +541,14 @@ function VolumesScreen(): React.JSX.Element {
         )}
         {view.level === 'brief' && (
           <>
-            <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)' }} />
+            <ChevronRightIcon size={15} className={styles.iconTertiary} />
             <Crumb label={`Ch. ${view.chapter} · Brief`} current />
           </>
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
-        <div className="nf-scroll" style={{ position: 'absolute', inset: 0 }}>
+      <div className={styles.body}>
+        <div className={`nf-scroll ${styles.scrollFill}`}>
           {view.level === 'volumes' && <VolumesList novelId={novelId} onOpen={volume => setView({ level: 'volume', volume })} />}
           {view.level === 'volume' && <VolumeDetail novelId={novelId} volumeKey={view.volume.volumeKey} onOpenArc={arc => setView({ level: 'arc', volume: view.volume, arc })} />}
           {view.level === 'arc' && (

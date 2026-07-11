@@ -21,6 +21,8 @@ import {
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef } from '@/lib/format';
 
+import styles from './ChatModel.module.css';
+
 /**
  * Chat-model UI + the model resolution ladder, mirrored from the backend (ChatService / resolveModel):
  *  1. the chat's own override (picked inline in the composer),
@@ -124,29 +126,9 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger asChild>
-        <button
-          type="button"
-          disabled={disabled || !session}
-          aria-label="Chat model"
-          style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 4,
-            height: 24,
-            padding: '0 8px',
-            border: 'none',
-            borderRadius: 999,
-            background: 'var(--sh-bg-pressed)',
-            color: 'var(--sh-text-secondary)',
-            fontSize: 11,
-            fontWeight: 600,
-            cursor: disabled || !session ? 'default' : 'pointer',
-            opacity: disabled || !session ? 0.55 : 1,
-            whiteSpace: 'nowrap',
-          }}
-        >
+        <button type="button" disabled={disabled || !session} aria-label="Chat model" className={styles.trigger}>
           {triggerLabel}
-          {!overridden && <span style={{ fontWeight: 400, color: 'var(--sh-text-tertiary)' }}>· default</span>}
+          {!overridden && <span className={styles.triggerDefault}>· default</span>}
           <ChevronDownIcon size={12} />
         </button>
       </DropdownMenu.Trigger>
@@ -156,7 +138,7 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
           <DropdownMenu.RadioItem value="default">
             <span>
               Default
-              {defaultCaption && <span style={{ display: 'block', fontSize: 11, color: 'var(--sh-text-tertiary)' }}>{defaultCaption}</span>}
+              {defaultCaption && <span className={styles.caption}>{defaultCaption}</span>}
             </span>
           </DropdownMenu.RadioItem>
           <DropdownMenu.Separator />
@@ -180,5 +162,5 @@ export function MessageModelTag({ message }: MessageModelTagProps): React.JSX.El
   const modelsQuery = useAiModelsQuery();
   if (message.role !== 'assistant' || !message.modelId) return null;
   const label = modelLabel(modelsQuery.data?.models ?? [], message.modelProvider, message.modelId);
-  return <div style={{ marginTop: 4, fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{label}</div>;
+  return <div className={styles.messageTag}>{label}</div>;
 }

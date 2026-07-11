@@ -1,0 +1,93 @@
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  height: 44px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--sh-surface-raised) 92%, transparent);
+  border: 1px solid var(--sh-border-subtle);
+  box-shadow: var(--sh-shadow-e3);
+  backdrop-filter: blur(12px);
+  cursor: pointer;
+}
+
+.pillIcon {
+  color: var(--sh-accent);
+}
+
+.pillLabel {
+  font-size: 13px;
+  color: var(--sh-text-secondary);
+}
+
+.card {
+  width: min(680px, 100%);
+  background: var(--sh-surface-raised);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 16px;
+  box-shadow: var(--sh-shadow-e3);
+  padding: 12px 14px 10px;
+}
+
+.inputRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+}
+
+.inputIcon {
+  color: var(--sh-accent);
+  flex-shrink: 0;
+  margin-top: 6px;
+}
+
+.input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  padding: 4px 0;
+}
+
+.closeGlyph {
+  font-size: 15px;
+}
+
+.reply {
+  margin: 10px 0 2px;
+  padding: 10px 12px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+}
+
+.thinking {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+  font-style: italic;
+}
+
+.replyBody {
+  max-height: 180px;
+  overflow-y: auto;
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: var(--sh-text-secondary);
+}
+
+.footerRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.spacer {
+  flex: 1;
+}

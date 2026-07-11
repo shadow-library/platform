@@ -12,7 +12,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
-import { PAGE_MAX_WIDTH, PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
+import { PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type DraftResponse,
@@ -29,6 +29,13 @@ import {
   useProjectStatusQuery,
   useUpdateDraftMutation,
 } from '@/lib/apis';
+
+import styles from './chapters.module.css';
+
+// Maps a status chip intent to the three-way tone used by the verdict banner and status pill.
+function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
+  return intent === 'success' ? 'success' : intent === 'danger' ? 'danger' : 'warning';
+}
 
 export const Route = createFileRoute('/novels/$novelId/chapters')({
   component: ChaptersScreen,
@@ -114,58 +121,37 @@ function GenerationProgress({ novelId, jobId, onBack }: GenerationProgressProps)
   const chapters = job?.target ? job.target.split(',') : [];
 
   return (
-    <div className="nf-scroll" style={{ position: 'absolute', inset: 0, background: 'var(--sh-surface-app)' }}>
-      <div style={{ maxWidth: 640, margin: '0 auto', padding: '60px 32px 90px' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 8 }}>
+    <div className={`nf-scroll ${styles.progressScreen}`}>
+      <div className={styles.progressInner}>
+        <div className={styles.progressHead}>
           {!finished ? <Spinner size="md" /> : null}
-          <h1 style={{ margin: 0, fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>
-            {finished ? (job?.status === 'done' ? 'Generation complete' : 'Generation failed') : 'Generating…'}
-          </h1>
+          <h1 className={styles.progressTitle}>{finished ? (job?.status === 'done' ? 'Generation complete' : 'Generation failed') : 'Generating…'}</h1>
         </div>
-        <p style={{ margin: '0 0 28px', fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)' }}>
+        <p className={styles.progressSub}>
           {chapters.length > 0 ? `Chapter${chapters.length > 1 ? 's' : ''} ${job?.target}` : 'Preparing the next chapter'} · drafted in order, judged, then queued for your review.
         </p>
 
-        <div
-          style={{ background: 'var(--sh-surface-card)', border: '1px solid var(--sh-border-subtle)', borderRadius: 'var(--sh-radius-lg)', padding: '18px 20px', marginBottom: 16 }}
-        >
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-            <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700 }}>Job {jobId.slice(0, 8)}</span>
+        <div className={styles.jobCard}>
+          <div className={styles.jobHead}>
+            <span className={styles.jobLabel}>Job {jobId.slice(0, 8)}</span>
             <StatusChip intent={job?.status === 'done' ? 'success' : job?.status === 'failed' ? 'danger' : 'info'} dot>
               {job?.status ?? 'pending'}
             </StatusChip>
-            <div style={{ flex: 1 }} />
-            <span style={{ fontSize: 11, color: 'var(--sh-text-tertiary)' }}>target: {job?.target ?? '…'}</span>
+            <div className={styles.spacer} />
+            <span className={styles.jobTarget}>target: {job?.target ?? '…'}</span>
           </div>
-          {job?.lastError && (
-            <pre style={{ margin: '12px 0 0', whiteSpace: 'pre-wrap', fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-danger-text-on-subtle)' }}>
-              {job.lastError}
-            </pre>
-          )}
+          {job?.lastError && <pre className={styles.jobError}>{job.lastError}</pre>}
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 28 }}>
-          {runs.length === 0 && !finished && (
-            <div style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>Waiting for the first workflow run to start…</div>
-          )}
+        <div className={styles.runList}>
+          {runs.length === 0 && !finished && <div className={styles.runWaiting}>Waiting for the first workflow run to start…</div>}
           {runs.map(run => (
-            <div
-              key={run.id}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: 10,
-                background: 'var(--sh-surface-card)',
-                border: '1px solid var(--sh-border-subtle)',
-                borderRadius: 'var(--sh-radius-md)',
-                padding: '11px 14px',
-              }}
-            >
+            <div key={run.id} className={styles.runCard}>
               {run.status === 'running' ? <Spinner size="sm" /> : null}
-              <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600 }}>
+              <span className={styles.runLabel}>
                 {run.graph} · {run.target}
               </span>
-              <div style={{ flex: 1 }} />
+              <div className={styles.spacer} />
               <StatusChip intent={RUN_INTENT[run.status] ?? 'neutral'} dot={run.status !== 'running'}>
                 {run.status}
               </StatusChip>
@@ -256,28 +242,22 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
   const totalWords = drafts.reduce((sum, d) => sum + wordCount(d.body), 0);
 
   return (
-    <div className="nf-scroll" style={{ position: 'absolute', inset: 0, background: 'var(--sh-surface-app)' }}>
-      <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '44px 32px 90px' }}>
-        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16, marginBottom: 6 }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ margin: '0 0 5px', fontSize: 'var(--sh-text-h1)', fontWeight: 700, letterSpacing: '-0.02em' }}>Chapters</h1>
-            <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)' }}>
+    <div className={`nf-scroll ${styles.screenScroll}`}>
+      <div className={`nf-page ${styles.listInner}`}>
+        <div className={styles.listHead}>
+          <div className={styles.listHeadMain}>
+            <h1 className={styles.title}>Chapters</h1>
+            <p className={styles.subtitle}>
               {drafts.length} drafts · {totalWords.toLocaleString()} words
             </p>
           </div>
-          <div style={{ display: 'flex' }}>
-            <Button
-              variant="primary"
-              loading={generate.isPending || createManual.isPending}
-              prefix={<PlusIcon />}
-              onClick={canGenerate ? startGeneration : writeManually}
-              style={{ borderTopRightRadius: 0, borderBottomRightRadius: 0 }}
-            >
+          <div className={styles.splitBtn}>
+            <Button variant="primary" loading={generate.isPending || createManual.isPending} prefix={<PlusIcon />} onClick={canGenerate ? startGeneration : writeManually} className={styles.splitLeft}>
               {canGenerate ? `Generate ch ${nextBriefChapter}` : 'Write chapter'}
             </Button>
             <DropdownMenu>
               <DropdownMenu.Trigger asChild>
-                <Button variant="primary" aria-label="Chapter creation options" style={{ borderTopLeftRadius: 0, borderBottomLeftRadius: 0, paddingInline: 8, boxShadow: 'inset 1px 0 0 rgba(255,255,255,0.25)' }}>
+                <Button variant="primary" aria-label="Chapter creation options" className={styles.splitRight}>
                   <ChevronDownIcon size={14} />
                 </Button>
               </DropdownMenu.Trigger>
@@ -286,9 +266,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                   Generate ch {nextBriefChapter ?? nextManualChapter} from its brief
                 </DropdownMenu.Item>
                 <DropdownMenu.Item onSelect={writeManually}>Write ch {nextManualChapter} yourself</DropdownMenu.Item>
-                {!canGenerate && generateReason && (
-                  <div style={{ padding: '4px 10px 6px', fontSize: 11, color: 'var(--sh-text-tertiary)', maxWidth: 240 }}>{generateReason}</div>
-                )}
+                {!canGenerate && generateReason && <div className={styles.menuNote}>{generateReason}</div>}
                 <DropdownMenu.Separator />
                 <DropdownMenu.Label>Advanced</DropdownMenu.Label>
                 <DropdownMenu.Item disabled={!canGenerate} onSelect={startBatch}>
@@ -300,28 +278,13 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
         </div>
 
         {activeJob && (
-          <button
-            onClick={() => onProgress(activeJob.id)}
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: 10,
-              width: '100%',
-              marginTop: 14,
-              padding: '11px 14px',
-              background: 'var(--sh-info-bg-subtle)',
-              border: '1px solid var(--sh-info-border)',
-              borderRadius: 'var(--sh-radius-md)',
-              cursor: 'pointer',
-              textAlign: 'left',
-            }}
-          >
+          <button onClick={() => onProgress(activeJob.id)} className={styles.activeJobBtn}>
             <Spinner size="sm" />
-            <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600 }}>Generating chapter {activeJob.target} — view progress</span>
+            <span className={styles.activeJobLabel}>Generating chapter {activeJob.target} — view progress</span>
           </button>
         )}
 
-        <div style={{ margin: '26px 0 4px' }}>
+        <div className={styles.filterWrap}>
           <SegmentedControl value={filter} onValueChange={v => setFilter(v as Filter)}>
             <SegmentedControl.Item value="all">All {counts.all}</SegmentedControl.Item>
             <SegmentedControl.Item value="needs_review">Needs review {counts.needs_review}</SegmentedControl.Item>
@@ -338,7 +301,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
           emptyDescription="Generate your first chapter from its brief."
           emptyAction={{ label: 'Generate first chapter', onClick: startGeneration }}
         >
-          <div style={{ marginTop: 8 }}>
+          <div className={styles.listBody}>
             {visible.map(draft => {
               const meta = statusMeta(draft);
               return (
@@ -346,33 +309,15 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                   key={draft.id}
                   role="button"
                   tabIndex={0}
-                  className="nf-selrow"
+                  className={`nf-selrow ${styles.rowChapter}`}
                   onClick={() => onOpen(draft.chapter)}
                   onKeyDown={e => e.key === 'Enter' && onOpen(draft.chapter)}
-                  style={{ gap: 16, padding: '15px 12px', borderRadius: 0, borderBottom: '1px solid var(--sh-border-subtle)' }}
                 >
-                  <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-text-tertiary)', width: 22, flexShrink: 0 }}>
-                    {String(draft.chapter).padStart(2, '0')}
-                  </span>
-                  <span
-                    style={{
-                      flex: 1,
-                      minWidth: 0,
-                      fontSize: 'var(--sh-text-body)',
-                      fontWeight: 500,
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      textAlign: 'left',
-                    }}
-                  >
-                    {draft.title ?? 'Untitled chapter'}
-                  </span>
+                  <span className={styles.rowNum}>{String(draft.chapter).padStart(2, '0')}</span>
+                  <span className={styles.rowTitle}>{draft.title ?? 'Untitled chapter'}</span>
                   <StatusChip intent={draft.generator === 'human' ? 'neutral' : 'accent'}>{draft.generator === 'human' ? 'You' : 'AI'}</StatusChip>
-                  <span style={{ fontSize: 12, color: 'var(--sh-text-tertiary)', fontVariantNumeric: 'tabular-nums', flexShrink: 0, width: 80, textAlign: 'right' }}>
-                    {wordCount(draft.body).toLocaleString()} words
-                  </span>
-                  <span style={{ width: 118, flexShrink: 0, display: 'flex', justifyContent: 'flex-start' }}>
+                  <span className={styles.rowWords}>{wordCount(draft.body).toLocaleString()} words</span>
+                  <span className={styles.rowStatus}>
                     <StatusChip intent={meta.intent} dot>
                       {meta.label}
                     </StatusChip>
@@ -382,7 +327,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                       <TrashIcon size={14} />
                     </RowAction>
                   </div>
-                  <ChevronRightIcon size={16} style={{ color: 'var(--sh-text-placeholder)', flexShrink: 0 }} />
+                  <ChevronRightIcon size={16} className={styles.iconPlaceholder} />
                 </div>
               );
             })}
@@ -419,37 +364,22 @@ interface ReviewDrawerProps {
 function ReviewDrawer({ open, onOpenChange, draft }: ReviewDrawerProps): React.JSX.Element {
   const meta = statusMeta(draft);
   const clean = draft.reviewStatus === 'approved' || draft.reviewStatus === 'final';
+  const tone = clean ? 'success' : draft.reviewStatus === 'contradiction' ? 'danger' : 'warning';
   return (
     <Drawer open={open} onOpenChange={onOpenChange} placement="right" size="sm">
       <Drawer.Header title="Judge review" meta={draft.judge ?? undefined} />
       <Drawer.Body>
-        <div
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 10,
-            padding: '13px 14px',
-            borderRadius: 'var(--sh-radius-md)',
-            marginBottom: 18,
-            background: clean ? 'var(--sh-success-bg-subtle)' : draft.reviewStatus === 'contradiction' ? 'var(--sh-danger-bg-subtle)' : 'var(--sh-warning-bg-subtle)',
-          }}
-        >
-          <WarningIcon
-            size={17}
-            style={{
-              color: meta.intent === 'success' ? 'var(--sh-success-solid)' : meta.intent === 'danger' ? 'var(--sh-danger-solid)' : 'var(--sh-warning-solid)',
-              flexShrink: 0,
-            }}
-          />
+        <div className={styles.verdict} data-tone={tone}>
+          <WarningIcon size={17} className={styles.verdictIcon} />
           <div>
-            <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700 }}>{meta.label}</div>
-            <div style={{ fontSize: 11, color: 'var(--sh-text-secondary)' }}>{clean ? 'Re-validated against the bible' : 'Judge flagged this draft'}</div>
+            <div className={styles.verdictLabel}>{meta.label}</div>
+            <div className={styles.verdictSub}>{clean ? 'Re-validated against the bible' : 'Judge flagged this draft'}</div>
           </div>
         </div>
         {draft.judgeNote ? (
-          <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)', lineHeight: 1.55 }}>{draft.judgeNote}</p>
+          <p className={styles.judgeNote}>{draft.judgeNote}</p>
         ) : (
-          <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)', lineHeight: 1.55 }}>No judge notes recorded for this draft.</p>
+          <p className={`${styles.judgeNote} ${styles.judgeNoteEmpty}`}>No judge notes recorded for this draft.</p>
         )}
       </Drawer.Body>
     </Drawer>
@@ -478,40 +408,16 @@ function ChapterSwitchDrawer({ open, onOpenChange, novelId, current, onPick }: C
             <button
               key={d.id}
               className="nf-selrow"
+              data-active={active || undefined}
               onClick={() => {
                 onPick(d.chapter);
                 onOpenChange(false);
               }}
-              style={{ background: active ? 'var(--sh-accent-soft)' : undefined }}
             >
-              <span
-                style={{
-                  fontFamily: 'var(--sh-font-mono)',
-                  fontSize: 11,
-                  color: active ? 'var(--sh-accent)' : 'var(--sh-text-tertiary)',
-                  width: 18,
-                  fontWeight: active ? 600 : 400,
-                }}
-              >
-                {String(d.chapter).padStart(2, '0')}
-              </span>
-              <span
-                style={{
-                  flex: 1,
-                  minWidth: 0,
-                  fontSize: 'var(--sh-text-body-sm)',
-                  color: active ? 'var(--sh-accent)' : 'var(--sh-text-secondary)',
-                  fontWeight: active ? 600 : 400,
-                  whiteSpace: 'nowrap',
-                  overflow: 'hidden',
-                  textOverflow: 'ellipsis',
-                  textAlign: 'left',
-                }}
-              >
-                {d.title ?? 'Untitled'}
-              </span>
+              <span className={styles.switchNum}>{String(d.chapter).padStart(2, '0')}</span>
+              <span className={styles.switchTitle}>{d.title ?? 'Untitled'}</span>
               {(d.reviewStatus === 'needs_review' || d.reviewStatus === 'contradiction') && (
-                <span style={{ width: 6, height: 6, borderRadius: '50%', background: meta.intent === 'danger' ? 'var(--sh-danger-solid)' : 'var(--sh-warning-solid)' }} />
+                <span className={styles.switchDot} style={{ '--nf-dot': meta.intent === 'danger' ? 'var(--sh-danger-solid)' : 'var(--sh-warning-solid)' } as React.CSSProperties} />
               )}
             </button>
           );
@@ -548,45 +454,16 @@ function ProseToolbar({ onBold, onItalic, onBulleted, onNumbered, onTable }: Pro
     { label: '▦', title: 'Table', action: onTable },
   ];
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: 4,
-        padding: '6px 8px',
-        border: '1px solid var(--sh-border-subtle)',
-        borderRadius: 'var(--sh-radius-md)',
-        background: 'var(--sh-surface-card)',
-        marginBottom: 10,
-        position: 'sticky',
-        top: 0,
-        zIndex: 1,
-      }}
-    >
+    <div className={styles.toolbar}>
       {buttons.map((b, i) => (
         <Tooltip key={i} content={b.title}>
-          <button
-            onMouseDown={e => e.preventDefault()}
-            onClick={b.action}
-            aria-label={b.title}
-            style={{
-              minWidth: 30,
-              height: 28,
-              padding: '0 8px',
-              border: 'none',
-              borderRadius: 6,
-              background: 'transparent',
-              cursor: 'pointer',
-              fontSize: 13,
-              color: 'var(--sh-text-secondary)',
-            }}
-          >
+          <button onMouseDown={e => e.preventDefault()} onClick={b.action} aria-label={b.title} className={styles.toolbarBtn}>
             {b.label}
           </button>
         </Tooltip>
       ))}
-      <div style={{ flex: 1 }} />
-      <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>Markdown supported</span>
+      <div className={styles.spacer} />
+      <span className={styles.toolbarNote}>Markdown supported</span>
     </div>
   );
 }
@@ -728,35 +605,18 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   };
 
   return (
-    <div style={{ position: 'absolute', inset: 0, display: 'flex', flexDirection: 'column', background: 'var(--sh-surface-app)', overflow: 'hidden' }}>
-      <div style={{ height: 60, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 14, padding: '0 20px 0 14px' }}>
+    <div className={styles.editorScreen}>
+      <div className={styles.editorHead}>
         <Tooltip content="Back to chapters">
           <IconButton variant="ghost" aria-label="Back to chapters" icon={<ChevronLeftIcon size={18} />} onClick={onBack} />
         </Tooltip>
-        <button className="nf-nav" onClick={() => setChaptersOpen(true)} style={{ width: 'auto', gap: 10, padding: '7px 12px 7px 6px' }}>
-          <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 12, color: 'var(--sh-text-tertiary)' }}>{String(chapter).padStart(2, '0')}</span>
-          <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 600, whiteSpace: 'nowrap' }}>{draft.title ?? 'Untitled chapter'}</span>
-          <ChevronRightIcon size={15} style={{ color: 'var(--sh-text-tertiary)' }} />
+        <button className={`nf-nav ${styles.chapterNav}`} onClick={() => setChaptersOpen(true)}>
+          <span className={styles.chapterNavNum}>{String(chapter).padStart(2, '0')}</span>
+          <span className={styles.chapterNavTitle}>{draft.title ?? 'Untitled chapter'}</span>
+          <ChevronRightIcon size={15} className={styles.iconTertiary} />
         </button>
-        <div style={{ flex: 1 }} />
-        <button
-          onClick={() => setReviewOpen(true)}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: 7,
-            height: 34,
-            padding: '0 13px',
-            border: 'none',
-            borderRadius: 999,
-            cursor: 'pointer',
-            fontSize: 12,
-            fontWeight: 600,
-            background: meta.intent === 'success' ? 'var(--sh-success-bg-subtle)' : meta.intent === 'danger' ? 'var(--sh-danger-bg-subtle)' : 'var(--sh-warning-bg-subtle)',
-            color:
-              meta.intent === 'success' ? 'var(--sh-success-text-on-subtle)' : meta.intent === 'danger' ? 'var(--sh-danger-text-on-subtle)' : 'var(--sh-warning-text-on-subtle)',
-          }}
-        >
+        <div className={styles.spacer} />
+        <button onClick={() => setReviewOpen(true)} className={styles.statusPill} data-tone={toneOf(meta.intent)}>
           {meta.label}
         </button>
         {editing ? (
@@ -788,28 +648,14 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
         )}
       </div>
 
-      <div style={{ flex: 1, minHeight: 0, position: 'relative' }}>
+      <div className={styles.body}>
         {editing ? (
-          <div className="nf-scroll" style={{ position: 'absolute', inset: 0 }}>
-            <div style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '16px 32px 120px' }}>
+          <div className={`nf-scroll ${styles.scrollFill}`}>
+            <div className={`nf-page ${styles.editorInner}`}>
               {/* Write / Preview tabs — GitHub-style */}
-              <div style={{ display: 'flex', gap: 4, marginBottom: 12, borderBottom: '1px solid var(--sh-border-subtle)' }}>
+              <div className={styles.tabs}>
                 {(['write', 'preview'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setTab(t)}
-                    style={{
-                      padding: '7px 14px',
-                      border: 'none',
-                      borderBottom: `2px solid ${tab === t ? 'var(--sh-accent)' : 'transparent'}`,
-                      background: 'transparent',
-                      cursor: 'pointer',
-                      fontSize: 'var(--sh-text-body-sm)',
-                      fontWeight: tab === t ? 700 : 500,
-                      color: tab === t ? 'var(--sh-text-primary)' : 'var(--sh-text-tertiary)',
-                      textTransform: 'capitalize',
-                    }}
-                  >
+                  <button key={t} onClick={() => setTab(t)} className={styles.tab} data-active={tab === t}>
                     {t}
                   </button>
                 ))}
@@ -831,67 +677,31 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
                     spellCheck
                     aria-label="Chapter prose (Markdown)"
                     placeholder="Write your chapter in Markdown…"
-                    style={{
-                      display: 'block',
-                      width: '100%',
-                      minHeight: '62vh',
-                      resize: 'vertical',
-                      outline: 'none',
-                      border: '1px solid var(--sh-border-subtle)',
-                      borderRadius: 'var(--sh-radius-md)',
-                      background: 'var(--sh-surface-app)',
-                      padding: '14px 16px',
-                      fontSize: 15,
-                      lineHeight: 1.7,
-                      fontFamily: 'var(--sh-font-mono)',
-                      color: 'var(--sh-text-primary)',
-                      caretColor: 'var(--sh-accent)',
-                    }}
+                    className={styles.textarea}
                   />
                 </>
               ) : (
-                <div
-                  className="nf-md"
-                  style={{ minHeight: '62vh', fontSize: 19, lineHeight: 1.85, fontFamily: "'Iowan Old Style','Palatino Linotype',Georgia,serif" }}
-                  dangerouslySetInnerHTML={renderMarkdown(text)}
-                />
+                <div className={`nf-md ${styles.preview}`} dangerouslySetInnerHTML={renderMarkdown(text)} />
               )}
             </div>
           </div>
         ) : (
-          <div className="nf-scroll" style={{ position: 'absolute', inset: 0 }}>
-            <article style={{ maxWidth: PAGE_MAX_WIDTH, margin: '0 auto', padding: '64px 32px 120px', fontSize: 19, lineHeight: 1.85, fontFamily: "'Iowan Old Style','Palatino Linotype',Georgia,serif" }}>
-              {draft.title && (
-                <div style={{ fontFamily: 'var(--sh-font-sans)', fontSize: 12, letterSpacing: '0.14em', textTransform: 'uppercase', color: 'var(--sh-text-tertiary)', marginBottom: 26 }}>Chapter {chapter}</div>
-              )}
+          <div className={`nf-scroll ${styles.scrollFill}`}>
+            <article className={`nf-page ${styles.reader}`}>
+              {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
               {draft.body?.trim() ? (
                 <div className="nf-md" dangerouslySetInnerHTML={renderMarkdown(draft.body)} />
               ) : (
-                <p style={{ color: 'var(--sh-text-tertiary)' }}>This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.</p>
+                <p className={styles.emptyProse}>This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.</p>
               )}
             </article>
           </div>
         )}
 
-        {!editing && (
-          <div style={{ position: 'absolute', left: 22, bottom: 20, fontSize: 11, color: 'var(--sh-text-tertiary)', fontVariantNumeric: 'tabular-nums', pointerEvents: 'none' }}>
-            {wordCount(draft.body).toLocaleString()} words
-          </div>
-        )}
+        {!editing && <div className={styles.wordBadge}>{wordCount(draft.body).toLocaleString()} words</div>}
 
         {!editing && (
-          <div
-            style={{
-              position: 'absolute',
-              left: '50%',
-              transform: 'translateX(-50%)',
-              bottom: 22,
-              width: 'min(680px, calc(100% - 60px))',
-              display: 'flex',
-              justifyContent: 'center',
-              zIndex: 5,
-            }}
-          >
+          <div className={styles.forgeDock}>
             <ForgeBar
               novelId={novelId}
               scope={{ type: 'brief', ref: `chapter:${chapter}`, title: draft.title ?? `Chapter ${chapter}` }}

@@ -6,6 +6,12 @@
    to the popover layer (which already sits above modals) so they work inside dialogs. */
 :root {
   --sh-z-dropdown: 1300;
+
+  /* Shared Novel Forge layout dimensions — the centered content column, the split-pane list rail,
+     and the detail-pane min width. Screens draw from these so navigation never shifts the layout. */
+  --nf-page-max: 1120px;
+  --nf-rail-width: 380px;
+  --nf-detail-min: 480px;
 }
 
 /* ========================================
@@ -170,6 +176,128 @@ a:hover {
   font-weight: 600;
   letter-spacing: 0.01em;
   white-space: nowrap;
+}
+
+/* Colour-coded chip intents. Each sets the surface/text pair and the `--nf-dot` colour its leading dot reads. */
+.nf-chip[data-intent='neutral'] {
+  background: var(--sh-bg-pressed);
+  color: var(--sh-text-secondary);
+  --nf-dot: var(--sh-text-tertiary);
+}
+.nf-chip[data-intent='info'] {
+  background: var(--sh-info-bg-subtle);
+  color: var(--sh-info-text-on-subtle);
+  --nf-dot: var(--sh-info-solid);
+}
+.nf-chip[data-intent='success'] {
+  background: var(--sh-success-bg-subtle);
+  color: var(--sh-success-text-on-subtle);
+  --nf-dot: var(--sh-success-solid);
+}
+.nf-chip[data-intent='warning'] {
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-text-on-subtle);
+  --nf-dot: var(--sh-warning-solid);
+}
+.nf-chip[data-intent='danger'] {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+  --nf-dot: var(--sh-danger-solid);
+}
+.nf-chip[data-intent='accent'],
+.nf-chip[data-intent='ai'] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  --nf-dot: var(--sh-accent);
+}
+
+.nf-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--nf-dot);
+}
+
+/* Centered content column shared by the non-split-pane screens (each screen sets its own padding). */
+.nf-page {
+  max-width: var(--nf-page-max);
+  margin: 0 auto;
+}
+
+/* Split-pane screens (review, chat, proposals, runs, bible): a fixed list rail beside a fluid detail pane. */
+.nf-splitpane {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: var(--sh-surface-app);
+}
+
+.nf-rail {
+  width: var(--nf-rail-width);
+  flex-shrink: 0;
+  border-right: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-card);
+  display: flex;
+  flex-direction: column;
+}
+
+.nf-detail {
+  flex: 1;
+  min-width: var(--nf-detail-min);
+  display: flex;
+  flex-direction: column;
+  background: var(--sh-surface-app);
+}
+
+/* The list rail's sticky header strip and its scrolling body (pair the body with `.nf-scroll`). */
+.nf-railhead {
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.nf-raillist {
+  flex: 1;
+  padding: 8px;
+}
+
+/* A quiet "nothing here" line inside a rail list. */
+.nf-emptynote {
+  padding: 16px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+/* The detail pane's placeholder before a row is selected. */
+.nf-pane-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: var(--sh-text-tertiary);
+}
+
+/* A small uppercase eyebrow label (callers set their own margin). */
+.nf-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+/* A `.nf-selrow` laid out as a stacked card; selection colours come from `data-active` + `--nf-bar`. */
+.nf-selrow-stack {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 5px;
+  padding: 12px;
+  margin-bottom: 4px;
+}
+
+.nf-selrow-stack[data-active='true'] {
+  box-shadow: inset 2px 0 0 var(--nf-bar, var(--sh-accent));
 }
 
 .nf-scroll {

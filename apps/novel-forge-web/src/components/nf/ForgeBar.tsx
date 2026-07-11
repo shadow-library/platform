@@ -11,6 +11,8 @@ import { SparkIcon } from '@/components/icons';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import { type ChatScope, type ChatTurnResponse, useCreateChatSessionMutation, useForgeTurnMutation, useListChatSessionsQuery } from '@/lib/apis';
 
+import styles from './ForgeBar.module.css';
+
 /**
  * The section the bar refines. `type`/`ref` map to the backend chat scope, so whatever the author is
  * looking at (an entity, a volume, an arc, a chapter) rides along as the model's context.
@@ -27,7 +29,7 @@ export interface ForgeScope {
  * a quiet model menu, and a Propose button. Each ask lands as a reviewable proposal; the latest
  * reply shows inline so quick back-and-forth never leaves the page.
  */
-export function ForgeBar({ novelId, scope, placeholder, style }: { novelId: string; scope: ForgeScope; placeholder?: string; style?: React.CSSProperties }): React.JSX.Element {
+export function ForgeBar({ novelId, scope, placeholder }: { novelId: string; scope: ForgeScope; placeholder?: string }): React.JSX.Element {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
   const [sessionId, setSessionId] = useState<string | undefined>();
@@ -92,43 +94,17 @@ export function ForgeBar({ novelId, scope, placeholder, style }: { novelId: stri
 
   if (!open) {
     return (
-      <button
-        onClick={() => setOpen(true)}
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          height: 44,
-          padding: '0 18px',
-          borderRadius: 999,
-          background: 'color-mix(in srgb, var(--sh-surface-raised) 92%, transparent)',
-          border: '1px solid var(--sh-border-subtle)',
-          boxShadow: 'var(--sh-shadow-e3)',
-          backdropFilter: 'blur(12px)',
-          cursor: 'pointer',
-          ...style,
-        }}
-      >
-        <SparkIcon size={16} style={{ color: 'var(--sh-accent)' }} />
-        <span style={{ fontSize: 13, color: 'var(--sh-text-secondary)' }}>Ask Forge to update {scope.title}…</span>
+      <button onClick={() => setOpen(true)} className={styles.pill}>
+        <SparkIcon size={16} className={styles.pillIcon} />
+        <span className={styles.pillLabel}>Ask Forge to update {scope.title}…</span>
       </button>
     );
   }
 
   return (
-    <div
-      style={{
-        width: 'min(680px, 100%)',
-        background: 'var(--sh-surface-raised)',
-        border: '1px solid var(--sh-border-subtle)',
-        borderRadius: 16,
-        boxShadow: 'var(--sh-shadow-e3)',
-        padding: '12px 14px 10px',
-        ...style,
-      }}
-    >
-      <div ref={inputWrapRef} style={{ display: 'flex', alignItems: 'flex-start', gap: 10 }}>
-        <SparkIcon size={16} style={{ color: 'var(--sh-accent)', flexShrink: 0, marginTop: 6 }} />
+    <div className={styles.card}>
+      <div ref={inputWrapRef} className={styles.inputRow}>
+        <SparkIcon size={16} className={styles.inputIcon} />
         <Textarea
           value={text}
           onValueChange={setText}
@@ -136,7 +112,7 @@ export function ForgeBar({ novelId, scope, placeholder, style }: { novelId: stri
           minRows={1}
           autoGrow
           disabled={!sessionId}
-          style={{ flex: 1, border: 'none', background: 'transparent', padding: '4px 0' }}
+          className={styles.input}
           onKeyDown={e => {
             if (e.key === 'Enter' && !e.shiftKey) {
               e.preventDefault();
@@ -145,22 +121,17 @@ export function ForgeBar({ novelId, scope, placeholder, style }: { novelId: stri
             if (e.key === 'Escape') setOpen(false);
           }}
         />
-        <IconButton variant="ghost" size="sm" aria-label="Close" icon={<span style={{ fontSize: 15 }}>×</span>} onClick={() => setOpen(false)} />
+        <IconButton variant="ghost" size="sm" aria-label="Close" icon={<span className={styles.closeGlyph}>×</span>} onClick={() => setOpen(false)} />
       </div>
 
       {(last || turn.isPending) && (
-        <div style={{ margin: '10px 0 2px', padding: '10px 12px', borderRadius: 'var(--sh-radius-md)', background: 'var(--sh-surface-well)' }}>
+        <div className={styles.reply}>
           {turn.isPending ? (
-            <span style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)', fontStyle: 'italic' }}>Forge is thinking…</span>
+            <span className={styles.thinking}>Forge is thinking…</span>
           ) : (
             last && (
               <>
-                <div
-                  className="nf-scroll"
-                  style={{ maxHeight: 180, overflowY: 'auto', fontSize: 'var(--sh-text-body-sm)', lineHeight: 1.55, whiteSpace: 'pre-wrap', color: 'var(--sh-text-secondary)' }}
-                >
-                  {last.assistantMessage.content}
-                </div>
+                <div className={`nf-scroll ${styles.replyBody}`}>{last.assistantMessage.content}</div>
                 <MessageModelTag message={last.assistantMessage} />
               </>
             )
@@ -168,13 +139,13 @@ export function ForgeBar({ novelId, scope, placeholder, style }: { novelId: stri
         </div>
       )}
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, flexWrap: 'wrap' }}>
-        <span className="nf-chip" style={{ background: 'var(--sh-bg-pressed)', color: 'var(--sh-text-secondary)', fontWeight: 600 }}>
+      <div className={styles.footerRow}>
+        <span className="nf-chip" data-intent="neutral">
           scope · {scope.title}
         </span>
         <ChatModelMenu novelId={novelId} session={session} scopeType={scope.type} />
-        <span style={{ fontSize: 11, color: 'var(--sh-text-tertiary)' }}>Produces a reviewable proposal — canon isn&apos;t edited directly.</span>
-        <div style={{ flex: 1 }} />
+        <span className={styles.hint}>Produces a reviewable proposal — canon isn&apos;t edited directly.</span>
+        <div className={styles.spacer} />
         <Button variant="primary" size="sm" loading={turn.isPending} disabled={!sessionId || !text.trim()} onClick={propose}>
           Propose
         </Button>

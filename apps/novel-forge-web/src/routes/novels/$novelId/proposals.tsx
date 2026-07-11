@@ -8,9 +8,11 @@ import { useEffect, useMemo, useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { PaneError, PaneLoader, StatusChip, detailPaneStyle, railStyle, splitPaneStyle, type ChipIntent } from '@/components/nf';
+import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
 import { type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useListProposalsQuery } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+
+import styles from './proposals.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/proposals')({
   component: ProposalsScreen,
@@ -51,53 +53,41 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
   };
 
   return (
-    <div className="nf-scroll" style={{ flex: 1, minHeight: 0, padding: '22px 26px' }}>
-      <div style={{ maxWidth: 720, margin: '0 auto' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+    <div className={`nf-scroll ${styles.detailScroll}`}>
+      <div className={styles.detailInner}>
+        <div className={styles.metaRow}>
           <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
           <StatusChip intent="neutral">{proposal.kind}</StatusChip>
           <StatusChip intent="neutral">{proposal.scopeType}</StatusChip>
-          <div style={{ flex: 1 }} />
-          {proposal.model && <span style={{ fontSize: 'var(--sh-text-caption)', color: 'var(--sh-text-tertiary)', fontFamily: 'var(--sh-font-mono)' }}>{proposal.model}</span>}
+          <div className={styles.spacer} />
+          {proposal.model && <span className={styles.model}>{proposal.model}</span>}
         </div>
-        <h1 style={{ margin: '6px 0 14px', fontSize: 'var(--sh-text-h2)', fontWeight: 700, letterSpacing: '-0.01em' }}>{proposalTitle(proposal)}</h1>
+        <h1 className={styles.title}>{proposalTitle(proposal)}</h1>
 
         {isConflicted && (
-          <div style={{ display: 'flex', gap: 11, padding: '14px 16px', background: 'var(--sh-danger-bg-subtle)', border: '1px solid var(--sh-danger-border)', borderRadius: 'var(--sh-radius-lg)', marginBottom: 20 }}>
+          <div className={styles.conflict}>
             <div>
-              <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700, color: 'var(--sh-danger-text-on-subtle)', marginBottom: 2 }}>Baseline changed underneath this proposal</div>
-              <div style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)', lineHeight: 1.5 }}>
+              <div className={styles.conflictTitle}>Baseline changed underneath this proposal</div>
+              <div className={styles.conflictBody}>
                 The canon moved on since this was drafted, so it can no longer apply cleanly. Discard it and ask again for a fresh proposal.
               </div>
             </div>
           </div>
         )}
 
-        <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', color: 'var(--sh-text-tertiary)', marginBottom: 8 }}>
+        <div className={`nf-eyebrow ${styles.changeSetLabel}`}>
           Proposed change-set · {proposal.changeSet.length} op{proposal.changeSet.length === 1 ? '' : 's'}
         </div>
-        <div style={{ border: '1px solid var(--sh-border-default)', borderRadius: 'var(--sh-radius-lg)', overflow: 'hidden', marginBottom: 18 }}>
+        <div className={styles.changeSet}>
           {proposal.changeSet.map((op, i) => (
-            <pre
-              key={i}
-              style={{
-                margin: 0,
-                padding: '12px 16px',
-                whiteSpace: 'pre-wrap',
-                fontFamily: 'var(--sh-font-mono)',
-                fontSize: 12,
-                lineHeight: 1.6,
-                color: 'var(--sh-text-secondary)',
-                borderTop: i > 0 ? '1px solid var(--sh-border-subtle)' : undefined,
-              }}
-            >
+            <pre key={i} className={styles.op}>
               {JSON.stringify(op, null, 2)}
             </pre>
           ))}
         </div>
 
         {isPending ? (
-          <div style={{ display: 'flex', gap: 8 }}>
+          <div className={styles.actions}>
             <Button variant="primary" loading={apply.isPending} onClick={doApply}>
               Apply to canon
             </Button>
@@ -106,7 +96,7 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
             </Button>
           </div>
         ) : (
-          <p style={{ margin: 0, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>
+          <p className={styles.statusNote}>
             This proposal is {proposal.status}
             {proposal.appliedAt ? ` · ${relativeTime(proposal.appliedAt)}` : ''}.
           </p>
@@ -133,11 +123,11 @@ function ProposalsScreen(): React.JSX.Element {
   const pendingCount = proposals.filter(p => p.status === 'pending').length;
 
   return (
-    <div style={splitPaneStyle}>
-      <div style={railStyle}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Proposals Center</span>
+    <div className="nf-splitpane">
+      <div className="nf-rail">
+        <div className="nf-railhead">
+          <div className={styles.railTitleRow}>
+            <span className={styles.railTitle}>Proposals Center</span>
             {pendingCount > 0 && <StatusChip intent="warning">{pendingCount} pending</StatusChip>}
           </div>
           <SegmentedControl value={filter} onValueChange={v => setFilter(v as Filter)} size="sm">
@@ -145,46 +135,31 @@ function ProposalsScreen(): React.JSX.Element {
             <SegmentedControl.Item value="all">All</SegmentedControl.Item>
           </SegmentedControl>
         </div>
-        <div className="nf-scroll" style={{ flex: 1, padding: 8 }}>
+        <div className="nf-scroll nf-raillist">
           {proposalsQuery.isLoading && <PaneLoader />}
           {proposalsQuery.error && <PaneError error={proposalsQuery.error} />}
-          {!proposalsQuery.isLoading && proposals.length === 0 && <div style={{ padding: 16, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>No proposals here.</div>}
-          {proposals.map(proposal => {
-            const selectedRow = proposal.id === selectedId;
-            const barColor = proposal.status === 'conflicted' ? 'var(--sh-danger-solid)' : 'var(--sh-accent)';
-            return (
-              <button
-                key={proposal.id}
-                className="nf-selrow"
-                onClick={() => setSelectedId(proposal.id)}
-                style={{
-                  flexDirection: 'column',
-                  alignItems: 'stretch',
-                  gap: 5,
-                  padding: 12,
-                  marginBottom: 4,
-                  background: selectedRow ? 'var(--sh-accent-soft)' : undefined,
-                  boxShadow: selectedRow ? `inset 2px 0 0 ${barColor}` : undefined,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
-                  <StatusChip intent="neutral">{proposal.kind}</StatusChip>
-                  <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{relativeTime(proposal.createdAt)}</span>
-                </div>
-                <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, color: 'var(--sh-text-primary)', textAlign: 'left' }}>{proposalTitle(proposal)}</div>
-              </button>
-            );
-          })}
+          {!proposalsQuery.isLoading && proposals.length === 0 && <div className="nf-emptynote">No proposals here.</div>}
+          {proposals.map(proposal => (
+            <button
+              key={proposal.id}
+              className="nf-selrow nf-selrow-stack"
+              data-active={proposal.id === selectedId}
+              onClick={() => setSelectedId(proposal.id)}
+              style={proposal.status === 'conflicted' ? ({ '--nf-bar': 'var(--sh-danger-solid)' } as React.CSSProperties) : undefined}
+            >
+              <div className={styles.cardRow}>
+                <StatusChip intent={statusIntent(proposal.status)}>{proposal.status}</StatusChip>
+                <StatusChip intent="neutral">{proposal.kind}</StatusChip>
+                <div className={styles.spacer} />
+                <span className={styles.cardTime}>{relativeTime(proposal.createdAt)}</span>
+              </div>
+              <div className={styles.cardTitle}>{proposalTitle(proposal)}</div>
+            </button>
+          ))}
         </div>
       </div>
-      <div style={detailPaneStyle}>
-        {selected ? (
-          <ProposalDetail novelId={novelId} proposal={selected} />
-        ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sh-text-tertiary)' }}>Select a proposal to review.</div>
-        )}
+      <div className="nf-detail">
+        {selected ? <ProposalDetail novelId={novelId} proposal={selected} /> : <div className="nf-pane-empty">Select a proposal to review.</div>}
       </div>
     </div>
   );

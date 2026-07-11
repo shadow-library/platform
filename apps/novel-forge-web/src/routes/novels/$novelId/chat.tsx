@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
  * Importing user defined modules
  */
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
-import { PaneError, PaneLoader, RowAction, StatusChip, detailPaneStyle, railStyle, splitPaneStyle } from '@/components/nf';
+import { PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChatScope,
@@ -25,6 +25,8 @@ import {
   useSetSessionStatusMutation,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
+
+import styles from './chat.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/chat')({
   component: ChatScreen,
@@ -132,7 +134,7 @@ function NewChatDialog({ novelId, open, onOpenChange, onCreated }: NewChatDialog
       <Dialog.Content size="md">
         <Dialog.Header title="New refinement chat" description="Pick what the chat should reason over — that scope becomes its context." />
         <Dialog.Body>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div className={styles.dialogForm}>
             <FormField label="Scope" helper={SCOPE_OPTIONS.find(o => o.value === scope)?.hint}>
               <Select
                 value={scope}
@@ -253,107 +255,42 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
   };
 
   return (
-    <div style={{ flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column' }}>
-      <div
-        style={{
-          flexShrink: 0,
-          height: 52,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 10,
-          padding: '0 20px',
-          borderBottom: '1px solid var(--sh-border-subtle)',
-          background: 'var(--sh-surface-card)',
-        }}
-      >
+    <div className={styles.thread}>
+      <div className={styles.threadHead}>
         <StatusChip intent="info">scope: {session.scopeType}</StatusChip>
         {session.scopeRef && <StatusChip intent="neutral">{session.scopeRef}</StatusChip>}
-        <span style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 700 }}>{session.title ?? 'Untitled chat'}</span>
+        <span className={styles.threadTitle}>{session.title ?? 'Untitled chat'}</span>
         <StatusChip intent={session.status === 'active' ? 'success' : 'neutral'} dot>
           {session.status}
         </StatusChip>
       </div>
 
-      <div ref={scrollRef} className="nf-scroll" style={{ flex: 1, minHeight: 0, padding: '24px 20px' }}>
-        <div style={{ maxWidth: 720, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div ref={scrollRef} className={`nf-scroll ${styles.scroll}`}>
+        <div className={styles.msgList}>
           {messagesQuery.isLoading && <PaneLoader />}
           {messagesQuery.error && <PaneError error={messagesQuery.error} />}
           {!messagesQuery.isLoading && messages.length === 0 && (
-            <p style={{ textAlign: 'center', fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)', lineHeight: 1.6 }}>
-              Ask Forge to change this {session.scopeType}. It drafts a reviewable proposal — canon isn&apos;t edited directly.
-            </p>
+            <p className={styles.emptyHint}>Ask Forge to change this {session.scopeType}. It drafts a reviewable proposal — canon isn&apos;t edited directly.</p>
           )}
           {messages.map(m =>
             m.role === 'user' ? (
-              <div key={m.id} style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <div
-                  style={{
-                    maxWidth: '78%',
-                    background: 'var(--sh-accent)',
-                    color: 'var(--sh-on-accent)',
-                    padding: '11px 14px',
-                    borderRadius: '14px 14px 4px 14px',
-                    fontSize: 'var(--sh-text-body)',
-                    lineHeight: 1.55,
-                    whiteSpace: 'pre-wrap',
-                  }}
-                >
-                  {m.content}
-                </div>
+              <div key={m.id} className={styles.userRow}>
+                <div className={styles.userBubble}>{m.content}</div>
               </div>
             ) : (
-              <div key={m.id} style={{ display: 'flex', gap: 12 }}>
-                <div
-                  style={{
-                    width: 28,
-                    height: 28,
-                    borderRadius: 8,
-                    background: 'linear-gradient(140deg,var(--sh-indigo-500),var(--sh-indigo-700))',
-                    flexShrink: 0,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    color: '#fff',
-                  }}
-                >
+              <div key={m.id} className={styles.assistantRow}>
+                <div className={styles.avatar}>
                   <ProposalsIcon size={15} />
                 </div>
-                <div style={{ maxWidth: '82%' }}>
-                  <div
-                    style={{
-                      background: 'var(--sh-surface-card)',
-                      border: '1px solid var(--sh-border-subtle)',
-                      padding: '12px 15px',
-                      borderRadius: '14px 14px 14px 4px',
-                      fontSize: 'var(--sh-text-body)',
-                      lineHeight: 1.6,
-                      whiteSpace: 'pre-wrap',
-                    }}
-                  >
-                    {m.content}
-                  </div>
+                <div className={styles.assistantCol}>
+                  <div className={styles.assistantBubble}>{m.content}</div>
                   <MessageModelTag message={m} />
                   {m.proposalId && (
-                    <button
-                      onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })}
-                      style={{
-                        marginTop: 8,
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 8,
-                        padding: '9px 12px',
-                        width: '100%',
-                        background: 'var(--sh-warning-bg-subtle)',
-                        border: '1px solid var(--sh-warning-border)',
-                        borderRadius: 'var(--sh-radius-md)',
-                        cursor: 'pointer',
-                        textAlign: 'left',
-                      }}
-                    >
-                      <ProposalsIcon size={15} style={{ color: 'var(--sh-warning-solid)' }} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600 }}>Refinement proposal · pending</div>
-                        <div style={{ fontSize: 11, color: 'var(--sh-text-tertiary)' }}>Review the change-set before it touches canon</div>
+                    <button onClick={() => navigate({ to: '/novels/$novelId/proposals', params: { novelId } })} className={styles.proposalBtn}>
+                      <ProposalsIcon size={15} className={styles.proposalIcon} />
+                      <div className={styles.proposalMain}>
+                        <div className={styles.proposalTitle}>Refinement proposal · pending</div>
+                        <div className={styles.proposalSub}>Review the change-set before it touches canon</div>
                       </div>
                     </button>
                   )}
@@ -362,24 +299,15 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
             ),
           )}
           {turn.isPending && (
-            <div style={{ display: 'flex', gap: 12, alignItems: 'center', color: 'var(--sh-text-tertiary)', fontSize: 'var(--sh-text-body-sm)' }}>
+            <div className={styles.thinking}>
               <Spinner size="sm" /> Forge is thinking…
             </div>
           )}
         </div>
       </div>
 
-      <div style={{ flexShrink: 0, padding: '14px 20px 18px', borderTop: '1px solid var(--sh-border-subtle)', background: 'var(--sh-surface-card)' }}>
-        <div
-          style={{
-            maxWidth: 720,
-            margin: '0 auto',
-            border: '1px solid var(--sh-border-default)',
-            borderRadius: 'var(--sh-radius-lg)',
-            background: 'var(--sh-surface-app)',
-            padding: '10px 12px',
-          }}
-        >
+      <div className={styles.composer}>
+        <div className={styles.composerInner}>
           <Textarea
             value={input}
             onValueChange={setInput}
@@ -387,7 +315,7 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
             minRows={1}
             autoGrow
             disabled={session.status !== 'active'}
-            style={{ border: 'none', background: 'transparent' }}
+            className={styles.input}
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -395,10 +323,10 @@ function ChatThread({ novelId, session }: ChatThreadProps): React.JSX.Element {
               }
             }}
           />
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+          <div className={styles.composerBar}>
             <ChatModelMenu novelId={novelId} session={session} scopeType={session.scopeType} disabled={session.status !== 'active'} />
-            <span style={{ fontSize: 11, color: 'var(--sh-text-tertiary)' }}>Proposals only — canon isn&apos;t edited directly</span>
-            <div style={{ flex: 1 }} />
+            <span className={styles.hint}>Proposals only — canon isn&apos;t edited directly</span>
+            <div className={styles.spacer} />
             <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={turn.isPending} disabled={session.status !== 'active'} onClick={send}>
               Send
             </Button>
@@ -444,111 +372,68 @@ function ChatScreen(): React.JSX.Element {
   };
 
   return (
-    <div style={splitPaneStyle}>
+    <div className="nf-splitpane">
       {/* sessions */}
-      <div style={railStyle}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--sh-border-subtle)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-            <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Refinement chats</span>
-            <div style={{ flex: 1 }} />
+      <div className="nf-rail">
+        <div className="nf-railhead">
+          <div className={styles.railTitleRow}>
+            <span className={styles.railTitle}>Refinement chats</span>
+            <div className={styles.spacer} />
             <Button variant="secondary" size="sm" onClick={() => setNewChatOpen(true)}>
               New
             </Button>
           </div>
-          <div style={{ display: 'flex', gap: 5 }}>
+          <div className={styles.filterRow}>
             {(['active', 'archived'] as const).map(s => (
-              <button
-                key={s}
-                onClick={() => setStatusFilter(s)}
-                style={{
-                  padding: '3px 10px',
-                  border: 'none',
-                  borderRadius: 99,
-                  cursor: 'pointer',
-                  fontSize: 11,
-                  fontWeight: statusFilter === s ? 600 : 500,
-                  background: statusFilter === s ? 'var(--sh-accent-soft)' : 'transparent',
-                  color: statusFilter === s ? 'var(--sh-accent)' : 'var(--sh-text-secondary)',
-                  textTransform: 'capitalize',
-                }}
-              >
+              <button key={s} onClick={() => setStatusFilter(s)} className={styles.filterPill} data-active={statusFilter === s}>
                 {s}
               </button>
             ))}
           </div>
         </div>
-        <div className="nf-scroll" style={{ flex: 1, padding: 8 }}>
+        <div className="nf-scroll nf-raillist">
           {sessionsQuery.isLoading && <PaneLoader />}
           {sessionsQuery.error && <PaneError error={sessionsQuery.error} />}
           {!sessionsQuery.isLoading && sessions.length === 0 && (
-            <div style={{ padding: 16, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>
-              {statusFilter === 'active' ? 'No chats yet — start one to refine the novel.' : 'No archived chats.'}
-            </div>
+            <div className="nf-emptynote">{statusFilter === 'active' ? 'No chats yet — start one to refine the novel.' : 'No archived chats.'}</div>
           )}
-          {sessions.map(session => {
-            const active = session.id === selectedId;
-            return (
-              <div
-                key={session.id}
-                role="button"
-                tabIndex={0}
-                onClick={() => setSelectedId(session.id)}
-                onKeyDown={e => e.key === 'Enter' && setSelectedId(session.id)}
-                className="nf-selrow"
-                style={{
-                  flexDirection: 'column',
-                  alignItems: 'stretch',
-                  gap: 4,
-                  padding: 11,
-                  marginBottom: 3,
-                  background: active ? 'var(--sh-accent-soft)' : undefined,
-                  boxShadow: active ? 'inset 2px 0 0 var(--sh-accent)' : undefined,
-                }}
-              >
-                <div style={{ display: 'flex', alignItems: 'center', gap: 7, minHeight: 22 }}>
-                  <StatusChip intent="neutral">{session.scopeType}</StatusChip>
-                  <div style={{ flex: 1 }} />
-                  <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)' }}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
-                  <div className="nf-rowactions">
-                    <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
-                      <ArchiveIcon size={13} />
-                    </RowAction>
-                    <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
-                      <TrashIcon size={13} />
-                    </RowAction>
-                  </div>
+          {sessions.map(session => (
+            <div
+              key={session.id}
+              role="button"
+              tabIndex={0}
+              onClick={() => setSelectedId(session.id)}
+              onKeyDown={e => e.key === 'Enter' && setSelectedId(session.id)}
+              className="nf-selrow nf-selrow-stack"
+              data-active={session.id === selectedId}
+            >
+              <div className={styles.sessionTop}>
+                <StatusChip intent="neutral">{session.scopeType}</StatusChip>
+                <div className={styles.spacer} />
+                <span className={styles.sessionTime}>{relativeTime(session.lastTurnAt ?? session.updatedAt)}</span>
+                <div className="nf-rowactions">
+                  <RowAction label={session.status === 'active' ? 'Archive chat' : 'Unarchive chat'} onClick={() => archive(session)}>
+                    <ArchiveIcon size={13} />
+                  </RowAction>
+                  <RowAction label="Delete chat & history" danger onClick={() => setDeleteTarget(session)}>
+                    <TrashIcon size={13} />
+                  </RowAction>
                 </div>
-                <div
-                  style={{
-                    fontSize: 'var(--sh-text-body-sm)',
-                    fontWeight: 600,
-                    color: active ? 'var(--sh-accent)' : 'var(--sh-text-primary)',
-                    whiteSpace: 'nowrap',
-                    overflow: 'hidden',
-                    textOverflow: 'ellipsis',
-                    textAlign: 'left',
-                  }}
-                >
-                  {session.title ?? 'Untitled chat'}
-                </div>
-                {session.summary && (
-                  <div style={{ fontSize: 11, color: 'var(--sh-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}>
-                    {session.summary}
-                  </div>
-                )}
               </div>
-            );
-          })}
+              <div className={styles.sessionTitle}>{session.title ?? 'Untitled chat'}</div>
+              {session.summary && <div className={styles.sessionSummary}>{session.summary}</div>}
+            </div>
+          ))}
         </div>
       </div>
 
       {/* thread */}
-      <div style={detailPaneStyle}>
+      <div className="nf-detail">
         {selected ? (
           <ChatThread key={selected.id} novelId={novelId} session={selected} />
         ) : (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--sh-text-tertiary)' }}>
-            <p style={{ margin: 0 }}>Start a refinement chat to talk through changes to your novel.</p>
+          <div className={styles.threadEmpty}>
+            <p className={styles.emptyText}>Start a refinement chat to talk through changes to your novel.</p>
             <Button variant="primary" onClick={() => setNewChatOpen(true)}>
               New chat
             </Button>

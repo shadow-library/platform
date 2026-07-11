@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { AssetBox, PaneError, PaneLoader, RowAction, StatusChip, detailPaneStyle, railStyle, splitPaneStyle } from '@/components/nf';
+import { AssetBox, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type CreateEntityBody,
@@ -26,6 +26,8 @@ import {
   useUpdateEntityMutation,
 } from '@/lib/apis';
 import { coverColor } from '@/lib/format';
+
+import styles from './story-bible.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/story-bible')({
   component: StoryBibleScreen,
@@ -76,8 +78,9 @@ function TypeGlyph({ type, size }: TypeGlyphProps): React.JSX.Element {
   );
 }
 
+/** CSS custom properties driving the `.iconTile` class (size, radius, and colours). */
 function iconTile(size: number, radius: number, background: string, color: string): React.CSSProperties {
-  return { width: size, height: size, borderRadius: radius, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, background, color };
+  return { '--tile-size': `${size}px`, '--tile-radius': `${radius}px`, '--tile-bg': background, '--tile-fg': color } as React.CSSProperties;
 }
 
 interface TypePickerProps {
@@ -94,54 +97,38 @@ function TypePicker({ active, counts, onPick }: TypePickerProps): React.JSX.Elem
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className={styles.picker}>
       <button type="button" className="nf-btrigger" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen(prev => !prev)}>
-        <span style={iconTile(34, 9, 'var(--sh-accent)', 'var(--sh-on-accent)')}>
+        <span className={styles.iconTile} style={iconTile(34, 9, 'var(--sh-accent)', 'var(--sh-on-accent)')}>
           <TypeGlyph type={active} size={18} />
         </span>
-        <span style={{ flex: 1, minWidth: 0 }}>
-          <span style={{ display: 'block', fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--sh-text-tertiary)' }}>Showing</span>
-          <span style={{ display: 'block', fontSize: 15, fontWeight: 700, color: 'var(--sh-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-            {active === 'all' ? 'All types' : TYPE_LABEL[active]}
-          </span>
+        <span className={styles.triggerLabel}>
+          <span className={styles.showingLabel}>Showing</span>
+          <span className={styles.showingValue}>{active === 'all' ? 'All types' : TYPE_LABEL[active]}</span>
         </span>
-        <ChevronDownIcon size={17} style={{ color: 'var(--sh-text-secondary)', flexShrink: 0 }} />
+        <ChevronDownIcon size={17} className={styles.iconSecondary} />
       </button>
       {open && (
         <>
-          <div style={{ position: 'fixed', inset: 0, zIndex: 59 }} onClick={() => setOpen(false)} />
-          <div
-            role="menu"
-            style={{
-              position: 'absolute',
-              top: 'calc(100% + 6px)',
-              left: 0,
-              right: 0,
-              zIndex: 60,
-              background: 'var(--sh-surface-raised)',
-              border: '1px solid var(--sh-border-default)',
-              borderRadius: 'var(--sh-radius-lg)',
-              boxShadow: 'var(--sh-shadow-e3)',
-              padding: 6,
-            }}
-          >
+          <div className={styles.overlay} onClick={() => setOpen(false)} />
+          <div role="menu" className={styles.menu}>
             <button type="button" className="nf-menuitem" data-active={active === 'all' || undefined} onClick={() => pick('all')}>
-              <span style={iconTile(28, 7, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>
+              <span className={styles.iconTile} style={iconTile(28, 7, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>
                 <TypeGlyph type="all" size={15} />
               </span>
-              <span style={{ flex: 1, minWidth: 0 }}>
-                <span style={{ display: 'block', fontSize: 13, fontWeight: 700, color: 'var(--sh-text-primary)' }}>All types</span>
-                <span style={{ display: 'block', fontSize: 11, color: 'var(--sh-text-tertiary)' }}>Browse everything as cards</span>
+              <span className={styles.menuItemText}>
+                <span className={styles.menuItemTitle}>All types</span>
+                <span className={styles.menuItemSub}>Browse everything as cards</span>
               </span>
             </button>
-            <div style={{ height: 1, background: 'var(--sh-border-subtle)', margin: '5px 6px' }} />
+            <div className={styles.menuDivider} />
             {TYPE_ORDER.map(type => (
               <button key={type} type="button" className="nf-menuitem" data-active={active === type || undefined} onClick={() => pick(type)}>
-                <span style={iconTile(28, 7, 'var(--sh-surface-well)', 'var(--sh-text-secondary)')}>
+                <span className={styles.iconTile} style={iconTile(28, 7, 'var(--sh-surface-well)', 'var(--sh-text-secondary)')}>
                   <TypeGlyph type={type} size={15} />
                 </span>
-                <span style={{ flex: 1, minWidth: 0, fontSize: 13, fontWeight: 600, color: 'var(--sh-text-primary)' }}>{TYPE_LABEL[type]}</span>
-                <span style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 11, fontWeight: 700, color: 'var(--sh-text-tertiary)' }}>{counts.get(type) ?? 0}</span>
+                <span className={styles.menuItemLabel}>{TYPE_LABEL[type]}</span>
+                <span className={styles.menuCount}>{counts.get(type) ?? 0}</span>
               </button>
             ))}
           </div>
@@ -160,16 +147,14 @@ interface BibleOverviewProps {
 function BibleOverview({ entities, counts, onOpen }: BibleOverviewProps): React.JSX.Element {
   return (
     <>
-      <div style={{ height: 60, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 11, padding: '0 24px' }}>
-        <h2 style={{ margin: 0, fontSize: 'var(--sh-text-h3)', fontWeight: 700, letterSpacing: '-0.01em' }}>Story Bible</h2>
-        <span style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>All types · {entities.length} entities</span>
+      <div className={styles.overviewHead}>
+        <h2 className={styles.overviewTitle}>Story Bible</h2>
+        <span className={styles.overviewMeta}>All types · {entities.length} entities</span>
       </div>
-      <div className="nf-scroll" style={{ flex: 1, minHeight: 0 }}>
-        <div style={{ maxWidth: 860, margin: '0 auto', padding: '8px 24px 60px' }}>
-          <p style={{ margin: '0 0 20px', fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)' }}>
-            Pick a category to browse its entries — or use the type selector on the left.
-          </p>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(230px, 1fr))', gap: 14 }}>
+      <div className={`nf-scroll ${styles.paneScroll}`}>
+        <div className={styles.overviewInner}>
+          <p className={styles.overviewHint}>Pick a category to browse its entries — or use the type selector on the left.</p>
+          <div className={styles.catGrid}>
             {TYPE_ORDER.map(type => {
               const sample = entities
                 .filter(e => e.type === type)
@@ -178,18 +163,16 @@ function BibleOverview({ entities, counts, onOpen }: BibleOverviewProps): React.
                 .join(' · ');
               return (
                 <button key={type} type="button" className="nf-catcard" onClick={() => onOpen(type)}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 11 }}>
-                    <span style={iconTile(40, 11, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>
+                  <div className={styles.catHead}>
+                    <span className={styles.iconTile} style={iconTile(40, 11, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>
                       <TypeGlyph type={type} size={20} />
                     </span>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700, color: 'var(--sh-text-primary)' }}>{TYPE_LABEL[type]}</div>
-                      <div style={{ fontFamily: 'var(--sh-font-mono)', fontSize: 11, color: 'var(--sh-text-tertiary)' }}>{counts.get(type) ?? 0} entries</div>
+                    <div className={styles.catInfo}>
+                      <div className={styles.catTitle}>{TYPE_LABEL[type]}</div>
+                      <div className={styles.catCount}>{counts.get(type) ?? 0} entries</div>
                     </div>
                   </div>
-                  <div style={{ fontSize: 12, lineHeight: 1.5, color: 'var(--sh-text-tertiary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {sample || 'No entries yet'}
-                  </div>
+                  <div className={styles.catSample}>{sample || 'No entries yet'}</div>
                 </button>
               );
             })}
@@ -220,15 +203,6 @@ interface EntityDialogState {
   initial: EntityFormState;
 }
 
-const SECTION_LABEL: React.CSSProperties = {
-  fontSize: 10,
-  fontWeight: 700,
-  letterSpacing: '0.06em',
-  textTransform: 'uppercase',
-  color: 'var(--sh-text-tertiary)',
-  marginBottom: 6,
-};
-
 interface EntityDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -251,8 +225,8 @@ function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: 
       <Dialog.Content size="md">
         <Dialog.Header title={mode === 'create' ? 'New entity' : 'Edit entity'} />
         <Dialog.Body>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+          <div className={styles.dialogForm}>
+            <div className={styles.dialogGrid}>
               <FormField label="Name" required>
                 <Input value={form.name} onValueChange={v => set('name', v)} autoFocus />
               </FormField>
@@ -283,7 +257,7 @@ function EntityDialog({ open, onOpenChange, mode, initial, onSubmit, pending }: 
                 </Select>
               </FormField>
             )}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+            <div className={styles.dialogGrid}>
               <FormField label="Significance">
                 <Select value={form.significance} onValueChange={v => set('significance', v as 'major' | 'minor')}>
                   <Select.Item value="major">Major</Select.Item>
@@ -334,49 +308,45 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
 
   return (
     <>
-      <div style={{ height: 60, flexShrink: 0, display: 'flex', alignItems: 'center', gap: 12, padding: '0 24px' }}>
-        <div style={{ display: 'flex', alignItems: 'baseline', gap: 11, minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: 'var(--sh-text-h3)', fontWeight: 700, letterSpacing: '-0.01em', whiteSpace: 'nowrap' }}>{entity.name}</h2>
-          <span style={{ fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>
+      <div className={styles.detailHead}>
+        <div className={styles.detailTitleWrap}>
+          <h2 className={styles.detailTitle}>{entity.name}</h2>
+          <span className={styles.detailType}>
             {TYPE_SINGULAR[entity.type]} · {entity.significance || 'minor'}
           </span>
         </div>
-        <div style={{ flex: 1 }} />
+        <div className={styles.spacer} />
         <Button variant="ghost" onClick={() => onEdit(entity)}>
           Edit
         </Button>
       </div>
-      <div className="nf-scroll" style={{ flex: 1, minHeight: 0 }}>
-        <div style={{ maxWidth: 740, margin: '0 auto', padding: '16px 24px 120px', display: 'grid', gridTemplateColumns: '196px 1fr', gap: 30 }}>
+      <div className={`nf-scroll ${styles.paneScroll}`}>
+        <div className={styles.detailInner}>
           <div>
-            <div style={{ aspectRatio: '3 / 4', borderRadius: 'var(--sh-radius-lg)', overflow: 'hidden', boxShadow: 'var(--sh-shadow-e2)' }}>
-              {entity.imagePath ? (
-                <img src={entity.imagePath} alt={entity.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-              ) : (
-                <AssetBox height={261} color={coverColor(entity.id)} radius={0} />
-              )}
+            <div className={styles.cover}>
+              {entity.imagePath ? <img src={entity.imagePath} alt={entity.name} className={styles.coverImg} /> : <AssetBox height={261} color={coverColor(entity.id)} radius={0} />}
             </div>
           </div>
           <div>
             {entity.body && (
               <>
-                <div style={SECTION_LABEL}>Summary</div>
-                <p style={{ margin: '0 0 22px', fontSize: 'var(--sh-text-body)', lineHeight: 1.65 }}>{entity.body}</p>
+                <div className={styles.sectionLabel}>Summary</div>
+                <p className={styles.para}>{entity.body}</p>
               </>
             )}
             {entity.motivation && (
               <>
-                <div style={SECTION_LABEL}>Motivation</div>
-                <p style={{ margin: '0 0 22px', fontSize: 'var(--sh-text-body)', lineHeight: 1.65, color: 'var(--sh-text-secondary)' }}>{entity.motivation}</p>
+                <div className={styles.sectionLabel}>Motivation</div>
+                <p className={`${styles.para} ${styles.paraMuted}`}>{entity.motivation}</p>
               </>
             )}
             {entity.notes && (
               <>
-                <div style={SECTION_LABEL}>Notes</div>
-                <p style={{ margin: '0 0 22px', fontSize: 'var(--sh-text-body)', lineHeight: 1.65, color: 'var(--sh-text-secondary)' }}>{entity.notes}</p>
+                <div className={styles.sectionLabel}>Notes</div>
+                <p className={`${styles.para} ${styles.paraMuted}`}>{entity.notes}</p>
               </>
             )}
-            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 7 }}>
+            <div className={styles.chips}>
               {entity.status && <StatusChip intent="neutral">{entity.status}</StatusChip>}
               {entity.origin && <StatusChip intent="info">{entity.origin}</StatusChip>}
               {entity.firstSeenChapter != null && <StatusChip intent="neutral">first seen · ch. {entity.firstSeenChapter}</StatusChip>}
@@ -385,18 +355,7 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
         </div>
       </div>
 
-      <div
-        style={{
-          position: 'absolute',
-          left: '50%',
-          transform: 'translateX(-50%)',
-          bottom: 22,
-          width: 'min(680px, calc(100% - 60px))',
-          display: 'flex',
-          justifyContent: 'center',
-          zIndex: 5,
-        }}
-      >
+      <div className={styles.forgeDock}>
         <ForgeBar
           novelId={novelId}
           scope={{ type: 'novel', title: entity.name }}
@@ -416,14 +375,12 @@ interface BibleEmptyPaneProps {
 
 function BibleEmptyPane({ brief, pending, onGenerate, onSettings }: BibleEmptyPaneProps): React.JSX.Element {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', textAlign: 'center', padding: 32 }}>
-      <div
-        style={{ width: 52, height: 52, borderRadius: 14, background: 'var(--sh-accent-soft)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: 18 }}
-      >
-        <SparkIcon size={24} style={{ color: 'var(--sh-accent)' }} />
+    <div className={styles.emptyPane}>
+      <div className={styles.emptyIcon}>
+        <SparkIcon size={24} className={styles.accentIcon} />
       </div>
-      <h2 style={{ margin: '0 0 8px', fontSize: 'var(--sh-text-h3)', fontWeight: 700 }}>Draft the story bible</h2>
-      <p style={{ margin: '0 0 22px', maxWidth: 420, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)', lineHeight: 1.6 }}>
+      <h2 className={styles.emptyTitle}>Draft the story bible</h2>
+      <p className={styles.emptyText}>
         Forge reads your brief and drafts the world, cast, factions, locations, and plot — the canon every chapter is checked against. This runs the full bible builder and can take
         a few minutes.
       </p>
@@ -555,12 +512,12 @@ function StoryBibleScreen(): React.JSX.Element {
   };
 
   return (
-    <div style={splitPaneStyle}>
-      <div style={railStyle}>
-        <div style={{ padding: '14px 16px 12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 13 }}>
-            <span style={{ fontSize: 'var(--sh-text-body)', fontWeight: 700 }}>Story Bible</span>
-            <div style={{ flex: 1 }} />
+    <div className="nf-splitpane">
+      <div className="nf-rail">
+        <div className={styles.railHead}>
+          <div className={styles.railTitleRow}>
+            <span className={styles.railTitle}>Story Bible</span>
+            <div className={styles.spacer} />
             <Tooltip content="New entity">
               <IconButton
                 variant="ghost"
@@ -571,16 +528,14 @@ function StoryBibleScreen(): React.JSX.Element {
               />
             </Tooltip>
           </div>
-          <div style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', color: 'var(--sh-text-tertiary)', marginBottom: 6 }}>Entity type</div>
+          <div className={styles.railEyebrow}>Entity type</div>
           <TypePicker active={activeType} counts={counts} onPick={pickCategory} />
         </div>
-        <div className="nf-scroll" style={{ flex: 1, padding: '2px 8px 8px' }}>
+        <div className={`nf-scroll ${styles.railList}`}>
           {entitiesQuery.isLoading && <PaneLoader />}
           {entitiesQuery.error && <PaneError error={entitiesQuery.error} />}
           {!entitiesQuery.isLoading && visible.length === 0 && (
-            <div style={{ padding: 16, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-tertiary)' }}>
-              No {activeType === 'all' ? 'entities' : TYPE_LABEL[activeType].toLowerCase()} yet.
-            </div>
+            <div className="nf-emptynote">No {activeType === 'all' ? 'entities' : TYPE_LABEL[activeType].toLowerCase()} yet.</div>
           )}
           {visible.map(entity => {
             const selected = entity.entityKey === selectedKey;
@@ -590,23 +545,17 @@ function StoryBibleScreen(): React.JSX.Element {
                 key={entity.id}
                 role="button"
                 tabIndex={0}
-                className="nf-selrow"
+                className={`nf-selrow ${styles.entityRow}`}
                 data-active={selected || undefined}
-                style={{ gap: 11, padding: '9px 10px' }}
                 onClick={() => setSelectedKey(entity.entityKey)}
                 onKeyDown={e => e.key === 'Enter' && setSelectedKey(entity.entityKey)}
               >
-                <div style={{ width: 30, height: 30, borderRadius: 8, background: coverColor(entity.id), flexShrink: 0 }} />
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div
-                    className="nf-entname"
-                    style={{ fontSize: 'var(--sh-text-body-sm)', fontWeight: 600, color: 'var(--sh-text-primary)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', textAlign: 'left' }}
-                  >
-                    {entity.name}
-                  </div>
-                  {subtitle && <div style={{ fontSize: 11, color: 'var(--sh-text-tertiary)', textAlign: 'left' }}>{subtitle}</div>}
+                <div className={styles.entityAvatar} style={{ '--nf-dot': coverColor(entity.id) } as React.CSSProperties} />
+                <div className={styles.entityBody}>
+                  <div className={`nf-entname ${styles.entityName}`}>{entity.name}</div>
+                  {subtitle && <div className={styles.entitySub}>{subtitle}</div>}
                 </div>
-                <span style={{ fontSize: 10, color: 'var(--sh-text-tertiary)', flexShrink: 0 }}>{entity.significance ?? ''}</span>
+                <span className={styles.entitySig}>{entity.significance ?? ''}</span>
                 <div className="nf-rowactions">
                   <RowAction label={`Delete ${entity.name}`} danger onClick={() => setDeleteTarget(entity)}>
                     <TrashIcon size={13} />
@@ -616,14 +565,14 @@ function StoryBibleScreen(): React.JSX.Element {
             );
           })}
         </div>
-        <div style={{ padding: 12, borderTop: '1px solid var(--sh-border-subtle)' }}>
+        <div className={styles.railFooter}>
           <Button variant="ghost" size="sm" fullWidth loading={audit.isPending} disabled={bibleEmpty} onClick={runAudit}>
             Run bible audit
           </Button>
         </div>
       </div>
 
-      <div style={{ ...detailPaneStyle, position: 'relative' }}>
+      <div className={`nf-detail ${styles.detailRelative}`}>
         {selectedKey ? (
           <EntityDetail
             novelId={novelId}
@@ -649,9 +598,7 @@ function StoryBibleScreen(): React.JSX.Element {
         ) : activeType === 'all' ? (
           <BibleOverview entities={entities} counts={counts} onOpen={pickCategory} />
         ) : (
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--sh-text-tertiary)' }}>
-            Select an entity to see its detail.
-          </div>
+          <div className="nf-pane-empty">Select an entity to see its detail.</div>
         )}
       </div>
 
