@@ -51,6 +51,12 @@
   font-size: var(--sh-text-body);
   color: var(--sh-text-secondary);
   max-width: 620px;
+  /* Keep a runaway brief from ballooning the header — cap it and let the ellipsis hint at more. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
 .headerActions {

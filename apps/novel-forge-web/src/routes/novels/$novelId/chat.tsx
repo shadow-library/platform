@@ -37,7 +37,15 @@ import { relativeTime } from '@/lib/format';
 import styles from './chat.module.css';
 import { opLabel } from './proposals';
 
+interface ChatSearch {
+  session?: string;
+}
+
+// The open chat lives in the URL so a refresh or shared link reopens the same conversation.
 export const Route = createFileRoute('/novels/$novelId/chat')({
+  validateSearch: (search: Record<string, unknown>): ChatSearch => ({
+    session: typeof search.session === 'string' && search.session ? search.session : undefined,
+  }),
   component: ChatScreen,
 });
 
@@ -623,22 +631,22 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
 
 function ChatScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
+  const { session: sessionParam } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const [statusFilter, setStatusFilter] = useState<'active' | 'archived'>('active');
   const sessionsQuery = useListChatSessionsQuery(novelId, { status: statusFilter, limit: 50 });
   const setStatus = useSetSessionStatusMutation(novelId);
   const deleteSession = useDeleteChatSessionMutation(novelId);
 
   const sessions = sessionsQuery.data?.items ?? [];
-  const [selectedId, setSelectedId] = useState<string | undefined>();
   const [newChatOpen, setNewChatOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<ChatSessionResponse | undefined>();
 
-  useEffect(() => {
-    if (!sessions.some(s => s.id === selectedId)) setSelectedId(sessions[0]?.id);
-  }, [sessions, selectedId]);
-
-  const selected = sessions.find(s => s.id === selectedId);
+  // The URL param wins when it names a session still in the list; otherwise fall back to the first
+  // without rewriting the URL, so an implicit selection stays clean and refresh is deterministic.
+  const selectSession = (id?: string): Promise<void> => navigate({ search: { session: id } });
+  const selected = sessions.find(s => s.id === sessionParam) ?? sessions[0];
 
   const archive = (session: ChatSessionResponse): void => {
     setStatus.mutate({ sessionId: session.id, status: session.status === 'active' ? 'archived' : 'active' }, { onError: err => toast.danger(err.message) });
@@ -650,7 +658,7 @@ function ChatScreen(): React.JSX.Element {
       onSuccess: () => {
         toast.success(`Deleted “${deleteTarget.title ?? 'chat'}” and its history`);
         setDeleteTarget(undefined);
-        if (deleteTarget.id === selectedId) setSelectedId(undefined);
+        if (deleteTarget.id === sessionParam) selectSession(undefined);
       },
       onError: err => toast.danger(err.message),
     });
@@ -690,10 +698,10 @@ function ChatScreen(): React.JSX.Element {
               key={session.id}
               role="button"
               tabIndex={0}
-              onClick={() => setSelectedId(session.id)}
-              onKeyDown={e => e.key === 'Enter' && setSelectedId(session.id)}
+              onClick={() => selectSession(session.id)}
+              onKeyDown={e => e.key === 'Enter' && selectSession(session.id)}
               className="nf-selrow nf-selrow-stack"
-              data-active={session.id === selectedId}
+              data-active={session.id === selected?.id}
             >
               <div className={styles.sessionTop}>
                 <StatusChip intent="neutral">{session.scopeType === 'project' ? 'hub' : session.scopeType}</StatusChip>
@@ -736,7 +744,7 @@ function ChatScreen(): React.JSX.Element {
         onOpenChange={setNewChatOpen}
         onCreated={session => {
           setStatusFilter('active');
-          setSelectedId(session.id);
+          selectSession(session.id);
         }}
       />
 

@@ -42,7 +42,7 @@
 }
 
 .msgList {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
   display: flex;
   flex-direction: column;
@@ -62,7 +62,7 @@
 }
 
 .userBubble {
-  max-width: 78%;
+  max-width: 86%;
   background: var(--sh-accent);
   color: var(--sh-on-accent);
   padding: 11px 14px;
@@ -90,7 +90,7 @@
 }
 
 .assistantCol {
-  max-width: 82%;
+  max-width: 88%;
   min-width: 0;
 }
 
@@ -150,7 +150,7 @@
 }
 
 .composerInner {
-  max-width: 720px;
+  max-width: 960px;
   margin: 0 auto;
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
@@ -273,7 +273,7 @@
   background: var(--sh-surface-card);
   overflow: hidden;
   width: 100%;
-  max-width: 560px;
+  max-width: 720px;
 }
 
 .turnCard[data-status='applied'] {

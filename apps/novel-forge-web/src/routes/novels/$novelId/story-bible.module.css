@@ -139,8 +139,8 @@
 }
 
 .overviewInner {
-  max-width: 860px;
-  margin: 0 auto;
+  max-width: 1040px;
+  margin: 0;
   padding: 8px 24px 60px;
 }
 
@@ -231,8 +231,8 @@
 }
 
 .detailInner {
-  max-width: 740px;
-  margin: 0 auto;
+  max-width: 1040px;
+  margin: 0;
   padding: 16px 24px 120px;
   display: grid;
   grid-template-columns: 196px 1fr;

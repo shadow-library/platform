@@ -44,11 +44,13 @@
   margin-bottom: 9px;
 }
 
+/* Field prose spans the full record width so it lines up with the arc / brief list below it, and is
+   justified so both edges meet the table's edges. */
 .fieldText {
   margin: 0 0 30px;
   font-size: var(--sh-text-body);
   line-height: 1.7;
-  max-width: 660px;
+  text-align: justify;
 }
 
 /* Floating Forge composer, centered at the bottom of the pane. */
@@ -179,6 +181,16 @@
 
 .row:hover {
   background: var(--sh-bg-hover);
+}
+
+/* A chapter with no brief yet: shown for context but not a navigation target. */
+.row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.row:disabled:hover {
+  background: transparent;
 }
 
 .rowVolume {

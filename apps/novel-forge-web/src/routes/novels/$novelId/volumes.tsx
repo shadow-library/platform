@@ -29,7 +29,23 @@ import {
 
 import styles from './volumes.module.css';
 
+interface VolumesSearch {
+  volume?: string;
+  arc?: string;
+  chapter?: number;
+}
+
+// The drill-down (volume → arc → chapter brief) lives in the URL so a refresh or shared link lands on
+// the same record instead of resetting to the volume list.
 export const Route = createFileRoute('/novels/$novelId/volumes')({
+  validateSearch: (search: Record<string, unknown>): VolumesSearch => {
+    const chapter = Number(search.chapter);
+    return {
+      volume: typeof search.volume === 'string' && search.volume ? search.volume : undefined,
+      arc: typeof search.arc === 'string' && search.arc ? search.arc : undefined,
+      chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
+    };
+  },
   component: VolumesScreen,
 });
 
@@ -391,8 +407,9 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
       <div className={styles.listBordered}>
         {chapters.map(n => {
           const brief = briefByChapter.get(n);
+          // A chapter with no brief has nothing to open — keep it visible for context but not clickable.
           return (
-            <button key={n} className={`${styles.row} ${styles.rowBrief}`} onClick={() => onOpenBrief(n)}>
+            <button key={n} className={`${styles.row} ${styles.rowBrief}`} disabled={!brief} onClick={() => onOpenBrief(n)}>
               <span className={styles.briefNum}>{String(n).padStart(2, '0')}</span>
               <span className={styles.briefName}>{brief?.title ?? `Chapter ${n}`}</span>
               <span className={styles.statusCol}>
@@ -406,7 +423,7 @@ function ArcDetail({ novelId, volumeKey, arcKey, onOpenBrief }: ArcDetailProps):
                   </StatusChip>
                 )}
               </span>
-              <ChevronRightIcon size={15} className={styles.iconTertiary} />
+              {brief && <ChevronRightIcon size={15} className={styles.iconTertiary} />}
             </button>
           );
         })}
@@ -498,68 +515,64 @@ function BriefDetail({ novelId, chapter }: BriefDetailProps): React.JSX.Element 
 
 // ─── Screen ─────────────────────────────────────────────────────────────────────
 
-type View =
-  | { level: 'volumes' }
-  | { level: 'volume'; volume: VolumeResponse }
-  | { level: 'arc'; volume: VolumeResponse; arc: ArcResponse }
-  | { level: 'brief'; volume: VolumeResponse; arc?: ArcResponse; chapter: number };
-
 function VolumesScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const [view, setView] = useState<View>({ level: 'volumes' });
+  const { volume: volumeKey, arc: arcKey, chapter } = Route.useSearch();
+  const navigate = Route.useNavigate();
+
+  // The active record is derived purely from the URL: chapter → brief, arc (with its volume) → arc,
+  // volume → volume, otherwise the volume list.
+  const level = chapter != null ? 'brief' : arcKey && volumeKey ? 'arc' : volumeKey ? 'volume' : 'volumes';
+
+  // Volume/arc titles for the breadcrumb and Forge scope — the queries are shared (React Query dedupes)
+  // with the detail panes below, so this adds no extra requests.
+  const volumeQuery = useVolumeQuery(novelId, volumeKey ?? '', Boolean(volumeKey));
+  const arcsQuery = useListArcsQuery(novelId, volumeKey, Boolean(volumeKey) && (Boolean(arcKey) || chapter != null));
+  const volumeTitle = volumeQuery.data ? (volumeQuery.data.title ?? `Volume ${volumeQuery.data.ordinal}`) : (volumeKey ?? '');
+  const arcTitle = arcsQuery.data?.arcs.find(a => a.arcKey === arcKey)?.title ?? arcKey ?? '';
+
+  const goVolumes = (): Promise<void> => navigate({ search: {} });
+  const goVolume = (key: string): Promise<void> => navigate({ search: { volume: key } });
+  const goArc = (key: string): Promise<void> => navigate({ search: { volume: volumeKey, arc: key } });
+  const goBrief = (n: number): Promise<void> => navigate({ search: { volume: volumeKey, arc: arcKey, chapter: n } });
 
   const forgeScope = ((): React.ComponentProps<typeof ForgeBar>['scope'] => {
-    if (view.level === 'volume') return { type: 'volume', ref: `volume:${view.volume.volumeKey}`, title: view.volume.title ?? `Volume ${view.volume.ordinal}` };
-    if (view.level === 'arc') return { type: 'arc', ref: `arc:${view.arc.arcKey}`, title: view.arc.title ?? view.arc.arcKey };
-    if (view.level === 'brief') return { type: 'brief', ref: `chapter:${view.chapter}`, title: `Chapter ${view.chapter}` };
+    if (level === 'volume') return { type: 'volume', ref: `volume:${volumeKey}`, title: volumeTitle };
+    if (level === 'arc') return { type: 'arc', ref: `arc:${arcKey}`, title: arcTitle };
+    if (level === 'brief') return { type: 'brief', ref: `chapter:${chapter}`, title: `Chapter ${chapter}` };
     return { type: 'volume_plan', title: 'the volume plan' };
   })();
 
   return (
     <div className={styles.screen}>
       <div className={styles.crumbBar}>
-        <Crumb label="Story Plan" onClick={view.level !== 'volumes' ? () => setView({ level: 'volumes' }) : undefined} current={view.level === 'volumes'} />
-        {view.level !== 'volumes' && (
+        <Crumb label="Story Plan" onClick={level !== 'volumes' ? goVolumes : undefined} current={level === 'volumes'} />
+        {level !== 'volumes' && volumeKey && (
           <>
             <ChevronRightIcon size={15} className={styles.iconTertiary} />
-            <Crumb
-              label={view.volume.title ?? `Volume ${view.volume.ordinal}`}
-              onClick={view.level !== 'volume' ? () => setView({ level: 'volume', volume: view.volume }) : undefined}
-              current={view.level === 'volume'}
-            />
+            <Crumb label={volumeTitle || volumeKey} onClick={level !== 'volume' ? () => goVolume(volumeKey) : undefined} current={level === 'volume'} />
           </>
         )}
-        {(view.level === 'arc' || (view.level === 'brief' && view.arc)) && (
+        {arcKey && (level === 'arc' || level === 'brief') && (
           <>
             <ChevronRightIcon size={15} className={styles.iconTertiary} />
-            <Crumb
-              label={(view.level === 'arc' ? view.arc : view.arc!).title ?? (view.level === 'arc' ? view.arc : view.arc!).arcKey}
-              onClick={view.level === 'brief' ? () => setView({ level: 'arc', volume: view.volume, arc: view.arc! }) : undefined}
-              current={view.level === 'arc'}
-            />
+            <Crumb label={arcTitle || arcKey} onClick={level === 'brief' ? () => goArc(arcKey) : undefined} current={level === 'arc'} />
           </>
         )}
-        {view.level === 'brief' && (
+        {level === 'brief' && (
           <>
             <ChevronRightIcon size={15} className={styles.iconTertiary} />
-            <Crumb label={`Ch. ${view.chapter} · Brief`} current />
+            <Crumb label={`Ch. ${chapter} · Brief`} current />
           </>
         )}
       </div>
 
       <div className={styles.body}>
         <div className={`nf-scroll ${styles.scrollFill}`}>
-          {view.level === 'volumes' && <VolumesList novelId={novelId} onOpen={volume => setView({ level: 'volume', volume })} />}
-          {view.level === 'volume' && <VolumeDetail novelId={novelId} volumeKey={view.volume.volumeKey} onOpenArc={arc => setView({ level: 'arc', volume: view.volume, arc })} />}
-          {view.level === 'arc' && (
-            <ArcDetail
-              novelId={novelId}
-              volumeKey={view.volume.volumeKey}
-              arcKey={view.arc.arcKey}
-              onOpenBrief={chapter => setView({ level: 'brief', volume: view.volume, arc: view.arc, chapter })}
-            />
-          )}
-          {view.level === 'brief' && <BriefDetail novelId={novelId} chapter={view.chapter} />}
+          {level === 'volumes' && <VolumesList novelId={novelId} onOpen={volume => goVolume(volume.volumeKey)} />}
+          {level === 'volume' && <VolumeDetail novelId={novelId} volumeKey={volumeKey!} onOpenArc={arc => goArc(arc.arcKey)} />}
+          {level === 'arc' && <ArcDetail novelId={novelId} volumeKey={volumeKey!} arcKey={arcKey!} onOpenBrief={goBrief} />}
+          {level === 'brief' && <BriefDetail novelId={novelId} chapter={chapter!} />}
         </div>
         <ForgeDockArea novelId={novelId} scope={forgeScope} />
       </div>

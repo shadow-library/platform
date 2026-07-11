@@ -37,7 +37,21 @@ function toneOf(intent: ChipIntent): 'success' | 'danger' | 'warning' {
   return intent === 'success' ? 'success' : intent === 'danger' ? 'danger' : 'warning';
 }
 
+interface ChaptersSearch {
+  chapter?: number;
+  job?: string;
+}
+
+// Which chapter editor / generation-progress view is open lives in the URL, so a refresh returns to
+// the same chapter instead of the list.
 export const Route = createFileRoute('/novels/$novelId/chapters')({
+  validateSearch: (search: Record<string, unknown>): ChaptersSearch => {
+    const chapter = Number(search.chapter);
+    return {
+      chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
+      job: typeof search.job === 'string' && search.job ? search.job : undefined,
+    };
+  },
   component: ChaptersScreen,
 });
 
@@ -719,13 +733,17 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
 
 function ChaptersScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
-  const [openChapter, setOpenChapter] = useState<number | undefined>();
-  const [progressJobId, setProgressJobId] = useState<string | undefined>();
+  const { chapter, job } = Route.useSearch();
+  const navigate = Route.useNavigate();
 
-  if (progressJobId) return <GenerationProgress novelId={novelId} jobId={progressJobId} onBack={() => setProgressJobId(undefined)} />;
-  return openChapter != null ? (
-    <ChapterEditor novelId={novelId} chapter={openChapter} onBack={() => setOpenChapter(undefined)} onPick={setOpenChapter} />
+  // Chapter and job are mutually exclusive views; setting one clears the other.
+  const openChapter = (n?: number): Promise<void> => navigate({ search: { chapter: n } });
+  const openJob = (jobId?: string): Promise<void> => navigate({ search: { job: jobId } });
+
+  if (job) return <GenerationProgress novelId={novelId} jobId={job} onBack={() => openJob(undefined)} />;
+  return chapter != null ? (
+    <ChapterEditor novelId={novelId} chapter={chapter} onBack={() => openChapter(undefined)} onPick={openChapter} />
   ) : (
-    <ChapterList novelId={novelId} onOpen={setOpenChapter} onProgress={setProgressJobId} />
+    <ChapterList novelId={novelId} onOpen={openChapter} onProgress={openJob} />
   );
 }

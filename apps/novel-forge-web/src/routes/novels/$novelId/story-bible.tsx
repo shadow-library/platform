@@ -32,7 +32,21 @@ import { coverColor, imageUrl } from '@/lib/format';
 
 import styles from './story-bible.module.css';
 
+interface BibleSearch {
+  type?: EntityType;
+  entity?: string;
+}
+
+// The active category and selected entity live in the URL so a refresh reopens the same entry.
 export const Route = createFileRoute('/novels/$novelId/story-bible')({
+  validateSearch: (search: Record<string, unknown>): BibleSearch => {
+    const type = search.type;
+    const valid = type === 'character' || type === 'faction' || type === 'location' || type === 'power_rule' || type === 'item' || type === 'concept';
+    return {
+      type: valid ? (type as EntityType) : undefined,
+      entity: typeof search.entity === 'string' && search.entity ? search.entity : undefined,
+    };
+  },
   component: StoryBibleScreen,
 });
 
@@ -411,15 +425,18 @@ function BibleEmptyPane({ brief, pending, onGenerate, onSettings }: BibleEmptyPa
 function StoryBibleScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const navigate = useNavigate();
+  const { type: typeParam, entity: entityParam } = Route.useSearch();
+  const goSearch = Route.useNavigate();
   const entitiesQuery = useListEntitiesQuery(novelId, { limit: 500 });
   const entities = useMemo(() => entitiesQuery.data?.items ?? [], [entitiesQuery.data]);
   const createEntity = useCreateEntityMutation(novelId);
   const projectQuery = useProjectQuery(novelId);
   const seed = useSeedFromBriefMutation(novelId);
-  const [activeType, setActiveType] = useState<BibleCategory>('all');
-  const [selectedKey, setSelectedKey] = useState<string | undefined>();
+  const activeType: BibleCategory = typeParam ?? 'all';
   const [dialog, setDialog] = useState<EntityDialogState | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<EntityResponse | undefined>();
+
+  const selectEntity = (key?: string): Promise<void> => goSearch({ search: { type: typeParam, entity: key } });
 
   const updateEntity = useUpdateEntityMutation(novelId, dialog?.mode === 'edit' ? dialog.initial.entityKey : '');
   const deleteEntity = useDeleteEntityMutation(novelId);
@@ -430,7 +447,7 @@ function StoryBibleScreen(): React.JSX.Element {
       onSuccess: () => {
         toast.success(`Deleted “${deleteTarget.name}”`);
         setDeleteTarget(undefined);
-        if (deleteTarget.entityKey === selectedKey) setSelectedKey(undefined);
+        if (deleteTarget.entityKey === entityParam) selectEntity(undefined);
       },
       onError: err => toast.danger(err.message),
     });
@@ -444,15 +461,11 @@ function StoryBibleScreen(): React.JSX.Element {
 
   const visible = useMemo(() => (activeType === 'all' ? entities : entities.filter(e => e.type === activeType)), [entities, activeType]);
 
-  useEffect(() => {
-    if (activeType === 'all') return;
-    if (visible.length > 0 && !visible.some(e => e.entityKey === selectedKey)) setSelectedKey(visible[0]!.entityKey);
-  }, [activeType, visible, selectedKey]);
+  // The selection is derived, not stored: the URL wins when it names a visible entity, otherwise a
+  // specific category auto-focuses its first entry while "all" shows the category overview.
+  const selectedKey = entityParam && visible.some(e => e.entityKey === entityParam) ? entityParam : activeType === 'all' ? undefined : visible[0]?.entityKey;
 
-  const pickCategory = (category: BibleCategory): void => {
-    setActiveType(category);
-    if (category === 'all') setSelectedKey(undefined);
-  };
+  const pickCategory = (category: BibleCategory): Promise<void> => goSearch({ search: { type: category === 'all' ? undefined : category } });
 
   const submit = (form: EntityFormState): void => {
     if (dialog?.mode === 'create') {
@@ -470,8 +483,7 @@ function StoryBibleScreen(): React.JSX.Element {
         onSuccess: created => {
           toast.success(`Created “${created.name}”`);
           setDialog(null);
-          setActiveType(created.type);
-          setSelectedKey(created.entityKey);
+          goSearch({ search: { type: created.type, entity: created.entityKey } });
         },
         onError: err => toast.danger(err.message),
       });
@@ -558,8 +570,8 @@ function StoryBibleScreen(): React.JSX.Element {
                 tabIndex={0}
                 className={`nf-selrow ${styles.entityRow}`}
                 data-active={selected || undefined}
-                onClick={() => setSelectedKey(entity.entityKey)}
-                onKeyDown={e => e.key === 'Enter' && setSelectedKey(entity.entityKey)}
+                onClick={() => selectEntity(entity.entityKey)}
+                onKeyDown={e => e.key === 'Enter' && selectEntity(entity.entityKey)}
               >
                 {entity.imagePath ? (
                   <img src={imageUrl(entity.imagePath)} alt="" className={styles.entityThumb} />
