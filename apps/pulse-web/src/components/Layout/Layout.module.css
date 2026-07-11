@@ -1,41 +1,103 @@
-@import 'tailwindcss';
-
-.sideNavContainer {
-  @apply fixed left-0 top-16 bottom-0 w-64 overflow-y-auto z-40;
-  background-color: var(--color-bg-sider);
-  border-right: 1px solid var(--color-border-dark);
+.shell {
+  display: flex;
+  height: 100vh;
+  width: 100%;
+  overflow: hidden;
+  color: var(--sh-text-primary);
 }
 
-/* Top Navbar Styles */
-.topNavContainer {
-  @apply fixed top-0 left-0 right-0 h-16 z-50 flex items-center justify-between px-4;
-  background-color: var(--color-bg-header);
-  border-bottom: 1px solid var(--color-border-dark);
-}
-
-.logoSection {
-  @apply w-56 flex justify-center gap-3;
-}
-
-.searchContainer {
-  @apply flex-1 max-w-xl mx-8;
-}
-
-.rightSection {
-  @apply flex items-center gap-4;
-}
-
-.themeToggle {
-  @apply p-2 rounded-lg cursor-pointer transition-all duration-200;
-}
-
-/* Footer Styles */
-.footerContainer {
-  @apply h-12 flex items-center justify-center px-6 text-sm;
-}
-
-/* Main Content Area */
 .main {
-  @apply ml-64 mt-16;
-  background-color: var(--color-bg-layout);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 28px 32px 64px;
+}
+
+/* ── Header ── */
+.header {
+  height: 60px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 0 28px;
+  background: var(--sh-surface-card);
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.headerTitle {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.2;
+}
+
+.headerEyebrow {
+  font-size: 0.75rem;
+  color: var(--sh-text-tertiary);
+  letter-spacing: 0.02em;
+}
+
+.headerName {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.envPill {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 12px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-well);
+}
+
+.envDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sh-success-solid);
+}
+
+.envLabel {
+  font-size: 0.75rem;
+  color: var(--sh-text-secondary);
+}
+
+.envValue {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  font-family: var(--sh-font-mono);
+}
+
+/* ── Sidebar footer theme toggle ── */
+.themeToggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  border-radius: var(--sh-radius-md);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.875rem;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.themeToggle:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
 }
