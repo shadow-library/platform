@@ -21,9 +21,9 @@ describe('Avatar', () => {
     expect(screen.getByText('MK')).toBeInTheDocument();
   });
 
-  it('derives two letters for a single-word name', () => {
+  it('derives a single letter for a single-word name', () => {
     render(<Avatar name='Acme' />);
-    expect(screen.getByText('AC')).toBeInTheDocument();
+    expect(screen.getByText('A')).toBeInTheDocument();
   });
 
   it('folds presence into the accessible name', () => {

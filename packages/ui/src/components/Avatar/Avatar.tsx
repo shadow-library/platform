@@ -7,7 +7,7 @@ import { Children, forwardRef, isValidElement, useContext } from 'react';
 /**
  * Importing user defined packages
  */
-import { cn } from '@/lib';
+import { cn, getInitials } from '@/lib';
 
 import { AvatarGroupContext } from './Avatar.context';
 import styles from './Avatar.module.css';
@@ -16,16 +16,6 @@ import { type AvatarGroupProps, type AvatarProps } from './Avatar.types';
 /**
  * Declaring the constants
  */
-
-/** First + last initial (single word → first two letters), uppercase, two max. */
-function getInitials(name: string): string {
-  const words = name.trim().split(/\s+/).filter(Boolean);
-  const first = words[0];
-  if (!first) return '';
-  if (words.length === 1) return first.slice(0, 2).toUpperCase();
-  const last = words[words.length - 1] ?? first;
-  return (first.charAt(0) + last.charAt(0)).toUpperCase();
-}
 
 /** Stable tint per name — a char-code sum picks one of the two muted palettes. */
 function getTint(name: string): 'indigo' | 'neutral' {
