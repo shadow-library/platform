@@ -12,6 +12,9 @@
 .thread {
   flex: 1;
   min-width: 0;
+  /* A column-flex item defaults to min-height:auto (= content height); without this the thread
+     grows past the pane, the composer lands offscreen, and the message pane cannot scroll. */
+  min-height: 0;
   display: flex;
   flex-direction: column;
 }
@@ -88,6 +91,7 @@
 
 .assistantCol {
   max-width: 82%;
+  min-width: 0;
 }
 
 .assistantBubble {
@@ -164,6 +168,7 @@
 .composerBar {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 8px;
   margin-top: 8px;
 }
@@ -171,6 +176,10 @@
 .hint {
   font-size: 11px;
   color: var(--sh-text-tertiary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 /* Session rail */
@@ -259,10 +268,12 @@
 }
 
 .turnCard {
+  margin-top: 8px;
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
-  background: var(--sh-surface-raised);
+  background: var(--sh-surface-card);
   overflow: hidden;
+  width: 100%;
   max-width: 560px;
 }
 

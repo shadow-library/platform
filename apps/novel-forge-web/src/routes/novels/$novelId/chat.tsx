@@ -272,7 +272,7 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
 
   const isPending = proposal.status === 'pending';
   const opResults = (proposal.opResults ?? []) as { index: number; status: string; error?: string; result?: Record<string, unknown> }[];
-  const revertible = proposal.status === 'applied';
+  const revertible = proposal.revertible;
 
   const toggle = (set: Set<number>, index: number, update: (next: Set<number>) => void): void => {
     const next = new Set(set);
@@ -484,7 +484,29 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
   const isAuto = session.mode === 'auto';
   const isHub = session.scopeType === 'project';
 
+  // Stay pinned to the newest message ChatGPT-style: inline change cards load after the transcript,
+  // so a one-shot scroll lands short — follow content growth while the user is near the bottom, and
+  // stop following the moment they scroll up to read.
+  const pinnedRef = useRef(true);
   useEffect(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const onScroll = (): void => {
+      pinnedRef.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+    };
+    el.addEventListener('scroll', onScroll, { passive: true });
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) el.scrollTo({ top: el.scrollHeight });
+    });
+    if (el.firstElementChild) observer.observe(el.firstElementChild);
+    return () => {
+      el.removeEventListener('scroll', onScroll);
+      observer.disconnect();
+    };
+  }, []);
+
+  useEffect(() => {
+    pinnedRef.current = true;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
   }, [messages.length, turn.isPending]);
 

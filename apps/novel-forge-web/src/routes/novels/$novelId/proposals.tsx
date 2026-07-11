@@ -159,13 +159,16 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
             </Button>
           </div>
         )}
-        {isApplied && (
+        {isApplied && proposal.revertible && (
           <div className={styles.actions}>
             <Button variant="danger" loading={revert.isPending} onClick={doRevert}>
               Revert this change
             </Button>
             <p className={styles.statusNote}>Applied{proposal.appliedAt ? ` ${relativeTime(proposal.appliedAt)}` : ''} — reverting restores every touched artifact.</p>
           </div>
+        )}
+        {isApplied && !proposal.revertible && (
+          <p className={styles.statusNote}>Applied{proposal.appliedAt ? ` ${relativeTime(proposal.appliedAt)}` : ''} — no inverse recorded, so this change cannot be reverted.</p>
         )}
         {!isPending && !isApplied && (
           <p className={styles.statusNote}>

@@ -1756,6 +1756,7 @@ export interface components {
         [key: string]: unknown;
       };
       autoApplied: boolean;
+      revertible: boolean;
       opResults?: null | components['schemas']['OpResultItem'][];
       model?: null | string;
       runId?: null | string;
