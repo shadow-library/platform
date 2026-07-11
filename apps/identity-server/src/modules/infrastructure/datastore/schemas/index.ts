@@ -1,3 +1,4 @@
+export * from './audit.schema';
 export * from './auth-tokens.schemas';
 export * from './keys.schema';
 export * from './organisations.schema';
