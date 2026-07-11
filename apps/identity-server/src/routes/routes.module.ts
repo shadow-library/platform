@@ -19,6 +19,7 @@ import { ContactModule } from '@server/modules/identity/contact';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { HealthModule } from '@server/modules/infrastructure/health';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
+import { SecurityModule } from '@server/modules/infrastructure/security';
 
 /**
  * Defining types
@@ -37,6 +38,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({});
 export const HttpRouteModule = FastifyModule.forRoot({
   imports: [
     AppHttpCoreModule,
+    SecurityModule,
     HealthModule,
     KeyModule,
     SessionModule,

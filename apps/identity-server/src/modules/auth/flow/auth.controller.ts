@@ -9,6 +9,7 @@ import { type FastifyReply, type FastifyRequest } from 'fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { WebauthnChallengeResponse } from '@server/modules/auth/mfa';
+import { RateLimit } from '@server/modules/infrastructure/security';
 
 import { AuthFlowService, DeviceContext } from './auth-flow.service';
 import {
@@ -48,12 +49,14 @@ export class AuthController {
   ) {}
 
   @Post('/login/init')
+  @RateLimit({ name: 'login-init', limit: 20, windowSeconds: 3600 })
   @RespondFor(200, LoginInitResponse)
   loginInit(@Body() body: LoginInitBody, @Req() request: FastifyRequest): Promise<LoginInitResponse> {
     return this.loginService.init({ identifier: body.identifier, device: this.deviceContext(request, body.deviceId) });
   }
 
   @Post('/register/init')
+  @RateLimit({ name: 'register-init', limit: 5, windowSeconds: 3600 })
   @RespondFor(200, FlowStatusResponse)
   registerInit(@Body() body: RegisterInitBody, @Req() request: FastifyRequest): Promise<FlowStatusResponse> {
     return this.registrationService.init({ email: body.email, device: this.deviceContext(request, body.deviceId) });
@@ -80,6 +83,7 @@ export class AuthController {
   }
 
   @Post('/recover/init')
+  @RateLimit({ name: 'recover-init', limit: 5, windowSeconds: 3600 })
   @RespondFor(200, FlowStatusResponse)
   recoverInit(@Body() body: RecoverInitBody, @Req() request: FastifyRequest): Promise<FlowStatusResponse> {
     return this.recoveryService.init({ identifier: body.identifier, device: this.deviceContext(request, body.deviceId) });
@@ -104,6 +108,7 @@ export class AuthController {
 
   /** Issues passkey assertion options for a usernameless login or a flow's MFA step. */
   @Post('/webauthn/options')
+  @RateLimit({ name: 'webauthn-options', limit: 60, windowSeconds: 3600 })
   @HttpStatus(200)
   @RespondFor(200, WebauthnChallengeResponse)
   webauthnOptions(@Body() body: WebauthnOptionsBody, @Req() request: FastifyRequest): Promise<WebauthnChallengeResponse> {

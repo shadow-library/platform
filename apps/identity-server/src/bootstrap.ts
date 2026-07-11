@@ -27,6 +27,8 @@ declare module '@shadow-library/common' {
 
     /** Security configs */
     'security.master-encryption-key': string;
+    'rate-limit.enabled': boolean;
+    'rate-limit.ip-allowlist': string;
 
     /** Notification service (pulse-server) */
     'notification.base-url': string;
@@ -64,6 +66,9 @@ Config.load('worker.poll-interval', { envKey: 'WORKER_POLL_INTERVAL', defaultVal
 
 Config.load('oauth.issuer', { envKey: 'OAUTH_ISSUER', defaultValue: 'https://identity.shadow-apps.com' });
 Config.load('oauth.login-url', { envKey: 'OAUTH_LOGIN_URL', defaultValue: 'https://identity.shadow-apps.com/login' });
+
+Config.load('rate-limit.enabled', { envKey: 'RATE_LIMIT_ENABLED', defaultValue: 'true', validateType: 'boolean' });
+Config.load('rate-limit.ip-allowlist', { envKey: 'RATE_LIMIT_IP_ALLOWLIST', defaultValue: '' });
 
 /**
  * The master encryption key wraps signing/encryption keys at rest. It must never fall back to a

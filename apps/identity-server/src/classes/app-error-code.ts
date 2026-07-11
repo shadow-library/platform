@@ -74,6 +74,19 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly MFA_003 = new AppErrorCode('MFA_003', ErrorType.CONFLICT, 'MFA method already enrolled');
 
   /**
+   * Security Error Codes
+   */
+
+  /** Too many requests from this client within the window (Tier-1/Tier-2 budgets) */
+  static readonly SEC_001 = new AppErrorCode('RATE_LIMITED', ErrorType.CLIENT_ERROR, 'Too many requests, retry later', 429);
+  /** The security backend is unavailable and the endpoint fails closed */
+  static readonly SEC_002 = new AppErrorCode('SEC_002', ErrorType.SERVER_ERROR, 'Service temporarily unavailable', 503);
+  /** A service (M2M) bearer token is required for this endpoint */
+  static readonly SEC_003 = new AppErrorCode('SEC_003', ErrorType.UNAUTHENTICATED, 'Service authentication required', 401);
+  /** The presented service token lacks the required scope */
+  static readonly SEC_004 = new AppErrorCode('SEC_004', ErrorType.UNAUTHORIZED, 'Insufficient scope', 403);
+
+  /**
    * Organisation Error Codes
    */
 
