@@ -57,6 +57,20 @@
       "when": 1783752009992,
       "tag": "0007_verification_challenges",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1783752670197,
+      "tag": "0008_drop_session_tokens",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1783752686475,
+      "tag": "0009_refresh_tokens",
+      "breakpoints": true
     }
   ]
 }

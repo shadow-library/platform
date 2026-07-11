@@ -7,7 +7,6 @@ import { bigint, bigserial, index, pgEnum, pgTable, text, timestamp, unique, uui
 /**
  * Importing user defined packages
  */
-import { applications } from './applications.schema';
 import { userAuthProvider, users } from './users.schema';
 
 /**
@@ -21,7 +20,6 @@ export namespace UserSession {
   export type Status = InferEnum<typeof sessionStatus>;
   export type Aal = InferEnum<typeof sessionAal>;
 
-  export type Token = InferSelectModel<typeof userSessionTokens>;
   export type SignInEvent = InferSelectModel<typeof userSignInEvents>;
 }
 
@@ -77,30 +75,6 @@ export const userSessions = pgTable(
   t => [index('user_sessions_user_id_status_idx').on(t.userId, t.status)],
 );
 
-export const userSessionTokens = pgTable(
-  'user_session_tokens',
-  {
-    id: uuid('id').defaultRandom().primaryKey(),
-    sessionId: bigint('session_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => userSessions.id, { onDelete: 'cascade' }),
-    applicationId: bigint('application_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => applications.id, { onDelete: 'restrict' }),
-
-    tokenHash: varchar('token_hash', { length: 512 }).notNull(),
-
-    createdAt: timestamp('created_at').notNull().defaultNow(),
-    expiresAt: timestamp('expires_at').notNull(),
-    revokedAt: timestamp('revoked_at'),
-
-    ipAddress: varchar('ip_address', { length: 45 }),
-    ipCountry: varchar('ip_country', { length: 2 }),
-    previousTokenId: bigint('previous_token_id', { mode: 'bigint' }),
-  },
-  t => [unique('user_session_tokens_session_id_application_id_unique').on(t.sessionId, t.applicationId), unique('user_session_tokens_token_hash_unique').on(t.tokenHash)],
-);
-
 export const userSignInEvents = pgTable(
   'user_sign_in_events',
   {
@@ -139,16 +113,10 @@ export const deviceRelations = relations(devices, ({ one }) => ({
   user: one(users, { fields: [devices.userId], references: [users.id] }),
 }));
 
-export const userSessionRelations = relations(userSessions, ({ many, one }) => ({
-  tokens: many(userSessionTokens),
+export const userSessionRelations = relations(userSessions, ({ one }) => ({
   user: one(users, { fields: [userSessions.userId], references: [users.id] }),
   device: one(devices, { fields: [userSessions.deviceId], references: [devices.id] }),
   userSignInEvent: one(userSignInEvents, { fields: [userSessions.userSignInEventId], references: [userSignInEvents.id] }),
-}));
-
-export const userSessionTokenRelations = relations(userSessionTokens, ({ one }) => ({
-  session: one(userSessions, { fields: [userSessionTokens.sessionId], references: [userSessions.id] }),
-  application: one(applications, { fields: [userSessionTokens.applicationId], references: [applications.id] }),
 }));
 
 export const userSignInEventRelations = relations(userSignInEvents, ({ one }) => ({
