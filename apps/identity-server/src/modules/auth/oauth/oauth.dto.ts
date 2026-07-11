@@ -96,6 +96,48 @@ export class TokenResponse {
 }
 
 @Schema()
+export class TokenActionBody {
+  @Field()
+  token: string;
+
+  @Field({ optional: true })
+  client_id?: string;
+
+  @Field({ optional: true })
+  client_secret?: string;
+}
+
+@Schema()
+export class IntrospectionResponseDto {
+  @Field(() => Boolean)
+  active: boolean;
+
+  @Field({ optional: true })
+  sub?: string;
+
+  @Field({ optional: true })
+  scope?: string;
+
+  @Field({ optional: true })
+  aud?: string;
+
+  @Field(() => Number, { optional: true })
+  exp?: number;
+
+  @Field({ optional: true })
+  client_id?: string;
+
+  @Field({ optional: true })
+  token_type?: string;
+}
+
+@Schema()
+export class RevocationResponse {
+  @Field(() => Boolean)
+  revoked: boolean;
+}
+
+@Schema()
 export class UserInfoResponse {
   @Field()
   sub: string;

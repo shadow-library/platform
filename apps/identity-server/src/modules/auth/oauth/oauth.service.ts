@@ -10,6 +10,7 @@ import { ServerError } from '@shadow-library/fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { KeyService } from '@server/modules/auth/keys';
 import { SessionService } from '@server/modules/auth/session';
 import { RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
 import { UserEmailService, UserService } from '@server/modules/identity/user';
@@ -63,6 +64,16 @@ export interface TokenResult {
   refreshToken?: string;
 }
 
+export interface IntrospectionResult {
+  active: boolean;
+  sub?: string;
+  scope?: string;
+  aud?: string;
+  exp?: number;
+  clientId?: string;
+  tokenType?: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -81,7 +92,45 @@ export class OAuthService {
     private readonly userService: UserService,
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
+    private readonly keyService: KeyService,
   ) {}
+
+  /** RFC 7009 token revocation: revokes the refresh-token family. Always succeeds (even if unknown). */
+  async revoke(token: string, credential: ClientCredential): Promise<void> {
+    await this.authenticateClient(credential);
+    await this.refreshTokenService.revokeBySecret(token);
+  }
+
+  /** RFC 7662 introspection: reports whether an access or refresh token is currently valid. */
+  async introspect(token: string, credential: ClientCredential): Promise<IntrospectionResult> {
+    await this.authenticateClient(credential);
+
+    const claims = this.keyService.verify(token);
+    if (claims && typeof claims.exp === 'number' && claims.exp * 1000 > Date.now()) {
+      return {
+        active: true,
+        sub: String(claims.sub),
+        scope: claims.scope ? String(claims.scope) : undefined,
+        aud: claims.aud ? String(claims.aud) : undefined,
+        exp: claims.exp,
+        clientId: claims.client_id ? String(claims.client_id) : undefined,
+        tokenType: 'access_token',
+      };
+    }
+
+    const refresh = await this.refreshTokenService.describeBySecret(token);
+    if (refresh?.active) {
+      return {
+        active: true,
+        sub: refresh.context.userId.toString(),
+        scope: refresh.context.scope ?? undefined,
+        aud: refresh.context.audience ?? undefined,
+        clientId: refresh.context.clientId ?? undefined,
+        tokenType: 'refresh_token',
+      };
+    }
+    return { active: false };
+  }
 
   /** Authorization Code entry point: validates the request then either issues a code or asks the caller to log in. */
   async authorize(params: AuthorizeParams, sessionSecret?: string): Promise<AuthorizeResult> {

@@ -147,6 +147,22 @@ export class RefreshTokenService {
     return { secret: nextSecret, familyId: family.id, tokenId, context: this.toContext(family) };
   }
 
+  /** Revokes the family a presented refresh token belongs to (RFC 7009); a no-op if unknown. */
+  async revokeBySecret(secret: string): Promise<void> {
+    const token = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
+    if (token) await this.revokeFamily(token.familyId, 'LOGOUT');
+  }
+
+  /** Describes a refresh token for introspection: active only if the token and its family are live. */
+  async describeBySecret(secret: string): Promise<{ active: boolean; context: FamilyContext } | null> {
+    const token = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
+    if (!token) return null;
+    const family = await this.db.query.refreshTokenFamilies.findFirst({ where: eq(schema.refreshTokenFamilies.id, token.familyId) });
+    if (!family) return null;
+    const active = token.status === 'ACTIVE' && token.expiresAt.getTime() > Date.now() && family.status === 'ACTIVE';
+    return { active, context: this.toContext(family) };
+  }
+
   async revokeFamily(familyId: string, reason: RefreshToken.RevokeReason): Promise<void> {
     const [family] = await this.db
       .update(schema.refreshTokenFamilies)

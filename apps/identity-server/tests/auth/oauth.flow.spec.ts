@@ -187,6 +187,53 @@ describe('OAuth authorization-code flow', () => {
     expect(reuse.statusCode).toBe(400);
   });
 
+  const codeFlow = async () => {
+    const { verifier, challenge } = pkce();
+    const code = new URL((await authorize(challenge)).headers.location ?? '').searchParams.get('code') ?? '';
+    const token = await env
+      .getRouter()
+      .mockRequest()
+      .post('/oauth2/token')
+      .headers({ authorization: basic(clientId, secret) })
+      .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+    return token.json() as { access_token: string; refresh_token: string };
+  };
+
+  it('should introspect active tokens and report inactive after revocation', async () => {
+    const { access_token, refresh_token } = await codeFlow();
+
+    const introspect = (token: string) =>
+      env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/introspect')
+        .headers({ authorization: basic(clientId, secret) })
+        .body({ token });
+
+    expect((await introspect(access_token)).json()).toMatchObject({ active: true, token_type: 'access_token', sub: userId.toString() });
+    expect((await introspect(refresh_token)).json()).toMatchObject({ active: true, token_type: 'refresh_token' });
+
+    const revoked = await env
+      .getRouter()
+      .mockRequest()
+      .post('/oauth2/revoke')
+      .headers({ authorization: basic(clientId, secret) })
+      .body({ token: refresh_token });
+    expect(revoked.statusCode).toBe(200);
+
+    expect((await introspect(refresh_token)).json()).toMatchObject({ active: false });
+  });
+
+  it('should report inactive for a garbage token', async () => {
+    const response = await env
+      .getRouter()
+      .mockRequest()
+      .post('/oauth2/introspect')
+      .headers({ authorization: basic(clientId, secret) })
+      .body({ token: 'garbage' });
+    expect(response.json()).toMatchObject({ active: false });
+  });
+
   it('should issue a client-credentials token scoped to granted scopes', async () => {
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
     const db = env.getPostgresClient();

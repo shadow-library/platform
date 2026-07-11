@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Config } from '@shadow-library/common';
-import { Body, Get, Header, HttpController, Post, Query, Req, Res, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor, ServerError } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
@@ -14,7 +14,7 @@ import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
 
 import { AccessTokenService } from './access-token.service';
-import { AuthorizeQuery, DiscoveryResponse, TokenRequestBody, TokenResponse, UserInfoResponse } from './oauth.dto';
+import { AuthorizeQuery, DiscoveryResponse, IntrospectionResponseDto, RevocationResponse, TokenActionBody, TokenRequestBody, TokenResponse, UserInfoResponse } from './oauth.dto';
 import { ClientCredential, OAuthService } from './oauth.service';
 
 /**
@@ -119,7 +119,23 @@ export class OAuthController {
     return { sub: claims.sub, email: email ?? undefined, email_verified: email ? true : undefined };
   }
 
-  private parseClientCredential(request: FastifyRequest, body: TokenRequestBody): ClientCredential {
+  @Post('/oauth2/revoke')
+  @HttpStatus(200)
+  @RespondFor(200, RevocationResponse)
+  async revoke(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<RevocationResponse> {
+    await this.oauthService.revoke(body.token, this.parseClientCredential(request, body));
+    return { revoked: true };
+  }
+
+  @Post('/oauth2/introspect')
+  @HttpStatus(200)
+  @RespondFor(200, IntrospectionResponseDto)
+  async introspect(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<IntrospectionResponseDto> {
+    const result = await this.oauthService.introspect(body.token, this.parseClientCredential(request, body));
+    return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
+  }
+
+  private parseClientCredential(request: FastifyRequest, body: { client_id?: string; client_secret?: string }): ClientCredential {
     const header = request.headers.authorization;
     if (header?.startsWith('Basic ')) {
       const decoded = Buffer.from(header.slice(6), 'base64').toString();
