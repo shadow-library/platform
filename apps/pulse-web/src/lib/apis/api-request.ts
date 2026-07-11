@@ -14,6 +14,8 @@ import { type components } from './api-types.gen';
  */
 type ErrorResponseDto = components['schemas']['ErrorResponseDto'];
 
+export type QueryValue = string | number | boolean;
+
 interface APIRequestOptions {
   path: string;
   method: string;
@@ -75,13 +77,13 @@ export class APIRequest {
     return this;
   }
 
-  query(key: string, value: string): this;
-  query(params: Record<string, string | undefined>): this;
-  query(keyOrParams: string | Record<string, string | undefined>, value?: string): this {
-    if (typeof keyOrParams === 'string') this.options.query[keyOrParams] = value as string;
+  query(key: string, value: QueryValue): this;
+  query(params: Record<string, QueryValue | undefined>): this;
+  query(keyOrParams: string | Record<string, QueryValue | undefined>, value?: QueryValue): this {
+    if (typeof keyOrParams === 'string') this.options.query[keyOrParams] = String(value);
     else {
       for (const [k, v] of Object.entries(keyOrParams)) {
-        if (v !== undefined) this.options.query[k] = v;
+        if (v !== undefined) this.options.query[k] = String(v);
       }
     }
     return this;

@@ -17,7 +17,7 @@ export type JsonArray = JsonValue[] | readonly JsonValue[];
 export type JsonPrimitive = string | number | boolean | null;
 export type JsonValue = JsonPrimitive | JsonObject | JsonArray;
 
-export interface PaginationUpdate {
+export interface PaginationUpdate extends Record<string, string | number | boolean> {
   limit: number;
   skip: number;
 }

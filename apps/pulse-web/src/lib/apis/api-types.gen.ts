@@ -10,18 +10,12 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          /** @description Expects a number. Defaults to 20. */
-          limit?: string;
-          /** @description Expects a number. Defaults to 0. */
-          offset?: string;
-          /** @description Expects a valid SortOrder schema. Defaults to asc. */
-          sortOrder?: string;
-          /** @description Expects a valid SortByTime schema. Defaults to createdAt. */
-          sortBy?: string;
-          /** @description Expects a string. */
+          limit?: number | string;
+          offset?: number | string;
+          sortOrder?: components['schemas']['SortOrder'];
+          sortBy?: components['schemas']['SortByTime'];
           key?: string;
-          /** @description Expects a boolean. */
-          isActive?: string;
+          isActive?: boolean | string;
         };
         header?: never;
         path?: never;
@@ -44,7 +38,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -53,7 +47,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -88,7 +82,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -97,7 +91,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -121,7 +115,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
         };
         cookie?: never;
@@ -143,7 +136,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -152,7 +145,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -165,7 +158,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
         };
         cookie?: never;
@@ -178,7 +170,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -187,7 +179,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -200,7 +192,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
         };
         cookie?: never;
@@ -226,7 +217,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -235,7 +226,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -253,24 +244,16 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          /** @description Expects a number. Defaults to 20. */
-          limit?: string;
-          /** @description Expects a number. Defaults to 0. */
-          offset?: string;
-          /** @description Expects avalid SortOrder schema. Defaults to asc. */
-          sortOrder?: string;
-          /** @description Expects avalid SortByTime schema. Defaults to createdAt. */
-          sortBy?: string;
-          /** @description Expects avalid NotificationChannel schema. */
-          channel?: string;
-          /** @description Expects avalid NotificationServiceProvider schema. */
-          provider?: string;
-          /** @description Expects a boolean. */
-          isActive?: string;
+          limit?: number | string;
+          offset?: number | string;
+          sortOrder?: components['schemas']['SortOrder'];
+          sortBy?: components['schemas']['SortByTime'];
+          channel?: components['schemas']['NotificationChannel'];
+          provider?: components['schemas']['NotificationServiceProvider'];
+          isActive?: boolean | string;
         };
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
         };
         cookie?: never;
@@ -292,7 +275,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -301,7 +284,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -313,7 +296,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
         };
         cookie?: never;
@@ -339,7 +321,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -348,7 +330,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -372,9 +354,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
-          /** @description Expects a string. */
           endpointId: string;
         };
         cookie?: never;
@@ -396,7 +376,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -405,7 +385,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -418,9 +398,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
-          /** @description Expects a string. */
           endpointId: string;
         };
         cookie?: never;
@@ -433,7 +411,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -442,7 +420,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -455,9 +433,7 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           profileId: string;
-          /** @description Expects a string. */
           endpointId: string;
         };
         cookie?: never;
@@ -483,7 +459,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -492,7 +468,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -510,19 +486,12 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          /** @description Expects a number. Defaults to 20. */
-          limit?: string;
-          /** @description Expects a number. Defaults to 0. */
-          offset?: string;
-          /** @description Expects avalid SortOrder schema. Defaults to asc. */
-          sortOrder?: string;
-          /** @description Expects avalid SortByTime schema. Defaults to createdAt. */
-          sortBy?: string;
-          /** @description Expects avalid MessageType schema. */
-          messageType?: string;
-          /** @description Expects a string. */
+          limit?: number | string;
+          offset?: number | string;
+          sortOrder?: components['schemas']['SortOrder'];
+          sortBy?: components['schemas']['SortByTime'];
+          messageType?: components['schemas']['MessageType'];
           region?: string;
-          /** @description Expects a string. */
           serviceName?: string;
         };
         header?: never;
@@ -546,7 +515,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -555,7 +524,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -590,7 +559,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -599,7 +568,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -623,7 +592,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           routingRuleId: string;
         };
         cookie?: never;
@@ -645,7 +613,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -654,7 +622,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -667,7 +635,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           routingRuleId: string;
         };
         cookie?: never;
@@ -680,7 +647,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -689,7 +656,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -702,7 +669,6 @@ export interface paths {
         query?: never;
         header?: never;
         path: {
-          /** @description Expects a string. */
           routingRuleId: string;
         };
         cookie?: never;
@@ -728,7 +694,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -737,525 +703,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/dashboard/stats': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Stats */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['DashboardStats'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/template-groups': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Template Groups */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Expects a number. Defaults to 20. */
-          limit?: string;
-          /** @description Expects a number. Defaults to 0. */
-          offset?: string;
-          /** @description Expects avalid SortOrder schema. Defaults to asc. */
-          sortOrder?: string;
-          /** @description Expects avalid SortByTime schema. Defaults to createdAt. */
-          sortBy?: string;
-          /** @description Expects a string. */
-          key?: string;
-        };
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ListTemplateGroupResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create Template Group */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path?: never;
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': components['schemas']['CreateTemplateGroupBody'];
-        };
-      };
-      responses: {
-        /** @description Default Response */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TemplateGroupResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/template-groups/{groupId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Template Group */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TemplateGroupResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    /** Update Template Group */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': components['schemas']['UpdateTemplateGroupBody'];
-        };
-      };
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TemplateGroupResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    trace?: never;
-  };
-  '/api/v1/template-groups/{groupId}/variants': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Template Variants */
-    get: {
-      parameters: {
-        query?: {
-          /** @description Expects a number. Defaults to 20. */
-          limit?: string;
-          /** @description Expects a number. Defaults to 0. */
-          offset?: string;
-          /** @description Expects avalid SortOrder schema. Defaults to asc. */
-          sortOrder?: string;
-          /** @description Expects avalid SortByTime schema. Defaults to createdAt. */
-          sortBy?: string;
-          /** @description Expects avalid NotificationChannel schema. */
-          channel?: string;
-          /** @description Expects a string. */
-          locale?: string;
-        };
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ListTemplateVariantResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    put?: never;
-    /** Create Template Variant */
-    post: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': components['schemas']['CreateTemplateVariantBody'];
-        };
-      };
-      responses: {
-        /** @description Default Response */
-        201: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TemplateVariantResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/template-groups/{groupId}/variants/{variantId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Template Variant */
-    get: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-          /** @description Expects a string. */
-          variantId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TemplateVariantResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    put?: never;
-    post?: never;
-    /** Delete Template Variant */
-    delete: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-          /** @description Expects a string. */
-          variantId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: never;
-      responses: {
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-      };
-    };
-    options?: never;
-    head?: never;
-    /** Update Template Variant */
-    patch: {
-      parameters: {
-        query?: never;
-        header?: never;
-        path: {
-          /** @description Expects a string. */
-          groupId: string;
-          /** @description Expects a string. */
-          variantId: string;
-        };
-        cookie?: never;
-      };
-      requestBody?: {
-        content: {
-          'application/json': components['schemas']['UpdateTemplateVariantBody'];
-        };
-      };
-      responses: {
-        /** @description Default Response */
-        200: {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['TemplateVariantResponse'];
-          };
-        };
-        /** @description Default Response */
-        '4XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
-          };
-        };
-        /** @description Default Response */
-        '5XX': {
-          headers: {
-            [name: string]: unknown;
-          };
-          content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -1300,7 +748,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -1309,7 +757,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -1331,17 +779,11 @@ export interface paths {
     get: {
       parameters: {
         query?: {
-          /** @description Expects a number. Defaults to 20. */
-          limit?: string;
-          /** @description Expects a number. Defaults to 0. */
-          offset?: string;
-          /** @description Expects avalid SortOrder schema. Defaults to asc. */
-          sortOrder?: string;
-          /** @description Expects avalid SortByCreatedAt schema. Defaults to createdAt. */
-          sortBy?: string;
-          /** @description Expects avalid NotificationChannel schema. */
-          channel?: string;
-          /** @description Expects a string. */
+          limit?: number | string;
+          offset?: number | string;
+          sortOrder?: components['schemas']['SortOrder'];
+          sortBy?: components['schemas']['SortByCreatedAt'];
+          channel?: components['schemas']['NotificationChannel'];
           recipient?: string;
         };
         header?: never;
@@ -1365,7 +807,7 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
         /** @description Default Response */
@@ -1374,7 +816,504 @@ export interface paths {
             [name: string]: unknown;
           };
           content: {
-            'application/json': components['schemas']['ErrorResponseDto'];
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/template-groups': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Template Groups */
+    get: {
+      parameters: {
+        query?: {
+          limit?: number | string;
+          offset?: number | string;
+          sortOrder?: components['schemas']['SortOrder'];
+          sortBy?: components['schemas']['SortByTime'];
+          key?: string;
+        };
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ListTemplateGroupResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Create Template Group */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['CreateTemplateGroupBody'];
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TemplateGroupResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/template-groups/{groupId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Template Group */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          groupId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TemplateGroupResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Update Template Group */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          groupId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['UpdateTemplateGroupBody'];
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TemplateGroupResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/template-groups/{groupId}/variants': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Template Variants */
+    get: {
+      parameters: {
+        query?: {
+          limit?: number | string;
+          offset?: number | string;
+          sortOrder?: components['schemas']['SortOrder'];
+          sortBy?: components['schemas']['SortByTime'];
+          channel?: components['schemas']['NotificationChannel'];
+          locale?: string;
+        };
+        header?: never;
+        path: {
+          groupId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['ListTemplateVariantResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    put?: never;
+    /** Create Template Variant */
+    post: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          groupId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['CreateTemplateVariantBody'];
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        201: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TemplateVariantResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/template-groups/{groupId}/variants/{variantId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Template Variant */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          groupId: string;
+          variantId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TemplateVariantResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    put?: never;
+    post?: never;
+    /** Delete Template Variant */
+    delete: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          groupId: string;
+          variantId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    options?: never;
+    head?: never;
+    /** Update Template Variant */
+    patch: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path: {
+          groupId: string;
+          variantId: string;
+        };
+        cookie?: never;
+      };
+      requestBody?: {
+        content: {
+          'application/json': components['schemas']['UpdateTemplateVariantBody'];
+        };
+      };
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['TemplateVariantResponse'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+      };
+    };
+    trace?: never;
+  };
+  '/api/v1/dashboard/stats': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Stats */
+    get: {
+      parameters: {
+        query?: never;
+        header?: never;
+        path?: never;
+        cookie?: never;
+      };
+      requestBody?: never;
+      responses: {
+        /** @description Default Response */
+        200: {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DashboardStats'];
+          };
+        };
+        /** @description Default Response */
+        '4XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
+          };
+        };
+        /** @description Default Response */
+        '5XX': {
+          headers: {
+            [name: string]: unknown;
+          };
+          content: {
+            'application/json': components['schemas']['DevErrorResponseDto'];
           };
         };
       };
@@ -1406,11 +1345,12 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
-    ErrorResponseDto: {
+    DevErrorResponseDto: {
       code: string;
       type: string;
       message: string;
       fields?: components['schemas']['ErrorFieldDto'][];
+      stack?: string;
     };
     ErrorFieldDto: {
       field: string;
@@ -1503,37 +1443,59 @@ export interface components {
     UpdateSenderRoutingRuleBody: {
       senderProfileId: string;
     };
-    DashboardStats: {
-      today: components['schemas']['NotificationStats'];
-      trend: components['schemas']['NotificationStatsTrend'];
+    CreateNotificationBody: {
+      templateKey: string;
+      recipients: components['schemas']['NotificationRecipients'];
+      payload?: Record<string, never>;
+      locale?: string;
+      service?: string;
     };
-    NotificationStats: {
-      date: string;
-      overall: components['schemas']['NotificationDeliveryStats'];
-      channels: components['schemas']['NotificationChannelStats'];
+    NotificationRecipients: {
+      email?: string;
+      phone?: string;
+      push?: string;
     };
-    NotificationDeliveryStats: {
+    CreateNotificationResponse: {
+      /** @enum {string} */
+      status: 'ACCEPTED' | 'PARTIAL_ACCEPTED' | 'FAILED';
+      channelResults: components['schemas']['NotificationChannelResponse'][];
+    };
+    NotificationChannelResponse: {
+      channel: components['schemas']['NotificationChannel'];
+      /** @enum {string} */
+      status: 'QUEUED' | 'FAILED';
+      locale?: string;
+      jobId?: string;
+      error?: components['schemas']['ErrorResponseDto'];
+    };
+    ErrorResponseDto: {
+      code: string;
+      type: string;
+      message: string;
+      fields?: components['schemas']['ErrorFieldDto'][];
+    };
+    /** @enum {string} */
+    SortByCreatedAt: 'createdAt';
+    ListNotificationMessagesResponse: {
       total: number;
-      succeeded: number;
-      failed: number;
-      pending: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['NotificationMessageResponse'][];
     };
-    NotificationChannelStats: {
-      email: components['schemas']['NotificationDeliveryStats'];
-      sms: components['schemas']['NotificationDeliveryStats'];
-      push: components['schemas']['NotificationDeliveryStats'];
-    };
-    NotificationStatsTrend: {
-      fromDate: string;
-      toDate: string;
-      stats: components['schemas']['NotificationStatsWithDate'][];
-    };
-    NotificationStatsWithDate: {
-      total: number;
-      succeeded: number;
-      failed: number;
-      pending: number;
-      date: string;
+    NotificationMessageResponse: {
+      id: string;
+      channel: components['schemas']['NotificationChannel'];
+      recipient: string;
+      locale: string;
+      renderedSubject?: string;
+      renderedBody: string;
+      payload?: {
+        [key: string]: unknown;
+      };
+      templateKey: string;
+      messageType: components['schemas']['MessageType'];
+      /** Format: date-time */
+      createdAt: string;
     };
     CreateTemplateGroupBody: {
       templateKey: string;
@@ -1598,53 +1560,37 @@ export interface components {
       body?: string;
       isActive?: boolean;
     };
-    CreateNotificationBody: {
-      templateKey: string;
-      recipients: components['schemas']['NotificationRecipients'];
-      payload?: Record<string, never>;
-      locale?: string;
-      service?: string;
+    DashboardStats: {
+      today: components['schemas']['NotificationStats'];
+      trend: components['schemas']['NotificationStatsTrend'];
     };
-    NotificationRecipients: {
-      email?: string;
-      phone?: string;
-      push?: string;
+    NotificationStats: {
+      date: string;
+      overall: components['schemas']['NotificationDeliveryStats'];
+      channels: components['schemas']['NotificationChannelStats'];
     };
-    CreateNotificationResponse: {
-      /** @enum {string} */
-      status: 'ACCEPTED' | 'PARTIAL_ACCEPTED' | 'FAILED';
-      channelResults: components['schemas']['NotificationChannelResponse'][];
-    };
-    NotificationChannelResponse: {
-      channel: components['schemas']['NotificationChannel'];
-      /** @enum {string} */
-      status: 'QUEUED' | 'FAILED';
-      locale?: string;
-      jobId?: string;
-      error?: components['schemas']['ErrorResponseDto'];
-    };
-    /** @enum {string} */
-    SortByCreatedAt: 'createdAt';
-    ListNotificationMessagesResponse: {
+    NotificationDeliveryStats: {
       total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['NotificationMessageResponse'][];
+      succeeded: number;
+      failed: number;
+      pending: number;
     };
-    NotificationMessageResponse: {
-      id: string;
-      channel: components['schemas']['NotificationChannel'];
-      recipient: string;
-      locale: string;
-      renderedSubject?: string;
-      renderedBody: string;
-      payload?: {
-        [key: string]: unknown;
-      };
-      templateKey: string;
-      messageType: components['schemas']['MessageType'];
-      /** Format: date-time */
-      createdAt: string;
+    NotificationChannelStats: {
+      email: components['schemas']['NotificationDeliveryStats'];
+      sms: components['schemas']['NotificationDeliveryStats'];
+      push: components['schemas']['NotificationDeliveryStats'];
+    };
+    NotificationStatsTrend: {
+      fromDate: string;
+      toDate: string;
+      stats: components['schemas']['NotificationStatsWithDate'][];
+    };
+    NotificationStatsWithDate: {
+      total: number;
+      succeeded: number;
+      failed: number;
+      pending: number;
+      date: string;
     };
   };
   responses: never;
@@ -1657,7 +1603,7 @@ export type $defs = Record<string, never>;
 export type operations = Record<string, never>;
 export type CreateSenderProfileBody = components['schemas']['CreateSenderProfileBody'];
 export type SenderProfileResponse = components['schemas']['SenderProfileResponse'];
-export type ErrorResponseDto = components['schemas']['ErrorResponseDto'];
+export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
 export type SortOrder = components['schemas']['SortOrder'];
 export type SortByTime = components['schemas']['SortByTime'];
@@ -1675,12 +1621,14 @@ export type SenderRoutingRuleResponse = components['schemas']['SenderRoutingRule
 export type ListSenderRoutingRuleResponse = components['schemas']['ListSenderRoutingRuleResponse'];
 export type SenderRoutingRuleDetailResponse = components['schemas']['SenderRoutingRuleDetailResponse'];
 export type UpdateSenderRoutingRuleBody = components['schemas']['UpdateSenderRoutingRuleBody'];
-export type DashboardStats = components['schemas']['DashboardStats'];
-export type NotificationStats = components['schemas']['NotificationStats'];
-export type NotificationDeliveryStats = components['schemas']['NotificationDeliveryStats'];
-export type NotificationChannelStats = components['schemas']['NotificationChannelStats'];
-export type NotificationStatsTrend = components['schemas']['NotificationStatsTrend'];
-export type NotificationStatsWithDate = components['schemas']['NotificationStatsWithDate'];
+export type CreateNotificationBody = components['schemas']['CreateNotificationBody'];
+export type NotificationRecipients = components['schemas']['NotificationRecipients'];
+export type CreateNotificationResponse = components['schemas']['CreateNotificationResponse'];
+export type NotificationChannelResponse = components['schemas']['NotificationChannelResponse'];
+export type ErrorResponseDto = components['schemas']['ErrorResponseDto'];
+export type SortByCreatedAt = components['schemas']['SortByCreatedAt'];
+export type ListNotificationMessagesResponse = components['schemas']['ListNotificationMessagesResponse'];
+export type NotificationMessageResponse = components['schemas']['NotificationMessageResponse'];
 export type CreateTemplateGroupBody = components['schemas']['CreateTemplateGroupBody'];
 export type Priority = components['schemas']['Priority'];
 export type TemplateGroupResponse = components['schemas']['TemplateGroupResponse'];
@@ -1690,13 +1638,12 @@ export type ListTemplateVariantResponse = components['schemas']['ListTemplateVar
 export type TemplateVariantResponse = components['schemas']['TemplateVariantResponse'];
 export type CreateTemplateVariantBody = components['schemas']['CreateTemplateVariantBody'];
 export type UpdateTemplateVariantBody = components['schemas']['UpdateTemplateVariantBody'];
-export type CreateNotificationBody = components['schemas']['CreateNotificationBody'];
-export type NotificationRecipients = components['schemas']['NotificationRecipients'];
-export type CreateNotificationResponse = components['schemas']['CreateNotificationResponse'];
-export type NotificationChannelResponse = components['schemas']['NotificationChannelResponse'];
-export type SortByCreatedAt = components['schemas']['SortByCreatedAt'];
-export type ListNotificationMessagesResponse = components['schemas']['ListNotificationMessagesResponse'];
-export type NotificationMessageResponse = components['schemas']['NotificationMessageResponse'];
+export type DashboardStats = components['schemas']['DashboardStats'];
+export type NotificationStats = components['schemas']['NotificationStats'];
+export type NotificationDeliveryStats = components['schemas']['NotificationDeliveryStats'];
+export type NotificationChannelStats = components['schemas']['NotificationChannelStats'];
+export type NotificationStatsTrend = components['schemas']['NotificationStatsTrend'];
+export type NotificationStatsWithDate = components['schemas']['NotificationStatsWithDate'];
 export type ListSenderProfilesQueryParams = Exclude<paths['/api/v1/sender-profiles']['get']['parameters']['query'], undefined>;
 export type GetSenderProfilePathParams = Exclude<paths['/api/v1/sender-profiles/{profileId}']['get']['parameters']['path'], undefined>;
 export type ListSenderEndpointsQueryParams = Exclude<paths['/api/v1/sender-profiles/{profileId}/endpoints']['get']['parameters']['query'], undefined>;
@@ -1704,9 +1651,9 @@ export type ListSenderEndpointsPathParams = Exclude<paths['/api/v1/sender-profil
 export type GetSenderEndpointPathParams = Exclude<paths['/api/v1/sender-profiles/{profileId}/endpoints/{endpointId}']['get']['parameters']['path'], undefined>;
 export type ListSenderRoutingRulesQueryParams = Exclude<paths['/api/v1/sender-routing-rules']['get']['parameters']['query'], undefined>;
 export type GetSenderRoutingRulePathParams = Exclude<paths['/api/v1/sender-routing-rules/{routingRuleId}']['get']['parameters']['path'], undefined>;
+export type ListMessagesQueryParams = Exclude<paths['/api/v1/notifications/messages']['get']['parameters']['query'], undefined>;
 export type ListTemplateGroupsQueryParams = Exclude<paths['/api/v1/template-groups']['get']['parameters']['query'], undefined>;
 export type GetTemplateGroupPathParams = Exclude<paths['/api/v1/template-groups/{groupId}']['get']['parameters']['path'], undefined>;
 export type ListTemplateVariantsQueryParams = Exclude<paths['/api/v1/template-groups/{groupId}/variants']['get']['parameters']['query'], undefined>;
 export type ListTemplateVariantsPathParams = Exclude<paths['/api/v1/template-groups/{groupId}/variants']['get']['parameters']['path'], undefined>;
 export type GetTemplateVariantPathParams = Exclude<paths['/api/v1/template-groups/{groupId}/variants/{variantId}']['get']['parameters']['path'], undefined>;
-export type ListMessagesQueryParams = Exclude<paths['/api/v1/notifications/messages']['get']['parameters']['query'], undefined>;

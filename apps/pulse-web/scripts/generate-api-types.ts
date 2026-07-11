@@ -17,12 +17,19 @@ import openapiTS, { astToString } from 'openapi-typescript';
 /**
  * Declaring the constants
  */
-const openapiSpecUrl = process.env.OPENAPI_SPEC_URL || 'https://pulse.shadow-apps.com/dev/api-docs/openapi.json';
 const rootDir = path.resolve(import.meta.dirname, '..');
 const outputPath = path.join(rootDir, 'src/lib/apis/api-types.gen.ts');
+const openapiSpecUrl = process.env.OPENAPI_SPEC_URL || 'https://pulse.shadow-apps.com/dev/api-docs/openapi.json';
 
-const response = await fetch(`${openapiSpecUrl}?schemaMode=api`);
+const response = await fetch(openapiSpecUrl);
 const openapiSpec = await response.json();
+for (const path of Object.keys(openapiSpec.paths)) {
+  const pathItem = openapiSpec.paths[path].get;
+  if (!pathItem?.parameters?.length) continue;
+  for (const param of pathItem.parameters) {
+    param.schema.type = [param.schema.type, 'string'];
+  }
+}
 const ast = await openapiTS(openapiSpec);
 
 let contents = astToString(ast);
