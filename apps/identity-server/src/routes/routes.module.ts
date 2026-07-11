@@ -1,6 +1,10 @@
 /**
  * Importing npm packages
  */
+import fs from 'fs';
+import path from 'path';
+
+import fastifyStatic from '@fastify/static';
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
@@ -22,6 +26,7 @@ import { AuditModule } from '@server/modules/infrastructure/audit';
 import { HealthModule } from '@server/modules/infrastructure/health';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { SecurityModule } from '@server/modules/infrastructure/security';
+import { UiModule } from '@server/modules/infrastructure/ui';
 
 /**
  * Defining types
@@ -35,7 +40,27 @@ import { SecurityModule } from '@server/modules/infrastructure/security';
  * `/.well-known/*`) with the versioned `/api/v1/*` surface.
  */
 
-export const AppHttpCoreModule = HttpCoreModule.forRoot({});
+export const AppHttpCoreModule = HttpCoreModule.forRoot({
+  helmet: {
+    /**
+     * Scripts stay 'self' (the client ships no inline script); styles allow inline because the
+     * Radix primitives inside @shadow-library/ui position overlays with style attributes.
+     */
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        baseUri: ["'self'"],
+        scriptSrc: ["'self'"],
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", 'data:'],
+        objectSrc: ["'none'"],
+        formAction: ["'self'"],
+        upgradeInsecureRequests: [],
+        manifestSrc: ["'self'"],
+      },
+    },
+  },
+});
 
 export const HttpRouteModule = FastifyModule.forRoot({
   imports: [
@@ -54,7 +79,15 @@ export const HttpRouteModule = FastifyModule.forRoot({
     AuditModule,
     NotificationModule,
     AdminModule,
+    UiModule,
   ],
+
+  /** Immutable, fingerprint-friendly delivery for the built client; pages are served no-store by UiController. */
+  fastifyFactory: async instance => {
+    const assetsDir = path.join(Config.get('ui.public-dir'), 'assets');
+    if (fs.existsSync(assetsDir)) await instance.register(fastifyStatic, { root: assetsDir, prefix: '/assets/', index: false, maxAge: '1d', etag: true });
+    return instance;
+  },
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

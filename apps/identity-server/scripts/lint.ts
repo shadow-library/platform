@@ -16,7 +16,7 @@ import { join } from 'path';
  * Declaring the constants
  */
 const isFixEnabled = process.argv.includes('--fix');
-const fileGlob = '{src,tests,scripts,packages}/**/*.ts';
+const fileGlob = '{src,tests,scripts,packages,client}/**/*.{ts,tsx}';
 const cwd = join(import.meta.dirname, '..');
 const options = { cwd, stdio: 'inherit' } satisfies SpawnSyncOptions;
 

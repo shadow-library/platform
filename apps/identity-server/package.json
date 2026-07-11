@@ -3,18 +3,22 @@
   "type": "module",
   "version": "0.0.0",
   "description": "description",
-  "workspaces": ["packages/*"],
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
     "lint": "bun run scripts/lint.ts",
-    "type-check": "bun run tsc",
+    "type-check": "bun run tsc && bun run tsc -p client/tsconfig.json",
     "build": "bun run scripts/build.ts",
     "dev": "bun run --watch src/main.ts",
     "dev:worker": "bun run --watch src/worker.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:create-template": "bun run scripts/create-template-db.ts"
+    "db:create-template": "bun run scripts/create-template-db.ts",
+    "build:client": "bun run scripts/build-client.ts",
+    "dev:client": "bun run --watch scripts/build-client.ts"
   },
   "repository": {
     "type": "git",
@@ -62,6 +66,7 @@
     "@shadow-library/fastify": "^1.7.1",
     "@shadow-library/modules": "^0.6.0",
     "@shadow-library/ui": "^1.1.1",
+    "@simplewebauthn/browser": "^13.3.0",
     "@simplewebauthn/server": "^13.3.2",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",

@@ -20,7 +20,7 @@ export default [
   ...eslintTs.configs.stylistic,
   importPlugin.flatConfigs.recommended,
   {
-    files: ['**/*.ts'],
+    files: ['**/*.{ts,tsx}'],
     languageOptions: { globals: globals.node },
     settings: {
       'import/core-modules': ['bun:test'],
@@ -44,6 +44,13 @@ export default [
       ],
       'no-console': 2,
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
+    },
+  },
+  {
+    files: ['client/**/*.{ts,tsx}'],
+    languageOptions: { globals: globals.browser },
+    settings: {
+      'import/resolver': { typescript: { project: 'client/tsconfig.json' } },
     },
   },
 ];

@@ -48,6 +48,11 @@ const entrypoints = [path.join(rootDir, 'src', 'main.ts'), path.join(rootDir, 's
 const result = await Bun.build({ entrypoints, target: 'bun', minify: { identifiers: false }, outdir: 'dist' });
 if (!result.success) error(`Build failed: ${result.logs.join('\n')}`);
 
+/** The web client ships inside the same image; main.js serves it from ./public */
+const { buildClient } = await import('./build-client');
+await buildClient().catch(cause => error(`Client build failed: ${cause}`));
+fs.cpSync(path.join(rootDir, 'public'), path.join(distDir, 'public'), { recursive: true });
+
 const endTime = process.hrtime(startTime);
 const timeTaken = endTime[0] * 1e3 + endTime[1] * 1e-6;
 success(`Built successful in ${formatTime(timeTaken)}`);

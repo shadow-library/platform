@@ -1,0 +1,246 @@
+/*
+ * Shadow Identity — "vault brass on graphite".
+ *
+ * The pages ride @shadow-library/ui's dark theme and retheme it through the
+ * documented --sh-* tokens: a warm brass accent over deep graphite, an
+ * engraved-serif display face for the wordmark, and an eclipse motif carried
+ * by pure-CSS ring layers. No inline styles or scripts — CSP stays 'self'.
+ */
+
+/*
+ * Self-hosted type (CSP script/style/font stay 'self'): Fraunces (display), Schibsted Grotesk
+ * (body), Spline Sans Mono (codes). The @font-face rules ship via the @fontsource imports in
+ * main.tsx so the bundler owns the font asset paths.
+ */
+:root {
+  --identity-display-font: 'Fraunces', 'Iowan Old Style', Georgia, serif;
+  --identity-brass: #c9a24b;
+  --identity-brass-bright: #e0b95e;
+  --identity-brass-deep: #a8813a;
+  --identity-ink: #0b0c0e;
+  --identity-ink-raised: #131519;
+  --identity-ring: rgb(201 162 75 / 14%);
+
+  --sh-font-sans: 'Schibsted Grotesk', 'Avenir Next', 'Segoe UI', sans-serif;
+  --sh-font-mono: 'Spline Sans Mono', 'SF Mono', 'Cascadia Mono', monospace;
+}
+
+/* Brass accent over the library's dark theme; graphite surfaces darker than stock. */
+html[data-theme='dark'] {
+  --sh-accent: var(--identity-brass);
+  --sh-accent-hover: var(--identity-brass-bright);
+  --sh-accent-active: var(--identity-brass-deep);
+  --sh-accent-soft: rgb(201 162 75 / 16%);
+  --sh-on-accent: #16130a;
+  --sh-border-focus: var(--identity-brass);
+  --sh-surface-app: var(--identity-ink);
+  --sh-surface-card: var(--identity-ink-raised);
+}
+
+body {
+  min-height: 100dvh;
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+  font-family: var(--sh-font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+/*
+ * The eclipse field: three concentric rings of brass light behind the auth card,
+ * breathing on a slow cycle. Layered radial gradients keep it a single element.
+ */
+.identity-atmosphere {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  background:
+    radial-gradient(circle at 18% 30%, var(--identity-ring) 0, transparent 26%),
+    radial-gradient(circle at 18% 30%, transparent 27%, var(--identity-ring) 28%, transparent 34%),
+    radial-gradient(circle at 18% 30%, transparent 41%, rgb(201 162 75 / 7%) 42%, transparent 50%),
+    radial-gradient(ellipse at 85% 90%, rgb(201 162 75 / 5%) 0, transparent 45%);
+  animation: identity-breathe 14s ease-in-out infinite;
+}
+
+@keyframes identity-breathe {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+/* The brand mark: a brass disc occluded by graphite — identity, mostly in shadow. */
+.identity-mark {
+  position: relative;
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, var(--identity-brass-bright), var(--identity-brass-deep) 70%);
+  box-shadow: 0 0 24px rgb(201 162 75 / 35%);
+}
+
+.identity-mark::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: var(--identity-ink);
+  transform: translate(-22%, -10%) scale(0.92);
+}
+
+.identity-wordmark {
+  font-family: var(--identity-display-font);
+  font-weight: 600;
+  font-size: 20px;
+  letter-spacing: 0.01em;
+  color: var(--sh-text-primary);
+}
+
+.identity-wordmark em {
+  font-style: normal;
+  color: var(--identity-brass);
+}
+
+/* Auth layout: brand rail beside the flow card on wide screens, stacked on narrow. */
+.auth-shell {
+  display: grid;
+  grid-template-columns: minmax(280px, 5fr) minmax(360px, 7fr);
+  align-items: center;
+  gap: 48px;
+  width: min(1040px, 100%);
+  min-height: 100dvh;
+  margin: 0 auto;
+  padding: 48px 24px;
+}
+
+.auth-shell__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.auth-shell__tagline {
+  font-family: var(--identity-display-font);
+  font-weight: 600;
+  font-size: clamp(28px, 4vw, 40px);
+  line-height: 1.15;
+  color: var(--sh-text-primary);
+  text-wrap: balance;
+}
+
+.auth-shell__fineprint {
+  max-width: 40ch;
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+}
+
+.auth-shell__card {
+  width: 100%;
+  max-width: 440px;
+  justify-self: center;
+}
+
+@media (max-width: 860px) {
+  .auth-shell {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    align-content: start;
+    padding-top: 40px;
+  }
+
+  .auth-shell__brand {
+    align-items: center;
+    text-align: center;
+  }
+
+  .auth-shell__tagline {
+    display: none;
+  }
+}
+
+/* Step transitions: one staggered rise per flow step, honoring reduced motion. */
+.auth-step > * {
+  animation: identity-rise var(--sh-duration-slow, 300ms) var(--sh-ease-standard, ease-out) both;
+}
+
+.auth-step > *:nth-child(2) {
+  animation-delay: 40ms;
+}
+
+.auth-step > *:nth-child(3) {
+  animation-delay: 80ms;
+}
+
+.auth-step > *:nth-child(4) {
+  animation-delay: 120ms;
+}
+
+.auth-step > *:nth-child(5) {
+  animation-delay: 160ms;
+}
+
+@keyframes identity-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .identity-atmosphere,
+  .auth-step > * {
+    animation: none;
+  }
+}
+
+/* Recovery codes and OTP secrets read in mono, spaced for transcription. */
+.identity-code-sheet {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px 24px;
+  padding: 16px;
+  border: 1px dashed var(--sh-border-strong);
+  border-radius: var(--sh-radius-lg);
+  background: var(--sh-surface-well);
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-code);
+  letter-spacing: 0.08em;
+}
+
+/* Account area: sober two-column shell, nav rail + content. */
+.account-shell {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 40px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 32px 24px 64px;
+}
+
+.account-shell__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  width: min(1120px, 100%);
+  margin: 0 auto;
+  padding: 20px 24px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+@media (max-width: 860px) {
+  .account-shell {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+}

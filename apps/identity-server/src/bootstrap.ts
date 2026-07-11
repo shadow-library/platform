@@ -40,6 +40,9 @@ declare module '@shadow-library/common' {
     /** OAuth / OIDC */
     'oauth.issuer': string;
     'oauth.login-url': string;
+
+    /** Web UI */
+    'ui.public-dir': string;
   }
 }
 
@@ -69,6 +72,8 @@ Config.load('oauth.login-url', { envKey: 'OAUTH_LOGIN_URL', defaultValue: 'https
 
 Config.load('rate-limit.enabled', { envKey: 'RATE_LIMIT_ENABLED', defaultValue: 'true', validateType: 'boolean' });
 Config.load('rate-limit.ip-allowlist', { envKey: 'RATE_LIMIT_IP_ALLOWLIST', defaultValue: '' });
+
+Config.load('ui.public-dir', { envKey: 'UI_PUBLIC_DIR', defaultValue: `${process.cwd()}/public` });
 
 /**
  * The master encryption key wraps signing/encryption keys at rest. It must never fall back to a
