@@ -13,7 +13,6 @@ import { Module } from '@shadow-library/app';
  */
 import { BootstrapModule } from './modules/bootstrap';
 import { DatastoreModule } from './modules/infrastructure/datastore';
-import { HttpRouteModule } from './routes';
 
 /**
  * Defining types
@@ -22,11 +21,12 @@ import { HttpRouteModule } from './routes';
 /**
  * Declaring the constants
  *
- * The configured datastore (forRoot) is imported exactly once at the root; feature modules
- * import the bare `DatabaseModule` class to access the shared, configured `DatabaseService`.
+ * A headless module graph (no HTTP server) used to run the platform bootstrap against a
+ * database: at real startup it is part of AppModule, and template/seed scripts boot this
+ * directly so tests clone an already-provisioned database.
  */
 
 @Module({
-  imports: [DatastoreModule, HttpRouteModule, BootstrapModule],
+  imports: [DatastoreModule, BootstrapModule],
 })
-export class AppModule {}
+export class SeedModule {}

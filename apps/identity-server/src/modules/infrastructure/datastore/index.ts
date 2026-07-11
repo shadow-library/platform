@@ -1,4 +1,4 @@
-export { DatabaseService } from '@shadow-library/modules';
+export { DatabaseModule, DatabaseService } from '@shadow-library/modules';
 
 export * from './datastore.module';
 export * from './datastore.types';

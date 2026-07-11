@@ -8,6 +8,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { Redis } from 'ioredis';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
@@ -53,8 +54,11 @@ export class TestEnvironment {
     const databaseUrl = baseConnectionString.replace(/\/[^/]*$/, `/${this.databaseName}`);
     Config['cache'].set('database.postgres.url', databaseUrl);
 
+    beforeAll(async () => {
+      await createDatabaseFromTemplate(this.databaseName);
+      await this.app.init();
+    });
     beforeEach(() => createDatabaseFromTemplate(this.databaseName));
-    beforeAll(() => this.app.init());
     afterAll(async () => {
       await this.flushRedis();
       await this.app.stop();
@@ -68,6 +72,10 @@ export class TestEnvironment {
 
   getDatabaseService(): DatabaseService {
     return this.app.get(DatabaseService);
+  }
+
+  getService<T>(token: Class<T>): T {
+    return this.app.get(token);
   }
 
   getPostgresClient(): PrimaryDatabase {

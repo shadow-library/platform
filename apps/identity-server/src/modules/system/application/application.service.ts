@@ -72,7 +72,7 @@ export class ApplicationService implements OnModuleInit {
 
     assert(record, 'Failed to create application');
     this.logger.info(`Created application with ID ${record.id} and name ${record.name}`);
-    this.loadApplications();
+    await this.loadApplications();
     return record;
   }
 
@@ -87,7 +87,7 @@ export class ApplicationService implements OnModuleInit {
     assert(application, `Failed to update application with name ${name}`);
 
     this.logger.info(`Updated application with ID ${application.id} and name ${application.name}`, { update });
-    this.loadApplications();
+    await this.loadApplications();
     return application;
   }
 

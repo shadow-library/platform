@@ -52,7 +52,7 @@ export class ApplicationRoleService {
       .catch(error => this.databaseService.translateError(error));
     assert(role, `Failed to add role ${newRole.roleName} to application ${service}`);
     this.logger.info(`added new role to the application ${service}: ${newRole.roleName}`);
-    this.applicationService.loadApplications();
+    await this.applicationService.loadApplications();
     return role;
   }
 
@@ -66,7 +66,7 @@ export class ApplicationRoleService {
       .catch(error => this.databaseService.translateError(error));
     if (!role) throw new ServerError(AppErrorCode.APP_003);
     this.logger.info(`Updated role with ID ${roleId}`, { update });
-    this.applicationService.loadApplications();
+    await this.applicationService.loadApplications();
     return role;
   }
 
@@ -78,7 +78,7 @@ export class ApplicationRoleService {
       .returning()
       .catch(error => this.databaseService.translateError(error));
     if (!role) throw new ServerError(AppErrorCode.APP_003);
-    this.applicationService.loadApplications();
+    await this.applicationService.loadApplications();
     this.logger.info(`Deleted role with ID ${roleId}`);
     return role;
   }
