@@ -12,9 +12,11 @@
   margin-bottom: 24px;
 }
 
+/* A book-cover portrait (3:4) with a floor so it stays legible; top-aligned with the title block. */
 .headerCover {
-  width: 84px;
-  height: 112px;
+  width: 144px;
+  min-width: 144px;
+  height: 192px;
   flex-shrink: 0;
   border-radius: var(--sh-radius-lg);
   box-shadow: var(--sh-shadow-e1);

@@ -51,7 +51,15 @@ export function ImageUpload({ src, alt, uploading, className, placeholder, onUpl
 
   return (
     <div className={`${styles.preview} ${className ?? ''}`} data-empty={src ? undefined : 'true'}>
-      {src ? <img src={src} alt={alt} className={styles.img} /> : (placeholder ?? <div className={styles.placeholder}>No image yet</div>)}
+      {src ? (
+        <img src={src} alt={alt} className={styles.img} />
+      ) : (
+        (placeholder ?? (
+          <div className={styles.placeholder}>
+            <ImageIcon size={22} />
+          </div>
+        ))
+      )}
 
       {uploading && (
         <div className={styles.overlay}>
