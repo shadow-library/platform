@@ -33,7 +33,9 @@ const LONG_BUDGET = 60 * 60 * 1000; // multi-call AI phases (bible seed / plan /
 const NOVEL_NAME = 'Omniscient Sovereigns';
 const PREMISE_PATH = '/Users/leander-paul/repositories/shadow-library/novel-forge-server/NOVEL_DETAILS.md';
 const AUDIT_PATH = '/Users/leander-paul/repositories/shadow-library/novel-forge-server/NOVEL_GENERATION_AUDIT.md';
-const PREMISE = readFileSync(PREMISE_PATH, 'utf8');
+// Read the operator's premise only when the suite is actually enabled — otherwise a missing local
+// file would crash Playwright at collection time and take the whole test run (and pre-commit) down.
+const PREMISE = ENABLED ? readFileSync(PREMISE_PATH, 'utf8') : '';
 
 /** Model assignment per Settings → Models row label, exactly as the operator requested. */
 const MODEL_ASSIGNMENT: { row: string; option: string; role: string; provider: string; model: string }[] = [
