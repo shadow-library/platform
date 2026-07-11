@@ -23,6 +23,20 @@ export class LoginInitBody {
 
   @Field({ optional: true })
   deviceId?: string;
+
+  /** Post-login destination; must be a relative path or a URL on this origin (validated server-side). */
+  @Field({ optional: true, maxLength: 2048 })
+  returnTo?: string;
+}
+
+@Schema()
+export class FederatedLoginOptionDto {
+  @Field()
+  authorizationUrl: string;
+
+  /** True when the organisation mandates federated sign-in and local credential steps will refuse. */
+  @Field()
+  enforced: boolean;
 }
 
 @Schema()
@@ -35,6 +49,9 @@ export class LoginInitResponse {
 
   @Field()
   hasAlternativeMethods: boolean;
+
+  @Field(() => FederatedLoginOptionDto, { optional: true })
+  federated?: FederatedLoginOptionDto;
 }
 
 @Schema()

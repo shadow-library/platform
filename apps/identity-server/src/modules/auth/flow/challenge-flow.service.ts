@@ -78,6 +78,8 @@ export class ChallengeFlowService {
   /** Switches a login flow to another first-factor method; OTP methods issue their first code here. */
   async changeMethod(flowId: string, method: ChallengeMethodName): Promise<MethodChangeResult> {
     const flow = await this.requireLoginFlow(flowId);
+    /** Enforced federation admits no local first factor — switching methods must not reopen one (T-702). */
+    if (flow.federated?.enforced) throw new ServerError(AppErrorCode.AUTH_007);
     if (MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
 
     if (method === 'PASSWORD') {

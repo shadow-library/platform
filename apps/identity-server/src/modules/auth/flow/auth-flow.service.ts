@@ -25,6 +25,17 @@ export interface DeviceContext {
   userAgent?: string;
 }
 
+/** Server-side state of an in-flight federated login (T-702); secrets never leave the flow store. */
+export interface FederatedFlowState {
+  identityProviderId: string;
+  nonce: string;
+  codeVerifier: string;
+  /** True when the org enforces federation and no break-glass applies: local credential steps refuse. */
+  enforced: boolean;
+  /** Upstream subject awaiting an email-OTP proof before it may link to an existing local account. */
+  pendingSubject?: string;
+}
+
 export interface AuthFlowContext {
   flowId: string;
   kind: AuthFlowKind;
@@ -40,6 +51,9 @@ export interface AuthFlowContext {
   resendsLeft?: number;
   /** Epoch millis of the last OTP delivery, driving the resend cooldown */
   lastOtpSentAt?: number;
+  /** Post-login destination (validated: relative or same-origin) carried through federated detours */
+  returnTo?: string;
+  federated?: FederatedFlowState;
   createdAt: number;
 }
 
@@ -79,6 +93,8 @@ export class AuthFlowService {
       regData: data.regData,
       resendsLeft: data.resendsLeft,
       lastOtpSentAt: data.lastOtpSentAt,
+      returnTo: data.returnTo,
+      federated: data.federated,
       createdAt: Date.now(),
     };
     await this.persist(context);

@@ -4,6 +4,7 @@ export * from './auth.controller';
 export * from './auth.dto';
 export * from './challenge-flow.service';
 export * from './challenge.service';
+export * from './federated.controller';
 export * from './flow.types';
 export * from './login.service';
 export * from './recovery.service';

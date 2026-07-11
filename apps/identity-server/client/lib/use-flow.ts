@@ -26,6 +26,8 @@ export interface FlowActions {
   run(action: () => Promise<FlowState>): Promise<FlowState | null>;
   reset(): void;
   setError(message: string | null): void;
+  /** Adopts a flow born elsewhere (federated callback redirects carry flow_id + status). */
+  hydrate(state: FlowState): void;
 }
 
 /**
@@ -73,5 +75,11 @@ export function useFlow(): FlowUiState & FlowActions {
     setDead(false);
   }, []);
 
-  return { flow, busy, error, dead, run, reset, setError };
+  /** Adopts a flow born elsewhere (a federated callback redirect carries flow_id + status). */
+  const hydrate = useCallback((state: FlowState) => {
+    previousFlow.current = state;
+    setFlow(state);
+  }, []);
+
+  return { flow, busy, error, dead, run, reset, setError, hydrate };
 }

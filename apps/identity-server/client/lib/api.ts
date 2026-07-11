@@ -21,6 +21,11 @@ export interface ChallengeMethodMetadata {
   maskedPhone?: string;
 }
 
+export interface FederatedLoginOption {
+  authorizationUrl: string;
+  enforced: boolean;
+}
+
 export interface FlowState {
   flowId: string;
   status: string;
@@ -28,6 +33,7 @@ export interface FlowState {
   resendsLeft?: number;
   hasAlternativeMethods?: boolean;
   metadata?: ChallengeMethodMetadata;
+  federated?: FederatedLoginOption;
 }
 
 export interface ChallengeMethod {
@@ -224,8 +230,8 @@ export class IdentityApi {
 
   /* ---------- interactive auth flows ---------- */
 
-  loginInit(identifier: string, deviceId?: string): Promise<FlowState> {
-    return this.flow(this.request('POST', '/api/v1/auth/login/init', { identifier, deviceId }));
+  loginInit(identifier: string, deviceId?: string, returnTo?: string): Promise<FlowState> {
+    return this.flow(this.request('POST', '/api/v1/auth/login/init', { identifier, deviceId, returnTo }));
   }
 
   registerInit(email: string, deviceId?: string): Promise<FlowState> {

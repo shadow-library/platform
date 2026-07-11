@@ -302,7 +302,11 @@ Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-us
 
 ## 11. Enterprise tables
 
-`organisation_domains`, `webhook_subscriptions`, `webhook_deliveries` (M7), `saml_service_providers`, `scim_directory`, `scim_groups`, and `scim_group_members` (M7b) are live (see §4 and below). Still reserved, NOT created: `identity_providers` (T-702 inbound federation). `scim_tokens` was retired unbuilt — org-bound SERVICE clients with the `scim:provision` scope subsumed it (recorded decision, T-704).
+`organisation_domains`, `webhook_subscriptions`, `webhook_deliveries` (M7), `saml_service_providers`, `scim_directory`, `scim_groups`, `scim_group_members`, `identity_providers`, and `federated_identities` (M7b) are live (see §4 and below). `scim_tokens` was retired unbuilt — org-bound SERVICE clients with the `scim:provision` scope subsumed it (recorded decision, T-704).
+
+### `identity_providers` / `federated_identities` — _implemented (T-702)_
+
+`identity_providers`: `id` uuid PK, `organisation_id` FK **unique** (one IdP per org until multi-IdP need appears), `name`, `issuer`, `client_id`, AES-256-GCM client-secret envelope (`ciphertext`/`iv`/`auth_tag`/`kek_version`), `scopes` (default `openid email profile`), discovery-snapshotted `authorization_endpoint`/`token_endpoint`/`jwks_uri` (SSRF-guarded, issuer-match verified), `enforced`, `is_active`, timestamps. `federated_identities`: `(identity_provider_id, subject)` unique and `(identity_provider_id, user_id)` unique — returning users match on subject, never bare email after first link.
 
 ### `scim_directory` / `scim_groups` / `scim_group_members` — _implemented (T-704)_
 

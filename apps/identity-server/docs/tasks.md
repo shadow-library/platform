@@ -289,9 +289,11 @@ SP-initiated SSO (api-contract §8): HTTP-Redirect in, HTTP-POST out, signed ass
 
 Users + Groups + discovery documents per organisation (api-contract §9). Recorded decisions: `scim_tokens` retired unbuilt — org-bound SERVICE clients carrying `scim:provision` already give per-tenant rotatable credentials (dual-secret overlap), introspection and revocation, and keep ONE token infrastructure; `userName` restricted to the org's VERIFIED domains (a tenant provisions only its own namespace, which also closes the account-enumeration oracle); adopted pre-existing accounts (`managed = false`) can never be deactivated by a tenant — deprovisioning strips org membership and org-scoped refresh-token families only, while SCIM-born accounts (`managed = true`) are DISABLED with full session/token revocation and back-channel logout. SCIM bodies are runtime-validated instead of class-schema DTOs (RFC 7644 PATCH values are polymorphic — Entra sends `"False"` strings for booleans); the SCIM error envelope bypasses the platform error shape by design. Deferred: group→role mapping (groups are provisioning structure only until a tenant needs authorization semantics), bulk operations, eTags.
 
-### Remaining (M7b — separate effort)
+### T-702 — Inbound OIDC federation · XL — **done**
 
-- **T-702 Inbound OIDC/SAML federation** · XL — `identity_providers`, home-realm discovery, JIT provisioning, claim/group mapping, break-glass local admin, tenant-takeover prevention.
+Home-realm discovery riding T-703's verified domains (api-contract §10): the login flow offers (or, when `enforced`, requires) the org's external OIDC IdP; the server-side RP does code+PKCE with per-flow state/nonce, verifies upstream ID tokens against the upstream JWKS (RS256/ES256/EdDSA allow-list) and demands `email_verified`. Tenant-takeover prevention is layered: endpoints only ever come from the issuer's own discovery document (issuer-match + SSRF guard), returning users match on (provider, subject) — never bare email after first link — and linking a first-time subject to an existing local account requires an email-OTP proof of control. JIT-provisioned users are passwordless org MEMBERs; federated proof is a first factor, so MFA-enrolled accounts still walk their local second factor; platform admins keep the password path as break-glass. Deferred + recorded: SAML **inbound** federation, group/claim mapping, upstream forced re-auth on step-up.
+
+**M7 is complete** (T-701, T-702, T-703, T-704, T-705, T-706).
 
 ---
 

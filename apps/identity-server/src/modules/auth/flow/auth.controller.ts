@@ -68,7 +68,7 @@ export class AuthController {
   @RateLimit({ name: 'login-init', limit: 20, windowSeconds: 3600 })
   @RespondFor(200, LoginInitResponse)
   loginInit(@Body() body: LoginInitBody, @Req() request: FastifyRequest): Promise<LoginInitResponse> {
-    return this.loginService.init({ identifier: body.identifier, device: this.deviceContext(request, body.deviceId) });
+    return this.loginService.init({ identifier: body.identifier, device: this.deviceContext(request, body.deviceId), returnTo: body.returnTo });
   }
 
   @Post('/register/init')
@@ -194,7 +194,7 @@ export class AuthController {
 
     const code = body.code as string;
     if (flow.kind === 'LOGIN')
-      return flow.status === 'AWAITING_EMAIL_OTP' || flow.status === 'AWAITING_SMS_OTP'
+      return flow.status === 'AWAITING_EMAIL_OTP' || flow.status === 'AWAITING_SMS_OTP' || flow.status === 'AWAITING_LINK_OTP'
         ? this.loginService.verifyOtp(body.flowId, code)
         : this.loginService.verifyMfa(body.flowId, { code });
     if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, code);

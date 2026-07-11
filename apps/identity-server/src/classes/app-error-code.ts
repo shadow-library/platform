@@ -134,6 +134,19 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly WHK_003 = new AppErrorCode('WHK_003', ErrorType.NOT_FOUND, 'Webhook delivery not found');
 
   /**
+   * Federation Error Codes
+   */
+
+  /** The organisation enforces federated sign-in; the local credential step is unavailable */
+  static readonly AUTH_007 = new AppErrorCode('AUTH_007', ErrorType.UNAUTHORIZED, 'Federated sign-in is required for this account', 403);
+  /** The identity provider configuration is invalid (bad issuer url, discovery failure, endpoint mismatch) */
+  static readonly FED_001 = new AppErrorCode('FED_001', ErrorType.VALIDATION_ERROR, 'Invalid identity provider configuration', 400);
+  /** The identity provider registration does not exist in this organisation */
+  static readonly FED_002 = new AppErrorCode('FED_002', ErrorType.NOT_FOUND, 'Identity provider not found');
+  /** An organisation may configure only one identity provider */
+  static readonly FED_003 = new AppErrorCode('FED_003', ErrorType.CONFLICT, 'An identity provider is already configured');
+
+  /**
    * SAML Error Codes
    */
 

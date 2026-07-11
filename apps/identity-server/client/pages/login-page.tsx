@@ -28,7 +28,7 @@ import { assertPasskey } from '../lib/webauthn';
  */
 
 export function LoginPage(): ReactElement {
-  const { flow, busy, error, dead, run, reset, setError } = useFlow();
+  const { flow, busy, error, dead, run, reset, setError, hydrate } = useFlow();
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [recoveryMode, setRecoveryMode] = useState(false);
@@ -45,13 +45,24 @@ export function LoginPage(): ReactElement {
     if (returnTo && isLoggedIn()) window.location.replace(`/consent?return_to=${encodeURIComponent(returnTo)}`);
   }, []);
 
+  /** A federated callback lands back here with the flow to resume — or a neutral failure marker. */
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const flowId = params.get('flow_id');
+    const flowStatus = params.get('status');
+    if (flowId && flowStatus) hydrate({ flowId, status: flowStatus });
+    if (params.get('error') === 'federation_failed') setError('Sign-in through your organisation failed. Please try again.');
+  }, [hydrate, setError]);
+
   const complete = (state: { status: string } | null): void => {
     if (state?.status === 'COMPLETED') finish();
   };
 
   const submitIdentifier = async (): Promise<void> => {
     if (!identifier.trim()) return setError('Enter your email or phone number.');
-    await run(() => api.loginInit(identifier.trim(), deviceId()));
+    const state = await run(() => api.loginInit(identifier.trim(), deviceId(), safeReturnTo() ?? undefined));
+    /** Enforced home realms go straight to the organisation's IdP; optional ones render a button. */
+    if (state?.federated?.enforced) window.location.assign(state.federated.authorizationUrl);
   };
 
   const submitPassword = async (): Promise<void> => {
@@ -126,6 +137,27 @@ export function LoginPage(): ReactElement {
           <Button variant="primary" fullWidth onClick={() => navigate('/recover')}>
             Reset password
           </Button>
+        </FlowStep>
+      );
+
+    if (status === 'AWAITING_FEDERATED')
+      return (
+        <FlowStep title="Continue with your organisation" subtitle="Your organisation manages sign-in for this account." error={error} busy={busy}>
+          <Button variant="primary" fullWidth onClick={() => flow?.federated && window.location.assign(flow.federated.authorizationUrl)}>
+            Continue to sign-in
+          </Button>
+        </FlowStep>
+      );
+
+    if (status === 'AWAITING_LINK_OTP')
+      return (
+        <FlowStep
+          title="Confirm it's you"
+          subtitle="You already have an account with this email. Enter the code we sent to link your organisation sign-in to it."
+          error={error}
+          busy={busy}
+        >
+          <OtpStep flowId={flow?.flowId ?? ''} method="EMAIL_OTP" maskedTarget={maskedTarget} busy={busy} onSubmit={code => void submitOtp(code)} />
         </FlowStep>
       );
 
@@ -213,6 +245,11 @@ export function LoginPage(): ReactElement {
       <Button variant="text" size="sm" type="button" onClick={() => navigate('/recover')}>
         Forgot password?
       </Button>
+      {flow?.federated && (
+        <Button variant="text" size="sm" type="button" onClick={() => flow.federated && window.location.assign(flow.federated.authorizationUrl)}>
+          Sign in with your organisation
+        </Button>
+      )}
     </div>
   );
 

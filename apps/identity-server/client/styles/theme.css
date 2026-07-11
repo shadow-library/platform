@@ -54,10 +54,8 @@ body {
   inset: 0;
   z-index: -1;
   background:
-    radial-gradient(circle at 18% 30%, var(--identity-ring) 0, transparent 26%),
-    radial-gradient(circle at 18% 30%, transparent 27%, var(--identity-ring) 28%, transparent 34%),
-    radial-gradient(circle at 18% 30%, transparent 41%, rgb(201 162 75 / 7%) 42%, transparent 50%),
-    radial-gradient(ellipse at 85% 90%, rgb(201 162 75 / 5%) 0, transparent 45%);
+    radial-gradient(circle at 18% 30%, var(--identity-ring) 0, transparent 26%), radial-gradient(circle at 18% 30%, transparent 27%, var(--identity-ring) 28%, transparent 34%),
+    radial-gradient(circle at 18% 30%, transparent 41%, rgb(201 162 75 / 7%) 42%, transparent 50%), radial-gradient(ellipse at 85% 90%, rgb(201 162 75 / 5%) 0, transparent 45%);
   animation: identity-breathe 14s ease-in-out infinite;
 }
 
