@@ -78,6 +78,13 @@
       "when": 1783753480107,
       "tag": "0010_tenancy",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1783753734344,
+      "tag": "0011_oauth_clients",
+      "breakpoints": true
     }
   ]
 }

@@ -10,6 +10,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
  */
 import { AuthFlowModule } from '@server/modules/auth/flow';
 import { KeyModule } from '@server/modules/auth/keys';
+import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuditModule } from '@server/modules/infrastructure/audit';
@@ -31,7 +32,7 @@ import { NotificationModule } from '@server/modules/infrastructure/notification'
 export const AppHttpCoreModule = HttpCoreModule.forRoot({});
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, HealthModule, KeyModule, SessionModule, TokenModule, AuthFlowModule, AuditModule, NotificationModule],
+  imports: [AppHttpCoreModule, HealthModule, KeyModule, SessionModule, TokenModule, OAuthModule, AuthFlowModule, AuditModule, NotificationModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),
