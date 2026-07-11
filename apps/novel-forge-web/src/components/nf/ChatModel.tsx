@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { DropdownMenu, toast } from '@shadow-library/ui';
+import { useState } from 'react';
 
 /**
  * Importing user defined modules
@@ -104,6 +105,9 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   const modelsQuery = useAiModelsQuery();
   const projectQuery = useProjectQuery(novelId);
   const updateModel = useUpdateSessionModelMutation(novelId);
+  // The DS radio items call preventDefault on select, so Radix never auto-closes; drive the open state
+  // ourselves and shut it on any pick.
+  const [open, setOpen] = useState(false);
 
   const models = modelsQuery.data?.models ?? [];
   const llmModels = models.filter(m => m.kind === 'llm' && m.enabled);
@@ -126,7 +130,7 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenu.Trigger asChild>
         <button type="button" disabled={disabled || !session} aria-label="Chat model" className={styles.trigger}>
           {triggerLabel}
@@ -137,7 +141,7 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
       <DropdownMenu.Content align="start">
         <DropdownMenu.Label>Model for this chat</DropdownMenu.Label>
         <DropdownMenu.RadioGroup value={value} onValueChange={onChange}>
-          <DropdownMenu.RadioItem value="default">
+          <DropdownMenu.RadioItem value="default" onSelect={() => setOpen(false)}>
             <span>
               Default
               {defaultCaption && <span className={styles.caption}>{defaultCaption}</span>}
@@ -145,7 +149,7 @@ export function ChatModelMenu({ novelId, session, scopeType, disabled }: ChatMod
           </DropdownMenu.RadioItem>
           <DropdownMenu.Separator />
           {llmModels.map(m => (
-            <DropdownMenu.RadioItem key={encodeModelRef(m.provider, m.id)} value={encodeModelRef(m.provider, m.id)}>
+            <DropdownMenu.RadioItem key={encodeModelRef(m.provider, m.id)} value={encodeModelRef(m.provider, m.id)} onSelect={() => setOpen(false)}>
               {m.label}
             </DropdownMenu.RadioItem>
           ))}
