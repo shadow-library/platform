@@ -3,7 +3,7 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { and, asc, eq, inArray, lte } from 'drizzle-orm';
+import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -51,7 +51,7 @@ export class NotificationService {
       const rows = await tx
         .select()
         .from(schema.notificationOutbox)
-        .where(and(inArray(schema.notificationOutbox.status, CLAIMABLE_STATUSES), lte(schema.notificationOutbox.nextAttemptAt, new Date())))
+        .where(and(inArray(schema.notificationOutbox.status, CLAIMABLE_STATUSES), lte(schema.notificationOutbox.nextAttemptAt, sql`now()`)))
         .orderBy(asc(schema.notificationOutbox.nextAttemptAt))
         .limit(limit)
         .for('update', { skipLocked: true });

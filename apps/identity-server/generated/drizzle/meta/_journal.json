@@ -36,6 +36,13 @@
       "when": 1783750240017,
       "tag": "0004_notification_outbox",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1783750808891,
+      "tag": "0005_sessions_devices",
+      "breakpoints": true
     }
   ]
 }
