@@ -30,7 +30,7 @@ export class RefineProjectParams {
 
 @Schema()
 export class EnhancePremiseBody {
-  @Field({ optional: true, minLength: 10, maxLength: 50_000, description: 'rough overview to enhance; falls back to the project brief/premise when omitted' })
+  @Field({ optional: true, minLength: 10, maxLength: 200_000, description: 'rough overview to enhance; falls back to the project brief/premise when omitted' })
   overview?: string;
 }
 

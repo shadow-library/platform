@@ -185,7 +185,10 @@ export class ListChatMessagesResponse {
 
 @Schema()
 export class ChatTurnBody {
-  @Field({ minLength: 1, maxLength: 20_000 })
+  // Generous on purpose: authors paste whole premises, chapters, and reference docs into the hub
+  // (~200k chars ≈ 50k tokens). Compaction and the pack budgets handle the size downstream; the
+  // 12MB fastify bodyLimit is the real transport ceiling.
+  @Field({ minLength: 1, maxLength: 200_000 })
   content: string;
 }
 
