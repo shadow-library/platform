@@ -185,7 +185,7 @@ export class RefreshTokenService {
         targetType: 'refresh_token_family',
         targetId: familyId,
       });
-      this.logger.warn('Refresh token reuse detected; family and session revoked', { familyId, userId: family.userId });
+      this.logger.warn('Refresh token reuse detected; family and session revoked', { securityEvent: 'security.token_reuse', familyId, userId: family.userId });
     }
   }
 

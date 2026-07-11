@@ -9,3 +9,4 @@ export * from './login.service';
 export * from './recovery.service';
 export * from './registration.service';
 export * from './sign-in-event.service';
+export * from './suspicious-login.service';

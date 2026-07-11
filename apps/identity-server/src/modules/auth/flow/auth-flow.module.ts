@@ -24,6 +24,7 @@ import { LoginService } from './login.service';
 import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 import { SignInEventService } from './sign-in-event.service';
+import { SuspiciousLoginService } from './suspicious-login.service';
 
 /**
  * Defining types
@@ -36,7 +37,7 @@ import { SignInEventService } from './sign-in-event.service';
 @Module({
   imports: [DatabaseModule, UserModule, CredentialsModule, SessionModule, TokenModule, MfaModule, AuditModule, NotificationModule, SecurityModule],
   controllers: [AuthController],
-  providers: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, LoginService, RegistrationService, RecoveryService],
-  exports: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, LoginService, RegistrationService, RecoveryService],
+  providers: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
+  exports: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
 })
 export class AuthFlowModule {}

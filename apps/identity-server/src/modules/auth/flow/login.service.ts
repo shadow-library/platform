@@ -22,6 +22,7 @@ import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.ser
 import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
+import { SuspiciousLoginService } from './suspicious-login.service';
 
 /**
  * Defining types
@@ -82,6 +83,7 @@ export class LoginService {
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly webauthnService: WebauthnService,
     private readonly challengeService: ChallengeService,
+    private readonly suspiciousLoginService: SuspiciousLoginService,
   ) {}
 
   /**
@@ -231,6 +233,8 @@ export class LoginService {
   }
 
   private async complete(flow: AuthFlowContext, userId: bigint, options: CompletionOptions): Promise<FlowStepResult> {
+    /** Assessed before the success is recorded so "previously seen" excludes this very login. */
+    await this.suspiciousLoginService.assessLogin(userId, flow.device);
     await this.signInEventService.record({
       flowId: flow.flowId,
       userId,
@@ -266,6 +270,7 @@ export class LoginService {
       device: this.deviceFields(flow),
     });
     if (userId) await this.signInEventService.evaluateLock(userId);
+    if (flow.device.ipAddress) await this.suspiciousLoginService.recordFailure(flow.device.ipAddress);
     await this.auditService.record({ action: 'auth.login.failed', outcome: 'FAILURE', actorType: 'USER', actorId: userId?.toString() ?? null, ipAddress: flow.device.ipAddress });
 
     if (failureCount >= MAX_FLOW_FAILURES) {
