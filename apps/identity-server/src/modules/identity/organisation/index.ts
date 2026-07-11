@@ -1,3 +1,6 @@
+export * from './dns-txt.resolver';
+export * from './domain.controller';
+export * from './domain.service';
 export * from './invitation.service';
 export * from './me-organisation.controller';
 export * from './organisation.controller';

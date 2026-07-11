@@ -115,6 +115,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_006 = new AppErrorCode('ORG_006', ErrorType.CONFLICT, 'Organisation slug already taken');
   /** The caller's organisation role does not permit this operation */
   static readonly ORG_007 = new AppErrorCode('ORG_007', ErrorType.UNAUTHORIZED, 'Insufficient organisation role', 403);
+  /** The submitted domain name is not a valid public hostname */
+  static readonly ORG_008 = new AppErrorCode('ORG_008', ErrorType.VALIDATION_ERROR, 'Invalid domain name', 400);
+  /** The domain is already registered for this organisation */
+  static readonly ORG_009 = new AppErrorCode('ORG_009', ErrorType.CONFLICT, 'Domain already registered');
+  /** The domain record does not exist in this organisation */
+  static readonly ORG_010 = new AppErrorCode('ORG_010', ErrorType.NOT_FOUND, 'Domain not found');
 
   /**
    * OAuth / OIDC Error Codes (mapped to RFC 6749 error identifiers)

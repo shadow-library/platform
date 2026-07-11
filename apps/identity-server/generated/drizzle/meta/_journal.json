@@ -162,6 +162,13 @@
       "when": 1783774177868,
       "tag": "0022_audit_org_chain",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1783774514517,
+      "tag": "0023_organisation_domains",
+      "breakpoints": true
     }
   ]
 }

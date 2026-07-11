@@ -18,10 +18,12 @@ export type Organisation = InferSelectModel<typeof organisations>;
 export namespace Organisation {
   export type Member = InferSelectModel<typeof organisationMembers>;
   export type Invitation = InferSelectModel<typeof organisationInvitations>;
+  export type Domain = InferSelectModel<typeof organisationDomains>;
 
   export type Type = InferEnum<typeof organisationType>;
   export type Status = InferEnum<typeof organisationStatus>;
   export type MemberRole = InferEnum<typeof organisationMemberRole>;
+  export type DomainStatus = InferEnum<typeof organisationDomainStatus>;
 }
 
 /**
@@ -31,6 +33,7 @@ export namespace Organisation {
 export const organisationType = pgEnum('organisation_type', ['PERSONAL', 'TEAM']);
 export const organisationStatus = pgEnum('organisation_status', ['ACTIVE', 'SUSPENDED', 'DELETED']);
 export const organisationMemberRole = pgEnum('organisation_member_role', ['OWNER', 'ADMIN', 'MEMBER']);
+export const organisationDomainStatus = pgEnum('organisation_domain_status', ['PENDING', 'VERIFIED', 'FAILED']);
 
 export const organisations = pgTable('organisations', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
@@ -86,6 +89,36 @@ export const organisationInvitations = pgTable(
       .on(t.organisationId, t.email)
       .where(sql`${t.acceptedAt} IS NULL AND ${t.declinedAt} IS NULL AND ${t.revokedAt} IS NULL`),
     index('organisation_invitations_email_idx').on(t.email),
+  ],
+);
+
+/**
+ * DNS-TXT-proven domain ownership (T-703). A domain may be VERIFIED by at most one organisation
+ * at a time (partial unique index); PENDING claims may coexist so a domain moving between orgs
+ * never needs the old row deleted first. Verification evidence (checked time, matched record) is
+ * retained for audit. SAML/SCIM/JIT-provisioning attach to VERIFIED domains in later milestones.
+ */
+export const organisationDomains = pgTable(
+  'organisation_domains',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    organisationId: bigint('organisation_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => organisations.id, { onDelete: 'cascade' }),
+    domain: varchar('domain', { length: 253 }).notNull(),
+    verificationToken: varchar('verification_token', { length: 64 }).notNull(),
+    status: organisationDomainStatus('status').notNull().default('PENDING'),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
+    lastCheckedAt: timestamp('last_checked_at', { withTimezone: true }),
+    matchedRecord: varchar('matched_record', { length: 512 }),
+    lastCheckError: varchar('last_check_error', { length: 512 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [
+    uniqueIndex('organisation_domains_org_domain_unique').on(t.organisationId, t.domain),
+    uniqueIndex('organisation_domains_verified_unique')
+      .on(t.domain)
+      .where(sql`${t.status} = 'VERIFIED'`),
   ],
 );
 

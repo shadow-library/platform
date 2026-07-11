@@ -13,6 +13,9 @@ import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { SecurityModule } from '@server/modules/infrastructure/security';
 
+import { DnsTxtResolver } from './dns-txt.resolver';
+import { DomainController } from './domain.controller';
+import { DomainService } from './domain.service';
 import { InvitationService } from './invitation.service';
 import { MeOrganisationController } from './me-organisation.controller';
 import { OrganisationController } from './organisation.controller';
@@ -28,8 +31,8 @@ import { OrganisationService } from './organisation.service';
 
 @Module({
   imports: [DatabaseModule, SessionModule, AuthzModule, AuditModule, NotificationModule, SecurityModule],
-  controllers: [OrganisationController, MeOrganisationController],
-  providers: [OrganisationService, InvitationService],
-  exports: [OrganisationService, InvitationService],
+  controllers: [OrganisationController, MeOrganisationController, DomainController],
+  providers: [OrganisationService, InvitationService, DomainService, DnsTxtResolver],
+  exports: [OrganisationService, InvitationService, DomainService, DnsTxtResolver],
 })
 export class OrganisationModule {}

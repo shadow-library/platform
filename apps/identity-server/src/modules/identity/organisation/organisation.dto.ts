@@ -189,3 +189,51 @@ export class MyOrganisationsResponse {
   @Field(() => [MyOrganisationItem])
   organisations: MyOrganisationItem[];
 }
+
+@Schema()
+export class DomainParams {
+  @Field({ pattern: '^\\d+$' })
+  organisationId: string;
+
+  @Field({ pattern: '^\\d+$' })
+  domainId: string;
+}
+
+@Schema()
+export class RegisterDomainBody {
+  @Field({ minLength: 4, maxLength: 253 })
+  domain: string;
+}
+
+@Schema()
+export class DomainItem {
+  @Field()
+  id: string;
+
+  @Field()
+  domain: string;
+
+  @Field(() => String, { enum: ['PENDING', 'VERIFIED', 'FAILED'] })
+  status: 'PENDING' | 'VERIFIED' | 'FAILED';
+
+  @Field()
+  txtRecordName: string;
+
+  @Field()
+  txtRecordValue: string;
+
+  @Field(() => String, { optional: true })
+  verifiedAt?: string;
+
+  @Field(() => String, { optional: true })
+  lastCheckedAt?: string;
+
+  @Field(() => String, { optional: true })
+  lastCheckError?: string;
+}
+
+@Schema()
+export class DomainsResponse {
+  @Field(() => [DomainItem])
+  domains: DomainItem[];
+}
