@@ -57,6 +57,19 @@ describe('NotificationService', () => {
     expect((await outboxRow())?.status).toBe('SENT');
   });
 
+  it('should requeue deliveries stranded in sending by an interrupted worker', async () => {
+    await service.enqueue({ templateKey: 'email.otp', recipients: { email: 'stranded@example.com' } });
+    await env.getPostgresClient().update(schema.notificationOutbox).set({ status: 'SENDING' });
+
+    const recovered = await service.recoverStuckDeliveries();
+    expect(recovered).toBe(1);
+    expect((await outboxRow())?.status).toBe('FAILED');
+
+    const sent = await service.dispatchPending();
+    expect(sent).toBe(1);
+    expect((await outboxRow())?.status).toBe('SENT');
+  });
+
   it('should mark a failed delivery for retry with backoff', async () => {
     await service.enqueue({ templateKey: 'email.otp', recipients: { email: 'jane@example.com' } });
     sendBehaviour = async () => {

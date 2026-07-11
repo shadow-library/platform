@@ -1,12 +1,12 @@
 # `@shadow-library/auth` — Consumer SDK Specification
 
-| | |
-| :--- | :--- |
-| **Status** | v1 implemented (`packages/auth`) |
-| **Version** | 1.0.0 (spec) |
-| **Last updated** | 2026-07-11 |
-| **Repository** | workspace package `packages/auth` in this repo — the server and SDK share protocol logic, and keeping them together lets the SDK be integration-tested against the real server on every commit |
-| **Runtime** | Bun ≥ 1.3 (WebCrypto Ed25519, native `fetch`); no Node-only APIs |
+|                  |                                                                                                                                                                                                |
+| :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**       | v1 implemented (`packages/auth`)                                                                                                                                                               |
+| **Version**      | 1.0.0 (spec)                                                                                                                                                                                   |
+| **Last updated** | 2026-07-11                                                                                                                                                                                     |
+| **Repository**   | workspace package `packages/auth` in this repo — the server and SDK share protocol logic, and keeping them together lets the SDK be integration-tested against the real server on every commit |
+| **Runtime**      | Bun ≥ 1.3 (WebCrypto Ed25519, native `fetch`); no Node-only APIs                                                                                                                               |
 
 ## 1. Purpose
 
@@ -36,11 +36,12 @@ export { createTestIdP } from '@shadow-library/auth/testing';
 
 ```ts
 const auth = createAuthClient({
-  issuer: 'https://identity.shadow-apps.com',          // discovery: {issuer}/.well-known/openid-configuration
-  audience: 'api://pulse',                             // this service's API resource identifier
-  client: {                                            // service-account credentials (M2M + PDP calls)
+  issuer: 'https://identity.shadow-apps.com', // discovery: {issuer}/.well-known/openid-configuration
+  audience: 'api://pulse', // this service's API resource identifier
+  client: {
+    // service-account credentials (M2M + PDP calls)
     id: Bun.env.IDENTITY_CLIENT_ID!,
-    secret: Bun.env.IDENTITY_CLIENT_SECRET,            // or privateKeyJwt: { kid, key } for private_key_jwt
+    secret: Bun.env.IDENTITY_CLIENT_SECRET, // or privateKeyJwt: { kid, key } for private_key_jwt
   },
   cache: { decisionTtlSeconds: 60, jwksTtlSeconds: 300 },
 });
@@ -90,11 +91,11 @@ Implementation notes: guards are `@Middleware`-based (see `fastify/src/decorator
 ## 5. PDP client
 
 ```ts
-await auth.check({ action: 'posts:write', organisation: who.org, principal: who });        // → boolean
-await auth.checkAll([{ action: 'posts:write' }, { action: 'posts:publish' }], who);        // batch
+await auth.check({ action: 'posts:write', organisation: who.org, principal: who }); // → boolean
+await auth.checkAll([{ action: 'posts:write' }, { action: 'posts:publish' }], who); // batch
 ```
 
-- Calls `POST {issuer}/api/v1/authz/check` authenticated with the service's own M2M token.
+- Calls `POST {issuer}/api/v1/authz/check` authenticated with the service's own M2M token. The endpoint requires the token to carry the `authz:check` scope (seeded at server bootstrap); the SDK requests that scope automatically, so the service's OAuth client **must be granted it at provisioning time** or every check denies.
 - L1 LRU cache keyed `(principal, org, action, resource, authz_version)`, TTL 60 s. The response's `authz_version` is compared on each hit; a bump (delivered piggybacked on responses) discards stale entries.
 - Deny-by-default: network failure, non-200, or malformed response ⇒ `false` (unless the route opted into fail-open).
 
@@ -119,10 +120,10 @@ const rp = createRelyingParty({
   session: { cookieName: '__Host-app_sid', secret: Bun.env.SESSION_SECRET!, idleDays: 30 },
 });
 
-app.get('/auth/login',    rp.beginLogin());     // → 302 /oauth2/authorize (PKCE S256 + state + nonce, Redis/memory state store)
+app.get('/auth/login', rp.beginLogin()); // → 302 /oauth2/authorize (PKCE S256 + state + nonce, Redis/memory state store)
 app.get('/auth/callback', rp.handleCallback()); // code→token exchange, nonce check, establish app session
 app.post('/auth/backchannel-logout', rp.handleBackChannelLogout()); // verifies logout token, destroys sessions by sid
-app.post('/auth/logout',  rp.logout());         // local + optional RP-initiated logout redirect
+app.post('/auth/logout', rp.logout()); // local + optional RP-initiated logout redirect
 ```
 
 The RP helper owns: PKCE generation/verification, `state`/`nonce` handling, ID-token validation (including `nonce` and `acr`), app-session cookie management (opaque, HttpOnly, SameSite=Lax), and back-channel-logout `sid` mapping. Apps never parse tokens themselves.

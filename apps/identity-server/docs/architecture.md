@@ -1,25 +1,25 @@
 # Shadow Identity — Target Architecture Specification
 
-| | |
-| :--- | :--- |
-| **Status** | Approved for development |
-| **Version** | 1.0.0 |
-| **Last updated** | 2026-07-11 |
-| **Supersedes** | The SSO and token-rotation designs previously described in `docs/auth/overview.md` (§E and conditional rotation in §D of the pre-1.0 revision) |
+|                  |                                                                                                                                                |
+| :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Status**       | Approved for development                                                                                                                       |
+| **Version**      | 1.0.0                                                                                                                                          |
+| **Last updated** | 2026-07-11                                                                                                                                     |
+| **Supersedes**   | The SSO and token-rotation designs previously described in `docs/auth/overview.md` (§E and conditional rotation in §D of the pre-1.0 revision) |
 
 The key words **MUST**, **MUST NOT**, **SHOULD**, **SHOULD NOT**, and **MAY** are to be interpreted as described in RFC 2119.
 
 ## Document map
 
-| Document | Contents |
-| :--- | :--- |
-| `docs/architecture.md` (this document) | Target architecture, decisions, trust model, token model, module boundaries |
-| `docs/database.md` | Target data model: entities, constraints, tenancy rules, lifecycle states, retention |
-| `docs/auth/overview.md` | Interactive authentication flow specification (registration, login, recovery, MFA) |
-| `docs/auth/api-contract.md` | HTTP API contract for the interactive authentication flows |
-| `docs/sdk.md` | Specification of the `@shadow-library/auth` client package for consuming services |
-| `docs/tasks.md` | Development backlog: milestones, tasks, detailed change lists, acceptance criteria |
-| `docs/standards.md` | Cross-cutting engineering conventions (IDs, error codes, localization) |
+| Document                               | Contents                                                                             |
+| :------------------------------------- | :----------------------------------------------------------------------------------- |
+| `docs/architecture.md` (this document) | Target architecture, decisions, trust model, token model, module boundaries          |
+| `docs/database.md`                     | Target data model: entities, constraints, tenancy rules, lifecycle states, retention |
+| `docs/auth/overview.md`                | Interactive authentication flow specification (registration, login, recovery, MFA)   |
+| `docs/auth/api-contract.md`            | HTTP API contract for the interactive authentication flows                           |
+| `docs/sdk.md`                          | Specification of the `@shadow-library/auth` client package for consuming services    |
+| `docs/tasks.md`                        | Development backlog: milestones, tasks, detailed change lists, acceptance criteria   |
+| `docs/standards.md`                    | Cross-cutting engineering conventions (IDs, error codes, localization)               |
 
 ---
 
@@ -39,37 +39,37 @@ Out of scope for the current phase, but explicitly planned for (see §14): SAML 
 
 ## 2. Definitions
 
-| Term | Meaning |
-| :--- | :--- |
-| **Principal** | Any authenticated actor: a user or a service account |
-| **Organisation** | Tenant boundary. Every principal and every tenant-owned row belongs to exactly one organisation |
-| **Personal workspace** | The synthetic organisation created for every user at registration (Decision D-1) |
-| **Application** | A logical product in the ecosystem (e.g. Pulse, Novel Forge). Owns OAuth clients, API resources, roles |
-| **OAuth client** | A registered credentialed entity that can request tokens: browser app, server app, or service account |
-| **API resource** | A protected API surface identified by a URI, used as the token `aud`ience |
-| **PDP / PEP** | Policy decision point (identity service) / policy enforcement point (each consuming service, via the SDK) |
-| **First-party** | Built and operated by us; trusted to bypass the consent screen but never the protocol |
+| Term                   | Meaning                                                                                                   |
+| :--------------------- | :-------------------------------------------------------------------------------------------------------- |
+| **Principal**          | Any authenticated actor: a user or a service account                                                      |
+| **Organisation**       | Tenant boundary. Every principal and every tenant-owned row belongs to exactly one organisation           |
+| **Personal workspace** | The synthetic organisation created for every user at registration (Decision D-1)                          |
+| **Application**        | A logical product in the ecosystem (e.g. Pulse, Novel Forge). Owns OAuth clients, API resources, roles    |
+| **OAuth client**       | A registered credentialed entity that can request tokens: browser app, server app, or service account     |
+| **API resource**       | A protected API surface identified by a URI, used as the token `aud`ience                                 |
+| **PDP / PEP**          | Policy decision point (identity service) / policy enforcement point (each consuming service, via the SDK) |
+| **First-party**        | Built and operated by us; trusted to bypass the consent screen but never the protocol                     |
 
 ## 3. Architectural decisions
 
 Decisions are binding. Changing one requires updating this document first.
 
-| ID | Decision | Rationale / consequences |
-| :--- | :--- | :--- |
-| **D-1** | Every user gets a **synthetic personal workspace** (an `organisations` row of type `PERSONAL`) at registration. Every tenant-owned row carries `organisation_id NOT NULL`. | One uniform tenancy rule; no nullable-tenant special cases; retrofit-free path to enterprise orgs and to data residency (org is the residency/shard unit). |
-| **D-2** | Service-to-service authentication uses **OAuth 2.0 client credentials** with short-lived JWT access tokens issued by this service. Service accounts are OAuth clients (`kind = SERVICE`). No static API keys, no mTLS mesh. | One token format and one verification path for human and machine calls; SDK handles acquisition/caching. mTLS rejected: no mesh infrastructure, no threat-model justification yet. |
-| **D-3** | Access tokens carry **identity, tenant, audience, and scopes only — never roles or permissions**. Permissions are resolved at the PDP per request and cached briefly by the SDK. | Bounded revocation latency (≤ cache TTL); small stable tokens; no stale-authorization class of bugs. Cost: one extra (cached) call per unique decision. |
-| **D-4** | First-party clients **bypass the consent screen but never the protocol**: full Authorization Code + PKCE with registered exact-match redirect URIs. The bespoke `/sso/authorize` design is **withdrawn**. | Consent UX without redirect/token-leak vulnerabilities; third-party support later is additive (enable consent screen). |
-| **D-5** | All authentication and protocol logic is implemented **in this repository**, on top of the `@shadow-library` framework. The framework provides transport, DI, validation, caching, and state machines — it is not and will not become an IdP. The consumer package **`@shadow-library/auth`** (see `docs/sdk.md`) gives consuming services verification, guards, and token management; it lives in this repo as the workspace package `packages/auth` because server and SDK share protocol logic and the SDK is integration-tested against the real server on every commit. | Framework stays generic; auth logic centralized here; consumers never hand-roll auth. |
-| **D-6** | Caching uses `@shadow-library/modules` **`CacheModule`** (L1 in-process LRU + L2 Redis). Memcached is removed. Redis is a **required** dependency. | One cache stack; Redis is already required for flow state, rate limits, and revocation. |
-| **D-7** | Data residency is **deferred but designed for**: UUIDv7 primary keys (no global sequences), `organisation_id` on every tenant row (shard/region key), `region` column on `organisations` and `users` (single value `default` for now), no cross-tenant JOINs outside the directory index, and a minimal global "identifier → user/region" lookup path kept separable from PII. | When residency is required, tenants move as units; no key-space or query rewrites. |
-| **D-8** | Primary keys are **UUIDv7** (`Bun.randomUUIDv7()`), stored as `uuid`. External representations are prefixed per `docs/standards.md` (`usr_…`, `org_…`, `sess_…`). Bigserial keys are abolished. | Time-ordered (index-friendly), region-portable, non-enumerable externally, consistent with the ID-prefix standard. |
-| **D-9** | Token signing uses **EdDSA (Ed25519)** with `kid`-addressed keys published via JWKS. Private keys are stored encrypted (AES-256-GCM envelope) under a master key-encryption key; the key provider is an interface so a KMS/HSM can replace env-based KEK without schema changes. Verifiers MUST enforce an algorithm allowlist of exactly `EdDSA`. | Fast, small signatures; native WebCrypto support in Bun; algorithm-confusion attacks precluded by allowlisting. ES256 is the designated fallback if a future third-party integration cannot verify Ed25519. |
-| **D-10** | Browser authentication to the identity service itself uses an **opaque, server-side session** (`__Host-sid` cookie), not JWT cookies. JWTs exist only as OAuth/OIDC artifacts issued to clients. | Instant revocation for the control plane; CSRF surface bounded; JWT lifetime problems don't apply to the primary session. |
-| **D-11** | Refresh tokens are opaque, stored hashed, and **rotate on every use** with family-based reuse detection: presenting any revoked family member revokes the family and its session. The previously documented conditional rotation is withdrawn. | Restores the theft-detection property rotation exists for. |
-| **D-12** | Identity-probing endpoints return **neutral responses** (no account-existence oracle): registration, recovery, and login-init behave identically for known and unknown identifiers. | Enumeration resistance. Residual risk (timing, method lists) documented in §11. |
-| **D-13** | Deployment is a **modular monolith** plus a worker process, one PostgreSQL, one Redis. Background jobs use a Postgres-backed queue (`FOR UPDATE SKIP LOCKED`). No message broker until job volume proves the need. | Matches team size and scale; the transactional boundary is the tenant-isolation boundary. |
-| **D-14** | The repo's local `DatastoreService` is replaced by `@shadow-library/modules` **`DatabaseModule`** (≥ 0.5), which lifecycle-manages Postgres/Redis clients. | Removes duplicated client management and the unsafe local SQL param-interpolating logger. |
+| ID       | Decision                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                     | Rationale / consequences                                                                                                                                                                                    |
+| :------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **D-1**  | Every user gets a **synthetic personal workspace** (an `organisations` row of type `PERSONAL`) at registration. Every tenant-owned row carries `organisation_id NOT NULL`.                                                                                                                                                                                                                                                                                                                                                                                                   | One uniform tenancy rule; no nullable-tenant special cases; retrofit-free path to enterprise orgs and to data residency (org is the residency/shard unit).                                                  |
+| **D-2**  | Service-to-service authentication uses **OAuth 2.0 client credentials** with short-lived JWT access tokens issued by this service. Service accounts are OAuth clients (`kind = SERVICE`). No static API keys, no mTLS mesh.                                                                                                                                                                                                                                                                                                                                                  | One token format and one verification path for human and machine calls; SDK handles acquisition/caching. mTLS rejected: no mesh infrastructure, no threat-model justification yet.                          |
+| **D-3**  | Access tokens carry **identity, tenant, audience, and scopes only — never roles or permissions**. Permissions are resolved at the PDP per request and cached briefly by the SDK.                                                                                                                                                                                                                                                                                                                                                                                             | Bounded revocation latency (≤ cache TTL); small stable tokens; no stale-authorization class of bugs. Cost: one extra (cached) call per unique decision.                                                     |
+| **D-4**  | First-party clients **bypass the consent screen but never the protocol**: full Authorization Code + PKCE with registered exact-match redirect URIs. The bespoke `/sso/authorize` design is **withdrawn**.                                                                                                                                                                                                                                                                                                                                                                    | Consent UX without redirect/token-leak vulnerabilities; third-party support later is additive (enable consent screen).                                                                                      |
+| **D-5**  | All authentication and protocol logic is implemented **in this repository**, on top of the `@shadow-library` framework. The framework provides transport, DI, validation, caching, and state machines — it is not and will not become an IdP. The consumer package **`@shadow-library/auth`** (see `docs/sdk.md`) gives consuming services verification, guards, and token management; it lives in this repo as the workspace package `packages/auth` because server and SDK share protocol logic and the SDK is integration-tested against the real server on every commit. | Framework stays generic; auth logic centralized here; consumers never hand-roll auth.                                                                                                                       |
+| **D-6**  | Caching uses `@shadow-library/modules` **`CacheModule`** (L1 in-process LRU + L2 Redis). Memcached is removed. Redis is a **required** dependency.                                                                                                                                                                                                                                                                                                                                                                                                                           | One cache stack; Redis is already required for flow state, rate limits, and revocation.                                                                                                                     |
+| **D-7**  | Data residency is **deferred but designed for**: UUIDv7 primary keys (no global sequences), `organisation_id` on every tenant row (shard/region key), `region` column on `organisations` and `users` (single value `default` for now), no cross-tenant JOINs outside the directory index, and a minimal global "identifier → user/region" lookup path kept separable from PII.                                                                                                                                                                                               | When residency is required, tenants move as units; no key-space or query rewrites.                                                                                                                          |
+| **D-8**  | Primary keys are **UUIDv7** (`Bun.randomUUIDv7()`), stored as `uuid`. External representations are prefixed per `docs/standards.md` (`usr_…`, `org_…`, `sess_…`). Bigserial keys are abolished.                                                                                                                                                                                                                                                                                                                                                                              | Time-ordered (index-friendly), region-portable, non-enumerable externally, consistent with the ID-prefix standard.                                                                                          |
+| **D-9**  | Token signing uses **EdDSA (Ed25519)** with `kid`-addressed keys published via JWKS. Private keys are stored encrypted (AES-256-GCM envelope) under a master key-encryption key; the key provider is an interface so a KMS/HSM can replace env-based KEK without schema changes. Verifiers MUST enforce an algorithm allowlist of exactly `EdDSA`.                                                                                                                                                                                                                           | Fast, small signatures; native WebCrypto support in Bun; algorithm-confusion attacks precluded by allowlisting. ES256 is the designated fallback if a future third-party integration cannot verify Ed25519. |
+| **D-10** | Browser authentication to the identity service itself uses an **opaque, server-side session** (`__Host-sid` cookie), not JWT cookies. JWTs exist only as OAuth/OIDC artifacts issued to clients.                                                                                                                                                                                                                                                                                                                                                                             | Instant revocation for the control plane; CSRF surface bounded; JWT lifetime problems don't apply to the primary session.                                                                                   |
+| **D-11** | Refresh tokens are opaque, stored hashed, and **rotate on every use** with family-based reuse detection: presenting any revoked family member revokes the family and its session. The previously documented conditional rotation is withdrawn.                                                                                                                                                                                                                                                                                                                               | Restores the theft-detection property rotation exists for.                                                                                                                                                  |
+| **D-12** | Identity-probing endpoints return **neutral responses** (no account-existence oracle): registration, recovery, and login-init behave identically for known and unknown identifiers.                                                                                                                                                                                                                                                                                                                                                                                          | Enumeration resistance. Residual risk (timing, method lists) documented in §11.                                                                                                                             |
+| **D-13** | Deployment is a **modular monolith** plus a worker process, one PostgreSQL, one Redis. Background jobs use a Postgres-backed queue (`FOR UPDATE SKIP LOCKED`). No message broker until job volume proves the need.                                                                                                                                                                                                                                                                                                                                                           | Matches team size and scale; the transactional boundary is the tenant-isolation boundary.                                                                                                                   |
+| **D-14** | The repo's local `DatastoreService` is replaced by `@shadow-library/modules` **`DatabaseModule`** (≥ 0.5), which lifecycle-manages Postgres/Redis clients.                                                                                                                                                                                                                                                                                                                                                                                                                   | Removes duplicated client management and the unsafe local SQL param-interpolating logger.                                                                                                                   |
 
 ## 4. System context
 
@@ -110,21 +110,21 @@ Both are stateless; all state lives in PostgreSQL (durable) and Redis (ephemeral
 
 Modules live under `src/modules/`. A module may only touch another module's tables through that module's exported services.
 
-| Module | Path | Owns (aggregates) | Notes |
-| :--- | :--- | :--- | :--- |
-| Directory | `identity/user` | User, Profile, Email, Phone, AuthIdentity | Exists; must be repaired (see tasks M0) |
-| Credentials | `identity/credentials` | PasswordCredential (+history), MFAEnrollment, WebAuthnCredential, RecoveryCode | New |
-| Auth flows | `auth/flow` | AuthFlow (Redis, via `FlowManager` from `@shadow-library/common`), VerificationChallenge | New |
-| Sessions | `auth/session` | Session, Device, RefreshTokenFamily, RefreshToken | New |
-| Authorization server | `auth/oauth` | OAuthClient, RedirectUri, AuthorizationCode (Redis), Consent, Scope, APIResource | New |
-| Key management | `auth/keys` | SigningKey, JWKS, KeyProvider | New |
-| PDP | `authz` | Role, Permission, RoleAssignment, decision API | New |
-| Tenancy | `identity/organisation` | Organisation, Membership, Invitation | New (schema exists, no code) |
-| Applications | `system/application` | Application, ApplicationRole | Exists; extended with client/resource links |
-| Notifications | `infrastructure/notification` | outbox, provider adapters (email now, SMS later) | New |
-| Audit | `infrastructure/audit` | AuditEvent, SignInEvent writer | New |
-| Jobs | `infrastructure/jobs` | queue tables, worker runtime | New |
-| Datastore | `infrastructure/datastore` | replaced by `DatabaseModule` (D-14); keeps Drizzle schemas | Refactor |
+| Module               | Path                          | Owns (aggregates)                                                                        | Notes                                       |
+| :------------------- | :---------------------------- | :--------------------------------------------------------------------------------------- | :------------------------------------------ |
+| Directory            | `identity/user`               | User, Profile, Email, Phone, AuthIdentity                                                | Exists; must be repaired (see tasks M0)     |
+| Credentials          | `identity/credentials`        | PasswordCredential (+history), MFAEnrollment, WebAuthnCredential, RecoveryCode           | New                                         |
+| Auth flows           | `auth/flow`                   | AuthFlow (Redis, via `FlowManager` from `@shadow-library/common`), VerificationChallenge | New                                         |
+| Sessions             | `auth/session`                | Session, Device, RefreshTokenFamily, RefreshToken                                        | New                                         |
+| Authorization server | `auth/oauth`                  | OAuthClient, RedirectUri, AuthorizationCode (Redis), Consent, Scope, APIResource         | New                                         |
+| Key management       | `auth/keys`                   | SigningKey, JWKS, KeyProvider                                                            | New                                         |
+| PDP                  | `authz`                       | Role, Permission, RoleAssignment, decision API                                           | New                                         |
+| Tenancy              | `identity/organisation`       | Organisation, Membership, Invitation                                                     | New (schema exists, no code)                |
+| Applications         | `system/application`          | Application, ApplicationRole                                                             | Exists; extended with client/resource links |
+| Notifications        | `infrastructure/notification` | outbox, provider adapters (email now, SMS later)                                         | New                                         |
+| Audit                | `infrastructure/audit`        | AuditEvent, SignInEvent writer                                                           | New                                         |
+| Jobs                 | `infrastructure/jobs`         | queue tables, worker runtime                                                             | New                                         |
+| Datastore            | `infrastructure/datastore`    | replaced by `DatabaseModule` (D-14); keeps Drizzle schemas                               | Refactor                                    |
 
 ## 7. Identity and tenancy model
 
@@ -145,7 +145,7 @@ Personal orgs MUST NOT be joinable by other users, deletable independently of th
 
 ### 7.3 Tenant-scoping invariant
 
-Every tenant-owned table carries `organisation_id NOT NULL`. All reads and writes go through repositories that require an org context; a CI-enforced test suite (the *isolation harness*) attempts cross-tenant access on every tenant-scoped repository method and MUST fail the build on any leak. Caches, queue payloads, audit rows, and log context are all keyed/tagged with `organisation_id`.
+Every tenant-owned table carries `organisation_id NOT NULL`. All reads and writes go through repositories that require an org context; a CI-enforced test suite (the _isolation harness_) attempts cross-tenant access on every tenant-scoped repository method and MUST fail the build on any leak. Caches, queue payloads, audit rows, and log context are all keyed/tagged with `organisation_id`.
 
 ## 8. Authentication architecture
 
@@ -159,16 +159,16 @@ Registration, login, recovery, and step-up are state machines defined with `Flow
 
 ### 8.2 Browser sessions with the identity service (D-10)
 
-| Property | Value |
-| :--- | :--- |
-| Cookie | `__Host-sid` — `Secure; HttpOnly; SameSite=Lax; Path=/` |
-| Value | Opaque 256-bit random, stored **hashed** (SHA-256) in `user_sessions` |
+| Property         | Value                                                                                        |
+| :--------------- | :------------------------------------------------------------------------------------------- |
+| Cookie           | `__Host-sid` — `Secure; HttpOnly; SameSite=Lax; Path=/`                                      |
+| Value            | Opaque 256-bit random, stored **hashed** (SHA-256) in `user_sessions`                        |
 | Companion cookie | `isLoggedIn=true` — `Secure; SameSite=Lax`, **not** HttpOnly (client-side session hint only) |
-| Idle timeout | 30 days rolling (`last_used_at` refreshed at most once per 5 minutes) |
-| Absolute timeout | 180 days (`expires_at`, fixed at creation) |
-| Validation | Redis-cached session lookup (60 s TTL) with explicit cache invalidation on revocation |
-| Fixation | Session ID is issued only after authentication completes; re-login always issues a new ID |
-| Step-up | `elevated_until` set after re-auth (password/MFA); sensitive operations require it (§8.5) |
+| Idle timeout     | 30 days rolling (`last_used_at` refreshed at most once per 5 minutes)                        |
+| Absolute timeout | 180 days (`expires_at`, fixed at creation)                                                   |
+| Validation       | Redis-cached session lookup (60 s TTL) with explicit cache invalidation on revocation        |
+| Fixation         | Session ID is issued only after authentication completes; re-login always issues a new ID    |
+| Step-up          | `elevated_until` set after re-auth (password/MFA); sensitive operations require it (§8.5)    |
 
 `SameSite=Lax` (not `Strict`) is required because OIDC redirects from app subdomains are top-level navigations that must carry the session cookie. CSRF protection therefore MUST NOT rely on SameSite alone: the `HttpCoreModule` CSRF double-submit is required on all state-changing browser endpoints, and the token MUST be HMAC-signed and compared in constant time (framework change — task T-012).
 
@@ -201,14 +201,14 @@ Client authentication methods: `client_secret_basic` (default; secret stored arg
 
 ## 9. Token model
 
-| Token | Format | Lifetime | Storage | Notes |
-| :--- | :--- | :--- | :--- | :--- |
-| Identity-service session | Opaque 256-bit | 30 d idle / 180 d absolute | `user_sessions` (hashed) + Redis cache | The only browser credential on the identity domain |
-| Access token (user) | JWT (EdDSA) | **10 minutes** | Not stored server-side | `sub`, `org`, `aud`, `scope`, `sid`, `acr/amr`, `iat/exp/iss/jti` |
-| Access token (M2M) | JWT (EdDSA) | 60 minutes | Not stored | `sub` = client ID, `aud` = API resource |
-| ID token | JWT (EdDSA) | 5 minutes | Not stored | OIDC claims + `nonce`; never used for API authorization |
-| Refresh token | Opaque 256-bit | 30 d idle / 180 d absolute (bounded by session) | `refresh_tokens` (hashed), grouped by family | Rotates on every use (D-11) |
-| Authorization code | Opaque | 60 seconds, single-use | Redis | Bound to client, redirect URI, PKCE, nonce, session |
+| Token                    | Format         | Lifetime                                        | Storage                                      | Notes                                                             |
+| :----------------------- | :------------- | :---------------------------------------------- | :------------------------------------------- | :---------------------------------------------------------------- |
+| Identity-service session | Opaque 256-bit | 30 d idle / 180 d absolute                      | `user_sessions` (hashed) + Redis cache       | The only browser credential on the identity domain                |
+| Access token (user)      | JWT (EdDSA)    | **10 minutes**                                  | Not stored server-side                       | `sub`, `org`, `aud`, `scope`, `sid`, `acr/amr`, `iat/exp/iss/jti` |
+| Access token (M2M)       | JWT (EdDSA)    | 60 minutes                                      | Not stored                                   | `sub` = client ID, `aud` = API resource                           |
+| ID token                 | JWT (EdDSA)    | 5 minutes                                       | Not stored                                   | OIDC claims + `nonce`; never used for API authorization           |
+| Refresh token            | Opaque 256-bit | 30 d idle / 180 d absolute (bounded by session) | `refresh_tokens` (hashed), grouped by family | Rotates on every use (D-11)                                       |
+| Authorization code       | Opaque         | 60 seconds, single-use                          | Redis                                        | Bound to client, redirect URI, PKCE, nonce, session               |
 
 Rules:
 
@@ -240,17 +240,17 @@ Rules:
 
 All standard endpoints; no dynamic client registration, no implicit flow, no ROPC, ever.
 
-| Endpoint | Purpose |
-| :--- | :--- |
-| `GET /.well-known/openid-configuration` | Discovery metadata |
-| `GET /.well-known/jwks.json` | Public signing keys |
-| `GET /oauth2/authorize` | Authorization Code + PKCE entry |
-| `POST /oauth2/token` | `authorization_code`, `refresh_token`, `client_credentials` |
-| `POST /oauth2/revoke` | RFC 7009 revocation (RT families, client tokens) |
-| `POST /oauth2/introspect` | RFC 7662, confidential clients only (SDK fallback when local verify is impossible) |
-| `GET /oauth2/userinfo` | OIDC UserInfo |
-| `GET /oauth2/logout` | RP-initiated logout |
-| `POST` back-channel logout | OIDC BCL logout tokens pushed to registered client endpoints |
+| Endpoint                                | Purpose                                                                            |
+| :-------------------------------------- | :--------------------------------------------------------------------------------- |
+| `GET /.well-known/openid-configuration` | Discovery metadata                                                                 |
+| `GET /.well-known/jwks.json`            | Public signing keys                                                                |
+| `GET /oauth2/authorize`                 | Authorization Code + PKCE entry                                                    |
+| `POST /oauth2/token`                    | `authorization_code`, `refresh_token`, `client_credentials`                        |
+| `POST /oauth2/revoke`                   | RFC 7009 revocation (RT families, client tokens)                                   |
+| `POST /oauth2/introspect`               | RFC 7662, confidential clients only (SDK fallback when local verify is impossible) |
+| `GET /oauth2/userinfo`                  | OIDC UserInfo                                                                      |
+| `GET /oauth2/logout`                    | RP-initiated logout                                                                |
+| `POST` back-channel logout              | OIDC BCL logout tokens pushed to registered client endpoints                       |
 
 Conformance: the OpenID Foundation conformance suite (OP Basic + Config profiles) runs in CI-adjacent tooling before the OIDC milestone exits (task T-309).
 
@@ -260,25 +260,27 @@ Conformance: the OpenID Foundation conformance suite (OP Basic + Config profiles
 
 `CacheModule` provides L1 (in-process LRU, small TTLs) + L2 (Redis). Cacheability rules:
 
-| Data | Cache | TTL | Invalidation |
-| :--- | :--- | :--- | :--- |
-| JWKS / discovery | L1 + L2 | 300 s | key rotation republish |
-| Session lookup (hash → session) | L2 | 60 s | explicit delete on revoke |
-| PDP decisions | SDK L1 | 60 s | `authz_version` bump |
-| Client/app registry | L1 + L2 | 300 s | explicit bust on admin write |
-| Auth flow state | L2 only | 900 s (TTL = flow lifetime) | terminal state delete |
-| Rate-limit counters | L2 only | window-scoped | — |
+| Data                            | Cache   | TTL                         | Invalidation                 |
+| :------------------------------ | :------ | :-------------------------- | :--------------------------- |
+| JWKS / discovery                | L1 + L2 | 300 s                       | key rotation republish       |
+| Session lookup (hash → session) | L2      | 60 s                        | explicit delete on revoke    |
+| PDP decisions                   | SDK L1  | 60 s                        | `authz_version` bump         |
+| Client/app registry             | L1 + L2 | 300 s                       | explicit bust on admin write |
+| Auth flow state                 | L2 only | 900 s (TTL = flow lifetime) | terminal state delete        |
+| Rate-limit counters             | L2 only | window-scoped               | —                            |
 
 Credentials, tokens, and PII MUST NOT be cached beyond the entries above. All keys embed `organisation_id` where tenant-scoped.
 
 ### 13.2 Rate limiting and abuse
 
-Four tiers (Redis, fail-closed for auth endpoints, fail-open for read APIs):
+Four tiers (Redis, fail-closed for auth endpoints, fail-open for read APIs). Implemented by the
+`SecurityModule` rate-limit middleware (`@RateLimit`-decorated routes fail closed on a Redis
+outage; undecorated routes carry only the general budget and fail open):
 
-1. **IP**: general 100 req/min; `register/init` 5/h; `login/init` 20/h.
-2. **Identifier**: OTP sends max 3 per flow, 5 per identifier per hour (anti-bombing).
-3. **Flow**: max 3 failed credential submissions per flow, 5 total across methods → flow terminated (410).
-4. **Persistent account lock**: ≥ 5 `INVALID_CREDENTIALS`/`MFA_FAILED` events in 15 min → `users.lock_mode = OTP_ONLY` with `locked_until`; only OTP methods offered until expiry. Evaluated transactionally on failure insert.
+1. **IP**: general 100 req/min on every route; `register/init` and `recover/init` 5/h; `login/init` 20/h; `webauthn/options` 60/h; `challenge/resend` 10/h. A dynamic deny list (`rl:ipblock:*`) rejects blocked IPs outright; `RATE_LIMIT_IP_ALLOWLIST` bypasses infrastructure IPs and `RATE_LIMIT_ENABLED` is the kill switch.
+2. **Identifier**: OTP resends max 3 per flow with a 60 s cooldown; deliveries max 5 per identifier per hour across all flows, enforced inside `ChallengeService.issue` (exceeding it silently skips delivery — anti-bombing without an enumeration signal).
+3. **Flow**: max 3 failed credential submissions per flow → flow terminated (410).
+4. **Persistent account lock**: ≥ 5 `INVALID_CREDENTIALS`/`MFA_FAILED` events in 15 min → `users.lock_mode = OTP_ONLY` with `locked_until`; the password step refuses while locked, OTP methods keep working.
 
 ### 13.3 Audit and security events
 
@@ -286,6 +288,14 @@ Four tiers (Redis, fail-closed for auth endpoints, fail-open for read APIs):
 - Everything privileged is audited: auth events, credential changes, grants, client/key changes, admin actions, consent changes, token/session revocations.
 - `sign_in_events` is the authentication-specific log; `user_id` is nullable with `ON DELETE SET NULL` so failed attempts against unknown identifiers and deleted users' histories survive.
 - Retention: audit 400 days minimum, sign-in events 400 days; right-to-erasure scrubs PII columns but preserves the chained skeleton. Audit storage is separate from operational logs (which go through `Logger` transports).
+- **Security event taxonomy** — audit actions under the `security.*` prefix, each mirrored by a structured log line tagged `securityEvent` so alerting keys off one name:
+  | Event | Trigger | Automatic response |
+  | :--- | :--- | :--- |
+  | `security.token_reuse` | rotated refresh token presented again | family + session revoked |
+  | `security.new_device_login` | successful login from a device/IP unseen for the account | alert email via outbox (`security.new-signin`) |
+  | `security.ip_blocked` | ≥ 30 failed logins from one IP in 15 min (cross-account) | IP temp-blocked for 1 h at Tier-1 |
+  | `security.otp_flooding` (log only) | identifier OTP budget exceeded | delivery suppressed |
+  GeoIP / impossible-travel signals require an external location database and are deferred (tasks M5 notes). Alerts on key-rotation failure and audit-chain breaks are monitoring rules over these logs.
 
 ### 13.4 Notifications
 
@@ -307,22 +317,22 @@ These MUST NOT be built now, but current decisions keep them additive: SAML 2.0 
 - **Graceful shutdown**: drain HTTP, finish in-flight jobs, close DB/Redis (provided by `DatabaseModule` lifecycle, D-14).
 - **Observability**: structured JSON logs with `cid`, metrics (auth success/failure rates, token issuance, PDP latency, queue depth, rate-limit hits), alerts on: token-reuse detections, admin actions, key-rotation failure, audit-chain verification failure.
 - **Backups/DR**: nightly logical backups + WAL archiving; quarterly restore drill; RPO ≤ 5 min, RTO ≤ 1 h (single region).
-- **Container**: current non-root Bun image kept; add `HEALTHCHECK`, pinned base digest, read-only rootfs.
+- **Container**: non-root Bun image (version-pinned tag; CI pins the digest via `--build-arg BUN_IMAGE`), `HEALTHCHECK` on `/health`, prebuilt `dist/` only (no toolchain in the image); production writes no files, so a read-only rootfs is safe. The worker runs the same image with `worker.js`. Operational procedures live in `docs/runbooks.md`.
 
 ## 16. Framework component mapping
 
-| Need | Component | Source |
-| :--- | :--- | :--- |
-| DI, modules, lifecycle | `ShadowFactory`, `@Module`, `OnModuleInit/Destroy` | `@shadow-library/app` |
-| HTTP routing, middleware, error envelope | `HttpController`, `Get/Post/…`, `@Middleware`, `ServerError` | `@shadow-library/fastify` |
-| Request validation / DTO schemas | class decorators → AJV | `@shadow-library/class-schema` |
-| Flow state machines | `FlowManager`, `FlowRegistry` | `@shadow-library/common` |
-| Config, logging, errors | `Config`, `Logger`, error classes | `@shadow-library/common` |
-| L1+L2 cache | `CacheModule` | `@shadow-library/modules` |
-| DB/Redis clients + lifecycle | `DatabaseModule` (≥ 0.5) | `@shadow-library/modules` |
-| Health, OpenAPI docs, CSRF, helmet | `HttpCoreModule` | `@shadow-library/modules` |
-| Login/account UI components | React components | `@shadow-library/ui` |
-| Consumer-side auth | **`@shadow-library/auth` (new)** | `docs/sdk.md` |
+| Need                                     | Component                                                    | Source                         |
+| :--------------------------------------- | :----------------------------------------------------------- | :----------------------------- |
+| DI, modules, lifecycle                   | `ShadowFactory`, `@Module`, `OnModuleInit/Destroy`           | `@shadow-library/app`          |
+| HTTP routing, middleware, error envelope | `HttpController`, `Get/Post/…`, `@Middleware`, `ServerError` | `@shadow-library/fastify`      |
+| Request validation / DTO schemas         | class decorators → AJV                                       | `@shadow-library/class-schema` |
+| Flow state machines                      | `FlowManager`, `FlowRegistry`                                | `@shadow-library/common`       |
+| Config, logging, errors                  | `Config`, `Logger`, error classes                            | `@shadow-library/common`       |
+| L1+L2 cache                              | `CacheModule`                                                | `@shadow-library/modules`      |
+| DB/Redis clients + lifecycle             | `DatabaseModule` (≥ 0.5)                                     | `@shadow-library/modules`      |
+| Health, OpenAPI docs, CSRF, helmet       | `HttpCoreModule`                                             | `@shadow-library/modules`      |
+| Login/account UI components              | React components                                             | `@shadow-library/ui`           |
+| Consumer-side auth                       | **`@shadow-library/auth` (new)**                             | `docs/sdk.md`                  |
 
 ## 17. Sequence diagrams
 

@@ -45,6 +45,21 @@ export class NotificationService {
     await executor.insert(schema.notificationOutbox).values({ templateKey: notification.templateKey, recipients: notification.recipients, payload: notification.payload ?? null });
   }
 
+  /**
+   * Requeues rows stranded in SENDING by an interrupted worker: a crash between claim and outcome
+   * would otherwise park them forever, since only PENDING/FAILED rows are claimable. Safe to run
+   * at worker boot because the dispatch loop runs in exactly one process.
+   */
+  async recoverStuckDeliveries(): Promise<number> {
+    const recovered = await this.db
+      .update(schema.notificationOutbox)
+      .set({ status: 'FAILED', lastError: 'recovered after interrupted delivery' })
+      .where(eq(schema.notificationOutbox.status, 'SENDING'))
+      .returning({ id: schema.notificationOutbox.id });
+    if (recovered.length > 0) this.logger.warn('Recovered interrupted notification deliveries', { count: recovered.length });
+    return recovered.length;
+  }
+
   /** Claims a batch of due notifications, sends them, and records the outcome. Worker-driven. */
   async dispatchPending(limit = 20): Promise<number> {
     const claimed = await this.db.transaction(async tx => {

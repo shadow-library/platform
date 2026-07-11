@@ -33,6 +33,7 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
   private readonly logger = Logger.getLogger(APP_NAME, WorkerService.name);
   private readonly intervalMs = Config.get('worker.poll-interval');
   private timer?: ReturnType<typeof setInterval>;
+  private current: Promise<void> | null = null;
   private running = false;
   private ticks = 0;
 
@@ -41,26 +42,39 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     private readonly maintenanceService: MaintenanceService,
   ) {}
 
-  onApplicationReady(): void {
+  async onApplicationReady(): Promise<void> {
+    /** Deliveries interrupted by the previous worker's crash re-enter the claimable pool first. */
+    await this.notificationService.recoverStuckDeliveries();
     this.timer = setInterval(() => void this.tick(), this.intervalMs);
     this.logger.info('Worker started', { intervalMs: this.intervalMs });
   }
 
-  onApplicationStop(): void {
+  /** Graceful drain: stop scheduling new ticks, then wait for the in-flight one to finish. */
+  async onApplicationStop(): Promise<void> {
     if (this.timer) clearInterval(this.timer);
+    if (this.current) await this.current;
+    this.logger.info('Worker drained and stopped');
   }
 
   private async tick(): Promise<void> {
     if (this.running) return;
     this.running = true;
+    this.current = this.run();
+    try {
+      await this.current;
+    } finally {
+      this.running = false;
+      this.current = null;
+    }
+  }
+
+  private async run(): Promise<void> {
     try {
       const sent = await this.notificationService.dispatchPending();
       if (sent > 0) this.logger.debug('Dispatched notifications', { sent });
       if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) await this.maintenanceService.purgeStaleContactClaims();
     } catch (error) {
       this.logger.error('Worker tick failed', { error });
-    } finally {
-      this.running = false;
     }
   }
 }

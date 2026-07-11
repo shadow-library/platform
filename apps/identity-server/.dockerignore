@@ -1,0 +1,3 @@
+# Only the prebuilt dist/ is copied into the image; keep the context minimal.
+*
+!dist
