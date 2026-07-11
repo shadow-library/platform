@@ -27,6 +27,12 @@ export interface CheckRequest {
   action: string;
 }
 
+export interface AssignmentFilter {
+  principal?: Principal;
+  organisationId?: string;
+  roleId?: number;
+}
+
 export interface Decision {
   decision: 'PERMIT' | 'DENY';
   reasons: string[];
@@ -73,7 +79,19 @@ export class PolicyDecisionService {
     return { decision: 'DENY', reasons: ['no assigned role grants this permission'], authzVersion };
   }
 
-  private async resolvePermissions(principal: Principal, organisationId: string): Promise<Set<string>> {
+  /**
+   * Like `check`, but only permissions owned by the given application count. Permission names are
+   * unique per application, not globally, so an application-scoped admin permission (for example
+   * `app:roles:manage`) must never leak across applications that happen to reuse the name.
+   */
+  async checkForApplication(request: CheckRequest, applicationId: number): Promise<Decision> {
+    const authzVersion = await this.getAuthzVersion(request.principal);
+    const permissions = await this.resolvePermissions(request.principal, request.organisationId, applicationId);
+    if (permissions.has(request.action)) return { decision: 'PERMIT', reasons: [`granted by application-scoped role permission '${request.action}'`], authzVersion };
+    return { decision: 'DENY', reasons: ['no assigned role grants this permission for the application'], authzVersion };
+  }
+
+  private async resolvePermissions(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<string>> {
     const assignments = await this.db
       .select({ roleId: schema.roleAssignments.roleId })
       .from(schema.roleAssignments)
@@ -88,11 +106,15 @@ export class PolicyDecisionService {
     const roleIds = assignments.map(assignment => assignment.roleId);
     if (roleIds.length === 0) return new Set();
 
+    const scope =
+      applicationId === undefined
+        ? inArray(schema.rolePermissions.roleId, roleIds)
+        : and(inArray(schema.rolePermissions.roleId, roleIds), eq(schema.permissions.applicationId, applicationId));
     const rows = await this.db
       .select({ name: schema.permissions.name })
       .from(schema.rolePermissions)
       .innerJoin(schema.permissions, eq(schema.rolePermissions.permissionId, schema.permissions.id))
-      .where(inArray(schema.rolePermissions.roleId, roleIds));
+      .where(scope);
     return new Set(rows.map(row => row.name));
   }
 
@@ -102,8 +124,30 @@ export class PolicyDecisionService {
     return permission.id;
   }
 
+  /** Idempotent variant of `createPermission` for boot-time seeding: tolerates an existing row. */
+  async ensurePermission(applicationId: number, name: string, description?: string): Promise<string> {
+    await this.db.insert(schema.permissions).values({ applicationId, name, description }).onConflictDoNothing();
+    const permission = await this.db.query.permissions.findFirst({ where: and(eq(schema.permissions.applicationId, applicationId), eq(schema.permissions.name, name)) });
+    if (!permission) throw new Error(`Permission '${name}' could not be provisioned`);
+    return permission.id;
+  }
+
   async grantPermissionToRole(roleId: number, permissionId: string): Promise<void> {
     await this.db.insert(schema.rolePermissions).values({ roleId, permissionId }).onConflictDoNothing();
+  }
+
+  async revokePermissionFromRole(roleId: number, permissionId: string): Promise<void> {
+    await this.db.delete(schema.rolePermissions).where(and(eq(schema.rolePermissions.roleId, roleId), eq(schema.rolePermissions.permissionId, permissionId)));
+  }
+
+  async listAssignments(filter: AssignmentFilter): Promise<RoleAssignment[]> {
+    const conditions = [
+      filter.principal ? eq(schema.roleAssignments.principalType, filter.principal.type) : undefined,
+      filter.principal ? eq(schema.roleAssignments.principalId, filter.principal.id) : undefined,
+      filter.organisationId ? eq(schema.roleAssignments.organisationId, BigInt(filter.organisationId)) : undefined,
+      filter.roleId !== undefined ? eq(schema.roleAssignments.roleId, filter.roleId) : undefined,
+    ].filter(condition => condition !== undefined);
+    return this.db.query.roleAssignments.findMany({ where: and(...conditions) });
   }
 
   async assignRole(principal: Principal, roleId: number, organisationId: string, grantedBy?: string): Promise<void> {

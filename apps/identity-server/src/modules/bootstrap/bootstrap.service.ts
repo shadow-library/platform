@@ -10,7 +10,10 @@ import { Config, Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
+import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { OAuthClientService } from '@server/modules/auth/oauth';
+import { PolicyDecisionService } from '@server/modules/authz';
+import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
@@ -21,13 +24,23 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 /**
  * Declaring the constants
  */
-const IAM_ADMIN_ROLE = 'IAMAdmin';
 const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
 
+const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
+  [ADMIN_PERMISSIONS.usersRead]: 'Read user accounts and their security posture',
+  [ADMIN_PERMISSIONS.usersManage]: 'Lock, unlock, reset and lifecycle user accounts',
+  [ADMIN_PERMISSIONS.clientsRead]: 'Read OAuth clients, resources and scopes',
+  [ADMIN_PERMISSIONS.clientsManage]: 'Register and manage OAuth clients, resources and scopes',
+  [ADMIN_PERMISSIONS.rolesManage]: 'Manage roles, permissions and assignments platform-wide',
+  [ADMIN_PERMISSIONS.auditRead]: 'Read audit trails',
+  [ADMIN_PERMISSIONS.appRolesManage]: 'Manage roles and assignments of the owning application only',
+};
+
 /**
  * Idempotently provisions the records the platform cannot run without: the identity application
- * itself, its administrator role, and a bootstrap administrator account. Runs on every boot and
+ * itself, its administrator role and permission taxonomy, the platform organisation that scopes
+ * administrative role assignments, and a bootstrap administrator account. Runs on every boot and
  * is a no-op once the records exist, so it is safe under horizontal scaling and repeated restarts.
  */
 @Injectable()
@@ -39,12 +52,16 @@ export class BootstrapService implements OnModuleInit {
     private readonly applicationRoleService: ApplicationRoleService,
     private readonly userService: UserService,
     private readonly oauthClientService: OAuthClientService,
+    private readonly policyDecisionService: PolicyDecisionService,
+    private readonly organisationService: OrganisationService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.ensurePlatformApplication();
     await this.ensurePlatformScopes();
-    await this.ensureBootstrapAdmin();
+    const organisationId = await this.ensurePlatformOrganisation();
+    await this.ensureAdminAuthorization();
+    await this.ensureBootstrapAdmin(organisationId);
   }
 
   /**
@@ -64,16 +81,42 @@ export class BootstrapService implements OnModuleInit {
     this.logger.info(`Bootstrapped platform application '${APP_NAME}'`, { applicationId: application.id });
   }
 
-  private async ensureBootstrapAdmin(): Promise<void> {
+  /** Administrative role assignments are org-scoped (D-1), so platform admins need a platform org. */
+  private async ensurePlatformOrganisation(): Promise<bigint> {
+    const organisation = await this.organisationService.ensureTeamOrganisation(PLATFORM_ORG_NAME);
+    return organisation.id;
+  }
+
+  /** Seeds the admin permission taxonomy (T-601) and grants all of it to the IAMAdmin role. */
+  private async ensureAdminAuthorization(): Promise<void> {
+    const application = this.applicationService.getApplicationOrThrow(APP_NAME);
+    const role = application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE);
+    if (!role) throw new Error(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`);
+
+    for (const permission of Object.values(ADMIN_PERMISSIONS)) {
+      const permissionId = await this.policyDecisionService.ensurePermission(application.id, permission, ADMIN_PERMISSION_DESCRIPTIONS[permission]);
+      await this.policyDecisionService.grantPermissionToRole(role.id, permissionId);
+    }
+  }
+
+  private async ensureBootstrapAdmin(organisationId: bigint): Promise<void> {
     const email = Config.get('auth.bootstrap.admin-email');
-    if (await this.userService.getUser(email)) return;
+    let admin = await this.userService.getUser(email);
 
-    const configuredPassword = Config.get('auth.bootstrap.admin-password');
-    const password = configuredPassword || this.generatePassword();
-    const admin = await this.userService.createUserWithPassword({ email, password, firstName: 'Platform', lastName: 'Admin', emailVerified: true, status: 'ACTIVE' });
+    if (!admin) {
+      const configuredPassword = Config.get('auth.bootstrap.admin-password');
+      const password = configuredPassword || this.generatePassword();
+      admin = await this.userService.createUserWithPassword({ email, password, firstName: 'Platform', lastName: 'Admin', emailVerified: true, status: 'ACTIVE' });
+      if (!configuredPassword) this.logger.warn(`Generated bootstrap admin password (shown once — sign in and rotate immediately): ${password}`, { email });
+      this.logger.info('Bootstrapped platform administrator', { userId: admin.id, email });
+    }
 
-    if (!configuredPassword) this.logger.warn(`Generated bootstrap admin password (shown once — sign in and rotate immediately): ${password}`, { email });
-    this.logger.info('Bootstrapped platform administrator', { userId: admin.id, email });
+    /** Membership and role assignment run even for a pre-existing admin so upgrades converge. */
+    const application = this.applicationService.getApplicationOrThrow(APP_NAME);
+    const role = application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE);
+    if (!role) throw new Error(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`);
+    await this.organisationService.ensureMember(organisationId, admin.id, 'OWNER');
+    await this.policyDecisionService.assignRole({ type: 'USER', id: admin.id.toString() }, role.id, organisationId.toString());
   }
 
   /** Generates a password that satisfies the strong-password policy without a static literal. */

@@ -87,6 +87,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SEC_004 = new AppErrorCode('SEC_004', ErrorType.UNAUTHORIZED, 'Insufficient scope', 403);
 
   /**
+   * Administration Error Codes
+   */
+
+  /** The session principal lacks the administrative permission for this operation */
+  static readonly ADM_001 = new AppErrorCode('ADM_001', ErrorType.UNAUTHORIZED, 'Insufficient administrative privileges', 403);
+  /** The platform organisation is missing — bootstrap has not run */
+  static readonly ADM_002 = new AppErrorCode('ADM_002', ErrorType.SERVER_ERROR, 'Platform administration is not provisioned', 500);
+
+  /**
    * Organisation Error Codes
    */
 

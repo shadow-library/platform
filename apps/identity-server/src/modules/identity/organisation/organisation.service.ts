@@ -43,6 +43,30 @@ export class OrganisationService {
     return organisation;
   }
 
+  /**
+   * Idempotently provisions a named team organisation. Organisation names carry no unique
+   * constraint, so this must only be called from single-flight contexts (bootstrap) where a
+   * concurrent duplicate insert cannot occur.
+   */
+  async ensureTeamOrganisation(name: string): Promise<Organisation> {
+    const existing = await this.findTeamByName(name);
+    if (existing) return existing;
+    const [organisation] = await this.db.insert(schema.organisations).values({ name, type: 'TEAM', status: 'ACTIVE' }).returning();
+    if (!organisation) throw new Error(`Failed to create organisation '${name}'`);
+    this.logger.info('Created team organisation', { organisationId: organisation.id, name });
+    return organisation;
+  }
+
+  async findTeamByName(name: string): Promise<Organisation | null> {
+    const organisation = await this.db.query.organisations.findFirst({ where: and(eq(schema.organisations.name, name), eq(schema.organisations.type, 'TEAM')) });
+    return organisation ?? null;
+  }
+
+  /** Idempotently adds a member; an existing membership (any role) is left untouched. */
+  async ensureMember(organisationId: bigint, userId: bigint, role: Organisation.MemberRole): Promise<void> {
+    await this.db.insert(schema.organisationMembers).values({ organisationId, userId, role }).onConflictDoNothing();
+  }
+
   async getMembership(userId: bigint, organisationId: bigint): Promise<Organisation.Member | null> {
     const membership = await this.db.query.organisationMembers.findFirst({
       where: and(eq(schema.organisationMembers.userId, userId), eq(schema.organisationMembers.organisationId, organisationId)),
