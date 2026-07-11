@@ -67,11 +67,20 @@ export interface ReviewQueueResult {
   proposals: Generation.ContinuityProposal[];
 }
 
+export interface RoleUsageResult {
+  role: string;
+  calls: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+}
+
 export interface AiUsageResult {
   totalInputTokens: number;
   totalOutputTokens: number;
   totalCostUsd: number;
   callsPerRole: Record<string, number>;
+  roles: RoleUsageResult[];
 }
 
 export interface SearchResult {
@@ -1067,15 +1076,23 @@ export class GenerationService {
     let totalOutputTokens = 0;
     let totalCostUsd = 0;
     const callsPerRole: Record<string, number> = {};
+    const roles: RoleUsageResult[] = [];
 
     for (const row of rows) {
+      const inputTokens = Number(row.inputTokens ?? 0);
+      const outputTokens = Number(row.outputTokens ?? 0);
+      const costUsd = Number(row.costUsd ?? 0);
       callsPerRole[row.role] = row.count;
-      totalInputTokens += Number(row.inputTokens ?? 0);
-      totalOutputTokens += Number(row.outputTokens ?? 0);
-      totalCostUsd += Number(row.costUsd ?? 0);
+      roles.push({ role: row.role, calls: row.count, inputTokens, outputTokens, costUsd });
+      totalInputTokens += inputTokens;
+      totalOutputTokens += outputTokens;
+      totalCostUsd += costUsd;
     }
 
-    return { totalInputTokens, totalOutputTokens, totalCostUsd, callsPerRole };
+    // Busiest roles first so the chart reads left-to-right by workload.
+    roles.sort((a, b) => b.inputTokens + b.outputTokens - (a.inputTokens + a.outputTokens));
+
+    return { totalInputTokens, totalOutputTokens, totalCostUsd, callsPerRole, roles };
   }
 
   // ─── Search ──────────────────────────────────────────────────────────────────

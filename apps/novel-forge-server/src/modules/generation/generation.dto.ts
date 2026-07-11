@@ -668,6 +668,26 @@ export class ListWorkflowRunResponse {
 @Schema({ patternProperties: { '^[a-z_]+$': Integer } })
 export class RoleCallCounts {}
 
+// Per-role usage row: `role` is the open AiRole vocabulary (may contain `:`/`-`, e.g. `bible:plot`),
+// so it stays a plain string rather than a pattern-keyed map.
+@Schema()
+export class RoleUsage {
+  @Field()
+  role: string;
+
+  @Field(() => Integer)
+  calls: number;
+
+  @Field(() => Integer)
+  inputTokens: number;
+
+  @Field(() => Integer)
+  outputTokens: number;
+
+  @Field()
+  costUsd: number;
+}
+
 @Schema()
 export class AiUsageResponse {
   @Field(() => Integer)
@@ -681,6 +701,10 @@ export class AiUsageResponse {
 
   @Field(() => RoleCallCounts)
   callsPerRole: RoleCallCounts;
+
+  // Per-role breakdown (calls + tokens + cost), sorted by total tokens descending.
+  @Field(() => [RoleUsage])
+  roles: RoleUsage[];
 }
 
 @Schema()
