@@ -124,8 +124,15 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     return body.client_id === options.clientId && (options.clientSecret === undefined || body.client_secret === options.clientSecret);
   };
 
+  /** Real-world RPs send form-encoded token requests (RFC 6749 §4.1.3); JSON stays accepted for the SDK. */
+  const readTokenBody = async (request: Request): Promise<Record<string, unknown>> => {
+    const contentType = request.headers.get('content-type') ?? '';
+    if (contentType.includes('application/x-www-form-urlencoded')) return Object.fromEntries(new URLSearchParams(await request.text()));
+    return (await request.json().catch(() => ({}))) as Record<string, unknown>;
+  };
+
   const handleToken = async (request: Request): Promise<Response> => {
-    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    const body = await readTokenBody(request);
     if (!isClientAuthorized(request, body)) return json({ error: 'invalid_client' }, 401);
 
     if (body.grant_type === 'client_credentials') {
@@ -145,7 +152,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       const clientId = options.clientId ?? stored.clientId ?? 'test-client';
       const accessToken = await issueToken({ ...stored, clientId });
       const now = Math.floor(Date.now() / 1000);
-      const idClaims: JwtPayload = { iss: issuer, sub: stored.sub, aud: clientId, iat: now, exp: now + ttl, auth_time: now };
+      /** Extra claims (email, email_verified, …) flow into the ID token so RPs can test claim mapping. */
+      const idClaims: JwtPayload = { iss: issuer, sub: stored.sub, aud: clientId, iat: now, exp: now + ttl, auth_time: now, ...stored.claims };
       if (stored.nonce) idClaims.nonce = stored.nonce;
       const idToken = await signer.sign(idClaims);
       const refreshToken = crypto.randomUUID();
