@@ -1,5 +1,5 @@
 CREATE EXTENSION IF NOT EXISTS vector;--> statement-breakpoint
-CREATE TYPE "public"."content_generator" AS ENUM('standard', 'grok');--> statement-breakpoint
+CREATE TYPE "public"."content_generator" AS ENUM('standard', 'grok', 'human');--> statement-breakpoint
 CREATE TYPE "public"."content_mode" AS ENUM('standard', 'grok_only');--> statement-breakpoint
 CREATE TYPE "public"."project_kind" AS ENUM('source', 'new_novel');--> statement-breakpoint
 CREATE TYPE "public"."chapter_status" AS ENUM('done', 'failed', 'skipped');--> statement-breakpoint
@@ -17,7 +17,7 @@ CREATE TYPE "public"."judge_verdict" AS ENUM('consistent', 'contradiction');--> 
 CREATE TYPE "public"."chat_message_role" AS ENUM('user', 'assistant');--> statement-breakpoint
 CREATE TYPE "public"."chat_scope" AS ENUM('novel', 'bible_document', 'volume_plan', 'volume', 'arc_plan', 'arc', 'brief');--> statement-breakpoint
 CREATE TYPE "public"."chat_session_status" AS ENUM('active', 'archived');--> statement-breakpoint
-CREATE TYPE "public"."refinement_kind" AS ENUM('chat', 'premise_enhance', 'bible_audit', 'arc_plan');--> statement-breakpoint
+CREATE TYPE "public"."refinement_kind" AS ENUM('chat', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract');--> statement-breakpoint
 CREATE TYPE "public"."refinement_proposal_status" AS ENUM('pending', 'applied', 'discarded', 'superseded', 'conflicted');--> statement-breakpoint
 CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('pending', 'in_progress', 'done', 'failed');--> statement-breakpoint
@@ -34,6 +34,7 @@ CREATE TABLE "projects" (
 	"name" varchar(255) NOT NULL,
 	"kind" "project_kind" NOT NULL,
 	"title" varchar(500),
+	"cover_image_path" varchar,
 	"content_mode" "content_mode" DEFAULT 'standard' NOT NULL,
 	"config" jsonb,
 	"brief" text,
@@ -337,6 +338,8 @@ CREATE TABLE "chat_messages" (
 	"content" text NOT NULL,
 	"proposal_id" bigint,
 	"run_id" varchar,
+	"model_provider" varchar,
+	"model_id" varchar,
 	"tokens" integer,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "chat_messages_session_id_ordinal_unique" UNIQUE("session_id","ordinal")
@@ -349,6 +352,8 @@ CREATE TABLE "chat_sessions" (
 	"scope_ref" varchar,
 	"title" varchar(500),
 	"status" "chat_session_status" DEFAULT 'active' NOT NULL,
+	"model_provider" varchar,
+	"model_id" varchar,
 	"summary" text,
 	"summary_through_ordinal" integer DEFAULT 0 NOT NULL,
 	"last_turn_at" timestamp,

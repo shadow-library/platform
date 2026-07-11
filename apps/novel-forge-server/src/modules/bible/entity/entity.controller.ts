@@ -12,7 +12,7 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Que
  */
 import { AppErrorCode } from '@server/classes';
 
-import { CreateEntityBody, EntityKeyParams, EntityProjectParams, EntityResponse, ListEntitiesQuery, ListEntityResponse, UpdateEntityBody } from './entity.dto';
+import { CreateEntityBody, EntityKeyParams, EntityProjectParams, EntityResponse, ListEntitiesQuery, ListEntityResponse, UpdateEntityBody, UploadImageBody } from './entity.dto';
 import { EntityService } from './entity.service';
 
 /**
@@ -57,5 +57,17 @@ export class EntityController {
   @HttpStatus(204)
   deleteEntity(@Params() params: EntityKeyParams): Promise<void> {
     return this.entityService.delete(params.projectId, params.entityKey);
+  }
+
+  @Post('/:entityKey/image')
+  @RespondFor(200, EntityResponse)
+  uploadImage(@Params() params: EntityKeyParams, @Body() body: UploadImageBody): Promise<EntityResponse> {
+    return this.entityService.setImage(params.projectId, params.entityKey, body.image, body.mime) as unknown as Promise<EntityResponse>;
+  }
+
+  @Delete('/:entityKey/image')
+  @RespondFor(200, EntityResponse)
+  deleteImage(@Params() params: EntityKeyParams): Promise<EntityResponse> {
+    return this.entityService.clearImage(params.projectId, params.entityKey) as unknown as Promise<EntityResponse>;
   }
 }

@@ -11,6 +11,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { StorageModule } from '../storage/storage.module';
 import { ArcController } from './arc/arc.controller';
 import { ArcService } from './arc/arc.service';
 import { BibleDocumentController } from './document/bible-document.controller';
@@ -29,7 +30,7 @@ import { VolumeService } from './volume/volume.service';
  */
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, StorageModule],
   controllers: [EntityController, VolumeController, ArcController, BibleDocumentController],
   providers: [EntityService, VolumeService, ArcService, BibleDocumentService],
   exports: [EntityService, VolumeService, ArcService, BibleDocumentService],

@@ -24,6 +24,7 @@ import {
   ResetBody,
   ResetResponse,
   UpdateProjectBody,
+  UploadImageBody,
 } from './project.dto';
 import { ProjectService } from './project.service';
 
@@ -93,5 +94,17 @@ export class ProjectController {
   @RespondFor(200, CostResponse)
   getProjectCost(@Params() params: ProjectParams): Promise<CostResponse> {
     return this.projectService.cost(params.projectId);
+  }
+
+  @Post('/:projectId/cover')
+  @RespondFor(200, ProjectResponse)
+  uploadCover(@Params() params: ProjectParams, @Body() body: UploadImageBody): Promise<ProjectResponse> {
+    return this.projectService.setCover(params.projectId, body.image, body.mime) as unknown as Promise<ProjectResponse>;
+  }
+
+  @Delete('/:projectId/cover')
+  @RespondFor(200, ProjectResponse)
+  deleteCover(@Params() params: ProjectParams): Promise<ProjectResponse> {
+    return this.projectService.clearCover(params.projectId) as unknown as Promise<ProjectResponse>;
   }
 }

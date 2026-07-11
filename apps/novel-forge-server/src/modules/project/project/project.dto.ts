@@ -146,6 +146,10 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   title?: string | null;
 
+  // Storage ref (e.g. `14/cover.png`); the client resolves it to `/api/v1/images/<ref>` for display.
+  @Field({ optional: true, nullable: true })
+  coverImagePath?: string | null;
+
   @Field(() => ContentMode)
   contentMode: Project.ContentMode;
 
@@ -172,6 +176,16 @@ export class ProjectResponse {
 
   @Field(() => String, { format: 'date-time' })
   updatedAt: Date;
+}
+
+@Schema()
+export class UploadImageBody {
+  @Field(() => String, { enum: ['image/png', 'image/jpeg', 'image/webp'] })
+  mime: 'image/png' | 'image/jpeg' | 'image/webp';
+
+  // Base64-encoded image bytes, without the `data:` URL prefix.
+  @Field()
+  image: string;
 }
 
 @Schema({ minProperties: 1 })

@@ -121,6 +121,16 @@ export class EntityResponse {
   updatedAt: Date;
 }
 
+@Schema()
+export class UploadImageBody {
+  @Field(() => String, { enum: ['image/png', 'image/jpeg', 'image/webp'] })
+  mime: 'image/png' | 'image/jpeg' | 'image/webp';
+
+  // Base64-encoded image bytes, without the `data:` URL prefix.
+  @Field()
+  image: string;
+}
+
 @Schema({ minProperties: 1 })
 export class UpdateEntityBody extends PartialType(OmitType(CreateEntityBody, ['entityKey', 'type'] as const)) {}
 

@@ -1,5 +1,5 @@
 {
-  "id": "3630a4c8-b014-493a-a8c4-dd83459aa77c",
+  "id": "8c728bd3-8720-4028-85f3-ca1875f2273f",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -36,6 +36,12 @@
         "title": {
           "name": "title",
           "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "cover_image_path": {
+          "name": "cover_image_path",
+          "type": "varchar",
           "primaryKey": false,
           "notNull": false
         },
@@ -2312,6 +2318,18 @@
           "primaryKey": false,
           "notNull": false
         },
+        "model_provider": {
+          "name": "model_provider",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
         "tokens": {
           "name": "tokens",
           "type": "integer",
@@ -2413,6 +2431,18 @@
           "primaryKey": false,
           "notNull": true,
           "default": "'active'"
+        },
+        "model_provider": {
+          "name": "model_provider",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "model_id": {
+          "name": "model_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
         },
         "summary": {
           "name": "summary",
@@ -4167,7 +4197,8 @@
       "schema": "public",
       "values": [
         "standard",
-        "grok"
+        "grok",
+        "human"
       ]
     },
     "public.content_mode": {
@@ -4334,7 +4365,8 @@
         "chat",
         "premise_enhance",
         "bible_audit",
-        "arc_plan"
+        "arc_plan",
+        "chapter_extract"
       ]
     },
     "public.refinement_proposal_status": {

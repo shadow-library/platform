@@ -11,6 +11,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { StorageModule } from '../storage/storage.module';
 import { ProjectController } from './project/project.controller';
 import { ProjectService } from './project/project.service';
 
@@ -23,7 +24,7 @@ import { ProjectService } from './project/project.service';
  */
 
 @Module({
-  imports: [DatabaseModule],
+  imports: [DatabaseModule, StorageModule],
   controllers: [ProjectController],
   providers: [ProjectService],
   exports: [ProjectService],

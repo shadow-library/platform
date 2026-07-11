@@ -38,6 +38,7 @@ export const projects = pgTable('projects', {
   name: varchar('name', { length: 255 }).notNull().unique(),
   kind: projectKind('kind').notNull(),
   title: varchar('title', { length: 500 }),
+  coverImagePath: varchar('cover_image_path'),
   contentMode: contentMode('content_mode').notNull().default('standard'),
   config: jsonb('config'),
   brief: text('brief'),

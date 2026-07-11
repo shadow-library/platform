@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Injectable } from '@shadow-library/app';
+import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
@@ -27,6 +27,7 @@ import {
   type ResetResponse,
   type UpdateProjectBody,
 } from './project.dto';
+import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
 
 /**
  * Defining types
@@ -43,7 +44,10 @@ export class ProjectService {
   private readonly logger = Logger.getLogger(APP_NAME, ProjectService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -98,6 +102,29 @@ export class ProjectService {
 
   get(id: bigint): Promise<Project.Row | null> {
     return this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) }).then(r => (r ? this.present(r) : null));
+  }
+
+  async setCover(id: bigint, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Project.Row> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
+    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+
+    // Drop the previous cover first so a different extension (png → jpg) never leaves an orphan behind.
+    if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
+    const ref = await this.imageStorage.save(id, 'cover', new Uint8Array(Buffer.from(image, 'base64')), mime);
+
+    const [result] = await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
+    if (!result) throw new ServerError(AppErrorCode.PRJ_001);
+    return this.present(result);
+  }
+
+  async clearCover(id: bigint): Promise<Project.Row> {
+    const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
+    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
+
+    const [result] = await this.db.update(schema.projects).set({ coverImagePath: null, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
+    if (!result) throw new ServerError(AppErrorCode.PRJ_001);
+    return this.present(result);
   }
 
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Row> {

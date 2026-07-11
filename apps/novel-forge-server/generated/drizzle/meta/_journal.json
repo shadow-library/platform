@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783531109141,
+      "when": 1783747421066,
       "tag": "0000_initial_schema",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1783706273244,
-      "tag": "0001_last_maria_hill",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783717219846,
-      "tag": "0002_late_susan_delgado",
       "breakpoints": true
     }
   ]

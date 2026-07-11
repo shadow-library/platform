@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Injectable } from '@shadow-library/app';
+import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
@@ -19,6 +19,7 @@ import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
 import { type CreateEntityBody, type ListEntitiesQuery, type UpdateEntityBody } from './entity.dto';
+import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
 
 /**
  * Defining types
@@ -33,7 +34,10 @@ export class EntityService {
   private readonly logger = Logger.getLogger(APP_NAME, EntityService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -108,6 +112,39 @@ export class EntityService {
 
     if (!result) throw new ServerError(AppErrorCode.ENT_001);
     return result;
+  }
+
+  async setImage(projectId: bigint, entityKey: string, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Knowledge.Entity> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+
+    // Drop the previous file first so a different extension (png → jpg) never leaves an orphan behind.
+    if (entity.imagePath) await this.imageStorage.delete(entity.imagePath);
+    const ref = await this.imageStorage.save(projectId, entityKey, new Uint8Array(Buffer.from(image, 'base64')), mime);
+
+    const [updated] = await this.db
+      .update(schema.entities)
+      .set({ imagePath: ref, updatedAt: new Date() })
+      .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
+      .returning();
+
+    if (!updated) throw new ServerError(AppErrorCode.ENT_001);
+    return updated;
+  }
+
+  async clearImage(projectId: bigint, entityKey: string): Promise<Knowledge.Entity> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (entity.imagePath) await this.imageStorage.delete(entity.imagePath);
+
+    const [updated] = await this.db
+      .update(schema.entities)
+      .set({ imagePath: null, updatedAt: new Date() })
+      .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
+      .returning();
+
+    if (!updated) throw new ServerError(AppErrorCode.ENT_001);
+    return updated;
   }
 
   async delete(projectId: bigint, entityKey: string): Promise<void> {
