@@ -15,11 +15,11 @@ import { defineConfig } from 'drizzle-kit';
  * Declaring the constants
  */
 
-const url = process.env.PRIMARY_DATABASE_URL ?? 'postgresql://admin:password@localhost/shadow_identity';
+const url = process.env.PRIMARY_DATABASE_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_identity';
 
 export default defineConfig({
   out: './generated/drizzle',
   dialect: 'postgresql',
-  schema: './src/modules/database/schemas/index.ts',
+  schema: './src/modules/infrastructure/datastore/schemas/index.ts',
   dbCredentials: { url },
 });

@@ -80,9 +80,12 @@ export const userSignInEvents = pgTable(
   'user_sign_in_events',
   {
     id: uuid('id').primaryKey(),
-    userId: bigint('user_id', { mode: 'bigint' })
-      .notNull()
-      .references(() => users.id, { onDelete: 'cascade' }),
+    /**
+     * Nullable and intentionally without a foreign key: sign-in events are an immutable audit log.
+     * Failed attempts against unknown identifiers have no user, and deleting a user must not erase
+     * their authentication history. The user linkage is maintained at the application layer.
+     */
+    userId: bigint('user_id', { mode: 'bigint' }),
 
     identifier: varchar('identifier', { length: 255 }).notNull(),
     status: signInStatus('status').notNull(),
@@ -96,7 +99,11 @@ export const userSignInEvents = pgTable(
     ipCountry: varchar('ip_country', { length: 2 }),
     userAgent: text('user_agent'),
   },
-  t => [index('user_sign_in_events_user_id_created_at_idx').on(t.userId, t.createdAt, t.status)],
+  t => [
+    index('user_sign_in_events_user_id_created_at_idx').on(t.userId, t.createdAt, t.status),
+    index('user_sign_in_events_identifier_created_at_idx').on(t.identifier, t.createdAt),
+    index('user_sign_in_events_ip_address_created_at_idx').on(t.ipAddress, t.createdAt),
+  ],
 );
 
 /**
