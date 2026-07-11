@@ -2,10 +2,10 @@
 
 | | |
 | :--- | :--- |
-| **Status** | Approved for development |
+| **Status** | v1 implemented (`packages/auth`) |
 | **Version** | 1.0.0 (spec) |
 | **Last updated** | 2026-07-11 |
-| **Repository** | new sibling package `shadow-library/auth` |
+| **Repository** | workspace package `packages/auth` in this repo — the server and SDK share protocol logic, and keeping them together lets the SDK be integration-tested against the real server on every commit |
 | **Runtime** | Bun ≥ 1.3 (WebCrypto Ed25519, native `fetch`); no Node-only APIs |
 
 ## 1. Purpose
@@ -140,3 +140,13 @@ The RP helper owns: PKCE generation/verification, `state`/`nonce` handling, ID-t
 ## 10. Explicit non-goals
 
 No token issuance, no credential storage, no login UI, no session storage backends beyond cookie+memory/Redis adapters, no support for non-Shadow identity providers. Anything issuing or persisting credentials belongs to Shadow Identity itself.
+
+## 11. Implementation notes (v1, `packages/auth`)
+
+Deliberate deviations from this spec in the shipped v1, each to be revisited with T-303:
+
+1. **Monorepo placement.** The package lives at `packages/auth` in the identity repo (Bun workspace), not a sibling repo: server and SDK share protocol logic, and the SDK's integration suite (`tests/sdk/`) runs against the real server on every commit via an injectable `fetch` transport bridged onto the test router.
+2. **JSON token-endpoint bodies.** The identity server parses JSON only, so the SDK sends `application/json` to `/oauth2/token` instead of RFC 6749 form encoding. Internal-ecosystem consistency wins until form parsing lands server-side.
+3. **RP scope.** `createRelyingParty` ships the protocol core — authorization URL with PKCE S256 + `state`/`nonce`, code exchange, ID-token validation (including `nonce`), refresh. App-session cookie management and back-channel logout are the consuming app's responsibility until the session adapters land with T-303.
+4. **`@Principal()`.** The framework's parameter decorators are a fixed set, so the principal is read with `getPrincipal(request)` (the guard attaches it to the request); `@Req()` + `getPrincipal` replaces the spec'd param decorator.
+5. **PDP transport.** `checkAll` fans out to parallel single checks; the batch HTTP endpoint arrives with the PDP batch API.

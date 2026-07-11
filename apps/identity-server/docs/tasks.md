@@ -157,7 +157,7 @@ This is the authoritative build plan to take Shadow Identity from its current st
 - **DoD:** assign a role; PDP returns PERMIT/DENY correctly; grant change bumps version and invalidates cached decisions; authorization-matrix tests pass.
 
 ### T-302 — `@shadow-library/auth` SDK v1 · XL · Sec: Critical
-- Build the sibling package per `docs/sdk.md`: Bun-native Ed25519 verify (JWKS cache + unknown-`kid` refetch), `AuthModule` guards (`@Authenticated`, `@RequirePermission`, `@RequireScope`, `@AllowService`), PDP client (60 s cache), M2M token manager (singleflight), RP helper (PKCE/state/nonce/BCL), `createTestIdP` utilities.
+- Build the package per `docs/sdk.md` as the **in-repo workspace package `packages/auth`** (decision: same repo as the identity server because the two share protocol logic and the SDK is integration-tested against the real server): Bun-native Ed25519 verify (JWKS cache + unknown-`kid` refetch), `AuthModule` guards (`@Authenticated`, `@RequirePermission`, `@RequireScope`, `@AllowService`), PDP client (60 s cache), M2M token manager (singleflight), RP helper (PKCE/state/nonce), `createTestIdP` utilities. Session-cookie adapters and back-channel logout ship with T-303 when the first consumer integrates.
 - **DoD:** a reference consumer service verifies tokens with no network on the hot path, enforces a permission via PDP, and calls another service M2M — all through the SDK; fail-closed behaviour tested.
 
 ### T-303 — Migrate one real service (`pulse-server`) as reference · L

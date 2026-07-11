@@ -23,6 +23,10 @@ Built with **[Bun](https://bun.sh/)** for high performance and modern tooling, i
 > [`docs/auth/`](./docs/auth/), [`docs/sdk.md`](./docs/sdk.md), and [`docs/tasks.md`](./docs/tasks.md).
 > These supersede earlier design notes where they disagree.
 
+> **Repository layout:** this repo hosts both the identity server (`src/`) and the consumer SDK
+> [`@shadow-library/auth`](./packages/auth/README.md) (`packages/auth`, a Bun workspace package).
+> They share protocol logic, and the SDK is integration-tested against the real server on every commit.
+
 ---
 
 ## 🧩 Core Features
