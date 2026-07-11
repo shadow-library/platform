@@ -28,7 +28,7 @@ const inputSchema = z.object({
 const outputSchema = z.string();
 
 export const searchLoreTool: RegisteredTool = {
-  allowedNodes: ['judge', 'review', 'validateWindow'],
+  allowedNodes: ['judge', 'review', 'validateWindow', 'chat-hub'],
   description: 'Search the lore knowledge base for relevant information about characters, factions, locations, or world rules.',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);

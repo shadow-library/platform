@@ -9,7 +9,7 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, between, eq, inArray, isNull, lte, or, sql } from 'drizzle-orm';
+import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -45,6 +45,9 @@ export const FULL_CAST_MAX = 5;
 export const CHAT_STABLE_BUDGET = 14_000;
 export const CHAT_VOLATILE_DELTA_BUDGET = 2_000;
 export const CHAT_PACK_BUDGET = CHAT_STABLE_BUDGET + CHAT_VOLATILE_DELTA_BUDGET;
+// The hub sees the whole project (catalog + full plan + pipeline status), so it gets catalog headroom
+// over the scoped chat budget (chat-hub design §6.1).
+export const CHAT_HUB_BUDGET = 20_000;
 export const CHAT_HISTORY_BUDGET = 6_000;
 export const CHAT_SUMMARY_BUDGET = 1_500;
 export const ARC_PLAN_BUDGET = 16_000;
@@ -587,13 +590,34 @@ export class ContextAssembler {
    * NOT part of the pack — it rides as prompt messages so provider caching can extend across turns.
    */
   async forChatTurn(projectId: bigint, session: ChatScopeInput, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
-    const budgetTokens = opts?.budgetTokens ?? CHAT_PACK_BUDGET;
+    const budgetTokens = opts?.budgetTokens ?? (session.scopeType === 'project' ? CHAT_HUB_BUDGET : CHAT_PACK_BUDGET);
     const refValue = session.scopeRef?.includes(':') ? (session.scopeRef.split(':')[1] ?? '') : (session.scopeRef ?? '');
 
     const sections: ContextSection[] = [];
     let unresolvedRefs: string[] = [];
 
     switch (session.scopeType) {
+      // The hub (chat-hub design §6.1): whole-project canon in the stable segment, live pipeline
+      // state in the volatile tail — the model is both story editor and showrunner here.
+      case 'project': {
+        const [project, docs, volumes, arcs, catalogText] = await Promise.all([
+          this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+          this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
+          this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId), orderBy: schema.volumes.ordinal }),
+          this.db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId), orderBy: [schema.arcs.volumeKey, schema.arcs.ordinal] }),
+          this.catalogService.render(projectId),
+        ]);
+        if (project) sections.push(asStable(makeSection('premise', this.renderPremise(project), 'canonical', ['premise'])));
+        if (docs.length > 0) sections.push(asStable(makeSection('doc_inventory', docs.map(d => `${d.section}/${d.slug}: ${firstLine(d.body)}`).join('\n'), 'canonical', [])));
+        if (volumes.length > 0) sections.push(asStable(makeSection('volume_plan', volumes.map(v => this.renderVolumeLine(v)).join('\n'), 'approved_intent', [])));
+        if (arcs.length > 0) {
+          const lines = arcs.map(a => `${a.arcKey} [${a.volumeKey}] (chs ${a.chapterStart ?? '?'}–${a.chapterEnd ?? '?'}, ${a.status}): ${a.title ?? a.objective ?? ''}`);
+          sections.push(asStable(makeSection('arc_inventory', lines.join('\n'), 'approved_intent', [])));
+        }
+        if (catalogText) sections.push(asStable(makeSection('catalog', catalogText, 'canonical', [])));
+        sections.push(makeSection('pipeline_status', await this.renderPipelineStatus(projectId, project?.storyCurrentChapter ?? 0), 'working', []));
+        break;
+      }
       case 'novel': {
         const [project, docs, volumes, catalogText] = await Promise.all([
           this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
@@ -724,7 +748,34 @@ export class ContextAssembler {
     const changed = await this.changedSince(projectId, session.createdAt);
     if (changed.length > 0) sections.push(makeSection('changed_since', changed.join('\n'), 'working', []));
 
-    return this.finalize(projectId, 'chat', null, sections, unresolvedRefs, budgetTokens, opts && 'dryRun' in opts ? (opts as { dryRun?: boolean }).dryRun : false);
+    const purpose = session.scopeType === 'project' ? 'chat_hub' : 'chat';
+    return this.finalize(projectId, purpose, null, sections, unresolvedRefs, budgetTokens, opts && 'dryRun' in opts ? (opts as { dryRun?: boolean }).dryRun : false);
+  }
+
+  /** The live production picture the hub reasons over: cursor, draft states, stale plans, open work. */
+  private async renderPipelineStatus(projectId: bigint, storyCurrentChapter: number): Promise<string> {
+    const [drafts, staleArcs, staleBriefs, pendingProposals, openJobs] = await Promise.all([
+      this.db.query.drafts.findMany({ where: eq(schema.drafts.projectId, projectId), orderBy: schema.drafts.chapter }),
+      this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), isNotNull(schema.arcs.staleReason)) }),
+      this.db.query.briefs.findMany({ where: and(eq(schema.briefs.projectId, projectId), isNotNull(schema.briefs.staleReason)) }),
+      this.db.$count(schema.refinementProposals, and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.status, 'pending'))),
+      this.db.$count(schema.jobs, and(eq(schema.jobs.projectId, projectId), inArray(schema.jobs.status, ['pending', 'in_progress']))),
+    ]);
+
+    const byReview = new Map<string, number[]>();
+    for (const draft of drafts) {
+      if (!byReview.has(draft.reviewStatus)) byReview.set(draft.reviewStatus, []);
+      byReview.get(draft.reviewStatus)?.push(draft.chapter);
+    }
+    const lines = [
+      `Story cursor (last finalized chapter): ${storyCurrentChapter}`,
+      drafts.length > 0 ? `Drafts: ${[...byReview.entries()].map(([status, chapters]) => `${status} [${chapters.join(', ')}]`).join('; ')}` : 'Drafts: none yet',
+    ];
+    if (staleArcs.length > 0) lines.push(`Stale arcs: ${staleArcs.map(a => `${a.arcKey} (${a.staleReason})`).join(', ')}`);
+    if (staleBriefs.length > 0) lines.push(`Stale briefs: chapters ${staleBriefs.map(b => b.chapter).join(', ')}`);
+    if (pendingProposals > 0) lines.push(`Pending proposals awaiting review: ${pendingProposals}`);
+    if (openJobs > 0) lines.push(`Jobs running or queued: ${openJobs}`);
+    return lines.join('\n');
   }
 
   /** Pack for the arc-plan chain (design §10.3): the volume, its neighbours' handoffs, premise, skeleton, catalog. */

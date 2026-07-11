@@ -30,7 +30,7 @@ const inputSchema = z.object({
 const outputSchema = z.string();
 
 export const getWorldFactsTool: RegisteredTool = {
-  allowedNodes: ['judge', 'validateWindow'],
+  allowedNodes: ['judge', 'validateWindow', 'chat-hub'],
   description: 'Retrieve world facts, optionally filtered by category.',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);

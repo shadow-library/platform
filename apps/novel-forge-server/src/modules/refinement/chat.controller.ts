@@ -22,6 +22,7 @@ import {
   ListChatMessagesResponse,
   ListChatSessionResponse,
   ListChatSessionsQuery,
+  UpdateChatSessionBody,
   UpdateSessionModelBody,
 } from './chat.dto';
 import { ChatService } from './chat.service';
@@ -71,8 +72,16 @@ export class ChatController {
       userMessage: serialiseMessage(r.userMessage),
       assistantMessage: serialiseMessage(r.assistantMessage),
       proposal: r.proposal ? serialiseProposal(r.proposal) : undefined,
+      applied: r.applied,
+      applyNote: r.applyNote,
       runId: r.runId,
     })) as unknown as Promise<ChatTurnResponse>;
+  }
+
+  @Patch('/:sessionId')
+  @RespondFor(200, ChatSessionResponse)
+  updateSession(@Params() params: ChatSessionParams, @Body() body: UpdateChatSessionBody): Promise<ChatSessionResponse> {
+    return this.chatService.updateSession(params.projectId, params.sessionId, body) as unknown as Promise<ChatSessionResponse>;
   }
 
   @Patch('/:sessionId/model')

@@ -88,10 +88,12 @@ describe('Prompt modules', () => {
 
   describe('refinement prompt modules', () => {
     it('registers the five new prompt keys', () => {
-      for (const key of ['premise-enhance', 'bible-audit', 'chat-refine', 'chat-compact', 'arc-plan'] as const) {
+      for (const key of ['premise-enhance', 'bible-audit', 'chat-compact', 'arc-plan'] as const) {
         expect(PROMPT_REGISTRY[key]).toBeDefined();
         expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
       }
+      // chat-refine v2 added the declared-lookup protocol (chat-hub design §6).
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.0.0');
     });
 
     it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
@@ -117,6 +119,17 @@ describe('Prompt modules', () => {
       const onScope = { reply: 'done', changeSet: [{ op: 'brief.update', chapter: 3, title: 'sharper' }] };
       expect(scoped.postValidate?.(onScope as never)).toEqual([]);
       expect(scoped.postValidate?.({ reply: 'just talking' } as never)).toEqual([]);
+    });
+
+    it('gates lookups to the hub scope and keeps them exclusive of change-sets', () => {
+      const lookups = [{ tool: 'search_lore', args: { query: 'x' } }];
+      const scoped = buildChatRefinePrompt('volume');
+      expect(scoped.postValidate?.({ reply: 'checking', lookups } as never)[0]).toMatch(/not available for this scope/);
+
+      const hub = buildChatRefinePrompt('project');
+      expect(hub.postValidate?.({ reply: 'checking', lookups } as never)).toEqual([]);
+      expect(hub.postValidate?.({ reply: 'both', lookups, changeSet: [{ op: 'premise.update', premise: 'x' }] } as never)[0]).toMatch(/never both/);
+      expect(hub.postValidate?.({ reply: 'acting', changeSet: [{ op: 'action.audit_bible' }] } as never)).toEqual([]);
     });
 
     it('validates chat-refine output shape', () => {

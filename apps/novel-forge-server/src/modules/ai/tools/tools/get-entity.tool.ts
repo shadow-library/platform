@@ -30,7 +30,7 @@ const inputSchema = z.object({
 const outputSchema = z.string();
 
 export const getEntityTool: RegisteredTool = {
-  allowedNodes: ['judge', 'review', 'validateWindow'],
+  allowedNodes: ['judge', 'review', 'validateWindow', 'chat-hub'],
   description: 'Retrieve a full entity card by entity key, including name, type, status, body, notes, aliases, and relationships.',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);

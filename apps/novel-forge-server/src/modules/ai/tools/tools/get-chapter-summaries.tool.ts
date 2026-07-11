@@ -33,7 +33,7 @@ const inputSchema = z
 const outputSchema = z.string();
 
 export const getChapterSummariesTool: RegisteredTool = {
-  allowedNodes: ['judge', 'validateWindow'],
+  allowedNodes: ['judge', 'validateWindow', 'chat-hub'],
   description: 'Retrieve chapter summaries for a range of chapters (max 20-chapter span).',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);

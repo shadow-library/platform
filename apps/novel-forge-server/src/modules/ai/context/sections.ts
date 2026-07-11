@@ -15,7 +15,7 @@
  */
 
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
-export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'arc_plan' | 'premise' | 'audit';
+export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with

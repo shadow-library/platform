@@ -19,6 +19,15 @@ import { Field, Schema } from '@shadow-library/class-schema';
  * Declaring the constants
  */
 
+@Schema({ additionalProperties: true })
+export class ChatLookupItem {
+  @Field({ description: 'the lookup tool name, exactly as listed in the playbook' })
+  tool: string;
+
+  @Field(() => Object, { optional: true, additionalProperties: true, description: 'the arguments for the tool' })
+  args?: Record<string, unknown>;
+}
+
 @Schema()
 export class ChatRefineSchema {
   @Field({ minLength: 1, description: 'the conversational reply to the user — ideas, critique, rationale for any proposed changes' })
@@ -26,6 +35,9 @@ export class ChatRefineSchema {
 
   @Field(() => [Object], { optional: true, description: 'change-set ops from the scope allowlist; omit entirely when the turn is discussion only' })
   changeSet?: Record<string, unknown>[];
+
+  @Field(() => [ChatLookupItem], { optional: true, description: 'lookups to run before answering — hub scope only, never alongside a changeSet' })
+  lookups?: { tool: string; args?: Record<string, unknown> }[];
 }
 
 export type ChatRefineOutput = ChatRefineSchema;

@@ -30,7 +30,7 @@ const inputSchema = z.object({
 const outputSchema = z.string();
 
 export const getPlotThreadsTool: RegisteredTool = {
-  allowedNodes: ['judge', 'validateWindow'],
+  allowedNodes: ['judge', 'validateWindow', 'chat-hub'],
   description: 'Retrieve plot threads, optionally filtered by status (open or closed).',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);

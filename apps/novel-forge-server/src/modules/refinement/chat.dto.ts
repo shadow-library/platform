@@ -12,10 +12,10 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
 /**
  * Importing user defined packages
  */
-import { ChatScope, ChatSessionStatus, SortByTime } from '@server/common';
+import { ChatMode, ChatScope, ChatSessionStatus, SortByTime } from '@server/common';
 import { type Refinement } from '@server/database';
 
-import { ProposalResponse } from './refinement.dto';
+import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
 
 /**
  * Defining types
@@ -51,6 +51,18 @@ export class CreateChatSessionBody {
 
   @Field({ optional: true })
   scopeRef?: string;
+
+  @Field({ optional: true })
+  title?: string;
+
+  @Field(() => ChatMode, { optional: true })
+  mode?: Refinement.ChatMode;
+}
+
+@Schema({ minProperties: 1 })
+export class UpdateChatSessionBody {
+  @Field(() => ChatMode, { optional: true })
+  mode?: Refinement.ChatMode;
 
   @Field({ optional: true })
   title?: string;
@@ -94,6 +106,9 @@ export class ChatSessionResponse {
 
   @Field(() => ChatSessionStatus)
   status: Refinement.ChatSessionStatus;
+
+  @Field(() => ChatMode)
+  mode: Refinement.ChatMode;
 
   @Field({ optional: true, nullable: true })
   modelProvider?: string | null;
@@ -174,6 +189,19 @@ export class ChatTurnBody {
   content: string;
 }
 
+// The in-turn apply outcome of an auto-mode turn (chat-hub design §6 step 6).
+@Schema()
+export class TurnAppliedResult {
+  @Field(() => [AppliedArtifactItem])
+  applied: AppliedArtifactItem[];
+
+  @Field(() => [String])
+  staleMarked: string[];
+
+  @Field(() => [OpResultItem])
+  opResults: OpResultItem[];
+}
+
 @Schema()
 export class ChatTurnResponse {
   @Field(() => ChatMessageResponse)
@@ -184,6 +212,12 @@ export class ChatTurnResponse {
 
   @Field(() => ProposalResponse, { optional: true })
   proposal?: ProposalResponse;
+
+  @Field(() => TurnAppliedResult, { optional: true, description: 'present when the session runs in auto mode and this turn applied its change-set' })
+  applied?: TurnAppliedResult;
+
+  @Field({ optional: true, description: 'why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure)' })
+  applyNote?: string;
 
   @Field()
   runId: string;

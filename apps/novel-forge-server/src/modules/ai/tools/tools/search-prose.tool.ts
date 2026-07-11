@@ -31,7 +31,7 @@ const inputSchema = z.object({
 const outputSchema = z.string();
 
 export const searchProseTool: RegisteredTool = {
-  allowedNodes: ['judge', 'review'],
+  allowedNodes: ['judge', 'review', 'chat-hub'],
   description: 'Search the prose index for relevant story passages by query.',
   handler: async (input: unknown, ctx): Promise<unknown> => {
     const parsed = inputSchema.parse(input);

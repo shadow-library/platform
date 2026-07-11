@@ -18,7 +18,10 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler } from '@modules/ai/context/context-assembler.service';
 import { WorkflowRunService } from '@modules/ai/graphs/workflow-run.service';
+import { ToolRegistryService } from '@modules/ai/tools';
+import { ActionExecutorRegistry } from '@modules/refinement/action-registry';
 import { ChatService } from '@modules/refinement/chat.service';
+import { ProposalApplyService } from '@modules/refinement/proposal-apply.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase, schema } from '@server/database';
@@ -69,7 +72,8 @@ describe.if(pgAvailable)('ChatService', () => {
     const assembler = new ContextAssembler(databaseService, new CatalogService(databaseService));
     const workflowRuns = new WorkflowRunService(databaseService, noop, noop, noop, noop, noop);
     const modelRouter = { structured: structuredMock, resolveModel: () => ({ provider: 'xai', model: 'grok-3' }) } as never;
-    chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService));
+    const applier = new ProposalApplyService(databaseService, new ActionExecutorRegistry());
+    chat = new ChatService(databaseService, assembler, modelRouter, workflowRuns, new ProposalService(databaseService), applier, new ToolRegistryService(), noop);
 
     const [project] = await db
       .insert(schema.projects)
@@ -153,5 +157,95 @@ describe.if(pgAvailable)('ChatService', () => {
 
     const compactRun = await db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.graph, 'chat-compact')) });
     expect(compactRun?.status).toBe('completed');
+  });
+
+  it('creates hub sessions defaulting to manual and switches mode via update', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'project', title: 'control hub' });
+    expect(session).toMatchObject({ scopeType: 'project', scopeRef: null, mode: 'manual' });
+
+    const flipped = await chat.updateSession(projectId, session.id, { mode: 'auto', title: 'hub (auto)' });
+    expect(flipped).toMatchObject({ mode: 'auto', title: 'hub (auto)' });
+  });
+
+  it('hub manual turn stages a kind=hub proposal with the full vocabulary incl. actions', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'project' });
+    structuredMock.mockImplementationOnce(async () => ({
+      reply: 'Premise sharpened; kicking off a batch.',
+      changeSet: [
+        { op: 'premise.update', premise: 'hub-refined premise' },
+        { op: 'action.generate_chapters', count: 2 },
+      ],
+    }));
+
+    const result = await chat.turn(projectId, session.id, 'sharpen the premise and generate two chapters');
+    expect(result.proposal).toMatchObject({ status: 'pending', kind: 'hub', scopeType: 'project' });
+    expect(result.applied).toBeUndefined();
+
+    // Manual mode: nothing landed.
+    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    expect(project?.premise).not.toBe('hub-refined premise');
+
+    // The hub playbook rode along with lookup + action vocabularies.
+    const input = structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;
+    expect(input['scopeInstructions']).toContain('action.generate_chapters');
+    expect(input['scopeInstructions']).toContain('Lookup tools available');
+    expect(input['stableContext']).toContain('CANON CATALOG');
+    expect(input['volatileContext']).toContain('Story cursor');
+  });
+
+  it('hub auto turn applies the change-set in the same request with autoApplied provenance', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'project', mode: 'auto' });
+    structuredMock.mockImplementationOnce(async () => ({
+      reply: 'Done — premise updated.',
+      changeSet: [{ op: 'premise.update', premise: 'auto-applied premise' }],
+    }));
+
+    const result = await chat.turn(projectId, session.id, 'tighten the premise hook');
+    expect(result.proposal).toMatchObject({ status: 'applied', autoApplied: true });
+    expect(result.applied?.applied).toEqual([{ artifactRef: 'premise', newRevision: null }]);
+    expect(result.applyNote).toBeUndefined();
+
+    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+    expect(project?.premise).toBe('auto-applied premise');
+  });
+
+  it('auto turn with a finalize action downgrades to a pending proposal with a note', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'project', mode: 'auto' });
+    structuredMock.mockImplementationOnce(async () => ({
+      reply: 'Finalizing everything.',
+      changeSet: [{ op: 'action.finalize' }],
+    }));
+
+    const result = await chat.turn(projectId, session.id, 'finalize the drafted chapters');
+    expect(result.proposal?.status).toBe('pending');
+    expect(result.applied).toBeUndefined();
+    expect(result.applyNote).toContain('never auto-applied');
+  });
+
+  it('executes declared lookups between rounds and audits them in tool_calls', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'project' });
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Checking the lore first.', lookups: [{ tool: 'search_lore', args: { query: 'axiom system' } }] }));
+    structuredMock.mockImplementationOnce(async () => ({ reply: 'Answer grounded in lookups.' }));
+
+    const result = await chat.turn(projectId, session.id, 'what does the canon say about the axiom system?');
+    expect(result.assistantMessage.content).toBe('Answer grounded in lookups.');
+    expect(result.proposal).toBeNull();
+
+    // The retrieval stub throws inside the handler → audited as handler_error; the loop still folds
+    // the error text back into the conversation and re-invokes.
+    const audit = await db.query.toolCalls.findFirst({ where: eq(schema.toolCalls.runId, result.runId) });
+    expect(audit).toMatchObject({ node: 'chat-hub', tool: 'search_lore', status: 'handler_error' });
+  });
+
+  it('caps lookup rounds and falls back to the final reply', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'project' });
+    for (let i = 0; i < 4; i++) {
+      structuredMock.mockImplementationOnce(async () => ({ reply: `still looking ${i}`, lookups: [{ tool: 'get_entity', args: { entityKey: 'hero' } }] }));
+    }
+
+    const result = await chat.turn(projectId, session.id, 'dig through everything');
+    // 1 initial + 3 lookup rounds = 4 calls; the 4th still asked for lookups, so its reply stands alone.
+    expect(result.assistantMessage.content).toBe('still looking 3');
+    expect(result.proposal).toBeNull();
   });
 });

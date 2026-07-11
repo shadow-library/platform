@@ -5,12 +5,15 @@
 /**
  * Importing npm packages
  */
+import { createHash } from 'node:crypto';
+
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { z } from 'zod';
 
 /**
  * Importing user defined packages
@@ -20,6 +23,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { type ChangeOp } from './change-set';
+import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
 import { ProposalService } from './proposal.service';
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
@@ -27,7 +31,9 @@ import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY, buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
+import { RetrievalService } from '../ai/retrieval';
 import { type ChatCompactOutput, type ChatRefineOutput } from '../ai/schemas';
+import { type ToolContext, ToolRegistryService } from '../ai/tools';
 
 /**
  * Defining types
@@ -37,12 +43,15 @@ export interface CreateSessionInput {
   scopeType: Refinement.ChatScope;
   scopeRef?: string;
   title?: string;
+  mode?: Refinement.ChatMode;
 }
 
 export interface ChatTurnResult {
   userMessage: Refinement.ChatMessage;
   assistantMessage: Refinement.ChatMessage;
   proposal: Refinement.Proposal | null;
+  applied?: Pick<ApplyResult, 'applied' | 'staleMarked' | 'opResults'>;
+  applyNote?: string;
   runId: string;
 }
 
@@ -64,6 +73,11 @@ interface SessionListFilter {
 // KEEP_VERBATIM_TURNS messages always stay verbatim.
 const MAX_VERBATIM_TURNS = 12;
 const KEEP_VERBATIM_TURNS = 6;
+
+// Declared-lookup budget for a hub turn (chat-hub design §6 step 4): at most this many lookup rounds
+// execute before the model is told to answer with what it has.
+const MAX_LOOKUP_ROUNDS = 3;
+const CHAT_HUB_NODE = 'chat-hub';
 
 // Which planning discipline each chat scope belongs to. A chat scoped to an arc IS arc-planning
 // work, so it defaults to the model the author configured for arc planning in the project settings —
@@ -90,15 +104,32 @@ export class ChatService {
     private readonly modelRouter: ModelRouterService,
     private readonly workflowRunService: WorkflowRunService,
     private readonly proposalService: ProposalService,
+    private readonly proposalApplyService: ProposalApplyService,
+    private readonly toolRegistry: ToolRegistryService,
+    private readonly retrievalService: RetrievalService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
   async createSession(projectId: bigint, input: CreateSessionInput): Promise<Refinement.ChatSession> {
     const scopeRef = await this.validateScopeRef(projectId, input.scopeType, input.scopeRef ?? null);
-    const [session] = await this.db.insert(schema.chatSessions).values({ projectId, scopeType: input.scopeType, scopeRef, title: input.title }).returning();
+    const [session] = await this.db
+      .insert(schema.chatSessions)
+      .values({ projectId, scopeType: input.scopeType, scopeRef, title: input.title, mode: input.mode ?? 'manual' })
+      .returning();
     if (!session) throw new ServerError(AppErrorCode.CHT_001);
     return session;
+  }
+
+  /** Updates the session's mode and/or title — the mode switch is the manual ⇄ auto toggle (chat-hub design §6.2). */
+  async updateSession(projectId: bigint, sessionId: string, update: { mode?: Refinement.ChatMode; title?: string }): Promise<Refinement.ChatSession> {
+    const session = await this.getSession(projectId, sessionId);
+    const set: Record<string, unknown> = { updatedAt: new Date() };
+    if (update.mode !== undefined) set['mode'] = update.mode;
+    if (update.title !== undefined) set['title'] = update.title;
+    const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
+    if (!updated) throw new ServerError(AppErrorCode.CHT_001);
+    return updated;
   }
 
   /** Resolves and verifies the scope target; the ref grammar is the artifact-ref grammar of the proposals. */
@@ -224,13 +255,8 @@ export class ChatService {
     ]);
 
     const prompt = buildChatRefinePrompt(session.scopeType);
-    const input = {
-      scopeInstructions: renderScopeInstructions(session.scopeType),
-      stableContext: pack.renderedStable,
-      history,
-      volatileContext: pack.renderedVolatile || 'nothing',
-      userMessage: content,
-    };
+    const isHub = session.scopeType === 'project';
+    const scopeInstructions = isHub ? `${renderScopeInstructions(session.scopeType)}\n\n${this.renderLookupVocabulary()}` : renderScopeInstructions(session.scopeType);
 
     // Resolve which model this turn runs on, then inject it as the `config.models.chat` override the
     // router already reads — the turn keeps the `chat` role for prompts/telemetry either way.
@@ -239,11 +265,106 @@ export class ChatService {
     const effectiveProject = { ...project, config: { ...baseConfig, models: { ...(baseConfig.models ?? {}), chat: resolvedModel } } } as typeof project;
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
-      const output = (await this.modelRouter.structured(prompt, input, ctx, effectiveProject as ProjectConfig | undefined)) as ChatRefineOutput;
+      const turnHistory = [...history];
+      const invoke = (): Promise<ChatRefineOutput> => {
+        const input = { scopeInstructions, stableContext: pack.renderedStable, history: turnHistory, volatileContext: pack.renderedVolatile || 'nothing', userMessage: content };
+        return this.modelRouter.structured(prompt, input, ctx, effectiveProject as ProjectConfig | undefined) as Promise<ChatRefineOutput>;
+      };
+
+      // Declared-lookup rounds (chat-hub design §6 step 4): execute the requested read-only tools,
+      // fold the results into the conversation, and re-invoke — bounded, audited, hub-only.
+      let output = await invoke();
+      for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
+        const results = await this.executeLookups(projectId, runId, output.lookups ?? []);
+        const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
+        turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
+        output = await invoke();
+      }
+      // A model that still asks for lookups after the budget note answers with its reply alone.
+      if ((output.lookups?.length ?? 0) > 0) output = { reply: output.reply };
+
       return this.persistTurn(projectId, session, content, output, runId, resolvedModel);
     });
 
+    // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply).
+    if (session.mode === 'auto' && result.proposal) {
+      const settled = await this.autoApply(projectId, result.proposal);
+      return { ...result, ...settled, runId };
+    }
     return { ...result, runId };
+  }
+
+  /** Applies an auto-mode turn's proposal immediately; failures downgrade to a pending proposal with a note, never a failed turn. */
+  private async autoApply(projectId: bigint, proposal: Refinement.Proposal): Promise<Pick<ChatTurnResult, 'proposal' | 'applied' | 'applyNote'>> {
+    try {
+      const applied = await this.proposalApplyService.apply(projectId, proposal.id, { autoApplied: true });
+      return { proposal: applied.proposal, applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults } };
+    } catch (err) {
+      const fresh = await this.proposalService.get(projectId, proposal.id);
+      const note = err instanceof ServerError ? err.getMessage() : err instanceof Error ? err.message : String(err);
+      this.logger.warn(`auto-apply of proposal ${proposal.id} failed: ${note}`);
+      return { proposal: fresh, applyNote: note };
+    }
+  }
+
+  /** The lookup half of the hub playbook: names, argument shapes, and purposes of the read-only tools. */
+  private renderLookupVocabulary(): string {
+    const tools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
+    const lines = tools.map(tool => {
+      const shape = tool.inputSchema instanceof z.ZodObject ? Object.keys(tool.inputSchema.shape).join(', ') : 'see description';
+      return `- ${tool.name} (args: ${shape}) — ${tool.description}`;
+    });
+    return `Lookup tools available this scope (read-only):\n${lines.join('\n')}`;
+  }
+
+  /** Runs declared lookups through the registry handlers with the same audit and budgets as the tool loop. */
+  private async executeLookups(projectId: bigint, runId: string, lookups: { tool: string; args?: Record<string, unknown> }[]): Promise<string> {
+    const rawTools = this.toolRegistry.getRaw(CHAT_HUB_NODE);
+    const ctx: ToolContext = { chapter: null, db: this.db, node: CHAT_HUB_NODE, projectId, retrieval: this.retrievalService, runId };
+    const callCounts = new Map<string, number>();
+    const blocks: string[] = [];
+
+    for (const lookup of lookups) {
+      const rawTool = rawTools.find(t => t.name === lookup.tool);
+      const callCount = (callCounts.get(lookup.tool) ?? 0) + 1;
+      callCounts.set(lookup.tool, callCount);
+      const startedAt = Date.now();
+
+      let resultStr: string;
+      let auditStatus: 'budget_exceeded' | 'handler_error' | 'invalid_args' | 'ok';
+      if (!rawTool) {
+        resultStr = `error: unknown tool '${lookup.tool}'`;
+        auditStatus = 'invalid_args';
+      } else if (callCount > rawTool.maxCallsPerRun) {
+        resultStr = `error: tool '${lookup.tool}' has exceeded its call budget for this turn`;
+        auditStatus = 'budget_exceeded';
+      } else {
+        const parsed = rawTool.inputSchema.safeParse(lookup.args ?? {});
+        if (!parsed.success) {
+          resultStr = `error: ${parsed.error.issues.map(i => `${i.path.join('.')}: ${i.message}`).join('; ')}`;
+          auditStatus = 'invalid_args';
+        } else {
+          try {
+            const result = await rawTool.handler(parsed.data, ctx);
+            resultStr = typeof result === 'string' ? result : JSON.stringify(result);
+            if (rawTool.tokensBudget > 0 && resultStr.length > rawTool.tokensBudget * 4) resultStr = resultStr.slice(0, rawTool.tokensBudget * 4) + '\n...[truncated]';
+            auditStatus = 'ok';
+          } catch (err) {
+            this.logger.error('lookup handler error', { err, tool: lookup.tool });
+            resultStr = 'error: lookup failed';
+            auditStatus = 'handler_error';
+          }
+        }
+      }
+
+      const digest = createHash('sha256').update(resultStr).digest('hex').slice(0, 16);
+      await this.db
+        .insert(schema.toolCalls)
+        .values({ args: lookup.args ?? {}, latencyMs: Date.now() - startedAt, node: CHAT_HUB_NODE, resultDigest: digest, runId, status: auditStatus, tool: lookup.tool })
+        .catch(err => this.logger.error('failed to write lookup audit row', { err }));
+      blocks.push(`### ${lookup.tool}\n${resultStr}`);
+    }
+    return blocks.join('\n\n');
   }
 
   /**
@@ -294,7 +415,7 @@ export class ChatService {
         messageId: assistantMessage.id,
         scopeType: session.scopeType,
         scopeRef: session.scopeRef,
-        kind: 'chat',
+        kind: session.scopeType === 'project' ? 'hub' : 'chat',
         summary: output.reply.split('\n', 1)[0]?.slice(0, 300),
         changeSet: output.changeSet as unknown as ChangeOp[],
         allowedOps: scopeAllowedOps(session.scopeType),
