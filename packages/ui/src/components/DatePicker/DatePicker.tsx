@@ -7,6 +7,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { addDays, addMonths, buildMonthMatrix, cn, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
 import { Input } from '../Input';
@@ -71,9 +72,7 @@ export function DatePicker({
   prefix,
   'aria-label': ariaLabel,
 }: DatePickerProps) {
-  const isControlled = value !== undefined;
-  const [internalValue, setInternalValue] = useState<string | null>(defaultValue);
-  const currentValue = isControlled ? value : internalValue;
+  const [currentValue, setCurrentValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
   const selectedDate = currentValue ? parseISODate(currentValue) : null;
 
   const [open, setOpen] = useState(false);
@@ -111,8 +110,7 @@ export function DatePicker({
   }
 
   function commit(next: string | null): void {
-    if (!isControlled) setInternalValue(next);
-    onValueChange?.(next);
+    setCurrentValue(next);
     setInvalidTyped(false);
   }
 

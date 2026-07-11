@@ -7,6 +7,8 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
+import { CheckIcon } from '@/icons';
 import { cn, pad2 } from '@/lib';
 
 import styles from './TimePicker.module.css';
@@ -68,13 +70,6 @@ function ClockIcon() {
     </svg>
   );
 }
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
-}
 
 /**
  * A time field with a suggestion menu, on 24-hour `HH:MM` strings at the API boundary. Typing is the
@@ -99,9 +94,7 @@ export function TimePicker({
   className,
   'aria-label': ariaLabel,
 }: TimePickerProps) {
-  const isControlled = value !== undefined;
-  const [internal, setInternal] = useState<string | null>(defaultValue);
-  const currentValue = isControlled ? value : internal;
+  const [currentValue, setCurrentValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
   const [text, setText] = useState('');
@@ -128,8 +121,7 @@ export function TimePicker({
   }, [currentValue, hour12]);
 
   function commit(next: string | null): void {
-    if (!isControlled) setInternal(next);
-    onValueChange?.(next);
+    setCurrentValue(next);
     setInvalidTyped(false);
   }
 
@@ -246,7 +238,7 @@ export function TimePicker({
                   onClick={() => selectMinutes(minutes)}
                 >
                   <span>{formatMinutes(minutes, hour12)}</span>
-                  <span className={styles.check}>{selected ? <CheckIcon /> : null}</span>
+                  <span className={styles.check}>{selected ? <CheckIcon strokeWidth={2.5} /> : null}</span>
                 </div>
               );
             })}

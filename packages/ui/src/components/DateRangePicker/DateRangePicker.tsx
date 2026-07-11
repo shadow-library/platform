@@ -7,6 +7,7 @@ import { useState } from 'react';
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { cn, parseISODate } from '@/lib';
 
 import { Button } from '../Button';
@@ -58,16 +59,13 @@ export function DateRangePicker({
   className,
   'aria-label': ariaLabel,
 }: DateRangePickerProps) {
-  const isControlled = value !== undefined;
-  const [internal, setInternal] = useState<DateRange>(defaultValue ?? { start: null, end: null });
-  const current = isControlled ? value : internal;
+  const [current, setCurrent] = useControllableState<DateRange>({ value, defaultValue: defaultValue ?? { start: null, end: null }, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<DateRange>(current);
 
   function commit(next: DateRange): void {
-    if (!isControlled) setInternal(next);
-    onValueChange?.(next);
+    setCurrent(next);
   }
 
   function handleOpenChange(next: boolean): void {

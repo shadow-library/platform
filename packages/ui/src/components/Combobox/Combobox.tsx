@@ -7,6 +7,8 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
+import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './Combobox.module.css';
@@ -20,22 +22,6 @@ function fold(text: string): string {
     .normalize('NFD')
     .replace(/\p{Diacritic}/gu, '')
     .toLowerCase();
-}
-
-function ChevronIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4 6.5L8 10.5L12 6.5' />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
 }
 
 function ClearIcon() {
@@ -76,9 +62,7 @@ export function Combobox({
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledby,
 }: ComboboxProps) {
-  const isControlled = value !== undefined;
-  const [internalValue, setInternalValue] = useState<string | null>(defaultValue);
-  const selectedValue = isControlled ? value : internalValue;
+  const [selectedValue, setSelectedValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
   const [inputValue, setInputValue] = useState('');
@@ -136,8 +120,7 @@ export function Combobox({
 
   function commit(option: ComboboxOption): void {
     if (option.disabled) return;
-    if (!isControlled) setInternalValue(option.value);
-    onValueChange?.(option.value);
+    setSelectedValue(option.value);
     setCommittedLabel(option.label);
     setInputValue(option.label);
     setQuery('');
@@ -155,8 +138,7 @@ export function Combobox({
   }
 
   function clear(): void {
-    if (!isControlled) setInternalValue(null);
-    onValueChange?.(null);
+    setSelectedValue(null);
     setCommittedLabel('');
     setInputValue('');
     setQuery('');
@@ -281,7 +263,7 @@ export function Combobox({
               }
             }}
           >
-            <ChevronIcon />
+            <ChevronDownIcon />
           </button>
         </div>
       </Popover.Anchor>
@@ -338,7 +320,7 @@ export function Combobox({
                       <span className={styles.optionLabel}>{option.label}</span>
                       {option.description != null ? <span className={styles.optionDescription}>{option.description}</span> : null}
                     </span>
-                    <span className={styles.check}>{selected ? <CheckIcon /> : null}</span>
+                    <span className={styles.check}>{selected ? <CheckIcon strokeWidth={2.5} /> : null}</span>
                   </div>
                 );
               })

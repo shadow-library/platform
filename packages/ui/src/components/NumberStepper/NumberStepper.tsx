@@ -6,6 +6,7 @@ import { type ChangeEvent, forwardRef, useEffect, useRef, useState } from 'react
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './NumberStepper.module.css';
@@ -74,9 +75,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   },
   ref,
 ) {
-  const isControlled = value !== undefined;
-  const [internalValue, setInternalValue] = useState<number | null>(defaultValue);
-  const current = isControlled ? value : internalValue;
+  const [current, setCurrent] = useControllableState<number | null>({ value, defaultValue, onChange: onValueChange });
 
   const format = (input: number): string => (precision != null ? input.toFixed(precision) : String(input));
   const [text, setText] = useState(current != null ? format(current) : '');
@@ -96,8 +95,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   }
 
   function commit(next: number | null): void {
-    if (!isControlled) setInternalValue(next);
-    onValueChange?.(next);
+    setCurrent(next);
     setInvalidTyped(false);
   }
 

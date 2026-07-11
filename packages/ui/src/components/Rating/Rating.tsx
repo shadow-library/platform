@@ -6,6 +6,7 @@ import { type KeyboardEvent, useState } from 'react';
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './Rating.module.css';
@@ -42,9 +43,7 @@ export function Rating({
   reviewCount,
   'aria-label': ariaLabel,
 }: RatingProps) {
-  const isControlled = value !== undefined;
-  const [internal, setInternal] = useState(defaultValue);
-  const current = isControlled ? value : internal;
+  const [current, setCurrent] = useControllableState({ value, defaultValue, onChange: onValueChange });
   const [hover, setHover] = useState<number | null>(null);
 
   const stars = Array.from({ length: max }, (_, index) => index + 1);
@@ -71,8 +70,7 @@ export function Rating({
   }
 
   function commit(next: number): void {
-    if (!isControlled) setInternal(next);
-    onValueChange?.(next);
+    setCurrent(next);
   }
 
   function activate(star: number): void {

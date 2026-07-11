@@ -6,6 +6,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { addDays, addMonths, buildMonthMatrix, cn, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
 import styles from './Calendar.module.css';
@@ -61,9 +62,11 @@ export function Calendar({
 }: CalendarProps) {
   // Multi-month views hide adjacent-month days by default so a boundary date never appears in both grids.
   const renderOutsideDays = showOutsideDays ?? months === 1;
-  const isControlled = value !== undefined;
-  const [internal, setInternal] = useState<CalendarValue>(defaultValue ?? (mode === 'multiple' ? [] : mode === 'range' ? { start: null, end: null } : null));
-  const current = isControlled ? value : internal;
+  const [current, setCurrent] = useControllableState<CalendarValue>({
+    value,
+    defaultValue: defaultValue ?? (mode === 'multiple' ? [] : mode === 'range' ? { start: null, end: null } : null),
+    onChange: onValueChange,
+  });
 
   const firstSelected = useMemo(() => {
     if (mode === 'single' && typeof current === 'string') return parseISODate(current);
@@ -98,8 +101,7 @@ export function Calendar({
   }
 
   function commit(next: CalendarValue): void {
-    if (!isControlled) setInternal(next);
-    onValueChange?.(next);
+    setCurrent(next);
   }
 
   function selectDate(date: Date): void {

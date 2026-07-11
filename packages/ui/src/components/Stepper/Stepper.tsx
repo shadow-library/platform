@@ -6,6 +6,7 @@ import { Children, isValidElement, type ReactElement, type ReactNode, useRef, us
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
 import { Button } from '../Button';
@@ -58,9 +59,8 @@ function StepperRoot({
     .map(child => child.props);
   const total = steps.length;
 
-  const isControlled = current !== undefined;
-  const [internal, setInternal] = useState(defaultCurrent);
-  const index = Math.min(isControlled ? current : internal, Math.max(0, total - 1));
+  const [activeStep, setActiveStep] = useControllableState({ value: current, defaultValue: defaultCurrent, onChange: onCurrentChange });
+  const index = Math.min(activeStep, Math.max(0, total - 1));
 
   const [completed, setCompleted] = useState<Set<string>>(new Set());
   const [skipped, setSkipped] = useState<Set<string>>(new Set());
@@ -81,8 +81,7 @@ function StepperRoot({
 
   function goTo(next: number): void {
     if (next < 0 || next >= total) return;
-    if (!isControlled) setInternal(next);
-    onCurrentChange?.(next);
+    setActiveStep(next);
   }
 
   function stateOf(step: StepperStepProps, i: number): StepState {

@@ -7,6 +7,8 @@ import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
+
 import { Kbd } from '../Kbd';
 import styles from './CommandPalette.module.css';
 import { type CommandItem, type CommandPaletteProps } from './CommandPalette.types';
@@ -55,9 +57,7 @@ export function CommandPalette({
   placeholder = 'Type a command or search…',
   emptyMessage = 'No results',
 }: CommandPaletteProps) {
-  const isControlled = open !== undefined;
-  const [internalOpen, setInternalOpen] = useState(defaultOpen);
-  const isOpen = isControlled ? open : internalOpen;
+  const [isOpen, setOpenState] = useControllableState({ value: open, defaultValue: defaultOpen, onChange: onOpenChange });
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -65,8 +65,7 @@ export function CommandPalette({
   const listId = useId();
 
   function setOpen(next: boolean): void {
-    if (!isControlled) setInternalOpen(next);
-    onOpenChange?.(next);
+    setOpenState(next);
     if (next) {
       setQuery('');
       setActiveIndex(0);

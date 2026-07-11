@@ -7,6 +7,8 @@ import { type KeyboardEvent, type PointerEvent, useState } from 'react';
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
+import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './ColorPicker.module.css';
@@ -119,22 +121,6 @@ function contrastColor(hex: string): string {
   return 0.299 * r + 0.587 * g + 0.114 * b > 140 ? '#000000' : '#ffffff';
 }
 
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
-}
-
-function ChevronIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4 6.5L8 10.5L12 6.5' />
-    </svg>
-  );
-}
-
 /**
  * A swatch trigger opening a palette-first surface. Curated swatches are a radiogroup, each named by its
  * meaning ("Indigo", "Team purple"), never a bare hex. When `allowCustom`, a "Custom…" disclosure reveals
@@ -156,9 +142,7 @@ export function ColorPicker({
   className,
   'aria-label': ariaLabel = 'Color',
 }: ColorPickerProps) {
-  const isControlled = value !== undefined;
-  const [internal, setInternal] = useState(defaultValue);
-  const current = isControlled ? value : internal;
+  const [current, setCurrent] = useControllableState({ value, defaultValue, onChange: onValueChange });
 
   const hasPalette = palette.length > 0;
   const [open, setOpen] = useState(false);
@@ -172,8 +156,7 @@ export function ColorPicker({
 
   // Sets the value live but leaves the hex text alone — so typing in the hex field is never re-mangled.
   function setColor(next: string): void {
-    if (!isControlled) setInternal(next);
-    onValueChange?.(next);
+    setCurrent(next);
     setHexInvalid(false);
   }
 
@@ -302,7 +285,7 @@ export function ColorPicker({
           <span className={styles.triggerSwatch} style={{ background: current }} />
           <span className={styles.triggerHex}>{current}</span>
           <span className={styles.triggerChevron} aria-hidden='true'>
-            <ChevronIcon />
+            <ChevronDownIcon />
           </span>
         </button>
       </Popover.Trigger>
@@ -328,7 +311,7 @@ export function ColorPicker({
                   >
                     {selected ? (
                       <span className={styles.swatchCheck} style={{ color: contrastColor(swatch.value) }}>
-                        <CheckIcon />
+                        <CheckIcon strokeWidth={2.5} />
                       </span>
                     ) : null}
                   </button>

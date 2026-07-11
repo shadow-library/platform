@@ -6,6 +6,7 @@ import { type ChangeEvent, type ClipboardEvent, forwardRef, type KeyboardEvent, 
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { cn, mergeRefs } from '@/lib';
 
 import styles from './TokenInput.module.css';
@@ -48,9 +49,7 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
   },
   ref,
 ) {
-  const isControlled = value !== undefined;
-  const [internal, setInternal] = useState<TokenValue[]>(defaultValue);
-  const tokens = isControlled ? value : internal;
+  const [tokens, setTokens] = useControllableState<TokenValue[]>({ value, defaultValue, onChange: onValueChange });
 
   const [draft, setDraft] = useState('');
   const [selected, setSelected] = useState<number | null>(null);
@@ -67,8 +66,7 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
   }
 
   function commitTokens(next: TokenValue[]): void {
-    if (!isControlled) setInternal(next);
-    onValueChange?.(next);
+    setTokens(next);
   }
 
   function addValues(rawValues: string[]): void {

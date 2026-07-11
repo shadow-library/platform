@@ -7,6 +7,8 @@ import { type KeyboardEvent, type MouseEvent, useId, useMemo, useRef, useState }
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
+import { CheckIcon, ChevronDownIcon } from '@/icons';
 import { cn } from '@/lib';
 
 import styles from './MultiSelect.module.css';
@@ -15,22 +17,6 @@ import { type MultiSelectOption, type MultiSelectProps } from './MultiSelect.typ
 /**
  * Declaring the constants
  */
-function ChevronIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4 6.5L8 10.5L12 6.5' />
-    </svg>
-  );
-}
-
-function CheckIcon() {
-  return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
-    </svg>
-  );
-}
-
 function CloseIcon() {
   return (
     <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' aria-hidden='true'>
@@ -67,13 +53,8 @@ export function MultiSelect({
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledby,
 }: MultiSelectProps) {
-  const isControlled = value !== undefined;
-  const [internalValue, setInternalValue] = useState<string[]>(defaultValue ?? []);
-  const selected = isControlled ? value : internalValue;
-
-  const isOpenControlled = open !== undefined;
-  const [internalOpen, setInternalOpen] = useState(defaultOpen ?? false);
-  const isOpen = isOpenControlled ? open : internalOpen;
+  const [selected, setSelected] = useControllableState<string[]>({ value, defaultValue: defaultValue ?? [], onChange: onValueChange });
+  const [isOpen, setOpenState] = useControllableState({ value: open, defaultValue: defaultOpen ?? false, onChange: onOpenChange });
 
   const [query, setQuery] = useState('');
   const [activeIndex, setActiveIndex] = useState(0);
@@ -98,13 +79,11 @@ export function MultiSelect({
   }, [filtered, selectAll]);
 
   function commit(next: string[]): void {
-    if (!isControlled) setInternalValue(next);
-    onValueChange?.(next);
+    setSelected(next);
   }
 
   function setOpen(next: boolean): void {
-    if (!isOpenControlled) setInternalOpen(next);
-    onOpenChange?.(next);
+    setOpenState(next);
     if (next) {
       setQuery('');
       setActiveIndex(
@@ -226,7 +205,7 @@ export function MultiSelect({
           {overflow > 0 ? <span className={styles.overflow}>+{overflow}</span> : null}
         </span>
         <span className={styles.chevron}>
-          <ChevronIcon />
+          <ChevronDownIcon />
         </span>
       </Popover.Trigger>
 
@@ -286,7 +265,7 @@ export function MultiSelect({
                 onClick={toggleSelectAll}
               >
                 <span className={styles.checkbox} data-checked={allSelected || undefined} data-indeterminate={!allSelected && someSelected ? 'true' : undefined}>
-                  {allSelected ? <CheckIcon /> : !allSelected && someSelected ? <span className={styles.dash} /> : null}
+                  {allSelected ? <CheckIcon strokeWidth={2.5} /> : !allSelected && someSelected ? <span className={styles.dash} /> : null}
                 </span>
                 <span className={styles.optionLabel}>Select all</span>
               </div>
@@ -315,7 +294,7 @@ export function MultiSelect({
                     onClick={() => !rowDisabled && toggle(option)}
                   >
                     <span className={styles.checkbox} data-checked={checked || undefined}>
-                      {checked ? <CheckIcon /> : null}
+                      {checked ? <CheckIcon strokeWidth={2.5} /> : null}
                     </span>
                     <span className={styles.optionLabel}>{option.label}</span>
                   </div>
