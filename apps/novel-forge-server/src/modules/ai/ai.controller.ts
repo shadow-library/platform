@@ -27,6 +27,9 @@ import { MODEL_REGISTRY } from './models';
 // options whose `enabled` reflects the server flag that gates them, and whose `id` is the CLI model alias.
 const SUBPROCESS_OPTIONS: { id: string; provider: string; label: string; flag: 'ai.claude-code.enabled' | 'ai.codex.enabled' | 'ai.grok-build.enabled' }[] = [
   // The `id` is passed to the CLI as its model alias (`claude --model <id>` / codex + grok-build default).
+  // `fable`/`opus`/`sonnet`/`haiku` are the aliases the `claude` CLI accepts for its latest models.
+  { id: 'fable', provider: 'anthropic-claude-code', label: 'Claude Code · Fable', flag: 'ai.claude-code.enabled' },
+  { id: 'opus', provider: 'anthropic-claude-code', label: 'Claude Code · Opus', flag: 'ai.claude-code.enabled' },
   { id: 'sonnet', provider: 'anthropic-claude-code', label: 'Claude Code · Sonnet', flag: 'ai.claude-code.enabled' },
   { id: 'haiku', provider: 'anthropic-claude-code', label: 'Claude Code · Haiku', flag: 'ai.claude-code.enabled' },
   { id: 'codex', provider: 'openai-codex', label: 'Codex (CLI)', flag: 'ai.codex.enabled' },
