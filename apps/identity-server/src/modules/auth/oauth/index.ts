@@ -1,5 +1,6 @@
 export * from './access-token.service';
 export * from './authorization-code.service';
+export * from './consent.service';
 export * from './oauth-client.service';
 export * from './oauth.controller';
 export * from './oauth.dto';

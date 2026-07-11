@@ -8,7 +8,7 @@ import { createHash, randomBytes } from 'node:crypto';
  * Importing user defined packages
  */
 import { KeyService } from '@server/modules/auth/keys';
-import { OAuthClientService } from '@server/modules/auth/oauth';
+import { ConsentService, OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -232,6 +232,26 @@ describe('OAuth authorization-code flow', () => {
       .headers({ authorization: basic(clientId, secret) })
       .body({ token: 'garbage' });
     expect(response.json()).toMatchObject({ active: false });
+  });
+
+  it('should record first-party consent and revoke tokens on withdrawal', async () => {
+    const { refresh_token } = await codeFlow();
+
+    const consents = await env.getService(ConsentService).listForUser(userId);
+    const consent = consents.find(entry => entry.clientId === clientId);
+    expect(consent?.source).toBe('FIRST_PARTY_POLICY');
+    expect(consent?.scopeNames).toContain('openid');
+
+    await env.getService(ConsentService).withdraw(userId, clientId);
+
+    const introspect = await env
+      .getRouter()
+      .mockRequest()
+      .post('/oauth2/introspect')
+      .headers({ authorization: basic(clientId, secret) })
+      .body({ token: refresh_token });
+    expect(introspect.json()).toMatchObject({ active: false });
+    expect(await env.getService(ConsentService).getActive(userId, clientId)).toBeNull();
   });
 
   it('should issue a client-credentials token scoped to granted scopes', async () => {

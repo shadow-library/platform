@@ -19,6 +19,7 @@ import { OAuthClient } from '@server/modules/infrastructure/datastore';
 
 import { AccessTokenService } from './access-token.service';
 import { AuthorizationCodeService } from './authorization-code.service';
+import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
 import { verifyPkce } from './pkce';
 
@@ -93,6 +94,7 @@ export class OAuthService {
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
     private readonly keyService: KeyService,
+    private readonly consentService: ConsentService,
   ) {}
 
   /** RFC 7009 token revocation: revokes the refresh-token family. Always succeeds (even if unknown). */
@@ -142,6 +144,13 @@ export class OAuthService {
 
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) return { kind: 'login' };
+
+    const scopes = params.scope.split(' ').filter(Boolean);
+    if (client.isFirstParty) {
+      await this.consentService.record(session.userId, client.id, scopes, 'FIRST_PARTY_POLICY');
+    } else if (!(await this.consentService.getActive(session.userId, client.id))) {
+      return { kind: 'login' };
+    }
 
     const code = await this.codeService.issue({
       clientId: client.id,
