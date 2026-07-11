@@ -85,7 +85,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] H2 — Op grammar extension: `draft.update`, `brief.remove`, `action.*` vocabulary + validation, `draft:` artifact-state refs, `renderActionVocabulary`, hub playbook + `SCOPE_CHAT_ROLE.project` (chat-hub §4). Verify: grammar unit tests.
 - [x] H3 — Apply engine v2: cherry-pick `opIndexes`, inverse-op capture + `postState`, new appliers, `revert`, rollback-to-point, `ActionExecutorRegistry` + `HubActionsModule`, `/revert` `/changes` `/changes/rollback` endpoints (chat-hub §5). Verify: apply/revert round-trip matrix, rollback ordering tests.
 - [x] H4 — Hub chat turn v2: `forHubTurn` pack + `chat_hub` budget, chat prompt v2 with declared lookups (max 3 rounds, audited), session `mode` PATCH + hub scope, auto-mode in-turn apply, render goldens (chat-hub §6). Verify: mocked-model e2e both modes + lookup-loop tests.
-- [ ] H5 — Hub verification sweep: full suite green, doc cross-links, `ai:smoke` still passing (chat-hub §8).
+- [x] H5 — Hub verification sweep: full suite green, doc cross-links, `ai:smoke` still passing (chat-hub §8).
 - [ ] H6 — Web UI (`novel-forge-web`): hub-first chat screen, mode toggle, per-op proposal cards with diffs + apply-selected, applied/revert cards, action chips, change-history timeline with rollback (chat-hub §7). Verify: web type-check/lint/build green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
