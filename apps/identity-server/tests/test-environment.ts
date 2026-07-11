@@ -44,7 +44,8 @@ export class TestEnvironment {
   private readonly databaseName: string;
 
   constructor(databaseSuffix: string) {
-    this.databaseName = `${baseConnectionString.split('/').pop()}_${databaseSuffix}`;
+    const suffix = databaseSuffix.replace(/[^a-z0-9]+/gi, '_').toLowerCase();
+    this.databaseName = `${baseConnectionString.split('/').pop()}_${suffix}`;
   }
 
   init(): this {
@@ -63,6 +64,10 @@ export class TestEnvironment {
 
   getRouter(): FastifyRouter {
     return this.app.get(Router);
+  }
+
+  getDatabaseService(): DatabaseService {
+    return this.app.get(DatabaseService);
   }
 
   getPostgresClient(): PrimaryDatabase {

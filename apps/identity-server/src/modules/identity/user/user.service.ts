@@ -6,7 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { SQL, eq } from 'drizzle-orm';
+import { SQL, eq, inArray } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import validator, { StrongPasswordOptions } from 'validator';
 
@@ -15,7 +15,7 @@ import validator, { StrongPasswordOptions } from 'validator';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
-import { DatabaseService, ID, OpResult, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, ID, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types
@@ -71,6 +71,18 @@ export class UserService {
     else if (identifier.startsWith('+')) return { table: 'userPhones', sql: eq(schema.userPhones.phoneNumber, identifier) };
     else if (identifier.includes('@')) return { table: 'userEmails', sql: eq(schema.userEmails.emailId, identifier.toLowerCase()) };
     else return { table: 'users', sql: eq(schema.users.username, identifier) };
+  }
+
+  /**
+   * Resolves an identifier filter to a condition on `users.id`. For email/phone lookups the
+   * predicate must select the matching user id from the child table: a Drizzle relational
+   * `with.where` filters the joined child rows, not the parent, so it would silently match the
+   * first user in the table.
+   */
+  private resolveUserCondition(filter: FindUserFilter): SQL {
+    if (filter.table === 'users') return filter.sql;
+    const table = filter.table === 'userEmails' ? schema.userEmails : schema.userPhones;
+    return inArray(schema.users.id, this.db.select({ id: table.userId }).from(table).where(filter.sql));
   }
 
   async createUserWithPassword(data: CreateUser): Promise<UserDetails> {
@@ -133,33 +145,20 @@ export class UserService {
   }
 
   async getUser(identifier: ID): Promise<User | null> {
-    const filter = this.buildWhereClause(identifier);
-    let user: User | undefined;
-    if (filter.table === 'users') user = await this.db.query.users.findFirst({ where: filter.sql });
-    else if (filter.table === 'userEmails') user = await this.db.query.users.findFirst({ with: { emails: { where: filter.sql } } });
-    else if (filter.table === 'userPhones') user = await this.db.query.users.findFirst({ with: { phones: { where: filter.sql } } });
+    const condition = this.resolveUserCondition(this.buildWhereClause(identifier));
+    const user = await this.db.query.users.findFirst({ where: condition });
     return user ?? null;
   }
 
   async updateUserStatus(identifier: ID, status: User.Status): Promise<void> {
-    const filter = this.buildWhereClause(identifier);
-    const update = this.db.update(schema.users).set({ status });
-    let result: OpResult = [];
-    if (filter.table === 'users') {
-      result = await update
-        .where(filter.sql)
-        .returning({ id: schema.users.id })
-        .catch(error => this.databaseService.translateError(error));
-      this.logger.debug('user status updated using users table', { userId: identifier, status, result });
-    } else {
-      const table = filter.table === 'userEmails' ? schema.userEmails : schema.userPhones;
-      result = await update
-        .from(table)
-        .where(filter.sql)
-        .returning({ id: schema.users.id })
-        .catch(error => this.databaseService.translateError(error));
-      this.logger.debug('user status updated using related table', { userId: identifier, status, table: filter.table, result });
-    }
+    const condition = this.resolveUserCondition(this.buildWhereClause(identifier));
+    const result = await this.db
+      .update(schema.users)
+      .set({ status, updatedAt: new Date() })
+      .where(condition)
+      .returning({ id: schema.users.id })
+      .catch(error => this.databaseService.translateError(error));
     if (result.length === 0) throw new ServerError(AppErrorCode.USR_001);
+    this.logger.debug('user status updated', { identifier, status, count: result.length });
   }
 }
