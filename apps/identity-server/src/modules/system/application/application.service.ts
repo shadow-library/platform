@@ -114,6 +114,17 @@ export class ApplicationService implements OnModuleInit {
     return application;
   }
 
+  getApplicationById(id: number): ApplicationDetails | null {
+    for (const application of this.cache.values()) if (application.id === id) return application;
+    return null;
+  }
+
+  getApplicationByIdOrThrow(id: number): ApplicationDetails {
+    const application = this.getApplicationById(id);
+    if (!application) throw new ServerError(AppErrorCode.APP_001);
+    return application;
+  }
+
   listApplications(): Application[] {
     return Array.from(this.cache.values());
   }

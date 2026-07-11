@@ -10,7 +10,7 @@ import { Redis } from 'ioredis';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, PrimaryDatabase, RoleAssignment, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, Permission, PrimaryDatabase, RoleAssignment, schema } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types
@@ -130,6 +130,15 @@ export class PolicyDecisionService {
     const permission = await this.db.query.permissions.findFirst({ where: and(eq(schema.permissions.applicationId, applicationId), eq(schema.permissions.name, name)) });
     if (!permission) throw new Error(`Permission '${name}' could not be provisioned`);
     return permission.id;
+  }
+
+  async getPermission(permissionId: string): Promise<Permission | null> {
+    const permission = await this.db.query.permissions.findFirst({ where: eq(schema.permissions.id, permissionId) });
+    return permission ?? null;
+  }
+
+  async listPermissionsForApplication(applicationId: number): Promise<Permission[]> {
+    return this.db.query.permissions.findMany({ where: eq(schema.permissions.applicationId, applicationId) });
   }
 
   async grantPermissionToRole(roleId: number, permissionId: string): Promise<void> {

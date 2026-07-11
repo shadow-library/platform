@@ -42,6 +42,11 @@ export class ApplicationRoleService {
     this.db = databaseService.getPostgresClient();
   }
 
+  async getRole(roleId: number): Promise<Application.Role | null> {
+    const role = await this.db.query.applicationRoles.findFirst({ where: eq(schema.applicationRoles.id, roleId) });
+    return role ?? null;
+  }
+
   async addRole(service: string, newRole: IRole): Promise<Application.Role> {
     const application = this.applicationService.getApplicationOrThrow(service);
     const data = { applicationId: application.id, roleName: newRole.roleName, description: newRole.description };

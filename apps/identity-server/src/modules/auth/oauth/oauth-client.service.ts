@@ -11,7 +11,7 @@ import { and, eq, gt, isNull, or } from 'drizzle-orm';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, OAuthClient, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, Scope, schema } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types
@@ -125,6 +125,74 @@ export class OAuthClientService {
 
   async rotateSecret(clientId: string): Promise<string> {
     return this.createSecret(clientId);
+  }
+
+  /**
+   * Dual-secret rotation (T-201): the new secret is live immediately while previous secrets stay
+   * valid for the overlap window, so running consumers can re-configure without an outage.
+   */
+  async rotateSecretWithOverlap(clientId: string, overlapHours = 24): Promise<{ secret: string; previousSecretsExpireAt: Date }> {
+    const previousSecretsExpireAt = new Date(Date.now() + overlapHours * 3_600_000);
+    await this.db
+      .update(schema.oauthClientSecrets)
+      .set({ expiresAt: previousSecretsExpireAt })
+      .where(and(eq(schema.oauthClientSecrets.clientId, clientId), isNull(schema.oauthClientSecrets.revokedAt)));
+    const secret = await this.createSecret(clientId);
+    return { secret, previousSecretsExpireAt };
+  }
+
+  async revokeScope(clientId: string, scopeId: string): Promise<void> {
+    await this.db.delete(schema.oauthClientScopeGrants).where(and(eq(schema.oauthClientScopeGrants.clientId, clientId), eq(schema.oauthClientScopeGrants.scopeId, scopeId)));
+  }
+
+  async listClients(): Promise<OAuthClient[]> {
+    return this.db.query.oauthClients.findMany();
+  }
+
+  async getClientDetail(clientId: string): Promise<(OAuthClient & { redirectUris: string[]; scopes: string[] }) | null> {
+    const client = await this.getClient(clientId);
+    if (!client) return null;
+    const redirects = await this.db.query.oauthClientRedirectUris.findMany({ where: eq(schema.oauthClientRedirectUris.clientId, clientId) });
+    const scopes = await this.getGrantedScopeNames(clientId);
+    return { ...client, redirectUris: redirects.map(redirect => redirect.uri), scopes };
+  }
+
+  /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
+  async updateClient(clientId: string, update: { name?: string; isActive?: boolean; redirectUris?: string[] }): Promise<void> {
+    await this.db.transaction(async tx => {
+      if (update.name !== undefined || update.isActive !== undefined) {
+        await tx
+          .update(schema.oauthClients)
+          .set({ ...(update.name !== undefined ? { name: update.name } : {}), ...(update.isActive !== undefined ? { isActive: update.isActive } : {}), updatedAt: new Date() })
+          .where(eq(schema.oauthClients.id, clientId));
+      }
+      if (update.redirectUris) {
+        await tx.delete(schema.oauthClientRedirectUris).where(eq(schema.oauthClientRedirectUris.clientId, clientId));
+        for (const uri of update.redirectUris) await tx.insert(schema.oauthClientRedirectUris).values({ clientId, uri });
+      }
+    });
+  }
+
+  async listResources(): Promise<(ApiResource & { scopes: Scope[] })[]> {
+    const resources = await this.db.query.apiResources.findMany({ with: { scopes: true } });
+    return resources;
+  }
+
+  async createScope(apiResourceId: string, name: string, description?: string, isSensitive?: boolean): Promise<string> {
+    await this.db
+      .insert(schema.scopes)
+      .values({ apiResourceId, name, description, isSensitive: isSensitive ?? false })
+      .onConflictDoNothing();
+    const scope = await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, apiResourceId), eq(schema.scopes.name, name)) });
+    if (!scope) throw new Error(`Scope '${name}' could not be provisioned`);
+    return scope.id;
+  }
+
+  async ensureResource(applicationId: number, identifier: string, displayName?: string): Promise<ApiResource> {
+    await this.db.insert(schema.apiResources).values({ applicationId, identifier, displayName }).onConflictDoNothing();
+    const resource = await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, identifier) });
+    if (!resource) throw new Error(`API resource '${identifier}' could not be provisioned`);
+    return resource;
   }
 
   /** Verifies a client secret against its active (unexpired, unrevoked) secrets, in constant work. */
