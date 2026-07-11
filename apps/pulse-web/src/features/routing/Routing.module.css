@@ -1,0 +1,27 @@
+.senderCell {
+  display: flex;
+  flex-direction: column;
+}
+
+.senderKey {
+  font-family: var(--sh-font-mono);
+  font-size: 0.8125rem;
+}
+
+.senderName {
+  font-size: 0.75rem;
+  color: var(--sh-text-tertiary);
+}
+
+.drawerLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 10px;
+}
+
+.divider {
+  border-top: 1px solid var(--sh-border-subtle);
+  margin: 22px 0;
+}

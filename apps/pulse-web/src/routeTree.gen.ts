@@ -10,33 +10,128 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as TemplatesIndexRouteImport } from './routes/templates/index'
+import { Route as SendersIndexRouteImport } from './routes/senders/index'
+import { Route as SendIndexRouteImport } from './routes/send/index'
+import { Route as RoutingIndexRouteImport } from './routes/routing/index'
+import { Route as LogsIndexRouteImport } from './routes/logs/index'
+import { Route as TemplatesGroupIdRouteImport } from './routes/templates/$groupId'
+import { Route as SendersProfileIdRouteImport } from './routes/senders/$profileId'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TemplatesIndexRoute = TemplatesIndexRouteImport.update({
+  id: '/templates/',
+  path: '/templates/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SendersIndexRoute = SendersIndexRouteImport.update({
+  id: '/senders/',
+  path: '/senders/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SendIndexRoute = SendIndexRouteImport.update({
+  id: '/send/',
+  path: '/send/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RoutingIndexRoute = RoutingIndexRouteImport.update({
+  id: '/routing/',
+  path: '/routing/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LogsIndexRoute = LogsIndexRouteImport.update({
+  id: '/logs/',
+  path: '/logs/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TemplatesGroupIdRoute = TemplatesGroupIdRouteImport.update({
+  id: '/templates/$groupId',
+  path: '/templates/$groupId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SendersProfileIdRoute = SendersProfileIdRouteImport.update({
+  id: '/senders/$profileId',
+  path: '/senders/$profileId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/senders/$profileId': typeof SendersProfileIdRoute
+  '/templates/$groupId': typeof TemplatesGroupIdRoute
+  '/logs': typeof LogsIndexRoute
+  '/routing': typeof RoutingIndexRoute
+  '/send': typeof SendIndexRoute
+  '/senders': typeof SendersIndexRoute
+  '/templates': typeof TemplatesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/senders/$profileId': typeof SendersProfileIdRoute
+  '/templates/$groupId': typeof TemplatesGroupIdRoute
+  '/logs': typeof LogsIndexRoute
+  '/routing': typeof RoutingIndexRoute
+  '/send': typeof SendIndexRoute
+  '/senders': typeof SendersIndexRoute
+  '/templates': typeof TemplatesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/senders/$profileId': typeof SendersProfileIdRoute
+  '/templates/$groupId': typeof TemplatesGroupIdRoute
+  '/logs/': typeof LogsIndexRoute
+  '/routing/': typeof RoutingIndexRoute
+  '/send/': typeof SendIndexRoute
+  '/senders/': typeof SendersIndexRoute
+  '/templates/': typeof TemplatesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/senders/$profileId'
+    | '/templates/$groupId'
+    | '/logs'
+    | '/routing'
+    | '/send'
+    | '/senders'
+    | '/templates'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/senders/$profileId'
+    | '/templates/$groupId'
+    | '/logs'
+    | '/routing'
+    | '/send'
+    | '/senders'
+    | '/templates'
+  id:
+    | '__root__'
+    | '/'
+    | '/senders/$profileId'
+    | '/templates/$groupId'
+    | '/logs/'
+    | '/routing/'
+    | '/send/'
+    | '/senders/'
+    | '/templates/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  SendersProfileIdRoute: typeof SendersProfileIdRoute
+  TemplatesGroupIdRoute: typeof TemplatesGroupIdRoute
+  LogsIndexRoute: typeof LogsIndexRoute
+  RoutingIndexRoute: typeof RoutingIndexRoute
+  SendIndexRoute: typeof SendIndexRoute
+  SendersIndexRoute: typeof SendersIndexRoute
+  TemplatesIndexRoute: typeof TemplatesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -48,11 +143,67 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/templates/': {
+      id: '/templates/'
+      path: '/templates'
+      fullPath: '/templates'
+      preLoaderRoute: typeof TemplatesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/senders/': {
+      id: '/senders/'
+      path: '/senders'
+      fullPath: '/senders'
+      preLoaderRoute: typeof SendersIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/send/': {
+      id: '/send/'
+      path: '/send'
+      fullPath: '/send'
+      preLoaderRoute: typeof SendIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/routing/': {
+      id: '/routing/'
+      path: '/routing'
+      fullPath: '/routing'
+      preLoaderRoute: typeof RoutingIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/logs/': {
+      id: '/logs/'
+      path: '/logs'
+      fullPath: '/logs'
+      preLoaderRoute: typeof LogsIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/templates/$groupId': {
+      id: '/templates/$groupId'
+      path: '/templates/$groupId'
+      fullPath: '/templates/$groupId'
+      preLoaderRoute: typeof TemplatesGroupIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/senders/$profileId': {
+      id: '/senders/$profileId'
+      path: '/senders/$profileId'
+      fullPath: '/senders/$profileId'
+      preLoaderRoute: typeof SendersProfileIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  SendersProfileIdRoute: SendersProfileIdRoute,
+  TemplatesGroupIdRoute: TemplatesGroupIdRoute,
+  LogsIndexRoute: LogsIndexRoute,
+  RoutingIndexRoute: RoutingIndexRoute,
+  SendIndexRoute: SendIndexRoute,
+  SendersIndexRoute: SendersIndexRoute,
+  TemplatesIndexRoute: TemplatesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

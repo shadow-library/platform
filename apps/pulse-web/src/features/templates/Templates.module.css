@@ -1,0 +1,22 @@
+.bodyPreview {
+  font-family: var(--sh-font-mono);
+  font-size: 0.75rem;
+  color: var(--sh-text-tertiary);
+  display: inline-block;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  vertical-align: middle;
+}
+
+.danger {
+  color: var(--sh-danger-text);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}

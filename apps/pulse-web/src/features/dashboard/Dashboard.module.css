@@ -1,13 +1,173 @@
-@import 'tailwindcss';
-
-.channelStat {
-  @apply flex justify-between items-center;
+.page {
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-.channelStat > span:first-child {
-  @apply text-[var(--color-text-secondary)];
+.pageHeader {
+  margin-bottom: 24px;
 }
 
-.channelStat > span:last-child {
-  @apply font-semibold text-lg;
+.title {
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  margin: 0;
+  font-weight: 640;
+  letter-spacing: -0.01em;
+}
+
+.subtitle {
+  color: var(--sh-text-secondary);
+  margin: 6px 0 0;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.h3,
+.sectionTitle {
+  font-size: var(--sh-text-h3);
+  line-height: var(--sh-text-h3--line-height);
+  font-weight: 620;
+  margin: 0;
+}
+
+.sectionTitle {
+  margin: 0 0 14px;
+}
+
+.muted {
+  color: var(--sh-text-tertiary);
+  font-size: 0.8125rem;
+}
+
+.kpiGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+.channelGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  margin-bottom: 28px;
+}
+
+/* ── Channel card ── */
+.channelHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.channelName {
+  font-weight: 600;
+  font-size: 0.9375rem;
+}
+
+.channelRate {
+  font-size: 0.8125rem;
+  color: var(--sh-text-tertiary);
+}
+
+.bar {
+  height: 6px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-well);
+  overflow: hidden;
+  margin-bottom: 18px;
+}
+
+.barFill {
+  height: 100%;
+  background: var(--sh-success-solid);
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px 12px;
+}
+
+.metricLabel {
+  font-size: 0.6875rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 2px;
+}
+
+.metricValue {
+  font-size: 1.125rem;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.success {
+  color: var(--sh-success-text);
+}
+
+.danger {
+  color: var(--sh-danger-text);
+}
+
+.warning {
+  color: var(--sh-warning-text);
+}
+
+/* ── Trend card ── */
+.trendHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.legend {
+  display: flex;
+  gap: 18px;
+  margin-bottom: 8px;
+}
+
+.legendItem {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--sh-text-secondary);
+}
+
+.legendDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+.dotSuccess {
+  background: var(--sh-success-solid);
+}
+
+.dotWarning {
+  background: var(--sh-warning-solid);
+}
+
+.dotDanger {
+  background: var(--sh-danger-solid);
+}
+
+.chart {
+  display: block;
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
 }

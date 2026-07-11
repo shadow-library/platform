@@ -6,8 +6,8 @@ import { createFileRoute } from '@tanstack/react-router';
 /**
  *  Importing user defined modules
  */
-import { Dashboard } from '@/features/dashboard';
+import { MessageLog } from '@/features/logs';
 
-export const Route = createFileRoute('/')({
-  component: Dashboard,
+export const Route = createFileRoute('/logs/')({
+  component: MessageLog,
 });
