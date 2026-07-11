@@ -10,10 +10,12 @@ import { ServerError } from '@shadow-library/fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { MfaService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { PasswordService } from '@server/modules/identity/credentials';
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
+import { User, UserSession } from '@server/modules/infrastructure/datastore';
 
 import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.service';
 import { FlowStepResult } from './flow.types';
@@ -34,6 +36,16 @@ export interface LoginInitResult {
   hasAlternativeMethods: boolean;
 }
 
+export interface MfaProof {
+  code?: string;
+  recoveryCode?: string;
+}
+
+interface CompletionOptions {
+  aal?: UserSession.Aal;
+  mfaMode?: User.AuthProvider;
+}
+
 /**
  * Declaring the constants
  *
@@ -41,6 +53,7 @@ export interface LoginInitResult {
  */
 const MAX_FLOW_FAILURES = 3;
 const AWAITING_PASSWORD = 'AWAITING_PASSWORD';
+const AWAITING_TOTP = 'AWAITING_TOTP';
 
 @Injectable()
 export class LoginService {
@@ -53,6 +66,7 @@ export class LoginService {
     private readonly sessionService: SessionService,
     private readonly signInEventService: SignInEventService,
     private readonly auditService: AuditService,
+    private readonly mfaService: MfaService,
   ) {}
 
   /**
@@ -76,18 +90,44 @@ export class LoginService {
 
     const userId = flow.userId ? BigInt(flow.userId) : null;
     const valid = await this.passwordService.verifyForUser(userId, password);
-    if (valid && userId) return this.complete(flow, userId);
-    return this.handleFailure(flow, userId);
+    if (!valid || !userId) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+
+    const user = await this.userService.getUser(userId);
+    if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+
+    if (await this.mfaService.hasMfa(userId)) {
+      const next = await this.authFlowService.update(flow, { status: AWAITING_TOTP });
+      return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
+    }
+    return this.complete(flow, userId, {});
   }
 
-  private async complete(flow: AuthFlowContext, userId: bigint): Promise<FlowStepResult> {
-    const user = await this.userService.getUser(userId);
-    if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId);
+  /** Completes the MFA step of a login flow with a TOTP code; sessions born here carry AAL2. */
+  async verifyMfa(flowId: string, proof: MfaProof): Promise<FlowStepResult> {
+    const flow = await this.requireFlow(flowId);
+    if (flow.status !== AWAITING_TOTP) throw new ServerError(AppErrorCode.AUTH_002);
 
-    await this.signInEventService.record({ flowId: flow.flowId, userId, identifier: flow.identifier, status: 'SUCCESS', authMode: 'PASSWORD', device: this.deviceFields(flow) });
+    const userId = flow.userId ? BigInt(flow.userId) : null;
+    if (!userId) return this.handleFailure(flow, null, 'MFA_FAILED');
+
+    const valid = proof.code ? await this.mfaService.verifyTotp(userId, proof.code) : false;
+    if (!valid) return this.handleFailure(flow, userId, 'MFA_FAILED');
+    return this.complete(flow, userId, { aal: 'AAL2', mfaMode: 'TOTP' });
+  }
+
+  private async complete(flow: AuthFlowContext, userId: bigint, options: CompletionOptions): Promise<FlowStepResult> {
+    await this.signInEventService.record({
+      flowId: flow.flowId,
+      userId,
+      identifier: flow.identifier,
+      status: 'SUCCESS',
+      authMode: 'PASSWORD',
+      mfaMode: options.mfaMode ?? null,
+      device: this.deviceFields(flow),
+    });
     const { cookies } = await this.sessionService.create({
       userId,
-      aal: 'AAL1',
+      aal: options.aal ?? 'AAL1',
       signInEventId: flow.flowId.replace(/^flow_auth_/, ''),
       deviceFingerprint: flow.device.fingerprint,
       ipAddress: flow.device.ipAddress,
@@ -100,13 +140,13 @@ export class LoginService {
     return { outcome: 'COMPLETED', flowId: flow.flowId, cookies };
   }
 
-  private async handleFailure(flow: AuthFlowContext, userId: bigint | null): Promise<FlowStepResult> {
+  private async handleFailure(flow: AuthFlowContext, userId: bigint | null, status: 'INVALID_CREDENTIALS' | 'MFA_FAILED'): Promise<FlowStepResult> {
     const failureCount = flow.failureCount + 1;
     await this.signInEventService.record({
       flowId: flow.flowId,
       userId,
       identifier: flow.identifier,
-      status: 'INVALID_CREDENTIALS',
+      status,
       authMode: 'PASSWORD',
       device: this.deviceFields(flow),
     });
@@ -119,7 +159,7 @@ export class LoginService {
     }
 
     await this.authFlowService.update(flow, { failureCount, globalFailureCount: flow.globalFailureCount + 1 });
-    return { outcome: 'FAILED', status: AWAITING_PASSWORD, flowId: flow.flowId, attemptsLeft: MAX_FLOW_FAILURES - failureCount };
+    return { outcome: 'FAILED', status: flow.status, flowId: flow.flowId, attemptsLeft: MAX_FLOW_FAILURES - failureCount };
   }
 
   private async requireFlow(flowId: string): Promise<AuthFlowContext> {

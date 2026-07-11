@@ -3,6 +3,7 @@ export * from './auth-tokens.schemas';
 export * from './authz.schema';
 export * from './challenges.schema';
 export * from './consent.schema';
+export * from './credentials.schema';
 export * from './keys.schema';
 export * from './notification.schema';
 export * from './oauth.schema';

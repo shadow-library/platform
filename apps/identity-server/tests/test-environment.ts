@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
+import { randomBytes } from 'node:crypto';
 
 import { Router, ShadowApplication } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
@@ -33,6 +34,17 @@ export const TEST_REGEX = {
   uuid: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/,
   dateISO: /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}.\d{3}Z$/,
 } satisfies Record<string, RegExp>;
+
+/**
+ * Builds a valid double-submit CSRF pair for cookie-authenticated mutations: the http-core
+ * middleware requires the `csrf-token` cookie (`<expiry base36>:<token>`) to match the
+ * `x-csrf-token` header on any request that carries cookies.
+ */
+export function csrfPair(): { cookie: string; header: string } {
+  const token = randomBytes(16).toString('hex');
+  const expiry = (Date.now() + 60_000).toString(36);
+  return { cookie: `${expiry}:${token}`, header: token };
+}
 
 /**
  * Boots the real application against an isolated database cloned from the migrated

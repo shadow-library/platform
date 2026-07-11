@@ -24,6 +24,6 @@ import { KeyService } from './key.service';
   imports: [DatabaseModule],
   controllers: [JwksController],
   providers: [KeyService, { token: KeyProvider, useClass: EnvKeyProvider }],
-  exports: [KeyService],
+  exports: [KeyService, KeyProvider],
 })
 export class KeyModule {}

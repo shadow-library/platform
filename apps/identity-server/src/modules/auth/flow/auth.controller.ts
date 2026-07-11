@@ -105,6 +105,7 @@ export class AuthController {
     if (body.code) {
       const flow = await this.authFlowService.get(body.flowId);
       if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
+      if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { code: body.code });
       if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, body.code);
       if (flow.kind === 'RECOVERY') return this.recoveryService.verifyOtp(body.flowId, body.code);
       throw new ServerError(AppErrorCode.AUTH_002);

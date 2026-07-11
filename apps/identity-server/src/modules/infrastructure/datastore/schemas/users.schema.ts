@@ -36,7 +36,7 @@ export namespace User {
 export const userStatus = pgEnum('user_status', ['ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED', 'CLOSED']);
 export const userLockMode = pgEnum('user_lock_mode', ['NONE', 'OTP_ONLY', 'FULL']);
 export const gender = pgEnum('gender', ['MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED']);
-export const userAuthProvider = pgEnum('user_auth_provider', ['PASSWORD', 'OTP', 'TOTP', 'GOOGLE', 'MICROSOFT']);
+export const userAuthProvider = pgEnum('user_auth_provider', ['PASSWORD', 'OTP', 'TOTP', 'WEBAUTHN', 'RECOVERY_CODE', 'GOOGLE', 'MICROSOFT']);
 export const passwordAlgorithm = pgEnum('password_algorithm', ['BCRYPT', 'ARGON2ID']);
 
 export const users = pgTable('users', {

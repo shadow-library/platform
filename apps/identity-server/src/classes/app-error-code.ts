@@ -53,6 +53,21 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUTH_003 = new AppErrorCode('AUTH_003', ErrorType.UNAUTHENTICATED, 'Invalid credentials');
   /** The flow was terminated after too many failed attempts */
   static readonly AUTH_004 = new AppErrorCode('AUTH_004', ErrorType.NOT_FOUND, 'Authentication flow terminated', 410);
+  /** No valid session accompanies a request to an authenticated endpoint */
+  static readonly AUTH_005 = new AppErrorCode('AUTH_005', ErrorType.UNAUTHENTICATED, 'Authentication required', 401);
+  /** A sensitive operation requires recent second-factor proof (step-up) */
+  static readonly AUTH_006 = new AppErrorCode('AUTH_006', ErrorType.UNAUTHORIZED, 'Step-up authentication required', 403);
+
+  /**
+   * MFA Error Codes
+   */
+
+  /** The requested MFA method is not enrolled for this account */
+  static readonly MFA_001 = new AppErrorCode('MFA_001', ErrorType.NOT_FOUND, 'MFA method not enrolled');
+  /** The submitted MFA code is invalid, expired, or replayed */
+  static readonly MFA_002 = new AppErrorCode('MFA_002', ErrorType.UNAUTHENTICATED, 'Invalid verification code', 401);
+  /** The MFA method is already enrolled */
+  static readonly MFA_003 = new AppErrorCode('MFA_003', ErrorType.CONFLICT, 'MFA method already enrolled');
 
   /**
    * Organisation Error Codes

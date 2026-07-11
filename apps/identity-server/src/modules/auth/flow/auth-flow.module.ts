@@ -6,6 +6,7 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { MfaModule } from '@server/modules/auth/mfa';
 import { SessionModule } from '@server/modules/auth/session';
 import { CredentialsModule } from '@server/modules/identity/credentials';
 import { UserModule } from '@server/modules/identity/user';
@@ -30,7 +31,7 @@ import { SignInEventService } from './sign-in-event.service';
  */
 
 @Module({
-  imports: [DatabaseModule, UserModule, CredentialsModule, SessionModule, AuditModule, NotificationModule],
+  imports: [DatabaseModule, UserModule, CredentialsModule, SessionModule, MfaModule, AuditModule, NotificationModule],
   controllers: [AuthController],
   providers: [AuthFlowService, SignInEventService, ChallengeService, LoginService, RegistrationService, RecoveryService],
   exports: [AuthFlowService, SignInEventService, ChallengeService, LoginService, RegistrationService, RecoveryService],

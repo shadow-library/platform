@@ -80,6 +80,7 @@ export class SessionService {
     const sessionHash = this.hashSecret(secret);
     const expiresAt = new Date(Date.now() + SESSION_ABSOLUTE_TTL_MS);
     const deviceId = input.deviceFingerprint ? await this.upsertDevice(input.userId, input.deviceFingerprint, input.deviceName) : null;
+    const aal = input.aal ?? 'AAL1';
 
     const [session] = await this.db
       .insert(schema.userSessions)
@@ -88,7 +89,9 @@ export class SessionService {
         sessionHash,
         userSignInEventId: input.signInEventId ?? null,
         deviceId,
-        aal: input.aal ?? 'AAL1',
+        aal,
+        /** A session born from a fresh second-factor proof starts inside the step-up window. */
+        elevatedUntil: aal === 'AAL2' ? new Date(Date.now() + SESSION_ELEVATION_TTL_MS) : null,
         expiresAt,
         ipAddress: input.ipAddress ?? null,
         ipCountry: input.ipCountry ?? null,
@@ -131,10 +134,16 @@ export class SessionService {
     session.lastUsedAt = lastUsedAt;
   }
 
-  async elevate(sessionId: bigint): Promise<void> {
+  /**
+   * Records a fresh second-factor proof: the session's achieved AAL becomes AAL2 permanently while
+   * the elevation window that gates sensitive operations is time-boxed.
+   */
+  async elevate(sessionId: bigint): Promise<ValidatedSession | null> {
     const elevatedUntil = new Date(Date.now() + SESSION_ELEVATION_TTL_MS);
-    const [session] = await this.db.update(schema.userSessions).set({ elevatedUntil }).where(eq(schema.userSessions.id, sessionId)).returning();
-    if (session) await this.cache(session);
+    const [session] = await this.db.update(schema.userSessions).set({ aal: 'AAL2', elevatedUntil }).where(eq(schema.userSessions.id, sessionId)).returning();
+    if (!session) return null;
+    await this.cache(session);
+    return this.toValidated(session);
   }
 
   isElevated(session: ValidatedSession): boolean {
