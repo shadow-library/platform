@@ -21,6 +21,7 @@ import { AuthController } from './auth.controller';
 import { ChallengeFlowService } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { LoginService } from './login.service';
+import { MeSessionsController } from './me-sessions.controller';
 import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 import { SignInEventService } from './sign-in-event.service';
@@ -36,7 +37,7 @@ import { SuspiciousLoginService } from './suspicious-login.service';
 
 @Module({
   imports: [DatabaseModule, UserModule, CredentialsModule, SessionModule, TokenModule, MfaModule, AuditModule, NotificationModule, SecurityModule],
-  controllers: [AuthController],
+  controllers: [AuthController, MeSessionsController],
   providers: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
   exports: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
 })

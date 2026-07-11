@@ -172,6 +172,20 @@ export class SessionService {
     return this.db.query.userSessions.findMany({ where: and(eq(schema.userSessions.userId, userId), eq(schema.userSessions.status, 'ACTIVE')) });
   }
 
+  async getById(sessionId: bigint): Promise<UserSession | null> {
+    const session = await this.db.query.userSessions.findFirst({ where: eq(schema.userSessions.id, sessionId) });
+    return session ?? null;
+  }
+
+  /** Active sessions joined with their device labels, for the self-service session list (§4.4). */
+  async listActiveDetailed(userId: bigint): Promise<{ session: UserSession; deviceName: string | null }[]> {
+    return this.db
+      .select({ session: schema.userSessions, deviceName: schema.devices.name })
+      .from(schema.userSessions)
+      .leftJoin(schema.devices, eq(schema.userSessions.deviceId, schema.devices.id))
+      .where(and(eq(schema.userSessions.userId, userId), eq(schema.userSessions.status, 'ACTIVE')));
+  }
+
   private async expire(session: UserSession): Promise<void> {
     await this.db.update(schema.userSessions).set({ status: 'EXPIRED', terminatedAt: new Date() }).where(eq(schema.userSessions.id, session.id));
     await this.invalidate(session);
