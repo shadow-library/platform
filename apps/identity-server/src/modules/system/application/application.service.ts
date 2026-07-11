@@ -13,7 +13,7 @@ import { InferInsertModel, eq } from 'drizzle-orm';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { Application, DatastoreService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types
@@ -47,8 +47,8 @@ export class ApplicationService implements OnModuleInit {
 
   private cache = new Map<string, ApplicationDetails>();
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async onModuleInit(): Promise<void> {
@@ -68,7 +68,7 @@ export class ApplicationService implements OnModuleInit {
       .insert(schema.applications)
       .values(application)
       .returning()
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
 
     assert(record, 'Failed to create application');
     this.logger.info(`Created application with ID ${record.id} and name ${record.name}`);
@@ -83,7 +83,7 @@ export class ApplicationService implements OnModuleInit {
       .set(update)
       .where(condition)
       .returning()
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
     assert(application, `Failed to update application with name ${name}`);
 
     this.logger.info(`Updated application with ID ${application.id} and name ${application.name}`, { update });
@@ -97,7 +97,7 @@ export class ApplicationService implements OnModuleInit {
       .delete(schema.applications)
       .where(condition)
       .returning()
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
     assert(application, `Failed to delete application with name ${name}`);
 
     this.cache.delete(name);

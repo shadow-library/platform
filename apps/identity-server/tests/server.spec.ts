@@ -32,4 +32,10 @@ describe('Server', () => {
     expect(response.statusCode).toBe(200);
     expect(response.json()).toEqual({ status: 'ok' });
   });
+
+  it('should report readiness of datastore dependencies', async () => {
+    const response = await router.mockRequest().get('/health/ready');
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toEqual({ status: 'ok', dependencies: { postgres: 'up', redis: 'up' } });
+  });
 });

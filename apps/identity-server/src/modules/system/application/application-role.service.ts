@@ -13,7 +13,7 @@ import { eq } from 'drizzle-orm';
  */
 import { AppErrorCode } from '@server/classes/app-error-code';
 import { APP_NAME } from '@server/constants';
-import { Application, DatastoreService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { ApplicationService } from './application.service';
 
@@ -36,10 +36,10 @@ export class ApplicationRoleService {
   private readonly db: PrimaryDatabase;
 
   constructor(
-    private readonly datastoreService: DatastoreService,
+    private readonly databaseService: DatabaseService,
     private readonly applicationService: ApplicationService,
   ) {
-    this.db = datastoreService.getPrimaryDatabase();
+    this.db = databaseService.getPostgresClient();
   }
 
   async addRole(service: string, newRole: IRole): Promise<Application.Role> {
@@ -49,7 +49,7 @@ export class ApplicationRoleService {
       .insert(schema.applicationRoles)
       .values(data)
       .returning()
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
     assert(role, `Failed to add role ${newRole.roleName} to application ${service}`);
     this.logger.info(`added new role to the application ${service}: ${newRole.roleName}`);
     this.applicationService.loadApplications();
@@ -63,7 +63,7 @@ export class ApplicationRoleService {
       .set(update)
       .where(condition)
       .returning()
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
     if (!role) throw new ServerError(AppErrorCode.APP_003);
     this.logger.info(`Updated role with ID ${roleId}`, { update });
     this.applicationService.loadApplications();
@@ -76,7 +76,7 @@ export class ApplicationRoleService {
       .delete(schema.applicationRoles)
       .where(condition)
       .returning()
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
     if (!role) throw new ServerError(AppErrorCode.APP_003);
     this.applicationService.loadApplications();
     this.logger.info(`Deleted role with ID ${roleId}`);

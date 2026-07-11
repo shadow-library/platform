@@ -15,7 +15,7 @@ import validator, { StrongPasswordOptions } from 'validator';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
-import { DatastoreService, ID, OpResult, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, ID, OpResult, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types
@@ -62,8 +62,8 @@ export class UserService {
   private readonly logger = Logger.getLogger(APP_NAME, UserService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   private buildWhereClause(identifier: ID): FindUserFilter {
@@ -125,7 +125,7 @@ export class UserService {
 
         return userDetails;
       })
-      .catch(error => this.datastoreService.translateError(error));
+      .catch(error => this.databaseService.translateError(error));
 
     this.logger.info('new user created', { userId: user.id });
     this.logger.debug('created user details', { user });
@@ -149,7 +149,7 @@ export class UserService {
       result = await update
         .where(filter.sql)
         .returning({ id: schema.users.id })
-        .catch(error => this.datastoreService.translateError(error));
+        .catch(error => this.databaseService.translateError(error));
       this.logger.debug('user status updated using users table', { userId: identifier, status, result });
     } else {
       const table = filter.table === 'userEmails' ? schema.userEmails : schema.userPhones;
@@ -157,7 +157,7 @@ export class UserService {
         .from(table)
         .where(filter.sql)
         .returning({ id: schema.users.id })
-        .catch(error => this.datastoreService.translateError(error));
+        .catch(error => this.databaseService.translateError(error));
       this.logger.debug('user status updated using related table', { userId: identifier, status, table: filter.table, result });
     }
     if (result.length === 0) throw new ServerError(AppErrorCode.USR_001);

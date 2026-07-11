@@ -8,6 +8,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { HealthModule } from '@server/modules/infrastructure/health';
 
 /**
  * Defining types
@@ -15,10 +16,16 @@ import { HttpCoreModule } from '@shadow-library/modules';
 
 /**
  * Declaring the constants
+ *
+ * Routes carry explicit, full paths at the controller level rather than a global
+ * prefix: an identity provider mixes unprefixed root routes (`/health`,
+ * `/.well-known/*`) with the versioned `/api/v1/*` surface.
  */
 
+export const AppHttpCoreModule = HttpCoreModule.forRoot({});
+
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [HttpCoreModule.forRoot()],
+  imports: [AppHttpCoreModule, HealthModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

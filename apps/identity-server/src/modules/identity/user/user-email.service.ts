@@ -8,7 +8,7 @@ import { Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { DatastoreService, PrimaryDatabase } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types
@@ -23,8 +23,8 @@ export class UserEmailService {
   private readonly logger = Logger.getLogger(APP_NAME, UserEmailService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(datastoreService: DatastoreService) {
-    this.db = datastoreService.getPrimaryDatabase();
+  constructor(databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
   }
 
   async isEmailExists(email: string): Promise<boolean> {
