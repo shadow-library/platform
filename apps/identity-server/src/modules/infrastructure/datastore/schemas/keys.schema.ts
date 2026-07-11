@@ -17,21 +17,27 @@ export type SigningKey = InferSelectModel<typeof signingKeys>;
 export namespace SigningKey {
   export type Algorithm = InferEnum<typeof signingKeyAlgorithm>;
   export type Status = InferEnum<typeof signingKeyStatus>;
+  export type Purpose = InferEnum<typeof signingKeyPurpose>;
 }
 
 /**
  * Declaring the constants
  */
 
-export const signingKeyAlgorithm = pgEnum('signing_key_algorithm', ['EdDSA']);
+export const signingKeyAlgorithm = pgEnum('signing_key_algorithm', ['EdDSA', 'RS256']);
 export const signingKeyStatus = pgEnum('signing_key_status', ['PENDING', 'ACTIVE', 'RETIRING', 'RETIRED']);
+/** OIDC keys are Ed25519 (JWKS); SAML keys are RSA-2048 — XML-DSIG interop rules out EdDSA (T-701). */
+export const signingKeyPurpose = pgEnum('signing_key_purpose', ['OIDC', 'SAML']);
 
 export const signingKeys = pgTable(
   'signing_keys',
   {
     kid: uuid('kid').primaryKey(),
     algorithm: signingKeyAlgorithm('algorithm').notNull().default('EdDSA'),
+    purpose: signingKeyPurpose('purpose').notNull().default('OIDC'),
     publicJwk: jsonb('public_jwk').notNull().$type<Record<string, string>>(),
+    /** Self-signed X.509 for the SAML metadata KeyDescriptor; null for OIDC keys (JWKS needs none). */
+    certificatePem: text('certificate_pem'),
 
     /** Ed25519 private key (PKCS#8), envelope-encrypted with AES-256-GCM under the master key. */
     privateKeyCiphertext: text('private_key_ciphertext').notNull(),
@@ -47,7 +53,7 @@ export const signingKeys = pgTable(
   },
   t => [
     uniqueIndex('signing_keys_single_active_idx')
-      .on(t.status)
+      .on(t.purpose)
       .where(sql`status = 'ACTIVE'`),
   ],
 );

@@ -293,3 +293,15 @@ Session cookie + CSRF. Org-level roles (`OWNER > ADMIN > MEMBER`) govern organis
 - `GET` (members) · `DELETE /{domainId}`.
 
 Verified domains are the attachment point for SAML/SCIM/JIT provisioning (M7b); email-domain auto-capture is deliberately deferred to inbound federation (T-702).
+
+## 8. SAML 2.0 IdP (`/saml2/*`) — _implemented (M7b, T-701)_
+
+SP-initiated SSO: HTTP-Redirect binding in, HTTP-POST binding out.
+
+- `GET /saml2/metadata` — IdP metadata (`application/xml`, cached 300 s): entity id (= OIDC issuer), every non-retired RSA signing certificate (active first, so SPs keep verifying across rotation), both NameID formats, and the redirect-binding SSO location.
+- `GET /saml2/sso?SAMLRequest=&RelayState=` — decodes the deflated AuthnRequest, resolves the issuer against the registered service providers, and exact-matches any `AssertionConsumerServiceURL` in the request against the registration. A live session answers immediately with an auto-submitting HTML form (CSP allows only the hashed one-line submit script) posting the signed response to the registered ACS; otherwise the request parks in Redis under a single-use resume id (10 min TTL) and the browser is sent to the hosted login with `return_to=/saml2/sso/resume?rid=…`.
+- `GET /saml2/sso/resume?rid=` — completes a parked request once (replayed resume ids answer `410 SML_003`).
+
+Assertions are signed (enveloped XML-DSIG, RSA-SHA256, exclusive c14n) with a dedicated RSA-2048 key lineage (`signing_keys.purpose = SAML`) — Ed25519 is not interoperable in the SAML ecosystem. Assertions live 5 minutes and carry `InResponseTo`, `Recipient` (registered ACS), `AudienceRestriction` (SP entity id), `SessionIndex` (IdP session), and the registered subset of `email · first_name · last_name · display_name`. `PERSISTENT` NameIDs are stable pairwise HMACs per (user, SP) derived from the master key; `EMAIL` NameIDs are the primary address. SP AuthnRequest signatures are NOT verified (recorded decision: nothing security-relevant is taken from the request — assertions only ever go to the registered ACS; hand-rolled XML-DSIG _verification_ invites signature-wrapping attacks). Assertion encryption, SLO, and IdP-initiated SSO are deferred (recorded in tasks.md).
+
+Administration: `GET/POST /api/v1/admin/saml/service-providers`, `GET/PATCH/DELETE /…/{id}` under `iam:clients:read`/`iam:clients:manage` (same owner as OAuth clients), AAL2 on mutations; ACS URLs must be https.

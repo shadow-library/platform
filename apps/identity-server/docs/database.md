@@ -302,7 +302,11 @@ Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-us
 
 ## 11. Enterprise tables
 
-`organisation_domains`, `webhook_subscriptions`, and `webhook_deliveries` shipped with M7 (see §4 and below). Still reserved, NOT created: `identity_providers` and `scim_tokens` (M7b — inbound federation and SCIM); the names MUST NOT be repurposed.
+`organisation_domains`, `webhook_subscriptions`, `webhook_deliveries` (M7) and `saml_service_providers` (M7b) are live (see §4 and below). Still reserved, NOT created: `identity_providers` and `scim_tokens` (M7b — inbound federation and SCIM); the names MUST NOT be repurposed.
+
+### `saml_service_providers` — _implemented (T-701)_
+
+`id` uuid PK, `entity_id` text unique, `name`, `acs_url` text (https-only, exact-matched against AuthnRequests), `name_id_format` enum (`EMAIL · PERSISTENT`), `released_attributes` text[] (subset of `email · first_name · last_name · display_name`), `sp_certificate_pem` (stored for future assertion encryption; request-signature verification is deliberately unsupported), `is_active`, timestamps. SAML signing keys live in `signing_keys` under `purpose = 'SAML'` (`algorithm = 'RS256'`, self-signed X.509 in `certificate_pem`); the single-ACTIVE unique index is now per purpose.
 
 ### `webhook_subscriptions` — _implemented (T-706)_
 

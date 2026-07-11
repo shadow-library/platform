@@ -72,9 +72,12 @@ export class KeyService implements OnModuleInit {
     }
   }
 
-  /** Loads every published key into memory, reconstructing the key objects from storage. */
+  /** Loads every published OIDC key into memory, reconstructing the key objects from storage. */
   async reload(): Promise<void> {
-    const rows = await this.db.select().from(schema.signingKeys).where(inArray(schema.signingKeys.status, PUBLISHED_STATUSES));
+    const rows = await this.db
+      .select()
+      .from(schema.signingKeys)
+      .where(and(eq(schema.signingKeys.purpose, 'OIDC'), inArray(schema.signingKeys.status, PUBLISHED_STATUSES)));
     const keys = new Map<string, LoadedKey>();
     let activeKid: string | null = null;
     for (const row of rows) {
@@ -118,7 +121,10 @@ export class KeyService implements OnModuleInit {
   async rotate(newKid?: string): Promise<string> {
     const kid = newKid ?? (await this.generateKey('PENDING'));
     await this.db.transaction(async tx => {
-      await tx.update(schema.signingKeys).set({ status: 'RETIRING' }).where(eq(schema.signingKeys.status, 'ACTIVE'));
+      await tx
+        .update(schema.signingKeys)
+        .set({ status: 'RETIRING' })
+        .where(and(eq(schema.signingKeys.purpose, 'OIDC'), eq(schema.signingKeys.status, 'ACTIVE')));
       await tx.update(schema.signingKeys).set({ status: 'ACTIVE', activatedAt: new Date() }).where(eq(schema.signingKeys.kid, kid));
     });
     await this.reload();
@@ -135,7 +141,7 @@ export class KeyService implements OnModuleInit {
     const retired = await this.db
       .update(schema.signingKeys)
       .set({ status: 'RETIRED', retiredAt: new Date() })
-      .where(and(eq(schema.signingKeys.status, 'RETIRING'), lt(schema.signingKeys.activatedAt, cutoff)))
+      .where(and(eq(schema.signingKeys.purpose, 'OIDC'), eq(schema.signingKeys.status, 'RETIRING'), lt(schema.signingKeys.activatedAt, cutoff)))
       .returning({ kid: schema.signingKeys.kid });
     if (retired.length) await this.reload();
     return retired.length;

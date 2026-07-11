@@ -134,6 +134,19 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly WHK_003 = new AppErrorCode('WHK_003', ErrorType.NOT_FOUND, 'Webhook delivery not found');
 
   /**
+   * SAML Error Codes
+   */
+
+  /** The SAMLRequest is malformed or its issuer is not a registered, active service provider */
+  static readonly SML_001 = new AppErrorCode('SML_001', ErrorType.VALIDATION_ERROR, 'Invalid saml authentication request', 400);
+  /** The AuthnRequest names an assertion consumer service other than the registered one */
+  static readonly SML_002 = new AppErrorCode('SML_002', ErrorType.VALIDATION_ERROR, 'Assertion consumer service mismatch', 400);
+  /** The pending SSO request expired or was already consumed (single use) */
+  static readonly SML_003 = new AppErrorCode('SML_003', ErrorType.NOT_FOUND, 'Saml sign-on request not found or expired', 410);
+  /** The service provider registration does not exist */
+  static readonly SML_004 = new AppErrorCode('SML_004', ErrorType.NOT_FOUND, 'Service provider not found');
+
+  /**
    * OAuth / OIDC Error Codes (mapped to RFC 6749 error identifiers)
    */
 

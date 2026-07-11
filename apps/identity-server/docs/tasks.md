@@ -281,9 +281,12 @@ Hosted web client under `client/`, built on `@shadow-library/ui` (dark theme ret
 
 Platform-tier subscriptions (`/api/v1/admin/webhooks`, `iam:webhooks:manage`, api-contract §6.4) over the audit event stream: fan-out happens inside the audit writer's transaction with `(subscription, event)` uniqueness as the receiver-side idempotency key; payloads carry ids/metadata only, never audit `detail`. Stripe-style HMAC-SHA256 signatures (`t=…,v1=…`) with a 24 h dual-secret rotation overlap; AES-256-GCM secret storage; SSRF guard at registration and again post-DNS-resolution at send time; worker-driven skip-locked dispatch with backoff, dead-letter at 5, crash requeue, and admin redelivery. Decision recorded: org-scoped subscriptions are out of scope until a tenant-facing need appears.
 
+### T-701 — SAML 2.0 IdP · XL — **done**
+
+SP-initiated SSO (api-contract §8): HTTP-Redirect in, HTTP-POST out, signed assertions (enveloped XML-DSIG, RSA-SHA256, exclusive c14n via `xml-crypto`) from a dedicated RSA-2048 key lineage (`signing_keys.purpose = SAML`, self-signed X.509 via `@peculiar/x509`, same envelope encryption and rotation states as OIDC keys; metadata publishes every non-retired certificate so rotation never breaks SPs). Replay guard: login detours park the request in Redis under a single-use resume id; assertions live 5 min with `InResponseTo`/`Recipient`/`AudienceRestriction`. Registered SPs are platform-tier (`iam:clients:manage`, https-only exact-match ACS). Decisions recorded: SP AuthnRequest signature verification unsupported (XSW risk of hand-rolled XML-DSIG verification outweighs its value when nothing security-relevant is taken from the request); pairwise `PERSISTENT` NameIDs are master-key-derived HMACs. Deferred: assertion **encryption** (xmlenc), single logout, IdP-initiated SSO.
+
 ### Remaining (M7b — separate effort)
 
-- **T-701 SAML 2.0 IdP** · XL — signed/encrypted assertions, metadata + cert rotation, replay guard.
 - **T-702 Inbound OIDC/SAML federation** · XL — `identity_providers`, home-realm discovery, JIT provisioning, claim/group mapping, break-glass local admin, tenant-takeover prevention.
 - **T-704 SCIM 2.0** · XL — Users+Groups, `scim_tokens` (per-tenant, rotatable), idempotency, deprovisioning → session/token revocation.
 

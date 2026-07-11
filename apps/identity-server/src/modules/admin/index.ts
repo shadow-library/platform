@@ -4,6 +4,8 @@ export * from './admin-client.dto';
 export * from './admin-resource.controller';
 export * from './admin-role.controller';
 export * from './admin-role.dto';
+export * from './admin-saml.controller';
+export * from './admin-saml.dto';
 export * from './admin-user.controller';
 export * from './admin-user.dto';
 export * from './admin-user.service';

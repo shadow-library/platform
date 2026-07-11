@@ -247,17 +247,19 @@ Rules:
 
 All standard endpoints; no dynamic client registration, no implicit flow, no ROPC, ever.
 
-| Endpoint                                | Purpose                                                                            |
-| :-------------------------------------- | :--------------------------------------------------------------------------------- |
-| `GET /.well-known/openid-configuration` | Discovery metadata                                                                 |
-| `GET /.well-known/jwks.json`            | Public signing keys                                                                |
-| `GET /oauth2/authorize`                 | Authorization Code + PKCE entry                                                    |
-| `POST /oauth2/token`                    | `authorization_code`, `refresh_token`, `client_credentials`                        |
-| `POST /oauth2/revoke`                   | RFC 7009 revocation (RT families, client tokens)                                   |
-| `POST /oauth2/introspect`               | RFC 7662, confidential clients only (SDK fallback when local verify is impossible) |
-| `GET /oauth2/userinfo`                  | OIDC UserInfo                                                                      |
-| `GET /oauth2/logout`                    | RP-initiated logout                                                                |
-| `POST` back-channel logout              | OIDC BCL logout tokens pushed to registered client endpoints                       |
+| Endpoint                                | Purpose                                                                                  |
+| :-------------------------------------- | :--------------------------------------------------------------------------------------- |
+| `GET /.well-known/openid-configuration` | Discovery metadata                                                                       |
+| `GET /.well-known/jwks.json`            | Public signing keys                                                                      |
+| `GET /oauth2/authorize`                 | Authorization Code + PKCE entry                                                          |
+| `POST /oauth2/token`                    | `authorization_code`, `refresh_token`, `client_credentials`                              |
+| `POST /oauth2/revoke`                   | RFC 7009 revocation (RT families, client tokens)                                         |
+| `POST /oauth2/introspect`               | RFC 7662, confidential clients only (SDK fallback when local verify is impossible)       |
+| `GET /oauth2/userinfo`                  | OIDC UserInfo                                                                            |
+| `GET /oauth2/logout`                    | RP-initiated logout                                                                      |
+| `POST` back-channel logout              | OIDC BCL logout tokens pushed to registered client endpoints                             |
+| `GET /saml2/metadata`                   | SAML 2.0 IdP metadata (RSA signing certificates, SSO location)                           |
+| `GET /saml2/sso` · `/saml2/sso/resume`  | SAML SP-initiated SSO (Redirect binding in, POST binding out; login detour resumes once) |
 
 Conformance: the OpenID Foundation conformance suite (OP Basic + Config profiles) runs in CI-adjacent tooling before the OIDC milestone exits (task T-309).
 

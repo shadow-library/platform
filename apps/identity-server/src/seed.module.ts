@@ -12,6 +12,7 @@ import { Module } from '@shadow-library/app';
  * Importing user defined packages
  */
 import { KeyModule } from './modules/auth/keys';
+import { SamlKeyService } from './modules/auth/saml';
 import { BootstrapModule } from './modules/bootstrap';
 import { DatastoreModule } from './modules/infrastructure/datastore';
 
@@ -28,6 +29,8 @@ import { DatastoreModule } from './modules/infrastructure/datastore';
  */
 
 @Module({
+  /** SamlKeyService rides along so the template database carries a ready SAML key beside the OIDC one. */
   imports: [DatastoreModule, KeyModule, BootstrapModule],
+  providers: [SamlKeyService],
 })
 export class SeedModule {}

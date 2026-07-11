@@ -17,6 +17,7 @@ import { AuthFlowModule } from '@server/modules/auth/flow';
 import { KeyModule } from '@server/modules/auth/keys';
 import { MfaModule } from '@server/modules/auth/mfa';
 import { OAuthModule } from '@server/modules/auth/oauth';
+import { SamlModule } from '@server/modules/auth/saml';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
@@ -72,6 +73,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     SessionModule,
     TokenModule,
     OAuthModule,
+    SamlModule,
     AuthzModule,
     AuthFlowModule,
     MfaModule,
