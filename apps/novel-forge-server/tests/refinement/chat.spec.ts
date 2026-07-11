@@ -121,6 +121,37 @@ describe.if(pgAvailable)('ChatService', () => {
     expect(input['userMessage']).toContain('grip harder');
   });
 
+  it('recovers an in-flight turn: the user message is persisted and pendingTurn is true while the model runs', async () => {
+    const session = await chat.createSession(projectId, { scopeType: 'novel' });
+
+    let release!: () => void;
+    const gate = new Promise<void>(resolve => (release = resolve));
+    structuredMock.mockImplementationOnce(async () => {
+      await gate;
+      return { reply: 'done thinking' };
+    });
+
+    const turnPromise = chat.turn(projectId, session.id, 'take your time');
+
+    // A second tab (or a refresh) loading the session mid-turn sees the user message and a pending run.
+    let mid = await chat.listMessages(projectId, session.id, {});
+    for (let i = 0; i < 200 && mid.length === 0; i++) {
+      await Bun.sleep(10);
+      mid = await chat.listMessages(projectId, session.id, {});
+    }
+    expect(mid.map(m => m.role)).toEqual(['user']);
+    expect(mid[0]?.content).toBe('take your time');
+    expect(await chat.hasPendingTurn(projectId, session.id)).toBe(true);
+
+    release();
+    await turnPromise;
+
+    // Once the reply lands, the run completes and the indicator clears.
+    const done = await chat.listMessages(projectId, session.id, {});
+    expect(done.map(m => m.role)).toEqual(['user', 'assistant']);
+    expect(await chat.hasPendingTurn(projectId, session.id)).toBe(false);
+  });
+
   it('returns no proposal for discussion-only turns and rejects archived sessions', async () => {
     const session = await chat.createSession(projectId, { scopeType: 'novel' });
     structuredMock.mockImplementationOnce(async () => ({ reply: 'Just thoughts, no changes yet.' }));

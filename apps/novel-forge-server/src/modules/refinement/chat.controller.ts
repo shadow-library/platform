@@ -61,8 +61,11 @@ export class ChatController {
   @Get('/:sessionId/messages')
   @RespondFor(200, ListChatMessagesResponse)
   async listMessages(@Params() params: ChatSessionParams, @Query() query: ListChatMessagesQuery): Promise<ListChatMessagesResponse> {
-    const messages = await this.chatService.listMessages(params.projectId, params.sessionId, query);
-    return { messages: messages.map(serialiseMessage) as unknown as ChatMessageResponse[] };
+    const [messages, pendingTurn] = await Promise.all([
+      this.chatService.listMessages(params.projectId, params.sessionId, query),
+      this.chatService.hasPendingTurn(params.projectId, params.sessionId),
+    ]);
+    return { messages: messages.map(serialiseMessage) as unknown as ChatMessageResponse[], pendingTurn };
   }
 
   @Post('/:sessionId/messages')

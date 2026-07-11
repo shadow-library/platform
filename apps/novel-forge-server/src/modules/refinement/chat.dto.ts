@@ -181,6 +181,12 @@ export class ChatMessageResponse {
 export class ListChatMessagesResponse {
   @Field(() => [ChatMessageResponse])
   messages: ChatMessageResponse[];
+
+  // True while a chat-turn is still running for this session — the signal any tab (a refresh, a
+  // second tab) uses to show that Forge is working, since the turn persists the user message before
+  // the model call. Clears once the reply lands or the run fails.
+  @Field()
+  pendingTurn: boolean;
 }
 
 @Schema()

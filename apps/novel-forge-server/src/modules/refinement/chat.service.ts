@@ -79,6 +79,10 @@ const KEEP_VERBATIM_TURNS = 6;
 const MAX_LOOKUP_ROUNDS = 3;
 const CHAT_HUB_NODE = 'chat-hub';
 
+// A chat-turn run older than this is treated as orphaned, never "in progress", so a crashed process
+// can't leave a session's thinking indicator stuck on forever.
+const PENDING_TURN_MAX_AGE_MS = 15 * 60 * 1000;
+
 // Which planning discipline each chat scope belongs to. A chat scoped to an arc IS arc-planning
 // work, so it defaults to the model the author configured for arc planning in the project settings —
 // not to a one-size-fits-all chat model. See resolveSessionModel for the full resolution ladder.
@@ -237,6 +241,26 @@ export class ChatService {
   }
 
   /**
+   * Whether a chat-turn is currently running for this session — the recovery signal a refresh or a
+   * second tab uses to show that Forge is working (the user message is already persisted, the reply
+   * is not yet). Bounded by a generous cutoff so an orphaned run can never pin the indicator on.
+   */
+  async hasPendingTurn(projectId: bigint, sessionId: string): Promise<boolean> {
+    const cutoff = new Date(Date.now() - PENDING_TURN_MAX_AGE_MS);
+    const row = await this.db.query.workflowRuns.findFirst({
+      where: and(
+        eq(schema.workflowRuns.projectId, projectId),
+        eq(schema.workflowRuns.graph, 'chat-turn'),
+        eq(schema.workflowRuns.target, `session:${sessionId}`),
+        eq(schema.workflowRuns.status, 'running'),
+        gt(schema.workflowRuns.startedAt, cutoff),
+      ),
+      columns: { id: true },
+    });
+    return Boolean(row);
+  }
+
+  /**
    * One chat turn (design §5.1): guard, compact if needed, assemble the scoped pack, one structured
    * call through the repair ladder, then persist the exchange and stage any proposed change-set —
    * all correlated under a fresh workflow run (Appendix A rules 9/11/12/13).
@@ -265,6 +289,10 @@ export class ChatService {
     const effectiveProject = { ...project, config: { ...baseConfig, models: { ...(baseConfig.models ?? {}), chat: resolvedModel } } } as typeof project;
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'chat-turn', `session:${sessionId}`, { content }, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
+      // Persist the user's message before the model call: the running chat-turn run plus this
+      // as-yet-unanswered message is what lets a refresh or a second tab recover the in-flight turn
+      // (design recovery). The reply lands in persistAssistantTurn once the model returns.
+      const userMessage = await this.persistUserMessage(projectId, session, content, runId);
       const ctx = { projectId, runId, node: 'chat-turn', promptKey: prompt.key, promptVersion: prompt.version, role: 'chat' };
       const turnHistory = [...history];
       const invoke = (): Promise<ChatRefineOutput> => {
@@ -284,7 +312,7 @@ export class ChatService {
       // A model that still asks for lookups after the budget note answers with its reply alone.
       if ((output.lookups?.length ?? 0) > 0) output = { reply: output.reply };
 
-      return this.persistTurn(projectId, session, content, output, runId, resolvedModel);
+      return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel);
     });
 
     // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply).
@@ -379,26 +407,32 @@ export class ChatService {
     return this.modelRouter.resolveModel(SCOPE_CHAT_ROLE[session.scopeType], project);
   }
 
-  private async persistTurn(
-    projectId: bigint,
-    session: Refinement.ChatSession,
-    content: string,
-    output: ChatRefineOutput,
-    runId: string,
-    model: { provider: string; model: string },
-  ): Promise<Omit<ChatTurnResult, 'runId'>> {
+  /** Persists the user's message at the start of a turn so the exchange is recoverable while the model runs. */
+  private async persistUserMessage(projectId: bigint, session: Refinement.ChatSession, content: string, runId: string): Promise<Refinement.ChatMessage> {
     const lastOrdinal = await this.latestOrdinal(session.id);
-
     const [userMessage] = await this.db
       .insert(schema.chatMessages)
       .values({ sessionId: session.id, projectId, ordinal: lastOrdinal + 1, role: 'user', content, runId, tokens: countTokens(content) })
       .returning();
+    if (!userMessage) throw new ServerError(AppErrorCode.CHT_001);
+    return userMessage;
+  }
+
+  /** Persists the assistant reply (following the already-stored user message) and stages any change-set it proposed. */
+  private async persistAssistantTurn(
+    projectId: bigint,
+    session: Refinement.ChatSession,
+    userMessage: Refinement.ChatMessage,
+    output: ChatRefineOutput,
+    runId: string,
+    model: { provider: string; model: string },
+  ): Promise<Omit<ChatTurnResult, 'runId'>> {
     const [assistantMessage] = await this.db
       .insert(schema.chatMessages)
       .values({
         sessionId: session.id,
         projectId,
-        ordinal: lastOrdinal + 2,
+        ordinal: userMessage.ordinal + 1,
         role: 'assistant',
         content: output.reply,
         runId,
@@ -407,7 +441,7 @@ export class ChatService {
         tokens: countTokens(output.reply),
       })
       .returning();
-    if (!userMessage || !assistantMessage) throw new ServerError(AppErrorCode.CHT_001);
+    if (!assistantMessage) throw new ServerError(AppErrorCode.CHT_001);
 
     let proposal: Refinement.Proposal | null = null;
     if (output.changeSet && output.changeSet.length > 0) {
