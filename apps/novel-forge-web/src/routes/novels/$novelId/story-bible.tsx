@@ -9,7 +9,7 @@ import { useEffect, useMemo, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
@@ -315,6 +315,17 @@ interface EntityDetailProps {
   onEdit: (entity: EntityResponse) => void;
 }
 
+// Generated entity summaries lead with an `# <Name>` heading that repeats the title already shown above
+// the summary. Drop a leading heading when its text is just the entity's own name, so the name isn't
+// stated twice.
+function stripEntityHeading(body: string, name: string): string {
+  const match = /^\s*#{1,3}[ \t]+(.+?)[ \t]*(?:\r?\n|$)/.exec(body);
+  if (!match?.[1]) return body;
+  const headingText = match[1].replace(/[*_`]/g, '').trim().toLowerCase();
+  if (headingText !== name.trim().toLowerCase()) return body;
+  return body.slice(match[0].length).replace(/^\s+/, '');
+}
+
 function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.JSX.Element {
   const entityQuery = useEntityQuery(novelId, entityKey);
   const uploadImage = useUploadEntityImageMutation(novelId, entityKey);
@@ -356,19 +367,19 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
             {entity.body && (
               <>
                 <div className={styles.sectionLabel}>Summary</div>
-                <p className={styles.para}>{entity.body}</p>
+                <Markdown content={stripEntityHeading(entity.body, entity.name)} className={styles.para} />
               </>
             )}
             {entity.motivation && (
               <>
                 <div className={styles.sectionLabel}>Motivation</div>
-                <p className={`${styles.para} ${styles.paraMuted}`}>{entity.motivation}</p>
+                <Markdown content={entity.motivation} className={`${styles.para} ${styles.paraMuted}`} />
               </>
             )}
             {entity.notes && (
               <>
                 <div className={styles.sectionLabel}>Notes</div>
-                <p className={`${styles.para} ${styles.paraMuted}`}>{entity.notes}</p>
+                <Markdown content={entity.notes} className={`${styles.para} ${styles.paraMuted}`} />
               </>
             )}
             <div className={styles.chips}>

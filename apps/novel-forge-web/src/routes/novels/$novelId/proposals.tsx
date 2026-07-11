@@ -3,12 +3,12 @@
  */
 import { Button, Checkbox, SegmentedControl, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 
 /**
  * Importing user defined modules
  */
-import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
+import { Markdown, PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
 import { type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useListProposalsQuery, useRevertProposalMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
@@ -47,6 +47,47 @@ export function opLabel(op: Record<string, unknown>): string {
   const type = String(op.op ?? 'unknown');
   const target = op.volumeKey ?? op.arcKey ?? op.entityKey ?? (op.section !== undefined ? `${op.section}/${op.slug}` : undefined) ?? (op.chapter !== undefined ? `ch ${op.chapter}` : undefined);
   return target === undefined ? type : `${type} · ${target}`;
+}
+
+// Fields whose values are prose/Markdown — shown as a rendered block instead of an inline value.
+const OP_PROSE_FIELDS = new Set(['body', 'premise', 'brief', 'objective', 'escalation', 'payoff', 'hook', 'conflict', 'motivation', 'notes', 'summary', 'instructions', 'note']);
+
+function formatOpValue(value: unknown): string {
+  if (Array.isArray(value)) return value.map(v => String(v)).join(', ');
+  if (value !== null && typeof value === 'object') return JSON.stringify(value);
+  return String(value);
+}
+
+/**
+ * A readable view of one change-set op: the identifying/scalar fields as a compact key/value grid,
+ * and the prose fields (a rewritten body, a new objective, a revision note) rendered as Markdown —
+ * so a change reads as what it does, not as a raw JSON blob.
+ */
+export function ChangeOpBody({ op }: { op: Record<string, unknown> }): React.JSX.Element {
+  const entries = Object.entries(op).filter(([k]) => k !== 'op' && op[k] !== undefined);
+  const prose = entries.filter(([k, v]) => OP_PROSE_FIELDS.has(k) && typeof v === 'string' && v.trim() !== '');
+  const inline = entries.filter(([k, v]) => !prose.some(([pk]) => pk === k) && v !== undefined);
+
+  return (
+    <div className={styles.opBody}>
+      {inline.length > 0 && (
+        <div className={styles.opFields}>
+          {inline.map(([k, v]) => (
+            <Fragment key={k}>
+              <span className={styles.opFieldKey}>{k}</span>
+              <span className={styles.opFieldVal}>{formatOpValue(v)}</span>
+            </Fragment>
+          ))}
+        </div>
+      )}
+      {prose.map(([k, v]) => (
+        <div key={k}>
+          <div className={styles.opProseLabel}>{k}</div>
+          <Markdown content={v as string} className={styles.opProse} />
+        </div>
+      ))}
+    </div>
+  );
 }
 
 interface ProposalDetailProps {
@@ -141,7 +182,7 @@ function ProposalDetail({ novelId, proposal }: ProposalDetailProps): React.JSX.E
                   <div className={styles.spacer} />
                   {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
                 </div>
-                <pre className={styles.op}>{JSON.stringify(op, null, 2)}</pre>
+                <ChangeOpBody op={op} />
                 {result?.error && <div className={styles.opError}>{result.error}</div>}
                 {result?.result?.summary !== undefined && <div className={styles.opSummary}>{String(result.result.summary)}</div>}
               </div>

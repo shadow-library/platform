@@ -497,9 +497,45 @@ a:hover {
   }
 }
 
-/* Rendered chapter Markdown (reading view + editor Preview tab) */
+/* Rendered Markdown (chapter reading view, editor Preview, chat replies, entity summaries) */
 .nf-md > *:first-child {
   margin-top: 0;
+}
+.nf-md > *:last-child {
+  margin-bottom: 0;
+}
+.nf-md h1,
+.nf-md h2,
+.nf-md h3 {
+  font-weight: 700;
+  line-height: 1.3;
+  margin: 1.2em 0 0.5em;
+}
+.nf-md h1 {
+  font-size: 1.3em;
+}
+.nf-md h2 {
+  font-size: 1.15em;
+}
+.nf-md h3 {
+  font-size: 1.02em;
+}
+.nf-md a {
+  color: var(--sh-accent);
+  text-decoration: underline;
+}
+.nf-md code {
+  font-family: var(--sh-font-mono);
+  font-size: 0.85em;
+  background: var(--sh-surface-well);
+  padding: 1px 5px;
+  border-radius: 4px;
+}
+.nf-md blockquote {
+  margin: 0 0 1.1em;
+  padding-left: 1em;
+  border-left: 3px solid var(--sh-border-default);
+  color: var(--sh-text-secondary);
 }
 .nf-md p {
   margin: 0 0 1.1em;

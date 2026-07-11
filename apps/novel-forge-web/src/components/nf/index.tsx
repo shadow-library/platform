@@ -12,6 +12,8 @@ import { type ApiError } from '@/lib/apis';
 import { SparkIcon } from '../icons';
 import styles from './nf.module.css';
 
+export { Markdown } from './Markdown';
+
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'ai';
 
 interface StatusChipProps {

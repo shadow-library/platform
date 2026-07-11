@@ -5,14 +5,13 @@ import { Button, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spi
 import { createFileRoute } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
-import { marked } from 'marked';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined modules
  */
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
-import { PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
+import { Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type DraftResponse,
@@ -82,14 +81,7 @@ function wordCount(body?: string | null): number {
 
 // ─── Prose formatting ───────────────────────────────────────────────────────────
 // Chapter prose is authored and stored as GitHub-flavored Markdown (bold, italic, lists, tables); the
-// reading view and the editor's Preview tab render it the same way.
-marked.setOptions({ gfm: true, breaks: true });
-
-// Rendered Markdown is sanitized (DOMPurify) so an imported/AI chapter carrying raw <script>/handlers
-// can never execute in the author's browser.
-function renderMarkdown(md: string | null | undefined): { __html: string } {
-  return { __html: DOMPurify.sanitize(marked.parse(md ?? '', { async: false }) as string) };
-}
+// reading view and the editor's Preview tab render it through the shared <Markdown> component.
 
 // Defense in depth: strip dangerous HTML from the Markdown source before it is persisted, so the stored
 // manuscript stays clean regardless of where the prose came from.
@@ -695,7 +687,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
                   />
                 </>
               ) : (
-                <div className={`nf-md ${styles.preview}`} dangerouslySetInnerHTML={renderMarkdown(text)} />
+                <Markdown content={text} className={styles.preview} />
               )}
             </div>
           </div>
@@ -704,7 +696,7 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
             <article className={`nf-page ${styles.reader}`}>
               {draft.title && <div className={styles.chapterEyebrow}>Chapter {chapter}</div>}
               {draft.body?.trim() ? (
-                <div className="nf-md" dangerouslySetInnerHTML={renderMarkdown(draft.body)} />
+                <Markdown content={draft.body} />
               ) : (
                 <p className={styles.emptyProse}>This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.</p>
               )}
