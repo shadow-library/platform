@@ -8,6 +8,7 @@ import { type FastifyReply, type FastifyRequest } from 'fastify';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { WebauthnChallengeResponse } from '@server/modules/auth/mfa';
 
 import { AuthFlowService, DeviceContext } from './auth-flow.service';
 import {
@@ -22,6 +23,7 @@ import {
   RegisterInitBody,
   ResetPasswordBody,
   SetPasswordBody,
+  WebauthnOptionsBody,
 } from './auth.dto';
 import { FlowStepResult } from './flow.types';
 import { LoginService } from './login.service';
@@ -100,12 +102,25 @@ export class AuthController {
     return this.respond(result, reply);
   }
 
+  /** Issues passkey assertion options for a usernameless login or a flow's MFA step. */
+  @Post('/webauthn/options')
+  @HttpStatus(200)
+  @RespondFor(200, WebauthnChallengeResponse)
+  webauthnOptions(@Body() body: WebauthnOptionsBody, @Req() request: FastifyRequest): Promise<WebauthnChallengeResponse> {
+    return this.loginService.webauthnOptions(body.flowId, this.deviceContext(request, body.deviceId));
+  }
+
   private async dispatchVerify(body: ChallengeVerifyBody): Promise<FlowStepResult> {
     if (body.password) return this.loginService.verifyPassword(body.flowId, body.password);
-    if (!body.code && !body.recoveryCode) throw new ServerError(AppErrorCode.AUTH_003);
+    if (!body.code && !body.recoveryCode && !body.webauthn) throw new ServerError(AppErrorCode.AUTH_003);
 
     const flow = await this.authFlowService.get(body.flowId);
     if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
+
+    if (body.webauthn) {
+      if (flow.kind === 'LOGIN') return this.loginService.verifyWebauthn(body.flowId, body.webauthn);
+      throw new ServerError(AppErrorCode.AUTH_002);
+    }
 
     if (body.recoveryCode) {
       if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { recoveryCode: body.recoveryCode });

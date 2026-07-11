@@ -53,6 +53,7 @@
     "@shadow-library/common": "^1.6.4",
     "@shadow-library/fastify": "^1.7.1",
     "@shadow-library/modules": "^0.6.0",
+    "@simplewebauthn/server": "^13.3.2",
     "ajv": "^8.17.1",
     "ajv-formats": "^3.0.1",
     "drizzle-orm": "^0.44.7",

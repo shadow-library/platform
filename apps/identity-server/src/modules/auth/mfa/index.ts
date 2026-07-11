@@ -4,3 +4,6 @@ export * from './mfa.module';
 export * from './mfa.service';
 export * from './recovery-code.service';
 export * from './totp';
+export * from './webauthn.controller';
+export * from './webauthn.dto';
+export * from './webauthn.service';

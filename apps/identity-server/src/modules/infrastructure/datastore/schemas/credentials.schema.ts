@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -15,6 +15,7 @@ import { users } from './users.schema';
 
 export type MfaEnrollment = InferSelectModel<typeof mfaEnrollments>;
 export type RecoveryCode = InferSelectModel<typeof recoveryCodes>;
+export type WebauthnCredential = InferSelectModel<typeof webauthnCredentials>;
 
 export namespace MfaEnrollment {
   export type Method = InferEnum<typeof mfaMethod>;
@@ -72,11 +73,42 @@ export const recoveryCodes = pgTable(
 );
 
 /**
+ * Registered passkeys / security keys. `credential_id` and `public_key` are stored base64url;
+ * `sign_count` tracks the authenticator's signature counter so a regression (a cloned
+ * authenticator replaying an old state) is detectable and rejected.
+ */
+export const webauthnCredentials = pgTable(
+  'webauthn_credentials',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    userId: bigint('user_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    credentialId: text('credential_id').notNull().unique(),
+    publicKey: text('public_key').notNull(),
+    signCount: bigint('sign_count', { mode: 'bigint' })
+      .notNull()
+      .default(sql`0`),
+    transports: text('transports'),
+    aaguid: varchar('aaguid', { length: 36 }),
+    backupEligible: boolean('backup_eligible').notNull().default(false),
+    label: varchar('label', { length: 64 }).notNull().default('passkey'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastUsedAt: timestamp('last_used_at', { withTimezone: true }),
+  },
+  t => [index('webauthn_credentials_user_id_idx').on(t.userId)],
+);
+
+/**
  * Declaring the relations
  */
 
 export const mfaEnrollmentsRelations = relations(mfaEnrollments, ({ one }) => ({
   user: one(users, { fields: [mfaEnrollments.userId], references: [users.id] }),
+}));
+
+export const webauthnCredentialsRelations = relations(webauthnCredentials, ({ one }) => ({
+  user: one(users, { fields: [webauthnCredentials.userId], references: [users.id] }),
 }));
 
 export const recoveryCodesRelations = relations(recoveryCodes, ({ one }) => ({

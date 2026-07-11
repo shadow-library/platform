@@ -37,6 +37,11 @@ export interface EnrollmentSummary {
   lastUsedAt: Date | null;
 }
 
+export interface MfaFactors {
+  totp: boolean;
+  webauthn: boolean;
+}
+
 interface SerializedSecret {
   ciphertext: string;
   iv: string;
@@ -68,18 +73,29 @@ export class MfaService {
 
   /** True when the user holds any verified second factor; drives the login-flow MFA gate. */
   async hasMfa(userId: bigint): Promise<boolean> {
+    const factors = await this.getFactors(userId);
+    return factors.totp || factors.webauthn;
+  }
+
+  /** Which factor kinds the user holds; drives the login flow's MFA step selection. */
+  async getFactors(userId: bigint): Promise<MfaFactors> {
     const enrollment = await this.db.query.mfaEnrollments.findFirst({
       where: and(eq(schema.mfaEnrollments.userId, userId), isNotNull(schema.mfaEnrollments.verifiedAt)),
       columns: { id: true },
     });
-    return enrollment !== undefined;
+    const credential = await this.db.query.webauthnCredentials.findFirst({ where: eq(schema.webauthnCredentials.userId, userId), columns: { id: true } });
+    return { totp: enrollment !== undefined, webauthn: credential !== undefined };
   }
 
   async listEnrollments(userId: bigint): Promise<EnrollmentSummary[]> {
     const enrollments = await this.db.query.mfaEnrollments.findMany({
       where: and(eq(schema.mfaEnrollments.userId, userId), isNotNull(schema.mfaEnrollments.verifiedAt)),
     });
-    return enrollments.map(enrollment => ({ type: enrollment.type, label: enrollment.label, createdAt: enrollment.createdAt, lastUsedAt: enrollment.lastUsedAt }));
+    const credentials = await this.db.query.webauthnCredentials.findMany({ where: eq(schema.webauthnCredentials.userId, userId) });
+    return [
+      ...enrollments.map(enrollment => ({ type: enrollment.type, label: enrollment.label, createdAt: enrollment.createdAt, lastUsedAt: enrollment.lastUsedAt })),
+      ...credentials.map(credential => ({ type: 'WEBAUTHN' as const, label: credential.label, createdAt: credential.createdAt, lastUsedAt: credential.lastUsedAt })),
+    ];
   }
 
   /**

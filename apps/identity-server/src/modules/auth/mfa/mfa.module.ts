@@ -16,6 +16,8 @@ import { NotificationModule } from '@server/modules/infrastructure/notification'
 import { MfaController } from './mfa.controller';
 import { MfaService } from './mfa.service';
 import { RecoveryCodeService } from './recovery-code.service';
+import { WebauthnController } from './webauthn.controller';
+import { WebauthnService } from './webauthn.service';
 
 /**
  * Defining types
@@ -27,8 +29,8 @@ import { RecoveryCodeService } from './recovery-code.service';
 
 @Module({
   imports: [DatabaseModule, KeyModule, SessionModule, UserModule, AuditModule, NotificationModule],
-  controllers: [MfaController],
-  providers: [MfaService, RecoveryCodeService],
-  exports: [MfaService, RecoveryCodeService],
+  controllers: [MfaController, WebauthnController],
+  providers: [MfaService, RecoveryCodeService, WebauthnService],
+  exports: [MfaService, RecoveryCodeService, WebauthnService],
 })
 export class MfaModule {}

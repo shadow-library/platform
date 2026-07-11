@@ -4,13 +4,14 @@
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
+import { type AuthenticationResponseJSON, type AuthenticatorAttachment, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { MfaService, RecoveryCodeService } from '@server/modules/auth/mfa';
+import { MfaService, RecoveryCodeService, WebauthnAssertion, WebauthnService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { PasswordService } from '@server/modules/identity/credentials';
 import { UserService } from '@server/modules/identity/user';
@@ -43,7 +44,13 @@ export interface MfaProof {
 
 interface CompletionOptions {
   aal?: UserSession.Aal;
+  authMode?: User.AuthProvider;
   mfaMode?: User.AuthProvider;
+}
+
+export interface WebauthnChallenge {
+  flowId: string;
+  options: PublicKeyCredentialRequestOptionsJSON;
 }
 
 /**
@@ -54,6 +61,9 @@ interface CompletionOptions {
 const MAX_FLOW_FAILURES = 3;
 const AWAITING_PASSWORD = 'AWAITING_PASSWORD';
 const AWAITING_TOTP = 'AWAITING_TOTP';
+const AWAITING_MFA_WEBAUTHN = 'AWAITING_MFA_WEBAUTHN';
+const AWAITING_WEBAUTHN = 'AWAITING_WEBAUTHN';
+const MFA_STATUSES = [AWAITING_TOTP, AWAITING_MFA_WEBAUTHN];
 
 @Injectable()
 export class LoginService {
@@ -68,6 +78,7 @@ export class LoginService {
     private readonly auditService: AuditService,
     private readonly mfaService: MfaService,
     private readonly recoveryCodeService: RecoveryCodeService,
+    private readonly webauthnService: WebauthnService,
   ) {}
 
   /**
@@ -96,8 +107,9 @@ export class LoginService {
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
 
-    if (await this.mfaService.hasMfa(userId)) {
-      const next = await this.authFlowService.update(flow, { status: AWAITING_TOTP });
+    const factors = await this.mfaService.getFactors(userId);
+    if (factors.totp || factors.webauthn) {
+      const next = await this.authFlowService.update(flow, { status: factors.totp ? AWAITING_TOTP : AWAITING_MFA_WEBAUTHN });
       return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
     }
     return this.complete(flow, userId, {});
@@ -109,7 +121,8 @@ export class LoginService {
    */
   async verifyMfa(flowId: string, proof: MfaProof): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
-    if (flow.status !== AWAITING_TOTP) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+    if (proof.code && flow.status !== AWAITING_TOTP) throw new ServerError(AppErrorCode.AUTH_002);
 
     const userId = flow.userId ? BigInt(flow.userId) : null;
     if (!userId) return this.handleFailure(flow, null, 'MFA_FAILED');
@@ -117,6 +130,65 @@ export class LoginService {
     const valid = await this.verifyProof(userId, proof);
     if (!valid) return this.handleFailure(flow, userId, 'MFA_FAILED');
     return this.complete(flow, userId, { aal: 'AAL2', mfaMode: proof.recoveryCode ? 'RECOVERY_CODE' : 'TOTP' });
+  }
+
+  /**
+   * Issues WebAuthn assertion options. Without a flow this begins a usernameless (discoverable
+   * credential) login; with one it serves the flow's MFA step. Options are shaped identically
+   * whether or not credentials exist (D-12).
+   */
+  async webauthnOptions(flowId: string | undefined, device: DeviceContext): Promise<WebauthnChallenge> {
+    if (!flowId) {
+      const flow = await this.authFlowService.create('LOGIN', AWAITING_WEBAUTHN, { identifier: '', authMethod: 'WEBAUTHN', device });
+      const options = await this.webauthnService.startAuthentication(flow.flowId, null, true);
+      return { flowId: flow.flowId, options };
+    }
+
+    const flow = await this.requireFlow(flowId);
+    const firstFactor = flow.status === AWAITING_WEBAUTHN;
+    if (!firstFactor && !MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+    const userId = flow.userId ? BigInt(flow.userId) : null;
+    const options = await this.webauthnService.startAuthentication(flowId, userId, firstFactor);
+    return { flowId, options };
+  }
+
+  /** Completes a login with a passkey assertion, as either the first factor or the MFA step. */
+  async verifyWebauthn(flowId: string, assertion: WebauthnAssertion): Promise<FlowStepResult> {
+    const flow = await this.requireFlow(flowId);
+    const firstFactor = flow.status === AWAITING_WEBAUTHN;
+    if (!firstFactor && !MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+
+    const flowUserId = flow.userId ? BigInt(flow.userId) : null;
+    const result = await this.webauthnService.finishAuthentication(flowId, this.toAuthenticationResponse(assertion), firstFactor);
+    if (!result) return this.handleFailure(flow, flowUserId, firstFactor ? 'INVALID_CREDENTIALS' : 'MFA_FAILED');
+
+    if (firstFactor) {
+      const user = await this.userService.getUser(result.userId);
+      if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, result.userId, 'INVALID_CREDENTIALS');
+      flow.userId = result.userId.toString();
+      flow.identifier = user.username ?? `user_${result.userId}`;
+      /** A user-verified passkey is possession + knowledge/biometric in one ceremony → AAL2. */
+      return this.complete(flow, result.userId, { aal: 'AAL2', authMode: 'WEBAUTHN' });
+    }
+
+    if (flowUserId === null || flowUserId !== result.userId) return this.handleFailure(flow, flowUserId, 'MFA_FAILED');
+    return this.complete(flow, result.userId, { aal: 'AAL2', mfaMode: 'WEBAUTHN' });
+  }
+
+  private toAuthenticationResponse(assertion: WebauthnAssertion): AuthenticationResponseJSON {
+    return {
+      id: assertion.id,
+      rawId: assertion.rawId,
+      type: assertion.type,
+      response: {
+        clientDataJSON: assertion.response.clientDataJSON,
+        authenticatorData: assertion.response.authenticatorData,
+        signature: assertion.response.signature,
+        userHandle: assertion.response.userHandle,
+      },
+      clientExtensionResults: {},
+      authenticatorAttachment: assertion.authenticatorAttachment as AuthenticatorAttachment | undefined,
+    };
   }
 
   private async verifyProof(userId: bigint, proof: MfaProof): Promise<boolean> {
@@ -131,7 +203,7 @@ export class LoginService {
       userId,
       identifier: flow.identifier,
       status: 'SUCCESS',
-      authMode: 'PASSWORD',
+      authMode: options.authMode ?? 'PASSWORD',
       mfaMode: options.mfaMode ?? null,
       device: this.deviceFields(flow),
     });

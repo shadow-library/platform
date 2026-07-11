@@ -22,6 +22,8 @@ declare module '@shadow-library/common' {
     'auth.bootstrap.admin-email': string;
     'auth.bootstrap.admin-password': string;
     'auth.password.breach-check-enabled': boolean;
+    'auth.webauthn.rp-id': string;
+    'auth.webauthn.origin': string;
 
     /** Security configs */
     'security.master-encryption-key': string;
@@ -52,6 +54,8 @@ Config.load('auth.flow.ttl', { defaultValue: '900', validateType: 'number' });
 Config.load('auth.bootstrap.admin-email', { envKey: 'IDENTITY_BOOTSTRAP_ADMIN_EMAIL', defaultValue: 'admin@shadow-apps.com' });
 Config.load('auth.bootstrap.admin-password', { envKey: 'IDENTITY_BOOTSTRAP_ADMIN_PASSWORD', defaultValue: '' });
 Config.load('auth.password.breach-check-enabled', { envKey: 'AUTH_PASSWORD_BREACH_CHECK', defaultValue: 'false', validateType: 'boolean' });
+Config.load('auth.webauthn.rp-id', { envKey: 'AUTH_WEBAUTHN_RP_ID', defaultValue: 'localhost' });
+Config.load('auth.webauthn.origin', { envKey: 'AUTH_WEBAUTHN_ORIGIN', defaultValue: 'http://localhost:8080' });
 
 Config.load('notification.base-url', { envKey: 'NOTIFICATION_BASE_URL', defaultValue: 'http://localhost:3000/api/v1' });
 Config.load('notification.service-name', { envKey: 'NOTIFICATION_SERVICE_NAME', defaultValue: 'shadow-identity' });

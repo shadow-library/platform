@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { WebauthnAssertion } from '@server/modules/auth/mfa';
 
 /**
  * Defining types
@@ -50,6 +51,20 @@ export class ChallengeVerifyBody {
   /** Single-use MFA bypass code; accepted wherever a second factor is awaited. */
   @Field({ optional: true })
   recoveryCode?: string;
+
+  /** Passkey assertion, as either the first factor or the MFA step. */
+  @Field(() => WebauthnAssertion, { optional: true })
+  webauthn?: WebauthnAssertion;
+}
+
+@Schema()
+export class WebauthnOptionsBody {
+  /** Absent for a usernameless (discoverable credential) login; present for a flow's MFA step. */
+  @Field({ optional: true })
+  flowId?: string;
+
+  @Field({ optional: true })
+  deviceId?: string;
 }
 
 @Schema()
