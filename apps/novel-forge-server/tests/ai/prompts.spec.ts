@@ -80,6 +80,10 @@ describe('Prompt modules', () => {
       const parsed = parseSchema(PlanSchema, vols);
       expect(parsed.success && validatePlanContiguity(parsed.data as never).length === 0).toBe(true);
     });
+
+    it('rejects an empty plan so the repair ladder retries instead of persisting zero volumes', () => {
+      expect(validatePlanContiguity([])).toEqual(['plan must contain at least one volume']);
+    });
   });
 
   describe('refinement prompt modules', () => {

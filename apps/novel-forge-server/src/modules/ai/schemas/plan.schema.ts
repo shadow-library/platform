@@ -57,6 +57,9 @@ export type PlanOutput = VolumeSpecSchema[];
 // kept as a plain post-validation check, wired into ModelRouterService.structured() via
 // PromptModule.postValidate, the same way zod's `.refine()` used to gate this.
 export function validatePlanContiguity(vols: VolumeSpecSchema[]): string[] {
+  // An empty array is schema-valid (root array) and vacuously contiguous, but it means the model
+  // refused the task — reject it so the repair ladder retries instead of persisting zero volumes.
+  if (vols.length === 0) return ['plan must contain at least one volume'];
   // Local models sometimes emit the same volume several times; collapse duplicate ordinals (the plan
   // upsert is keyed by volumeKey, so repeats become one row anyway) before checking contiguity.
   const byOrdinal = new Map<number, VolumeSpecSchema>();

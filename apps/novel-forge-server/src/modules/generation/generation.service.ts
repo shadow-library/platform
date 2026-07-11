@@ -130,7 +130,10 @@ export class GenerationService {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw new ServerError(AppErrorCode.PRJ_001);
 
-    const skeleton = body.skeleton ?? [project.skeletonPowerCurve, JSON.stringify(project.skeletonCharacterArcs ?? {})].filter(Boolean).join('\n\n');
+    // Fresh (non-source) novels have no skeleton; a blank "Novel skeleton:" line makes weak models
+    // treat the task as unanswerable and return an empty plan, so state the fallback explicitly.
+    const derived = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
+    const skeleton = body.skeleton ?? (derived || 'No skeleton available — derive the character arcs and escalation curve from the brief.');
 
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
     const planOutput = await this.modelRouter.structured(
