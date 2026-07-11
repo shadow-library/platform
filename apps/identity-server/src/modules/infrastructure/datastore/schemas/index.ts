@@ -1,5 +1,6 @@
 export * from './audit.schema';
 export * from './auth-tokens.schemas';
+export * from './challenges.schema';
 export * from './keys.schema';
 export * from './notification.schema';
 export * from './organisations.schema';

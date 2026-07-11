@@ -10,12 +10,13 @@ import { ServerError } from '@shadow-library/fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { CookieSpec, SessionService } from '@server/modules/auth/session';
+import { SessionService } from '@server/modules/auth/session';
 import { PasswordService } from '@server/modules/identity/credentials';
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 
 import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.service';
+import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
 
 /**
@@ -32,8 +33,6 @@ export interface LoginInitResult {
   status: string;
   hasAlternativeMethods: boolean;
 }
-
-export type LoginVerifyResult = { status: 'COMPLETED'; flowId: string; cookies: CookieSpec[] } | { status: string; flowId: string; attemptsLeft: number };
 
 /**
  * Declaring the constants
@@ -71,7 +70,7 @@ export class LoginService {
     return { flowId: flow.flowId, status: flow.status, hasAlternativeMethods: false };
   }
 
-  async verifyPassword(flowId: string, password: string): Promise<LoginVerifyResult> {
+  async verifyPassword(flowId: string, password: string): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     if (flow.status !== AWAITING_PASSWORD) throw new ServerError(AppErrorCode.AUTH_002);
 
@@ -81,7 +80,7 @@ export class LoginService {
     return this.handleFailure(flow, userId);
   }
 
-  private async complete(flow: AuthFlowContext, userId: bigint): Promise<LoginVerifyResult> {
+  private async complete(flow: AuthFlowContext, userId: bigint): Promise<FlowStepResult> {
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId);
 
@@ -98,10 +97,10 @@ export class LoginService {
     await this.auditService.record({ action: 'auth.login.succeeded', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString(), ipAddress: flow.device.ipAddress });
     await this.authFlowService.delete(flow.flowId);
     this.logger.info('login completed', { userId });
-    return { status: 'COMPLETED', flowId: flow.flowId, cookies };
+    return { outcome: 'COMPLETED', flowId: flow.flowId, cookies };
   }
 
-  private async handleFailure(flow: AuthFlowContext, userId: bigint | null): Promise<LoginVerifyResult> {
+  private async handleFailure(flow: AuthFlowContext, userId: bigint | null): Promise<FlowStepResult> {
     const failureCount = flow.failureCount + 1;
     await this.signInEventService.record({
       flowId: flow.flowId,
@@ -120,7 +119,7 @@ export class LoginService {
     }
 
     await this.authFlowService.update(flow, { failureCount, globalFailureCount: flow.globalFailureCount + 1 });
-    return { status: AWAITING_PASSWORD, flowId: flow.flowId, attemptsLeft: MAX_FLOW_FAILURES - failureCount };
+    return { outcome: 'FAILED', status: AWAITING_PASSWORD, flowId: flow.flowId, attemptsLeft: MAX_FLOW_FAILURES - failureCount };
   }
 
   private async requireFlow(flowId: string): Promise<AuthFlowContext> {

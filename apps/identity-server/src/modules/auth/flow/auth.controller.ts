@@ -9,9 +9,21 @@ import { type FastifyReply, type FastifyRequest } from 'fastify';
  */
 import { AppErrorCode } from '@server/classes';
 
-import { DeviceContext } from './auth-flow.service';
-import { ChallengeVerifyBody, ChallengeVerifyResponse, LoginInitBody, LoginInitResponse } from './auth.dto';
+import { AuthFlowService, DeviceContext } from './auth-flow.service';
+import {
+  ChallengeVerifyBody,
+  ChallengeVerifyResponse,
+  DemographicsBody,
+  FlowStatusResponse,
+  LoginInitBody,
+  LoginInitResponse,
+  ProfileBody,
+  RegisterInitBody,
+  SetPasswordBody,
+} from './auth.dto';
+import { FlowStepResult } from './flow.types';
 import { LoginService } from './login.service';
+import { RegistrationService } from './registration.service';
 
 /**
  * Defining types
@@ -23,7 +35,11 @@ import { LoginService } from './login.service';
 
 @HttpController('/api/v1/auth')
 export class AuthController {
-  constructor(private readonly loginService: LoginService) {}
+  constructor(
+    private readonly loginService: LoginService,
+    private readonly registrationService: RegistrationService,
+    private readonly authFlowService: AuthFlowService,
+  ) {}
 
   @Post('/login/init')
   @RespondFor(200, LoginInitResponse)
@@ -31,19 +47,62 @@ export class AuthController {
     return this.loginService.init({ identifier: body.identifier, device: this.deviceContext(request, body.deviceId) });
   }
 
+  @Post('/register/init')
+  @RespondFor(200, FlowStatusResponse)
+  registerInit(@Body() body: RegisterInitBody, @Req() request: FastifyRequest): Promise<FlowStatusResponse> {
+    return this.registrationService.init({ email: body.email, device: this.deviceContext(request, body.deviceId) });
+  }
+
+  @Post('/register/demographics')
+  @RespondFor(200, FlowStatusResponse)
+  registerDemographics(@Body() body: DemographicsBody): Promise<FlowStatusResponse> {
+    return this.registrationService.setDemographics(body.flowId, { dateOfBirth: body.dateOfBirth, gender: body.gender });
+  }
+
+  @Post('/register/profile')
+  @RespondFor(200, FlowStatusResponse)
+  registerProfile(@Body() body: ProfileBody): Promise<FlowStatusResponse> {
+    return this.registrationService.setProfile(body.flowId, { firstName: body.firstName, lastName: body.lastName });
+  }
+
+  @Post('/register/password')
+  @HttpStatus(200)
+  @RespondFor(200, ChallengeVerifyResponse)
+  async registerPassword(@Body() body: SetPasswordBody, @Res() reply: FastifyReply): Promise<ChallengeVerifyResponse> {
+    const result = await this.registrationService.setPassword(body.flowId, body.password);
+    return this.respond(result, reply);
+  }
+
   @Post('/challenge/verify')
   @HttpStatus(200)
   @RespondFor(200, ChallengeVerifyResponse)
   @RespondFor(401, ChallengeVerifyResponse)
   async challengeVerify(@Body() body: ChallengeVerifyBody, @Res() reply: FastifyReply): Promise<ChallengeVerifyResponse> {
-    if (!body.password) throw new ServerError(AppErrorCode.AUTH_003);
-    const result = await this.loginService.verifyPassword(body.flowId, body.password);
-    if ('cookies' in result) {
+    const result = await this.dispatchVerify(body);
+    return this.respond(result, reply);
+  }
+
+  private async dispatchVerify(body: ChallengeVerifyBody): Promise<FlowStepResult> {
+    if (body.password) return this.loginService.verifyPassword(body.flowId, body.password);
+    if (body.code) {
+      const flow = await this.authFlowService.get(body.flowId);
+      if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
+      if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, body.code);
+      throw new ServerError(AppErrorCode.AUTH_002);
+    }
+    throw new ServerError(AppErrorCode.AUTH_003);
+  }
+
+  private respond(result: FlowStepResult, reply: FastifyReply): ChallengeVerifyResponse {
+    if (result.outcome === 'COMPLETED') {
       for (const cookie of result.cookies) reply.setCookie(cookie.name, cookie.value, cookie.options);
       return { flowId: result.flowId, status: 'COMPLETED' };
     }
-    reply.status(401);
-    return { flowId: result.flowId, status: result.status, attemptsLeft: result.attemptsLeft };
+    if (result.outcome === 'FAILED') {
+      reply.status(401);
+      return { flowId: result.flowId, status: result.status, attemptsLeft: result.attemptsLeft };
+    }
+    return { flowId: result.flowId, status: result.status };
   }
 
   private deviceContext(request: FastifyRequest, deviceId?: string): DeviceContext {
