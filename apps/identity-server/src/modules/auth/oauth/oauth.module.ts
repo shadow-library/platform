@@ -15,6 +15,7 @@ import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 
 import { AccessTokenService } from './access-token.service';
 import { AuthorizationCodeService } from './authorization-code.service';
+import { ConsentController } from './consent.controller';
 import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
 import { OAuthController } from './oauth.controller';
@@ -30,7 +31,7 @@ import { OAuthService } from './oauth.service';
 
 @Module({
   imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule],
-  controllers: [OAuthController],
+  controllers: [OAuthController, ConsentController],
   providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, ConsentService, OAuthService],
   exports: [OAuthClientService, AccessTokenService, ConsentService],
 })
