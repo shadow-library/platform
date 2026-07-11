@@ -57,5 +57,8 @@ export const HttpRouteModule = FastifyModule.forRoot({
   port: Config.get('server.port'),
   routePrefix: '/api',
   prefixVersioning: true,
+  // Cover/portrait uploads arrive as base64 JSON (~1.33x the file size); Fastify's 1MB default
+  // rejects any real image with a 413. Lift the ceiling to comfortably fit the client's 8MB cap.
+  bodyLimit: 12 * 1024 * 1024,
   transformers: CUSTOM_DATA_TRANSFORMERS,
 });
