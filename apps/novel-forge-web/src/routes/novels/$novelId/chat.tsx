@@ -592,6 +592,7 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
             onValueChange={setInput}
             placeholder={isHub ? 'Ask for anything — edits, prose, pipeline runs…' : `Ask for a change to this ${session.scopeType}…`}
             minRows={1}
+            maxRows={6}
             autoGrow
             disabled={session.status !== 'active'}
             className={styles.input}

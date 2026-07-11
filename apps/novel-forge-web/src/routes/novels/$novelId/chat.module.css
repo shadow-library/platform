@@ -146,9 +146,7 @@
 
 .composer {
   flex-shrink: 0;
-  padding: 14px 20px 18px;
-  border-top: 1px solid var(--sh-border-subtle);
-  background: var(--sh-surface-card);
+  padding: 6px 20px 16px;
 }
 
 .composerInner {
@@ -156,7 +154,8 @@
   margin: 0 auto;
   border: 1px solid var(--sh-border-default);
   border-radius: var(--sh-radius-lg);
-  background: var(--sh-surface-app);
+  background: var(--sh-surface-card);
+  box-shadow: var(--sh-shadow-sm, 0 1px 2px rgb(0 0 0 / 0.05));
   padding: 10px 12px;
 }
 
