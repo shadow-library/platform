@@ -7,7 +7,7 @@ import { type UseQueryResult, useQuery } from '@tanstack/react-query';
  * Importing user defined packages
  */
 import { APIRequest, ApiError, type PollingOptions } from './api-request';
-import { type ListWorkflowRunResponse, type WorkflowRunDetailResponse } from './api-types.gen';
+import { type ListWorkflowRunResponse, type RunContextResponse, type RunModelCallDetailResponse, type WorkflowRunDetailResponse } from './api-types.gen';
 
 /**
  * Workflow runs are the orchestrator's execution records — every generate, judge,
@@ -16,6 +16,8 @@ import { type ListWorkflowRunResponse, type WorkflowRunDetailResponse } from './
 const runKeys = {
   all: (projectId: string) => ['projects', projectId, 'runs'] as const,
   detail: (projectId: string, runId: string) => [...runKeys.all(projectId), runId] as const,
+  context: (projectId: string, runId: string) => [...runKeys.detail(projectId, runId), 'context'] as const,
+  call: (projectId: string, runId: string, callId: string) => [...runKeys.detail(projectId, runId), 'calls', callId] as const,
 };
 
 export function useListRunsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListWorkflowRunResponse, ApiError> {
@@ -32,5 +34,25 @@ export function useRunQuery(projectId: string, runId: string | undefined, enable
     queryKey: runKeys.detail(projectId, runId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/runs/${runId}`).execute(),
     enabled: enabled && Boolean(projectId) && Boolean(runId),
+  });
+}
+
+/** The exact rendered context that fed the run's prompt — fetched on demand, it can be tens of KB. */
+export function useRunContextQuery(projectId: string, runId: string | undefined, enabled = true): UseQueryResult<RunContextResponse, ApiError> {
+  return useQuery<RunContextResponse, ApiError>({
+    queryKey: runKeys.context(projectId, runId ?? ''),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/runs/${runId}/context`).execute(),
+    enabled: enabled && Boolean(projectId) && Boolean(runId),
+    staleTime: Infinity,
+  });
+}
+
+/** One model call in full (raw output + error) — fetched when the author expands the row. */
+export function useRunCallQuery(projectId: string, runId: string, callId: string | undefined, enabled = true): UseQueryResult<RunModelCallDetailResponse, ApiError> {
+  return useQuery<RunModelCallDetailResponse, ApiError>({
+    queryKey: runKeys.call(projectId, runId, callId ?? ''),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/runs/${runId}/calls/${callId}`).execute(),
+    enabled: enabled && Boolean(projectId) && Boolean(callId),
+    staleTime: Infinity,
   });
 }

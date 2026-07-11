@@ -547,6 +547,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/runs/{runId}/context': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Run Context */
+    get: operations['getRunContext'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/runs/{runId}/calls/{callId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Run Call */
+    get: operations['getRunCall'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/ai-usage': {
     parameters: {
       query?: never;
@@ -1826,6 +1860,8 @@ export interface components {
       };
       nodeTrace?: null | string[];
       modelCalls?: components['schemas']['RunModelCallResponse'][];
+      toolCalls?: components['schemas']['RunToolCallResponse'][];
+      contextPack?: components['schemas']['RunContextPackResponse'];
       /** Format: date-time */
       startedAt: string;
       /** Format: date-time */
@@ -1840,6 +1876,7 @@ export interface components {
       provider: string;
       model: string;
       promptKey: string;
+      promptVersion: string;
       status: string;
       inputTokens?: null | number;
       outputTokens?: null | number;
@@ -1848,6 +1885,62 @@ export interface components {
       attempt: number;
       /** Format: date-time */
       createdAt: string;
+    };
+    RunToolCallResponse: {
+      id: string;
+      node?: null | string;
+      tool: string;
+      args?: null | {
+        [key: string]: unknown;
+      };
+      status: string;
+      resultDigest?: null | string;
+      latencyMs?: null | number;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    RunContextPackResponse: {
+      id: string;
+      purpose: string;
+      budgetTokens?: null | number;
+      usedTokens?: null | number;
+      sections: components['schemas']['RunContextSectionItem'][];
+    };
+    RunContextSectionItem: {
+      key: string;
+      tier: string;
+      segment: string;
+      tokens: number;
+      truncated: boolean;
+    };
+    RunContextResponse: {
+      id: string;
+      purpose: string;
+      budgetTokens?: null | number;
+      usedTokens?: null | number;
+      sections: components['schemas']['RunContextSectionItem'][];
+      rendered: string;
+    };
+    RunModelCallDetailResponse: {
+      id: string;
+      node?: null | string;
+      role: string;
+      provider: string;
+      model: string;
+      promptKey: string;
+      promptVersion: string;
+      status: string;
+      inputTokens?: null | number;
+      outputTokens?: null | number;
+      latencyMs?: null | number;
+      costUsd?: null | string;
+      attempt: number;
+      /** Format: date-time */
+      createdAt: string;
+      rawOutput?: null | string;
+      error?: null | {
+        [key: string]: unknown;
+      };
     };
     AiUsageResponse: {
       totalInputTokens: number;
@@ -4006,6 +4099,89 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WorkflowRunDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getRunContext: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        runId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RunContextResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getRunCall: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        runId: string;
+        callId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RunModelCallDetailResponse'];
         };
       };
       /** @description Default Response */
@@ -7172,6 +7348,11 @@ export type ListWorkflowRunResponse = components['schemas']['ListWorkflowRunResp
 export type WorkflowRunDetailResponse = components['schemas']['WorkflowRunDetailResponse'];
 export type WorkflowRunStatus = components['schemas']['WorkflowRunStatus'];
 export type RunModelCallResponse = components['schemas']['RunModelCallResponse'];
+export type RunToolCallResponse = components['schemas']['RunToolCallResponse'];
+export type RunContextPackResponse = components['schemas']['RunContextPackResponse'];
+export type RunContextSectionItem = components['schemas']['RunContextSectionItem'];
+export type RunContextResponse = components['schemas']['RunContextResponse'];
+export type RunModelCallDetailResponse = components['schemas']['RunModelCallDetailResponse'];
 export type AiUsageResponse = components['schemas']['AiUsageResponse'];
 export type RoleCallCounts = components['schemas']['RoleCallCounts'];
 export type RoleUsage = components['schemas']['RoleUsage'];
@@ -7282,6 +7463,8 @@ export type GetContinuityProposalPathParams = Exclude<paths['/api/v1/projects/{p
 export type GetReviewQueuePathParams = Exclude<paths['/api/v1/projects/{projectId}/review-queue']['get']['parameters']['path'], undefined>;
 export type ListRunsPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs']['get']['parameters']['path'], undefined>;
 export type GetRunPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}']['get']['parameters']['path'], undefined>;
+export type GetRunContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/context']['get']['parameters']['path'], undefined>;
+export type GetRunCallPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/calls/{callId}']['get']['parameters']['path'], undefined>;
 export type GetAiUsagePathParams = Exclude<paths['/api/v1/projects/{projectId}/ai-usage']['get']['parameters']['path'], undefined>;
 export type SearchQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;
 export type SearchPathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;

@@ -190,3 +190,52 @@
   font-size: var(--sh-text-caption);
   color: var(--sh-text-tertiary);
 }
+
+.callRow {
+  cursor: pointer;
+}
+
+.callRow:hover td {
+  background: var(--sh-bg-hover);
+}
+
+.callDetailCell {
+  padding: 10px 14px !important;
+  background: var(--sh-surface-app);
+}
+
+.callDetailLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 6px;
+}
+
+.tableNote {
+  margin: 6px 2px 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.anatomyHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.anatomySummary {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.contextPre {
+  max-height: 60vh;
+  overflow: auto;
+  background: var(--sh-surface-app);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-md);
+  padding: 12px;
+}

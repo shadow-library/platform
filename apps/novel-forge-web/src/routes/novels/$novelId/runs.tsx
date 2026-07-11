@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Spinner } from '@shadow-library/ui';
+import { Button, Dialog, Spinner } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
 
@@ -9,7 +9,16 @@ import { useEffect, useState } from 'react';
  * Importing user defined modules
  */
 import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
-import { type RunModelCallResponse, type WorkflowRunDetailResponse, useListRunsQuery, useRunQuery } from '@/lib/apis';
+import {
+  type RunContextPackResponse,
+  type RunModelCallResponse,
+  type RunToolCallResponse,
+  type WorkflowRunDetailResponse,
+  useListRunsQuery,
+  useRunCallQuery,
+  useRunContextQuery,
+  useRunQuery,
+} from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './runs.module.css';
@@ -80,17 +89,74 @@ function RunListItem({ run, selected, onSelect }: RunListItemProps): React.JSX.E
   );
 }
 
+/** One model call: the summary row, plus the raw model output fetched lazily when expanded. */
+interface ModelCallRowProps {
+  novelId: string;
+  runId: string;
+  call: RunModelCallResponse;
+}
+
+function ModelCallRow({ novelId, runId, call }: ModelCallRowProps): React.JSX.Element {
+  const [expanded, setExpanded] = useState(false);
+  const detailQuery = useRunCallQuery(novelId, runId, call.id, expanded);
+
+  return (
+    <>
+      <tr className={styles.callRow} onClick={() => setExpanded(e => !e)}>
+        <td className={styles.cellMono}>
+          {call.provider}/{call.model}
+          {call.attempt > 0 && <span className={styles.retry}> · retry {call.attempt}</span>}
+        </td>
+        <td className={styles.cellMono}>
+          {call.promptKey}@{call.promptVersion}
+        </td>
+        <td>{call.role}</td>
+        <td>
+          <StatusChip intent={call.status === 'ok' ? 'success' : call.status === 'repaired' ? 'warning' : 'danger'}>{call.status}</StatusChip>
+        </td>
+        <td>{tokens(call.inputTokens)}</td>
+        <td>{tokens(call.outputTokens)}</td>
+        <td>{call.latencyMs != null ? `${(call.latencyMs / 1000).toFixed(1)}s` : '—'}</td>
+        <td>{call.costUsd != null ? `$${Number(call.costUsd).toFixed(4)}` : '—'}</td>
+      </tr>
+      {expanded && (
+        <tr>
+          <td colSpan={8} className={styles.callDetailCell}>
+            {detailQuery.isLoading && <Spinner size="sm" />}
+            {detailQuery.error && <PaneError error={detailQuery.error} />}
+            {detailQuery.data?.error != null && (
+              <>
+                <div className={styles.callDetailLabel}>Call error</div>
+                <pre className={styles.pre}>{JSON.stringify(detailQuery.data.error, null, 2)}</pre>
+              </>
+            )}
+            {detailQuery.data && (
+              <>
+                <div className={styles.callDetailLabel}>Raw model output</div>
+                <pre className={`${styles.pre} ${styles.preWell}`}>{detailQuery.data.rawOutput ?? '(not recorded)'}</pre>
+              </>
+            )}
+          </td>
+        </tr>
+      )}
+    </>
+  );
+}
+
 interface ModelCallsTableProps {
+  novelId: string;
+  runId: string;
   calls: RunModelCallResponse[];
 }
 
-function ModelCallsTable({ calls }: ModelCallsTableProps): React.JSX.Element {
+function ModelCallsTable({ novelId, runId, calls }: ModelCallsTableProps): React.JSX.Element {
   return (
     <div className={styles.tableWrap}>
       <table className={styles.table}>
         <thead>
           <tr>
             <th>Model</th>
+            <th>Prompt</th>
             <th>Role</th>
             <th>Status</th>
             <th>In</th>
@@ -101,24 +167,115 @@ function ModelCallsTable({ calls }: ModelCallsTableProps): React.JSX.Element {
         </thead>
         <tbody>
           {calls.map(c => (
+            <ModelCallRow key={c.id} novelId={novelId} runId={runId} call={c} />
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+interface ToolCallsTableProps {
+  calls: RunToolCallResponse[];
+}
+
+function ToolCallsTable({ calls }: ToolCallsTableProps): React.JSX.Element {
+  return (
+    <div className={styles.tableWrap}>
+      <table className={styles.table}>
+        <thead>
+          <tr>
+            <th>Tool</th>
+            <th>Node</th>
+            <th>Arguments</th>
+            <th>Status</th>
+            <th>Latency</th>
+          </tr>
+        </thead>
+        <tbody>
+          {calls.map(c => (
             <tr key={c.id}>
-              <td className={styles.cellMono}>
-                {c.provider}/{c.model}
-                {c.attempt > 0 && <span className={styles.retry}> · retry {c.attempt}</span>}
-              </td>
-              <td>{c.role}</td>
+              <td className={styles.cellMono}>{c.tool}</td>
+              <td>{c.node ?? '—'}</td>
+              <td className={styles.cellMono}>{c.args ? JSON.stringify(c.args) : '—'}</td>
               <td>
-                <StatusChip intent={c.status === 'ok' ? 'success' : c.status === 'repaired' ? 'warning' : 'danger'}>{c.status}</StatusChip>
+                <StatusChip intent={c.status === 'ok' ? 'success' : 'danger'}>{c.status}</StatusChip>
               </td>
-              <td>{tokens(c.inputTokens)}</td>
-              <td>{tokens(c.outputTokens)}</td>
-              <td>{c.latencyMs != null ? `${(c.latencyMs / 1000).toFixed(1)}s` : '—'}</td>
-              <td>{c.costUsd != null ? `$${Number(c.costUsd).toFixed(4)}` : '—'}</td>
+              <td>{c.latencyMs != null ? `${c.latencyMs}ms` : '—'}</td>
             </tr>
           ))}
         </tbody>
       </table>
     </div>
+  );
+}
+
+/**
+ * Where the run's input tokens actually come from: the assembled context pack, section by section.
+ * The chain input below is just the trigger — this is the prompt.
+ */
+interface PromptAnatomyProps {
+  novelId: string;
+  runId: string;
+  pack: RunContextPackResponse;
+}
+
+function PromptAnatomy({ novelId, runId, pack }: PromptAnatomyProps): React.JSX.Element {
+  const [contextOpen, setContextOpen] = useState(false);
+  const contextQuery = useRunContextQuery(novelId, runId, contextOpen);
+  const sectionTotal = pack.sections.reduce((sum, s) => sum + s.tokens, 0);
+
+  return (
+    <>
+      <div className={styles.anatomyHead}>
+        <StatusChip intent="info">{pack.purpose}</StatusChip>
+        <span className={styles.anatomySummary}>
+          {tokens(pack.usedTokens ?? sectionTotal)} of {tokens(pack.budgetTokens)} budget tokens
+        </span>
+        <div className={styles.spacer} />
+        <Button size="sm" variant="ghost" onClick={() => setContextOpen(true)}>
+          View full context
+        </Button>
+      </div>
+      <div className={styles.tableWrap}>
+        <table className={styles.table}>
+          <thead>
+            <tr>
+              <th>Section</th>
+              <th>Segment</th>
+              <th>Tier</th>
+              <th>Tokens</th>
+              <th>Share</th>
+            </tr>
+          </thead>
+          <tbody>
+            {pack.sections.map(s => (
+              <tr key={s.key}>
+                <td className={styles.cellMono}>
+                  {s.key}
+                  {s.truncated && <span className={styles.retry}> · truncated</span>}
+                </td>
+                <td>{s.segment}</td>
+                <td>{s.tier}</td>
+                <td>{tokens(s.tokens)}</td>
+                <td>{sectionTotal > 0 ? `${Math.round((s.tokens / sectionTotal) * 100)}%` : '—'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      <Dialog open={contextOpen} onOpenChange={setContextOpen}>
+        <Dialog.Content size="lg">
+          <Dialog.Header title="Rendered prompt context" description="The exact assembled text that fed this run's model prompt (stable segment first, volatile tail last)." />
+          <Dialog.Body>
+            {contextQuery.isLoading && <PaneLoader />}
+            {contextQuery.error && <PaneError error={contextQuery.error} />}
+            {contextQuery.data && <pre className={`${styles.pre} ${styles.contextPre}`}>{contextQuery.data.rendered}</pre>}
+          </Dialog.Body>
+        </Dialog.Content>
+      </Dialog>
+    </>
   );
 }
 
@@ -135,15 +292,19 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
   if (!run) return <PaneLoader />;
 
   const calls = run.modelCalls ?? [];
+  const toolCalls = run.toolCalls ?? [];
   const totalIn = calls.reduce((sum, c) => sum + (c.inputTokens ?? 0), 0);
   const totalOut = calls.reduce((sum, c) => sum + (c.outputTokens ?? 0), 0);
+  const totalCost = calls.reduce((sum, c) => sum + (c.costUsd != null ? Number(c.costUsd) : 0), 0);
   const trace = run.nodeTrace ?? [];
 
   const facts: RunFact[] = [
     { label: 'Duration', value: duration(run.startedAt, run.endedAt) },
     { label: 'Started', value: new Date(run.startedAt).toLocaleString() },
     { label: 'Model calls', value: String(calls.length) },
+    { label: 'Tool calls', value: String(toolCalls.length) },
     { label: 'Tokens in / out', value: `${totalIn.toLocaleString()} / ${totalOut.toLocaleString()}` },
+    { label: 'Cost', value: totalCost > 0 ? `$${totalCost.toFixed(4)}` : '—' },
     ...(run.jobId ? [{ label: 'Job', value: run.jobId }] : []),
   ];
 
@@ -194,15 +355,28 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
               </div>
             </>
           )}
+          {run.contextPack && (
+            <>
+              <SectionLabel>Prompt anatomy — where the input tokens go</SectionLabel>
+              <PromptAnatomy novelId={novelId} runId={runId} pack={run.contextPack} />
+            </>
+          )}
           {calls.length > 0 && (
             <>
               <SectionLabel>Model calls</SectionLabel>
-              <ModelCallsTable calls={calls} />
+              <ModelCallsTable novelId={novelId} runId={runId} calls={calls} />
+              <p className={styles.tableNote}>Click a call to see its raw model output. Input tokens include the assembled context, playbook, and history — not just the trigger below.</p>
+            </>
+          )}
+          {toolCalls.length > 0 && (
+            <>
+              <SectionLabel>Tool calls</SectionLabel>
+              <ToolCallsTable calls={toolCalls} />
             </>
           )}
           {run.input && (
             <>
-              <SectionLabel>Context input</SectionLabel>
+              <SectionLabel>Chain input — the trigger, not the prompt</SectionLabel>
               <div className={styles.inputBox}>
                 <pre className={`${styles.pre} ${styles.preWell}`}>{JSON.stringify(run.input, null, 2)}</pre>
               </div>
