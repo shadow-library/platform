@@ -36,6 +36,10 @@ export interface AuthFlowContext {
   globalFailureCount: number;
   device: DeviceContext;
   regData?: Record<string, unknown>;
+  /** Remaining OTP re-deliveries for this flow (Tier-2 per-flow budget) */
+  resendsLeft?: number;
+  /** Epoch millis of the last OTP delivery, driving the resend cooldown */
+  lastOtpSentAt?: number;
   createdAt: number;
 }
 
@@ -73,6 +77,8 @@ export class AuthFlowService {
       globalFailureCount: 0,
       device: data.device ?? {},
       regData: data.regData,
+      resendsLeft: data.resendsLeft,
+      lastOtpSentAt: data.lastOtpSentAt,
       createdAt: Date.now(),
     };
     await this.persist(context);

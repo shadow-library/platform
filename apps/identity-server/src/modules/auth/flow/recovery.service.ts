@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger, ValidationError } from '@shadow-library/common';
+import { Logger, ValidationError, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 
 /**
@@ -18,6 +18,7 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.service';
+import { OTP_RESEND_BUDGET } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
@@ -64,12 +65,21 @@ export class RecoveryService {
    * Starts recovery. Neutral for unknown accounts (D-12): a flow is always created but an OTP is
    * only issued (to the account's verified email) when the identifier resolves to a user.
    */
-  async init(input: RecoverInitInput): Promise<{ flowId: string; status: string }> {
+  async init(input: RecoverInitInput): Promise<{ flowId: string; status: string; resendsLeft: number; metadata?: { maskedEmail: string } }> {
     const user = await this.userService.getUser(input.identifier);
     const email = user ? await this.userEmailService.getPrimaryEmail(user.id) : null;
-    const flow = await this.authFlowService.create('RECOVERY', AWAITING_EMAIL_OTP, { identifier: input.identifier, userId: user?.id.toString(), device: input.device });
+    const flow = await this.authFlowService.create('RECOVERY', AWAITING_EMAIL_OTP, {
+      identifier: input.identifier,
+      userId: user?.id.toString(),
+      device: input.device,
+      resendsLeft: OTP_RESEND_BUDGET,
+      lastOtpSentAt: Date.now(),
+    });
     if (user && email) await this.challengeService.issue({ flowId: flow.flowId, type: 'EMAIL_OTP', target: email, userId: user.id, templateKey: OTP_TEMPLATE });
-    return { flowId: flow.flowId, status: flow.status };
+
+    /** The masked address is derived from the typed identifier only, never the resolved account (D-12). */
+    const metadata = input.identifier.includes('@') ? { maskedEmail: utils.string.maskEmail(input.identifier) } : undefined;
+    return { flowId: flow.flowId, status: flow.status, resendsLeft: OTP_RESEND_BUDGET, metadata };
   }
 
   /**

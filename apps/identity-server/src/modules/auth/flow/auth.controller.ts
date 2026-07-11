@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Body, HttpController, HttpStatus, Post, Req, Res, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Get, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor, ServerError } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
@@ -9,10 +9,19 @@ import { type FastifyReply, type FastifyRequest } from 'fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { WebauthnChallengeResponse } from '@server/modules/auth/mfa';
+import { SessionAuthService, SessionService, clearSessionCookies } from '@server/modules/auth/session';
+import { RefreshTokenService } from '@server/modules/auth/token';
+import { AuditService } from '@server/modules/infrastructure/audit';
 import { RateLimit } from '@server/modules/infrastructure/security';
 
 import { AuthFlowService, DeviceContext } from './auth-flow.service';
 import {
+  CancelFlowBody,
+  ChallengeChangeBody,
+  ChallengeMethodsQuery,
+  ChallengeMethodsResponse,
+  ChallengeResendBody,
+  ChallengeResendResponse,
   ChallengeVerifyBody,
   ChallengeVerifyResponse,
   DemographicsBody,
@@ -26,6 +35,7 @@ import {
   SetPasswordBody,
   WebauthnOptionsBody,
 } from './auth.dto';
+import { ChallengeFlowService } from './challenge-flow.service';
 import { FlowStepResult } from './flow.types';
 import { LoginService } from './login.service';
 import { RecoveryService } from './recovery.service';
@@ -46,6 +56,11 @@ export class AuthController {
     private readonly registrationService: RegistrationService,
     private readonly recoveryService: RecoveryService,
     private readonly authFlowService: AuthFlowService,
+    private readonly challengeFlowService: ChallengeFlowService,
+    private readonly sessionAuthService: SessionAuthService,
+    private readonly sessionService: SessionService,
+    private readonly refreshTokenService: RefreshTokenService,
+    private readonly auditService: AuditService,
   ) {}
 
   @Post('/login/init')
@@ -106,6 +121,48 @@ export class AuthController {
     return this.respond(result, reply);
   }
 
+  @Get('/challenge/methods')
+  @RespondFor(200, ChallengeMethodsResponse)
+  async challengeMethods(@Query() query: ChallengeMethodsQuery): Promise<ChallengeMethodsResponse> {
+    const methods = await this.challengeFlowService.listMethods(query.flowId);
+    return { flowId: query.flowId, methods };
+  }
+
+  @Post('/challenge/change')
+  @HttpStatus(200)
+  @RespondFor(200, FlowStatusResponse)
+  challengeChange(@Body() body: ChallengeChangeBody): Promise<FlowStatusResponse> {
+    return this.challengeFlowService.changeMethod(body.flowId, body.method);
+  }
+
+  @Post('/challenge/resend')
+  @RateLimit({ name: 'challenge-resend', limit: 10, windowSeconds: 3600 })
+  @HttpStatus(200)
+  @RespondFor(200, ChallengeResendResponse)
+  @RespondFor(429, ChallengeResendResponse)
+  async challengeResend(@Body() body: ChallengeResendBody, @Res() reply: FastifyReply): Promise<ChallengeResendResponse> {
+    const result = await this.challengeFlowService.resend(body.flowId, body.method);
+    if (result.status === 'LIMITED') reply.status(429).header('retry-after', String(result.retryAfterSeconds));
+    return result;
+  }
+
+  @Post('/cancel')
+  async cancel(@Body() body: CancelFlowBody, @Res() reply: FastifyReply): Promise<void> {
+    await this.authFlowService.delete(body.flowId);
+    reply.status(204).send();
+  }
+
+  /** Terminates the current session and its refresh-token families, then clears the session cookies. */
+  @Post('/signout')
+  async signout(@Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+    const session = await this.sessionAuthService.authenticate(request);
+    await this.sessionService.revoke(session.id, 'TERMINATED');
+    await this.refreshTokenService.revokeForSession(session.id);
+    await this.auditService.record({ action: 'auth.signout', outcome: 'SUCCESS', actorType: 'USER', actorId: session.userId.toString(), ipAddress: request.ip });
+    for (const cookie of clearSessionCookies()) reply.setCookie(cookie.name, cookie.value, cookie.options);
+    reply.status(204).send();
+  }
+
   /** Issues passkey assertion options for a usernameless login or a flow's MFA step. */
   @Post('/webauthn/options')
   @RateLimit({ name: 'webauthn-options', limit: 60, windowSeconds: 3600 })
@@ -134,7 +191,10 @@ export class AuthController {
     }
 
     const code = body.code as string;
-    if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { code });
+    if (flow.kind === 'LOGIN')
+      return flow.status === 'AWAITING_EMAIL_OTP' || flow.status === 'AWAITING_SMS_OTP'
+        ? this.loginService.verifyOtp(body.flowId, code)
+        : this.loginService.verifyMfa(body.flowId, { code });
     if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, code);
     if (flow.kind === 'RECOVERY')
       return flow.status === 'AWAITING_TOTP' ? this.recoveryService.verifyMfa(body.flowId, { code }) : this.recoveryService.verifyOtp(body.flowId, code);

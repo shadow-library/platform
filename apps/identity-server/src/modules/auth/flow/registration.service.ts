@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { Logger, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 
 /**
@@ -16,6 +16,7 @@ import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { User } from '@server/modules/infrastructure/datastore';
 
 import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.service';
+import { OTP_RESEND_BUDGET } from './challenge-flow.service';
 import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 
@@ -65,12 +66,18 @@ export class RegistrationService {
    * Starts a registration flow. The response is identical whether or not the email already exists
    * (D-12); when it does, no OTP is issued and any code submission fails generically.
    */
-  async init(input: RegisterInitInput): Promise<{ flowId: string; status: string }> {
+  async init(input: RegisterInitInput): Promise<{ flowId: string; status: string; resendsLeft: number; metadata: { maskedEmail: string } }> {
     const email = input.email.toLowerCase();
     const exists = await this.userEmailService.isEmailExists(email);
-    const flow = await this.authFlowService.create('REGISTRATION', AWAITING_EMAIL_OTP, { identifier: email, device: input.device, regData: { email, exists } });
+    const flow = await this.authFlowService.create('REGISTRATION', AWAITING_EMAIL_OTP, {
+      identifier: email,
+      device: input.device,
+      regData: { email, exists },
+      resendsLeft: OTP_RESEND_BUDGET,
+      lastOtpSentAt: Date.now(),
+    });
     if (!exists) await this.challengeService.issue({ flowId: flow.flowId, type: 'EMAIL_OTP', target: email, templateKey: OTP_TEMPLATE });
-    return { flowId: flow.flowId, status: flow.status };
+    return { flowId: flow.flowId, status: flow.status, resendsLeft: OTP_RESEND_BUDGET, metadata: { maskedEmail: utils.string.maskEmail(email) } };
   }
 
   async verifyOtp(flowId: string, code: string): Promise<FlowStepResult> {

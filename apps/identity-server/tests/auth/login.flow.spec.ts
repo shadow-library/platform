@@ -31,7 +31,7 @@ describe('Login flow', () => {
   it('should complete a password login and set the session cookie', async () => {
     const init = await login('login@example.com');
     expect(init.statusCode).toBe(200);
-    expect(init.json()).toMatchObject({ status: 'AWAITING_PASSWORD', hasAlternativeMethods: false });
+    expect(init.json()).toMatchObject({ status: 'AWAITING_PASSWORD', hasAlternativeMethods: true });
 
     const { flowId } = init.json() as { flowId: string };
     const done = await verify(flowId, 'Password@123');

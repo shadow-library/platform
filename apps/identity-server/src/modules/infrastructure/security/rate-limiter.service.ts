@@ -57,6 +57,7 @@ export class RateLimiterService {
 
   /** Counts a hit against `bucket:key` and reports whether the caller is still within budget. */
   async consume(bucket: string, key: string, limit: number, windowSeconds: number): Promise<RateDecision> {
+    if (!this.enabled) return { allowed: true, remaining: limit, retryAfterSeconds: 0 };
     const redisKey = `rl:${bucket}:${key}`;
     const results = await this.redis.multi().incr(redisKey).call('EXPIRE', redisKey, windowSeconds, 'NX').ttl(redisKey).exec();
     if (!results) throw new Error('Rate limit transaction aborted');

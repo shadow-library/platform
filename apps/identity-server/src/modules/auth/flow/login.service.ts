@@ -19,6 +19,7 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { User, UserSession } from '@server/modules/infrastructure/datastore';
 
 import { AuthFlowContext, AuthFlowService, DeviceContext } from './auth-flow.service';
+import { ChallengeService } from './challenge.service';
 import { FlowStepResult } from './flow.types';
 import { SignInEventService } from './sign-in-event.service';
 
@@ -64,6 +65,7 @@ const AWAITING_TOTP = 'AWAITING_TOTP';
 const AWAITING_MFA_WEBAUTHN = 'AWAITING_MFA_WEBAUTHN';
 const AWAITING_WEBAUTHN = 'AWAITING_WEBAUTHN';
 const MFA_STATUSES = [AWAITING_TOTP, AWAITING_MFA_WEBAUTHN];
+const OTP_STATUSES = ['AWAITING_EMAIL_OTP', 'AWAITING_SMS_OTP'];
 
 @Injectable()
 export class LoginService {
@@ -79,6 +81,7 @@ export class LoginService {
     private readonly mfaService: MfaService,
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly webauthnService: WebauthnService,
+    private readonly challengeService: ChallengeService,
   ) {}
 
   /**
@@ -93,7 +96,8 @@ export class LoginService {
       authMethod: 'PASSWORD',
       device: input.device,
     });
-    return { flowId: flow.flowId, status: flow.status, hasAlternativeMethods: false };
+    /** Passkeys (and OTP for email/phone identifiers) are always advertised, so alternatives always exist. */
+    return { flowId: flow.flowId, status: flow.status, hasAlternativeMethods: true };
   }
 
   async verifyPassword(flowId: string, password: string): Promise<FlowStepResult> {
@@ -106,6 +110,8 @@ export class LoginService {
 
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+    /** Tier-4 lock: a locked account only accepts OTP methods until the lock expires (§13.2). */
+    if (this.isOtpLocked(user)) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
 
     const factors = await this.mfaService.getFactors(userId);
     if (factors.totp || factors.webauthn) {
@@ -113,6 +119,33 @@ export class LoginService {
       return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
     }
     return this.complete(flow, userId, {});
+  }
+
+  /**
+   * Completes the OTP first factor a `challenge/change` switched to. MFA-enrolled accounts still
+   * continue to their second factor: an emailed code alone must never satisfy an MFA account.
+   */
+  async verifyOtp(flowId: string, code: string): Promise<FlowStepResult> {
+    const flow = await this.requireFlow(flowId);
+    if (!OTP_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+
+    const userId = flow.userId ? BigInt(flow.userId) : null;
+    const valid = Boolean(userId) && (await this.challengeService.verify(flowId, code));
+    if (!valid || !userId) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+
+    const user = await this.userService.getUser(userId);
+    if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+
+    const factors = await this.mfaService.getFactors(userId);
+    if (factors.totp || factors.webauthn) {
+      const next = await this.authFlowService.update(flow, { status: factors.totp ? AWAITING_TOTP : AWAITING_MFA_WEBAUTHN });
+      return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
+    }
+    return this.complete(flow, userId, { authMode: 'OTP' });
+  }
+
+  private isOtpLocked(user: User): boolean {
+    return user.lockMode === 'OTP_ONLY' && user.lockedUntil !== null && user.lockedUntil.getTime() > Date.now();
   }
 
   /**

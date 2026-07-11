@@ -2,6 +2,7 @@ export * from './auth-flow.module';
 export * from './auth-flow.service';
 export * from './auth.controller';
 export * from './auth.dto';
+export * from './challenge-flow.service';
 export * from './challenge.service';
 export * from './flow.types';
 export * from './login.service';

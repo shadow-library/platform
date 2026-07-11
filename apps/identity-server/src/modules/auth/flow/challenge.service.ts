@@ -13,6 +13,7 @@ import { and, desc, eq, isNull } from 'drizzle-orm';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService, PrimaryDatabase, VerificationChallenge, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
+import { RateLimiterService } from '@server/modules/infrastructure/security';
 
 /**
  * Defining types
@@ -28,9 +29,15 @@ export interface IssueChallenge {
 
 /**
  * Declaring the constants
+ *
+ * Tier-2 anti-bombing (architecture §13.2): at most 5 OTP deliveries per identifier per hour,
+ * across every flow kind. Exceeding the budget silently skips delivery — a distinguishable
+ * refusal would let a caller probe whether an identifier is receiving real mail (D-12).
  */
 const CODE_TTL_MS = 10 * 60 * 1000;
 const MAX_ATTEMPTS = 3;
+const IDENTIFIER_SEND_LIMIT = 5;
+const IDENTIFIER_SEND_WINDOW_SECONDS = 3600;
 
 @Injectable()
 export class ChallengeService {
@@ -40,6 +47,7 @@ export class ChallengeService {
   constructor(
     databaseService: DatabaseService,
     private readonly notificationService: NotificationService,
+    private readonly rateLimiter: RateLimiterService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -50,6 +58,12 @@ export class ChallengeService {
 
   /** Issues a numeric OTP: persisted as a hash and delivered via the notification outbox. */
   async issue(input: IssueChallenge): Promise<void> {
+    const budget = await this.rateLimiter.consume('otp-ident', input.target.toLowerCase(), IDENTIFIER_SEND_LIMIT, IDENTIFIER_SEND_WINDOW_SECONDS);
+    if (!budget.allowed) {
+      this.logger.warn('OTP delivery suppressed by identifier budget', { securityEvent: 'security.otp_flooding', flowId: input.flowId, type: input.type });
+      return;
+    }
+
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
     await this.db.transaction(async tx => {
       await tx.insert(schema.verificationChallenges).values({

@@ -80,12 +80,87 @@ export class ChallengeVerifyResponse {
 }
 
 @Schema()
+export class ChallengeMethodMetadata {
+  @Field({ optional: true })
+  maskedEmail?: string;
+
+  @Field({ optional: true })
+  maskedPhone?: string;
+}
+
+@Schema()
 export class FlowStatusResponse {
   @Field()
   flowId: string;
 
   @Field()
   status: string;
+
+  @Field(() => Number, { optional: true })
+  resendsLeft?: number;
+
+  @Field(() => ChallengeMethodMetadata, { optional: true })
+  metadata?: ChallengeMethodMetadata;
+}
+
+@Schema()
+export class ChallengeMethod {
+  @Field(() => String, { enum: ['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP', 'SMS_OTP'] })
+  name: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
+
+  @Field(() => ChallengeMethodMetadata, { optional: true })
+  metadata?: ChallengeMethodMetadata;
+}
+
+@Schema()
+export class ChallengeMethodsQuery {
+  @Field()
+  flowId: string;
+}
+
+@Schema()
+export class ChallengeMethodsResponse {
+  @Field()
+  flowId: string;
+
+  @Field(() => [ChallengeMethod])
+  methods: ChallengeMethod[];
+}
+
+@Schema()
+export class ChallengeChangeBody {
+  @Field()
+  flowId: string;
+
+  @Field(() => String, { enum: ['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP', 'SMS_OTP'] })
+  method: 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
+}
+
+@Schema()
+export class ChallengeResendBody {
+  @Field()
+  flowId: string;
+
+  @Field(() => String, { enum: ['EMAIL_OTP', 'SMS_OTP'] })
+  method: 'EMAIL_OTP' | 'SMS_OTP';
+}
+
+@Schema()
+export class ChallengeResendResponse {
+  @Field(() => String, { enum: ['SENT', 'LIMITED'] })
+  status: 'SENT' | 'LIMITED';
+
+  @Field(() => Number, { optional: true })
+  resendsLeft?: number;
+
+  @Field(() => Number, { optional: true })
+  retryAfterSeconds?: number;
+}
+
+@Schema()
+export class CancelFlowBody {
+  @Field()
+  flowId: string;
 }
 
 @Schema()
