@@ -23,14 +23,27 @@ export interface IssueRefreshToken {
   userId: bigint;
   sessionId?: bigint | null;
   clientId?: string | null;
+  scope?: string | null;
+  audience?: string | null;
+  organisationId?: bigint | null;
   ipAddress?: string;
   ipCountry?: string;
+}
+
+export interface FamilyContext {
+  userId: bigint;
+  clientId: string | null;
+  scope: string | null;
+  audience: string | null;
+  organisationId: bigint | null;
+  sessionId: bigint | null;
 }
 
 export interface RefreshTokenResult {
   secret: string;
   familyId: string;
   tokenId: string;
+  context: FamilyContext;
 }
 
 export class RefreshTokenReuseError extends Error {
@@ -73,7 +86,14 @@ export class RefreshTokenService {
     const result = await this.db.transaction(async tx => {
       const [family] = await tx
         .insert(schema.refreshTokenFamilies)
-        .values({ userId: input.userId, sessionId: input.sessionId ?? null, clientId: input.clientId ?? null })
+        .values({
+          userId: input.userId,
+          sessionId: input.sessionId ?? null,
+          clientId: input.clientId ?? null,
+          scope: input.scope ?? null,
+          audience: input.audience ?? null,
+          organisationId: input.organisationId ?? null,
+        })
         .returning();
       if (!family) throw new Error('Failed to create refresh token family');
       const [token] = await tx
@@ -81,9 +101,13 @@ export class RefreshTokenService {
         .values({ familyId: family.id, tokenHash, expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS), ipAddress: input.ipAddress ?? null, ipCountry: input.ipCountry ?? null })
         .returning();
       if (!token) throw new Error('Failed to create refresh token');
-      return { familyId: family.id, tokenId: token.id };
+      return { familyId: family.id, tokenId: token.id, context: this.toContext(family) };
     });
     return { secret, ...result };
+  }
+
+  private toContext(family: typeof schema.refreshTokenFamilies.$inferSelect): FamilyContext {
+    return { userId: family.userId, clientId: family.clientId, scope: family.scope, audience: family.audience, organisationId: family.organisationId, sessionId: family.sessionId };
   }
 
   /**
@@ -120,7 +144,7 @@ export class RefreshTokenService {
       if (!token) throw new Error('Failed to rotate refresh token');
       return token.id;
     });
-    return { secret: nextSecret, familyId: family.id, tokenId };
+    return { secret: nextSecret, familyId: family.id, tokenId, context: this.toContext(family) };
   }
 
   async revokeFamily(familyId: string, reason: RefreshToken.RevokeReason): Promise<void> {

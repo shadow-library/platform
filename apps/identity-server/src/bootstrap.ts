@@ -32,6 +32,10 @@ declare module '@shadow-library/common' {
 
     /** Worker configs */
     'worker.poll-interval': number;
+
+    /** OAuth / OIDC */
+    'oauth.issuer': string;
+    'oauth.login-url': string;
   }
 }
 
@@ -53,6 +57,9 @@ Config.load('notification.base-url', { envKey: 'NOTIFICATION_BASE_URL', defaultV
 Config.load('notification.service-name', { envKey: 'NOTIFICATION_SERVICE_NAME', defaultValue: 'shadow-identity' });
 
 Config.load('worker.poll-interval', { envKey: 'WORKER_POLL_INTERVAL', defaultValue: '5000', validateType: 'number' });
+
+Config.load('oauth.issuer', { envKey: 'OAUTH_ISSUER', defaultValue: 'https://identity.shadow-apps.com' });
+Config.load('oauth.login-url', { envKey: 'OAUTH_LOGIN_URL', defaultValue: 'https://identity.shadow-apps.com/login' });
 
 /**
  * The master encryption key wraps signing/encryption keys at rest. It must never fall back to a

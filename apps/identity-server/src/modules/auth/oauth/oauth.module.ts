@@ -6,9 +6,18 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { KeyModule } from '@server/modules/auth/keys';
+import { SessionModule } from '@server/modules/auth/session';
+import { TokenModule } from '@server/modules/auth/token';
+import { UserModule } from '@server/modules/identity/user';
+import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 
+import { AccessTokenService } from './access-token.service';
+import { AuthorizationCodeService } from './authorization-code.service';
 import { OAuthClientService } from './oauth-client.service';
+import { OAuthController } from './oauth.controller';
+import { OAuthService } from './oauth.service';
 
 /**
  * Defining types
@@ -19,8 +28,9 @@ import { OAuthClientService } from './oauth-client.service';
  */
 
 @Module({
-  imports: [DatabaseModule],
-  providers: [OAuthClientService],
-  exports: [OAuthClientService],
+  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule],
+  controllers: [OAuthController],
+  providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, OAuthService],
+  exports: [OAuthClientService, AccessTokenService],
 })
 export class OAuthModule {}

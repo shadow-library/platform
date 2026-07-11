@@ -62,4 +62,17 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_001 = new AppErrorCode('ORG_001', ErrorType.UNAUTHORIZED, 'Not a member of this organisation');
   /** The organisation does not exist */
   static readonly ORG_002 = new AppErrorCode('ORG_002', ErrorType.NOT_FOUND, 'Organisation not found');
+
+  /**
+   * OAuth / OIDC Error Codes (mapped to RFC 6749 error identifiers)
+   */
+
+  /** invalid_request — a required parameter is missing or malformed */
+  static readonly OAU_001 = new AppErrorCode('invalid_request', ErrorType.CLIENT_ERROR, 'The request is missing a required parameter or is malformed', 400);
+  /** invalid_client — client authentication failed */
+  static readonly OAU_002 = new AppErrorCode('invalid_client', ErrorType.UNAUTHENTICATED, 'Client authentication failed', 401);
+  /** invalid_grant — the grant or credential is invalid, expired, or revoked */
+  static readonly OAU_003 = new AppErrorCode('invalid_grant', ErrorType.CLIENT_ERROR, 'The authorization grant is invalid, expired, or revoked', 400);
+  /** unsupported_grant_type / invalid_scope */
+  static readonly OAU_004 = new AppErrorCode('invalid_scope', ErrorType.CLIENT_ERROR, 'The requested scope or grant is invalid', 400);
 }

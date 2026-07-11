@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
-import { bigint, index, pgEnum, pgTable, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, index, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -44,6 +44,9 @@ export const refreshTokenFamilies = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     sessionId: bigint('session_id', { mode: 'bigint' }).references(() => userSessions.id, { onDelete: 'set null' }),
     clientId: uuid('client_id'),
+    scope: text('scope'),
+    audience: varchar('audience', { length: 255 }),
+    organisationId: bigint('organisation_id', { mode: 'bigint' }),
     status: refreshFamilyStatus('status').notNull().default('ACTIVE'),
     revokeReason: refreshRevokeReason('revoke_reason'),
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
