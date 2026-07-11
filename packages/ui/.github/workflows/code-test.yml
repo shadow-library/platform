@@ -27,3 +27,6 @@ jobs:
 
       - name: Test the code
         run: bun test:setup && bun run test
+
+      - name: Test the stories (interaction + a11y)
+        run: bun run test:stories

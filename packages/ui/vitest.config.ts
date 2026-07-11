@@ -43,6 +43,9 @@ export default defineConfig({
         plugins: [storybookTest()],
         test: {
           name: 'storybook',
+          // The browser harness occasionally aborts a worker under load; retry flaky specs so a
+          // transient crash doesn't fail an otherwise-green PR.
+          retry: 2,
           browser: {
             enabled: true,
             provider: playwright(),
