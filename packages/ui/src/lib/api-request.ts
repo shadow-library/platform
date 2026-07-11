@@ -93,8 +93,9 @@ export class APIRequest {
   query(key: string, value: string): this;
   query(params: QueryParams): this;
   query(keyOrParams: string | QueryParams, value?: string): this {
-    if (typeof keyOrParams === 'string') this.options.query[keyOrParams] = String(value);
-    else {
+    if (typeof keyOrParams === 'string') {
+      if (value !== undefined) this.options.query[keyOrParams] = String(value);
+    } else {
       for (const [k, v] of Object.entries(keyOrParams)) {
         if (v !== undefined) this.options.query[k] = String(v);
       }
