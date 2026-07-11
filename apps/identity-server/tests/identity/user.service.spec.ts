@@ -26,6 +26,8 @@ const env = new TestEnvironment('user-service').init();
 
 const buildUser = (overrides: Partial<CreateUser> = {}): CreateUser => ({
   email: 'user@example.com',
+  emailVerified: true,
+  phoneVerified: true,
   password: 'Password@123',
   firstName: 'Test',
   lastName: 'User',

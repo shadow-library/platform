@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, date, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { InferEnum, InferSelectModel, relations, sql } from 'drizzle-orm';
+import { bigint, bigserial, boolean, date, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, uniqueIndex, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -63,18 +63,31 @@ export const userProfiles = pgTable('user_profiles', {
   avatarUrl: text('avatar_url'),
 });
 
+/**
+ * Global uniqueness applies only to verified addresses: an unverified claim must never block the
+ * rightful owner from verifying the same address (pre-verification squatting, DB doc §2).
+ * Unverified claims are purged by the worker after seven days.
+ */
 export const userEmails = pgTable(
   'user_emails',
   {
     userId: bigint('user_id', { mode: 'bigint' })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    emailId: varchar('email_id', { length: 255 }).notNull().unique(),
+    emailId: varchar('email_id', { length: 255 }).notNull(),
     isPrimary: boolean('is_primary').notNull().default(false),
-    isVerified: boolean('is_verified').notNull().default(false),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [primaryKey({ columns: [t.userId, t.emailId] })],
+  t => [
+    primaryKey({ columns: [t.userId, t.emailId] }),
+    uniqueIndex('user_emails_verified_email_unique')
+      .on(sql`lower(${t.emailId})`)
+      .where(sql`${t.verifiedAt} is not null`),
+    uniqueIndex('user_emails_primary_unique')
+      .on(t.userId)
+      .where(sql`${t.isPrimary}`),
+  ],
 );
 
 export const userPhones = pgTable(
@@ -83,12 +96,20 @@ export const userPhones = pgTable(
     userId: bigint('user_id', { mode: 'bigint' })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    phoneNumber: varchar('phone_number', { length: 15 }).notNull().unique(),
+    phoneNumber: varchar('phone_number', { length: 15 }).notNull(),
     isPrimary: boolean('is_primary').notNull().default(false),
-    isVerified: boolean('is_verified').notNull().default(false),
+    verifiedAt: timestamp('verified_at', { withTimezone: true }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },
-  t => [primaryKey({ columns: [t.userId, t.phoneNumber] })],
+  t => [
+    primaryKey({ columns: [t.userId, t.phoneNumber] }),
+    uniqueIndex('user_phones_verified_phone_unique')
+      .on(t.phoneNumber)
+      .where(sql`${t.verifiedAt} is not null`),
+    uniqueIndex('user_phones_primary_unique')
+      .on(t.userId)
+      .where(sql`${t.isPrimary}`),
+  ],
 );
 
 export const userAuthIdentities = pgTable(

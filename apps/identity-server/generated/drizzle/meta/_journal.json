@@ -120,6 +120,20 @@
       "when": 1783760876720,
       "tag": "0016_webauthn_credentials",
       "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1783761193100,
+      "tag": "0017_drop_contact_is_verified",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1783761224135,
+      "tag": "0018_contact_verified_at",
+      "breakpoints": true
     }
   ]
 }

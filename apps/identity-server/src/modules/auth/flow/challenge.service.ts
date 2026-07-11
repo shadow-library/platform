@@ -71,22 +71,27 @@ export class ChallengeService {
    * attempts, or mismatch; increments the attempt counter on a wrong code.
    */
   async verify(flowId: string, code: string): Promise<boolean> {
+    return (await this.verifyAndGet(flowId, code)) !== null;
+  }
+
+  /** Like `verify`, but returns the consumed challenge so callers can act on its target. */
+  async verifyAndGet(flowId: string, code: string): Promise<VerificationChallenge | null> {
     const challenge = await this.db.query.verificationChallenges.findFirst({
       where: and(eq(schema.verificationChallenges.flowId, flowId), isNull(schema.verificationChallenges.consumedAt)),
       orderBy: desc(schema.verificationChallenges.createdAt),
     });
-    if (!challenge) return false;
-    if (challenge.expiresAt.getTime() <= Date.now() || challenge.attemptCount >= MAX_ATTEMPTS) return false;
+    if (!challenge) return null;
+    if (challenge.expiresAt.getTime() <= Date.now() || challenge.attemptCount >= MAX_ATTEMPTS) return null;
 
     if (this.hashCode(code) !== challenge.codeHash) {
       await this.db
         .update(schema.verificationChallenges)
         .set({ attemptCount: challenge.attemptCount + 1 })
         .where(eq(schema.verificationChallenges.id, challenge.id));
-      return false;
+      return null;
     }
 
     await this.db.update(schema.verificationChallenges).set({ consumedAt: new Date() }).where(eq(schema.verificationChallenges.id, challenge.id));
-    return true;
+    return challenge;
   }
 }

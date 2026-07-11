@@ -40,6 +40,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly USR_003 = new AppErrorCode('USR_003', ErrorType.CONFLICT, 'Email already exists');
   /** Phone number already exists */
   static readonly USR_004 = new AppErrorCode('USR_004', ErrorType.CONFLICT, 'Phone number already exists');
+  /** The primary contact identifier cannot be removed */
+  static readonly USR_005 = new AppErrorCode('USR_005', ErrorType.CONFLICT, 'Cannot remove the primary contact identifier');
+  /** Only a verified identifier can become primary */
+  static readonly USR_006 = new AppErrorCode('USR_006', ErrorType.CONFLICT, 'Identifier must be verified first');
 
   /**
    * Authentication Flow Error Codes

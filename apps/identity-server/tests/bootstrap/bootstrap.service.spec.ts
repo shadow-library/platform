@@ -37,7 +37,7 @@ describe('BootstrapService', () => {
 
     const emails = await env.getPostgresClient().select().from(schema.userEmails);
     const adminEmail = emails.find(email => email.emailId === ADMIN_EMAIL);
-    expect(adminEmail?.isVerified).toBe(true);
+    expect(adminEmail?.verifiedAt).not.toBeNull();
   });
 
   it('should not seed the old hardcoded super-admin credentials', async () => {

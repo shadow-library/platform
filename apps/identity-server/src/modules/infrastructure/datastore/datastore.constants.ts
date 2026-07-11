@@ -18,6 +18,6 @@ import { AppErrorCode } from '@server/classes';
 
 export const constraintErrorMap: Record<string, ServerError> = {
   users_username_unique: new ServerError(AppErrorCode.USR_002),
-  user_emails_email_id_unique: new ServerError(AppErrorCode.USR_003),
-  user_phones_phone_number_unique: new ServerError(AppErrorCode.USR_004),
+  user_emails_verified_email_unique: new ServerError(AppErrorCode.USR_003),
+  user_phones_verified_phone_unique: new ServerError(AppErrorCode.USR_004),
 };

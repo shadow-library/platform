@@ -58,7 +58,7 @@ describe('Registration flow', () => {
     const user = await env.getService(UserService).getUser(email);
     expect(user?.status).toBe('ACTIVE');
     const emails = await env.getPostgresClient().select().from(schema.userEmails).where(eq(schema.userEmails.emailId, email));
-    expect(emails[0]?.isVerified).toBe(true);
+    expect(emails[0]?.verifiedAt).not.toBeNull();
   });
 
   it('should reject a wrong OTP and report remaining attempts', async () => {
@@ -75,7 +75,7 @@ describe('Registration flow', () => {
   });
 
   it('should stay neutral and issue no OTP for an already-registered email', async () => {
-    await env.getService(UserService).createUserWithPassword({ email: 'taken@example.com', password: 'Password@123', status: 'ACTIVE' });
+    await env.getService(UserService).createUserWithPassword({ email: 'taken@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
 
     const init = await post('register/init', { email: 'taken@example.com' });
     expect(init.statusCode).toBe(200);

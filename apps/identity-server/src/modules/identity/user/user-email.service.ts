@@ -27,9 +27,10 @@ export class UserEmailService {
     this.db = databaseService.getPostgresClient();
   }
 
+  /** An address is taken only once verified: unverified claims must not block registration (DB §2). */
   async isEmailExists(email: string): Promise<boolean> {
     const userEmail = await this.db.query.userEmails.findFirst({
-      where: (userEmail, { eq }) => eq(userEmail.emailId, email.toLowerCase()),
+      where: (userEmail, { and, eq, isNotNull }) => and(eq(userEmail.emailId, email.toLowerCase()), isNotNull(userEmail.verifiedAt)),
     });
     return !!userEmail;
   }
@@ -37,7 +38,7 @@ export class UserEmailService {
   /** Returns the user's primary verified email, preferring a primary flag then any verified one. */
   async getPrimaryEmail(userId: bigint): Promise<string | null> {
     const emails = await this.db.query.userEmails.findMany({ where: (email, { eq }) => eq(email.userId, userId) });
-    const verified = emails.filter(email => email.isVerified);
+    const verified = emails.filter(email => email.verifiedAt !== null);
     const primary = verified.find(email => email.isPrimary) ?? verified[0];
     return primary?.emailId ?? null;
   }

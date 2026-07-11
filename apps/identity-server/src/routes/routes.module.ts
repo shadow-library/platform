@@ -15,6 +15,7 @@ import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
+import { ContactModule } from '@server/modules/identity/contact';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { HealthModule } from '@server/modules/infrastructure/health';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
@@ -34,7 +35,20 @@ import { NotificationModule } from '@server/modules/infrastructure/notification'
 export const AppHttpCoreModule = HttpCoreModule.forRoot({});
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, HealthModule, KeyModule, SessionModule, TokenModule, OAuthModule, AuthzModule, AuthFlowModule, MfaModule, AuditModule, NotificationModule],
+  imports: [
+    AppHttpCoreModule,
+    HealthModule,
+    KeyModule,
+    SessionModule,
+    TokenModule,
+    OAuthModule,
+    AuthzModule,
+    AuthFlowModule,
+    MfaModule,
+    ContactModule,
+    AuditModule,
+    NotificationModule,
+  ],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

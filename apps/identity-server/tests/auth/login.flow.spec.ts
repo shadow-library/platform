@@ -25,7 +25,7 @@ const verify = (flowId: string, password: string) => env.getRouter().mockRequest
 
 describe('Login flow', () => {
   beforeEach(async () => {
-    await env.getService(UserService).createUserWithPassword({ email: 'login@example.com', password: 'Password@123', status: 'ACTIVE' });
+    await env.getService(UserService).createUserWithPassword({ email: 'login@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
   });
 
   it('should complete a password login and set the session cookie', async () => {
@@ -73,7 +73,7 @@ describe('Login flow', () => {
   });
 
   it('should not issue a session for a non-active account', async () => {
-    await env.getService(UserService).createUserWithPassword({ email: 'suspended@example.com', password: 'Password@123', status: 'SUSPENDED' });
+    await env.getService(UserService).createUserWithPassword({ email: 'suspended@example.com', password: 'Password@123', status: 'SUSPENDED', emailVerified: true });
     const { flowId } = (await login('suspended@example.com')).json() as { flowId: string };
     const response = await verify(flowId, 'Password@123');
     expect(response.statusCode).toBe(401);

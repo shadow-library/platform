@@ -6,7 +6,7 @@ import assert from 'node:assert';
 import { Injectable } from '@shadow-library/app';
 import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { SQL, eq, inArray } from 'drizzle-orm';
+import { SQL, and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import validator from 'validator';
 
@@ -72,10 +72,15 @@ export class UserService {
     this.db = databaseService.getPostgresClient();
   }
 
+  /**
+   * Email/phone lookups match only verified rows: with verified-only uniqueness (DB §2), an
+   * unverified claim by another account must never capture a login or recovery identifier.
+   */
   private buildWhereClause(identifier: ID): FindUserFilter {
     if (typeof identifier === 'bigint' || /^\d{12,}$/.test(identifier)) return { table: 'users', sql: eq(schema.users.id, BigInt(identifier)) };
-    else if (identifier.startsWith('+')) return { table: 'userPhones', sql: eq(schema.userPhones.phoneNumber, identifier) };
-    else if (identifier.includes('@')) return { table: 'userEmails', sql: eq(schema.userEmails.emailId, identifier.toLowerCase()) };
+    else if (identifier.startsWith('+')) return { table: 'userPhones', sql: and(eq(schema.userPhones.phoneNumber, identifier), isNotNull(schema.userPhones.verifiedAt)) as SQL };
+    else if (identifier.includes('@'))
+      return { table: 'userEmails', sql: and(eq(schema.userEmails.emailId, identifier.toLowerCase()), isNotNull(schema.userEmails.verifiedAt)) as SQL };
     else return { table: 'users', sql: eq(schema.users.username, identifier) };
   }
 
@@ -116,7 +121,10 @@ export class UserService {
         userDetails.profile = profile;
 
         const emailId = data.email.toLowerCase();
-        const [email] = await tx.insert(schema.userEmails).values({ userId: user.id, emailId, isPrimary: true, isVerified: data.emailVerified }).returning();
+        const [email] = await tx
+          .insert(schema.userEmails)
+          .values({ userId: user.id, emailId, isPrimary: true, verifiedAt: data.emailVerified ? new Date() : null })
+          .returning();
         assert(email, 'User email creation failed');
         this.logger.debug('user email created', { userId: user.id, emailId });
         userDetails.emails.push(email);
@@ -124,7 +132,7 @@ export class UserService {
         if (data.phoneNumber) {
           const [phone] = await tx
             .insert(schema.userPhones)
-            .values({ userId: user.id, phoneNumber: data.phoneNumber, isPrimary: true, isVerified: data.phoneVerified })
+            .values({ userId: user.id, phoneNumber: data.phoneNumber, isPrimary: true, verifiedAt: data.phoneVerified ? new Date() : null })
             .returning();
           assert(phone, 'User phone creation failed');
           this.logger.debug('user phone created', { userId: user.id, phoneNumber: data.phoneNumber });
