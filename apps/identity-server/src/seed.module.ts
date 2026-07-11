@@ -11,6 +11,7 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { KeyModule } from './modules/auth/keys';
 import { BootstrapModule } from './modules/bootstrap';
 import { DatastoreModule } from './modules/infrastructure/datastore';
 
@@ -27,6 +28,6 @@ import { DatastoreModule } from './modules/infrastructure/datastore';
  */
 
 @Module({
-  imports: [DatastoreModule, BootstrapModule],
+  imports: [DatastoreModule, KeyModule, BootstrapModule],
 })
 export class SeedModule {}

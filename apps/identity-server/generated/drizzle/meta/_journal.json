@@ -8,6 +8,13 @@
       "when": 1783746895131,
       "tag": "0000_baseline",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783749254239,
+      "tag": "0001_signing_keys",
+      "breakpoints": true
     }
   ]
 }
