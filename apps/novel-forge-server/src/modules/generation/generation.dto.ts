@@ -80,6 +80,20 @@ export class RunParams {
   runId: string;
 }
 
+@Schema()
+export class RunCallParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field()
+  runId: string;
+
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  callId: bigint;
+}
+
 // ─── Request bodies ───────────────────────────────────────────────────────────
 
 @Schema()
@@ -453,6 +467,9 @@ export class RunModelCallResponse {
   promptKey: string;
 
   @Field()
+  promptVersion: string;
+
+  @Field()
   status: string;
 
   @Field(() => Integer, { optional: true, nullable: true })
@@ -472,6 +489,89 @@ export class RunModelCallResponse {
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
+}
+
+// A read-only lookup the model made mid-run (chat lookups, judge/validation tools) — args in full,
+// result as a digest; the tokens the lookups added ride in the following model call's input.
+@Schema()
+export class RunToolCallResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field({ optional: true, nullable: true })
+  node?: string | null;
+
+  @Field()
+  tool: string;
+
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  args?: Record<string, unknown> | null;
+
+  @Field()
+  status: string;
+
+  @Field({ optional: true, nullable: true })
+  resultDigest?: string | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  latencyMs?: number | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+}
+
+@Schema()
+export class RunContextSectionItem {
+  @Field()
+  key: string;
+
+  @Field()
+  tier: string;
+
+  @Field()
+  segment: string;
+
+  @Field(() => Integer)
+  tokens: number;
+
+  @Field()
+  truncated: boolean;
+}
+
+// The prompt anatomy: where a run's input tokens actually come from — the assembled context pack's
+// sections, not the user's message. This is the data for optimising token usage per purpose.
+@Schema()
+export class RunContextPackResponse {
+  @Field()
+  id: string;
+
+  @Field()
+  purpose: string;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  budgetTokens?: number | null;
+
+  @Field(() => Integer, { optional: true, nullable: true })
+  usedTokens?: number | null;
+
+  @Field(() => [RunContextSectionItem])
+  sections: RunContextSectionItem[];
+}
+
+@Schema()
+export class RunContextResponse extends RunContextPackResponse {
+  // The exact rendered text that fed the prompt (stable + volatile, in order).
+  @Field()
+  rendered: string;
+}
+
+@Schema()
+export class RunModelCallDetailResponse extends RunModelCallResponse {
+  @Field({ optional: true, nullable: true })
+  rawOutput?: string | null;
+
+  @Field(() => Object, { optional: true, nullable: true, additionalProperties: true })
+  error?: Record<string, unknown> | null;
 }
 
 @Schema()
@@ -511,6 +611,15 @@ export class WorkflowRunDetailResponse {
   // Present only on the run-detail endpoint (the list omits it): every model call this run made.
   @Field(() => [RunModelCallResponse], { optional: true })
   modelCalls?: RunModelCallResponse[];
+
+  // Present only on the run-detail endpoint: every tool lookup the run's model calls performed.
+  @Field(() => [RunToolCallResponse], { optional: true })
+  toolCalls?: RunToolCallResponse[];
+
+  // Present only on the run-detail endpoint, when the run linked its pack: the prompt anatomy.
+  // Optional, never null — the route serialiser cannot build nullable nested-object fields.
+  @Field(() => RunContextPackResponse, { optional: true })
+  contextPack?: RunContextPackResponse;
 
   @Field(() => String, { format: 'date-time' })
   startedAt: Date;

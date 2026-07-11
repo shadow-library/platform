@@ -91,6 +91,7 @@ export class RefineService {
     const pack = await this.contextAssembler.forPremise(projectId);
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'premise-enhance', 'premise', { overview: effectiveOverview }, async runId => {
+      await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'premise-enhance', promptKey: prompt.key, promptVersion: prompt.version, role: 'premise' };
       const output = (await this.modelRouter.structured(
         prompt,
@@ -132,6 +133,7 @@ export class RefineService {
     const docInventory = docs.length > 0 ? docs.map(d => `${d.section}/${d.slug} (revision ${d.revision})`).join('\n') : 'none';
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'bible-audit', 'bible', {}, async runId => {
+      await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'bible-audit', promptKey: prompt.key, promptVersion: prompt.version, role: 'audit' };
       const output = (await this.modelRouter.structured(
         prompt,
@@ -180,6 +182,7 @@ export class RefineService {
     const pack = await this.contextAssembler.forArcPlanning(projectId, volumeKey);
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'arc-plan', `volume:${volumeKey}`, { arcCount: opts?.arcCount }, async runId => {
+      await this.workflowRunService.linkContextPack(runId, pack.id);
       const ctx = { projectId, runId, node: 'arc-plan', promptKey: prompt.key, promptVersion: prompt.version, role: 'arc' };
       const input = {
         stableContext: pack.rendered,

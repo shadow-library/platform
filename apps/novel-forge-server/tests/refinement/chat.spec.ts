@@ -111,6 +111,8 @@ describe.if(pgAvailable)('ChatService', () => {
 
     const run = await db.query.workflowRuns.findFirst({ where: eq(schema.workflowRuns.id, result.runId) });
     expect(run).toMatchObject({ graph: 'chat-turn', status: 'completed' });
+    // The turn links its context pack so the run detail can explain where the input tokens went.
+    expect(run?.contextPackId).not.toBeNull();
 
     // The structured call received the stable pack + playbook + the user message.
     const input = structuredMock.mock.calls.at(-1)?.[1 as never] as unknown as Record<string, string>;

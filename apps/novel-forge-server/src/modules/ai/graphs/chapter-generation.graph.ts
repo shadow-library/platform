@@ -155,6 +155,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
   // ─── assembleContext ──────────────────────────────────────────────────────────
   async function assembleContext(state: ChapterGenState) {
     const pack = await contextAssembler.forChapter(BigInt(state.projectId), state.chapter);
+    // Link the pack to the run row so the run detail can show the prompt anatomy behind the tokens.
+    if (pack.id !== null) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
     return { contextPackId: pack.id ? String(pack.id) : null };
   }
 

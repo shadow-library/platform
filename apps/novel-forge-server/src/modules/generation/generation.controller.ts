@@ -44,6 +44,9 @@ import {
   ReviewQueueResponse,
   ReviseDraftBody,
   RevisionParams,
+  RunCallParams,
+  RunContextResponse,
+  RunModelCallDetailResponse,
   RunParams,
   SearchQuery,
   SearchResponse,
@@ -299,6 +302,18 @@ export class GenerationController {
   @RespondFor(200, WorkflowRunDetailResponse)
   getRun(@Params() params: RunParams): Promise<WorkflowRunDetailResponse> {
     return this.generationService.getRun(params.projectId, params.runId) as unknown as Promise<WorkflowRunDetailResponse>;
+  }
+
+  @Get('/runs/:runId/context')
+  @RespondFor(200, RunContextResponse)
+  getRunContext(@Params() params: RunParams): Promise<RunContextResponse> {
+    return this.generationService.getRunContext(params.projectId, params.runId) as unknown as Promise<RunContextResponse>;
+  }
+
+  @Get('/runs/:runId/calls/:callId')
+  @RespondFor(200, RunModelCallDetailResponse)
+  getRunCall(@Params() params: RunCallParams): Promise<RunModelCallDetailResponse> {
+    return this.generationService.getRunCall(params.projectId, params.runId, params.callId) as unknown as Promise<RunModelCallDetailResponse>;
   }
 
   @Get('/ai-usage')

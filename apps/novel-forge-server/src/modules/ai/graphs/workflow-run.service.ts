@@ -165,6 +165,16 @@ export class WorkflowRunService {
   }
 
   /**
+   * Records which context pack fed this run's prompt — the run detail uses it to explain the input
+   * tokens (the pack, not the user's one-line message, is where they go). Call it from every chain
+   * or node that assembles a pack for the run.
+   */
+  async linkContextPack(runId: string, contextPackId: bigint | null): Promise<void> {
+    if (contextPackId === null) return;
+    await this.db.update(schema.workflowRuns).set({ contextPackId }).where(eq(schema.workflowRuns.id, runId));
+  }
+
+  /**
    * Runs a plain (non-graph, non-checkpointed) chain under workflow_runs bookkeeping — the rule-11
    * seam for the refinement chains (chat-turn, premise-enhance, bible-audit, arc-plan): every turn
    * gets a fresh runId that correlates its model_calls and context pack, and failures land in the

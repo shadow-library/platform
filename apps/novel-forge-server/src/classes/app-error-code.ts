@@ -145,6 +145,11 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly RFN_011 = new AppErrorCode('RFN_011', ErrorType.CLIENT_ERROR, 'Invalid op selection — indexes must reference ops in the change-set and select at least one');
 
   /*!
+   * Context Errors
+   */
+  static readonly CTX_001 = new AppErrorCode('CTX_001', ErrorType.NOT_FOUND, 'No context pack is linked to this run');
+
+  /*!
    * Premise Errors
    */
   static readonly PRM_001 = new AppErrorCode('PRM_001', ErrorType.CLIENT_ERROR, 'No overview available — provide an overview or set the project brief or premise first');

@@ -35,6 +35,7 @@ import {
   type UpdateDraftBody,
 } from './generation.dto';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
+import { type ContextSection } from '../ai/context/sections';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
@@ -56,6 +57,22 @@ import { ProposalService } from '../refinement/proposal.service';
 /**
  * Defining types
  */
+
+export interface RunContextSectionSummary {
+  key: string;
+  tier: string;
+  segment: string;
+  tokens: number;
+  truncated: boolean;
+}
+
+export interface RunContextPackSummary {
+  id: string;
+  purpose: string;
+  budgetTokens: number | null;
+  usedTokens: number | null;
+  sections: RunContextSectionSummary[];
+}
 
 export interface JudgeResult {
   verdict: string;
@@ -1049,14 +1066,52 @@ export class GenerationService {
     return this.db.query.workflowRuns.findMany({ where: eq(schema.workflowRuns.projectId, projectId), orderBy: [desc(schema.workflowRuns.startedAt)], limit: 20 });
   }
 
-  async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[] }> {
+  /**
+   * The full audit picture of one run (chat-hub follow-up): every model call, every tool call, and
+   * the context pack's per-section token anatomy — the input tokens live in the assembled pack, not
+   * the user's one-line message, and this is where that becomes visible and optimisable.
+   */
+  async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
     if (!run) throw new ServerError(AppErrorCode.PRJ_001);
-    const modelCalls = await this.db.query.modelCalls.findMany({
-      where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId)),
-      orderBy: asc(schema.modelCalls.createdAt),
+    const [modelCalls, toolCalls, contextPack] = await Promise.all([
+      this.db.query.modelCalls.findMany({
+        where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId)),
+        orderBy: asc(schema.modelCalls.createdAt),
+      }),
+      this.db.query.toolCalls.findMany({ where: eq(schema.toolCalls.runId, runId), orderBy: asc(schema.toolCalls.createdAt) }),
+      this.loadPackSummary(run.contextPackId),
+    ]);
+    // Omitted (never null) when unlinked — the route serialiser cannot build nullable nested objects.
+    return { ...run, modelCalls, toolCalls, ...(contextPack ? { contextPack } : {}) };
+  }
+
+  /** The pack's token anatomy without the rendered text — section keys, tiers, segments, and sizes. */
+  private async loadPackSummary(contextPackId: bigint | null): Promise<RunContextPackSummary | null> {
+    if (contextPackId === null) return null;
+    const pack = await this.db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, contextPackId) });
+    if (!pack) return null;
+    const sections = ((pack.sections as ContextSection[] | null) ?? []).map(s => ({ key: s.key, tier: s.tier, segment: s.segment, tokens: s.tokens, truncated: s.truncated }));
+    return { id: String(pack.id), purpose: pack.purpose, budgetTokens: pack.budgetTokens, usedTokens: pack.usedTokens, sections };
+  }
+
+  /** One model call in full — the raw model output and error detail are too heavy for the run table. */
+  async getRunCall(projectId: bigint, runId: string, callId: bigint): Promise<Ai.ModelCall> {
+    const call = await this.db.query.modelCalls.findFirst({
+      where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId), eq(schema.modelCalls.id, callId)),
     });
-    return { ...run, modelCalls };
+    if (!call) throw new ServerError(AppErrorCode.PRJ_001);
+    return call;
+  }
+
+  /** The exact rendered context that fed the run's prompt, with the section anatomy alongside. */
+  async getRunContext(projectId: bigint, runId: string): Promise<RunContextPackSummary & { rendered: string }> {
+    const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
+    if (!run) throw new ServerError(AppErrorCode.PRJ_001);
+    const summary = await this.loadPackSummary(run.contextPackId);
+    if (!summary) throw new ServerError(AppErrorCode.CTX_001);
+    const pack = await this.db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(summary.id)) });
+    return { ...summary, rendered: pack?.rendered ?? '' };
   }
 
   async getAiUsage(projectId: bigint): Promise<AiUsageResult> {
