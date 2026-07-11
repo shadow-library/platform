@@ -16,6 +16,7 @@ import validator from 'validator';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
 import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
+import { OrganisationService } from '@server/modules/identity/organisation';
 import { DatabaseService, ID, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
 
 /**
@@ -66,6 +67,7 @@ export class UserService {
     private readonly databaseService: DatabaseService,
     private readonly passwordService: PasswordService,
     private readonly passwordPolicyService: PasswordPolicyService,
+    private readonly organisationService: OrganisationService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -139,6 +141,12 @@ export class UserService {
         assert(password, 'User password creation failed');
         await tx.insert(schema.passwordHistory).values({ userId: user.id, hash: passwordHash });
         this.logger.debug('user password created', { userId: user.id, authIdentityId: password.userAuthIdentityId });
+
+        const workspaceName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || 'Personal';
+        const organisation = await this.organisationService.createPersonalWorkspace(user.id, `${workspaceName} Workspace`, tx);
+        await tx.update(schema.users).set({ personalOrganisationId: organisation.id }).where(eq(schema.users.id, user.id));
+        userDetails.personalOrganisationId = organisation.id;
+        this.logger.debug('personal workspace created', { userId: user.id, organisationId: organisation.id });
 
         return userDetails;
       })

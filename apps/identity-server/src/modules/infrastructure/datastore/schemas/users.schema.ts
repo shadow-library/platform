@@ -43,6 +43,8 @@ export const users = pgTable('users', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   username: varchar('username', { length: 32 }).unique(),
   status: userStatus('status').notNull().default('INACTIVE'),
+  /** The user's synthetic personal workspace (D-1); set in the same transaction as user creation. */
+  personalOrganisationId: bigint('personal_organisation_id', { mode: 'bigint' }),
   lockMode: userLockMode('lock_mode').notNull().default('NONE'),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
   createdAt: timestamp('created_at').notNull().defaultNow(),

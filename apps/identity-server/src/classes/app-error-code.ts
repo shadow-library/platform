@@ -53,4 +53,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUTH_003 = new AppErrorCode('AUTH_003', ErrorType.UNAUTHENTICATED, 'Invalid credentials');
   /** The flow was terminated after too many failed attempts */
   static readonly AUTH_004 = new AppErrorCode('AUTH_004', ErrorType.NOT_FOUND, 'Authentication flow terminated', 410);
+
+  /**
+   * Organisation Error Codes
+   */
+
+  /** The principal is not a member of the organisation */
+  static readonly ORG_001 = new AppErrorCode('ORG_001', ErrorType.UNAUTHORIZED, 'Not a member of this organisation');
+  /** The organisation does not exist */
+  static readonly ORG_002 = new AppErrorCode('ORG_002', ErrorType.NOT_FOUND, 'Organisation not found');
 }

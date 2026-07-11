@@ -18,6 +18,8 @@ export type Organisation = InferSelectModel<typeof organisations>;
 export namespace Organisation {
   export type Member = InferSelectModel<typeof organisationMembers>;
 
+  export type Type = InferEnum<typeof organisationType>;
+  export type Status = InferEnum<typeof organisationStatus>;
   export type MemberRole = InferEnum<typeof organisationMemberRole>;
 }
 
@@ -25,13 +27,17 @@ export namespace Organisation {
  * Declaring the constants
  */
 
+export const organisationType = pgEnum('organisation_type', ['PERSONAL', 'TEAM']);
+export const organisationStatus = pgEnum('organisation_status', ['ACTIVE', 'SUSPENDED', 'DELETED']);
 export const organisationMemberRole = pgEnum('organisation_member_role', ['OWNER', 'ADMIN', 'MEMBER']);
 
 export const organisations = pgTable('organisations', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   name: varchar('name', { length: 255 }).notNull(),
-  createdAt: timestamp('created_at').notNull().defaultNow(),
-  updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  type: organisationType('type').notNull().default('TEAM'),
+  status: organisationStatus('status').notNull().default('ACTIVE'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
 export const organisationMembers = pgTable(
@@ -45,7 +51,7 @@ export const organisationMembers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     isDefault: boolean('is_default').notNull().default(false),
     role: organisationMemberRole('role').notNull().default('MEMBER'),
-    joinedAt: timestamp('joined_at').notNull().defaultNow(),
+    joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
   },
   t => [primaryKey({ columns: [t.organisationId, t.userId] })],
 );

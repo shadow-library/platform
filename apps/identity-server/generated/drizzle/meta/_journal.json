@@ -71,6 +71,13 @@
       "when": 1783752686475,
       "tag": "0009_refresh_tokens",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1783753480107,
+      "tag": "0010_tenancy",
+      "breakpoints": true
     }
   ]
 }
