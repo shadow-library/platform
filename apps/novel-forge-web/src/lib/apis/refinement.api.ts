@@ -49,6 +49,12 @@ interface ForgeTurnVariables {
   content: string;
 }
 
+// The optimistic-update rollback snapshot for a chat turn: the messages cache as it was before the
+// author's message was appended.
+interface ChatTurnContext {
+  previous?: ListChatMessagesResponse;
+}
+
 interface SessionStatusVariables {
   sessionId: string;
   status: 'active' | 'archived';
@@ -93,6 +99,9 @@ export function useChatMessagesQuery(projectId: string, sessionId: string | unde
     queryKey: refinementKeys.messages(projectId, sessionId ?? ''),
     queryFn: () => APIRequest.get(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).query({ limit: 200 }).execute(),
     enabled: enabled && Boolean(projectId) && Boolean(sessionId),
+    // Follow an in-flight turn to completion: the server sets pendingTurn while a chat-turn is still
+    // running, so a refresh or a second tab keeps polling until the reply lands, then stops.
+    refetchInterval: query => (query.state.data?.pendingTurn ? 1500 : false),
   });
 }
 
@@ -104,11 +113,33 @@ export function useCreateChatSessionMutation(projectId: string): UseMutationResu
   });
 }
 
-export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, string> {
+export function useChatTurnMutation(projectId: string, sessionId: string): UseMutationResult<ChatTurnResponse, ApiError, string, ChatTurnContext> {
   const queryClient = useQueryClient();
-  return useMutation<ChatTurnResponse, ApiError, string>({
+  const messagesKey = refinementKeys.messages(projectId, sessionId);
+  return useMutation<ChatTurnResponse, ApiError, string, ChatTurnContext>({
     mutationFn: content => APIRequest.post(`/projects/${projectId}/chat/sessions/${sessionId}/messages`).body({ content }).execute(),
-    onSuccess: () => invalidateChat(queryClient, projectId, sessionId),
+    // Show the author's message and a pending state the instant they send — the reply can take a
+    // while, and the server has already persisted this message so any other tab sees it too.
+    onMutate: async content => {
+      await queryClient.cancelQueries({ queryKey: messagesKey });
+      const previous = queryClient.getQueryData<ListChatMessagesResponse>(messagesKey);
+      const optimistic: ListChatMessagesResponse['messages'][number] = {
+        id: `optimistic-${Date.now()}`,
+        sessionId,
+        ordinal: (previous?.messages.at(-1)?.ordinal ?? 0) + 1,
+        role: 'user',
+        content,
+        createdAt: new Date().toISOString(),
+      };
+      queryClient.setQueryData<ListChatMessagesResponse>(messagesKey, old => ({ messages: [...(old?.messages ?? []), optimistic], pendingTurn: true }));
+      return { previous };
+    },
+    onError: (_err, _content, context) => {
+      if (context?.previous) queryClient.setQueryData(messagesKey, context.previous);
+    },
+    // Reconcile against the server on both outcomes: on success the real exchange arrives; on a
+    // post-persist failure the user message is still there, minus a reply.
+    onSettled: () => invalidateChat(queryClient, projectId, sessionId),
   });
 }
 

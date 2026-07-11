@@ -101,7 +101,6 @@
   border-radius: 14px 14px 14px 4px;
   font-size: var(--sh-text-body);
   line-height: 1.6;
-  white-space: pre-wrap;
 }
 
 .proposalBtn {
@@ -335,20 +334,6 @@
 
 .turnOpLabel:hover {
   text-decoration: underline;
-}
-
-.turnOpJson {
-  margin: 8px 0 0;
-  padding: 8px 10px;
-  border-radius: var(--sh-radius-md);
-  background: var(--sh-surface-sunken, var(--sh-surface-default));
-  white-space: pre-wrap;
-  font-family: var(--sh-font-mono);
-  font-size: 11px;
-  line-height: 1.5;
-  color: var(--sh-text-secondary);
-  max-height: 240px;
-  overflow: auto;
 }
 
 .turnOpError {

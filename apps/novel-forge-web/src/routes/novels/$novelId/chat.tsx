@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react';
  * Importing user defined modules
  */
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
-import { PaneError, PaneLoader, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
+import { Markdown, PaneError, PaneLoader, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChangeItemResponse,
@@ -35,7 +35,7 @@ import {
 import { relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
-import { opLabel } from './proposals';
+import { ChangeOpBody, opLabel } from './proposals';
 
 interface ChatSearch {
   session?: string;
@@ -334,7 +334,7 @@ function TurnProposalCard({ novelId, proposalId }: TurnProposalCardProps): React
                 <div className={styles.spacer} />
                 {result && <StatusChip intent={OP_RESULT_INTENT[result.status] ?? 'neutral'}>{result.status}</StatusChip>}
               </div>
-              {expanded.has(i) && <pre className={styles.turnOpJson}>{JSON.stringify(op, null, 2)}</pre>}
+              {expanded.has(i) && <ChangeOpBody op={op} />}
               {result?.error && <div className={styles.turnOpError}>{result.error}</div>}
               {result?.result?.summary !== undefined && <div className={styles.turnOpSummary}>{String(result.result.summary)}</div>}
             </div>
@@ -491,6 +491,9 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
   const messages = messagesQuery.data?.messages ?? [];
   const isAuto = session.mode === 'auto';
   const isHub = session.scopeType === 'project';
+  // "Forge is working" comes from this tab's own request OR the server flag — the latter is what lets a
+  // refresh or a second tab recover an in-flight turn instead of showing a silent, unanswered message.
+  const pending = turn.isPending || (messagesQuery.data?.pendingTurn ?? false);
 
   // Stay pinned to the newest message ChatGPT-style: inline change cards load after the transcript,
   // so a one-shot scroll lands short — follow content growth while the user is near the bottom, and
@@ -516,11 +519,11 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
   useEffect(() => {
     pinnedRef.current = true;
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
-  }, [messages.length, turn.isPending]);
+  }, [messages.length, pending]);
 
   const send = (): void => {
     const content = input.trim();
-    if (!content || turn.isPending) return;
+    if (!content || pending) return;
     setInput('');
     turn.mutate(content, {
       onSuccess: result => {
@@ -578,14 +581,14 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
                   <ProposalsIcon size={15} />
                 </div>
                 <div className={styles.assistantCol}>
-                  <div className={styles.assistantBubble}>{m.content}</div>
+                  <Markdown content={m.content} className={styles.assistantBubble} />
                   <MessageModelTag message={m} />
                   {m.proposalId && <TurnProposalCard novelId={novelId} proposalId={m.proposalId} />}
                 </div>
               </div>
             ),
           )}
-          {turn.isPending && (
+          {pending && (
             <div className={styles.thinking}>
               <Spinner size="sm" /> {isAuto ? 'Forge is working…' : 'Forge is thinking…'}
             </div>
@@ -619,7 +622,7 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
             </SegmentedControl>
             <span className={styles.hint}>{isAuto ? 'Auto — changes apply instantly, revertible from History' : 'Manual — you accept or decline each change'}</span>
             <div className={styles.spacer} />
-            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={turn.isPending} disabled={session.status !== 'active'} onClick={send}>
+            <Button variant="primary" size="sm" prefix={<SendIcon size={14} />} loading={pending} disabled={session.status !== 'active' || pending} onClick={send}>
               Send
             </Button>
           </div>

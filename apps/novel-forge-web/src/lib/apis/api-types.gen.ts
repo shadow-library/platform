@@ -2144,6 +2144,7 @@ export interface components {
     };
     ListChatMessagesResponse: {
       messages: components['schemas']['ChatMessageResponse'][];
+      pendingTurn: boolean;
     };
     ChatMessageResponse: {
       id: string;
