@@ -96,7 +96,9 @@ const PRODUCTION_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
 const LOCAL_TEST_GROUP_DEFAULTS: Record<ModelGroup, ResolvedModel> = {
   writing: { provider: 'ollama', model: 'qwen3:14b' },
   planning: { provider: 'ollama', model: 'qwen3:14b' },
-  review: { provider: 'ollama', model: 'qwen3:8b' },
+  // review needs the 14b model: qwen3:8b fixes one audit gap per round and oscillates on taste
+  // instead of settling at `keep`, so judge loops never converge on the smaller model.
+  review: { provider: 'ollama', model: 'qwen3:14b' },
   chat: { provider: 'ollama', model: 'qwen3:14b' },
   helper: { provider: 'ollama', model: 'qwen3:8b' },
   image: { provider: 'ollama', model: 'qwen3:8b' },

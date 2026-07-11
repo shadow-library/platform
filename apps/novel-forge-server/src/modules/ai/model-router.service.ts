@@ -156,6 +156,10 @@ export class ModelRouterService {
           baseUrl: Config.get('ai.ollama.host'),
           temperature: 0,
           think: false,
+          // Bun's fetch aborts after ~300s without socket activity, and a long-context prompt eval
+          // streams no bytes for minutes — so long generations die as DOMException transport errors.
+          // Disable that idle timeout (Bun RequestInit extension); LLM_TIMEOUT_MS still bounds the call.
+          fetch: ((input, init) => fetch(input, { ...init, ...({ timeout: false } as object) })) as typeof fetch,
           ...(opts?.format ? { format: opts.format } : {}),
         });
       case 'anthropic-claude-code':
