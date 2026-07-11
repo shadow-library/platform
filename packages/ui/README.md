@@ -32,7 +32,7 @@ Shadow UI is styled with **CSS Modules and CSS-variable design tokens** — ther
 import '@shadow-library/ui/styles.css';
 ```
 
-This ships the `--sh-*` design tokens, a minimal reset, the `sh-*` utility classes, and every component's scoped styles.
+This ships the `--sh-*` design tokens, a minimal reset, the unprefixed utility classes, and every component's scoped styles.
 
 ### Theming
 
