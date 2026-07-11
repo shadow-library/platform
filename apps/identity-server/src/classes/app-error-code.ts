@@ -94,6 +94,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ADM_001 = new AppErrorCode('ADM_001', ErrorType.UNAUTHORIZED, 'Insufficient administrative privileges', 403);
   /** The platform organisation is missing — bootstrap has not run */
   static readonly ADM_002 = new AppErrorCode('ADM_002', ErrorType.SERVER_ERROR, 'Platform administration is not provisioned', 500);
+  /** A malformed administrative request value (for example an unparseable timestamp) */
+  static readonly ADM_003 = new AppErrorCode('ADM_003', ErrorType.VALIDATION_ERROR, 'Invalid administrative request value', 400);
 
   /**
    * Organisation Error Codes

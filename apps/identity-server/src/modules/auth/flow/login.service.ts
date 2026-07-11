@@ -114,6 +114,16 @@ export class LoginService {
     if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
     /** Tier-4 lock: a locked account only accepts OTP methods until the lock expires (§13.2). */
     if (this.isOtpLocked(user)) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+    /**
+     * An admin-forced reset refuses even the correct password until recovery replaces it (T-602).
+     * The caller has just proven the credential, so naming the reason leaks nothing — and it must
+     * not burn failure budget or trip lockouts.
+     */
+    if (user.passwordResetRequired) {
+      await this.auditService.record({ action: 'auth.login.reset_required', outcome: 'FAILURE', actorType: 'USER', actorId: userId.toString(), ipAddress: flow.device.ipAddress });
+      await this.authFlowService.delete(flow.flowId);
+      return { outcome: 'FAILED', flowId: flow.flowId, status: 'PASSWORD_RESET_REQUIRED', attemptsLeft: 0 };
+    }
 
     const factors = await this.mfaService.getFactors(userId);
     if (factors.totp || factors.webauthn) {

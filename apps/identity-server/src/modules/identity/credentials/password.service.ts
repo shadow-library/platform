@@ -107,6 +107,8 @@ export class PasswordService {
         .values({ userAuthIdentityId: identity.id, hash, version, algorithm: 'ARGON2ID' })
         .onConflictDoUpdate({ target: schema.userPasswords.userAuthIdentityId, set: { hash, version, algorithm: 'ARGON2ID' } });
       await tx.insert(schema.passwordHistory).values({ userId, hash });
+      /** A replaced credential satisfies any admin-forced reset (T-602). */
+      await tx.update(schema.users).set({ passwordResetRequired: false }).where(eq(schema.users.id, userId));
     });
     await this.pruneHistory(userId);
   }

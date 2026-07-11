@@ -8,6 +8,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AdminModule } from '@server/modules/admin';
 import { AuthFlowModule } from '@server/modules/auth/flow';
 import { KeyModule } from '@server/modules/auth/keys';
 import { MfaModule } from '@server/modules/auth/mfa';
@@ -50,6 +51,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     ContactModule,
     AuditModule,
     NotificationModule,
+    AdminModule,
   ],
 
   host: Config.get('server.host'),

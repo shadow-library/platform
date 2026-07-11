@@ -134,6 +134,13 @@
       "when": 1783761224135,
       "tag": "0018_contact_verified_at",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1783766458571,
+      "tag": "0019_admin_user_lifecycle",
+      "breakpoints": true
     }
   ]
 }

@@ -47,6 +47,8 @@ export const users = pgTable('users', {
   personalOrganisationId: bigint('personal_organisation_id', { mode: 'bigint' }),
   lockMode: userLockMode('lock_mode').notNull().default('NONE'),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
+  /** Admin-forced credential reset (T-602): the password step refuses until recovery replaces it. */
+  passwordResetRequired: boolean('password_reset_required').notNull().default(false),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

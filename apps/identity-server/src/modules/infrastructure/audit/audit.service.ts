@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { asc, eq, isNull, sql } from 'drizzle-orm';
+import { asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -106,6 +106,16 @@ export class AuditService {
       assert(inserted, 'Audit event insertion failed');
       return inserted;
     });
+  }
+
+  /** Most-recent-first trail of events a subject performed or was the target of (admin views). */
+  async listForSubject(subjectId: string, limit = 50): Promise<AuditEvent[]> {
+    return this.db
+      .select()
+      .from(schema.auditEvents)
+      .where(or(eq(schema.auditEvents.actorId, subjectId), eq(schema.auditEvents.targetId, subjectId)))
+      .orderBy(desc(schema.auditEvents.id))
+      .limit(limit);
   }
 
   /** Recomputes every hash in a chain and reports the first row that fails to match. */
