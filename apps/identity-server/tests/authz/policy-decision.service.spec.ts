@@ -6,6 +6,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
+import { AccessTokenService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
@@ -73,15 +74,39 @@ describe('PolicyDecisionService', () => {
     expect(after).toBeGreaterThan(before);
   });
 
-  it('should serve decisions over the HTTP PDP endpoint', async () => {
+  const serviceToken = (scope = 'authz:check') =>
+    env.getService(AccessTokenService).mintAccessToken({ subject: 'pdp-caller', audience: 'shadow-identity', scope, clientId: 'pdp-caller', ttlSeconds: 60, actorType: 'service' })
+      .token;
+
+  it('should serve decisions over the HTTP PDP endpoint to authenticated services', async () => {
     await pdp.assignRole(principal(), roleId, orgId);
     const response = await env
       .getRouter()
       .mockRequest()
       .post('/api/v1/authz/check')
+      .headers({ authorization: `Bearer ${serviceToken()}` })
       .body({ principalType: 'USER', principalId: userId, organisationId: orgId, action: 'posts:write' });
     expect(response.statusCode).toBe(200);
     expect(response.json()).toMatchObject({ decision: 'PERMIT' });
+  });
+
+  it('should reject unauthenticated PDP calls', async () => {
+    const response = await env
+      .getRouter()
+      .mockRequest()
+      .post('/api/v1/authz/check')
+      .body({ principalType: 'USER', principalId: userId, organisationId: orgId, action: 'posts:write' });
+    expect(response.statusCode).toBe(401);
+  });
+
+  it('should reject service tokens lacking the authz scope', async () => {
+    const response = await env
+      .getRouter()
+      .mockRequest()
+      .post('/api/v1/authz/check')
+      .headers({ authorization: `Bearer ${serviceToken('reports:read')}` })
+      .body({ principalType: 'USER', principalId: userId, organisationId: orgId, action: 'posts:write' });
+    expect(response.statusCode).toBe(403);
   });
 
   it('should revoke a role and deny thereafter', async () => {

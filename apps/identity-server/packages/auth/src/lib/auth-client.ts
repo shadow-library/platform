@@ -56,6 +56,9 @@ const DEFAULT_DECISION_TTL_SECONDS = 60;
 /** Matches the identity server's default token audience for its own API surface */
 const DEFAULT_IDENTITY_RESOURCE = 'shadow-identity';
 
+/** The server's PDP endpoint requires a service token granted this scope */
+const PDP_SCOPE = 'authz:check';
+
 class AuthClientImpl implements AuthClient {
   private readonly issuer: string;
   private readonly transport: FetchLike;
@@ -76,7 +79,7 @@ class AuthClientImpl implements AuthClient {
       issuer: this.issuer,
       fetchFn: this.transport,
       ttlSeconds: config.cache?.decisionTtlSeconds ?? DEFAULT_DECISION_TTL_SECONDS,
-      getToken: config.client ? () => this.tokens.getToken({ resource: config.identityResource ?? DEFAULT_IDENTITY_RESOURCE }) : undefined,
+      getToken: config.client ? () => this.tokens.getToken({ resource: config.identityResource ?? DEFAULT_IDENTITY_RESOURCE, scopes: [PDP_SCOPE] }) : undefined,
     });
   }
 

@@ -6,10 +6,12 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { KeyModule } from '@server/modules/auth/keys';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 
 import { AuthzController } from './authz.controller';
 import { PolicyDecisionService } from './policy-decision.service';
+import { ServiceTokenGuard } from './service-token.guard';
 
 /**
  * Defining types
@@ -20,8 +22,8 @@ import { PolicyDecisionService } from './policy-decision.service';
  */
 
 @Module({
-  imports: [DatabaseModule],
-  controllers: [AuthzController],
+  imports: [DatabaseModule, KeyModule],
+  controllers: [AuthzController, ServiceTokenGuard],
   providers: [PolicyDecisionService],
   exports: [PolicyDecisionService],
 })

@@ -6,6 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { BootstrapService } from '@server/modules/bootstrap';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -46,7 +47,12 @@ describe('BootstrapService', () => {
   });
 
   it('should be idempotent when run again', async () => {
-    const bootstrap = new BootstrapService(env.getService(ApplicationService), env.getService(ApplicationRoleService), env.getService(UserService));
+    const bootstrap = new BootstrapService(
+      env.getService(ApplicationService),
+      env.getService(ApplicationRoleService),
+      env.getService(UserService),
+      env.getService(OAuthClientService),
+    );
     await bootstrap.onModuleInit();
 
     const admins = (await env.getPostgresClient().select().from(schema.userEmails)).filter(email => email.emailId === ADMIN_EMAIL);

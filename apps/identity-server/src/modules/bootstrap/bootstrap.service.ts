@@ -10,6 +10,7 @@ import { Config, Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
@@ -21,6 +22,8 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
  * Declaring the constants
  */
 const IAM_ADMIN_ROLE = 'IAMAdmin';
+const PLATFORM_RESOURCE = 'shadow-identity';
+const AUTHZ_CHECK_SCOPE = 'authz:check';
 
 /**
  * Idempotently provisions the records the platform cannot run without: the identity application
@@ -35,11 +38,23 @@ export class BootstrapService implements OnModuleInit {
     private readonly applicationService: ApplicationService,
     private readonly applicationRoleService: ApplicationRoleService,
     private readonly userService: UserService,
+    private readonly oauthClientService: OAuthClientService,
   ) {}
 
   async onModuleInit(): Promise<void> {
     await this.ensurePlatformApplication();
+    await this.ensurePlatformScopes();
     await this.ensureBootstrapAdmin();
+  }
+
+  /**
+   * The PDP endpoint demands a service token carrying `authz:check`; the scope must therefore
+   * exist before any client can be granted it. Runs unconditionally so existing deployments pick
+   * it up on upgrade.
+   */
+  private async ensurePlatformScopes(): Promise<void> {
+    const application = this.applicationService.getApplicationOrThrow(APP_NAME);
+    await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_CHECK_SCOPE);
   }
 
   private async ensurePlatformApplication(): Promise<void> {

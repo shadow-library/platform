@@ -49,7 +49,11 @@ describe('@shadow-library/auth against the real identity server', () => {
 
   beforeEach(async () => {
     applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
-    const service = await env.getService(OAuthClientService).register({ applicationId, name: 'SDK Service', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    /** PDP calls need the bootstrap-seeded authz:check scope granted to the calling client */
+    const scopeId = await env.getService(OAuthClientService).ensureScope(applicationId, 'shadow-identity', 'authz:check');
+    const service = await env
+      .getService(OAuthClientService)
+      .register({ applicationId, name: 'SDK Service', kind: 'SERVICE', grantTypes: ['client_credentials'], scopeIds: [scopeId] });
     serviceClientId = service.clientId;
     auth = createAuthClient({ issuer, audience: 'shadow-identity', client: { id: service.clientId, secret: service.secret }, fetch: fetchViaRouter });
   });

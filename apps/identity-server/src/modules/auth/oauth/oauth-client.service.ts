@@ -97,6 +97,23 @@ export class OAuthClientService {
     return Boolean(match);
   }
 
+  /** Idempotently provisions an API resource and one of its scopes, returning the scope id. */
+  async ensureScope(applicationId: number, resourceIdentifier: string, scopeName: string): Promise<string> {
+    await this.db.insert(schema.apiResources).values({ applicationId, identifier: resourceIdentifier }).onConflictDoNothing();
+    const resource = await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, resourceIdentifier) });
+    if (!resource) throw new Error(`API resource '${resourceIdentifier}' could not be provisioned`);
+
+    await this.db.insert(schema.scopes).values({ apiResourceId: resource.id, name: scopeName }).onConflictDoNothing();
+    const scope = await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, resource.id), eq(schema.scopes.name, scopeName)) });
+    if (!scope) throw new Error(`Scope '${scopeName}' could not be provisioned`);
+    return scope.id;
+  }
+
+  /** Grants an already-provisioned scope to a client, tolerating re-grants. */
+  async grantScope(clientId: string, scopeId: string): Promise<void> {
+    await this.db.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId }).onConflictDoNothing();
+  }
+
   async getGrantedScopeNames(clientId: string): Promise<string[]> {
     const grants = await this.db
       .select({ name: schema.scopes.name })
