@@ -26,6 +26,7 @@
     "moduleResolution": "bundler",
     "paths": {
       "@modules/*": ["src/modules/*"],
+      "@scripts/*": ["scripts/*"],
       "@server/*": ["src/*"]
     },
     "resolveJsonModule": true,

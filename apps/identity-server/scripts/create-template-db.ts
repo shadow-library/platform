@@ -1,0 +1,69 @@
+/**
+ * Importing npm packages
+ */
+import { Logger } from '@shadow-library/common';
+import { SQL } from 'bun';
+import { drizzle } from 'drizzle-orm/bun-sql';
+import { migrate } from 'drizzle-orm/bun-sql/migrator';
+
+/**
+ * Importing user defined packages
+ */
+import * as schema from '@server/modules/infrastructure/datastore/schemas';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+const logger = Logger.getLogger('Scripts', 'TemplateDBCreator');
+const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost:5432/shadow_identity';
+const baseUrl = baseConnectionString.replace(/\/[^/]*$/, '');
+const templateDbName = process.env.POSTGRES_TEMPLATE_DB_NAME ?? 'shadow_identity_template';
+
+export async function dropDatabase(dbName: string, sql?: SQL): Promise<void> {
+  const isProvidedSQL = Boolean(sql);
+  if (!sql) sql = new SQL(baseUrl);
+  await sql.unsafe(`DROP DATABASE IF EXISTS ${dbName} WITH (FORCE)`);
+  logger.debug(`Database '${dbName}' dropped successfully`);
+  if (!isProvidedSQL) await sql.close();
+}
+
+export async function createDatabaseFromTemplate(dbName: string): Promise<string> {
+  const sql = new SQL(baseUrl);
+  await dropDatabase(dbName, sql);
+  await sql.unsafe(`CREATE DATABASE ${dbName} TEMPLATE ${templateDbName}`);
+  logger.debug(`Database '${dbName}' created from template '${templateDbName}'`);
+  await sql.close();
+  return `${baseUrl}/${dbName}`;
+}
+
+export async function createTemplateDatabase(): Promise<void> {
+  const sql = new SQL(baseUrl);
+  const databaseExists = await sql`SELECT 1 FROM pg_database WHERE datname = ${templateDbName}`.then(result => result.length > 0);
+  if (databaseExists) {
+    await sql.unsafe(`ALTER DATABASE ${templateDbName} IS_TEMPLATE false`);
+    await dropDatabase(templateDbName, sql);
+  }
+
+  await sql.unsafe(`CREATE DATABASE ${templateDbName}`);
+  logger.debug(`Database '${templateDbName}' created successfully`);
+
+  const templateDbUrl = `${baseUrl}/${templateDbName}`;
+  const client = new SQL(templateDbUrl);
+  const db = drizzle({ client, schema });
+  await migrate(db, { migrationsFolder: 'generated/drizzle' });
+  await client.close();
+  logger.debug(`Migrations applied to template database '${templateDbName}'`);
+
+  await sql.unsafe(`ALTER DATABASE ${templateDbName} IS_TEMPLATE true`);
+  logger.info(`Template database '${templateDbName}' created successfully`);
+  await sql.close();
+}
+
+if (import.meta.path === Bun.main) {
+  Logger.attachTransport('console:pretty');
+  await createTemplateDatabase().catch(err => (logger.error('Template database creation failed', err), process.exit(1)));
+}
