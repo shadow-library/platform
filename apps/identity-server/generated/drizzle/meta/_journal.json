@@ -43,6 +43,13 @@
       "when": 1783750808891,
       "tag": "0005_sessions_devices",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1783751470721,
+      "tag": "0006_user_lock",
+      "breakpoints": true
     }
   ]
 }

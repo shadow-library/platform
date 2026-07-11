@@ -40,4 +40,17 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly USR_003 = new AppErrorCode('USR_003', ErrorType.CONFLICT, 'Email already exists');
   /** Phone number already exists */
   static readonly USR_004 = new AppErrorCode('USR_004', ErrorType.CONFLICT, 'Phone number already exists');
+
+  /**
+   * Authentication Flow Error Codes
+   */
+
+  /** The authentication flow does not exist or has expired */
+  static readonly AUTH_001 = new AppErrorCode('AUTH_001', ErrorType.NOT_FOUND, 'Authentication flow not found or expired', 410);
+  /** The requested step does not match the current flow state */
+  static readonly AUTH_002 = new AppErrorCode('AUTH_002', ErrorType.CONFLICT, 'Invalid flow state for this operation');
+  /** The submitted credential or code is invalid */
+  static readonly AUTH_003 = new AppErrorCode('AUTH_003', ErrorType.UNAUTHENTICATED, 'Invalid credentials');
+  /** The flow was terminated after too many failed attempts */
+  static readonly AUTH_004 = new AppErrorCode('AUTH_004', ErrorType.NOT_FOUND, 'Authentication flow terminated', 410);
 }

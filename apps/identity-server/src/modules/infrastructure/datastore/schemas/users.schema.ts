@@ -23,6 +23,7 @@ export namespace User {
   export type PasswordHistory = InferSelectModel<typeof passwordHistory>;
 
   export type Status = InferEnum<typeof userStatus>;
+  export type LockMode = InferEnum<typeof userLockMode>;
   export type Gender = InferEnum<typeof gender>;
   export type AuthProvider = InferEnum<typeof userAuthProvider>;
   export type PasswordAlgorithm = InferEnum<typeof passwordAlgorithm>;
@@ -33,6 +34,7 @@ export namespace User {
  */
 
 export const userStatus = pgEnum('user_status', ['ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED', 'CLOSED']);
+export const userLockMode = pgEnum('user_lock_mode', ['NONE', 'OTP_ONLY', 'FULL']);
 export const gender = pgEnum('gender', ['MALE', 'FEMALE', 'OTHER', 'UNSPECIFIED']);
 export const userAuthProvider = pgEnum('user_auth_provider', ['PASSWORD', 'OTP', 'TOTP', 'GOOGLE', 'MICROSOFT']);
 export const passwordAlgorithm = pgEnum('password_algorithm', ['BCRYPT', 'ARGON2ID']);
@@ -41,6 +43,8 @@ export const users = pgTable('users', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   username: varchar('username', { length: 32 }).unique(),
   status: userStatus('status').notNull().default('INACTIVE'),
+  lockMode: userLockMode('lock_mode').notNull().default('NONE'),
+  lockedUntil: timestamp('locked_until', { withTimezone: true }),
   createdAt: timestamp('created_at').notNull().defaultNow(),
   updatedAt: timestamp('updated_at').notNull().defaultNow(),
 });

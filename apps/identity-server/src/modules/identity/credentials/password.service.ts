@@ -36,6 +36,9 @@ const ARGON2_OPTIONS = { algorithm: 'argon2id', memoryCost: 65536, timeCost: 3 }
 export const PASSWORD_PARAMS_VERSION = 1;
 const PASSWORD_HISTORY_DEPTH = 5;
 
+/** A valid argon2id hash used to spend equivalent work when a user has no password credential. */
+const DUMMY_HASH = '$argon2id$v=19$m=65536,t=3,p=1$NCJqmYBSCaQHCbd96KVjeycfea/Op9Qf6OqrtzsUMkw$YNaWD8v4qxMkTfyuv7T0n+3PYqGqYo+6ixhN31TqX6E';
+
 @Injectable()
 export class PasswordService {
   private readonly logger = Logger.getLogger(APP_NAME, PasswordService.name);
@@ -53,6 +56,35 @@ export class PasswordService {
   async verify(password: string, stored: PasswordHash): Promise<VerifyResult> {
     const valid = await Bun.password.verify(password, stored.hash);
     return { valid, needsRehash: valid && stored.version !== PASSWORD_PARAMS_VERSION };
+  }
+
+  /**
+   * Verifies a user's password credential, transparently upgrading the stored hash when the pinned
+   * parameters have changed. Returns false (after a constant-work dummy verification) when the user
+   * has no password identity, so callers cannot distinguish "no credential" from "wrong password".
+   */
+  async verifyForUser(userId: bigint | null, password: string): Promise<boolean> {
+    const identity = userId
+      ? await this.db.query.userAuthIdentities.findFirst({
+          where: and(eq(schema.userAuthIdentities.userId, userId), eq(schema.userAuthIdentities.provider, 'PASSWORD')),
+          with: { password: true },
+        })
+      : undefined;
+    const stored = identity?.password;
+    if (!stored) {
+      await Bun.password.verify(password, DUMMY_HASH).catch(() => false);
+      return false;
+    }
+
+    const result = await this.verify(password, { hash: stored.hash, version: stored.version });
+    if (result.valid && result.needsRehash) {
+      const rehashed = await this.hash(password);
+      await this.db
+        .update(schema.userPasswords)
+        .set({ hash: rehashed.hash, version: rehashed.version, algorithm: 'ARGON2ID' })
+        .where(eq(schema.userPasswords.userAuthIdentityId, stored.userAuthIdentityId));
+    }
+    return result.valid;
   }
 
   /** Rejects a candidate password that matches the current or any of the recent stored hashes. */
