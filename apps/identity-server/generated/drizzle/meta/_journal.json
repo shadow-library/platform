@@ -15,6 +15,13 @@
       "when": 1783749254239,
       "tag": "0001_signing_keys",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783749673942,
+      "tag": "0002_password_history",
+      "breakpoints": true
     }
   ]
 }

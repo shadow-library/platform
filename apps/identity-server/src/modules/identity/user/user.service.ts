@@ -8,13 +8,14 @@ import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { SQL, eq, inArray } from 'drizzle-orm';
 import { DateTime } from 'luxon';
-import validator, { StrongPasswordOptions } from 'validator';
+import validator from 'validator';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
+import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
 import { DatabaseService, ID, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
 
 /**
@@ -55,14 +56,17 @@ interface FindUserFilter {
 /**
  * Declaring the constants
  */
-const PASSWORD_VALIDATION_OPTIONS: StrongPasswordOptions = { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 };
 
 @Injectable()
 export class UserService {
   private readonly logger = Logger.getLogger(APP_NAME, UserService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly passwordService: PasswordService,
+    private readonly passwordPolicyService: PasswordPolicyService,
+  ) {
     this.db = databaseService.getPostgresClient();
   }
 
@@ -87,7 +91,7 @@ export class UserService {
 
   async createUserWithPassword(data: CreateUser): Promise<UserDetails> {
     if (!validator.isEmail(data.email)) throw new ValidationError('email', ERROR_MESSAGES.INVALID_EMAIL);
-    if (!validator.isStrongPassword(data.password, PASSWORD_VALIDATION_OPTIONS)) throw new ValidationError('password', ERROR_MESSAGES.INVALID_PASSWORD);
+    this.passwordPolicyService.assertStrong(data.password);
     if (data.phoneNumber && !validator.isMobilePhone(data.phoneNumber, 'any', { strictMode: true })) throw new ValidationError('phoneNumber', ERROR_MESSAGES.INVALID_PHONE_NUMBER);
     if (data.username && !REGEX.USERNAME.test(data.username)) throw new ValidationError('username', ERROR_MESSAGES.INVALID_USERNAME);
     if (data.dateOfBirth) {
@@ -130,9 +134,10 @@ export class UserService {
         this.logger.debug('user auth identity created', { userId: user.id, authIdentityId: authIdentity.id });
         userDetails.authIdentities.push(authIdentity);
 
-        const passwordHash = await Bun.password.hash(data.password, { algorithm: 'argon2id' });
-        const [password] = await tx.insert(schema.userPasswords).values({ userAuthIdentityId: authIdentity.id, algorithm: 'ARGON2ID', hash: passwordHash }).returning();
+        const { hash: passwordHash, version } = await this.passwordService.hash(data.password);
+        const [password] = await tx.insert(schema.userPasswords).values({ userAuthIdentityId: authIdentity.id, algorithm: 'ARGON2ID', hash: passwordHash, version }).returning();
         assert(password, 'User password creation failed');
+        await tx.insert(schema.passwordHistory).values({ userId: user.id, hash: passwordHash });
         this.logger.debug('user password created', { userId: user.id, authIdentityId: password.userAuthIdentityId });
 
         return userDetails;

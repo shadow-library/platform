@@ -44,7 +44,7 @@ describe('UserService', () => {
   let service: UserService;
 
   beforeEach(() => {
-    service = new UserService(env.getDatabaseService());
+    service = env.getService(UserService);
   });
 
   describe('createUserWithPassword', () => {

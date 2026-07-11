@@ -21,6 +21,7 @@ declare module '@shadow-library/common' {
     'auth.flow.ttl': number;
     'auth.bootstrap.admin-email': string;
     'auth.bootstrap.admin-password': string;
+    'auth.password.breach-check-enabled': boolean;
 
     /** Security configs */
     'security.master-encryption-key': string;
@@ -39,6 +40,7 @@ Config.load('server.host', { defaultValue: '0.0.0.0' });
 Config.load('auth.flow.ttl', { defaultValue: '900', validateType: 'number' });
 Config.load('auth.bootstrap.admin-email', { envKey: 'IDENTITY_BOOTSTRAP_ADMIN_EMAIL', defaultValue: 'admin@shadow-apps.com' });
 Config.load('auth.bootstrap.admin-password', { envKey: 'IDENTITY_BOOTSTRAP_ADMIN_PASSWORD', defaultValue: '' });
+Config.load('auth.password.breach-check-enabled', { envKey: 'AUTH_PASSWORD_BREACH_CHECK', defaultValue: 'false', validateType: 'boolean' });
 
 /**
  * The master encryption key wraps signing/encryption keys at rest. It must never fall back to a

@@ -41,4 +41,6 @@ export const ERROR_MESSAGES = {
   INVALID_PASSWORD: 'must be at least 8 characters long and include a mix of lowercase, uppercase, numbers, and special characters',
   INVALID_USERNAME: 'must be 3-32 characters long and contain only letters, numbers, dots, underscores, or hyphens',
   INVALID_DATE_OF_BIRTH: 'must be a valid date in the past',
+  BREACHED_PASSWORD: 'has appeared in a known data breach and must not be used',
+  REUSED_PASSWORD: 'must not match a recently used password',
 } as const satisfies Record<string, string>;

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, boolean, date, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, boolean, date, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -20,6 +20,7 @@ export namespace User {
   export type Phone = InferSelectModel<typeof userPhones>;
   export type AuthIdentity = InferSelectModel<typeof userAuthIdentities>;
   export type Password = InferSelectModel<typeof userPasswords>;
+  export type PasswordHistory = InferSelectModel<typeof passwordHistory>;
 
   export type Status = InferEnum<typeof userStatus>;
   export type Gender = InferEnum<typeof gender>;
@@ -107,6 +108,19 @@ export const userPasswords = pgTable('user_passwords', {
   version: integer('version').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),
 });
+
+export const passwordHistory = pgTable(
+  'password_history',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    userId: bigint('user_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    hash: text('hash').notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [index('password_history_user_id_created_at_idx').on(t.userId, t.createdAt)],
+);
 
 /**
  * Declaring the relations
