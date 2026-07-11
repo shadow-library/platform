@@ -9,8 +9,9 @@ import { useEffect, useMemo, useState } from 'react';
  * Importing user defined modules
  */
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
-import { AssetBox, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
+import { PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
+import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
   type CreateEntityBody,
   type EntityResponse,
@@ -19,13 +20,15 @@ import {
   useAuditBibleMutation,
   useCreateEntityMutation,
   useDeleteEntityMutation,
+  useDeleteEntityImageMutation,
   useEntityQuery,
+  useUploadEntityImageMutation,
   useListEntitiesQuery,
   useProjectQuery,
   useSeedFromBriefMutation,
   useUpdateEntityMutation,
 } from '@/lib/apis';
-import { coverColor } from '@/lib/format';
+import { coverColor, imageUrl } from '@/lib/format';
 
 import styles from './story-bible.module.css';
 
@@ -300,6 +303,8 @@ interface EntityDetailProps {
 
 function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.JSX.Element {
   const entityQuery = useEntityQuery(novelId, entityKey);
+  const uploadImage = useUploadEntityImageMutation(novelId, entityKey);
+  const removeImage = useDeleteEntityImageMutation(novelId, entityKey);
 
   if (entityQuery.isLoading) return <PaneLoader />;
   if (entityQuery.error) return <PaneError error={entityQuery.error} />;
@@ -323,9 +328,15 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
       <div className={`nf-scroll ${styles.paneScroll}`}>
         <div className={styles.detailInner}>
           <div>
-            <div className={styles.cover}>
-              {entity.imagePath ? <img src={entity.imagePath} alt={entity.name} className={styles.coverImg} /> : <AssetBox height={261} color={coverColor(entity.id)} radius={0} />}
-            </div>
+            <ImageUpload
+              className={styles.cover}
+              src={imageUrl(entity.imagePath)}
+              alt={entity.name}
+              uploading={uploadImage.isPending || removeImage.isPending}
+              placeholder={<div className={styles.coverPlaceholder} style={{ background: coverColor(entity.id) }} />}
+              onUpload={body => uploadImage.mutate(body, { onSuccess: () => toast.success(`Updated ${entity.name}’s image`), onError: e => toast.danger(e.message) })}
+              onRemove={() => removeImage.mutate(undefined, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
+            />
           </div>
           <div>
             {entity.body && (
@@ -550,7 +561,11 @@ function StoryBibleScreen(): React.JSX.Element {
                 onClick={() => setSelectedKey(entity.entityKey)}
                 onKeyDown={e => e.key === 'Enter' && setSelectedKey(entity.entityKey)}
               >
-                <div className={styles.entityAvatar} style={{ '--nf-dot': coverColor(entity.id) } as React.CSSProperties} />
+                {entity.imagePath ? (
+                  <img src={imageUrl(entity.imagePath)} alt="" className={styles.entityThumb} />
+                ) : (
+                  <div className={styles.entityAvatar} style={{ '--nf-dot': coverColor(entity.id) } as React.CSSProperties} />
+                )}
                 <div className={styles.entityBody}>
                   <div className={`nf-entname ${styles.entityName}`}>{entity.name}</div>
                   {subtitle && <div className={styles.entitySub}>{subtitle}</div>}

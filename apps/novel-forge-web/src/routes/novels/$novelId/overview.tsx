@@ -10,6 +10,7 @@ import { useState } from 'react';
  */
 import { CheckIcon, CloseIcon, CopyIcon, ResetIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
+import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
   type ResetBody,
   type WorkflowRunDetailResponse,
@@ -18,9 +19,11 @@ import {
   useListRunsQuery,
   useProjectQuery,
   useProjectStatusQuery,
+  useDeleteCoverMutation,
   useResetProjectMutation,
+  useUploadCoverMutation,
 } from '@/lib/apis';
-import { LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { LIFECYCLE_PHASES, imageUrl, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './overview.module.css';
 
@@ -134,6 +137,8 @@ function OverviewScreen(): React.JSX.Element {
   const runsQuery = useListRunsQuery(novelId);
   const cloneProject = useCloneProjectMutation(novelId);
   const resetProject = useResetProjectMutation(novelId);
+  const uploadCover = useUploadCoverMutation(novelId);
+  const removeCover = useDeleteCoverMutation(novelId);
 
   const [cloneOpen, setCloneOpen] = useState(false);
   const [cloneName, setCloneName] = useState('');
@@ -217,6 +222,14 @@ function OverviewScreen(): React.JSX.Element {
       ) : (
         <>
           <div className={styles.header}>
+            <ImageUpload
+              className={styles.headerCover}
+              src={imageUrl(project.coverImagePath)}
+              alt={`${projectTitle(project)} cover`}
+              uploading={uploadCover.isPending || removeCover.isPending}
+              onUpload={body => uploadCover.mutate(body, { onSuccess: () => toast.success('Cover updated'), onError: e => toast.danger(e.message) })}
+              onRemove={() => removeCover.mutate(undefined, { onSuccess: () => toast.success('Cover removed'), onError: e => toast.danger(e.message) })}
+            />
             <div className={styles.headerMain}>
               <div className={styles.kindRow}>
                 <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)} project</StatusChip>

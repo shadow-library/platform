@@ -41,6 +41,11 @@ export function coverColor(id: string): string {
   return `hsl(${hue} 42% 32%)`;
 }
 
+/** Resolve a storage ref (e.g. `14/cover.png`) to the URL that serves its bytes; null passes through. */
+export function imageUrl(ref?: string | null): string | undefined {
+  return ref ? `/api/v1/images/${ref}` : undefined;
+}
+
 /** The best human title for a project — its explicit title, falling back to its name. */
 export function projectTitle(project: Pick<ProjectResponse, 'name' | 'title'>): string {
   return project.title?.trim() || project.name;

@@ -9,7 +9,7 @@ import { type ReactNode, useState } from 'react';
  * Importing user defined modules
  */
 import { useListProjectsQuery, useListProposalsQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
-import { lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
+import { imageUrl, lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
 import { useTheme } from '../AppProvider';
 import { type NovelParams, type ProjectRoute } from './routes';
 import {
@@ -121,7 +121,11 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
             <button type="button" className={styles.switcherTrigger}>
               {inProject && project ? (
                 <>
-                  <span className={styles.projectDot} style={projectDotVar(projectDotColor(project))} />
+                  {project.coverImagePath ? (
+                    <img className={styles.switcherThumb} src={imageUrl(project.coverImagePath)} alt="" />
+                  ) : (
+                    <span className={styles.projectDot} style={projectDotVar(projectDotColor(project))} />
+                  )}
                   <span className={styles.projectMeta}>
                     <span className={styles.projectName}>{projectTitle(project)}</span>
                     <span className={styles.projectKind}>{projectKindTag(project.kind)}</span>
@@ -147,7 +151,11 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
                   navigate({ to: '/novels/$novelId/overview', params: { novelId: p.id } });
                 }}
               >
-                <span className={styles.projectDot} style={projectDotVar(projectDotColor(p))} />
+                {p.coverImagePath ? (
+                  <img className={styles.switcherThumb} src={imageUrl(p.coverImagePath)} alt="" />
+                ) : (
+                  <span className={styles.projectDot} style={projectDotVar(projectDotColor(p))} />
+                )}
                 <span className={styles.rowMeta}>
                   <span className={styles.rowName}>{projectTitle(p)}</span>
                   <span className={styles.projectKind}>{projectKindTag(p.kind)}</span>

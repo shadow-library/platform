@@ -7,7 +7,7 @@ import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, use
  * Importing user defined packages
  */
 import { APIRequest, ApiError } from './api-request';
-import { type CreateEntityBody, type EntityResponse, type ListEntitiesQueryParams, type ListEntityResponse, type UpdateEntityBody } from './api-types.gen';
+import { type CreateEntityBody, type EntityResponse, type ListEntitiesQueryParams, type ListEntityResponse, type UpdateEntityBody, type UploadImageBody } from './api-types.gen';
 
 /**
  * Declaring the constants
@@ -57,6 +57,22 @@ export function useDeleteEntityMutation(projectId: string): UseMutationResult<un
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
     mutationFn: entityKey => APIRequest.delete(`/projects/${projectId}/entities/${entityKey}`).execute(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) }),
+  });
+}
+
+export function useUploadEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityResponse, ApiError, UploadImageBody> {
+  const queryClient = useQueryClient();
+  return useMutation<EntityResponse, ApiError, UploadImageBody>({
+    mutationFn: data => APIRequest.post(`/projects/${projectId}/entities/${entityKey}/image`).body(data).execute(),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) }),
+  });
+}
+
+export function useDeleteEntityImageMutation(projectId: string, entityKey: string): UseMutationResult<EntityResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<EntityResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.delete(`/projects/${projectId}/entities/${entityKey}/image`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: entityKeys.all(projectId) }),
   });
 }

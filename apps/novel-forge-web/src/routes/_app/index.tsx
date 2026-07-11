@@ -12,7 +12,7 @@ import { PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { type ProjectKind, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
-import { projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { imageUrl, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './index.module.css';
 
@@ -64,7 +64,11 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
         if (e.key === 'Enter' || e.key === ' ') open();
       }}
     >
-      <div className={styles.stripe} data-kind={project.kind} />
+      {project.coverImagePath ? (
+        <img src={imageUrl(project.coverImagePath)} alt="" className={styles.cardCover} />
+      ) : (
+        <div className={styles.stripe} data-kind={project.kind} />
+      )}
       <div className={styles.cardBody}>
         <div className={styles.chipRow}>
           <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)}</StatusChip>

@@ -17,6 +17,7 @@ import {
   type ResetBody,
   type ResetResponse,
   type UpdateProjectBody,
+  type UploadImageBody,
 } from './api-types.gen';
 
 /**
@@ -68,6 +69,28 @@ export function useUpdateProjectMutation(projectId: string): UseMutationResult<P
   const queryClient = useQueryClient();
   return useMutation<ProjectResponse, ApiError, UpdateProjectBody>({
     mutationFn: data => APIRequest.patch(`/projects/${projectId}`).body(data).execute(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+    },
+  });
+}
+
+export function useUploadCoverMutation(projectId: string): UseMutationResult<ProjectResponse, ApiError, UploadImageBody> {
+  const queryClient = useQueryClient();
+  return useMutation<ProjectResponse, ApiError, UploadImageBody>({
+    mutationFn: data => APIRequest.post(`/projects/${projectId}/cover`).body(data).execute(),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
+      queryClient.invalidateQueries({ queryKey: projectKeys.lists() });
+    },
+  });
+}
+
+export function useDeleteCoverMutation(projectId: string): UseMutationResult<ProjectResponse, ApiError, undefined> {
+  const queryClient = useQueryClient();
+  return useMutation<ProjectResponse, ApiError, undefined>({
+    mutationFn: () => APIRequest.delete(`/projects/${projectId}/cover`).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: projectKeys.detail(projectId) });
       queryClient.invalidateQueries({ queryKey: projectKeys.lists() });

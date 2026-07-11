@@ -1,0 +1,105 @@
+.preview {
+  position: relative;
+  overflow: hidden;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-caption);
+  padding: 12px;
+  text-align: center;
+}
+
+/* Action bar sits along the bottom, revealed on hover/focus of the preview. */
+.bar {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  gap: 8px;
+  padding: 8px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.62), transparent);
+  opacity: 0;
+  transition: opacity 0.14s;
+}
+
+.preview:hover .bar,
+.preview:focus-within .bar {
+  opacity: 1;
+}
+
+/* Always show the bar while there is no image, so the upload affordance is discoverable. */
+.preview[data-empty='true'] .bar {
+  opacity: 1;
+  background: none;
+  justify-content: center;
+}
+
+.action {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: rgba(255, 255, 255, 0.16);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  backdrop-filter: blur(6px);
+  transition: background 0.12s;
+}
+
+.action:hover {
+  background: rgba(255, 255, 255, 0.28);
+}
+
+.action:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.preview[data-empty='true'] .action {
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+}
+
+.preview[data-empty='true'] .action:hover {
+  background: var(--sh-accent-hover);
+}
+
+.actionDanger:hover {
+  background: var(--sh-danger-solid);
+}
+
+.overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+}
+
+.input {
+  display: none;
+}

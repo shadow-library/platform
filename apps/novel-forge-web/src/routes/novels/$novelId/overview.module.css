@@ -12,7 +12,16 @@
   margin-bottom: 24px;
 }
 
+.headerCover {
+  width: 84px;
+  height: 112px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e1);
+}
+
 .headerMain {
+  flex: 1;
   min-width: 0;
 }
 

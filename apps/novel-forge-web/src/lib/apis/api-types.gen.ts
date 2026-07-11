@@ -199,7 +199,8 @@ export interface paths {
     /** Update Draft */
     put: operations['updateDraft'];
     post?: never;
-    delete?: never;
+    /** Delete Draft */
+    delete: operations['deleteDraft'];
     options?: never;
     head?: never;
     patch?: never;
@@ -386,6 +387,23 @@ export interface paths {
     put?: never;
     /** Propose Continuity */
     post: operations['proposeContinuity'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/extract-to-bible': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Extract To Bible */
+    post: operations['extractToBible'];
     delete?: never;
     options?: never;
     head?: never;
@@ -650,281 +668,6 @@ export interface paths {
     patch: operations['updateChapter'];
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Start */
-    post: operations['start'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration/refine': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Refine */
-    post: operations['refine'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration/save': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Save */
-    post: operations['save'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration/cancel': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Cancel */
-    post: operations['cancel'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/ingest': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Ingest */
-    post: operations['ingest'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/extract': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Extract */
-    post: operations['extract'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/consolidate': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Consolidate */
-    post: operations['consolidate'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/assets': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Assets */
-    get: operations['assets'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/skeleton': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Skeleton */
-    post: operations['skeleton'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/resume': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Resume */
-    post: operations['resume'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** List Projects */
-    get: operations['listProjects'];
-    put?: never;
-    /** Create Project */
-    post: operations['createProject'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Project */
-    get: operations['getProject'];
-    put?: never;
-    post?: never;
-    /** Delete Project */
-    delete: operations['deleteProject'];
-    options?: never;
-    head?: never;
-    /** Update Project */
-    patch: operations['updateProject'];
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/status': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Project Status */
-    get: operations['getProjectStatus'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/clone': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Clone Project */
-    post: operations['cloneProject'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/reset': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Reset Project */
-    post: operations['resetProject'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/cost': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Get Project Cost */
-    get: operations['getProjectCost'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/proposals': {
     parameters: {
       query?: never;
@@ -1167,6 +910,316 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Start */
+    post: operations['start'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration/refine': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Refine */
+    post: operations['refine'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration/save': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Save */
+    post: operations['save'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/illustration/cancel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Cancel */
+    post: operations['cancel'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/images/{projectId}/{filename}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Serve */
+    get: operations['serve'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/ingest': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Ingest */
+    post: operations['ingest'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/extract': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Extract */
+    post: operations['extract'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/consolidate': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Consolidate */
+    post: operations['consolidate'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/assets': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Assets */
+    get: operations['assets'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/skeleton': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Skeleton */
+    post: operations['skeleton'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/resume': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Resume */
+    post: operations['resume'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Projects */
+    get: operations['listProjects'];
+    put?: never;
+    /** Create Project */
+    post: operations['createProject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Project */
+    get: operations['getProject'];
+    put?: never;
+    post?: never;
+    /** Delete Project */
+    delete: operations['deleteProject'];
+    options?: never;
+    head?: never;
+    /** Update Project */
+    patch: operations['updateProject'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Project Status */
+    get: operations['getProjectStatus'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/clone': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Clone Project */
+    post: operations['cloneProject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reset': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reset Project */
+    post: operations['resetProject'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/cost': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Project Cost */
+    get: operations['getProjectCost'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/cover': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload Cover */
+    post: operations['uploadCover'];
+    /** Delete Cover */
+    delete: operations['deleteCover'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/entities': {
     parameters: {
       query?: never;
@@ -1202,6 +1255,24 @@ export interface paths {
     head?: never;
     /** Update Entity */
     patch: operations['updateEntity'];
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/image': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Upload Image */
+    post: operations['uploadImage'];
+    /** Delete Image */
+    delete: operations['deleteImage'];
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/projects/{projectId}/volumes/approve': {
@@ -1618,6 +1689,43 @@ export interface components {
       /** Format: date-time */
       updatedAt: string;
     };
+    ProposalResponse: {
+      id: string;
+      projectId: string;
+      sessionId?: null | string;
+      messageId?: null | string;
+      scopeType: components['schemas']['ChatScope'];
+      scopeRef?: null | string;
+      kind: components['schemas']['RefinementKind'];
+      status: components['schemas']['RefinementProposalStatus'];
+      summary?: null | string;
+      changeSet: components['schemas']['ChangeOpItem'][];
+      baseline: {
+        [key: string]: unknown;
+      };
+      model?: null | string;
+      runId?: null | string;
+      /** Format: date-time */
+      appliedAt?: null | string;
+      error?: null | {
+        [key: string]: unknown;
+      };
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ChatScope: 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
+    /** @enum {string} */
+    RefinementKind: 'chat' | 'premise_enhance' | 'bible_audit' | 'arc_plan' | 'chapter_extract';
+    /** @enum {string} */
+    RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted';
+    ChangeOpItem: {
+      op: string;
+    } & {
+      [key: string]: unknown;
+    };
     UpdateContinuityBody: {
       proposal: {
         [key: string]: unknown;
@@ -1767,201 +1875,11 @@ export interface components {
       title?: string;
       content?: string;
     };
-    StartIllustrationBody: {
-      instruction?: string;
-      noChat?: boolean;
-    };
-    StartIllustrationResponse: {
-      sessionId: string;
-      previewUrl: string;
-    };
-    RefineIllustrationBody: {
-      sessionId: string;
-      instruction: string;
-    };
-    RefineIllustrationResponse: {
-      previewUrl: string;
-    };
-    SaveIllustrationBody: {
-      sessionId: string;
-    };
-    SaveIllustrationResponse: {
-      saved: boolean;
-      imagePath: string;
-    };
-    CancelIllustrationBody: {
-      sessionId: string;
-    };
-    CancelIllustrationResponse: {
-      cancelled: boolean;
-    };
-    IngestBody: {
-      limit?: number;
-      delayMs?: number;
-    };
-    JobEnqueueResponse1: {
-      jobId: string;
-      kind: string;
-      status: string;
-      target: string;
-    };
-    ExtractBody: {
-      limit?: number;
-      rearm?: boolean;
-    };
-    ConsolidateResponse: {
-      significanceUpdated: number;
-      relationshipsPromoted: number;
-    };
-    AssetsResponse: {
-      markdown: string;
-    };
-    SkeletonResponse: {
-      characterArcs: {
-        [key: string]: unknown;
-      };
-      powerCurve: string;
-    };
-    ResumeResponse: {
-      jobId: string;
-    };
-    CreateProjectBody: {
-      name: string;
-      kind: components['schemas']['ProjectKind'];
-      url?: string;
-      title?: string;
-      contentMode?: components['schemas']['ContentMode'];
-    };
-    /** @enum {string} */
-    ProjectKind: 'source' | 'new_novel';
-    /** @enum {string} */
-    ContentMode: 'standard' | 'grok_only';
-    ProjectResponse: {
-      id: string;
-      name: string;
-      kind: components['schemas']['ProjectKind'];
-      title?: null | string;
-      contentMode: components['schemas']['ContentMode'];
-      config?: components['schemas']['ProjectConfig'];
-      brief?: null | string;
-      sourceUrl?: null | string;
-      scrapeComplete: boolean;
-      storyCurrentChapter?: null | number;
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    ProjectConfig: {
-      models?: components['schemas']['ProjectModelOverrides'];
-    };
-    ProjectModelOverrides: {
-      extraction?: components['schemas']['ProjectModelRef'];
-      generation?: components['schemas']['ProjectModelRef'];
-      judge?: components['schemas']['ProjectModelRef'];
-      fix?: components['schemas']['ProjectModelRef'];
-      outline?: components['schemas']['ProjectModelRef'];
-      revision?: components['schemas']['ProjectModelRef'];
-      title?: components['schemas']['ProjectModelRef'];
-      continuity?: components['schemas']['ProjectModelRef'];
-      validation?: components['schemas']['ProjectModelRef'];
-      review?: components['schemas']['ProjectModelRef'];
-      plan?: components['schemas']['ProjectModelRef'];
-      skeleton?: components['schemas']['ProjectModelRef'];
-      bible?: components['schemas']['ProjectModelRef'];
-      premise?: components['schemas']['ProjectModelRef'];
-      audit?: components['schemas']['ProjectModelRef'];
-      chat?: components['schemas']['ProjectModelRef'];
-      compact?: components['schemas']['ProjectModelRef'];
-      arc?: components['schemas']['ProjectModelRef'];
-      embedding?: components['schemas']['ProjectModelRef'];
-      image?: components['schemas']['ProjectModelRef'];
-    };
-    ProjectModelRef: {
-      provider: string;
-      model: string;
-    };
-    ListProjectResponse: {
-      total: number;
-      limit: number;
-      offset: number;
-      items: components['schemas']['ProjectResponse'][];
-    };
-    ProjectStatusResponse: {
-      kind: components['schemas']['ProjectKind'];
-      chaptersTotal?: number;
-      chaptersExtracted?: number;
-      draftsTotal?: number;
-      draftsFinal?: number;
-      planApproved?: boolean;
-      volumesTotal?: number;
-    };
-    UpdateProjectBody: {
-      title?: string;
-      config?: components['schemas']['ProjectConfig'];
-      contentMode?: components['schemas']['ContentMode'];
-      brief?: string;
-    };
-    CloneProjectBody: {
-      name: string;
-      config?: components['schemas']['ProjectConfig'];
-      contentMode?: components['schemas']['ContentMode'];
-      resetDerived?: boolean;
-    };
-    ResetBody: {
-      /** @enum {string} */
-      stage: 'extract' | 'plan' | 'generate' | 'all';
-    };
-    ResetResponse: {
-      stage: string;
-      tablesCleared: string[];
-    };
-    CostResponse: {
-      estimate: null | string;
-      message: string;
-    };
-    /** @enum {string} */
-    RefinementProposalStatus: 'pending' | 'applied' | 'discarded' | 'superseded' | 'conflicted';
-    /** @enum {string} */
-    RefinementKind: 'chat' | 'premise_enhance' | 'bible_audit' | 'arc_plan';
-    /** @enum {string} */
-    ChatScope: 'novel' | 'bible_document' | 'volume_plan' | 'volume' | 'arc_plan' | 'arc' | 'brief';
     ListProposalResponse: {
       total: number;
       limit: number;
       offset: number;
       items: components['schemas']['ProposalResponse'][];
-    };
-    ProposalResponse: {
-      id: string;
-      projectId: string;
-      sessionId?: null | string;
-      messageId?: null | string;
-      scopeType: components['schemas']['ChatScope'];
-      scopeRef?: null | string;
-      kind: components['schemas']['RefinementKind'];
-      status: components['schemas']['RefinementProposalStatus'];
-      summary?: null | string;
-      changeSet: components['schemas']['ChangeOpItem'][];
-      baseline: {
-        [key: string]: unknown;
-      };
-      model?: null | string;
-      runId?: null | string;
-      /** Format: date-time */
-      appliedAt?: null | string;
-      error?: null | {
-        [key: string]: unknown;
-      };
-      /** Format: date-time */
-      createdAt: string;
-      /** Format: date-time */
-      updatedAt: string;
-    };
-    ChangeOpItem: {
-      op: string;
-    } & {
-      [key: string]: unknown;
     };
     UpdateProposalBody: {
       changeSet: components['schemas']['ChangeOpItem'][];
@@ -2103,6 +2021,165 @@ export interface components {
       tokens: number;
       truncated: boolean;
     };
+    StartIllustrationBody: {
+      instruction?: string;
+      noChat?: boolean;
+    };
+    StartIllustrationResponse: {
+      sessionId: string;
+      previewUrl: string;
+    };
+    RefineIllustrationBody: {
+      sessionId: string;
+      instruction: string;
+    };
+    RefineIllustrationResponse: {
+      previewUrl: string;
+    };
+    SaveIllustrationBody: {
+      sessionId: string;
+    };
+    SaveIllustrationResponse: {
+      saved: boolean;
+      imagePath: string;
+    };
+    CancelIllustrationBody: {
+      sessionId: string;
+    };
+    CancelIllustrationResponse: {
+      cancelled: boolean;
+    };
+    IngestBody: {
+      limit?: number;
+      delayMs?: number;
+    };
+    JobEnqueueResponse1: {
+      jobId: string;
+      kind: string;
+      status: string;
+      target: string;
+    };
+    ExtractBody: {
+      limit?: number;
+      rearm?: boolean;
+    };
+    ConsolidateResponse: {
+      significanceUpdated: number;
+      relationshipsPromoted: number;
+    };
+    AssetsResponse: {
+      markdown: string;
+    };
+    SkeletonResponse: {
+      characterArcs: {
+        [key: string]: unknown;
+      };
+      powerCurve: string;
+    };
+    ResumeResponse: {
+      jobId: string;
+    };
+    CreateProjectBody: {
+      name: string;
+      kind: components['schemas']['ProjectKind'];
+      url?: string;
+      title?: string;
+      contentMode?: components['schemas']['ContentMode'];
+    };
+    /** @enum {string} */
+    ProjectKind: 'source' | 'new_novel';
+    /** @enum {string} */
+    ContentMode: 'standard' | 'grok_only';
+    ProjectResponse: {
+      id: string;
+      name: string;
+      kind: components['schemas']['ProjectKind'];
+      title?: null | string;
+      coverImagePath?: null | string;
+      contentMode: components['schemas']['ContentMode'];
+      config?: components['schemas']['ProjectConfig'];
+      brief?: null | string;
+      sourceUrl?: null | string;
+      scrapeComplete: boolean;
+      storyCurrentChapter?: null | number;
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ProjectConfig: {
+      models?: components['schemas']['ProjectModelOverrides'];
+    };
+    ProjectModelOverrides: {
+      extraction?: components['schemas']['ProjectModelRef'];
+      generation?: components['schemas']['ProjectModelRef'];
+      judge?: components['schemas']['ProjectModelRef'];
+      fix?: components['schemas']['ProjectModelRef'];
+      outline?: components['schemas']['ProjectModelRef'];
+      revision?: components['schemas']['ProjectModelRef'];
+      title?: components['schemas']['ProjectModelRef'];
+      continuity?: components['schemas']['ProjectModelRef'];
+      validation?: components['schemas']['ProjectModelRef'];
+      review?: components['schemas']['ProjectModelRef'];
+      plan?: components['schemas']['ProjectModelRef'];
+      skeleton?: components['schemas']['ProjectModelRef'];
+      bible?: components['schemas']['ProjectModelRef'];
+      premise?: components['schemas']['ProjectModelRef'];
+      audit?: components['schemas']['ProjectModelRef'];
+      chat?: components['schemas']['ProjectModelRef'];
+      compact?: components['schemas']['ProjectModelRef'];
+      arc?: components['schemas']['ProjectModelRef'];
+      embedding?: components['schemas']['ProjectModelRef'];
+      image?: components['schemas']['ProjectModelRef'];
+    };
+    ProjectModelRef: {
+      provider: string;
+      model: string;
+    };
+    ListProjectResponse: {
+      total: number;
+      limit: number;
+      offset: number;
+      items: components['schemas']['ProjectResponse'][];
+    };
+    ProjectStatusResponse: {
+      kind: components['schemas']['ProjectKind'];
+      chaptersTotal?: number;
+      chaptersExtracted?: number;
+      draftsTotal?: number;
+      draftsFinal?: number;
+      planApproved?: boolean;
+      volumesTotal?: number;
+    };
+    UpdateProjectBody: {
+      title?: string;
+      config?: components['schemas']['ProjectConfig'];
+      contentMode?: components['schemas']['ContentMode'];
+      brief?: string;
+    };
+    CloneProjectBody: {
+      name: string;
+      config?: components['schemas']['ProjectConfig'];
+      contentMode?: components['schemas']['ContentMode'];
+      resetDerived?: boolean;
+    };
+    ResetBody: {
+      /** @enum {string} */
+      stage: 'extract' | 'plan' | 'generate' | 'all';
+    };
+    ResetResponse: {
+      stage: string;
+      tablesCleared: string[];
+    };
+    CostResponse: {
+      estimate: null | string;
+      message: string;
+    };
+    UploadImageBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      image: string;
+    };
     CreateEntityBody: {
       entityKey: string;
       type: components['schemas']['EntityType'];
@@ -2156,6 +2233,11 @@ export interface components {
       motivation?: string;
       body?: string;
       aliases?: string[];
+    };
+    UploadImageBody1: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      image: string;
     };
     ApprovePlanResponse1: {
       volumesApproved: number;
@@ -2890,6 +2972,38 @@ export interface operations {
       };
     };
   };
+  deleteDraft: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   reviseDraft: {
     parameters: {
       query?: never;
@@ -3343,6 +3457,47 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ContinuityProposalResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  extractToBible: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProposalResponse'];
         };
       };
       /** @description Default Response */
@@ -4081,803 +4236,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ChapterResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  start: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['StartIllustrationBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['StartIllustrationResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  refine: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['RefineIllustrationBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RefineIllustrationResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  save: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['SaveIllustrationBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SaveIllustrationResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  cancel: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        entityKey: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['CancelIllustrationBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CancelIllustrationResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  ingest: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['IngestBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JobEnqueueResponse1'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  extract: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['ExtractBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['JobEnqueueResponse1'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  consolidate: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ConsolidateResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  assets: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AssetsResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  skeleton: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['SkeletonResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  resume: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ResumeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  listProjects: {
-    parameters: {
-      query?: {
-        limit?: number | string;
-        offset?: number | string;
-        sortOrder?: components['schemas']['SortOrder'];
-        sortBy?: components['schemas']['SortByTime'];
-        kind?: components['schemas']['ProjectKind'];
-      };
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ListProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  createProject: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['CreateProjectBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  getProject: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  deleteProject: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  updateProject: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['UpdateProjectBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  getProjectStatus: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectStatusResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  cloneProject: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['CloneProjectBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ProjectResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  resetProject: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['ResetBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ResetResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  getProjectCost: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CostResponse'];
         };
       };
       /** @description Default Response */
@@ -5686,6 +5044,919 @@ export interface operations {
       };
     };
   };
+  start: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['StartIllustrationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StartIllustrationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  refine: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['RefineIllustrationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RefineIllustrationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  save: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['SaveIllustrationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SaveIllustrationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  cancel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CancelIllustrationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CancelIllustrationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  serve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        filename: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  ingest: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['IngestBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  extract: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ExtractBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  consolidate: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConsolidateResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  assets: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AssetsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  skeleton: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SkeletonResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  resume: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResumeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  listProjects: {
+    parameters: {
+      query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['SortByTime'];
+        kind?: components['schemas']['ProjectKind'];
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  createProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CreateProjectBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  deleteProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  updateProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UpdateProjectBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getProjectStatus: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  cloneProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CloneProjectBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  resetProject: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ResetBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ResetResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getProjectCost: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CostResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  uploadCover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UploadImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  deleteCover: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ProjectResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   listEntities: {
     parameters: {
       query?: {
@@ -5865,6 +6136,92 @@ export interface operations {
         'application/json': components['schemas']['UpdateEntityBody'];
       };
     };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  uploadImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UploadImageBody1'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  deleteImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
     responses: {
       /** @description Default Response */
       200: {
@@ -6485,6 +6842,11 @@ export type ImportDraftBody = components['schemas']['ImportDraftBody'];
 export type FinalizeBody = components['schemas']['FinalizeBody'];
 export type GenerateGrokBody = components['schemas']['GenerateGrokBody'];
 export type ContinuityProposalResponse = components['schemas']['ContinuityProposalResponse'];
+export type ProposalResponse = components['schemas']['ProposalResponse'];
+export type ChatScope = components['schemas']['ChatScope'];
+export type RefinementKind = components['schemas']['RefinementKind'];
+export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
+export type ChangeOpItem = components['schemas']['ChangeOpItem'];
 export type UpdateContinuityBody = components['schemas']['UpdateContinuityBody'];
 export type ChapterReviewResponse = components['schemas']['ChapterReviewResponse'];
 export type ReviewQueueResponse = components['schemas']['ReviewQueueResponse'];
@@ -6504,6 +6866,29 @@ export type ListChapterResponse = components['schemas']['ListChapterResponse'];
 export type ChapterListResponse = components['schemas']['ChapterListResponse'];
 export type ChapterResponse = components['schemas']['ChapterResponse'];
 export type UpdateChapterBody = components['schemas']['UpdateChapterBody'];
+export type ListProposalResponse = components['schemas']['ListProposalResponse'];
+export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
+export type ApplyProposalResponse = components['schemas']['ApplyProposalResponse'];
+export type AppliedArtifactItem = components['schemas']['AppliedArtifactItem'];
+export type CreateChatSessionBody = components['schemas']['CreateChatSessionBody'];
+export type ChatSessionResponse = components['schemas']['ChatSessionResponse'];
+export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
+export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
+export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
+export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
+export type ChatTurnBody = components['schemas']['ChatTurnBody'];
+export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
+export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
+export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];
+export type EnhancePremiseResponse = components['schemas']['EnhancePremiseResponse'];
+export type PremiseRationaleResponse = components['schemas']['PremiseRationaleResponse'];
+export type AuditBibleResponse = components['schemas']['AuditBibleResponse'];
+export type AuditFindingResponse = components['schemas']['AuditFindingResponse'];
+export type PlanArcsBody = components['schemas']['PlanArcsBody'];
+export type PlanArcsResponse = components['schemas']['PlanArcsResponse'];
+export type PlannedArcItem = components['schemas']['PlannedArcItem'];
+export type ContextPreviewResponse = components['schemas']['ContextPreviewResponse'];
+export type ContextSectionPreview = components['schemas']['ContextSectionPreview'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type StartIllustrationResponse = components['schemas']['StartIllustrationResponse'];
 export type RefineIllustrationBody = components['schemas']['RefineIllustrationBody'];
@@ -6533,34 +6918,7 @@ export type CloneProjectBody = components['schemas']['CloneProjectBody'];
 export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
-export type RefinementProposalStatus = components['schemas']['RefinementProposalStatus'];
-export type RefinementKind = components['schemas']['RefinementKind'];
-export type ChatScope = components['schemas']['ChatScope'];
-export type ListProposalResponse = components['schemas']['ListProposalResponse'];
-export type ProposalResponse = components['schemas']['ProposalResponse'];
-export type ChangeOpItem = components['schemas']['ChangeOpItem'];
-export type UpdateProposalBody = components['schemas']['UpdateProposalBody'];
-export type ApplyProposalResponse = components['schemas']['ApplyProposalResponse'];
-export type AppliedArtifactItem = components['schemas']['AppliedArtifactItem'];
-export type CreateChatSessionBody = components['schemas']['CreateChatSessionBody'];
-export type ChatSessionResponse = components['schemas']['ChatSessionResponse'];
-export type ChatSessionStatus = components['schemas']['ChatSessionStatus'];
-export type ListChatSessionResponse = components['schemas']['ListChatSessionResponse'];
-export type ListChatMessagesResponse = components['schemas']['ListChatMessagesResponse'];
-export type ChatMessageResponse = components['schemas']['ChatMessageResponse'];
-export type ChatTurnBody = components['schemas']['ChatTurnBody'];
-export type ChatTurnResponse = components['schemas']['ChatTurnResponse'];
-export type UpdateSessionModelBody = components['schemas']['UpdateSessionModelBody'];
-export type EnhancePremiseBody = components['schemas']['EnhancePremiseBody'];
-export type EnhancePremiseResponse = components['schemas']['EnhancePremiseResponse'];
-export type PremiseRationaleResponse = components['schemas']['PremiseRationaleResponse'];
-export type AuditBibleResponse = components['schemas']['AuditBibleResponse'];
-export type AuditFindingResponse = components['schemas']['AuditFindingResponse'];
-export type PlanArcsBody = components['schemas']['PlanArcsBody'];
-export type PlanArcsResponse = components['schemas']['PlanArcsResponse'];
-export type PlannedArcItem = components['schemas']['PlannedArcItem'];
-export type ContextPreviewResponse = components['schemas']['ContextPreviewResponse'];
-export type ContextSectionPreview = components['schemas']['ContextSectionPreview'];
+export type UploadImageBody = components['schemas']['UploadImageBody'];
 export type CreateEntityBody = components['schemas']['CreateEntityBody'];
 export type EntityType = components['schemas']['EntityType'];
 export type EntitySignificance = components['schemas']['EntitySignificance'];
@@ -6568,6 +6926,7 @@ export type EntityOrigin = components['schemas']['EntityOrigin'];
 export type EntityResponse = components['schemas']['EntityResponse'];
 export type ListEntityResponse = components['schemas']['ListEntityResponse'];
 export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
+export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
 export type ApprovePlanResponse1 = components['schemas']['ApprovePlanResponse1'];
 export type CreateVolumeBody = components['schemas']['CreateVolumeBody'];
 export type VolumeResponse = components['schemas']['VolumeResponse'];
@@ -6602,11 +6961,6 @@ export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['par
 export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
 export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
 export type GetChapterPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters/{n}']['get']['parameters']['path'], undefined>;
-export type AssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;
-export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
-export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
-export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
-export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
 export type ListProposalsQueryParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['query'], undefined>;
 export type ListProposalsPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals']['get']['parameters']['path'], undefined>;
 export type GetProposalPathParams = Exclude<paths['/api/v1/projects/{projectId}/proposals/{proposalId}']['get']['parameters']['path'], undefined>;
@@ -6617,6 +6971,12 @@ export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId
 export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
+export type ServePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
+export type AssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;
+export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
+export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
+export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;
+export type GetProjectCostPathParams = Exclude<paths['/api/v1/projects/{projectId}/cost']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;
