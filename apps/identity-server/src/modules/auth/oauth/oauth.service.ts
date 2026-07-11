@@ -215,7 +215,8 @@ export class OAuthService {
       clientId: client.id,
       nonce: payload.nonce,
       ttlSeconds: 300,
-      claims: await this.idClaims(userId),
+      /** `sid` ties the ID token to the session so back-channel logout tokens can reference it. */
+      claims: { ...(await this.idClaims(userId)), sid: payload.sessionId },
     });
 
     let refreshToken: string | undefined;

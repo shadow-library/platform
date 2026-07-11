@@ -10,7 +10,7 @@ import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { AppErrorCode } from '@server/classes';
 import { WebauthnChallengeResponse } from '@server/modules/auth/mfa';
 import { SessionAuthService, SessionService, clearSessionCookies } from '@server/modules/auth/session';
-import { RefreshTokenService } from '@server/modules/auth/token';
+import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { RateLimit } from '@server/modules/infrastructure/security';
 
@@ -60,6 +60,7 @@ export class AuthController {
     private readonly sessionAuthService: SessionAuthService,
     private readonly sessionService: SessionService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly backChannelLogoutService: BackChannelLogoutService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -158,6 +159,7 @@ export class AuthController {
     const session = await this.sessionAuthService.authenticate(request);
     await this.sessionService.revoke(session.id, 'TERMINATED');
     await this.refreshTokenService.revokeForSession(session.id);
+    await this.backChannelLogoutService.enqueueForSession(session.id, session.userId);
     await this.auditService.record({ action: 'auth.signout', outcome: 'SUCCESS', actorType: 'USER', actorId: session.userId.toString(), ipAddress: request.ip });
     for (const cookie of clearSessionCookies()) reply.setCookie(cookie.name, cookie.value, cookie.options);
     reply.status(204).send();

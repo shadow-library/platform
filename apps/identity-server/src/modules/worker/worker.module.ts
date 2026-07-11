@@ -6,6 +6,7 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
+import { TokenModule } from '@server/modules/auth/token';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 
@@ -21,7 +22,7 @@ import { WorkerService } from './worker.service';
  */
 
 @Module({
-  imports: [DatabaseModule, NotificationModule],
+  imports: [DatabaseModule, NotificationModule, TokenModule],
   providers: [WorkerService, MaintenanceService],
 })
 export class WorkerModule {}

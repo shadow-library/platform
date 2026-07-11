@@ -13,7 +13,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { MfaService, WebauthnService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
-import { RefreshTokenService } from '@server/modules/auth/token';
+import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { AuditEvent, DatabaseService, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
 
@@ -72,6 +72,7 @@ export class AdminUserService {
     databaseService: DatabaseService,
     private readonly sessionService: SessionService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly backChannelLogoutService: BackChannelLogoutService,
     private readonly auditService: AuditService,
     private readonly mfaService: MfaService,
     private readonly webauthnService: WebauthnService,
@@ -204,8 +205,10 @@ export class AdminUserService {
   }
 
   private async revokeAllAccess(userId: bigint): Promise<void> {
+    const sessions = await this.sessionService.listActiveForUser(userId);
     await this.sessionService.terminateAllForUser(userId);
     await this.refreshTokenService.revokeAllForUser(userId);
+    for (const session of sessions) await this.backChannelLogoutService.enqueueForSession(session.id, userId);
   }
 
   private async requireUser(userId: bigint): Promise<User> {

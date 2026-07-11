@@ -10,7 +10,7 @@ import { type FastifyRequest } from 'fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { SessionAuthService, SessionService } from '@server/modules/auth/session';
-import { RefreshTokenService } from '@server/modules/auth/token';
+import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
 
 /**
@@ -80,6 +80,7 @@ export class MeSessionsController {
     private readonly sessionAuthService: SessionAuthService,
     private readonly sessionService: SessionService,
     private readonly refreshTokenService: RefreshTokenService,
+    private readonly backChannelLogoutService: BackChannelLogoutService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -114,6 +115,7 @@ export class MeSessionsController {
 
     await this.sessionService.revoke(sessionId, 'REVOKED');
     await this.refreshTokenService.revokeForSession(sessionId);
+    await this.backChannelLogoutService.enqueueForSession(sessionId, current.userId);
     await this.auditService.record({
       action: 'session.revoked_by_user',
       outcome: 'SUCCESS',
@@ -134,7 +136,10 @@ export class MeSessionsController {
     const others = active.filter(session => session.id !== current.id);
 
     await this.sessionService.terminateAllForUser(current.userId, current.id);
-    for (const session of others) await this.refreshTokenService.revokeForSession(session.id);
+    for (const session of others) {
+      await this.refreshTokenService.revokeForSession(session.id);
+      await this.backChannelLogoutService.enqueueForSession(session.id, current.userId);
+    }
     await this.auditService.record({
       action: 'session.revoked_all_by_user',
       outcome: 'SUCCESS',

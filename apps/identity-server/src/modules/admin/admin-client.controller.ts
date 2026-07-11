@@ -96,6 +96,7 @@ export class AdminClientController {
       redirectUris: body.redirectUris,
       grantTypes: body.grantTypes,
       accessTokenTtl: body.accessTokenTtl,
+      backchannelLogoutUri: body.backchannelLogoutUri,
     });
     await this.record(actor, 'admin.client.registered', registered.clientId, { name: body.name, kind: body.kind });
     return { clientId: registered.clientId, secret: registered.secret };
@@ -127,7 +128,12 @@ export class AdminClientController {
   async update(@Params() params: ClientIdParams, @Body() body: UpdateClientBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
     await this.requireClient(params.clientId);
-    await this.clientService.updateClient(params.clientId, { name: body.name, isActive: body.isActive, redirectUris: body.redirectUris });
+    await this.clientService.updateClient(params.clientId, {
+      name: body.name,
+      isActive: body.isActive,
+      redirectUris: body.redirectUris,
+      backchannelLogoutUri: body.backchannelLogoutUri,
+    });
     await this.record(actor, 'admin.client.updated', params.clientId, { fields: Object.keys(body) });
     return { success: true };
   }

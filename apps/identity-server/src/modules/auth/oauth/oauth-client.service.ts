@@ -27,6 +27,7 @@ export interface RegisterClient {
   scopeIds?: string[];
   organisationId?: bigint | null;
   accessTokenTtl?: number;
+  backchannelLogoutUri?: string;
 }
 
 export interface RegisteredClient {
@@ -67,6 +68,7 @@ export class OAuthClientService {
           requirePkce: true,
           accessTokenTtl: input.accessTokenTtl ?? 600,
           organisationId: input.organisationId ?? null,
+          backchannelLogoutUri: input.backchannelLogoutUri ?? null,
         })
         .returning({ id: schema.oauthClients.id });
       if (!client) throw new Error('Failed to create OAuth client');
@@ -158,12 +160,17 @@ export class OAuthClientService {
   }
 
   /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
-  async updateClient(clientId: string, update: { name?: string; isActive?: boolean; redirectUris?: string[] }): Promise<void> {
+  async updateClient(clientId: string, update: { name?: string; isActive?: boolean; redirectUris?: string[]; backchannelLogoutUri?: string | null }): Promise<void> {
     await this.db.transaction(async tx => {
-      if (update.name !== undefined || update.isActive !== undefined) {
+      if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined) {
         await tx
           .update(schema.oauthClients)
-          .set({ ...(update.name !== undefined ? { name: update.name } : {}), ...(update.isActive !== undefined ? { isActive: update.isActive } : {}), updatedAt: new Date() })
+          .set({
+            ...(update.name !== undefined ? { name: update.name } : {}),
+            ...(update.isActive !== undefined ? { isActive: update.isActive } : {}),
+            ...(update.backchannelLogoutUri !== undefined ? { backchannelLogoutUri: update.backchannelLogoutUri } : {}),
+            updatedAt: new Date(),
+          })
           .where(eq(schema.oauthClients.id, clientId));
       }
       if (update.redirectUris) {

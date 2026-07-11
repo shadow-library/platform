@@ -57,6 +57,10 @@ export class RegisterClientBody {
 
   @Field(() => Number, { optional: true, minimum: 60, maximum: 86400 })
   accessTokenTtl?: number;
+
+  /** OIDC back-channel logout endpoint; logout tokens POST here on session termination. */
+  @Field({ optional: true })
+  backchannelLogoutUri?: string;
 }
 
 @Schema()
@@ -124,6 +128,9 @@ export class UpdateClientBody {
 
   @Field(() => [String], { optional: true })
   redirectUris?: string[];
+
+  @Field({ optional: true })
+  backchannelLogoutUri?: string;
 }
 
 @Schema()

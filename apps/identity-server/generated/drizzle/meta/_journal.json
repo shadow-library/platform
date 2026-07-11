@@ -141,6 +141,13 @@
       "when": 1783766458571,
       "tag": "0019_admin_user_lifecycle",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1783768068767,
+      "tag": "0020_backchannel_logout",
+      "breakpoints": true
     }
   ]
 }

@@ -8,6 +8,7 @@ import { Config, Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
+import { BackChannelLogoutService } from '@server/modules/auth/token';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { MaintenanceService } from './maintenance.service';
@@ -39,12 +40,14 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
 
   constructor(
     private readonly notificationService: NotificationService,
+    private readonly backChannelLogoutService: BackChannelLogoutService,
     private readonly maintenanceService: MaintenanceService,
   ) {}
 
   async onApplicationReady(): Promise<void> {
     /** Deliveries interrupted by the previous worker's crash re-enter the claimable pool first. */
     await this.notificationService.recoverStuckDeliveries();
+    await this.backChannelLogoutService.recoverStuckDeliveries();
     this.timer = setInterval(() => void this.tick(), this.intervalMs);
     this.logger.info('Worker started', { intervalMs: this.intervalMs });
   }
@@ -72,6 +75,8 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
     try {
       const sent = await this.notificationService.dispatchPending();
       if (sent > 0) this.logger.debug('Dispatched notifications', { sent });
+      const logouts = await this.backChannelLogoutService.dispatchPending();
+      if (logouts > 0) this.logger.debug('Dispatched back-channel logouts', { logouts });
       if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) await this.maintenanceService.purgeStaleContactClaims();
     } catch (error) {
       this.logger.error('Worker tick failed', { error });

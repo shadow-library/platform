@@ -180,4 +180,10 @@ export class DiscoveryResponse {
 
   @Field(() => [String])
   code_challenge_methods_supported: string[];
+
+  @Field(() => Boolean)
+  backchannel_logout_supported: boolean;
+
+  @Field(() => Boolean)
+  backchannel_logout_session_supported: boolean;
 }

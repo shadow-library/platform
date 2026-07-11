@@ -16,12 +16,17 @@ import { applications } from './applications.schema';
 export type OAuthClient = InferSelectModel<typeof oauthClients>;
 export type ApiResource = InferSelectModel<typeof apiResources>;
 export type Scope = InferSelectModel<typeof scopes>;
+export type OidcLogoutDelivery = InferSelectModel<typeof oidcLogoutDeliveries>;
 
 export namespace OAuthClient {
   export type Kind = InferEnum<typeof oauthClientKind>;
   export type AuthMethod = InferEnum<typeof tokenEndpointAuthMethod>;
   export type Secret = InferSelectModel<typeof oauthClientSecrets>;
   export type RedirectUri = InferSelectModel<typeof oauthClientRedirectUris>;
+}
+
+export namespace OidcLogoutDelivery {
+  export type Status = InferEnum<typeof logoutDeliveryStatus>;
 }
 
 /**
@@ -46,6 +51,8 @@ export const oauthClients = pgTable('oauth_clients', {
   refreshTokenTtl: integer('refresh_token_ttl'),
   organisationId: bigint('organisation_id', { mode: 'bigint' }),
   isActive: boolean('is_active').notNull().default(true),
+  /** OIDC Back-Channel Logout 1.0: logout tokens for terminated sessions POST here when set. */
+  backchannelLogoutUri: text('backchannel_logout_uri'),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
 });
@@ -112,6 +119,33 @@ export const oauthClientScopeGrants = pgTable(
       .references(() => scopes.id, { onDelete: 'cascade' }),
   },
   t => [primaryKey({ columns: [t.clientId, t.scopeId] })],
+);
+
+export const logoutDeliveryStatus = pgEnum('logout_delivery_status', ['PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD']);
+
+/**
+ * Transactional queue of OIDC back-channel logout deliveries. The logout token itself is minted at
+ * send time (they expire within minutes, while retries may span hours); the URI is snapshotted at
+ * enqueue so a client edit cannot redirect in-flight notifications.
+ */
+export const oidcLogoutDeliveries = pgTable(
+  'oidc_logout_deliveries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: uuid('client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    logoutUri: text('logout_uri').notNull(),
+    subject: varchar('subject', { length: 64 }).notNull(),
+    sid: varchar('sid', { length: 64 }).notNull(),
+    status: logoutDeliveryStatus('status').notNull().default('PENDING'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+  },
+  t => [index('oidc_logout_deliveries_claim_idx').on(t.status, t.nextAttemptAt)],
 );
 
 /**

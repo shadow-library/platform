@@ -52,6 +52,8 @@ export class OAuthController {
       subject_types_supported: ['public'],
       id_token_signing_alg_values_supported: ['EdDSA'],
       code_challenge_methods_supported: ['S256'],
+      backchannel_logout_supported: true,
+      backchannel_logout_session_supported: true,
     };
   }
 
