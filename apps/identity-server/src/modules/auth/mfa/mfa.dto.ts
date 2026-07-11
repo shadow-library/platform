@@ -67,3 +67,20 @@ export class OperationSuccessResponse {
   @Field()
   success: boolean;
 }
+
+@Schema()
+export class TotpActivateResponse {
+  @Field()
+  success: boolean;
+
+  /** Present only when this activation produced the account's first recovery-code batch. */
+  @Field(() => [String], { optional: true })
+  recoveryCodes?: string[];
+}
+
+@Schema()
+export class RecoveryCodesResponse {
+  /** Shown exactly once; only hashes are retained server-side. */
+  @Field(() => [String])
+  recoveryCodes: string[];
+}

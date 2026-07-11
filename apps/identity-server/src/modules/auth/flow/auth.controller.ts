@@ -102,15 +102,23 @@ export class AuthController {
 
   private async dispatchVerify(body: ChallengeVerifyBody): Promise<FlowStepResult> {
     if (body.password) return this.loginService.verifyPassword(body.flowId, body.password);
-    if (body.code) {
-      const flow = await this.authFlowService.get(body.flowId);
-      if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
-      if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { code: body.code });
-      if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, body.code);
-      if (flow.kind === 'RECOVERY') return this.recoveryService.verifyOtp(body.flowId, body.code);
+    if (!body.code && !body.recoveryCode) throw new ServerError(AppErrorCode.AUTH_003);
+
+    const flow = await this.authFlowService.get(body.flowId);
+    if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
+
+    if (body.recoveryCode) {
+      if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { recoveryCode: body.recoveryCode });
+      if (flow.kind === 'RECOVERY') return this.recoveryService.verifyMfa(body.flowId, { recoveryCode: body.recoveryCode });
       throw new ServerError(AppErrorCode.AUTH_002);
     }
-    throw new ServerError(AppErrorCode.AUTH_003);
+
+    const code = body.code as string;
+    if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { code });
+    if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, code);
+    if (flow.kind === 'RECOVERY')
+      return flow.status === 'AWAITING_TOTP' ? this.recoveryService.verifyMfa(body.flowId, { code }) : this.recoveryService.verifyOtp(body.flowId, code);
+    throw new ServerError(AppErrorCode.AUTH_002);
   }
 
   private respond(result: FlowStepResult, reply: FastifyReply): ChallengeVerifyResponse {

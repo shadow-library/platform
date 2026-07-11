@@ -15,6 +15,7 @@ import { NotificationModule } from '@server/modules/infrastructure/notification'
 
 import { MfaController } from './mfa.controller';
 import { MfaService } from './mfa.service';
+import { RecoveryCodeService } from './recovery-code.service';
 
 /**
  * Defining types
@@ -27,7 +28,7 @@ import { MfaService } from './mfa.service';
 @Module({
   imports: [DatabaseModule, KeyModule, SessionModule, UserModule, AuditModule, NotificationModule],
   controllers: [MfaController],
-  providers: [MfaService],
-  exports: [MfaService],
+  providers: [MfaService, RecoveryCodeService],
+  exports: [MfaService, RecoveryCodeService],
 })
 export class MfaModule {}

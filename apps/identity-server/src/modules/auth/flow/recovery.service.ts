@@ -10,6 +10,7 @@ import { ServerError } from '@shadow-library/fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
+import { MfaService, RecoveryCodeService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
 import { UserEmailService, UserService } from '@server/modules/identity/user';
@@ -35,6 +36,7 @@ export interface RecoverInitInput {
  */
 const MAX_FLOW_FAILURES = 3;
 const AWAITING_EMAIL_OTP = 'AWAITING_EMAIL_OTP';
+const AWAITING_TOTP = 'AWAITING_TOTP';
 const AWAITING_NEW_PASSWORD = 'AWAITING_NEW_PASSWORD';
 const OTP_TEMPLATE = 'auth.recovery.otp';
 const CHANGED_TEMPLATE = 'auth.password.changed';
@@ -54,6 +56,8 @@ export class RecoveryService {
     private readonly signInEventService: SignInEventService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
+    private readonly mfaService: MfaService,
+    private readonly recoveryCodeService: RecoveryCodeService,
   ) {}
 
   /**
@@ -68,9 +72,31 @@ export class RecoveryService {
     return { flowId: flow.flowId, status: flow.status };
   }
 
+  /**
+   * Proves control of the verified email. For MFA-enrolled accounts the flow then demands a
+   * second factor: recovery MUST NOT downgrade an MFA account to single-factor takeover
+   * (docs/auth/overview.md §5).
+   */
   async verifyOtp(flowId: string, code: string): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId, AWAITING_EMAIL_OTP);
     const valid = Boolean(flow.userId) && (await this.challengeService.verify(flowId, code));
+    if (!valid) return this.handleFailure(flow);
+
+    const requiresMfa = await this.mfaService.hasMfa(BigInt(flow.userId as string));
+    const next = await this.authFlowService.update(flow, { status: requiresMfa ? AWAITING_TOTP : AWAITING_NEW_PASSWORD });
+    return { outcome: 'CONTINUE', flowId, status: next.status };
+  }
+
+  /** Satisfies the recovery MFA gate with a TOTP code or a single-use recovery code. */
+  async verifyMfa(flowId: string, proof: { code?: string; recoveryCode?: string }): Promise<FlowStepResult> {
+    const flow = await this.requireFlow(flowId, AWAITING_TOTP);
+    const userId = BigInt(flow.userId ?? '0');
+
+    const valid = proof.code
+      ? await this.mfaService.verifyTotp(userId, proof.code)
+      : proof.recoveryCode
+        ? await this.recoveryCodeService.consume(userId, proof.recoveryCode)
+        : false;
     if (!valid) return this.handleFailure(flow);
 
     const next = await this.authFlowService.update(flow, { status: AWAITING_NEW_PASSWORD });

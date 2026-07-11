@@ -10,7 +10,7 @@ import { ServerError } from '@shadow-library/fastify';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { MfaService } from '@server/modules/auth/mfa';
+import { MfaService, RecoveryCodeService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { PasswordService } from '@server/modules/identity/credentials';
 import { UserService } from '@server/modules/identity/user';
@@ -67,6 +67,7 @@ export class LoginService {
     private readonly signInEventService: SignInEventService,
     private readonly auditService: AuditService,
     private readonly mfaService: MfaService,
+    private readonly recoveryCodeService: RecoveryCodeService,
   ) {}
 
   /**
@@ -102,7 +103,10 @@ export class LoginService {
     return this.complete(flow, userId, {});
   }
 
-  /** Completes the MFA step of a login flow with a TOTP code; sessions born here carry AAL2. */
+  /**
+   * Completes the MFA step of a login flow with a TOTP code or a single-use recovery code;
+   * sessions born here carry AAL2.
+   */
   async verifyMfa(flowId: string, proof: MfaProof): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     if (flow.status !== AWAITING_TOTP) throw new ServerError(AppErrorCode.AUTH_002);
@@ -110,9 +114,15 @@ export class LoginService {
     const userId = flow.userId ? BigInt(flow.userId) : null;
     if (!userId) return this.handleFailure(flow, null, 'MFA_FAILED');
 
-    const valid = proof.code ? await this.mfaService.verifyTotp(userId, proof.code) : false;
+    const valid = await this.verifyProof(userId, proof);
     if (!valid) return this.handleFailure(flow, userId, 'MFA_FAILED');
-    return this.complete(flow, userId, { aal: 'AAL2', mfaMode: 'TOTP' });
+    return this.complete(flow, userId, { aal: 'AAL2', mfaMode: proof.recoveryCode ? 'RECOVERY_CODE' : 'TOTP' });
+  }
+
+  private async verifyProof(userId: bigint, proof: MfaProof): Promise<boolean> {
+    if (proof.code) return this.mfaService.verifyTotp(userId, proof.code);
+    if (proof.recoveryCode) return this.recoveryCodeService.consume(userId, proof.recoveryCode);
+    return false;
   }
 
   private async complete(flow: AuthFlowContext, userId: bigint, options: CompletionOptions): Promise<FlowStepResult> {

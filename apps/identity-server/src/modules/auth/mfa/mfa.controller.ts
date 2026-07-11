@@ -10,8 +10,9 @@ import { type FastifyRequest } from 'fastify';
 import { AppErrorCode } from '@server/classes';
 import { SessionAuthService, SessionService } from '@server/modules/auth/session';
 
-import { MfaEnrollmentsResponse, OperationSuccessResponse, StepUpResponse, TotpCodeBody, TotpEnrollResponse } from './mfa.dto';
+import { MfaEnrollmentsResponse, OperationSuccessResponse, RecoveryCodesResponse, StepUpResponse, TotpActivateResponse, TotpCodeBody, TotpEnrollResponse } from './mfa.dto';
 import { MfaService } from './mfa.service';
+import { RecoveryCodeService } from './recovery-code.service';
 
 /**
  * Defining types
@@ -25,6 +26,7 @@ import { MfaService } from './mfa.service';
 export class MfaController {
   constructor(
     private readonly mfaService: MfaService,
+    private readonly recoveryCodeService: RecoveryCodeService,
     private readonly sessionAuthService: SessionAuthService,
     private readonly sessionService: SessionService,
   ) {}
@@ -50,14 +52,25 @@ export class MfaController {
     return this.mfaService.enrollTotp(session.userId);
   }
 
+  /** Activation of the account's first factor also provisions its recovery-code batch (T-403). */
   @Post('/totp/activate')
   @HttpStatus(200)
-  @RespondFor(200, OperationSuccessResponse)
-  async activateTotp(@Body() body: TotpCodeBody, @Req() request: FastifyRequest): Promise<OperationSuccessResponse> {
+  @RespondFor(200, TotpActivateResponse)
+  async activateTotp(@Body() body: TotpCodeBody, @Req() request: FastifyRequest): Promise<TotpActivateResponse> {
     const session = await this.sessionAuthService.authenticate(request);
     await this.mfaService.activateTotp(session.userId, body.code);
     await this.sessionService.elevate(session.id);
-    return { success: true };
+    const hasCodes = (await this.recoveryCodeService.countRemaining(session.userId)) > 0;
+    const recoveryCodes = hasCodes ? undefined : await this.recoveryCodeService.generate(session.userId);
+    return { success: true, recoveryCodes };
+  }
+
+  @Post('/recovery-codes')
+  @HttpStatus(200)
+  @RespondFor(200, RecoveryCodesResponse)
+  async regenerateRecoveryCodes(@Req() request: FastifyRequest): Promise<RecoveryCodesResponse> {
+    const session = await this.sessionAuthService.authenticateElevated(request);
+    return { recoveryCodes: await this.recoveryCodeService.generate(session.userId) };
   }
 
   @Delete('/totp')

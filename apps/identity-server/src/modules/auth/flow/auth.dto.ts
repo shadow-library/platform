@@ -46,6 +46,10 @@ export class ChallengeVerifyBody {
 
   @Field({ optional: true })
   code?: string;
+
+  /** Single-use MFA bypass code; accepted wherever a second factor is awaited. */
+  @Field({ optional: true })
+  recoveryCode?: string;
 }
 
 @Schema()
