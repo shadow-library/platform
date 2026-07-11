@@ -13,7 +13,12 @@ export function serialiseMessage<T extends { proposalId?: bigint | null }>(messa
   return { ...message, proposalId: message.proposalId == null ? null : (String(message.proposalId) as unknown as bigint) };
 }
 
-/** Coerce a proposal's nullable `messageId` bigint to the wire's `string | null`. */
-export function serialiseProposal<T extends { messageId?: bigint | null }>(proposal: T): T {
-  return { ...proposal, messageId: proposal.messageId == null ? null : (String(proposal.messageId) as unknown as bigint) };
+/** Coerce a proposal's nullable `messageId` bigint to the wire's `string | null`, and derive `revertible`. */
+export function serialiseProposal<T extends { messageId?: bigint | null; status?: string; inverseOps?: unknown }>(proposal: T): T {
+  const inverseOps = proposal.inverseOps as unknown[] | null | undefined;
+  return {
+    ...proposal,
+    messageId: proposal.messageId == null ? null : (String(proposal.messageId) as unknown as bigint),
+    revertible: proposal.status === 'applied' && (inverseOps?.length ?? 0) > 0,
+  };
 }

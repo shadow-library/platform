@@ -139,6 +139,11 @@ export class ProposalResponse {
   @Field()
   autoApplied: boolean;
 
+  // Computed at serialisation: applied AND carrying inverse ops — proposals applied before inverse
+  // capture existed (or action-only ones) cannot be undone, so the UI must not offer a revert.
+  @Field()
+  revertible: boolean;
+
   // Per-op dispositions recorded at apply time — applied/declined/failed (+ action results). Open
   // objects so the action `result` payloads survive serialisation.
   @Field(() => [OpResultItem], { optional: true, nullable: true })
