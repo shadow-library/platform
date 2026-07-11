@@ -27,7 +27,11 @@
     "paths": {
       "@modules/*": ["src/modules/*"],
       "@scripts/*": ["scripts/*"],
-      "@server/*": ["src/*"]
+      "@server/*": ["src/*"],
+      "@shadow-library/auth": ["packages/auth/src/index.ts"],
+      "@shadow-library/auth/module": ["packages/auth/src/module/index.ts"],
+      "@shadow-library/auth/rp": ["packages/auth/src/rp/index.ts"],
+      "@shadow-library/auth/testing": ["packages/auth/src/testing/index.ts"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
@@ -44,5 +48,5 @@
     /** Completeness */
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "packages/**/*.ts"]
 }
