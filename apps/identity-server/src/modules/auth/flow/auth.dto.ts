@@ -110,3 +110,21 @@ export class SetPasswordBody {
   @Field()
   password: string;
 }
+
+@Schema()
+export class RecoverInitBody {
+  @Field()
+  identifier: string;
+
+  @Field({ optional: true })
+  deviceId?: string;
+}
+
+@Schema()
+export class ResetPasswordBody {
+  @Field()
+  flowId: string;
+
+  @Field()
+  newPassword: string;
+}

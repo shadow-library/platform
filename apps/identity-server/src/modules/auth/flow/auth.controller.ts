@@ -18,11 +18,14 @@ import {
   LoginInitBody,
   LoginInitResponse,
   ProfileBody,
+  RecoverInitBody,
   RegisterInitBody,
+  ResetPasswordBody,
   SetPasswordBody,
 } from './auth.dto';
 import { FlowStepResult } from './flow.types';
 import { LoginService } from './login.service';
+import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 
 /**
@@ -38,6 +41,7 @@ export class AuthController {
   constructor(
     private readonly loginService: LoginService,
     private readonly registrationService: RegistrationService,
+    private readonly recoveryService: RecoveryService,
     private readonly authFlowService: AuthFlowService,
   ) {}
 
@@ -73,6 +77,20 @@ export class AuthController {
     return this.respond(result, reply);
   }
 
+  @Post('/recover/init')
+  @RespondFor(200, FlowStatusResponse)
+  recoverInit(@Body() body: RecoverInitBody, @Req() request: FastifyRequest): Promise<FlowStatusResponse> {
+    return this.recoveryService.init({ identifier: body.identifier, device: this.deviceContext(request, body.deviceId) });
+  }
+
+  @Post('/recover/reset')
+  @HttpStatus(200)
+  @RespondFor(200, ChallengeVerifyResponse)
+  async recoverReset(@Body() body: ResetPasswordBody, @Res() reply: FastifyReply): Promise<ChallengeVerifyResponse> {
+    const result = await this.recoveryService.reset(body.flowId, body.newPassword);
+    return this.respond(result, reply);
+  }
+
   @Post('/challenge/verify')
   @HttpStatus(200)
   @RespondFor(200, ChallengeVerifyResponse)
@@ -88,6 +106,7 @@ export class AuthController {
       const flow = await this.authFlowService.get(body.flowId);
       if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
       if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, body.code);
+      if (flow.kind === 'RECOVERY') return this.recoveryService.verifyOtp(body.flowId, body.code);
       throw new ServerError(AppErrorCode.AUTH_002);
     }
     throw new ServerError(AppErrorCode.AUTH_003);

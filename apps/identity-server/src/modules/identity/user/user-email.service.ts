@@ -33,4 +33,12 @@ export class UserEmailService {
     });
     return !!userEmail;
   }
+
+  /** Returns the user's primary verified email, preferring a primary flag then any verified one. */
+  async getPrimaryEmail(userId: bigint): Promise<string | null> {
+    const emails = await this.db.query.userEmails.findMany({ where: (email, { eq }) => eq(email.userId, userId) });
+    const verified = emails.filter(email => email.isVerified);
+    const primary = verified.find(email => email.isPrimary) ?? verified[0];
+    return primary?.emailId ?? null;
+  }
 }

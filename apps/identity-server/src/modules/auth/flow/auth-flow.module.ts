@@ -17,6 +17,7 @@ import { AuthFlowService } from './auth-flow.service';
 import { AuthController } from './auth.controller';
 import { ChallengeService } from './challenge.service';
 import { LoginService } from './login.service';
+import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 import { SignInEventService } from './sign-in-event.service';
 
@@ -31,7 +32,7 @@ import { SignInEventService } from './sign-in-event.service';
 @Module({
   imports: [DatabaseModule, UserModule, CredentialsModule, SessionModule, AuditModule, NotificationModule],
   controllers: [AuthController],
-  providers: [AuthFlowService, SignInEventService, ChallengeService, LoginService, RegistrationService],
-  exports: [AuthFlowService, SignInEventService, ChallengeService, LoginService, RegistrationService],
+  providers: [AuthFlowService, SignInEventService, ChallengeService, LoginService, RegistrationService, RecoveryService],
+  exports: [AuthFlowService, SignInEventService, ChallengeService, LoginService, RegistrationService, RecoveryService],
 })
 export class AuthFlowModule {}

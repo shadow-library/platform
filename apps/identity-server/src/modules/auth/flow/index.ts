@@ -5,5 +5,6 @@ export * from './auth.dto';
 export * from './challenge.service';
 export * from './flow.types';
 export * from './login.service';
+export * from './recovery.service';
 export * from './registration.service';
 export * from './sign-in-event.service';

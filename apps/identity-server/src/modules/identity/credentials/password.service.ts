@@ -87,6 +87,30 @@ export class PasswordService {
     return result.valid;
   }
 
+  /**
+   * Sets (or creates) a user's password credential and records it in history. Used by recovery and
+   * password change; callers should reject reused passwords via isReused beforehand.
+   */
+  async changePassword(userId: bigint, password: string, providerKey: string): Promise<void> {
+    const { hash, version } = await this.hash(password);
+    await this.db.transaction(async tx => {
+      let identity = await tx.query.userAuthIdentities.findFirst({
+        where: and(eq(schema.userAuthIdentities.userId, userId), eq(schema.userAuthIdentities.provider, 'PASSWORD')),
+      });
+      if (!identity) {
+        [identity] = await tx.insert(schema.userAuthIdentities).values({ userId, provider: 'PASSWORD', providerKey }).returning();
+      }
+      if (!identity) throw new Error('Failed to resolve password identity');
+
+      await tx
+        .insert(schema.userPasswords)
+        .values({ userAuthIdentityId: identity.id, hash, version, algorithm: 'ARGON2ID' })
+        .onConflictDoUpdate({ target: schema.userPasswords.userAuthIdentityId, set: { hash, version, algorithm: 'ARGON2ID' } });
+      await tx.insert(schema.passwordHistory).values({ userId, hash });
+    });
+    await this.pruneHistory(userId);
+  }
+
   /** Rejects a candidate password that matches the current or any of the recent stored hashes. */
   async isReused(userId: bigint, password: string): Promise<boolean> {
     const history = await this.db
