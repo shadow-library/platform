@@ -195,13 +195,44 @@ function validateEndingContract(value: unknown, path: string, errors: string[]):
 }
 
 /**
+ * Local models routinely emit the whole doc ref in the section and/or slug field of bible_document
+ * ops (`{"section": "project/premise", "slug": "project/premise"}`, sometimes `doc:`-prefixed).
+ * The intent is unambiguous, so repair it deterministically instead of burning a model retry:
+ * strip a `doc:` prefix, split an embedded `section/slug`, and de-duplicate a section-prefixed slug.
+ * Anything that doesn't match a known section is left untouched for validation to reject.
+ */
+function normalizeBibleDocumentOp(record: Record<string, unknown>): void {
+  let section = record['section'];
+  let slug = record['slug'];
+  if (typeof section === 'string' && section.startsWith('doc:')) section = section.slice(4);
+  if (typeof slug === 'string' && slug.startsWith('doc:')) slug = slug.slice(4);
+  if (typeof section === 'string' && section.includes('/')) {
+    const [head, ...rest] = section.split('/');
+    if (BIBLE_SECTIONS.includes(head as string)) {
+      section = head;
+      if (typeof slug !== 'string' || slug === record['section'] || slug === '') slug = rest.join('/');
+    }
+  }
+  if (typeof section === 'string' && typeof slug === 'string' && slug.startsWith(`${section}/`)) slug = slug.slice(section.length + 1);
+  record['section'] = section;
+  record['slug'] = slug;
+}
+
+/**
  * Validates an untrusted change-set structurally, optionally against a scope's allowed-op vocabulary.
  * Returns human-readable errors; an empty array means `value` is a well-formed `ChangeOp[]`.
+ * Obviously-malformed-but-unambiguous bible_document refs are normalized in place first (see above),
+ * so every staging and apply path repairs them consistently.
  */
 export function validateChangeSet(value: unknown, allowedOps?: readonly OpType[]): string[] {
   const errors: string[] = [];
   if (!Array.isArray(value)) return ['changeSet must be an array of operations'];
   if (value.length === 0) return ['changeSet must contain at least one operation'];
+
+  for (const item of value) {
+    if (isKind(item, 'object') && typeof (item as Record<string, unknown>)['op'] === 'string' && ((item as Record<string, unknown>)['op'] as string).startsWith('bible_document'))
+      normalizeBibleDocumentOp(item as Record<string, unknown>);
+  }
 
   value.forEach((item, index) => {
     const path = `changeSet[${index}]`;

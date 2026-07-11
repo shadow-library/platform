@@ -57,6 +57,23 @@ describe('validateChangeSet', () => {
     expect(validateChangeSet([{ op: 'arc.upsert', arcKey: 'a1', volumeKey: 'v1', chapterStart: 9, chapterEnd: 3 }])[0]).toMatch(/chapterStart must be <= chapterEnd/);
     expect(validateChangeSet([{ op: 'bible_document.remove', section: 'poetry', slug: 'x' }])[0]).toMatch(/section must be one of/);
   });
+
+  it('should normalize path-style bible_document refs local models emit', () => {
+    const combined = { op: 'bible_document.upsert', section: 'project/premise', slug: 'project/premise', body: 'x' };
+    expect(validateChangeSet([combined])).toEqual([]);
+    expect(combined).toMatchObject({ section: 'project', slug: 'premise' });
+
+    const prefixedSlug = { op: 'bible_document.remove', section: 'world', slug: 'world/factions' };
+    expect(validateChangeSet([prefixedSlug])).toEqual([]);
+    expect(prefixedSlug).toMatchObject({ section: 'world', slug: 'factions' });
+
+    const docPrefixed = { op: 'bible_document.upsert', section: 'doc:plot/ending-vision', slug: 'doc:plot/ending-vision', body: 'x' };
+    expect(validateChangeSet([docPrefixed])).toEqual([]);
+    expect(docPrefixed).toMatchObject({ section: 'plot', slug: 'ending-vision' });
+
+    // An unknown section is not guessable — leave it for validation to reject.
+    expect(validateChangeSet([{ op: 'bible_document.remove', section: 'poetry/haiku', slug: 'haiku' }])[0]).toMatch(/section must be one of/);
+  });
 });
 
 describe('changeSetRefs', () => {
