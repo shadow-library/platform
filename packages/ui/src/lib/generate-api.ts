@@ -291,7 +291,10 @@ function generateEndpoint(
       const jsonSchema = resolved.content?.['application/json']?.schema;
       if (jsonSchema) {
         if (isRef(jsonSchema)) returnType = resolveRefName(jsonSchema.$ref);
-        else types.push(`export type ${pascalName}Response = ${schemaToTs(jsonSchema, spec)};`);
+        else {
+          returnType = `${pascalName}Response`;
+          types.push(`export type ${returnType} = ${schemaToTs(jsonSchema, spec)};`);
+        }
       }
     }
   }
