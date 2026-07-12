@@ -66,7 +66,7 @@ export class VolumeService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!volume) throw new ServerError(AppErrorCode.PRJ_002);
+    if (!volume) throw new ServerError(AppErrorCode.S001);
     return volume;
   }
 

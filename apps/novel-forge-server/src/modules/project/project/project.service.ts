@@ -66,7 +66,7 @@ export class ProjectService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!project) throw new ServerError(AppErrorCode.PRJ_002);
+    if (!project) throw new ServerError(AppErrorCode.S001);
 
     if (body.kind === 'new_novel') {
       await this.db
@@ -165,7 +165,7 @@ export class ProjectService {
         .returning()
         .catch(err => this.databaseService.translateError(err));
 
-      if (!newProject) throw new ServerError(AppErrorCode.PRJ_002);
+      if (!newProject) throw new ServerError(AppErrorCode.S001);
 
       if (body.resetDerived !== false) {
         if (source.kind === 'new_novel') {

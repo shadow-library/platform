@@ -78,7 +78,7 @@ export class EntityService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!entity) throw new ServerError(AppErrorCode.PRJ_002);
+    if (!entity) throw new ServerError(AppErrorCode.S001);
     return entity;
   }
 

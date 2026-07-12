@@ -57,8 +57,7 @@ CREATE TABLE "projects" (
 	"skeleton_character_arcs" jsonb,
 	"skeleton_power_curve" text,
 	"created_at" timestamp DEFAULT now() NOT NULL,
-	"updated_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "projects_name_unique" UNIQUE("name")
+	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "chapters" (

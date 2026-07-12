@@ -15,7 +15,6 @@ import { AppErrorCode } from '@server/classes';
 describe('AppErrorCode', () => {
   it('should define project error codes', () => {
     expect(AppErrorCode.PRJ_001).toBeDefined();
-    expect(AppErrorCode.PRJ_002).toBeDefined();
     expect(AppErrorCode.PRJ_003).toBeDefined();
   });
 

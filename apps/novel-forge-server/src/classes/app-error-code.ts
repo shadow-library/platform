@@ -25,7 +25,6 @@ export class AppErrorCode extends ServerErrorCode {
    * Project Errors
    */
   static readonly PRJ_001 = new AppErrorCode('PRJ_001', ErrorType.NOT_FOUND, 'Project not found');
-  static readonly PRJ_002 = new AppErrorCode('PRJ_002', ErrorType.CONFLICT, 'Project with this name already exists');
   static readonly PRJ_003 = new AppErrorCode('PRJ_003', ErrorType.CLIENT_ERROR, 'Operation not valid for this project kind');
 
   /*!

@@ -61,10 +61,12 @@ describe.if(pgAvailable)('Projects API', () => {
       expect(response.json().kind).toBe('new_novel');
     });
 
-    it('should return 409 for duplicate name', async () => {
-      await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'dup', kind: 'new_novel' });
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'dup', kind: 'new_novel' });
-      expect(response.statusCode).toBe(409);
+    it('should allow two projects with the same name, distinguished by id', async () => {
+      const first = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'dup', kind: 'new_novel' });
+      const second = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'dup', kind: 'new_novel' });
+      expect(first.statusCode).toBe(201);
+      expect(second.statusCode).toBe(201);
+      expect(second.json().id).not.toBe(first.json().id);
     });
   });
 

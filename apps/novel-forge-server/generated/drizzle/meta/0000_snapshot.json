@@ -1,5 +1,5 @@
 {
-  "id": "4b2adb13-efec-4d17-9688-6c795b0e5c74",
+  "id": "88af0fb8-a689-41c2-bc46-3454077cdfde",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -184,15 +184,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "projects_name_unique": {
-          "name": "projects_name_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "name"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false

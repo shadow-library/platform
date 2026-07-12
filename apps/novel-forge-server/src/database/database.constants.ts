@@ -10,7 +10,6 @@ import { ServerError } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
-import { AppErrorCode } from '../classes/app-error-code';
 
 /**
  * Defining types
@@ -21,7 +20,6 @@ import { AppErrorCode } from '../classes/app-error-code';
  */
 
 // Maps postgres constraint names to user-facing errors; anything unmapped surfaces as a 500 from
-// DatabaseService.translateError, so every user-triggerable constraint belongs here.
-export const constraintErrorMap: Record<string, ServerError> = {
-  projects_name_unique: new ServerError(AppErrorCode.PRJ_002),
-};
+// DatabaseService.translateError, so every user-triggerable constraint belongs here. Currently empty:
+// project names stopped being unique and no other constraint is reachable from user input.
+export const constraintErrorMap: Record<string, ServerError> = {};

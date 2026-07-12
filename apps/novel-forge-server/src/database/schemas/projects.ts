@@ -35,7 +35,7 @@ export const contentGenerator = pgEnum('content_generator', ['standard', 'grok',
 export const projects = pgTable('projects', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   ownerId: bigint('owner_id', { mode: 'bigint' }),
-  name: varchar('name', { length: 255 }).notNull().unique(),
+  name: varchar('name', { length: 255 }).notNull(),
   kind: projectKind('kind').notNull(),
   title: varchar('title', { length: 500 }),
   coverImagePath: varchar('cover_image_path'),
