@@ -8,7 +8,7 @@ Targets (architecture §15): **RPO ≤ 5 min, RTO ≤ 1 h**, single region.
 
 ## 1. Signing-key rotation (routine)
 
-Signing keys live in `signing_keys`, envelope-encrypted with `MASTER_ENCRYPTION_KEY`
+Signing keys live in `signing_keys`, envelope-encrypted with `SECURITY_MASTER_ENCRYPTION_KEY`
 (AES-256-GCM), and move through `PENDING → ACTIVE → RETIRING → RETIRED`. Verification honours
 retiring keys, so rotation is zero-downtime.
 
@@ -28,7 +28,7 @@ retiring keys, so rotation is zero-downtime.
    `UPDATE refresh_token_families SET status='REVOKED', revoke_reason='ADMIN', revoked_at=now() WHERE status='ACTIVE' AND created_at > '<exposure start>';`
    `UPDATE user_sessions SET status='REVOKED', terminated_at=now() WHERE status='ACTIVE' AND created_at > '<exposure start>';`
    then flush the session cache: `redis-cli --scan --pattern 'session:*' | xargs redis-cli del`.
-4. If `MASTER_ENCRYPTION_KEY` itself leaked, generate a new one, re-encrypt stored private keys
+4. If `SECURITY_MASTER_ENCRYPTION_KEY` itself leaked, generate a new one, re-encrypt stored private keys
    (decrypt with old, encrypt with new — maintenance script), redeploy, then rotate per §1.
 5. Preserve the audit trail: key changes are audited; do not truncate `audit_events`.
 
@@ -80,13 +80,13 @@ Automatic: ≥ 30 failed logins from one IP within 15 min blocks it for 1 h
 ## 6. Bootstrap and break-glass access
 
 On every boot the server idempotently provisions the platform application, the `IAMAdmin` role,
-the `authz:check` scope, and a bootstrap administrator (`IDENTITY_BOOTSTRAP_ADMIN_EMAIL`,
+the `authz:check` scope, and a bootstrap administrator (`AUTH_BOOTSTRAP_ADMIN_EMAIL`,
 default `admin@shadow-apps.com`).
 
-- If `IDENTITY_BOOTSTRAP_ADMIN_PASSWORD` is unset, a random password is generated and logged
+- If `AUTH_BOOTSTRAP_ADMIN_PASSWORD` is unset, a random password is generated and logged
   exactly once at boot (`Generated bootstrap admin password`); rotate it immediately after use.
 - Lost admin access: recover via `POST /api/v1/auth/recover/init` against the admin email (OTP to
-  the verified address), or set a new `IDENTITY_BOOTSTRAP_ADMIN_PASSWORD`, delete the admin's
+  the verified address), or set a new `AUTH_BOOTSTRAP_ADMIN_PASSWORD`, delete the admin's
   password credential row, and reboot — `ensureBootstrapAdmin` only creates missing users, so
   prefer the recovery flow.
 

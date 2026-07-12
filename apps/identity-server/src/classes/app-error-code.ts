@@ -27,6 +27,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly APP_002 = new AppErrorCode('APP_002', ErrorType.CONFLICT, 'Application already exists');
   /** Application role not found */
   static readonly APP_003 = new AppErrorCode('APP_003', ErrorType.NOT_FOUND, 'Application role not found');
+  /** The platform application is protected and cannot be mutated or deleted */
+  static readonly APP_004 = new AppErrorCode('APP_004', ErrorType.CONFLICT, 'The platform application cannot be modified or deleted', 403);
+  /** The application still owns OAuth clients (FK restrict) and cannot be deleted */
+  static readonly APP_005 = new AppErrorCode('APP_005', ErrorType.CONFLICT, 'The application still has registered OAuth clients');
 
   /**
    * User Error Codes

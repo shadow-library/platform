@@ -26,6 +26,8 @@ export const IAM_ADMIN_ROLE = 'IAMAdmin';
 export const ADMIN_PERMISSIONS = {
   usersRead: 'iam:users:read',
   usersManage: 'iam:users:manage',
+  appsRead: 'iam:apps:read',
+  appsManage: 'iam:apps:manage',
   clientsRead: 'iam:clients:read',
   clientsManage: 'iam:clients:manage',
   rolesManage: 'iam:roles:manage',

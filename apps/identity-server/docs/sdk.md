@@ -41,7 +41,7 @@ const auth = createAuthClient({
   client: {
     // service-account credentials (M2M + PDP calls)
     id: Bun.env.IDENTITY_CLIENT_ID!,
-    secret: Bun.env.IDENTITY_CLIENT_SECRET, // or privateKeyJwt: { kid, key } for private_key_jwt
+    secret: Bun.env.IDENTITY_CLIENT_SECRET, // client_secret_basic — the only confidential auth method
   },
   cache: { decisionTtlSeconds: 60, jwksTtlSeconds: 300 },
 });

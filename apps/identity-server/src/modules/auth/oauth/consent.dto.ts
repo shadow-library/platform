@@ -80,3 +80,39 @@ export class ConsentDecisionResponse {
   @Field({ optional: true })
   redirectTo?: string;
 }
+
+@Schema()
+export class ConsentClientParams {
+  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  clientId: string;
+}
+
+@Schema()
+export class ConsentRecordDto {
+  @Field()
+  clientId: string;
+
+  @Field()
+  clientName: string;
+
+  @Field(() => [String])
+  scopeNames: string[];
+
+  @Field(() => String, { enum: ['USER', 'FIRST_PARTY_POLICY', 'ADMIN'] })
+  source: 'USER' | 'FIRST_PARTY_POLICY' | 'ADMIN';
+
+  @Field()
+  grantedAt: string;
+}
+
+@Schema()
+export class ConsentRecordsResponse {
+  @Field(() => [ConsentRecordDto])
+  items: ConsentRecordDto[];
+}
+
+@Schema()
+export class ConsentOperationResponse {
+  @Field(() => Boolean)
+  success: boolean;
+}

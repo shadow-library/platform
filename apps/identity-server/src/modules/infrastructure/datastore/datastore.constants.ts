@@ -17,6 +17,7 @@ import { AppErrorCode } from '@server/classes';
  */
 
 export const constraintErrorMap: Record<string, ServerError> = {
+  applications_name_unique: new ServerError(AppErrorCode.APP_002),
   users_username_unique: new ServerError(AppErrorCode.USR_002),
   user_emails_verified_email_unique: new ServerError(AppErrorCode.USR_003),
   user_phones_verified_phone_unique: new ServerError(AppErrorCode.USR_004),

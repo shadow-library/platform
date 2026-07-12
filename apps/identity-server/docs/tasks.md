@@ -37,7 +37,7 @@ This is the authoritative build plan to take Shadow Identity from its current st
 ### T-003 — Remove hardcoded super-admin credentials · S · Sec: Critical · Blocks prod
 
 - **Change:** `src/modules/identity/user/user.module.ts:34-53` seeds `super-admin@shadow-apps.com` / `Password@123`.
-- **Fix:** replace with a one-time bootstrap: on first boot with no platform admin, generate a random password, print it once to stdout, create the user in `PENDING` state requiring password reset on first login; OR gate on `IDENTITY_BOOTSTRAP_ADMIN_EMAIL` + a `MASTER_ENCRYPTION_KEY`-derived one-time token. No literal secret in source, ever.
+- **Fix:** replace with a one-time bootstrap: on first boot with no platform admin, generate a random password, print it once to stdout, create the user in `PENDING` state requiring password reset on first login; OR gate on `AUTH_BOOTSTRAP_ADMIN_EMAIL` + a `SECURITY_MASTER_ENCRYPTION_KEY`-derived one-time token. No literal secret in source, ever.
 - **DoD:** grep for `Password@123` returns nothing; boot on a fresh DB yields no known-credential account.
 
 ### T-004 — Repair migration pipeline & reset baseline · S · Blocks prod
@@ -55,7 +55,7 @@ This is the authoritative build plan to take Shadow Identity from its current st
 ### T-006 — Fail-closed configuration · S · Sec: High · Blocks prod
 
 - **Change:** `src/bootstrap.ts` defaults production secrets (DB URL, Redis) to localhost values.
-- **Fix:** in `Config.isProd()`, require `PRIMARY_DATABASE_URL`, `REDIS_URL`, `MASTER_ENCRYPTION_KEY` — abort boot if absent. Keep dev defaults behind `isDev()`. Expand `.env.example` to list every variable actually read.
+- **Fix:** in `Config.isProd()`, require `PRIMARY_DATABASE_URL`, `REDIS_URL`, `SECURITY_MASTER_ENCRYPTION_KEY` — abort boot if absent. Keep dev defaults behind `isDev()`. Expand `.env.example` to list every variable actually read.
 - **DoD:** prod boot without the three secrets exits non-zero with a clear message.
 
 ### T-007 — Wire modules into the app · S · Blocks prod

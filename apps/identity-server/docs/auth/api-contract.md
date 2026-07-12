@@ -4,7 +4,7 @@
 | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Status**       | Approved for development                                                                                                                                                                                                                  |
 | **Version**      | 2.0.0                                                                                                                                                                                                                                     |
-| **Last updated** | 2026-07-11                                                                                                                                                                                                                                |
+| **Last updated** | 2026-07-12                                                                                                                                                                                                                                |
 | **Base URL**     | `https://identity.shadow-apps.com/api/v1`                                                                                                                                                                                                 |
 | **Supersedes**   | v1. Token-cookie delivery (`AT`/`RT` cookies) and `POST /auth/session/refresh` are **withdrawn** — the browser holds only the `__Host-sid` session cookie (decision D-10); applications use `/oauth2/*` (see `docs/architecture.md` §12). |
 
@@ -18,6 +18,10 @@ Successful authentication sets exactly two cookies (never tokens in the JSON bod
 2. `isLoggedIn=true` — UI hint. `Secure; SameSite=Lax`, not HttpOnly.
 
 All state-changing endpoints require the CSRF double-submit header (`x-csrf-token`) per `HttpCoreModule`.
+
+### Machine-readable spec
+
+Outside production, `HttpCoreModule` serves the full OpenAPI 3.1 document at `GET /dev/api-docs/openapi.json` (derived from the class-schema DTOs — it is generated, never hand-maintained). First-party clients generate their request/response types from it rather than transcribing this contract by hand; this document remains the prose source of truth for behaviour, neutrality, and state transitions that the schema alone cannot express.
 
 ### State machine contract
 
@@ -185,7 +189,7 @@ Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the
 
 ### 4.5 MFA management (under `/me/mfa`, session cookie + CSRF) — _implemented (M4)_
 
-- `GET /me/mfa` — list verified enrollments (TOTP + passkeys).
+- `GET /me/mfa` → `{ enrollments: [{ type, label, credentialId?, createdAt, lastUsedAt? }], recoveryCodesRemaining }` — verified enrollments (TOTP + passkeys) plus how many one-time recovery codes are still unused (the security page warns when the balance runs low).
 - `POST /me/mfa/totp/enroll` → `{ secret, uri }` (base32 seed + otpauth URI, shown once). Adding the _first_ factor needs only a session; changing factors once MFA exists requires elevation.
 - `POST /me/mfa/totp/activate` `{ code }` → `{ success, recoveryCodes? }` — proof-of-possession activates the enrollment; the account's first factor also returns its one-time recovery-code batch.
 - `DELETE /me/mfa/totp` — step-up required.
@@ -203,12 +207,19 @@ Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the
 
 `GET /me` (session cookie) → `{ userId, firstName?, lastName?, email?, aal, elevated, elevatedUntil? }` — profile basics plus session assurance for first-party surfaces (the account page renders step-up affordances from `elevated`).
 
+`PATCH /me/profile` `{ firstName?, lastName? }` → the refreshed `GET /me` shape — updates the display name shown across first-party surfaces. `firstName`, when present, must be non-empty; email and phone are managed under §4.9, not here.
+
 ### 4.8 Consent interaction (session cookie + CSRF) — _implemented (M6)_
 
 The hosted consent screen's backing endpoints; the UI trusts nothing from the URL beyond the same-origin authorize link.
 
 - `GET /auth/consent?clientId=&scope=` → `{ clientName, isFirstParty, alreadyGranted, scopes: [{ name, description?, isSensitive }] }`. Standard OIDC scopes (`openid`, `profile`, `email`, `offline_access`) are described from a fixed map; resource scopes from their registrations. Unknown/inactive clients → `400`.
 - `POST /auth/consent` `{ clientId, scopeNames, decision: APPROVE|DENY, redirectUri?, state? }` → `{ decision, redirectTo? }`. APPROVE records a `USER`-sourced consent (audited); DENY answers with an `error=access_denied` redirect **only** when `redirectUri` matches the client's registration — the browser never builds one from untrusted input.
+
+The standing grants those approvals create are reviewed and revoked from the account portal:
+
+- `GET /me/consents` → `{ items: [{ clientId, clientName, scopeNames, source: USER|FIRST_PARTY_POLICY|ADMIN, grantedAt }] }` — every client that still holds a grant, backing the "Connected apps" page.
+- `DELETE /me/consents/{clientId}` → `{ success }` — withdraws the grant (audited `oauth.consent.withdrawn`); the client must prompt for consent again the next time it needs those scopes.
 
 ### 4.9 Emails & phones (under `/me`, session cookie + CSRF) — _implemented (M4)_
 

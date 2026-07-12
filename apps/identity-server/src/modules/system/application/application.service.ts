@@ -23,7 +23,6 @@ type IApplication = Omit<InferInsertModel<typeof schema.applications>, 'id' | 'c
 
 export interface ApplicationDetails extends Application {
   roles: Application.Role[];
-  keys: Application.Key[];
 }
 
 export interface CreateApplication {
@@ -56,7 +55,7 @@ export class ApplicationService implements OnModuleInit {
   }
 
   async loadApplications(): Promise<void> {
-    const applications = await this.db.query.applications.findMany({ with: { roles: true, keys: true } });
+    const applications = await this.db.query.applications.findMany({ with: { roles: true } });
     const cache = new Map<string, ApplicationDetails>();
     for (const application of applications) cache.set(application.name, application);
     this.cache = cache;

@@ -104,7 +104,7 @@ Interactive API documentation is available at:
 GET /dev/api-docs
 ```
 
-This endpoint lists all REST routes, authentication methods, and response schemas.
+This endpoint lists all REST routes, authentication methods, and response schemas. The raw OpenAPI 3.1 document backing it is served at `GET /dev/api-docs/openapi.json` — first-party clients generate their types from it (e.g. `identity-web`'s `bun run generate:api-types`) instead of hand-writing request/response shapes.
 
 > Note: The service is in active development — endpoints are being implemented progressively.
 

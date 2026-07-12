@@ -46,7 +46,6 @@ erDiagram
   api_resources ||--o{ scopes : defines
   oauth_clients ||--o{ oauth_client_redirect_uris : allows
   oauth_clients ||--o{ oauth_client_secrets : authenticates
-  oauth_clients ||--o{ application_keys : "private_key_jwt"
   oauth_clients ||--o{ oauth_client_scope_grants : granted
   users ||--o{ consents : grants
   application_roles ||--o{ role_permissions : includes
@@ -162,7 +161,7 @@ PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN �
 | `application_id` FK restrict                 |                                                                                                                 |
 | `kind` enum                                  | `WEB_CONFIDENTIAL · SPA_PUBLIC · NATIVE_PUBLIC · SERVICE`                                                       |
 | `is_first_party` boolean                     | consent-bypass flag (D-4)                                                                                       |
-| `token_endpoint_auth_method` enum            | `client_secret_basic · private_key_jwt · none` (public clients: `none`)                                         |
+| `token_endpoint_auth_method` enum            | `client_secret_basic · none` (public clients: `none`)                                                          |
 | `grant_types` text[]                         | subset of `authorization_code · refresh_token · client_credentials`; `SERVICE` ⇒ exactly `[client_credentials]` |
 | `require_pkce` boolean                       | default true; MUST be true for `authorization_code`                                                             |
 | `access_token_ttl` / `refresh_token_ttl` int | seconds; defaults 600 / session-bound                                                                           |
@@ -181,10 +180,6 @@ PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN �
 ### `oauth_client_origins`
 
 Allowed CORS origins for public clients. PK `(client_id, origin)`.
-
-### `application_keys` — _repurposed with a defined role_
-
-Client-registered public keys for `private_key_jwt` authentication. `id` PK (`kid`), `client_id` FK cascade, `public_jwk` jsonb, `alg` enum (`EdDSA · ES256`), `expires_at`, `revoked_at`, timestamps.
 
 ### `api_resources`
 

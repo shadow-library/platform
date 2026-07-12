@@ -8,6 +8,7 @@ import { Module } from '@shadow-library/app';
  */
 import { DatabaseModule } from '@modules/infrastructure/datastore';
 
+import { ApplicationMemberService } from './application-member.service';
 import { ApplicationRoleService } from './application-role.service';
 import { ApplicationService } from './application.service';
 
@@ -21,7 +22,7 @@ import { ApplicationService } from './application.service';
 
 @Module({
   imports: [DatabaseModule],
-  providers: [ApplicationService, ApplicationRoleService],
-  exports: [ApplicationService, ApplicationRoleService],
+  providers: [ApplicationService, ApplicationRoleService, ApplicationMemberService],
+  exports: [ApplicationService, ApplicationRoleService, ApplicationMemberService],
 })
 export class ApplicationModule {}

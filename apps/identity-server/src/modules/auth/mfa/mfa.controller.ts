@@ -36,7 +36,11 @@ export class MfaController {
   async list(@Req() request: FastifyRequest): Promise<MfaEnrollmentsResponse> {
     const session = await this.sessionAuthService.authenticate(request);
     const enrollments = await this.mfaService.listEnrollments(session.userId);
-    return { enrollments: enrollments.map(enrollment => ({ ...enrollment, createdAt: enrollment.createdAt.toISOString(), lastUsedAt: enrollment.lastUsedAt?.toISOString() })) };
+    const recoveryCodesRemaining = await this.recoveryCodeService.countRemaining(session.userId);
+    return {
+      enrollments: enrollments.map(enrollment => ({ ...enrollment, createdAt: enrollment.createdAt.toISOString(), lastUsedAt: enrollment.lastUsedAt?.toISOString() })),
+      recoveryCodesRemaining,
+    };
   }
 
   /**

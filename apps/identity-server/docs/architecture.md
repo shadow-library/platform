@@ -198,7 +198,7 @@ Every internal service holds a service-account client. Flow:
 2. Identity validates the client, checks the requested scopes against the client's **granted scopes** for that resource, and issues an access token: `aud` = resource identifier, `sub` = client ID, TTL 60 minutes.
 3. The callee verifies the token locally (JWKS, `iss`, `aud`, `exp`, alg allowlist) via the SDK and enforces scopes; fine-grained decisions go to the PDP.
 
-Client authentication methods: `client_secret_basic` (default; secret stored argon2id-hashed, rotatable with dual-secret overlap) and `private_key_jwt` (RFC 7523) for higher-trust services using per-client public keys registered in `application_keys` — this is now the **defined purpose** of that table. Service-account tokens are cached by the SDK until 60 s before expiry (singleflight refresh).
+Client authentication uses `client_secret_basic` (secret stored argon2id-hashed, rotatable with dual-secret overlap); public clients use `none` (PKCE). `private_key_jwt` was removed as unimplemented — `client_secret` is the only confidential method (the `application_keys` table that would have held per-client public keys was dropped with it). Service-account tokens are cached by the SDK until 60 s before expiry (singleflight refresh).
 
 ### 8.5 MFA and step-up
 
@@ -229,7 +229,7 @@ Rules:
 - `signing_keys` table: `kid` (UUIDv7), `alg = EdDSA`, public JWK, private key ciphertext (AES-256-GCM), KEK version, state machine `PENDING → ACTIVE → RETIRING → RETIRED`.
 - Exactly one `ACTIVE` signing key; `PENDING` is published in JWKS before activation (pre-publication window ≥ 24 h so consumer caches warm); `RETIRING` keys remain published until every token they signed has expired, then become `RETIRED` (unpublished, retained for audit).
 - Rotation cadence: 90 days, executed by a worker job; manual emergency rotation MUST be a single admin action that generates, pre-publishes, activates, and retires in an accelerated but ordered sequence.
-- KEK: 32-byte key from `MASTER_ENCRYPTION_KEY` env secret initially, behind a `KeyProvider` interface (`encrypt`, `decrypt`, `kekVersion`) so KMS/HSM replaces it without data migration beyond re-wrapping.
+- KEK: 32-byte key from `SECURITY_MASTER_ENCRYPTION_KEY` env secret initially, behind a `KeyProvider` interface (`encrypt`, `decrypt`, `kekVersion`) so KMS/HSM replaces it without data migration beyond re-wrapping.
 - JWKS endpoint (`/.well-known/jwks.json`) serves public keys with `Cache-Control: max-age=300`; the SDK caches with automatic refresh on unknown `kid` (bounded retry).
 - All other secrets at rest (TOTP seeds, client secrets where reversible storage is not needed → hash instead) follow the same envelope pattern. No custom cryptographic constructions anywhere; primitives come from WebCrypto/`node:crypto` and `Bun.password`.
 - Password hashing: argon2id via `Bun.password` with **pinned** parameters (`memoryCost: 65536`, `timeCost: 3`), parameters recorded per credential row; verify-time rehash upgrades on parameter change.
@@ -324,7 +324,7 @@ Shipped in M7: team organisations with invitations, DNS-verified domains (`organ
 
 ## 15. Deployment and operations
 
-- **Config**: fail-closed — production boot MUST abort if `PRIMARY_DATABASE_URL`, `REDIS_URL`, or `MASTER_ENCRYPTION_KEY` are missing. Development-only defaults are gated on `Config.isDev()`. `.env.example` lists every variable.
+- **Config**: fail-closed — production boot MUST abort if `PRIMARY_DATABASE_URL`, `REDIS_URL`, or `SECURITY_MASTER_ENCRYPTION_KEY` are missing. Development-only defaults are gated on `Config.isDev()`. `.env.example` lists every variable.
 - **Migrations**: `drizzle-kit` from the corrected schema path; every schema change lands with its migration in the same PR; CI fails if `drizzle-kit generate` produces a diff. Migrations MUST be expand/contract (zero-downtime): additive first, backfill via worker, contract later.
 - **Health**: `/health` (liveness, exists) plus `/health/ready` (Postgres + Redis + active signing key present).
 - **Graceful shutdown**: drain HTTP, finish in-flight jobs, close DB/Redis (provided by `DatabaseModule` lifecycle, D-14).

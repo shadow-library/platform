@@ -34,7 +34,7 @@ export namespace OidcLogoutDelivery {
  */
 
 export const oauthClientKind = pgEnum('oauth_client_kind', ['WEB_CONFIDENTIAL', 'SPA_PUBLIC', 'NATIVE_PUBLIC', 'SERVICE']);
-export const tokenEndpointAuthMethod = pgEnum('token_endpoint_auth_method', ['client_secret_basic', 'private_key_jwt', 'none']);
+export const tokenEndpointAuthMethod = pgEnum('token_endpoint_auth_method', ['client_secret_basic', 'none']);
 
 export const oauthClients = pgTable('oauth_clients', {
   id: uuid('id').defaultRandom().primaryKey(),

@@ -39,3 +39,12 @@ export class MeResponse {
   @Field({ optional: true })
   elevatedUntil?: string;
 }
+
+@Schema()
+export class UpdateProfileBody {
+  @Field({ optional: true, minLength: 1, maxLength: 255 })
+  firstName?: string;
+
+  @Field({ optional: true, minLength: 1, maxLength: 255 })
+  lastName?: string;
+}

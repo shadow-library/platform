@@ -19,6 +19,7 @@ import { WebhookModule } from '@server/modules/infrastructure/webhook';
 import { ApplicationModule } from '@server/modules/system/application';
 
 import { AdminAccessService } from './admin-access.service';
+import { AdminApplicationController } from './admin-application.controller';
 import { AdminClientController } from './admin-client.controller';
 import { AdminResourceController } from './admin-resource.controller';
 import { AdminRoleController } from './admin-role.controller';
@@ -37,7 +38,7 @@ import { AdminWebhookController } from './admin-webhook.controller';
 
 @Module({
   imports: [DatabaseModule, SessionModule, AuthzModule, OrganisationModule, TokenModule, MfaModule, AuditModule, OAuthModule, SamlModule, ApplicationModule, WebhookModule],
-  controllers: [AdminUserController, AdminClientController, AdminResourceController, AdminRoleController, AdminSamlController, AdminWebhookController],
+  controllers: [AdminUserController, AdminApplicationController, AdminClientController, AdminResourceController, AdminRoleController, AdminSamlController, AdminWebhookController],
   providers: [AdminAccessService, AdminUserService],
   exports: [AdminAccessService, AdminUserService],
 })

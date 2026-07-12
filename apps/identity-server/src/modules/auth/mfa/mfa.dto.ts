@@ -55,6 +55,10 @@ export class MfaEnrollmentItem {
 export class MfaEnrollmentsResponse {
   @Field(() => [MfaEnrollmentItem])
   enrollments: MfaEnrollmentItem[];
+
+  /** Unused single-use recovery codes remaining in the current batch. */
+  @Field(() => Number)
+  recoveryCodesRemaining: number;
 }
 
 @Schema()

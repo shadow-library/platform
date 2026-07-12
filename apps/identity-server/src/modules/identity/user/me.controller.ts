@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Get, HttpController, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Patch, Req, RespondFor } from '@shadow-library/fastify';
 import { eq } from 'drizzle-orm';
 import { type FastifyRequest } from 'fastify';
 
@@ -11,8 +11,9 @@ import { type FastifyRequest } from 'fastify';
 import { SessionAuthService, SessionService } from '@server/modules/auth/session';
 import { DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
-import { MeResponse } from './me.dto';
+import { MeResponse, UpdateProfileBody } from './me.dto';
 import { UserEmailService } from './user-email.service';
+import { UserService } from './user.service';
 
 /**
  * Defining types
@@ -31,6 +32,7 @@ export class MeController {
     private readonly sessionAuthService: SessionAuthService,
     private readonly sessionService: SessionService,
     private readonly userEmailService: UserEmailService,
+    private readonly userService: UserService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -52,5 +54,14 @@ export class MeController {
       elevated: this.sessionService.isElevated(session),
       elevatedUntil: session.elevatedUntil ? new Date(session.elevatedUntil).toISOString() : undefined,
     };
+  }
+
+  /** Updates the signed-in user's own name; returns the refreshed identity summary. */
+  @Patch('/profile')
+  @RespondFor(200, MeResponse)
+  async updateProfile(@Body() body: UpdateProfileBody, @Req() request: FastifyRequest): Promise<MeResponse> {
+    const session = await this.sessionAuthService.authenticate(request);
+    await this.userService.updateProfile(session.userId, { firstName: body.firstName, lastName: body.lastName });
+    return this.me(request);
   }
 }

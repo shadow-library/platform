@@ -63,6 +63,12 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
       },
     },
   },
+  /**
+   * OpenAPI is generated from the class-schema DTOs and served (non-prod) at
+   * `/dev/api-docs/openapi.json`. `identity-web` consumes it via `bun run generate:api-types`,
+   * so the client's request/response types stay in lockstep with the controllers.
+   */
+  openapi: { normalizeSchemaIds: true },
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({

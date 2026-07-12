@@ -26,6 +26,8 @@ import { DatabaseService, ID, PrimaryDatabase, User, schema } from '@server/modu
 export interface CreateUser {
   username?: string;
   status?: User.Status;
+  /** Seeds the account so the first successful password login is refused until recovery replaces it (T-602). */
+  passwordResetRequired?: boolean;
   password: string;
 
   email: string;
@@ -118,7 +120,7 @@ export class UserService {
 
     const user = await this.db
       .transaction(async tx => {
-        const [user] = await tx.insert(schema.users).values({ username: data.username, status: data.status }).returning();
+        const [user] = await tx.insert(schema.users).values({ username: data.username, status: data.status, passwordResetRequired: data.passwordResetRequired }).returning();
         assert(user, 'User creation failed');
         this.logger.debug('user created', { userId: user.id });
         const userDetails: UserDetails = { ...user, emails: [], phones: [], profile: null, authIdentities: [] };
@@ -192,5 +194,15 @@ export class UserService {
       .catch(error => this.databaseService.translateError(error));
     if (result.length === 0) throw new ServerError(AppErrorCode.USR_001);
     this.logger.debug('user status updated', { identifier, status, count: result.length });
+  }
+
+  /** Updates the signed-in user's own profile fields; a no-op when nothing changed. */
+  async updateProfile(userId: bigint, data: { firstName?: string; lastName?: string }): Promise<void> {
+    const update: Partial<{ firstName: string; lastName: string }> = {};
+    if (data.firstName !== undefined) update.firstName = data.firstName;
+    if (data.lastName !== undefined) update.lastName = data.lastName;
+    if (Object.keys(update).length === 0) return;
+    await this.db.update(schema.userProfiles).set(update).where(eq(schema.userProfiles.userId, userId));
+    this.logger.debug('user profile updated', { userId });
   }
 }

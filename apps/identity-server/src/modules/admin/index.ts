@@ -1,4 +1,6 @@
 export * from './admin-access.service';
+export * from './admin-application.controller';
+export * from './admin-application.dto';
 export * from './admin-client.controller';
 export * from './admin-client.dto';
 export * from './admin-resource.controller';
