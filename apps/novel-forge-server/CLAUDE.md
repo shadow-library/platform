@@ -96,6 +96,6 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RB5 — Rebrand job & endpoints: three-phase `runRebrand` executor (flag-and-continue), rebrand controller/DTOs wired via `PipelineModule` (rebrand §6–7). Verify: executor + controller e2e tests.
 - [x] RB6 — Web UI (`novel-forge-web`): rebrand panel — config, start + progress, chapter status list, original/converted reader toggle, re-run, manuscript download (rebrand §8). Verify: web type-check/build green.
 - [x] RC1 — Recombine core: `chapters.mergedFrom` column, `SRC_002`/`SRC_003`, `title-parts` detection ladder, `RecombineService` (guards, transactional merge + renumber, dry-run), `POST /recombine` (recombine §2, §4). Verify: parser matrix + service/e2e tests green.
-- [ ] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks on ingest completion + rebrand phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
+- [x] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks on ingest completion + rebrand phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

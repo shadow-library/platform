@@ -22,6 +22,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { AcquireService } from '../source/acquire.service';
+import { RecombineService } from '../source/recombine.service';
 
 /**
  * Defining types
@@ -66,6 +67,7 @@ export class JobExecutor {
     private readonly databaseService: DatabaseService,
     private readonly acquireService: AcquireService,
     private readonly rebrandService: RebrandService,
+    private readonly recombineService: RecombineService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -168,6 +170,14 @@ export class JobExecutor {
     const { limit, delayMs } = (job.payload ?? {}) as IngestPayload;
     await this.jobService.progress(job.id, { done: 0, total: 1, current: 'scraping', phase: 'ingest' });
     const result = await this.acquireService.ingest(job.projectId, { limit, delayMs });
+
+    // A finished scrape triggers the recombine pass (recombine design §1) — merge translator-split
+    // parts before extraction ever sees them; its guards make it a safe no-op elsewhere.
+    if (result.complete) {
+      await this.jobService.progress(job.id, { done: result.ingested, total: result.ingested, current: 'merging parts', phase: 'recombining' });
+      await this.recombineService.autoRecombine(job.projectId);
+    }
+
     await this.jobService.progress(job.id, { done: result.ingested, total: result.ingested, current: 'done', phase: 'ingest' });
   }
 
@@ -190,6 +200,11 @@ export class JobExecutor {
         if (!project) throw new Error(`project ${projectId} not found`);
         if (result.ingested === 0 && !project.scrapeComplete) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
       }
+
+      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them
+      // (recombine design §1); the guards make this a safe no-op on resume.
+      await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
+      await this.recombineService.autoRecombine(projectId);
 
       // Phase 2: glossary seed (idempotent inside the service — resume never re-seeds or re-bills).
       await this.setRebrandStatus(projectId, 'glossary');

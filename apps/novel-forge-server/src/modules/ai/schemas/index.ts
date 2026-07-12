@@ -36,6 +36,7 @@ export * from './ending-contract.schema';
 export * from './premise.schema';
 export * from './bible-audit.schema';
 export * from './rebrand.schema';
+export * from './recombine.schema';
 export * from './chat-refine.schema';
 export * from './arc-plan.schema';
 export * from './validate';

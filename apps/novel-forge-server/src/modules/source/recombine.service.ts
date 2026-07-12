@@ -18,7 +18,11 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type PrimaryDatabase, type Project, schema } from '@server/database';
 
-import { type AmbiguousBoundary, type ChapterLike, type RecombinePlan, buildGroupingPlan } from './title-parts';
+import { type AmbiguousBoundary, type ChapterLike, type RecombinePlan, applyBoundaryMerges, buildGroupingPlan } from './title-parts';
+import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
+import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
+import { PROMPT_REGISTRY } from '../ai/prompts';
+import { type RecombineOutput } from '../ai/schemas';
 
 /**
  * Defining types
@@ -51,9 +55,18 @@ interface LoadedChapter extends ChapterLike {
  * Declaring the constants
  */
 
+const MAX_BOUNDARIES_PER_CALL = 50;
+const EXCERPT_CHARS = 300;
+
 function countWords(text: string | null): number {
   if (!text) return 0;
   return text.trim().split(/\s+/).filter(Boolean).length;
+}
+
+function chunk<T>(items: T[], size: number): T[][] {
+  const batches: T[][] = [];
+  for (let i = 0; i < items.length; i += size) batches.push(items.slice(i, i + size));
+  return batches;
 }
 
 /**
@@ -67,7 +80,11 @@ export class RecombineService {
   private readonly logger = Logger.getLogger(APP_NAME, RecombineService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly modelRouter: ModelRouterService,
+    private readonly workflowRunService: WorkflowRunService,
+  ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
 
@@ -107,12 +124,62 @@ export class RecombineService {
     return rows.map(row => ({ number: row.number, title: row.title, words: row.wordCount ?? countWords(row.content), row }));
   }
 
-  // RC2 extends this with the AI boundary-resolution call; deterministic grouping only for now.
   private async buildPlan(projectId: bigint, chapters: LoadedChapter[], useAi: boolean, project: Project.Row): Promise<RecombinePlan> {
-    void projectId;
-    void useAi;
-    void project;
-    return buildGroupingPlan(chapters);
+    const plan = buildGroupingPlan(chapters);
+    if (!useAi || plan.ambiguous.length === 0) return plan;
+
+    // An AI failure falls back to the deterministic plan — every unresolved boundary defaults to
+    // split, which is always the safe direction (recombine design §3).
+    try {
+      const mergeAfter = await this.resolveBoundaries(projectId, chapters, plan.ambiguous, project);
+      return applyBoundaryMerges(plan, mergeAfter);
+    } catch (err) {
+      this.logger.warn('AI boundary resolution failed — keeping the deterministic plan', { projectId: String(projectId), err });
+      return plan;
+    }
+  }
+
+  private async resolveBoundaries(projectId: bigint, chapters: LoadedChapter[], ambiguous: AmbiguousBoundary[], project: Project.Row): Promise<number[]> {
+    const prompt = PROMPT_REGISTRY['recombine'];
+    const mergeAfter: number[] = [];
+
+    for (const batch of chunk(ambiguous, MAX_BOUNDARIES_PER_CALL)) {
+      const boundaries = this.renderBoundaries(batch, chapters);
+      const valid = new Set(batch.map(b => b.afterNumber));
+
+      const { result } = await this.workflowRunService.runChain(projectId, 'recombine', 'boundaries', { boundaries: batch.length }, async runId => {
+        const ctx = { projectId, runId, node: 'resolveBoundaries', promptKey: prompt.key, promptVersion: prompt.version, role: 'skeleton' };
+        return (await this.modelRouter.structured(prompt, { boundaries }, ctx, project as ProjectConfig)) as RecombineOutput;
+      });
+
+      // Verdicts for boundaries the ladder already decided are ignored — the model only ever joins
+      // what deterministic parsing left separate, never the other way around.
+      for (const decision of result.decisions) {
+        if (decision.verdict === 'merge' && valid.has(decision.afterChapter)) mergeAfter.push(decision.afterChapter);
+      }
+    }
+
+    return mergeAfter;
+  }
+
+  private renderBoundaries(batch: AmbiguousBoundary[], chapters: LoadedChapter[]): string {
+    const indexByNumber = new Map(chapters.map((c, i) => [c.number, i]));
+    return batch
+      .map(boundary => {
+        const prevIndex = indexByNumber.get(boundary.afterNumber) ?? -1;
+        const prev = chapters[prevIndex];
+        const next = chapters[prevIndex + 1];
+        if (!prev || !next) return null;
+        const tail = (prev.row.content ?? '').slice(-EXCERPT_CHARS).trim();
+        const head = (next.row.content ?? '').slice(0, EXCERPT_CHARS).trim();
+        return [
+          `Boundary after chapter ${prev.number} (flag: ${boundary.reason})`,
+          `<- #${prev.number} "${prev.title ?? 'untitled'}" (${prev.words} words) ends: …${tail}`,
+          `-> #${next.number} "${next.title ?? 'untitled'}" (${next.words} words) starts: ${head}…`,
+        ].join('\n');
+      })
+      .filter(Boolean)
+      .join('\n\n');
   }
 
   /** Renumbering corrupts anything keyed by chapter number — refuse once derived data exists. */

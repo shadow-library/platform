@@ -57,8 +57,23 @@ describe.if(pgAvailable)('RecombineService', () => {
   beforeAll(async () => {
     const url = await createDatabaseFromTemplate(dbName);
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
-    service = new RecombineService({ getPostgresClient: () => db } as never);
+    service = buildService();
   });
+
+  // AI collaborators are stubbed: `decisions` scripts the boundary verdicts, `calls` records inputs.
+  function buildService(decisions: { afterChapter: number; verdict: string }[] | Error = [], calls: Record<string, unknown>[] = []): RecombineService {
+    const modelRouter = {
+      structured: async (_prompt: unknown, inputs: Record<string, unknown>) => {
+        calls.push(inputs);
+        if (decisions instanceof Error) throw decisions;
+        return { decisions };
+      },
+    } as never;
+    const workflowRunService = {
+      runChain: async (_p: bigint, _g: string, _t: string, _i: unknown, fn: (runId: string) => Promise<unknown>) => ({ runId: 'run-1', result: await fn('run-1') }),
+    } as never;
+    return new RecombineService({ getPostgresClient: () => db } as never, modelRouter, workflowRunService);
+  }
 
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
@@ -133,5 +148,55 @@ describe.if(pgAvailable)('RecombineService', () => {
   it('should log-and-skip guard violations in autoRecombine', async () => {
     const midScrape = await seedProject({ scrapeComplete: false });
     expect(await service.autoRecombine(midScrape)).toBeNull();
+  });
+
+  describe('AI boundary resolution', () => {
+    async function seedBareRepeat(): Promise<bigint> {
+      const [project] = await db
+        .insert(schema.projects)
+        .values({ name: `recombine-ai-${Date.now()}-${Math.random()}`, kind: 'source', scrapeComplete: true })
+        .returning();
+      if (!project) throw new Error('failed to seed project');
+      await db.insert(schema.chapters).values([
+        { projectId: project.id, number: 1, title: 'The Gate', content: 'The blade fell and', status: 'done' },
+        { projectId: project.id, number: 2, title: 'The Gate', content: 'the guard caught it.', status: 'done' },
+        { projectId: project.id, number: 3, title: 'The Road', content: 'Onward.', status: 'done' },
+      ]);
+      return project.id;
+    }
+
+    it('should merge a bare repeat when the model says merge and render prose excerpts', async () => {
+      const projectId = await seedBareRepeat();
+      const calls: Record<string, unknown>[] = [];
+      const aiService = buildService([{ afterChapter: 1, verdict: 'merge' }], calls);
+
+      const result = await aiService.recombine(projectId, { useAi: true });
+      expect(result).toMatchObject({ applied: true, before: 3, after: 2, ambiguous: [] });
+      expect(String(calls[0]?.['boundaries'])).toContain('flag: bare_repeat');
+      expect(String(calls[0]?.['boundaries'])).toContain('the guard caught it.');
+
+      const gate = await db.query.chapters.findFirst({ where: eq(schema.chapters.projectId, projectId) });
+      expect(gate?.content).toBe('The blade fell and\n\nthe guard caught it.');
+    });
+
+    it('should keep split verdicts and ignore decisions for undisputed boundaries', async () => {
+      const projectId = await seedBareRepeat();
+      const aiService = buildService([
+        { afterChapter: 1, verdict: 'split' },
+        { afterChapter: 2, verdict: 'merge' },
+      ]);
+
+      const result = await aiService.recombine(projectId, { useAi: true });
+      expect(result).toMatchObject({ applied: false, before: 3, after: 3 });
+      expect(result.ambiguous).toEqual([{ afterNumber: 1, reason: 'bare_repeat' }]);
+    });
+
+    it('should fall back to the deterministic plan when the model call fails', async () => {
+      const projectId = await seedBareRepeat();
+      const aiService = buildService(new Error('model unavailable'));
+
+      const result = await aiService.recombine(projectId, { useAi: true });
+      expect(result).toMatchObject({ applied: false, before: 3, after: 3 });
+    });
   });
 });

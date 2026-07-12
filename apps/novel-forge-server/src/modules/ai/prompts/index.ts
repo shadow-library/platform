@@ -32,6 +32,7 @@ import { premiseEnhancePrompt } from './premise-enhance.prompt';
 import { rebrandAuditPrompt } from './rebrand-audit.prompt';
 import { rebrandConvertPrompt } from './rebrand-convert.prompt';
 import { rebrandGlossaryPrompt } from './rebrand-glossary.prompt';
+import { recombinePrompt } from './recombine.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
 import { skeletonPrompt } from './skeleton.prompt';
@@ -76,6 +77,7 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,
   'rebrand-convert': rebrandConvertPrompt as PromptModule<unknown>,
   'rebrand-audit': rebrandAuditPrompt as PromptModule<unknown>,
+  recombine: recombinePrompt as PromptModule<unknown>,
 };
 
 export * from './types';

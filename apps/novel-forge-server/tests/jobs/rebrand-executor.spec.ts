@@ -100,6 +100,13 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
       },
     } as never;
 
+    const recombineService = {
+      autoRecombine: async () => {
+        events.push('recombine');
+        return null;
+      },
+    } as never;
+
     const workflowRunService = {
       runChapterRebrand: async ({ chapter }: { chapter: number }) => {
         events.push(chapter);
@@ -108,7 +115,16 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
       },
     } as never;
 
-    const executor = new JobExecutor(jobService, concurrency, workflowRunService, {} as never, { getPostgresClient: () => db } as never, acquireService, rebrandService);
+    const executor = new JobExecutor(
+      jobService,
+      concurrency,
+      workflowRunService,
+      {} as never,
+      { getPostgresClient: () => db } as never,
+      acquireService,
+      rebrandService,
+      recombineService,
+    );
     return { executor, jobService, events };
   }
 
@@ -124,7 +140,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
 
     const jobId = await runRebrandJob(harness, projectId);
 
-    expect(harness.events).toEqual(['ingest', 'seed', 1, 2, 3]);
+    expect(harness.events).toEqual(['ingest', 'recombine', 'seed', 1, 2, 3]);
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('done');
     const rebrand = await db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) });
@@ -141,7 +157,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
 
     await runRebrandJob(harness, projectId);
 
-    expect(harness.events).toEqual(['seed', 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 2, 3]);
   });
 
   it('should flag a failed chapter run and keep converting the rest', async () => {
@@ -150,7 +166,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
 
     const jobId = await runRebrandJob(harness, projectId);
 
-    expect(harness.events).toEqual(['seed', 1, 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 1, 2, 3]);
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('done');
 
@@ -177,12 +193,26 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
     const explicit = buildExecutor();
     await runRebrandJob(explicit, projectId, { chapters: [3, 1] });
     // Chapter 1 is converted already, so only 3 runs; the requested list is sorted ascending first.
-    expect(explicit.events).toEqual(['seed', 3]);
+    expect(explicit.events).toEqual(['recombine', 'seed', 3]);
 
     const forced = buildExecutor();
     const forcedJobId = await forced.jobService.enqueue(projectId, 'rebrand', `rebrand-${projectId}-forced`, { force: true, limit: 2 });
     await forced.executor.dispatch(forcedJobId);
-    expect(forced.events).toEqual(['seed', 1, 2]);
+    expect(forced.events).toEqual(['recombine', 'seed', 1, 2]);
+  });
+
+  it('should recombine after a completed ingest job and skip mid-scrape', async () => {
+    const completed = await seedProject(false);
+    const harness = buildExecutor();
+    const jobId = await harness.jobService.enqueue(completed, 'ingest', `ingest-${completed}`, {});
+    await harness.executor.dispatch(jobId);
+    expect(harness.events).toEqual(['ingest', 'recombine']);
+
+    const midScrape = await seedProject(false);
+    const stalled = buildExecutor({ stallAcquire: true });
+    const stalledJobId = await stalled.jobService.enqueue(midScrape, 'ingest', `ingest-${midScrape}`, {});
+    await stalled.executor.dispatch(stalledJobId);
+    expect(stalled.events).toEqual(['ingest']);
   });
 
   it('should fail the job and mark the rebrand failed when acquisition stalls', async () => {

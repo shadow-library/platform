@@ -220,6 +220,20 @@ describe('Prompt modules', () => {
       expect(parseSchema(RebrandConvertSchema, withExtras).success).toBe(true);
     });
 
+    it('registers the recombine prompt and validates its decision shape', async () => {
+      const prompt = PROMPT_REGISTRY['recombine'];
+      expect(prompt.version).toBe('1.0.0');
+      // Boundary resolution rides the skeleton role — same source-structure-analysis family.
+      expect(prompt.role).toBe('skeleton');
+
+      const messages = await prompt.template.formatMessages({ boundaries: 'Boundary after chapter 12 (flag: bare_repeat)' });
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toContain('flag: bare_repeat');
+
+      expect(parseSchema(prompt.schema, { decisions: [{ afterChapter: 12, verdict: 'merge' }] }).success).toBe(true);
+      expect(parseSchema(prompt.schema, { decisions: [{ afterChapter: 12, verdict: 'maybe' }] }).success).toBe(false);
+    });
+
     it('rebrand-audit postValidate forces verdict/issues agreement', () => {
       const audit = PROMPT_REGISTRY['rebrand-audit'];
       expect(audit.postValidate?.({ verdict: 'clean', issues: [] })).toEqual([]);

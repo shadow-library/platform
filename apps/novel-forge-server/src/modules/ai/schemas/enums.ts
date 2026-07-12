@@ -31,3 +31,4 @@ export const AuditAction = EnumType.create('AuditAction', ['add', 'revise', 'rem
 export const RebrandFixKind = EnumType.create('RebrandFixKind', ['name', 'attribution', 'grammar']);
 export const RebrandAuditVerdict = EnumType.create('RebrandAuditVerdict', ['clean', 'issues']);
 export const RebrandAuditIssueType = EnumType.create('RebrandAuditIssueType', ['nationalism', 'discrimination', 'naming', 'real_world_reference']);
+export const RecombineVerdict = EnumType.create('RecombineVerdict', ['merge', 'split']);

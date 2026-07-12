@@ -46,7 +46,8 @@ export type PromptKey =
   | 'chapter-extract'
   | 'rebrand-glossary'
   | 'rebrand-convert'
-  | 'rebrand-audit';
+  | 'rebrand-audit'
+  | 'recombine';
 
 export interface PromptModule<TOut> {
   key: PromptKey;
