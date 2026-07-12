@@ -35,6 +35,7 @@ interface Harness {
 interface HarnessOptions {
   failChapters?: number[];
   stallAcquire?: boolean;
+  acquireBatches?: { ingested: number; complete: boolean }[];
 }
 
 /**
@@ -88,8 +89,9 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
       ingest: async (projectId: bigint) => {
         events.push('ingest');
         if (options.stallAcquire) return { ingested: 0, complete: false };
-        await db.update(schema.projects).set({ scrapeComplete: true }).where(eq(schema.projects.id, projectId));
-        return { ingested: 1, complete: true };
+        const batch = options.acquireBatches?.shift() ?? { ingested: 1, complete: true };
+        if (batch.complete) await db.update(schema.projects).set({ scrapeComplete: true }).where(eq(schema.projects.id, projectId));
+        return batch;
       },
     } as never;
 
@@ -221,6 +223,34 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
     const stalledJobId = await stalled.jobService.enqueue(midScrape, 'ingest', `ingest-${midScrape}`, {});
     await stalled.executor.dispatch(stalledJobId);
     expect(stalled.events).toEqual(['ingest']);
+  });
+
+  it('should loop ingest batches to completion when no limit is given', async () => {
+    const projectId = await seedProject(false);
+    const harness = buildExecutor({
+      acquireBatches: [
+        { ingested: 10, complete: false },
+        { ingested: 10, complete: false },
+        { ingested: 3, complete: true },
+      ],
+    });
+    const jobId = await harness.jobService.enqueue(projectId, 'ingest', `ingest-${projectId}`, {});
+    await harness.executor.dispatch(jobId);
+
+    expect(harness.events).toEqual(['ingest', 'ingest', 'ingest', 'retitle', 'recombine']);
+    const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(job?.status).toBe('done');
+  });
+
+  it('should keep an explicit ingest limit to a single batch', async () => {
+    const projectId = await seedProject(false);
+    const harness = buildExecutor({ acquireBatches: [{ ingested: 5, complete: false }] });
+    const jobId = await harness.jobService.enqueue(projectId, 'ingest', `ingest-${projectId}`, { limit: 5 });
+    await harness.executor.dispatch(jobId);
+
+    expect(harness.events).toEqual(['ingest']);
+    const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(job?.status).toBe('done');
   });
 
   it('should fail the job and mark the rebrand failed when acquisition stalls', async () => {

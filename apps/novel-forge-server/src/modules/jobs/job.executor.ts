@@ -55,6 +55,10 @@ interface RebrandPayload {
  * Declaring the constants
  */
 
+// Pages per acquire batch when scraping to completion — small enough that job progress (and a crash
+// cursor) advances every few seconds, polite enough for the source site.
+const INGEST_BATCH = 10;
+
 @Injectable()
 export class JobExecutor {
   private readonly logger = Logger.getLogger(APP_NAME, JobExecutor.name);
@@ -168,21 +172,36 @@ export class JobExecutor {
     await this.jobService.progress(job.id, { done: 1, total: 1, current: 'all', phase: 'embedding' });
   }
 
+  // An explicit `limit` keeps the old single-batch behavior; without one the job scrapes to
+  // completion in polite batches, publishing the running chapter count after each so the UI can
+  // follow live. `done` is the total chapters scraped so far (the cursor), not this job's count.
   private async runIngest(job: Job.Row): Promise<void> {
     const { limit, delayMs } = (job.payload ?? {}) as IngestPayload;
-    await this.jobService.progress(job.id, { done: 0, total: 1, current: 'scraping', phase: 'ingest' });
-    const result = await this.acquireService.ingest(job.projectId, { limit, delayMs });
+    await this.jobService.progress(job.id, { done: 0, total: 0, current: 'scraping', phase: 'ingest' });
+
+    let complete = false;
+    let scraped = 0;
+    do {
+      const result = await this.acquireService.ingest(job.projectId, { limit: limit ?? INGEST_BATCH, delayMs });
+      complete = result.complete;
+
+      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, job.projectId), columns: { scrapeNextNumber: true } });
+      scraped = Math.max((project?.scrapeNextNumber ?? 1) - 1, 0);
+      await this.jobService.progress(job.id, { done: scraped, total: 0, current: `chapter ${scraped}`, phase: 'ingest' });
+
+      if (!complete && result.ingested === 0) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
+    } while (!complete && limit === undefined);
 
     // A finished scrape triggers the hygiene passes (recombine design §1, §5): reference titles
     // first — webnovel's part markers feed the recombine ladder — then part merging. Both are safe
     // no-ops when unconfigured or guarded.
-    if (result.complete) {
-      await this.jobService.progress(job.id, { done: result.ingested, total: result.ingested, current: 'merging parts', phase: 'recombining' });
+    if (complete) {
+      await this.jobService.progress(job.id, { done: scraped, total: scraped, current: 'merging parts', phase: 'recombining' });
       await this.webnovelCatalog.autoSync(job.projectId);
       await this.recombineService.autoRecombine(job.projectId);
     }
 
-    await this.jobService.progress(job.id, { done: result.ingested, total: result.ingested, current: 'done', phase: 'ingest' });
+    await this.jobService.progress(job.id, { done: scraped, total: scraped, current: 'done', phase: 'ingest' });
   }
 
   // ─── Rebrand (rebrand design §6) ──────────────────────────────────────────────
