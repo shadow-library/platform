@@ -19,6 +19,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
+import { ChapterImageService } from './chapter-image.service';
 import {
   type FeedbackBody,
   type FinalizeBody,
@@ -142,6 +143,7 @@ export class GenerationService {
     private readonly jobService: JobService,
     private readonly jobExecutor: JobExecutor,
     private readonly proposalService: ProposalService,
+    private readonly chapterImages: ChapterImageService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -694,6 +696,10 @@ export class GenerationService {
           .where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, row.chapter)));
       }
     });
+
+    // Scene images live outside the draft transaction (they touch disk); purge the deleted chapter's
+    // images and shift later chapters' images down to match the renumber above.
+    await this.chapterImages.onChapterDeleted(projectId, chapter);
   }
 
   async importDraft(projectId: bigint, chapter: number, body: ImportDraftBody): Promise<Generation.Draft> {

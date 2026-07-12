@@ -53,7 +53,7 @@ describe.if(pgAvailable)('GenerationService.approveDraft', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     // approveDraft only touches the db client; the other injected services are unused for this path.
     const noop = {} as never;
-    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService({ getPostgresClient: () => db } as never, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
   });
 
   async function seedDraft(chapter: number): Promise<bigint> {

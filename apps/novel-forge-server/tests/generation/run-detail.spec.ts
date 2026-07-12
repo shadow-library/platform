@@ -53,7 +53,7 @@ describe.if(pgAvailable)('run detail observability', () => {
     const databaseService = { getPostgresClient: () => db } as never;
     const noop = {} as never;
     // getRun/getRunCall/getRunContext are pure DB reads — every AI collaborator can be a stub.
-    service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
+    service = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop, noop);
 
     const [project] = await db
       .insert(schema.projects)

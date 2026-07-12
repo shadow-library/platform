@@ -20,6 +20,7 @@ import { contentGenerator, projects } from './projects';
 
 export namespace Generation {
   export type Draft = InferSelectModel<typeof drafts>;
+  export type ChapterImage = InferSelectModel<typeof chapterImages>;
   export type Brief = InferSelectModel<typeof briefs>;
   export type ContinuityProposal = InferSelectModel<typeof continuityProposals>;
   export type DraftStatus = InferEnum<typeof draftStatus>;
@@ -61,6 +62,24 @@ export const drafts = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   t => [unique('drafts_project_id_chapter_unique').on(t.projectId, t.chapter)],
+);
+
+// Scene illustrations attached to an authored chapter, keyed by chapter number so they survive draft
+// re-generation; the drafter cleans them up explicitly when a chapter is deleted or renumbered.
+export const chapterImages = pgTable(
+  'chapter_images',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    chapter: integer('chapter').notNull(),
+    imagePath: varchar('image_path').notNull(),
+    caption: varchar('caption'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [index('chapter_images_project_id_chapter_idx').on(t.projectId, t.chapter)],
 );
 
 export const briefs = pgTable(
@@ -106,6 +125,10 @@ export const continuityProposals = pgTable(
 
 export const draftsRelations = relations(drafts, ({ one }) => ({
   project: one(projects, { fields: [drafts.projectId], references: [projects.id] }),
+}));
+
+export const chapterImagesRelations = relations(chapterImages, ({ one }) => ({
+  project: one(projects, { fields: [chapterImages.projectId], references: [projects.id] }),
 }));
 
 export const briefsRelations = relations(briefs, ({ one }) => ({

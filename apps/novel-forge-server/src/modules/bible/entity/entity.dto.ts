@@ -41,6 +41,20 @@ export class EntityKeyParams {
 }
 
 @Schema()
+export class EntityImageParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  @Field()
+  entityKey: string;
+
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  imageId: bigint;
+}
+
+@Schema()
 export class CreateEntityBody {
   @Field()
   entityKey: string;
@@ -71,6 +85,21 @@ export class CreateEntityBody {
 
   @Field(() => [String], { optional: true })
   aliases?: string[];
+}
+
+@Schema()
+export class EntityImageResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field()
+  imagePath: string;
+
+  @Field({ optional: true, nullable: true })
+  caption?: string | null;
+
+  @Field(() => Integer)
+  sortOrder: number;
 }
 
 @Schema()
@@ -114,6 +143,10 @@ export class EntityResponse {
   @Field({ optional: true, nullable: true })
   imagePath?: string | null;
 
+  // The entity's gallery of additional reference images, populated on the single-entity `get` route.
+  @Field(() => [EntityImageResponse], { optional: true })
+  images?: EntityImageResponse[];
+
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;
 
@@ -129,6 +162,12 @@ export class UploadImageBody {
   // Base64-encoded image bytes, without the `data:` URL prefix.
   @Field()
   image: string;
+}
+
+@Schema()
+export class AddEntityImageBody extends UploadImageBody {
+  @Field({ optional: true })
+  caption?: string;
 }
 
 @Schema({ minProperties: 1 })

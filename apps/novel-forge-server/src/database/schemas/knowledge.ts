@@ -20,6 +20,7 @@ import { projects } from './projects';
 
 export namespace Knowledge {
   export type Entity = InferSelectModel<typeof entities>;
+  export type EntityImage = InferSelectModel<typeof entityImages>;
   export type EntityAlias = InferSelectModel<typeof entityAliases>;
   export type EntityRelationship = InferSelectModel<typeof entityRelationships>;
   export type EntityAppearance = InferSelectModel<typeof entityAppearances>;
@@ -60,6 +61,25 @@ export const entities = pgTable(
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },
   t => [unique('entities_project_id_entity_key_unique').on(t.projectId, t.entityKey), index('entities_project_id_type_idx').on(t.projectId, t.type)],
+);
+
+// Additional reference images for an entity — a gallery that complements the single `imagePath` portrait.
+export const entityImages = pgTable(
+  'entity_images',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    entityId: bigint('entity_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    imagePath: varchar('image_path').notNull(),
+    caption: varchar('caption'),
+    sortOrder: integer('sort_order').notNull().default(0),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [index('entity_images_entity_id_idx').on(t.entityId)],
 );
 
 export const entityAliases = pgTable(
@@ -121,10 +141,15 @@ export const relationshipObservations = pgTable(
 
 export const entitiesRelations = relations(entities, ({ one, many }) => ({
   project: one(projects, { fields: [entities.projectId], references: [projects.id] }),
+  images: many(entityImages),
   aliases: many(entityAliases),
   relationships: many(entityRelationships),
   appearances: many(entityAppearances),
   observations: many(relationshipObservations),
+}));
+
+export const entityImagesRelations = relations(entityImages, ({ one }) => ({
+  entity: one(entities, { fields: [entityImages.entityId], references: [entities.id] }),
 }));
 
 export const entityAliasesRelations = relations(entityAliases, ({ one }) => ({

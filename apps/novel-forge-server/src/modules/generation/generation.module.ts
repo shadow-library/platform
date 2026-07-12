@@ -11,11 +11,14 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { ChapterImageController } from './chapter-image.controller';
+import { ChapterImageService } from './chapter-image.service';
 import { GenerationController } from './generation.controller';
 import { GenerationService } from './generation.service';
 import { AiModule } from '../ai/ai.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { RefinementModule } from '../refinement/refinement.module';
+import { StorageModule } from '../storage/storage.module';
 
 /**
  * Defining types
@@ -26,9 +29,9 @@ import { RefinementModule } from '../refinement/refinement.module';
  */
 
 @Module({
-  imports: [DatabaseModule, AiModule, JobsModule, RefinementModule],
-  controllers: [GenerationController],
-  providers: [GenerationService],
+  imports: [DatabaseModule, AiModule, JobsModule, RefinementModule, StorageModule],
+  controllers: [GenerationController, ChapterImageController],
+  providers: [GenerationService, ChapterImageService],
   exports: [GenerationService],
 })
 export class GenerationModule {}

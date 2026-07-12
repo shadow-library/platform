@@ -68,7 +68,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
     const noop = {} as never;
     const jobService = { enqueue: async () => 'job-1' } as never;
     const jobExecutor = { dispatch: async () => undefined } as never;
-    generationService = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, jobExecutor, noop);
+    generationService = new GenerationService(databaseService, noop, noop, noop, noop, noop, noop, noop, jobService, jobExecutor, noop, noop);
   });
 
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
@@ -163,6 +163,7 @@ describe.if(pgAvailable)('arc module & gates', () => {
       {} as never,
       { structured } as never,
       { catalog: async () => 'CATALOG' } as never,
+      {} as never,
       {} as never,
       {} as never,
       {} as never,

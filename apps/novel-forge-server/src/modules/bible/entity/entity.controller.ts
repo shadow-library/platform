@@ -12,7 +12,18 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Que
  */
 import { AppErrorCode } from '@server/classes';
 
-import { CreateEntityBody, EntityKeyParams, EntityProjectParams, EntityResponse, ListEntitiesQuery, ListEntityResponse, UpdateEntityBody, UploadImageBody } from './entity.dto';
+import {
+  AddEntityImageBody,
+  CreateEntityBody,
+  EntityImageParams,
+  EntityKeyParams,
+  EntityProjectParams,
+  EntityResponse,
+  ListEntitiesQuery,
+  ListEntityResponse,
+  UpdateEntityBody,
+  UploadImageBody,
+} from './entity.dto';
 import { EntityService } from './entity.service';
 
 /**
@@ -69,5 +80,18 @@ export class EntityController {
   @RespondFor(200, EntityResponse)
   deleteImage(@Params() params: EntityKeyParams): Promise<EntityResponse> {
     return this.entityService.clearImage(params.projectId, params.entityKey) as unknown as Promise<EntityResponse>;
+  }
+
+  @Post('/:entityKey/images')
+  @RespondFor(201, EntityResponse)
+  @HttpStatus(201)
+  addImage(@Params() params: EntityKeyParams, @Body() body: AddEntityImageBody): Promise<EntityResponse> {
+    return this.entityService.addImage(params.projectId, params.entityKey, body.image, body.mime, body.caption) as unknown as Promise<EntityResponse>;
+  }
+
+  @Delete('/:entityKey/images/:imageId')
+  @RespondFor(200, EntityResponse)
+  removeImage(@Params() params: EntityImageParams): Promise<EntityResponse> {
+    return this.entityService.deleteImageById(params.projectId, params.entityKey, params.imageId) as unknown as Promise<EntityResponse>;
   }
 }

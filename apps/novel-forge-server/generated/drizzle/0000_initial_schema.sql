@@ -115,6 +115,16 @@ CREATE TABLE "entity_appearances" (
 	CONSTRAINT "entity_appearances_entity_id_chapter_pk" PRIMARY KEY("entity_id","chapter")
 );
 --> statement-breakpoint
+CREATE TABLE "entity_images" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"entity_id" bigint NOT NULL,
+	"project_id" bigint NOT NULL,
+	"image_path" varchar NOT NULL,
+	"caption" varchar,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
+);
+--> statement-breakpoint
 CREATE TABLE "entity_relationships" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"project_id" bigint NOT NULL,
@@ -294,6 +304,16 @@ CREATE TABLE "briefs" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "briefs_project_id_chapter_unique" UNIQUE("project_id","chapter")
+);
+--> statement-breakpoint
+CREATE TABLE "chapter_images" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"chapter" integer NOT NULL,
+	"image_path" varchar NOT NULL,
+	"caption" varchar,
+	"sort_order" integer DEFAULT 0 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "continuity_proposals" (
@@ -559,6 +579,8 @@ ALTER TABLE "chapters" ADD CONSTRAINT "chapters_project_id_projects_id_fk" FOREI
 ALTER TABLE "entities" ADD CONSTRAINT "entities_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_aliases" ADD CONSTRAINT "entity_aliases_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_appearances" ADD CONSTRAINT "entity_appearances_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "entity_images" ADD CONSTRAINT "entity_images_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "entity_images" ADD CONSTRAINT "entity_images_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_relationships" ADD CONSTRAINT "entity_relationships_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "relationship_observations" ADD CONSTRAINT "relationship_observations_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "arcs" ADD CONSTRAINT "arcs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -571,6 +593,7 @@ ALTER TABLE "timeline_events" ADD CONSTRAINT "timeline_events_project_id_project
 ALTER TABLE "world_facts" ADD CONSTRAINT "world_facts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "bible_documents" ADD CONSTRAINT "bible_documents_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "briefs" ADD CONSTRAINT "briefs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chapter_images" ADD CONSTRAINT "chapter_images_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "continuity_proposals" ADD CONSTRAINT "continuity_proposals_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "drafts" ADD CONSTRAINT "drafts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_session_id_chat_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."chat_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -591,11 +614,13 @@ ALTER TABLE "user_feedback" ADD CONSTRAINT "user_feedback_project_id_projects_id
 ALTER TABLE "workflow_runs" ADD CONSTRAINT "workflow_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "chapters_project_id_status_idx" ON "chapters" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "entities_project_id_type_idx" ON "entities" USING btree ("project_id","type");--> statement-breakpoint
+CREATE INDEX "entity_images_entity_id_idx" ON "entity_images" USING btree ("entity_id");--> statement-breakpoint
 CREATE INDEX "arcs_project_id_volume_key_ordinal_idx" ON "arcs" USING btree ("project_id","volume_key","ordinal");--> statement-breakpoint
 CREATE INDEX "volumes_project_id_ordinal_idx" ON "volumes" USING btree ("project_id","ordinal");--> statement-breakpoint
 CREATE INDEX "beats_project_id_chapter_idx" ON "beats" USING btree ("project_id","chapter");--> statement-breakpoint
 CREATE INDEX "world_facts_project_id_category_idx" ON "world_facts" USING btree ("project_id","category");--> statement-breakpoint
 CREATE INDEX "briefs_project_id_arc_key_idx" ON "briefs" USING btree ("project_id","arc_key");--> statement-breakpoint
+CREATE INDEX "chapter_images_project_id_chapter_idx" ON "chapter_images" USING btree ("project_id","chapter");--> statement-breakpoint
 CREATE INDEX "chat_sessions_project_id_status_idx" ON "chat_sessions" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "chat_sessions_project_id_scope_idx" ON "chat_sessions" USING btree ("project_id","scope_type","scope_ref");--> statement-breakpoint
 CREATE INDEX "refinement_proposals_project_id_status_idx" ON "refinement_proposals" USING btree ("project_id","status");--> statement-breakpoint

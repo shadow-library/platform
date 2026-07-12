@@ -56,6 +56,7 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly DRF_003 = new AppErrorCode('DRF_003', ErrorType.CLIENT_ERROR, 'Unresolved contradiction — resolve or use autoFix before generating next chapter');
   static readonly DRF_004 = new AppErrorCode('DRF_004', ErrorType.CLIENT_ERROR, 'Draft is not approved — approve draft before finalizing');
   static readonly DRF_005 = new AppErrorCode('DRF_005', ErrorType.CLIENT_ERROR, 'Chapter adds no new canon to the bible');
+  static readonly DRF_006 = new AppErrorCode('DRF_006', ErrorType.NOT_FOUND, 'Chapter scene image not found');
 
   /*!
    * Finalize Errors
@@ -88,6 +89,7 @@ export class AppErrorCode extends ServerErrorCode {
    * Entity Errors
    */
   static readonly ENT_001 = new AppErrorCode('ENT_001', ErrorType.NOT_FOUND, 'Entity not found');
+  static readonly ENT_002 = new AppErrorCode('ENT_002', ErrorType.NOT_FOUND, 'Entity image not found');
 
   /*!
    * Volume Errors

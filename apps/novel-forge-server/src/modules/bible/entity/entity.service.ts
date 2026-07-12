@@ -5,6 +5,8 @@
 /**
  * Importing npm packages
  */
+import { randomUUID } from 'node:crypto';
+
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
@@ -24,6 +26,10 @@ import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-st
 /**
  * Defining types
  */
+
+export type EntityWithImages = Knowledge.Entity & { images: Knowledge.EntityImage[] };
+
+type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
 
 /**
  * Declaring the constants
@@ -98,8 +104,13 @@ export class EntityService {
     return utils.pagination.createResult(query, items, total);
   }
 
-  get(projectId: bigint, entityKey: string): Promise<Knowledge.Entity | null> {
-    return this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)) }).then(r => r ?? null);
+  get(projectId: bigint, entityKey: string): Promise<EntityWithImages | null> {
+    return this.db.query.entities
+      .findFirst({
+        where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)),
+        with: { images: { orderBy: (img, { asc: ascOrder }) => [ascOrder(img.sortOrder), ascOrder(img.id)] } },
+      })
+      .then(r => r ?? null);
   }
 
   async update(projectId: bigint, entityKey: string, update: UpdateEntityBody): Promise<Knowledge.Entity> {
@@ -145,6 +156,39 @@ export class EntityService {
 
     if (!updated) throw new ServerError(AppErrorCode.ENT_001);
     return updated;
+  }
+
+  async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string): Promise<EntityWithImages> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+
+    // Gallery files get a random suffix so multiple images per entity never collide on the storage key.
+    const key = `${entityKey}_g_${randomUUID().slice(0, 8)}`;
+    const ref = await this.imageStorage.save(projectId, key, new Uint8Array(Buffer.from(image, 'base64')), mime);
+    const nextOrder = entity.images.reduce((max, img) => Math.max(max, img.sortOrder + 1), 0);
+
+    await this.db.insert(schema.entityImages).values({ entityId: entity.id, projectId, imagePath: ref, caption: caption ?? null, sortOrder: nextOrder });
+
+    return this.getOrThrow(projectId, entityKey);
+  }
+
+  async deleteImageById(projectId: bigint, entityKey: string, imageId: bigint): Promise<EntityWithImages> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+
+    const image = entity.images.find(img => img.id === imageId);
+    if (!image) throw new ServerError(AppErrorCode.ENT_002);
+
+    await this.imageStorage.delete(image.imagePath);
+    await this.db.delete(schema.entityImages).where(and(eq(schema.entityImages.id, imageId), eq(schema.entityImages.projectId, projectId)));
+
+    return this.getOrThrow(projectId, entityKey);
+  }
+
+  private async getOrThrow(projectId: bigint, entityKey: string): Promise<EntityWithImages> {
+    const entity = await this.get(projectId, entityKey);
+    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    return entity;
   }
 
   async delete(projectId: bigint, entityKey: string): Promise<void> {
