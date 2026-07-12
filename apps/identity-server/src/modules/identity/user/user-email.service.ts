@@ -40,6 +40,7 @@ export class UserEmailService {
     const emails = await this.db.query.userEmails.findMany({ where: (email, { eq }) => eq(email.userId, userId) });
     const verified = emails.filter(email => email.verifiedAt !== null);
     const primary = verified.find(email => email.isPrimary) ?? verified[0];
+    if (!primary) this.logger.debug('no verified email resolved for user', { userId, totalEmails: emails.length });
     return primary?.emailId ?? null;
   }
 }

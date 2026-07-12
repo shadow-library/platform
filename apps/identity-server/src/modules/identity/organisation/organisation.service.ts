@@ -63,8 +63,12 @@ export class OrganisationService {
   async createPersonalWorkspace(userId: bigint, name: string, executor: OrgWriter = this.db): Promise<Organisation> {
     const slug = this.generateSlug(name);
     const [organisation] = await executor.insert(schema.organisations).values({ name, slug, type: 'PERSONAL', status: 'ACTIVE' }).returning();
-    if (!organisation) throw new Error('Failed to create personal workspace');
+    if (!organisation) {
+      this.logger.error('failed to create personal workspace', { userId });
+      throw new Error('Failed to create personal workspace');
+    }
     await executor.insert(schema.organisationMembers).values({ organisationId: organisation.id, userId, role: 'OWNER', isDefault: true });
+    this.logger.debug('created personal workspace', { organisationId: organisation.id, userId });
     return organisation;
   }
 
@@ -80,7 +84,7 @@ export class OrganisationService {
         .returning();
       if (!organisation) throw new ServerError(AppErrorCode.ORG_006);
       await tx.insert(schema.organisationMembers).values({ organisationId: organisation.id, userId, role: 'OWNER' });
-      this.logger.info('Created team organisation', { organisationId: organisation.id, userId });
+      this.logger.info('created team organisation', { organisationId: organisation.id, userId });
       return organisation;
     });
   }
@@ -98,7 +102,7 @@ export class OrganisationService {
       .values({ name, slug: this.generateSlug(name), type: 'TEAM', status: 'ACTIVE' })
       .returning();
     if (!organisation) throw new Error(`Failed to create organisation '${name}'`);
-    this.logger.info('Created team organisation', { organisationId: organisation.id, name });
+    this.logger.info('created team organisation', { organisationId: organisation.id, name });
     return organisation;
   }
 
@@ -136,17 +140,22 @@ export class OrganisationService {
     const organisation = await this.getById(organisationId);
     if (!organisation || organisation.status === 'DELETED') throw new ServerError(AppErrorCode.ORG_001);
     if (organisation.type === 'PERSONAL') throw new ServerError(AppErrorCode.ORG_003);
-    if (ROLE_RANK[membership.role] < ROLE_RANK[minimumRole]) throw new ServerError(AppErrorCode.ORG_007);
+    if (ROLE_RANK[membership.role] < ROLE_RANK[minimumRole]) {
+      this.logger.debug('organisation role requirement not met', { userId, organisationId, role: membership.role, minimumRole });
+      throw new ServerError(AppErrorCode.ORG_007);
+    }
     return { membership, organisation };
   }
 
   async rename(organisationId: bigint, name: string): Promise<void> {
     await this.db.update(schema.organisations).set({ name, updatedAt: new Date() }).where(eq(schema.organisations.id, organisationId));
+    this.logger.info('renamed organisation', { organisationId, name });
   }
 
   /** Soft-deletes the organisation; role-assignment revocation and auditing ride on the caller. */
   async softDelete(organisationId: bigint): Promise<void> {
     await this.db.update(schema.organisations).set({ status: 'DELETED', deletedAt: new Date(), updatedAt: new Date() }).where(eq(schema.organisations.id, organisationId));
+    this.logger.info('soft-deleted organisation', { organisationId });
   }
 
   /** Changes a member's org role; refuses to demote the last remaining owner. */
@@ -160,6 +169,7 @@ export class OrganisationService {
       .where(and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.userId, userId)))
       .returning();
     if (!updated) throw new ServerError(AppErrorCode.USR_001);
+    this.logger.info('updated member role', { organisationId, userId, role });
     return updated;
   }
 
@@ -169,6 +179,7 @@ export class OrganisationService {
     if (!membership) throw new ServerError(AppErrorCode.USR_001);
     if (membership.role === 'OWNER') await this.assertNotLastOwner(organisationId, userId);
     await this.db.delete(schema.organisationMembers).where(and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.userId, userId)));
+    this.logger.info('removed organisation member', { organisationId, userId, previousRole: membership.role });
     return membership;
   }
 
@@ -176,7 +187,10 @@ export class OrganisationService {
     const owners = await this.db.query.organisationMembers.findMany({
       where: and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.role, 'OWNER')),
     });
-    if (!owners.some(owner => owner.userId !== exceptUserId)) throw new ServerError(AppErrorCode.ORG_004);
+    if (!owners.some(owner => owner.userId !== exceptUserId)) {
+      this.logger.warn('last-owner protection triggered: refusing to remove or demote the only owner', { organisationId, userId: exceptUserId });
+      throw new ServerError(AppErrorCode.ORG_004);
+    }
   }
 
   /** Lists the members of an organisation, but only for a caller who belongs to it (tenant scope). */
