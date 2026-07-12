@@ -2863,6 +2863,7 @@ export interface components {
       url?: string;
       title?: string;
       webnovelId?: string;
+      instructions?: string;
       contentMode?: components['schemas']['ContentMode'];
     };
     /** @enum {string} */
@@ -2878,6 +2879,7 @@ export interface components {
       contentMode: components['schemas']['ContentMode'];
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
+      instructions?: null | string;
       sourceUrl?: null | string;
       webnovelId?: null | string;
       scrapeComplete: boolean;
@@ -2936,6 +2938,7 @@ export interface components {
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       brief?: string;
+      instructions?: string | null;
       webnovelId?: string | null;
     };
     CloneProjectBody: {

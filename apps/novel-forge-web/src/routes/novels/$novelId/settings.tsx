@@ -138,6 +138,7 @@ function SettingsScreen(): React.JSX.Element {
   const project = projectQuery.data;
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
+  const [instructions, setInstructions] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('standard');
   const [webnovelId, setWebnovelId] = useState('');
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
@@ -147,6 +148,9 @@ function SettingsScreen(): React.JSX.Element {
     if (!project) return;
     setTitle(projectTitle(project));
     setBrief(project.brief ?? '');
+    // The API returns the effective instructions (the project's override, or the default), so the field
+    // is always pre-filled with what the AI will actually use.
+    setInstructions(project.instructions ?? '');
     setContentMode(project.contentMode);
     setWebnovelId(project.webnovelId ?? '');
     const overrides = project.config?.models ?? {};
@@ -163,7 +167,7 @@ function SettingsScreen(): React.JSX.Element {
 
   const saveGeneral = (): void => {
     updateProject.mutate(
-      { title: title.trim(), brief, contentMode, ...(project?.kind === 'source' ? { webnovelId: webnovelId.trim() || null } : {}) },
+      { title: title.trim(), brief, instructions, contentMode, ...(project?.kind === 'source' ? { webnovelId: webnovelId.trim() || null } : {}) },
       { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) },
     );
   };
@@ -219,6 +223,12 @@ function SettingsScreen(): React.JSX.Element {
                   </FormField>
                   <FormField label="Premise / brief">
                     <Textarea value={brief} onValueChange={setBrief} minRows={3} autoGrow />
+                  </FormField>
+                  <FormField
+                    label="Chapter writing instructions"
+                    helper="Always sent to the AI when it writes a chapter — voice, style, and length. Clear the field to restore the default."
+                  >
+                    <Textarea value={instructions} onValueChange={setInstructions} minRows={6} autoGrow />
                   </FormField>
                   {project?.kind === 'source' && (
                     <FormField
