@@ -8,7 +8,7 @@ import { useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { CheckIcon, CloseIcon, CopyIcon, ResetIcon } from '@/components/icons';
+import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon } from '@/components/icons';
 import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
@@ -256,6 +256,18 @@ function OverviewScreen(): React.JSX.Element {
               {project.brief && <p className={styles.brief}>{project.brief}</p>}
             </div>
             <div className={styles.headerActions}>
+              <Tooltip content="Export as a .novel package">
+                <IconButton
+                  variant="secondary"
+                  aria-label="Export .novel package"
+                  icon={<DownloadIcon />}
+                  onClick={() => {
+                    // A same-origin GET whose Content-Disposition drives the browser's download; the API
+                    // client only speaks JSON, so navigate to the endpoint directly.
+                    window.location.assign(`/api/v1/projects/${novelId}/export/novel`);
+                  }}
+                />
+              </Tooltip>
               <Tooltip content="Clone project">
                 <IconButton variant="secondary" aria-label="Clone project" icon={<CopyIcon />} onClick={() => setCloneOpen(true)} />
               </Tooltip>
