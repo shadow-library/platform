@@ -101,6 +101,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
   const projectNav: ProjectNavItem[] = [
     { to: '/novels/$novelId/overview', label: 'Overview', icon: <OverviewIcon /> },
     { to: '/novels/$novelId/source', label: 'Source Pipeline', icon: <SourceIcon />, sourceOnly: true },
+    { to: '/novels/$novelId/rebrand', label: 'Rebrand', icon: <GlobeIcon />, sourceOnly: true },
     { to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon /> },
     { to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon /> },
     { to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon />, badge: status?.chaptersTotal },

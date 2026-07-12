@@ -19,6 +19,7 @@ import { Route as NovelsNovelIdSourceRouteImport } from './routes/novels/$novelI
 import { Route as NovelsNovelIdSettingsRouteImport } from './routes/novels/$novelId/settings'
 import { Route as NovelsNovelIdRunsRouteImport } from './routes/novels/$novelId/runs'
 import { Route as NovelsNovelIdReviewRouteImport } from './routes/novels/$novelId/review'
+import { Route as NovelsNovelIdRebrandRouteImport } from './routes/novels/$novelId/rebrand'
 import { Route as NovelsNovelIdProposalsRouteImport } from './routes/novels/$novelId/proposals'
 import { Route as NovelsNovelIdOverviewRouteImport } from './routes/novels/$novelId/overview'
 import { Route as NovelsNovelIdChatRouteImport } from './routes/novels/$novelId/chat'
@@ -73,6 +74,11 @@ const NovelsNovelIdReviewRoute = NovelsNovelIdReviewRouteImport.update({
   path: '/review',
   getParentRoute: () => NovelsNovelIdRoute,
 } as any)
+const NovelsNovelIdRebrandRoute = NovelsNovelIdRebrandRouteImport.update({
+  id: '/rebrand',
+  path: '/rebrand',
+  getParentRoute: () => NovelsNovelIdRoute,
+} as any)
 const NovelsNovelIdProposalsRoute = NovelsNovelIdProposalsRouteImport.update({
   id: '/proposals',
   path: '/proposals',
@@ -101,6 +107,7 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
+  '/novels/$novelId/rebrand': typeof NovelsNovelIdRebrandRoute
   '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
@@ -115,6 +122,7 @@ export interface FileRoutesByTo {
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
+  '/novels/$novelId/rebrand': typeof NovelsNovelIdRebrandRoute
   '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
@@ -132,6 +140,7 @@ export interface FileRoutesById {
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
   '/novels/$novelId/overview': typeof NovelsNovelIdOverviewRoute
   '/novels/$novelId/proposals': typeof NovelsNovelIdProposalsRoute
+  '/novels/$novelId/rebrand': typeof NovelsNovelIdRebrandRoute
   '/novels/$novelId/review': typeof NovelsNovelIdReviewRoute
   '/novels/$novelId/runs': typeof NovelsNovelIdRunsRoute
   '/novels/$novelId/settings': typeof NovelsNovelIdSettingsRoute
@@ -149,6 +158,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/chat'
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
+    | '/novels/$novelId/rebrand'
     | '/novels/$novelId/review'
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
@@ -163,6 +173,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/chat'
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
+    | '/novels/$novelId/rebrand'
     | '/novels/$novelId/review'
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
@@ -179,6 +190,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/chat'
     | '/novels/$novelId/overview'
     | '/novels/$novelId/proposals'
+    | '/novels/$novelId/rebrand'
     | '/novels/$novelId/review'
     | '/novels/$novelId/runs'
     | '/novels/$novelId/settings'
@@ -265,6 +277,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof NovelsNovelIdReviewRouteImport
       parentRoute: typeof NovelsNovelIdRoute
     }
+    '/novels/$novelId/rebrand': {
+      id: '/novels/$novelId/rebrand'
+      path: '/rebrand'
+      fullPath: '/novels/$novelId/rebrand'
+      preLoaderRoute: typeof NovelsNovelIdRebrandRouteImport
+      parentRoute: typeof NovelsNovelIdRoute
+    }
     '/novels/$novelId/proposals': {
       id: '/novels/$novelId/proposals'
       path: '/proposals'
@@ -311,6 +330,7 @@ interface NovelsNovelIdRouteChildren {
   NovelsNovelIdChatRoute: typeof NovelsNovelIdChatRoute
   NovelsNovelIdOverviewRoute: typeof NovelsNovelIdOverviewRoute
   NovelsNovelIdProposalsRoute: typeof NovelsNovelIdProposalsRoute
+  NovelsNovelIdRebrandRoute: typeof NovelsNovelIdRebrandRoute
   NovelsNovelIdReviewRoute: typeof NovelsNovelIdReviewRoute
   NovelsNovelIdRunsRoute: typeof NovelsNovelIdRunsRoute
   NovelsNovelIdSettingsRoute: typeof NovelsNovelIdSettingsRoute
@@ -325,6 +345,7 @@ const NovelsNovelIdRouteChildren: NovelsNovelIdRouteChildren = {
   NovelsNovelIdChatRoute: NovelsNovelIdChatRoute,
   NovelsNovelIdOverviewRoute: NovelsNovelIdOverviewRoute,
   NovelsNovelIdProposalsRoute: NovelsNovelIdProposalsRoute,
+  NovelsNovelIdRebrandRoute: NovelsNovelIdRebrandRoute,
   NovelsNovelIdReviewRoute: NovelsNovelIdReviewRoute,
   NovelsNovelIdRunsRoute: NovelsNovelIdRunsRoute,
   NovelsNovelIdSettingsRoute: NovelsNovelIdSettingsRoute,

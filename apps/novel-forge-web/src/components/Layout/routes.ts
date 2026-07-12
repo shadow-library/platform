@@ -9,6 +9,7 @@ export interface NovelParams {
 export type ProjectRoute =
   | '/novels/$novelId/overview'
   | '/novels/$novelId/source'
+  | '/novels/$novelId/rebrand'
   | '/novels/$novelId/story-bible'
   | '/novels/$novelId/volumes'
   | '/novels/$novelId/chapters'

@@ -13,4 +13,5 @@ export * from './insight.api';
 export * from './proposal.api';
 export * from './refinement.api';
 export * from './run.api';
+export * from './rebrand.api';
 export * from './source.api';
