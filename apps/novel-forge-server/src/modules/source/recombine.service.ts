@@ -89,20 +89,28 @@ export class RecombineService {
   }
 
   async recombine(projectId: bigint, options: RecombineOptions = {}): Promise<RecombineResult> {
+    this.logger.debug('recombine: starting', { projectId, dryRun: options.dryRun ?? false, useAi: options.useAi ?? false });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw new ServerError(AppErrorCode.PRJ_001);
     if (project.kind !== 'source') throw new ServerError(AppErrorCode.PRJ_003);
 
     const chapters = await this.loadChapters(projectId);
     const plan = await this.buildPlan(projectId, chapters, options.useAi ?? false, project);
-    if (options.dryRun) return this.toResult(plan, false);
+    this.logger.debug('recombine: plan built', { projectId, before: plan.before, after: plan.after, groups: plan.groups.length, ambiguous: plan.ambiguous.length });
+    if (options.dryRun) {
+      this.logger.debug('recombine: dry-run — not applying', { projectId });
+      return this.toResult(plan, false);
+    }
 
     if (!project.scrapeComplete) throw new ServerError(AppErrorCode.SRC_002);
     await this.assertNoDerivedData(projectId);
-    if (plan.after === plan.before) return this.toResult(plan, false);
+    if (plan.after === plan.before) {
+      this.logger.debug('recombine: no merges to apply (before == after)', { projectId, before: plan.before });
+      return this.toResult(plan, false);
+    }
 
     await this.apply(projectId, plan);
-    this.logger.info('recombined translator chapters', { projectId: String(projectId), before: plan.before, after: plan.after });
+    this.logger.info('recombined translator chapters', { projectId, before: plan.before, after: plan.after, merged: plan.before - plan.after });
     return this.toResult(plan, true);
   }
 
@@ -114,7 +122,7 @@ export class RecombineService {
     try {
       return await this.recombine(projectId, { useAi: true });
     } catch (err) {
-      this.logger.warn('autoRecombine skipped', { projectId: String(projectId), reason: err instanceof Error ? err.message : String(err) });
+      this.logger.warn('autoRecombine skipped', { projectId, reason: err instanceof Error ? err.message : String(err) });
       return null;
     }
   }
@@ -131,10 +139,12 @@ export class RecombineService {
     // An AI failure falls back to the deterministic plan — every unresolved boundary defaults to
     // split, which is always the safe direction (recombine design §3).
     try {
+      this.logger.debug('buildPlan: resolving ambiguous boundaries with AI', { projectId, ambiguous: plan.ambiguous.length });
       const mergeAfter = await this.resolveBoundaries(projectId, chapters, plan.ambiguous, project);
+      this.logger.debug('buildPlan: AI resolved boundaries to merge', { projectId, mergeAfter });
       return applyBoundaryMerges(plan, mergeAfter);
     } catch (err) {
-      this.logger.warn('AI boundary resolution failed — keeping the deterministic plan', { projectId: String(projectId), err });
+      this.logger.warn('AI boundary resolution failed — keeping the deterministic plan', { projectId, err });
       return plan;
     }
   }
@@ -193,7 +203,20 @@ export class RecombineService {
       this.db.query.chapterConversions.findFirst({ where: eq(schema.chapterConversions.projectId, projectId), columns: { id: true } }),
       this.db.query.drafts.findFirst({ where: eq(schema.drafts.projectId, projectId), columns: { id: true } }),
     ]);
-    if (extracted || appearances || beats || chunks || briefs || conversions || drafts) throw new ServerError(AppErrorCode.SRC_003);
+    if (extracted || appearances || beats || chunks || briefs || conversions || drafts) {
+      // Naming the blocking table makes an auto-recombine no-op self-explanatory in the logs.
+      this.logger.debug('recombine blocked by existing derived data', {
+        projectId,
+        extracted: !!extracted,
+        appearances: !!appearances,
+        beats: !!beats,
+        chunks: !!chunks,
+        briefs: !!briefs,
+        conversions: !!conversions,
+        drafts: !!drafts,
+      });
+      throw new ServerError(AppErrorCode.SRC_003);
+    }
   }
 
   private async apply(projectId: bigint, plan: RecombinePlan): Promise<void> {
@@ -206,6 +229,7 @@ export class RecombineService {
         if (members.length > 1) {
           const content = members.map(m => m.row.content ?? '').join('\n\n');
           const mergedFrom: Chapter.MergedPart[] = members.map(m => ({ number: m.number, title: m.title, words: m.words, url: m.row.url }));
+          this.logger.debug('recombine: merging group', { projectId, newNumber, title: group.title, absorbing: members.map(m => m.number) });
           await tx
             .update(schema.chapters)
             .set({ content, title: group.title, wordCount: countWords(content), mergedFrom, updatedAt: new Date() })

@@ -7,11 +7,13 @@
  */
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
+import { Logger } from '@shadow-library/common';
 import { and, eq, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
+import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
@@ -73,6 +75,8 @@ export type JudgeFinding = JudgeOutput['findings'][number];
 /**
  * Declaring the constants
  */
+
+const logger = Logger.getLogger(APP_NAME, 'chapter-generation.graph');
 
 // Normalize finding text for dedup comparison.
 function normalizeFinding(text: string): string {
@@ -198,6 +202,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       title = titleResult.title ?? '';
     }
 
+    logger.debug('generation draftChapter', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, proseLength: result.body.length, title });
     return {
       prose: result.body,
       title,
@@ -309,11 +314,13 @@ export function createChapterGenerationGraph(services: GraphServices) {
 
     const verdict = judgeResult?.verdict ?? 'consistent';
     const findings = [...(judgeResult?.findings ?? [])];
+    if (!judgeResult) logger.warn('generation judge: could not parse judge output — defaulting to consistent', { runId: state.runId, chapter: state.chapter });
 
     // Contract violations ride the repair ladder as soft findings — they never harden the verdict.
     const compliance = renderedContract ? judgeResult?.endingCompliance : undefined;
     const endingCompliant = compliance ? compliance.compliant : true;
     if (compliance && !compliance.compliant) findings.push(...compliance.issues.map(issue => ({ severity: 'soft' as const, text: `ending contract: ${issue}` })));
+    logger.debug('generation judge', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, verdict, findings: findings.length, endingCompliant });
 
     // Update draft with judge result.
     if (state.draftId) {
@@ -349,6 +356,8 @@ export function createChapterGenerationGraph(services: GraphServices) {
       projectRow as ProjectConfig | undefined,
     )) as FixOutput;
 
+    logger.debug('generation repairPatch', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, action: result.action, patches: result.patches?.length ?? 0 });
+
     if (result.action === 'rewrite' && result.body) {
       return { prose: result.body, repairMode: 'rewrite' as const, patchApplied: false };
     }
@@ -367,6 +376,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
       }
 
       if (allApplied) return { prose: patched, repairMode: 'patch' as const, patchApplied: true };
+      logger.debug('generation repairPatch: a patch anchor was not uniquely found — falling back to rewrite', { runId: state.runId, chapter: state.chapter });
     }
 
     // Patch failed — fall through to rewrite.

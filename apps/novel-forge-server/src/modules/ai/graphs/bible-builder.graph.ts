@@ -119,6 +119,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
 
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: stageName, promptKey, promptVersion: '1.0.0', role: promptKey };
+    logger.debug('bible-builder runStage', { runId: state.runId, stage: stageName, section, slug, force: state.force });
 
     const result = (await modelRouter.structured(prompt, promptInput, ctx, projectRow as ProjectConfig | undefined)) as BibleStageOutput;
 

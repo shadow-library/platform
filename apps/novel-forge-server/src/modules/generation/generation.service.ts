@@ -163,6 +163,7 @@ export class GenerationService {
     const derived = [project.skeletonPowerCurve, project.skeletonCharacterArcs ? JSON.stringify(project.skeletonCharacterArcs) : ''].filter(Boolean).join('\n\n');
     const skeleton = body.skeleton ?? (derived || 'No skeleton available — derive the character arcs and escalation curve from the brief.');
 
+    this.logger.info('plan: generating volume plan', { projectId, volumeCount: body.volumeCount, chaptersPerVolume: body.chaptersPerVolume });
     const ctx = { projectId, promptKey: PROMPT_REGISTRY.plan.key, promptVersion: PROMPT_REGISTRY.plan.version, role: PROMPT_REGISTRY.plan.key };
     const planOutput = await this.modelRouter.structured(
       PROMPT_REGISTRY.plan,
@@ -222,6 +223,7 @@ export class GenerationService {
       ),
     );
 
+    this.logger.info('plan: volumes upserted', { projectId, volumes: upserted.filter(Boolean).length });
     return { volumes: upserted.filter(Boolean) as never };
   }
 
@@ -242,7 +244,11 @@ export class GenerationService {
     const end = start + count - 1;
 
     const relevantVolumes = volumes.filter(v => v.startChapter !== null && v.endChapter !== null && v.endChapter >= start && v.startChapter <= end);
-    if (relevantVolumes.length === 0) return { briefs: [] };
+    if (relevantVolumes.length === 0) {
+      this.logger.debug('outline: no volumes overlap the requested range — nothing to outline', { projectId, start, end });
+      return { briefs: [] };
+    }
+    this.logger.info('outline: generating briefs', { projectId, start, end, volumes: relevantVolumes.length });
 
     const volumePlan = relevantVolumes
       .map(
@@ -295,6 +301,7 @@ export class GenerationService {
       }),
     );
 
+    this.logger.info('outline: briefs upserted', { projectId, briefs: upserted.filter(Boolean).length });
     return { briefs: upserted.filter(Boolean) as Generation.Brief[] };
   }
 
@@ -315,6 +322,7 @@ export class GenerationService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
     if (siblings.some(a => a.status !== 'approved')) throw new ServerError(AppErrorCode.ARC_004);
+    this.logger.info('outlineArc: generating briefs for arc', { projectId, arcKey, chapterStart: arc.chapterStart, chapterEnd: arc.chapterEnd });
 
     const nextArc = siblings.find(a => a.ordinal > arc.ordinal);
     const volumePlan = [
@@ -412,7 +420,10 @@ export class GenerationService {
     const activeJob = await this.db.query.jobs.findFirst({
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, 'generate'), inArray(schema.jobs.status, ['pending', 'in_progress'])),
     });
-    if (activeJob) return { jobId: activeJob.id, kind: 'generate', status: activeJob.status, target: activeJob.target ?? '' };
+    if (activeJob) {
+      this.logger.debug('generate: a generation job is already active — returning it', { projectId, jobId: activeJob.id, status: activeJob.status });
+      return { jobId: activeJob.id, kind: 'generate', status: activeJob.status, target: activeJob.target ?? '' };
+    }
 
     // Guard: no unresolved contradiction drafts.
     const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
@@ -444,6 +455,7 @@ export class GenerationService {
 
     const target = [...chapters].sort((a, b) => a - b).join(',');
     const payload = { chapters, autoFix: body.autoFix, maxFixes: body.maxFixes, guidance: body.guidance };
+    this.logger.info('generate: enqueueing chapters', { projectId, chapters, limit, autoFix: body.autoFix });
 
     const jobId = await this.jobService.enqueue(projectId, 'generate', target, payload);
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('generate job dispatch failed', { err, jobId }));
@@ -501,6 +513,8 @@ export class GenerationService {
   }
 
   async reviseDraft(projectId: bigint, chapter: number, body: ReviseDraftBody): Promise<Generation.Draft> {
+    this.logger.info('reviseDraft: revising draft', { projectId, chapter });
+    this.logger.debug('reviseDraft: feedback note', { projectId, chapter, note: body.note });
     const draft = await this.getDraft(projectId, chapter);
     if (draft.status === 'final') throw new ServerError(AppErrorCode.DRF_002);
 
@@ -557,6 +571,7 @@ export class GenerationService {
   }
 
   async judgeDraft(projectId: bigint, chapter: number): Promise<JudgeResult> {
+    this.logger.debug('judgeDraft: starting', { projectId, chapter });
     const draft = await this.getDraft(projectId, chapter);
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
 
@@ -587,6 +602,8 @@ export class GenerationService {
     const parsed = parseSchema<JudgeOutput>(JudgeSchema, this.tryParseJson(rawContent));
 
     const judgeOutput = parsed.success ? parsed.data : { verdict: 'consistent' as const, findings: [] };
+    if (!parsed.success) this.logger.warn('judgeDraft: judge output failed to parse — defaulting to consistent', { projectId, chapter });
+    this.logger.info('judgeDraft: verdict', { projectId, chapter, verdict: judgeOutput.verdict, findings: judgeOutput.findings.length });
 
     // Update draft with judge result.
     await this.db
@@ -641,6 +658,7 @@ export class GenerationService {
     });
 
     if (!updated) throw new ServerError(AppErrorCode.DRF_001);
+    this.logger.info('draft approved', { projectId, chapter, reviewerId: options?.reviewerId });
     return updated;
   }
 
@@ -668,6 +686,7 @@ export class GenerationService {
    * plan (briefs/arcs/volumes) and derived indexes are deliberately left alone.
    */
   async deleteDraft(projectId: bigint, chapter: number): Promise<void> {
+    this.logger.info('deleteDraft: deleting and renumbering', { projectId, chapter });
     await this.db.transaction(async tx => {
       const deleted = await tx
         .delete(schema.drafts)
@@ -740,6 +759,7 @@ export class GenerationService {
     if (!draft) throw new ServerError(AppErrorCode.DRF_001);
     if (draft.reviewStatus !== 'approved') throw new ServerError(AppErrorCode.DRF_004);
     if (draft.status === 'final') throw new ServerError(AppErrorCode.DRF_002);
+    this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
     // Enforce order: all previous chapters must have a final draft.
     if (draft.chapter > 1) {
@@ -877,6 +897,7 @@ export class GenerationService {
     )) as ChapterExtractOutput;
 
     const changeSet = (output.changeSet ?? []) as unknown as ChangeOp[];
+    this.logger.debug('extractChapterToBible: derived change-set', { projectId, chapter, ops: changeSet.length });
     if (changeSet.length === 0) throw new ServerError(AppErrorCode.DRF_005);
 
     return this.proposalService.create(projectId, {
@@ -910,6 +931,7 @@ export class GenerationService {
   }
 
   async applyContinuityProposal(projectId: bigint, chapter: number): Promise<Generation.ContinuityProposal> {
+    this.logger.info('applyContinuityProposal: applying', { projectId, chapter });
     const proposalRow = await this.getContinuityProposal(projectId, chapter);
     const delta = proposalRow.proposal as unknown as ContinuityOutput;
 
@@ -1026,6 +1048,7 @@ export class GenerationService {
   // ─── Validation / Review ─────────────────────────────────────────────────────
 
   async validate(projectId: bigint): Promise<WorkflowRunResult> {
+    this.logger.info('validate: running full-novel validation', { projectId });
     return this.workflowRunService.runNovelValidation({ projectId });
   }
 
@@ -1190,6 +1213,7 @@ export class GenerationService {
   }
 
   async backfill(projectId: bigint): Promise<JobEnqueueResult> {
+    this.logger.info('backfill: enqueueing reindex', { projectId });
     const jobId = await this.jobService.enqueue(projectId, 'backfill', 'all');
     this.jobExecutor.dispatch(jobId).catch(err => this.logger.error('backfill job dispatch failed', { err, jobId }));
     return { jobId, kind: 'backfill', status: 'pending', target: 'all' };

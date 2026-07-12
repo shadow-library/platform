@@ -57,7 +57,9 @@ export class ChapterImageService {
 
     // A random suffix keeps every scene image's storage key unique within the chapter.
     const key = `ch${chapter}_s_${randomUUID().slice(0, 8)}`;
-    const ref = await this.imageStorage.save(projectId, key, new Uint8Array(Buffer.from(image, 'base64')), mime);
+    const bytes = Buffer.from(image, 'base64');
+    this.logger.debug('chapter image add: saving', { projectId, chapter, key, mime, bytes: bytes.length, sortOrder: nextOrder });
+    const ref = await this.imageStorage.save(projectId, key, new Uint8Array(bytes), mime);
 
     const [created] = await this.db
       .insert(schema.chapterImages)
@@ -65,6 +67,7 @@ export class ChapterImageService {
       .returning();
 
     if (!created) throw new ServerError(AppErrorCode.DRF_001);
+    this.logger.info('chapter image added', { projectId, chapter, imageId: created.id, ref });
     return created;
   }
 
@@ -74,6 +77,7 @@ export class ChapterImageService {
     });
     if (!image) throw new ServerError(AppErrorCode.DRF_006);
 
+    this.logger.info('chapter image removed', { projectId, chapter, imageId, ref: image.imagePath });
     await this.imageStorage.delete(image.imagePath);
     await this.db.delete(schema.chapterImages).where(eq(schema.chapterImages.id, imageId));
   }
@@ -84,6 +88,7 @@ export class ChapterImageService {
    */
   async onChapterDeleted(projectId: bigint, deletedChapter: number): Promise<void> {
     const removed = await this.list(projectId, deletedChapter);
+    this.logger.debug('onChapterDeleted: purging scene images and shifting later chapters down', { projectId, deletedChapter, removed: removed.length });
     await Promise.all(removed.map(img => this.imageStorage.delete(img.imagePath)));
     await this.db.delete(schema.chapterImages).where(and(eq(schema.chapterImages.projectId, projectId), eq(schema.chapterImages.chapter, deletedChapter)));
 

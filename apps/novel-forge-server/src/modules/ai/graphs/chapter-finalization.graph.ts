@@ -80,12 +80,14 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
       throw new Error(`[guard] Chapter ${state.chapter} is not next in sequence (current: ${currentChapter})`);
     }
 
+    logger.debug('finalization guard passed', { runId: state.runId, chapter: state.chapter, currentChapter });
     return {};
   }
 
   // ─── commitProse ──────────────────────────────────────────────────────────────
   async function commitProse(state: FinalizationState) {
     const projectId = BigInt(state.projectId);
+    logger.debug('finalization commitProse', { runId: state.runId, chapter: state.chapter, proseLength: state.prose.length });
 
     // Commit the canonical chapter row and mark the draft final atomically: a crash must not leave a
     // committed chapter with a non-final draft (or vice versa). Both happen or neither does.
@@ -325,6 +327,7 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
         .update(schema.projects)
         .set(updateData as never)
         .where(eq(schema.projects.id, projectId));
+      logger.debug('finalization advanceCursor', { runId: state.runId, chapter: state.chapter, previousCurrent: currentChapter });
     }
 
     return {};

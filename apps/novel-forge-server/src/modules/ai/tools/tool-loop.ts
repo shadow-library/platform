@@ -60,6 +60,7 @@ export async function runToolLoop(
   // bindTools. Run them tool-free: they answer from the context already assembled in the prompt rather
   // than looking canon up via tools. Degraded but functional, so these providers remain selectable.
   if (typeof model.bindTools !== 'function') {
+    logger.debug('runToolLoop: model has no bindTools — running tool-free', { node: ctx.node, runId: ctx.runId });
     const response = await model.invoke(messages);
     return { messages: [...messages, response], toolCallCount: 0 };
   }
@@ -82,6 +83,7 @@ export async function runToolLoop(
       const callCount = (callCounts.get(tc.name) ?? 0) + 1;
       callCounts.set(tc.name, callCount);
       const startedAt = Date.now();
+      logger.debug('runToolLoop: tool call', { node: ctx.node, runId: ctx.runId, round, tool: tc.name, callCount, args: tc.args });
 
       let resultStr: string;
       let auditStatus: 'budget_exceeded' | 'handler_error' | 'invalid_args' | 'ok';
@@ -134,6 +136,7 @@ export async function runToolLoop(
   }
 
   if (exhaustedBudget) {
+    logger.debug('runToolLoop: tool budget exhausted — forcing a final answer', { node: ctx.node, runId: ctx.runId, maxRounds, toolCallCount });
     resultMessages.push(new HumanMessage('Tool budget exhausted — answer with what you have.'));
     const finalResponse = (await model.invoke(resultMessages)) as BaseMessage;
     resultMessages.push(finalResponse);

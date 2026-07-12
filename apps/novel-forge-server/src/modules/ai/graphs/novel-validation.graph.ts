@@ -140,6 +140,7 @@ export function createNovelValidationGraph(services: ValidationServices) {
       }
     }
 
+    logger.debug('validation planWindows', { runId: state.runId, chapters: chapterRows.length, windows: windows.length });
     return { windows };
   }
 
@@ -210,6 +211,12 @@ export function createNovelValidationGraph(services: ValidationServices) {
         .join(' | ') || 'No issues found.';
     const report: ValidationOutput = { issues: deduplicated, summary };
 
+    logger.debug('validation mergeFindings', {
+      runId: state.runId,
+      windows: state.windowFindings.length,
+      issues: deduplicated.length,
+      errors: deduplicated.filter(i => i.severity === 'error').length,
+    });
     return { report };
   }
 
@@ -218,6 +225,8 @@ export function createNovelValidationGraph(services: ValidationServices) {
     const projectId = BigInt(state.projectId);
     const report = state.report as ValidationOutput | null;
     const issues = report?.issues ?? [];
+
+    logger.info('validation persistReport', { runId: state.runId, issues: issues.length });
 
     // Durably record the report — the run outcome alone is not queryable canon.
     await db

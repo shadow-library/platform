@@ -43,13 +43,18 @@ export class IndexingService {
   // Add (or re-add) prose chunks for a chapter. Deletes existing chunks first (idempotent).
   // Does NOT embed grok chapters — silently skips if generator === 'grok'.
   async addProse(projectId: bigint, chapter: number, content: string, generator: string): Promise<void> {
-    if (generator === 'grok') return;
+    if (generator === 'grok') {
+      this.logger.debug('addProse: skipping grok chapter (not indexed)', { projectId, chapter });
+      return;
+    }
 
     await this.deleteProse(projectId, chapter);
 
     const chunks = chunkText(content);
     const texts = chunks.map(c => c.text);
     const embeddings = await this.embeddingService.embedBatch(texts);
+    const embedded = embeddings.filter(Boolean).length;
+    this.logger.debug('addProse: embedded chapter', { projectId, chapter, chunks: chunks.length, embedded, failed: chunks.length - embedded });
 
     await this.db.insert(schema.chapterChunks).values(
       chunks.map((c, i) => ({
@@ -90,6 +95,7 @@ export class IndexingService {
     });
 
     const standardChapters = doneChapters.filter(c => c.generator !== 'grok');
+    this.logger.info('backfill: reindexing prose', { projectId, doneChapters: doneChapters.length, standardChapters: standardChapters.length });
 
     // Find chapters that already have chunks.
     const indexedCounts = await this.db.execute<{ chapter: number; cnt: number }>(sql`
@@ -119,6 +125,7 @@ export class IndexingService {
       }
     }
 
+    this.logger.info('backfill: complete', { projectId, indexed, skipped });
     return { indexed, skipped };
   }
 }

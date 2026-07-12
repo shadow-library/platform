@@ -71,6 +71,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
 
     if (!ch) throw new Error(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
 
+    logger.debug('extraction loadChapter', { runId: state.runId, chapter: state.chapter, chapterId: String(ch.id), contentLength: (ch.content ?? '').length });
     return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterGenerator: ch.generator };
   }
 
@@ -95,6 +96,16 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
       projectRow as ProjectConfig | undefined,
     )) as ExtractionOutput;
 
+    logger.debug('extraction extractKnowledge', {
+      runId: state.runId,
+      chapter: state.chapter,
+      entities: result.entities.length,
+      relationships: result.relationships.length,
+      beats: result.beats.length,
+      plotThreads: result.plotThreads.length,
+      worldFacts: result.worldFacts.length,
+      mysteries: result.mysteries.length,
+    });
     return { extracted: result };
   }
 
@@ -104,6 +115,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
 
     const projectId = BigInt(state.projectId);
     const extracted = state.extracted;
+    logger.debug('extraction persistKnowledge', { runId: state.runId, chapter: state.chapter, entities: extracted.entities.length, beats: extracted.beats.length });
 
     // Upsert entities and aliases.
     for (const e of extracted.entities) {

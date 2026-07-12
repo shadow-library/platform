@@ -86,6 +86,11 @@ export class RefineService {
     if (!project) throw new ServerError(AppErrorCode.PRJ_001);
     const effectiveOverview = overview ?? project.brief ?? project.premise;
     if (!effectiveOverview) throw new ServerError(AppErrorCode.PRM_001);
+    this.logger.info('enhancePremise: starting', {
+      projectId,
+      overviewSource: overview ? 'argument' : project.brief ? 'brief' : 'premise',
+      overviewLength: effectiveOverview.length,
+    });
 
     const prompt = PROMPT_REGISTRY['premise-enhance'];
     const pack = await this.contextAssembler.forPremise(projectId);
@@ -113,6 +118,7 @@ export class RefineService {
       return { proposal, rationale: rationale as Omit<PremiseEnhanceOutput, 'changeSet'> };
     });
 
+    this.logger.info('enhancePremise: staged proposal', { projectId, runId, proposalId: result.proposal.id });
     return { ...result, runId };
   }
 
@@ -131,6 +137,7 @@ export class RefineService {
       this.db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId), orderBy: [schema.bibleDocuments.section, schema.bibleDocuments.slug] }),
     ]);
     const docInventory = docs.length > 0 ? docs.map(d => `${d.section}/${d.slug} (revision ${d.revision})`).join('\n') : 'none';
+    this.logger.info('auditBible: starting', { projectId, existingDocs: docs.length });
 
     const { runId, result } = await this.workflowRunService.runChain(projectId, 'bible-audit', 'bible', {}, async runId => {
       await this.workflowRunService.linkContextPack(runId, pack.id);
@@ -142,6 +149,7 @@ export class RefineService {
         project as ProjectConfig,
       )) as BibleAuditOutput;
 
+      this.logger.info('auditBible: findings', { projectId, runId, findings: output.findings.length, changeSetOps: output.changeSet.length });
       if (output.changeSet.length === 0) return { proposal: null, findings: output.findings };
 
       const proposal = await this.proposalService.create(projectId, {
@@ -178,6 +186,7 @@ export class RefineService {
 
     const startChapter = volume.startChapter as number;
     const endChapter = volume.endChapter as number;
+    this.logger.info('planArcs: starting', { projectId, volumeKey, startChapter, endChapter, arcCount: opts?.arcCount });
     const prompt = buildArcPlanPrompt(startChapter, endChapter);
     const pack = await this.contextAssembler.forArcPlanning(projectId, volumeKey);
 
@@ -219,6 +228,7 @@ export class RefineService {
         allowedOps: ['arc.upsert', 'arc.remove'],
         runId,
       });
+      this.logger.info('planArcs: staged proposal', { projectId, runId, volumeKey, arcs: output.arcs.length, proposalId: proposal.id });
       return { proposal, arcs: output.arcs };
     });
 

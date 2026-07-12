@@ -54,6 +54,7 @@ export class CheckpointJanitor {
     if (runs.length === 0) return 0;
 
     const threadIds = runs.map(r => r.id);
+    this.logger.debug('Checkpoint janitor: purging terminal run checkpoints', { olderThanDays, cutoff, runs: threadIds.length });
 
     // These tables are managed by @langchain/langgraph-checkpoint-postgres; no Drizzle schema exists for them.
     await db.execute(sql`DELETE FROM checkpoints WHERE thread_id = ANY(${threadIds}::text[])`);

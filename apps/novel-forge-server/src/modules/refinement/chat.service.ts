@@ -122,6 +122,7 @@ export class ChatService {
       .values({ projectId, scopeType: input.scopeType, scopeRef, title: input.title, mode: input.mode ?? 'manual' })
       .returning();
     if (!session) throw new ServerError(AppErrorCode.CHT_001);
+    this.logger.info('chat session created', { projectId, sessionId: session.id, scopeType: session.scopeType, scopeRef, mode: session.mode });
     return session;
   }
 
@@ -269,6 +270,8 @@ export class ChatService {
     const session = await this.getSession(projectId, sessionId);
     if (session.status !== 'active') throw new ServerError(AppErrorCode.CHT_002);
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
+    this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
+    this.logger.debug('chat turn user message', { projectId, sessionId, content });
 
     await this.compactIfNeeded(projectId, session);
 
@@ -304,6 +307,7 @@ export class ChatService {
       // fold the results into the conversation, and re-invoke — bounded, audited, hub-only.
       let output = await invoke();
       for (let round = 0; round < MAX_LOOKUP_ROUNDS && (output.lookups?.length ?? 0) > 0; round++) {
+        this.logger.debug('chat turn: executing declared lookups', { runId, round, lookups: output.lookups?.map(l => l.tool) });
         const results = await this.executeLookups(projectId, runId, output.lookups ?? []);
         const exhausted = round === MAX_LOOKUP_ROUNDS - 1 ? '\n\nLookup budget exhausted — answer with what you have; do not request more lookups.' : '';
         turnHistory.push(new AIMessage(JSON.stringify({ reply: output.reply, lookups: output.lookups })), new HumanMessage(`Lookup results:\n${results}${exhausted}`));
@@ -314,6 +318,8 @@ export class ChatService {
 
       return this.persistAssistantTurn(projectId, session, userMessage, output, runId, resolvedModel);
     });
+
+    this.logger.debug('chat turn complete', { projectId, sessionId, runId, hasProposal: !!result.proposal, proposalId: result.proposal?.id });
 
     // Auto mode lands the change-set in the same turn (rule 13: still through the proposal apply).
     if (session.mode === 'auto' && result.proposal) {

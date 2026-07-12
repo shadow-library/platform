@@ -153,10 +153,14 @@ export class WorkflowRunService {
       .values({ projectId, graph, target, status: 'running', input: toJsonSafe(input) as never, jobId: jobId ?? null, nodeTrace: [] })
       .returning({ id: schema.workflowRuns.id });
     if (!run) throw new Error(`[WorkflowRunService] Failed to create workflow_run row`);
+    this.logger.info('workflow run created', { runId: run.id, projectId, graph, target, jobId });
+    this.logger.debug('workflow run input', { runId: run.id, graph, input });
     return run.id;
   }
 
   private async completeRun(runId: string, outcome: string | null, status: 'completed' | 'awaiting_review', nodeTrace: string[]): Promise<void> {
+    this.logger.info('workflow run finished', { runId, status, outcome });
+    this.logger.debug('workflow run node trace', { runId, nodeTrace });
     await this.db
       .update(schema.workflowRuns)
       .set({ status, outcome: outcome ?? undefined, endedAt: new Date(), nodeTrace: nodeTrace as never })
@@ -165,6 +169,7 @@ export class WorkflowRunService {
 
   private async failRun(runId: string, err: unknown, node?: string): Promise<void> {
     const error = err instanceof Error ? { class: err.constructor.name, message: err.message, node } : { class: 'UnknownError', message: String(err), node };
+    this.logger.debug('persisting workflow run failure', { runId, node, error });
     await this.db
       .update(schema.workflowRuns)
       .set({ status: 'failed', error: error as never, endedAt: new Date() })

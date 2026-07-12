@@ -69,6 +69,9 @@ export class IllustrationService {
     const url = isGrokOnly ? 'https://api.x.ai/v1/images/generations' : 'https://api.openai.com/v1/images/generations';
     const model = isGrokOnly ? Config.get('ai.grok.image.model') : 'gpt-image-1';
 
+    // The full prompt is sensitive/verbose — dev-only debug is where it belongs.
+    this.logger.debug('generateImage: requesting', { projectId, provider: isGrokOnly ? 'xai' : 'openai', model, instruction });
+    const startedAt = Date.now();
     const res = await fetch(url, {
       method: 'POST',
       headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
@@ -77,13 +80,16 @@ export class IllustrationService {
 
     if (!res.ok) {
       const err = await res.text().catch(() => res.statusText);
+      this.logger.error('generateImage: provider returned an error', { projectId, model, status: res.status, err });
       throw new Error(`Image generation failed: ${err}`);
     }
 
     const data = (await res.json()) as { data: { b64_json: string }[] };
     const b64 = data.data[0]?.b64_json;
     if (!b64) throw new Error('Image generation returned no data');
-    return new Uint8Array(Buffer.from(b64, 'base64'));
+    const bytes = new Uint8Array(Buffer.from(b64, 'base64'));
+    this.logger.debug('generateImage: received image', { projectId, model, bytes: bytes.length, latencyMs: Date.now() - startedAt });
+    return bytes;
   }
 
   async start(projectId: bigint, entityKey: string, options: { instruction?: string; noChat?: boolean }): Promise<{ sessionId: string; previewUrl: string }> {
@@ -91,6 +97,7 @@ export class IllustrationService {
     const entity = await this.db.query.entities.findFirst({ where: eq(schema.entities.entityKey, entityKey) });
     const instruction = options.instruction ?? `Create a character portrait for "${entity?.name ?? entityKey}", a ${entity?.type ?? 'character'} in a fantasy novel.`;
 
+    this.logger.info('illustration start', { projectId, entityKey });
     const bytes = await this.generateImage(instruction, projectId);
     const sessionId = randomUUID();
     this.sessions.set(sessionId, { sessionId, projectId, entityKey, instruction, previewBytes: bytes, status: 'active', createdAt: new Date() });
@@ -103,6 +110,7 @@ export class IllustrationService {
     const session = this.sessions.get(sessionId);
     if (!session || session.status !== 'active') throw new Error(`Session ${sessionId} not found or inactive`);
 
+    this.logger.info('illustration refine', { sessionId, projectId: session.projectId, entityKey: session.entityKey });
     const fullInstruction = `${session.instruction}\n\nRefinement: ${instruction}`;
     const bytes = await this.generateImage(fullInstruction, session.projectId);
     session.previewBytes = bytes;

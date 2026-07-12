@@ -132,6 +132,7 @@ export class ProposalApplyService {
    * transaction back and leaves the proposal pending.
    */
   async apply(projectId: bigint, proposalId: bigint, options?: ApplyOptions): Promise<ApplyResult> {
+    this.logger.debug('apply: starting', { projectId, proposalId, opIndexes: options?.opIndexes, autoApplied: options?.autoApplied });
     const result = await this.db.transaction(async (tx): Promise<TxResult> => {
       const [proposal] = await tx
         .select()
@@ -162,6 +163,11 @@ export class ProposalApplyService {
         baseline,
       );
       if (mismatches.length > 0) {
+        this.logger.warn('apply: baseline conflict — artifact changed since the proposal was staged', {
+          projectId,
+          proposalId,
+          conflictedRefs: mismatches.map(m => m.artifactRef),
+        });
         const [conflicted] = await tx
           .update(schema.refinementProposals)
           .set({ status: 'conflicted', error: { mismatches }, updatedAt: new Date() })
@@ -774,6 +780,7 @@ export class ProposalApplyService {
    * with the restored content, so later baselines stay coherent.
    */
   async revert(projectId: bigint, proposalId: bigint): Promise<RevertResult> {
+    this.logger.debug('revert: starting', { projectId, proposalId });
     const result = await this.db.transaction(async tx => {
       const [proposal] = await tx
         .select()

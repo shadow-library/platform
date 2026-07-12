@@ -95,6 +95,8 @@ export class RebrandService {
     const set: Partial<typeof schema.rebrands.$inferInsert> = { updatedAt: new Date() };
     if (update.directives !== undefined) set.directives = update.directives;
     if (update.settings !== undefined) set.settings = update.settings;
+    this.logger.info('rebrand config updated', { projectId, directivesChanged: update.directives !== undefined, settingsChanged: update.settings !== undefined });
+    this.logger.debug('rebrand config payload', { projectId, directives: update.directives, settings: update.settings });
     const [updated] = await this.db.update(schema.rebrands).set(set).where(eq(schema.rebrands.id, rebrand.id)).returning();
     return updated ?? rebrand;
   }
@@ -175,7 +177,11 @@ export class RebrandService {
    */
   async seedGlossary(projectId: bigint, jobId?: string): Promise<SeedGlossaryResult> {
     const rebrand = await this.getOrCreate(projectId);
-    if (rebrand.worldNotes) return { seeded: false, mappings: 0 };
+    if (rebrand.worldNotes) {
+      this.logger.debug('seedGlossary: worldNotes already present — skipping (idempotent)', { projectId, jobId });
+      return { seeded: false, mappings: 0 };
+    }
+    this.logger.info('seedGlossary: seeding world notes and name mappings', { projectId, jobId });
 
     const [project, pack, openingRows] = await Promise.all([
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
@@ -212,7 +218,7 @@ export class RebrandService {
       return { seeded: true, mappings: output.mappings.length };
     });
 
-    this.logger.info('rebrand glossary seeded', { projectId: String(projectId), mappings: result.mappings });
+    this.logger.info('rebrand glossary seeded', { projectId, mappings: result.mappings });
     return result;
   }
 }

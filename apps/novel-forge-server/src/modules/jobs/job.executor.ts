@@ -88,6 +88,7 @@ export class JobExecutor {
   }
 
   async dispatch(jobId: string): Promise<void> {
+    this.logger.debug('dispatch requested', { jobId });
     const job = await this.jobService.get(jobId);
     if (!job) {
       this.logger.warn('dispatch: job not found', { jobId });
@@ -105,6 +106,7 @@ export class JobExecutor {
     // A10 will add Ollama detection; for now all jobs use remote LLM concurrency.
     const isLocal = false;
     const key = this.concurrency.lockKey(projectId, isLocal);
+    this.logger.debug('dispatch: awaiting concurrency lock', { jobId, kind: job.kind, projectId, lockKey: key });
 
     await this.concurrency.run(key, async () => {
       // Claim the job atomically; if another worker beat us to it inside the lock, stand down.
@@ -113,18 +115,24 @@ export class JobExecutor {
         this.logger.warn('dispatch: job already claimed by another worker', { jobId });
         return;
       }
+      const startedAt = Date.now();
+      // Payload can carry chapter lists, guidance, limits — sensitive/verbose, so it rides on debug.
+      this.logger.info('Job started', { jobId, kind: job.kind, projectId, target: job.target });
+      this.logger.debug('Job payload', { jobId, kind: job.kind, payload: job.payload });
       try {
         await this.runJob(job);
         await this.jobService.succeed(jobId);
+        this.logger.info('Job succeeded', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt });
       } catch (err) {
         const msg = err instanceof Error ? err.message : String(err);
-        this.logger.error('Job failed', { jobId, kind: job.kind, err });
+        this.logger.error('Job failed', { jobId, kind: job.kind, projectId, durationMs: Date.now() - startedAt, err });
         await this.jobService.fail(jobId, msg);
       }
     });
   }
 
   private async runJob(job: Job.Row): Promise<void> {
+    this.logger.debug('runJob: routing to handler', { jobId: job.id, kind: job.kind });
     switch (job.kind) {
       case 'generate':
         return this.runGenerate(job);
@@ -145,10 +153,13 @@ export class JobExecutor {
   private async runGenerate(job: Job.Row): Promise<void> {
     const { chapters = [], autoFix, maxFixes, guidance } = (job.payload ?? {}) as GeneratePayload;
     const total = chapters.length;
+    this.logger.debug('runGenerate: starting', { jobId: job.id, chapters, total, autoFix, maxFixes, guidance });
 
     for (const [i, chapter] of chapters.entries()) {
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'generating' });
+      this.logger.debug('runGenerate: generating chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runChapterGeneration({ projectId: job.projectId, chapter, autoFix, maxFixes, guidance, jobId: job.id });
+      this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
       // The run service swallows its own errors into a `failed` result; surface that as a job failure
       // instead of quietly marking the job done with no draft persisted.
       if (result.status === 'failed') throw new Error(`chapter ${chapter} generation failed (run ${result.runId})`);
@@ -158,18 +169,23 @@ export class JobExecutor {
   private async runExtract(job: Job.Row): Promise<void> {
     const { chapters = [] } = (job.payload ?? {}) as ExtractPayload;
     const total = chapters.length;
+    this.logger.debug('runExtract: starting', { jobId: job.id, chapters, total });
 
     for (const [i, chapter] of chapters.entries()) {
       await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'extracting' });
+      this.logger.debug('runExtract: extracting chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter });
+      this.logger.debug('runExtract: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
       if (result.status === 'failed') throw new Error(`chapter ${chapter} extraction failed (run ${result.runId})`);
     }
   }
 
   private async runBackfill(job: Job.Row): Promise<void> {
+    this.logger.info('runBackfill: reindexing project', { jobId: job.id, projectId: job.projectId });
     await this.jobService.progress(job.id, { done: 0, total: 1, current: 'all', phase: 'embedding' });
     await this.indexingService.backfill(job.projectId);
     await this.jobService.progress(job.id, { done: 1, total: 1, current: 'all', phase: 'embedding' });
+    this.logger.info('runBackfill: done', { jobId: job.id, projectId: job.projectId });
   }
 
   // An explicit `limit` keeps the old single-batch behavior; without one the job scrapes to
@@ -177,10 +193,12 @@ export class JobExecutor {
   // follow live. `done` is the total chapters scraped so far (the cursor), not this job's count.
   private async runIngest(job: Job.Row): Promise<void> {
     const { limit, delayMs } = (job.payload ?? {}) as IngestPayload;
+    this.logger.info('runIngest: starting', { jobId: job.id, projectId: job.projectId, limit, delayMs, batchSize: INGEST_BATCH });
     await this.jobService.progress(job.id, { done: 0, total: 0, current: 'scraping', phase: 'ingest' });
 
     let complete = false;
     let scraped = 0;
+    let batch = 0;
     do {
       const result = await this.acquireService.ingest(job.projectId, { limit: limit ?? INGEST_BATCH, delayMs });
       complete = result.complete;
@@ -188,6 +206,7 @@ export class JobExecutor {
       const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, job.projectId), columns: { scrapeNextNumber: true } });
       scraped = Math.max((project?.scrapeNextNumber ?? 1) - 1, 0);
       await this.jobService.progress(job.id, { done: scraped, total: 0, current: `chapter ${scraped}`, phase: 'ingest' });
+      this.logger.debug('runIngest: batch complete', { jobId: job.id, batch: batch++, ingested: result.ingested, scrapedTotal: scraped, complete });
 
       if (!complete && result.ingested === 0) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
     } while (!complete && limit === undefined);
@@ -196,9 +215,12 @@ export class JobExecutor {
     // first — webnovel's part markers feed the recombine ladder — then part merging. Both are safe
     // no-ops when unconfigured or guarded.
     if (complete) {
+      this.logger.info('runIngest: scrape complete — running hygiene passes', { jobId: job.id, projectId: job.projectId, scraped });
       await this.jobService.progress(job.id, { done: scraped, total: scraped, current: 'merging parts', phase: 'recombining' });
       await this.webnovelCatalog.autoSync(job.projectId);
       await this.recombineService.autoRecombine(job.projectId);
+    } else {
+      this.logger.info('runIngest: batch limit reached, scrape still incomplete', { jobId: job.id, projectId: job.projectId, scraped });
     }
 
     await this.jobService.progress(job.id, { done: scraped, total: scraped, current: 'done', phase: 'ingest' });
@@ -210,28 +232,33 @@ export class JobExecutor {
   private async runRebrand(job: Job.Row): Promise<void> {
     const projectId = job.projectId;
     const payload = (job.payload ?? {}) as RebrandPayload;
+    this.logger.info('runRebrand: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
 
     try {
       // Phase 1: finish acquisition. Blocking on a stalled scrape is correct — nothing to convert.
       let project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       if (!project) throw new Error(`project ${projectId} not found`);
+      this.logger.debug('runRebrand: phase 1 — acquisition', { jobId: job.id, projectId, scrapeComplete: project.scrapeComplete });
       while (!project.scrapeComplete) {
         await this.setRebrandStatus(projectId, 'ingesting');
         await this.jobService.progress(job.id, { done: project.scrapeNextNumber ?? 0, total: 0, current: 'scraping', phase: 'ingest' });
         const result = await this.acquireService.ingest(projectId, {});
         project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
         if (!project) throw new Error(`project ${projectId} not found`);
+        this.logger.debug('runRebrand: acquisition batch', { jobId: job.id, ingested: result.ingested, scrapeComplete: project.scrapeComplete });
         if (result.ingested === 0 && !project.scrapeComplete) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
       }
 
       // Phase 1.5: reference titles from webnovel (when configured), then merge translator-split
       // chapter parts — both before the glossary ever sees them (recombine design §1, §5); the
       // guards make these safe no-ops on resume.
+      this.logger.info('runRebrand: phase 1.5 — retitle + recombine', { jobId: job.id, projectId });
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
       await this.webnovelCatalog.autoSync(projectId);
       await this.recombineService.autoRecombine(projectId);
 
       // Phase 2: glossary seed (idempotent inside the service — resume never re-seeds or re-bills).
+      this.logger.info('runRebrand: phase 2 — glossary seed', { jobId: job.id, projectId });
       await this.setRebrandStatus(projectId, 'glossary');
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'glossary', phase: 'glossary' });
       await this.rebrandService.seedGlossary(projectId, job.id);
@@ -240,17 +267,27 @@ export class JobExecutor {
       await this.setRebrandStatus(projectId, 'converting');
       const targets = await this.selectRebrandChapters(projectId, payload);
       const total = targets.length;
+      this.logger.info('runRebrand: phase 3 — converting chapters', { jobId: job.id, projectId, total });
+      this.logger.debug('runRebrand: conversion targets', { jobId: job.id, targets });
+      let failed = 0;
       for (const [i, chapter] of targets.entries()) {
         await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'converting' });
+        this.logger.debug('runRebrand: converting chapter', { jobId: job.id, chapter, index: i, total });
         const result = await this.workflowRunService.runChapterRebrand({ projectId, chapter, jobId: job.id });
+        this.logger.debug('runRebrand: chapter conversion finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
         // Flag-and-continue — a deliberate divergence from runGenerate/runExtract's throw: a failed
         // chapter records a failed conversion row and the loop moves on; the pipeline never blocks.
-        if (result.status === 'failed') await this.recordFailedConversion(projectId, chapter, result.runId);
+        if (result.status === 'failed') {
+          failed++;
+          await this.recordFailedConversion(projectId, chapter, result.runId);
+        }
       }
 
       await this.jobService.progress(job.id, { done: total, total, current: 'done', phase: 'converting' });
       await this.setRebrandStatus(projectId, 'done');
+      this.logger.info('runRebrand: complete', { jobId: job.id, projectId, total, converted: total - failed, failed });
     } catch (err) {
+      this.logger.error('runRebrand: failed', { jobId: job.id, projectId, err });
       await this.setRebrandStatus(projectId, 'failed', err instanceof Error ? err.message : String(err));
       throw err;
     }

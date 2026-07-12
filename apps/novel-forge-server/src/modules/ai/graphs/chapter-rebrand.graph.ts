@@ -111,6 +111,14 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     if (!chapter) throw new Error(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
     if (!rebrand?.worldNotes) throw new Error(`[loadChapter] Rebrand glossary is not seeded for project ${state.projectId}`);
 
+    logger.debug('rebrand loadChapter', {
+      runId: state.runId,
+      chapter: state.chapter,
+      proseLength: (chapter.content ?? '').length,
+      glossarySize: glossaryRows.length,
+      hasCarryState: !!previous?.carryState,
+      hasPrevBody: !!previous?.body,
+    });
     return {
       chapterProse: chapter.content ?? '',
       chapterTitle: chapter.title ?? '',
@@ -137,6 +145,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     });
     if (pack.id) await db.update(schema.workflowRuns).set({ contextPackId: pack.id }).where(eq(schema.workflowRuns.id, state.runId));
 
+    logger.debug('rebrand assembleContext', { runId: state.runId, chapter: state.chapter, glossarySliceLength: glossarySlice.length, contextPackLength: pack.rendered.length });
     return { contextPack: pack.rendered, glossarySlice };
   }
 
@@ -161,6 +170,15 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       projectRow as ProjectConfig | undefined,
     )) as RebrandConvertOutput;
 
+    logger.debug('rebrand convert', {
+      runId: state.runId,
+      chapter: state.chapter,
+      attempt: state.attempt,
+      bodyLength: result.body.length,
+      discoveredNames: result.discoveredNames?.length ?? 0,
+      fixes: result.fixes?.length ?? 0,
+      addedScenes: result.addedScenes?.length ?? 0,
+    });
     return { converted: result };
   }
 
@@ -168,7 +186,9 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
   function residueScan(state: RebrandState) {
     if (!state.converted) return { residueIssues: [] };
     const combined = [...state.glossary, ...(state.converted.discoveredNames ?? [])];
-    return { residueIssues: scanResidue(state.converted.body, combined, state.settings.bannedExtra ?? []) };
+    const residueIssues = scanResidue(state.converted.body, combined, state.settings.bannedExtra ?? []);
+    if (residueIssues.length > 0) logger.debug('rebrand residueScan found issues', { runId: state.runId, chapter: state.chapter, issues: residueIssues });
+    return { residueIssues };
   }
 
   // ─── audit ────────────────────────────────────────────────────────────────────
@@ -189,6 +209,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
 
     const auditIssues: RebrandAuditIssueRecord[] =
       result.verdict === 'issues' ? result.issues.map(i => ({ source: 'audit' as const, type: i.type, detail: i.detail, excerpt: i.excerpt })) : [];
+    logger.debug('rebrand audit', { runId: state.runId, chapter: state.chapter, verdict: result.verdict, auditIssues: auditIssues.length });
     return { auditIssues };
   }
 
@@ -206,6 +227,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
     const converted = state.converted;
     const issues: ConversionIssue[] = [...state.residueIssues, ...state.auditIssues];
     const status: Rebrand.ConversionStatus = issues.length > 0 ? 'attention' : 'converted';
+    logger.debug('rebrand persistConversion', { runId: state.runId, chapter: state.chapter, status, issues: issues.length, attempt: state.attempt });
 
     const values = {
       projectId,

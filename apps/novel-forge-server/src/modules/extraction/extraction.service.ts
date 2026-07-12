@@ -65,6 +65,7 @@ export class ExtractionService {
   }
 
   async extractChapter(projectId: bigint, chapterNumber: number): Promise<void> {
+    this.logger.debug('extractChapter: starting', { projectId, chapterNumber });
     // 1. Load chapter content.
     const chapter = await this.db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, chapterNumber)) });
     if (!chapter?.content) {
@@ -98,6 +99,17 @@ export class ExtractionService {
       ctx,
       projectRow as Parameters<ModelRouterService['structured']>[3],
     )) as ExtractionOutput;
+
+    this.logger.debug('extractChapter: extracted knowledge', {
+      projectId,
+      chapterNumber,
+      entities: result.entities.length,
+      relationships: result.relationships.length,
+      beats: result.beats.length,
+      plotThreads: result.plotThreads.length,
+      worldFacts: result.worldFacts.length,
+      mysteries: result.mysteries.length,
+    });
 
     // 4. Persist extracted knowledge using KnowledgeRepository.
     for (const e of result.entities) {
@@ -174,6 +186,7 @@ export class ExtractionService {
 
     // 7. Auto-consolidate after each chapter to keep significance + relationships current.
     await this.consolidateService.consolidate(projectId);
+    this.logger.debug('extractChapter: done', { projectId, chapterNumber });
   }
 
   async extractBatch(projectId: bigint, options: ExtractBatchOptions = {}): Promise<ExtractBatchResult> {
@@ -185,6 +198,7 @@ export class ExtractionService {
       columns: { number: true },
       limit,
     });
+    this.logger.info('extractBatch: starting', { projectId, pending: chapters.length, limit });
 
     let done = 0;
     for (const ch of chapters) {
@@ -196,6 +210,7 @@ export class ExtractionService {
       }
     }
 
+    this.logger.info('extractBatch: complete', { projectId, done, attempted: chapters.length });
     return { done };
   }
 }

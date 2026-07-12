@@ -75,6 +75,7 @@ export class RetrievalService {
         LIMIT ${k}
       `);
 
+      this.logger.debug('searchProse', { projectId, query, k, hits: rows.length, topScore: rows[0]?.score });
       return rows.map(row => ({
         text: row.text,
         score: row.score,
@@ -110,6 +111,7 @@ export class RetrievalService {
         LIMIT ${k}
       `);
 
+      this.logger.debug('searchLore', { projectId, query, k, kinds: opts?.kinds, hits: loreRows.length, topScore: loreRows[0]?.score });
       return loreRows.map(row => ({
         text: row.text,
         score: row.score,

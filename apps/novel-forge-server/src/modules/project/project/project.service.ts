@@ -59,6 +59,7 @@ export class ProjectService {
 
   async create(body: CreateProjectBody): Promise<Project.Row> {
     if (body.kind === 'source' && !body.url) throw new ServerError(AppErrorCode.SRC_001);
+    this.logger.debug('create project', { name: body.name, kind: body.kind, url: body.url, webnovelId: body.webnovelId, contentMode: body.contentMode });
 
     const [project] = await this.db
       .insert(schema.projects)
@@ -67,6 +68,7 @@ export class ProjectService {
       .catch(err => this.databaseService.translateError(err));
 
     if (!project) throw new ServerError(AppErrorCode.S001);
+    this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
 
     if (body.kind === 'new_novel') {
       await this.db
@@ -219,11 +221,13 @@ export class ProjectService {
   }
 
   async delete(id: bigint): Promise<void> {
+    this.logger.info('deleting project (cascades to all child tables)', { projectId: id });
     const result = await this.db.delete(schema.projects).where(eq(schema.projects.id, id)).returning();
     if (result.length === 0) throw new ServerError(AppErrorCode.PRJ_001);
   }
 
   async reset(id: bigint, stage: string): Promise<ResetResponse> {
+    this.logger.info('resetting project stage', { projectId: id, stage });
     const tablesCleared: string[] = [];
 
     if (stage === 'extract' || stage === 'all') {
@@ -261,6 +265,7 @@ export class ProjectService {
       if (!tablesCleared.some(t => t.startsWith('jobs'))) tablesCleared.push('jobs(generate/finalize/backfill)');
     }
 
+    this.logger.info('project stage reset complete', { projectId: id, stage, tablesCleared });
     return { stage, tablesCleared };
   }
 

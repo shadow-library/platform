@@ -48,13 +48,17 @@ export class JobService {
   // if a pending/in_progress job already exists we return it unchanged, but a previously terminal job
   // (done/failed) is reset to pending with the new payload so re-posting genuinely re-runs the work.
   async enqueue(projectId: bigint, kind: Job.Kind, target: string, payload?: unknown): Promise<string> {
+    this.logger.debug('enqueue', { projectId, kind, target, payload });
     const [inserted] = await this.db
       .insert(schema.jobs)
       .values({ projectId, kind, target, payload: payload as never })
       .onConflictDoNothing()
       .returning({ id: schema.jobs.id });
 
-    if (inserted) return inserted.id;
+    if (inserted) {
+      this.logger.info('Job enqueued', { jobId: inserted.id, projectId, kind, target });
+      return inserted.id;
+    }
 
     // Conflict on the (projectId, kind, target) unique index — inspect the existing job.
     const existing = await this.db.query.jobs.findFirst({
@@ -64,9 +68,13 @@ export class JobService {
     if (!existing) throw new Error(`enqueue: job not found after conflict on (${projectId}, ${kind}, ${target})`);
 
     // Active job: real dedup — return it as-is without disturbing an in-flight run.
-    if (existing.status === 'pending' || existing.status === 'in_progress') return existing.id;
+    if (existing.status === 'pending' || existing.status === 'in_progress') {
+      this.logger.debug('enqueue: deduped onto active job', { jobId: existing.id, kind, target, status: existing.status });
+      return existing.id;
+    }
 
     // Terminal job (done/failed): reset it so the re-request runs again from a clean slate.
+    this.logger.info('Job re-enqueued (terminal job reset to pending)', { jobId: existing.id, kind, target, previousStatus: existing.status });
     await this.db
       .update(schema.jobs)
       .set({ status: 'pending', attempts: 0, lastError: null, progress: null, payload: payload as never, nextAttemptAt: null, updatedAt: new Date() })
@@ -91,6 +99,7 @@ export class JobService {
   }
 
   async progress(jobId: string, progress: JobProgress): Promise<void> {
+    this.logger.debug('job progress', { jobId, ...progress });
     await this.db
       .update(schema.jobs)
       .set({ progress: progress as never, updatedAt: new Date() })
@@ -98,10 +107,12 @@ export class JobService {
   }
 
   async succeed(jobId: string): Promise<void> {
+    this.logger.debug('marking job done', { jobId });
     await this.db.update(schema.jobs).set({ status: 'done', updatedAt: new Date() }).where(eq(schema.jobs.id, jobId));
   }
 
   async fail(jobId: string, error: string): Promise<void> {
+    this.logger.warn('marking job failed', { jobId, error: error.slice(0, 2000) });
     await this.db
       .update(schema.jobs)
       .set({ status: 'failed', lastError: error.slice(0, 2000), updatedAt: new Date() })

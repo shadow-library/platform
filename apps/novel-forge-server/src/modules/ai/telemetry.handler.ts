@@ -80,9 +80,22 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const nf = metadata?.['nfTelemetry'] as (TelemetryContext & { projectId: string; provider: string; model: string; attempt: number }) | undefined;
     if (nf) {
       const { provider, model, attempt, projectId, ...ctx } = nf;
+      this.logger.debug('LLM call started', {
+        runId,
+        provider,
+        model,
+        attempt,
+        role: ctx.role,
+        promptKey: ctx.promptKey,
+        node: ctx.node,
+        workflowRunId: ctx.runId,
+        promptTokensEstimate,
+      });
       this.pending.set(runId, { startedAt: Date.now(), ctx: { ...ctx, projectId: BigInt(projectId) }, provider, model, attempt, promptTokensEstimate });
       return;
     }
+
+    this.logger.debug('LLM call started without attribution metadata', { runId, promptTokensEstimate });
 
     this.pending.set(runId, {
       startedAt: Date.now(),
@@ -116,6 +129,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const outputTokens: number =
       usage?.output_tokens ?? usage?.completion_tokens ?? meta?.message?.usage_metadata?.output_tokens ?? meta?.generationInfo?.eval_count ?? countTokens(rawOutput);
 
+    this.logger.debug('LLM call completed', { runId, role: call.ctx.role, model: call.model, latencyMs, inputTokens, outputTokens, attempt: call.attempt });
+
     try {
       await this.db.insert(schema.modelCalls).values({
         projectId: call.ctx.projectId,
@@ -134,7 +149,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
         rawOutput,
       });
     } catch (err) {
-      this.logger.error('Failed to write model_call telemetry row', { err });
+      this.logger.error('Failed to write model_call telemetry row', { err, runId });
     }
   }
 
@@ -142,6 +157,8 @@ export class TelemetryHandler extends BaseCallbackHandler {
     const call = this.pending.get(runId);
     if (!call) return;
     this.pending.delete(runId);
+
+    this.logger.warn('LLM call errored', { runId, role: call.ctx.role, model: call.model, attempt: call.attempt, err });
 
     try {
       await this.db.insert(schema.modelCalls).values({

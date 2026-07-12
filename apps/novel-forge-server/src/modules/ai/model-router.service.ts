@@ -187,6 +187,19 @@ export class ModelRouterService {
     const resolved = this.resolveModel(role, project);
     const llm = this.buildClient(resolved, { format: toJsonSchemaFormat(promptModule.schema) });
     const messages = await this.buildMessages(promptModule, input, resolved);
+    // Input carries the rendered context pack and user prose — sensitive/large, so it rides on debug
+    // (dev-only) as a full snapshot to reproduce the exact model call locally.
+    this.logger.debug('structured: invoking model', {
+      role,
+      provider: resolved.provider,
+      model: resolved.model,
+      promptKey: promptModule.key,
+      promptVersion: promptModule.version,
+      runId: ctx.runId,
+      node: ctx.node,
+      inputKeys: Object.keys(input),
+      input,
+    });
 
     // ─── Cache read-through (deterministic roles only) ────────────────────────
     const requestHash = CACHEABLE_ROLES.has(role) ? this.hashRequest(resolved, promptModule, input) : null;
@@ -198,6 +211,7 @@ export class ModelRouterService {
           this.logger.debug('LLM cache hit — skipping model call', { role, requestHash });
           return parsedCached.data;
         }
+        this.logger.debug('LLM cache row present but no longer parses — re-invoking', { role, requestHash });
       }
     }
 
@@ -205,11 +219,13 @@ export class ModelRouterService {
     const rawOutput1 = await this.invokeResilient(llm, messages, this.invokeConfig(ctx, resolved, 0), role);
     const parsed1 = this.parseOutput(promptModule, tryParseJson(rawOutput1));
     if (parsed1.success) {
+      this.logger.debug('structured: parsed on first attempt', { role, runId: ctx.runId, outputLength: rawOutput1.length });
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput1);
       return parsed1.data;
     }
 
     this.logger.warn('Attempt 1 parse failed — repairing', { role, issues: parsed1.issues.length });
+    this.logger.debug('Attempt 1 raw output and issues', { role, runId: ctx.runId, rawOutput: rawOutput1, issues: renderSchemaIssues(parsed1.issues) });
 
     // ─── Attempt 2: repair — continue the conversation with the actual issues ──
     const repairMessages: BaseMessage[] = [
@@ -223,23 +239,28 @@ export class ModelRouterService {
     const rawOutput2 = await this.invokeResilient(llm, repairMessages, this.invokeConfig(ctx, resolved, 1), role);
     const parsed2 = this.parseOutput(promptModule, tryParseJson(rawOutput2));
     if (parsed2.success) {
+      this.logger.debug('structured: parsed after repair', { role, runId: ctx.runId, outputLength: rawOutput2.length });
       await this.cacheResponse(requestHash, ctx, resolved, promptModule, rawOutput2);
       return parsed2.data;
     }
 
     // ─── Attempt 3: tolerant extraction ──────────────────────────────────────
     this.logger.warn('Repair parse failed — trying tolerant extraction', { role });
+    this.logger.debug('Repair raw output and issues', { role, runId: ctx.runId, rawOutput: rawOutput2, issues: renderSchemaIssues(parsed2.issues) });
     const extracted = extractJsonBlock(rawOutput2);
     if (extracted) {
       const parsed3 = this.parseOutput(promptModule, extracted);
       if (parsed3.success) {
+        this.logger.debug('structured: parsed via tolerant extraction', { role, runId: ctx.runId });
         await this.cacheResponse(requestHash, ctx, resolved, promptModule, JSON.stringify(extracted));
         return parsed3.data;
       }
     }
 
     // ─── Fail ────────────────────────────────────────────────────────────────
-    this.logger.error('All parse attempts failed', { role, rawOutput1: rawOutput1.slice(0, 200) });
+    this.logger.error('All parse attempts failed', { role, runId: ctx.runId, rawOutput1: rawOutput1.slice(0, 200) });
+    // Full outputs only on debug (dev) — an operator can read the exact prose the model returned.
+    this.logger.debug('All parse attempts failed — full raw outputs', { role, runId: ctx.runId, rawOutput1, rawOutput2 });
     throw new ServerError(AppErrorCode.AI_001);
   }
 
