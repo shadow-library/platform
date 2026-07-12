@@ -134,20 +134,9 @@
   color: var(--sh-text-secondary);
 }
 
-.splitBtn {
-  display: flex;
-}
-
-.splitLeft {
-  border-top-right-radius: 0;
-  border-bottom-right-radius: 0;
-}
-
-.splitRight {
-  border-top-left-radius: 0;
-  border-bottom-left-radius: 0;
+/* The dropdown caret is a slim segment of the attached ButtonGroup; ButtonGroup fuses the borders. */
+.splitCaret {
   padding-inline: 8px;
-  box-shadow: inset 1px 0 0 rgba(255, 255, 255, 0.25);
 }
 
 .menuNote {
@@ -505,6 +494,23 @@
 }
 
 .emptyProse {
+  color: var(--sh-text-tertiary);
+}
+
+/* Scene illustrations sit below the prose, in the app sans font rather than the reader's serif. */
+.sceneImages {
+  margin-top: 44px;
+  padding-top: 26px;
+  border-top: 1px solid var(--sh-border-subtle);
+  font-family: var(--sh-font-sans);
+}
+
+.sceneImagesHead {
+  margin-bottom: 12px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
   color: var(--sh-text-tertiary);
 }
 

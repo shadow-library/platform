@@ -1,0 +1,117 @@
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 10px;
+}
+
+.tile {
+  position: relative;
+  margin: 0;
+  aspect-ratio: 1;
+  border-radius: var(--sh-radius-md);
+  overflow: hidden;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+}
+
+.img,
+.imgFallback {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.imgFallback {
+  background: var(--sh-surface-well);
+}
+
+/* Remove button sits top-right, revealed on hover/focus of the tile. */
+.remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: var(--sh-radius-sm);
+  background: rgba(0, 0, 0, 0.5);
+  color: #fff;
+  cursor: pointer;
+  opacity: 0;
+  backdrop-filter: blur(4px);
+  transition:
+    opacity 0.14s,
+    background 0.12s;
+}
+
+.tile:hover .remove,
+.tile:focus-within .remove {
+  opacity: 1;
+}
+
+.remove:hover {
+  background: var(--sh-danger-solid);
+}
+
+.remove:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.caption {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 12px 8px 5px;
+  font-size: 11px;
+  line-height: 1.3;
+  color: #fff;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.72), transparent);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* The add tile mirrors the image tiles' footprint with a dashed, accent-tinted affordance. */
+.addTile {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  aspect-ratio: 1;
+  border: 1px dashed var(--sh-border);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+  transition:
+    border-color 0.12s,
+    color 0.12s,
+    background 0.12s;
+}
+
+.addTile:hover:not(:disabled) {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+}
+
+.addTile:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.addLabel {
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.input {
+  display: none;
+}

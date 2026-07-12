@@ -1,13 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Spinner, toast } from '@shadow-library/ui';
+import { Spinner } from '@shadow-library/ui';
 import { type ReactNode, useRef } from 'react';
 
 /**
  * Importing user defined packages
  */
 import { ImageIcon, TrashIcon } from '@/components/icons';
+import { ACCEPT_ATTR, type UploadMime, readImageFile } from './image-file';
 import styles from './ImageUpload.module.css';
 
 /**
@@ -15,11 +16,6 @@ import styles from './ImageUpload.module.css';
  * Replace / Remove actions over it. The parent sizes and shapes the box via `className`, and receives
  * the chosen file as base64 bytes ready for the upload endpoints.
  */
-type UploadMime = 'image/png' | 'image/jpeg' | 'image/webp';
-const ACCEPTED: UploadMime[] = ['image/png', 'image/jpeg', 'image/webp'];
-// Keep the base64 body under the server's 12MB limit and give oversized files a clear message.
-const MAX_BYTES = 8 * 1024 * 1024;
-
 interface ImageUploadProps {
   src?: string;
   alt: string;
@@ -34,26 +30,6 @@ export function ImageUpload({ src, alt, uploading, className, placeholder, onUpl
   const inputRef = useRef<HTMLInputElement>(null);
 
   const pick = (): void => inputRef.current?.click();
-
-  const onFile = (file: File | undefined): void => {
-    if (!file) return;
-    if (!ACCEPTED.includes(file.type as UploadMime)) {
-      toast.danger('Use a PNG, JPEG, or WebP image');
-      return;
-    }
-    if (file.size > MAX_BYTES) {
-      toast.danger('Image is too large — pick one under 8 MB');
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => {
-      // `readAsDataURL` yields `data:<mime>;base64,<bytes>` — the endpoint wants the bytes alone.
-      const base64 = (reader.result as string).split(',')[1] ?? '';
-      onUpload({ mime: file.type as UploadMime, image: base64 });
-    };
-    reader.onerror = () => toast.danger('Could not read that image');
-    reader.readAsDataURL(file);
-  };
 
   return (
     <div className={`${styles.preview} ${className ?? ''}`} data-empty={src ? undefined : 'true'}>
@@ -85,7 +61,7 @@ export function ImageUpload({ src, alt, uploading, className, placeholder, onUpl
         )}
       </div>
 
-      <input ref={inputRef} type="file" accept="image/png,image/jpeg,image/webp" className={styles.input} onChange={e => onFile(e.target.files?.[0])} />
+      <input ref={inputRef} type="file" accept={ACCEPT_ATTR} className={styles.input} onChange={e => readImageFile(e.target.files?.[0], onUpload)} />
     </div>
   );
 }

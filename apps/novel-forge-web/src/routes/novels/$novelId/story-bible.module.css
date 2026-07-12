@@ -284,6 +284,10 @@
   gap: 7px;
 }
 
+.gallerySection {
+  margin-top: 26px;
+}
+
 .forgeDock {
   position: absolute;
   left: 50%;

@@ -11,15 +11,18 @@ import { useEffect, useMemo, useState } from 'react';
 import { ChevronDownIcon, PlusIcon, SparkIcon, TrashIcon } from '@/components/icons';
 import { Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
+import { ImageGallery } from '@/components/nf/ImageGallery';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
   type CreateEntityBody,
   type EntityResponse,
   type EntityType,
   type UpdateEntityBody,
+  useAddEntityImageMutation,
   useAuditBibleMutation,
   useCreateEntityMutation,
   useDeleteEntityMutation,
+  useDeleteEntityImageByIdMutation,
   useDeleteEntityImageMutation,
   useEntityQuery,
   useUploadEntityImageMutation,
@@ -330,6 +333,8 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
   const entityQuery = useEntityQuery(novelId, entityKey);
   const uploadImage = useUploadEntityImageMutation(novelId, entityKey);
   const removeImage = useDeleteEntityImageMutation(novelId, entityKey);
+  const addGalleryImage = useAddEntityImageMutation(novelId, entityKey);
+  const removeGalleryImage = useDeleteEntityImageByIdMutation(novelId, entityKey);
 
   if (entityQuery.isLoading) return <PaneLoader />;
   if (entityQuery.error) return <PaneError error={entityQuery.error} />;
@@ -386,6 +391,17 @@ function EntityDetail({ novelId, entityKey, onEdit }: EntityDetailProps): React.
               {entity.status && <StatusChip intent="neutral">{entity.status}</StatusChip>}
               {entity.origin && <StatusChip intent="info">{entity.origin}</StatusChip>}
               {entity.firstSeenChapter != null && <StatusChip intent="neutral">first seen · ch. {entity.firstSeenChapter}</StatusChip>}
+            </div>
+
+            <div className={styles.gallerySection}>
+              <div className={styles.sectionLabel}>Gallery</div>
+              <ImageGallery
+                images={(entity.images ?? []).map(img => ({ id: img.id, url: imageUrl(img.imagePath), caption: img.caption }))}
+                busy={addGalleryImage.isPending || removeGalleryImage.isPending}
+                addLabel="Add image"
+                onAdd={body => addGalleryImage.mutate(body, { onSuccess: () => toast.success('Image added'), onError: e => toast.danger(e.message) })}
+                onRemove={id => removeGalleryImage.mutate(id, { onSuccess: () => toast.success('Image removed'), onError: e => toast.danger(e.message) })}
+              />
             </div>
           </div>
         </div>

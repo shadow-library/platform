@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, Tooltip, toast } from '@shadow-library/ui';
+import { Button, ButtonGroup, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, Tooltip, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
 import DOMPurify from 'dompurify';
@@ -13,9 +13,13 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
 import { Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
+import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
   type DraftResponse,
+  useAddChapterImageMutation,
   useApproveDraftMutation,
+  useChapterImagesQuery,
+  useDeleteChapterImageMutation,
   useDeleteDraftMutation,
   useDraftQuery,
   useExtractToBibleMutation,
@@ -28,6 +32,7 @@ import {
   useProjectStatusQuery,
   useUpdateDraftMutation,
 } from '@/lib/apis';
+import { imageUrl } from '@/lib/format';
 
 import styles from './chapters.module.css';
 
@@ -257,13 +262,13 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
               {drafts.length} drafts · {totalWords.toLocaleString()} words
             </p>
           </div>
-          <div className={styles.splitBtn}>
-            <Button variant="primary" loading={generate.isPending || createManual.isPending} prefix={<PlusIcon />} onClick={canGenerate ? startGeneration : writeManually} className={styles.splitLeft}>
+          <ButtonGroup variant="primary" aria-label="Chapter creation">
+            <Button loading={generate.isPending || createManual.isPending} prefix={<PlusIcon />} onClick={canGenerate ? startGeneration : writeManually}>
               {canGenerate ? `Generate ch ${nextBriefChapter}` : 'Write chapter'}
             </Button>
             <DropdownMenu>
               <DropdownMenu.Trigger asChild>
-                <Button variant="primary" aria-label="Chapter creation options" className={styles.splitRight}>
+                <Button aria-label="Chapter creation options" className={styles.splitCaret}>
                   <ChevronDownIcon size={14} />
                 </Button>
               </DropdownMenu.Trigger>
@@ -280,7 +285,7 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
                 </DropdownMenu.Item>
               </DropdownMenu.Content>
             </DropdownMenu>
-          </div>
+          </ButtonGroup>
         </div>
 
         {activeJob && (
@@ -487,6 +492,9 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
   const approveDraft = useApproveDraftMutation(novelId);
   const judge = useJudgeDraftMutation(novelId, chapter);
   const extract = useExtractToBibleMutation(novelId, chapter);
+  const sceneImagesQuery = useChapterImagesQuery(novelId, chapter);
+  const addSceneImage = useAddChapterImageMutation(novelId, chapter);
+  const removeSceneImage = useDeleteChapterImageMutation(novelId, chapter);
 
   const [reviewOpen, setReviewOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
@@ -700,6 +708,17 @@ function ChapterEditor({ novelId, chapter, onBack, onPick }: ChapterEditorProps)
               ) : (
                 <p className={styles.emptyProse}>This chapter has no prose yet. Use “Edit prose” to write it, or generate a draft from its brief.</p>
               )}
+
+              <section className={styles.sceneImages}>
+                <div className={styles.sceneImagesHead}>Scene images</div>
+                <ImageGallery
+                  images={(sceneImagesQuery.data?.items ?? []).map(img => ({ id: img.id, url: imageUrl(img.imagePath), caption: img.caption }))}
+                  busy={addSceneImage.isPending || removeSceneImage.isPending}
+                  addLabel="Add scene image"
+                  onAdd={body => addSceneImage.mutate(body, { onSuccess: () => toast.success('Scene image added'), onError: e => toast.danger(e.message) })}
+                  onRemove={id => removeSceneImage.mutate(id, { onSuccess: () => toast.success('Scene image removed'), onError: e => toast.danger(e.message) })}
+                />
+              </section>
             </article>
           </div>
         )}

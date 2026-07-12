@@ -1,0 +1,64 @@
+/**
+ * Importing npm packages
+ */
+import { Spinner } from '@shadow-library/ui';
+import { useRef } from 'react';
+
+/**
+ * Importing user defined packages
+ */
+import { ImageIcon, TrashIcon } from '@/components/icons';
+import { ACCEPT_ATTR, type UploadMime, readImageFile } from './image-file';
+import styles from './ImageGallery.module.css';
+
+/**
+ * Defining types
+ */
+export interface GalleryImage {
+  id: string;
+  url?: string;
+  caption?: string | null;
+}
+
+interface ImageGalleryProps {
+  images: GalleryImage[];
+  busy?: boolean;
+  addLabel?: string;
+  onAdd: (body: { mime: UploadMime; image: string }) => void;
+  onRemove: (id: string) => void;
+}
+
+/**
+ * A grid of reference images with per-tile removal and an always-present "add" tile. Used for entity
+ * galleries and chapter scene images; the parent owns the mutations and passes resolved image URLs.
+ */
+export function ImageGallery({ images, busy, addLabel = 'Add image', onAdd, onRemove }: ImageGalleryProps): React.JSX.Element {
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  return (
+    <div className={styles.grid} aria-busy={busy || undefined}>
+      {images.map(image => (
+        <figure key={image.id} className={styles.tile}>
+          {image.url ? <img src={image.url} alt={image.caption ?? ''} className={styles.img} /> : <div className={styles.imgFallback} />}
+          <button type="button" className={styles.remove} onClick={() => onRemove(image.id)} disabled={busy} aria-label="Remove image">
+            <TrashIcon size={13} />
+          </button>
+          {image.caption && <figcaption className={styles.caption}>{image.caption}</figcaption>}
+        </figure>
+      ))}
+
+      <button type="button" className={styles.addTile} onClick={() => inputRef.current?.click()} disabled={busy}>
+        {busy ? (
+          <Spinner size="sm" />
+        ) : (
+          <>
+            <ImageIcon size={18} />
+            <span className={styles.addLabel}>{addLabel}</span>
+          </>
+        )}
+      </button>
+
+      <input ref={inputRef} type="file" accept={ACCEPT_ATTR} className={styles.input} onChange={e => readImageFile(e.target.files?.[0], onAdd)} />
+    </div>
+  );
+}
