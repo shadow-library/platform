@@ -649,6 +649,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/chapters/{n}/images': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List */
+    get: operations['list'];
+    put?: never;
+    /** Add */
+    post: operations['add'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{n}/images/{imageId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove */
+    delete: operations['remove'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/jobs/{jobId}': {
     parameters: {
       query?: never;
@@ -996,6 +1031,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/images/{projectId}/{filename}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Serve */
+    get: operations['serve'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/entities': {
     parameters: {
       query?: never;
@@ -1046,6 +1098,40 @@ export interface paths {
     post: operations['uploadImage'];
     /** Delete Image */
     delete: operations['deleteImage'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/images': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Add Image */
+    post: operations['addImage'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/entities/{entityKey}/images/{imageId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Remove Image */
+    delete: operations['removeImage'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1192,23 +1278,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/images/{projectId}/{filename}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Serve */
-    get: operations['serve'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/entities/{entityKey}/illustration': {
     parameters: {
       query?: never;
@@ -1311,6 +1380,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/retitle': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Retitle */
+    post: operations['retitle'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/recombine': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Recombine */
+    post: operations['recombine'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/consolidate': {
     parameters: {
       query?: never;
@@ -1373,6 +1476,110 @@ export interface paths {
     put?: never;
     /** Resume */
     post: operations['resume'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/rebrand/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Config */
+    put: operations['updateConfig'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/rebrand': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Status */
+    get: operations['status'];
+    put?: never;
+    /** Start Rebrand */
+    post: operations['startRebrand'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/rebrand/glossary': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Glossary */
+    get: operations['glossary'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/rebrand/chapters': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Conversions */
+    get: operations['listConversions'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/rebrand/chapters/{chapter}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Conversion */
+    get: operations['getConversion'];
+    put?: never;
+    /** Rerun Chapter */
+    post: operations['rerunChapter'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/rebrand/manuscript': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Manuscript */
+    get: operations['manuscript'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -1655,7 +1862,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'ingest' | 'extract' | 'generate' | 'finalize' | 'backfill' | 'resume';
+    JobKind: 'ingest' | 'extract' | 'generate' | 'finalize' | 'backfill' | 'resume' | 'rebrand';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed';
     ListDraftResponse: {
@@ -1968,6 +2175,25 @@ export interface components {
       metadata: {
         [key: string]: unknown;
       };
+    };
+    ListChapterImageResponse: {
+      items: components['schemas']['ChapterImageResponse'][];
+    };
+    ChapterImageResponse: {
+      id: string;
+      projectId: string;
+      chapter: number;
+      imagePath: string;
+      caption?: null | string;
+      sortOrder: number;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    AddChapterImageBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      image: string;
+      caption?: string;
     };
     JobResponse: {
       id: string;
@@ -2286,10 +2512,17 @@ export interface components {
       motivation?: null | string;
       body?: null | string;
       imagePath?: null | string;
+      images?: components['schemas']['EntityImageResponse'][];
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
       updatedAt: string;
+    };
+    EntityImageResponse: {
+      id: string;
+      imagePath: string;
+      caption?: null | string;
+      sortOrder: number;
     };
     ListEntityResponse: {
       total: number;
@@ -2311,6 +2544,12 @@ export interface components {
       /** @enum {string} */
       mime: 'image/png' | 'image/jpeg' | 'image/webp';
       image: string;
+    };
+    AddEntityImageBody: {
+      /** @enum {string} */
+      mime: 'image/png' | 'image/jpeg' | 'image/webp';
+      image: string;
+      caption?: string;
     };
     ApprovePlanResponse1: {
       volumesApproved: number;
@@ -2487,6 +2726,32 @@ export interface components {
       limit?: number;
       rearm?: boolean;
     };
+    RetitleResponse: {
+      fetched: number;
+      retitled: number;
+      chapterCount: number;
+      referenceCount: number;
+    };
+    RecombineBody: {
+      dryRun?: boolean;
+      useAi?: boolean;
+    };
+    RecombineResponse: {
+      applied: boolean;
+      before: number;
+      after: number;
+      merged: components['schemas']['MergedChapterItem'][];
+      ambiguous: components['schemas']['AmbiguousBoundaryItem'][];
+    };
+    MergedChapterItem: {
+      number: number;
+      title?: null | string;
+      parts: number;
+    };
+    AmbiguousBoundaryItem: {
+      afterNumber: number;
+      reason: string;
+    };
     ConsolidateResponse: {
       significanceUpdated: number;
       relationshipsPromoted: number;
@@ -2503,11 +2768,101 @@ export interface components {
     ResumeResponse: {
       jobId: string;
     };
+    RebrandConfigBody: {
+      directives?: string | null;
+      settings?: components['schemas']['RebrandSettingsBody'];
+    };
+    RebrandSettingsBody: {
+      bannedExtra?: string[];
+      auditEnabled?: boolean;
+    };
+    RebrandResponse: {
+      id: string;
+      status: components['schemas']['RebrandStatus'];
+      directives?: null | string;
+      worldNotes?: null | string;
+      settings?: null | {
+        [key: string]: unknown;
+      };
+      lastError?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    RebrandStatus: 'pending' | 'ingesting' | 'glossary' | 'converting' | 'done' | 'failed';
+    RebrandStartBody: {
+      force?: boolean;
+      limit?: number;
+    };
+    RebrandStatusResponse: {
+      rebrand: components['schemas']['RebrandResponse'];
+      sourceChapters: number;
+      scrapeComplete: boolean;
+      glossaryCount: number;
+      counts: components['schemas']['ConversionCountsResponse'];
+      job?: null | {
+        [key: string]: unknown;
+      };
+    };
+    ConversionCountsResponse: {
+      converted: number;
+      attention: number;
+      failed: number;
+    };
+    /** @enum {string} */
+    RebrandGlossaryCategory: 'character' | 'place' | 'country' | 'culture' | 'faction' | 'technique' | 'item' | 'term';
+    GlossaryListResponse: {
+      items: components['schemas']['GlossaryEntryResponse'][];
+    };
+    GlossaryEntryResponse: {
+      sourceName: string;
+      variants?: null | string[];
+      replacement: string;
+      category: components['schemas']['RebrandGlossaryCategory'];
+      notes?: null | string;
+      createdChapter?: null | number;
+    };
+    ListConversionsResponse: {
+      items: components['schemas']['ConversionSummaryResponse'][];
+    };
+    ConversionSummaryResponse: {
+      chapter: number;
+      title?: null | string;
+      status: components['schemas']['RebrandConversionStatus'];
+      issueCount: number;
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    RebrandConversionStatus: 'converted' | 'attention' | 'failed';
+    ConversionResponse: {
+      chapter: number;
+      title?: null | string;
+      body: string;
+      summaryOfChanges?: null | string;
+      fixes?: null | components['schemas']['ConversionDetailItem'][];
+      addedScenes?: null | components['schemas']['ConversionDetailItem'][];
+      issues?: null | components['schemas']['ConversionDetailItem'][];
+      status: components['schemas']['RebrandConversionStatus'];
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ConversionDetailItem: {
+      detail?: string;
+    } & {
+      [key: string]: unknown;
+    };
+    ManuscriptResponse: {
+      markdown: string;
+    };
     CreateProjectBody: {
       name: string;
       kind: components['schemas']['ProjectKind'];
       url?: string;
       title?: string;
+      webnovelId?: string;
       contentMode?: components['schemas']['ContentMode'];
     };
     /** @enum {string} */
@@ -2524,6 +2879,7 @@ export interface components {
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
       sourceUrl?: null | string;
+      webnovelId?: null | string;
       scrapeComplete: boolean;
       storyCurrentChapter?: null | number;
       /** Format: date-time */
@@ -2580,6 +2936,7 @@ export interface components {
       config?: components['schemas']['ProjectConfig'];
       contentMode?: components['schemas']['ContentMode'];
       brief?: string;
+      webnovelId?: string | null;
     };
     CloneProjectBody: {
       name: string;
@@ -4369,6 +4726,125 @@ export interface operations {
       };
     };
   };
+  list: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number | string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListChapterImageResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  add: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['AddChapterImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterImageResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  remove: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        n: number;
+        imageId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   getJob: {
     parameters: {
       query?: never;
@@ -5538,6 +6014,38 @@ export interface operations {
       };
     };
   };
+  serve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        filename: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   listEntities: {
     parameters: {
       query?: {
@@ -5799,6 +6307,93 @@ export interface operations {
       path: {
         projectId: string;
         entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  addImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['AddEntityImageBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['EntityResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  removeImage: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        entityKey: string;
+        imageId: string;
       };
       cookie?: never;
     };
@@ -6377,38 +6972,6 @@ export interface operations {
       };
     };
   };
-  serve: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        filename: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   start: {
     parameters: {
       query?: never;
@@ -6677,6 +7240,90 @@ export interface operations {
       };
     };
   };
+  retitle: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RetitleResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  recombine: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['RecombineBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RecombineResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   consolidate: {
     parameters: {
       query?: never;
@@ -6815,6 +7462,340 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ResumeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  updateConfig: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['RebrandConfigBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RebrandResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['RebrandStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  startRebrand: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['RebrandStartBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  glossary: {
+    parameters: {
+      query?: {
+        category?: components['schemas']['RebrandGlossaryCategory'];
+        page?: number | string;
+        limit?: number | string;
+      };
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GlossaryListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  listConversions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListConversionsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  getConversion: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number | string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ConversionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  rerunChapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  manuscript: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ManuscriptResponse'];
         };
       };
       /** @description Default Response */
@@ -7359,6 +8340,9 @@ export type RoleCallCounts = components['schemas']['RoleCallCounts'];
 export type RoleUsage = components['schemas']['RoleUsage'];
 export type SearchResponse = components['schemas']['SearchResponse'];
 export type SearchHitResponse = components['schemas']['SearchHitResponse'];
+export type ListChapterImageResponse = components['schemas']['ListChapterImageResponse'];
+export type ChapterImageResponse = components['schemas']['ChapterImageResponse'];
+export type AddChapterImageBody = components['schemas']['AddChapterImageBody'];
 export type JobResponse = components['schemas']['JobResponse'];
 export type SortOrder = components['schemas']['SortOrder'];
 export type SortByTime = components['schemas']['SortByTime'];
@@ -7405,9 +8389,11 @@ export type EntityType = components['schemas']['EntityType'];
 export type EntitySignificance = components['schemas']['EntitySignificance'];
 export type EntityOrigin = components['schemas']['EntityOrigin'];
 export type EntityResponse = components['schemas']['EntityResponse'];
+export type EntityImageResponse = components['schemas']['EntityImageResponse'];
 export type ListEntityResponse = components['schemas']['ListEntityResponse'];
 export type UpdateEntityBody = components['schemas']['UpdateEntityBody'];
 export type UploadImageBody = components['schemas']['UploadImageBody'];
+export type AddEntityImageBody = components['schemas']['AddEntityImageBody'];
 export type ApprovePlanResponse1 = components['schemas']['ApprovePlanResponse1'];
 export type CreateVolumeBody = components['schemas']['CreateVolumeBody'];
 export type VolumeResponse = components['schemas']['VolumeResponse'];
@@ -7433,10 +8419,31 @@ export type CancelIllustrationResponse = components['schemas']['CancelIllustrati
 export type IngestBody = components['schemas']['IngestBody'];
 export type JobEnqueueResponse1 = components['schemas']['JobEnqueueResponse1'];
 export type ExtractBody = components['schemas']['ExtractBody'];
+export type RetitleResponse = components['schemas']['RetitleResponse'];
+export type RecombineBody = components['schemas']['RecombineBody'];
+export type RecombineResponse = components['schemas']['RecombineResponse'];
+export type MergedChapterItem = components['schemas']['MergedChapterItem'];
+export type AmbiguousBoundaryItem = components['schemas']['AmbiguousBoundaryItem'];
 export type ConsolidateResponse = components['schemas']['ConsolidateResponse'];
 export type AssetsResponse = components['schemas']['AssetsResponse'];
 export type SkeletonResponse = components['schemas']['SkeletonResponse'];
 export type ResumeResponse = components['schemas']['ResumeResponse'];
+export type RebrandConfigBody = components['schemas']['RebrandConfigBody'];
+export type RebrandSettingsBody = components['schemas']['RebrandSettingsBody'];
+export type RebrandResponse = components['schemas']['RebrandResponse'];
+export type RebrandStatus = components['schemas']['RebrandStatus'];
+export type RebrandStartBody = components['schemas']['RebrandStartBody'];
+export type RebrandStatusResponse = components['schemas']['RebrandStatusResponse'];
+export type ConversionCountsResponse = components['schemas']['ConversionCountsResponse'];
+export type RebrandGlossaryCategory = components['schemas']['RebrandGlossaryCategory'];
+export type GlossaryListResponse = components['schemas']['GlossaryListResponse'];
+export type GlossaryEntryResponse = components['schemas']['GlossaryEntryResponse'];
+export type ListConversionsResponse = components['schemas']['ListConversionsResponse'];
+export type ConversionSummaryResponse = components['schemas']['ConversionSummaryResponse'];
+export type RebrandConversionStatus = components['schemas']['RebrandConversionStatus'];
+export type ConversionResponse = components['schemas']['ConversionResponse'];
+export type ConversionDetailItem = components['schemas']['ConversionDetailItem'];
+export type ManuscriptResponse = components['schemas']['ManuscriptResponse'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
@@ -7470,6 +8477,7 @@ export type GetAiUsagePathParams = Exclude<paths['/api/v1/projects/{projectId}/a
 export type SearchQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;
 export type SearchPathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;
 export type GetManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/manuscript']['get']['parameters']['path'], undefined>;
+export type ListPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
 export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
 export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
@@ -7486,6 +8494,7 @@ export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId
 export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
+export type ServePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;
@@ -7496,8 +8505,13 @@ export type ListArcsPathParams = Exclude<paths['/api/v1/projects/{projectId}/vol
 export type GetArcPathParams = Exclude<paths['/api/v1/projects/{projectId}/arcs/{arcKey}']['get']['parameters']['path'], undefined>;
 export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible']['get']['parameters']['path'], undefined>;
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;
-export type ServePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
 export type AssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;
+export type StatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand']['get']['parameters']['path'], undefined>;
+export type GlossaryQueryParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['query'], undefined>;
+export type GlossaryPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['path'], undefined>;
+export type ListConversionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/chapters']['get']['parameters']['path'], undefined>;
+export type GetConversionPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/chapters/{chapter}']['get']['parameters']['path'], undefined>;
+export type ManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/manuscript']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;

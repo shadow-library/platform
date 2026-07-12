@@ -7,7 +7,7 @@ import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, use
  * Importing user defined packages
  */
 import { APIRequest, ApiError } from './api-request';
-import { type JobEnqueueResponse, type JobResponse } from './api-types.gen';
+import { type JobEnqueueResponse, type JobResponse, type RebrandConfigBody, type RebrandStartBody } from './api-types.gen';
 
 /**
  * The rebrand pipeline converts a source novel into an alternate-world version
@@ -39,23 +39,13 @@ export interface ConversionCounts {
   failed: number;
 }
 
-export interface RebrandStatusResponse {
+export interface RebrandOverview {
   rebrand: Rebrand;
   sourceChapters: number;
   scrapeComplete: boolean;
   glossaryCount: number;
   counts: ConversionCounts;
   job?: JobResponse | null;
-}
-
-export interface RebrandConfigBody {
-  directives?: string | null;
-  settings?: RebrandSettings;
-}
-
-export interface RebrandStartBody {
-  force?: boolean;
-  limit?: number;
 }
 
 export interface GlossaryEntry {
@@ -107,8 +97,8 @@ function useRebrandInvalidation(projectId: string): () => void {
   };
 }
 
-export function useRebrandStatusQuery(projectId: string, enabled = true): UseQueryResult<RebrandStatusResponse, ApiError> {
-  return useQuery<RebrandStatusResponse, ApiError>({
+export function useRebrandStatusQuery(projectId: string, enabled = true): UseQueryResult<RebrandOverview, ApiError> {
+  return useQuery<RebrandOverview, ApiError>({
     queryKey: rebrandKeys.status(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/rebrand`).execute(),
     enabled: enabled && Boolean(projectId),

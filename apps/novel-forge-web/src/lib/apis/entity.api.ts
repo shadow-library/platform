@@ -7,7 +7,15 @@ import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, use
  * Importing user defined packages
  */
 import { APIRequest, ApiError } from './api-request';
-import { type CreateEntityBody, type EntityResponse, type ListEntitiesQueryParams, type ListEntityResponse, type UpdateEntityBody, type UploadImageBody } from './api-types.gen';
+import {
+  type AddEntityImageBody,
+  type CreateEntityBody,
+  type EntityResponse,
+  type ListEntitiesQueryParams,
+  type ListEntityResponse,
+  type UpdateEntityBody,
+  type UploadImageBody,
+} from './api-types.gen';
 
 /**
  * Defining types
@@ -23,10 +31,6 @@ export interface EntityImage {
 }
 
 export type EntityWithImages = EntityResponse & { images?: EntityImage[] };
-
-export interface AddEntityImageBody extends UploadImageBody {
-  caption?: string;
-}
 
 /**
  * Declaring the constants

@@ -7,6 +7,7 @@ import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, use
  * Importing user defined packages
  */
 import { APIRequest, ApiError } from './api-request';
+import { type AddChapterImageBody } from './api-types.gen';
 
 /**
  * Defining types
@@ -26,12 +27,6 @@ export interface ChapterImage {
 
 export interface ChapterImageList {
   items: ChapterImage[];
-}
-
-export interface AddChapterImageBody {
-  mime: 'image/png' | 'image/jpeg' | 'image/webp';
-  image: string;
-  caption?: string;
 }
 
 /**

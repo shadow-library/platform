@@ -12,7 +12,7 @@ import { PageHeader, QueryState, StatusChip, type ChipIntent } from '@/component
 import {
   type ConversionStatus,
   type ConversionSummary,
-  type RebrandStatusResponse,
+  type RebrandOverview,
   fetchRebrandManuscript,
   useChapterQuery,
   useListChaptersQuery,
@@ -49,7 +49,7 @@ interface JobProgress {
   current?: string;
 }
 
-function jobIsActive(status?: RebrandStatusResponse): boolean {
+function jobIsActive(status?: RebrandOverview): boolean {
   const jobStatus = status?.job?.status;
   return jobStatus === 'pending' || jobStatus === 'in_progress';
 }
@@ -58,7 +58,7 @@ function jobIsActive(status?: RebrandStatusResponse): boolean {
 
 interface ConfigCardProps {
   novelId: string;
-  status: RebrandStatusResponse | undefined;
+  status: RebrandOverview | undefined;
 }
 
 function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
@@ -117,7 +117,7 @@ function ConfigCard({ novelId, status }: ConfigCardProps): React.JSX.Element {
 // ─── Progress card ───────────────────────────────────────────────────────────
 
 interface ProgressCardProps {
-  status: RebrandStatusResponse;
+  status: RebrandOverview;
 }
 
 function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {

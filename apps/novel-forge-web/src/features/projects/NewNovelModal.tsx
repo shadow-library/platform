@@ -29,6 +29,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'ne
   const [kind, setKind] = useState<Kind>(initialKind);
   const [contentMode, setContentMode] = useState<Mode>('standard');
   const [url, setUrl] = useState('');
+  const [webnovelId, setWebnovelId] = useState('');
   const [touched, setTouched] = useState(false);
 
   const titleError = touched && !title.trim() ? 'Give your novel a working title' : undefined;
@@ -39,6 +40,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'ne
     setKind(initialKind);
     setContentMode('standard');
     setUrl('');
+    setWebnovelId('');
     setTouched(false);
   };
 
@@ -51,6 +53,7 @@ export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'ne
       kind,
       contentMode,
       ...(kind === 'source' && url.trim() ? { url: url.trim() } : {}),
+      ...(kind === 'source' && webnovelId.trim() ? { webnovelId: webnovelId.trim() } : {}),
     };
     createProject.mutate(body, {
       onSuccess: project => {
@@ -87,6 +90,11 @@ export function NewNovelModal({ open, onOpenChange, onCreated, initialKind = 'ne
             {kind === 'source' && (
               <FormField label="Source URL" required error={urlError}>
                 <Input placeholder="https://…" value={url} onValueChange={setUrl} invalid={Boolean(urlError)} />
+              </FormField>
+            )}
+            {kind === 'source' && (
+              <FormField label="Webnovel book ID" helper="Optional — when set, chapter titles are taken from third-party-site.example's table of contents instead of the source site.">
+                <Input placeholder="e.g. 31931419070238805" value={webnovelId} onValueChange={setWebnovelId} />
               </FormField>
             )}
             <FormField label="Content mode">

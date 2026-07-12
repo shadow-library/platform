@@ -139,6 +139,7 @@ function SettingsScreen(): React.JSX.Element {
   const [title, setTitle] = useState('');
   const [brief, setBrief] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('standard');
+  const [webnovelId, setWebnovelId] = useState('');
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -147,6 +148,7 @@ function SettingsScreen(): React.JSX.Element {
     setTitle(projectTitle(project));
     setBrief(project.brief ?? '');
     setContentMode(project.contentMode);
+    setWebnovelId(project.webnovelId ?? '');
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
     for (const group of ALL_ROLES) {
@@ -160,7 +162,10 @@ function SettingsScreen(): React.JSX.Element {
   const setModel = (key: ModelGroup, value: string): void => setModels(prev => ({ ...prev, [key]: value }));
 
   const saveGeneral = (): void => {
-    updateProject.mutate({ title: title.trim(), brief, contentMode }, { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) });
+    updateProject.mutate(
+      { title: title.trim(), brief, contentMode, ...(project?.kind === 'source' ? { webnovelId: webnovelId.trim() || null } : {}) },
+      { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) },
+    );
   };
 
   const saveModels = (): void => {
@@ -215,6 +220,14 @@ function SettingsScreen(): React.JSX.Element {
                   <FormField label="Premise / brief">
                     <Textarea value={brief} onValueChange={setBrief} minRows={3} autoGrow />
                   </FormField>
+                  {project?.kind === 'source' && (
+                    <FormField
+                      label="Webnovel book ID"
+                      helper="Optional — when set, chapter titles come from third-party-site.example's table of contents on the next ingest (or POST /retitle)."
+                    >
+                      <Input value={webnovelId} onValueChange={setWebnovelId} placeholder="e.g. 31931419070238805" />
+                    </FormField>
+                  )}
                   <FormField label="Content mode">
                     <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as ContentMode)}>
                       <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>
@@ -285,9 +298,7 @@ function SettingsScreen(): React.JSX.Element {
 
             <Tabs.Panel value="danger" className={styles.tabPanel}>
               <SectionCard title="Delete project">
-                <p className={styles.dangerText}>
-                  Permanently delete this project and every draft, entity, and run it contains. This cannot be undone.
-                </p>
+                <p className={styles.dangerText}>Permanently delete this project and every draft, entity, and run it contains. This cannot be undone.</p>
                 <Button variant="danger" onClick={() => setConfirmDelete(true)}>
                   Delete project
                 </Button>
