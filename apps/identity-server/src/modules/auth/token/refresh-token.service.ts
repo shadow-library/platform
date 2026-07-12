@@ -95,14 +95,21 @@ export class RefreshTokenService {
           organisationId: input.organisationId ?? null,
         })
         .returning();
-      if (!family) throw new Error('Failed to create refresh token family');
+      if (!family) {
+        this.logger.error('failed to create refresh token family', { userId: input.userId, clientId: input.clientId });
+        throw new Error('Failed to create refresh token family');
+      }
       const [token] = await tx
         .insert(schema.refreshTokens)
         .values({ familyId: family.id, tokenHash, expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS), ipAddress: input.ipAddress ?? null, ipCountry: input.ipCountry ?? null })
         .returning();
-      if (!token) throw new Error('Failed to create refresh token');
+      if (!token) {
+        this.logger.error('failed to create refresh token', { userId: input.userId, familyId: family.id });
+        throw new Error('Failed to create refresh token');
+      }
       return { familyId: family.id, tokenId: token.id, context: this.toContext(family) };
     });
+    this.logger.debug('issued refresh token family', { userId: input.userId, clientId: input.clientId, familyId: result.familyId });
     return { secret, ...result };
   }
 
@@ -117,15 +124,26 @@ export class RefreshTokenService {
    */
   async rotate(secret: string, context: { ipAddress?: string; ipCountry?: string } = {}): Promise<RefreshTokenResult> {
     const presented = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
-    if (!presented) throw new RefreshTokenReuseError();
+    if (!presented) {
+      this.logger.warn('refresh token rotation rejected: presented token is unknown', { securityEvent: 'security.token_reuse' });
+      throw new RefreshTokenReuseError();
+    }
 
     if (presented.status !== 'ACTIVE' || presented.expiresAt.getTime() <= Date.now()) {
+      this.logger.warn('refresh token rotation rejected: superseded or expired token replayed', {
+        securityEvent: 'security.token_reuse',
+        familyId: presented.familyId,
+        status: presented.status,
+      });
       await this.revokeFamily(presented.familyId, 'ROTATION_REUSE');
       throw new RefreshTokenReuseError();
     }
 
     const family = await this.db.query.refreshTokenFamilies.findFirst({ where: eq(schema.refreshTokenFamilies.id, presented.familyId) });
-    if (!family || family.status !== 'ACTIVE') throw new RefreshTokenReuseError();
+    if (!family || family.status !== 'ACTIVE') {
+      this.logger.warn('refresh token rotation rejected: family is not active', { securityEvent: 'security.token_reuse', familyId: presented.familyId });
+      throw new RefreshTokenReuseError();
+    }
 
     const { secret: nextSecret, tokenHash } = this.mint();
     const tokenId = await this.db.transaction(async tx => {
@@ -144,6 +162,7 @@ export class RefreshTokenService {
       if (!token) throw new Error('Failed to rotate refresh token');
       return token.id;
     });
+    this.logger.debug('rotated refresh token', { userId: family.userId, familyId: family.id });
     return { secret: nextSecret, familyId: family.id, tokenId, context: this.toContext(family) };
   }
 
