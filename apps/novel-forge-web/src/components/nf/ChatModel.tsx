@@ -20,7 +20,7 @@ import {
   useProjectQuery,
   useUpdateSessionModelMutation,
 } from '@/lib/apis';
-import { decodeModelRef, encodeModelRef } from '@/lib/format';
+import { decodeModelRef, encodeModelRef, messageTime } from '@/lib/format';
 
 import styles from './ChatModel.module.css';
 
@@ -163,10 +163,22 @@ interface MessageModelTagProps {
   message: ChatMessageResponse;
 }
 
-/** Which model produced an assistant reply — rendered as a quiet caption under the bubble. */
+/** Which model produced an assistant reply and when — a quiet "model · time" caption under the bubble. */
 export function MessageModelTag({ message }: MessageModelTagProps): React.JSX.Element | null {
   const modelsQuery = useAiModelsQuery();
-  if (message.role !== 'assistant' || !message.modelId) return null;
-  const label = modelLabel(modelsQuery.data?.models ?? [], message.modelProvider, message.modelId);
-  return <div className={styles.messageTag}>{label}</div>;
+  if (message.role !== 'assistant') return null;
+  const label = message.modelId ? modelLabel(modelsQuery.data?.models ?? [], message.modelProvider, message.modelId) : null;
+  const time = messageTime(message.createdAt);
+  if (!label && !time) return null;
+  return (
+    <div className={styles.messageTag}>
+      {label}
+      {label && time && ' · '}
+      {time && (
+        <time dateTime={message.createdAt} title={new Date(message.createdAt).toLocaleString()}>
+          {time}
+        </time>
+      )}
+    </div>
+  );
 }

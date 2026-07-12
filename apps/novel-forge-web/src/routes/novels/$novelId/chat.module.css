@@ -61,8 +61,15 @@
   justify-content: flex-end;
 }
 
-.userBubble {
+.userCol {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
   max-width: 86%;
+  min-width: 0;
+}
+
+.userBubble {
   background: var(--sh-accent);
   color: var(--sh-on-accent);
   padding: 11px 14px;
@@ -70,6 +77,13 @@
   font-size: var(--sh-text-body);
   line-height: 1.55;
   white-space: pre-wrap;
+}
+
+.userTime {
+  margin-top: 4px;
+  padding-right: 2px;
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
 }
 
 .assistantRow {

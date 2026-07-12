@@ -32,7 +32,7 @@ import {
   useSetSessionStatusMutation,
   useUpdateChatSessionMutation,
 } from '@/lib/apis';
-import { relativeTime } from '@/lib/format';
+import { messageTime, relativeTime } from '@/lib/format';
 
 import styles from './chat.module.css';
 import { ChangeOpBody, opLabel } from './proposals';
@@ -573,7 +573,12 @@ function ChatThread({ novelId, session, onOpenHistory }: ChatThreadProps): React
           {messages.map(m =>
             m.role === 'user' ? (
               <div key={m.id} className={styles.userRow}>
-                <div className={styles.userBubble}>{m.content}</div>
+                <div className={styles.userCol}>
+                  <div className={styles.userBubble}>{m.content}</div>
+                  <time className={styles.userTime} dateTime={m.createdAt} title={new Date(m.createdAt).toLocaleString()}>
+                    {messageTime(m.createdAt)}
+                  </time>
+                </div>
               </div>
             ) : (
               <div key={m.id} className={styles.assistantRow}>

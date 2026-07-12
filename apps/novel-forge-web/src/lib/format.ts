@@ -33,6 +33,24 @@ export function relativeTime(iso: string): string {
   return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
 }
 
+/**
+ * A compact absolute timestamp for a chat message — clock time for today, date + clock time otherwise
+ * (dropping the year unless it differs from now). Complements `relativeTime`, which reads better for
+ * lists but hides the wall-clock time a transcript wants.
+ */
+export function messageTime(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (date.toDateString() === now.toDateString()) return time;
+  const day = date.toLocaleDateString(
+    undefined,
+    date.getFullYear() === now.getFullYear() ? { month: 'short', day: 'numeric' } : { year: 'numeric', month: 'short', day: 'numeric' },
+  );
+  return `${day}, ${time}`;
+}
+
 /** A deterministic, pleasant cover colour derived from an id — stable per project. */
 export function coverColor(id: string): string {
   let hash = 0;
