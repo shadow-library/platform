@@ -94,8 +94,9 @@ describe('Prompt modules', () => {
       }
       // premise-enhance v1.1 reframes the enhanced premise as an enticing summary, not a plot walkthrough.
       expect(PROMPT_REGISTRY['premise-enhance'].version).toBe('1.1.0');
-      // chat-refine v2 added the declared-lookup protocol (chat-hub design §6).
-      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.0.0');
+      // chat-refine v2 added the declared-lookup protocol (chat-hub design §6); v2.1 instructs partial
+      // updates (emit only changed fields, since the apply engine merges) to cut output tokens.
+      expect(PROMPT_REGISTRY['chat-refine'].version).toBe('2.1.0');
     });
 
     it('renders chat-refine in cache order: system, stable scope context, history, volatile tail', async () => {
