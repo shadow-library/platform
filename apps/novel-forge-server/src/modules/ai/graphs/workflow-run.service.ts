@@ -24,6 +24,7 @@ import { TelemetryHandler } from '../telemetry.handler';
 import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-builder.graph';
 import { type FinalizationServices, createChapterFinalizationGraph } from './chapter-finalization.graph';
 import { type GraphServices, createChapterGenerationGraph } from './chapter-generation.graph';
+import { type RebrandGraphServices, createChapterRebrandGraph } from './chapter-rebrand.graph';
 import { type ValidationServices, createNovelValidationGraph } from './novel-validation.graph';
 import { type ExtractionServices, createSourceExtractionGraph } from './source-extraction.graph';
 import { IndexingService } from '../retrieval/indexing.service';
@@ -63,6 +64,12 @@ export interface BibleBuilderInput {
 }
 
 export interface SourceExtractionInput {
+  projectId: bigint;
+  chapter: number;
+  jobId?: string;
+}
+
+export interface RebrandChapterInput {
   projectId: bigint;
   chapter: number;
   jobId?: string;
@@ -286,6 +293,25 @@ export class WorkflowRunService {
       return { runId, outcome: 'completed', status: 'completed' };
     } catch (err) {
       this.logger.error('runSourceExtraction failed', { err, runId });
+      await this.failRun(runId, err);
+      return { runId, outcome: 'failed', status: 'failed' };
+    }
+  }
+
+  async runChapterRebrand(input: RebrandChapterInput): Promise<WorkflowRunResult> {
+    const runId = await this.createRun(input.projectId, 'chapter-rebrand', `chapter-${input.chapter}`, input, input.jobId);
+    const nodeTrace: string[] = [];
+
+    try {
+      const graph = createChapterRebrandGraph(this.graphServices as RebrandGraphServices);
+      const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
+      const outcome = (rawState as unknown as { outcome: string | null }).outcome ?? 'converted';
+
+      nodeTrace.push('loadChapter', 'assembleContext', 'convert', 'residueScan', 'audit', 'persistConversion', 'mergeGlossary', 'finish');
+      await this.completeRun(runId, outcome, 'completed', nodeTrace);
+      return { runId, outcome, status: 'completed' };
+    } catch (err) {
+      this.logger.error('runChapterRebrand failed', { err, runId });
       await this.failRun(runId, err);
       return { runId, outcome: 'failed', status: 'failed' };
     }

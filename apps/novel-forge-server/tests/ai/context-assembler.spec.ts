@@ -397,3 +397,66 @@ describe('ContextAssembler — memory budget trimming', () => {
     expect(pack.sections.length).toBeGreaterThan(0);
   });
 });
+
+// ─── forRebrand / forRebrandSeed — rebrand packs (rebrand design §5) ─────────
+
+describe('ContextAssembler.forRebrand', () => {
+  const input = {
+    worldNotes: 'Veldram replaces every real nation.',
+    directives: 'weave romance in',
+    glossarySlice: 'Ye Fan → Evan Vale [character]',
+    carryState: '{"activeThreads":"Mira spark"}',
+    prevBody: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+  };
+
+  it('puts world notes and directives in the stable segment and the rest in the volatile tail', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forRebrand(1n, 5, input);
+
+    expect(pack.purpose).toBe('rebrand');
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({ world_notes: 'stable', directives: 'stable', glossary_slice: 'volatile', carry_state: 'volatile', prev_ending: 'volatile' });
+    expect(pack.renderedStable).toContain('Veldram replaces');
+    expect(pack.renderedStable).toContain('weave romance in');
+    expect(pack.renderedVolatile).toContain('Evan Vale');
+  });
+
+  it('keeps the END of the previous converted body and stays byte-identical across chapters with unchanged canon', async () => {
+    const assembler = makeAssembler();
+    const pack5 = await assembler.forRebrand(1n, 5, input);
+    const pack6 = await assembler.forRebrand(1n, 6, { ...input, carryState: '{"activeThreads":"Mira kiss"}' });
+
+    const prevEnding = pack5.sections.find(s => s.key === 'prev_ending');
+    expect(prevEnding?.rendered).toContain('CLOSING_MARKER');
+    expect(prevEnding?.rendered).not.toContain('OPENING_MARKER');
+    // The stable prefix is the provider prompt-cache key — volatile changes must not disturb it.
+    expect(pack6.renderedStable).toBe(pack5.renderedStable);
+  });
+
+  it('omits directives and carry state sections when absent', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forRebrand(1n, 1, { ...input, directives: null, carryState: null, prevBody: null });
+    expect(pack.sections.map(s => s.key)).toEqual(['world_notes', 'glossary_slice']);
+  });
+});
+
+describe('ContextAssembler.forRebrandSeed', () => {
+  it('renders the overview, extracted entity roster with aliases, and world facts', async () => {
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, title: 'Shrouded Peaks', premise: 'A cultivator rises.', brief: null, themes: null, instructions: null })) },
+        entities: { findMany: mock(async () => [{ name: 'Ye Fan', type: 'character', aliases: [{ alias: 'Yefan' }] }]) },
+        worldFacts: { findMany: mock(async () => [{ category: 'geography', key: 'capital', value: 'the Jade Capital' }]) },
+        contextPacks: { findFirst: mock(async () => null) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forRebrandSeed(1n);
+
+    expect(pack.purpose).toBe('rebrand_seed');
+    expect(pack.rendered).toContain('Title: Shrouded Peaks');
+    expect(pack.rendered).toContain('Ye Fan (character) — aka Yefan');
+    expect(pack.rendered).toContain('geography/capital: the Jade Capital');
+  });
+});
