@@ -13,6 +13,7 @@ import { describe, expect, it, mock } from 'bun:test';
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ContextAssembler, FULL_CAST_MAX, PREV_ENDING_TAIL } from '@modules/ai/context/context-assembler.service';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from '@modules/ai/context/token-budget';
+import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 
 /**
  * Defining types
@@ -292,6 +293,33 @@ describe('ContextAssembler.forChapter — no brief', () => {
     expect(sectionKeys).not.toContain('brief');
     // Pack still assembled (writing_style present from project.instructions)
     expect(sectionKeys).toContain('writing_style');
+  });
+
+  it('falls back to the default writing instructions when the project has none', async () => {
+    const dbOverrides = {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => null) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null) },
+        entities: { findMany: mock(async () => []) },
+        worldFacts: { findMany: mock(async () => []) },
+        plotThreads: { findMany: mock(async () => []) },
+        mysteries: { findMany: mock(async () => []) },
+        contextPacks: { findFirst: mock(async () => null) },
+        userFeedback: { findMany: mock(async () => []) },
+      },
+    };
+
+    const assembler = makeAssembler(dbOverrides);
+    const pack = await assembler.forChapter(1n, 1, { dryRun: true });
+
+    // The chapter generator must always be told how to write — the default carries the length rule.
+    const writingStyle = pack.sections.find(s => s.key === 'writing_style');
+    expect(writingStyle).toBeDefined();
+    expect(writingStyle?.rendered).toContain(DEFAULT_WRITING_INSTRUCTIONS.slice(0, 40));
+    expect(writingStyle?.rendered).toContain('2000 and 3000 words');
   });
 });
 

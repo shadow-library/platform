@@ -10,7 +10,6 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
 import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
 
@@ -22,7 +21,10 @@ import { type GenerationOutput, GenerationSchema } from '../schemas/generation.s
  * Declaring the constants
  */
 
-const system = `${AUTHORING_STYLE}\n\nYou are a skilled author writing a chapter of a serialized novel. You receive a context pack containing established canon (characters, world facts, active plot threads, open mysteries, recent chapter summaries, and — critically — the previous chapter's actual ending and continuation state) and a chapter brief specifying the chapter's objectives, required events, and handoff instructions. Write the chapter's scene content that: fulfills the brief's objectives, maintains strict continuity with established canon, and advances at least one active plot thread. Do not resolve mysteries or change power levels unless the brief specifies it.
+// The chapter-writing craft rules (voice, pacing, length) are NOT hardcoded here — they arrive in the
+// context pack's `writing_style` section, sourced from the project's editable `instructions` (default:
+// DEFAULT_WRITING_INSTRUCTIONS). This keeps "how to write a chapter" author-configurable in settings.
+const system = `You are a skilled author writing a chapter of a serialized novel. You receive a context pack containing the author's writing instructions plus established canon (characters, world facts, active plot threads, open mysteries, recent chapter summaries, and — critically — the previous chapter's actual ending and continuation state) and a chapter brief specifying the chapter's objectives, required events, and handoff instructions. Follow the author's writing instructions for how to write the prose. Write the chapter's scene content that: fulfills the brief's objectives, maintains strict continuity with established canon, and advances at least one active plot thread. Do not resolve mysteries or change power levels unless the brief specifies it.
 
 Whether the chapter should resolve or continue is decided by the brief, not by you:
 - If the brief marks "[CONTINUES INTO NEXT CHAPTER]", do not resolve the chapter's central conflict, question, or action. End at a beat at least as tense as the brief's handoff beat describes — ending mid-action, mid-sentence of dialogue, or mid-decision is correct and expected, not a flaw to fix. Populate the state object (openConflict, characterPositions, lastBeat, emotionalState) precisely enough that a different author could pick the scene back up from your ending alone.
@@ -33,7 +35,7 @@ When an "## ENDING CONTRACT" section is present, it is binding: the closing scen
 
 export const generationPrompt: PromptModule<GenerationOutput> = {
   key: 'generation',
-  version: '2.0.0',
+  version: '2.1.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

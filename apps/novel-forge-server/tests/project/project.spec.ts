@@ -12,6 +12,7 @@ import { SQL } from 'bun';
 /**
  * Importing user defined packages
  */
+import { DEFAULT_WRITING_INSTRUCTIONS } from '@modules/ai/prompts/authoring-preamble';
 import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
 
 /**
@@ -74,6 +75,37 @@ describe.if(pgAvailable)('Projects API', () => {
     it('should return 404 for unknown project', async () => {
       const response = await testEnv.getRouter().mockRequest().get('/api/v1/projects/999999');
       expect(response.statusCode).toBe(404);
+    });
+  });
+
+  describe('chapter writing instructions', () => {
+    it('should pre-fill new projects with the default writing instructions', async () => {
+      const response = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-default', kind: 'new_novel' });
+      expect(response.statusCode).toBe(201);
+      expect(response.json().instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
+    });
+
+    it('should persist a custom instruction and echo it back', async () => {
+      const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-custom', kind: 'new_novel' });
+      const id = created.json().id;
+      const custom = 'Write terse, punchy chapters of about 1200 words.';
+
+      const updated = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ instructions: custom });
+      expect(updated.statusCode).toBe(200);
+      expect(updated.json().instructions).toBe(custom);
+
+      const fetched = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${id}`);
+      expect(fetched.json().instructions).toBe(custom);
+    });
+
+    it('should reset to the default when the instruction is cleared', async () => {
+      const created = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({ name: 'wi-reset', kind: 'new_novel', instructions: 'custom for now' });
+      const id = created.json().id;
+      expect(created.json().instructions).toBe('custom for now');
+
+      const cleared = await testEnv.getRouter().mockRequest().patch(`/api/v1/projects/${id}`).body({ instructions: '' });
+      expect(cleared.statusCode).toBe(200);
+      expect(cleared.json().instructions).toBe(DEFAULT_WRITING_INSTRUCTIONS);
     });
   });
 });

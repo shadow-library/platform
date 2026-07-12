@@ -27,12 +27,21 @@ import { parseSchema } from '@modules/ai/schemas/validate';
 
 describe('Prompt modules', () => {
   describe('AUTHORING_STYLE invariant', () => {
-    it('authoring prompts contain AUTHORING_STYLE', () => {
-      const authoring = Object.values(PROMPT_REGISTRY).filter(p => p.kind === 'authoring');
+    // `generation` is the exception: its chapter-writing craft rules are author-configurable, so they
+    // arrive at runtime via the project's `instructions` (the context pack's `writing_style` section)
+    // rather than being hardcoded into the prompt's system message.
+    const CONTEXT_STYLED_KEYS = new Set(['generation']);
+
+    it('authoring prompts contain AUTHORING_STYLE (except the context-styled generation prompt)', () => {
+      const authoring = Object.values(PROMPT_REGISTRY).filter(p => p.kind === 'authoring' && !CONTEXT_STYLED_KEYS.has(p.key));
       expect(authoring.length).toBeGreaterThan(0);
       for (const p of authoring) {
         expect(p.system).toContain(AUTHORING_STYLE.slice(0, 40));
       }
+    });
+
+    it('the generation prompt does not hardcode AUTHORING_STYLE — it comes from the editable writing instructions', () => {
+      expect(PROMPT_REGISTRY.generation.system).not.toContain(AUTHORING_STYLE.slice(0, 40));
     });
 
     it('analytical prompts do not contain AUTHORING_STYLE', () => {

@@ -48,6 +48,11 @@ export class CreateProjectBody {
   @Field({ optional: true })
   webnovelId?: string;
 
+  // Author instructions for how the AI writes each chapter (voice, craft, length). Left unset, the
+  // project falls back to DEFAULT_WRITING_INSTRUCTIONS.
+  @Field({ optional: true })
+  instructions?: string;
+
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
 }
@@ -166,6 +171,12 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   brief?: string | null;
 
+  // Effective chapter-writing instructions — the stored value, or DEFAULT_WRITING_INSTRUCTIONS when the
+  // project has not overridden it (the service fills the default in `present`), so the settings form is
+  // always pre-populated.
+  @Field({ optional: true, nullable: true })
+  instructions?: string | null;
+
   @Field({ optional: true, nullable: true })
   sourceUrl?: string | null;
 
@@ -208,6 +219,10 @@ export class UpdateProjectBody {
 
   @Field({ optional: true })
   brief?: string;
+
+  // Author chapter-writing instructions; send empty string to clear back to the default.
+  @Field({ optional: true, nullable: true })
+  instructions?: string | null;
 
   @Field({ optional: true, nullable: true })
   webnovelId?: string | null;

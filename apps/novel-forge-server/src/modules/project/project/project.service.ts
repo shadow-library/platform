@@ -27,6 +27,7 @@ import {
   type ResetResponse,
   type UpdateProjectBody,
 } from './project.dto';
+import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
 import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
 
 /**
@@ -52,9 +53,12 @@ export class ProjectService {
   }
 
   // The `ProjectResponse.config` schema is a non-nullable object; a fresh project stores `config = null`,
-  // so map that to `undefined` (an omitted field) before it reaches the serialiser.
+  // so map that to `undefined` (an omitted field) before it reaches the serialiser. `instructions` is
+  // surfaced as its effective value (stored override or the default) so the settings form always shows
+  // the writing instructions the AI will actually use.
   private present<T extends Project.Row>(project: T): T {
-    return project.config == null ? { ...project, config: undefined } : project;
+    const instructions = project.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS;
+    return { ...project, config: project.config ?? undefined, instructions } as T;
   }
 
   async create(body: CreateProjectBody): Promise<Project.Row> {
@@ -63,7 +67,16 @@ export class ProjectService {
 
     const [project] = await this.db
       .insert(schema.projects)
-      .values({ name: body.name, kind: body.kind, sourceUrl: body.url, title: body.title, webnovelId: body.webnovelId, contentMode: body.contentMode })
+      .values({
+        name: body.name,
+        kind: body.kind,
+        sourceUrl: body.url,
+        title: body.title,
+        webnovelId: body.webnovelId,
+        // Blank instructions stay null so the column means "use the default"; `present` fills it in.
+        instructions: body.instructions?.trim() || null,
+        contentMode: body.contentMode,
+      })
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
@@ -130,9 +143,17 @@ export class ProjectService {
   }
 
   async update(id: bigint, update: UpdateProjectBody): Promise<Project.Row> {
+    const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
+    // Normalise the writing instructions: blank — or the default itself — collapses back to null so the
+    // column keeps meaning "use the default" and follows future changes to DEFAULT_WRITING_INSTRUCTIONS.
+    if (update.instructions !== undefined) {
+      const trimmed = update.instructions?.trim() ?? '';
+      set.instructions = trimmed && trimmed !== DEFAULT_WRITING_INSTRUCTIONS ? trimmed : null;
+    }
+
     const [result] = await this.db
       .update(schema.projects)
-      .set({ ...update, updatedAt: new Date() })
+      .set(set)
       .where(eq(schema.projects.id, id))
       .returning()
       .catch(err => this.databaseService.translateError(err));

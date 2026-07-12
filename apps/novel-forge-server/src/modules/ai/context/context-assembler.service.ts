@@ -20,6 +20,7 @@ import * as schema from '@server/database/schemas';
 import { CatalogService } from './catalog.service';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
+import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 
 /**
@@ -348,10 +349,9 @@ export class ContextAssembler {
       sections.push(makeSection('memory', lines.join('\n'), 'canonical', []));
     }
 
-    // g. writing_style
-    if (project?.instructions) {
-      sections.push(makeSection('writing_style', project.instructions, 'canonical', []));
-    }
+    // g. writing_style — always present: the chapter generator has no other source for how to write the
+    // prose (voice, craft, length). It comes from the project's editable `instructions`, or the default.
+    sections.push(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', []));
 
     // Excess entity sections go at lowest priority.
     for (const s of excessEntitySections) sections.push(s);
@@ -519,9 +519,7 @@ export class ContextAssembler {
         .map((c, i) => `${i + 1}. Ch ${c.number}: ${c.summary ?? ''}`);
       sections.push(makeSection('memory', lines.join('\n'), 'canonical', []));
     }
-    if (project?.instructions) {
-      sections.push(makeSection('writing_style', project.instructions, 'canonical', []));
-    }
+    sections.push(makeSection('writing_style', project?.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS, 'canonical', []));
 
     return this.finalize(projectId, 'revision', chapter, sections, unresolvedRefs, budgetTokens, false);
   }
