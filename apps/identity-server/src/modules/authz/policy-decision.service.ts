@@ -68,15 +68,25 @@ export class PolicyDecisionService {
   }
 
   private async bumpAuthzVersion(principal: Principal): Promise<void> {
-    await this.redis.incr(this.versionKey(principal));
+    const version = await this.redis.incr(this.versionKey(principal));
+    this.logger.debug('bumped authz version, cached decisions invalidated', { principal, version });
   }
 
   /** Resolves a permission decision: deny by default; a matching permission on any assigned role permits. */
   async check(request: CheckRequest): Promise<Decision> {
     const authzVersion = await this.getAuthzVersion(request.principal);
     const permissions = await this.resolvePermissions(request.principal, request.organisationId);
-    if (permissions.has(request.action)) return { decision: 'PERMIT', reasons: [`granted by role permission '${request.action}'`], authzVersion };
-    return { decision: 'DENY', reasons: ['no assigned role grants this permission'], authzVersion };
+    const decision: Decision = permissions.has(request.action)
+      ? { decision: 'PERMIT', reasons: [`granted by role permission '${request.action}'`], authzVersion }
+      : { decision: 'DENY', reasons: ['no assigned role grants this permission'], authzVersion };
+    this.logger.debug('policy decision resolved', {
+      principal: request.principal,
+      organisationId: request.organisationId,
+      action: request.action,
+      decision: decision.decision,
+      authzVersion,
+    });
+    return decision;
   }
 
   /**
@@ -87,8 +97,18 @@ export class PolicyDecisionService {
   async checkForApplication(request: CheckRequest, applicationId: number): Promise<Decision> {
     const authzVersion = await this.getAuthzVersion(request.principal);
     const permissions = await this.resolvePermissions(request.principal, request.organisationId, applicationId);
-    if (permissions.has(request.action)) return { decision: 'PERMIT', reasons: [`granted by application-scoped role permission '${request.action}'`], authzVersion };
-    return { decision: 'DENY', reasons: ['no assigned role grants this permission for the application'], authzVersion };
+    const decision: Decision = permissions.has(request.action)
+      ? { decision: 'PERMIT', reasons: [`granted by application-scoped role permission '${request.action}'`], authzVersion }
+      : { decision: 'DENY', reasons: ['no assigned role grants this permission for the application'], authzVersion };
+    this.logger.debug('application-scoped policy decision resolved', {
+      principal: request.principal,
+      organisationId: request.organisationId,
+      applicationId,
+      action: request.action,
+      decision: decision.decision,
+      authzVersion,
+    });
+    return decision;
   }
 
   private async resolvePermissions(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<string>> {
@@ -104,7 +124,10 @@ export class PolicyDecisionService {
         ),
       );
     const roleIds = assignments.map(assignment => assignment.roleId);
-    if (roleIds.length === 0) return new Set();
+    if (roleIds.length === 0) {
+      this.logger.debug('principal holds no active role assignments in organisation', { principal, organisationId, applicationId });
+      return new Set();
+    }
 
     const scope =
       applicationId === undefined
@@ -115,12 +138,19 @@ export class PolicyDecisionService {
       .from(schema.rolePermissions)
       .innerJoin(schema.permissions, eq(schema.rolePermissions.permissionId, schema.permissions.id))
       .where(scope);
-    return new Set(rows.map(row => row.name));
+    const permissions = new Set(rows.map(row => row.name));
+    /** The full grant set is sensitive (it reveals a principal's exact capabilities) — debug-only, so it stays out of prod logs. */
+    this.logger.debug('resolved principal permissions', { principal, organisationId, applicationId, roleIds, permissions: [...permissions] });
+    return permissions;
   }
 
   async createPermission(applicationId: number, name: string, description?: string): Promise<string> {
     const [permission] = await this.db.insert(schema.permissions).values({ applicationId, name, description }).returning({ id: schema.permissions.id });
-    if (!permission) throw new Error('Failed to create permission');
+    if (!permission) {
+      this.logger.error('failed to create permission', { applicationId, name });
+      throw new Error('Failed to create permission');
+    }
+    this.logger.debug('created permission', { permissionId: permission.id, applicationId, name });
     return permission.id;
   }
 
@@ -128,7 +158,10 @@ export class PolicyDecisionService {
   async ensurePermission(applicationId: number, name: string, description?: string): Promise<string> {
     await this.db.insert(schema.permissions).values({ applicationId, name, description }).onConflictDoNothing();
     const permission = await this.db.query.permissions.findFirst({ where: and(eq(schema.permissions.applicationId, applicationId), eq(schema.permissions.name, name)) });
-    if (!permission) throw new Error(`Permission '${name}' could not be provisioned`);
+    if (!permission) {
+      this.logger.error('failed to provision permission', { applicationId, name });
+      throw new Error(`Permission '${name}' could not be provisioned`);
+    }
     return permission.id;
   }
 
@@ -143,10 +176,12 @@ export class PolicyDecisionService {
 
   async grantPermissionToRole(roleId: number, permissionId: string): Promise<void> {
     await this.db.insert(schema.rolePermissions).values({ roleId, permissionId }).onConflictDoNothing();
+    this.logger.debug('granted permission to role', { roleId, permissionId });
   }
 
   async revokePermissionFromRole(roleId: number, permissionId: string): Promise<void> {
     await this.db.delete(schema.rolePermissions).where(and(eq(schema.rolePermissions.roleId, roleId), eq(schema.rolePermissions.permissionId, permissionId)));
+    this.logger.debug('revoked permission from role', { roleId, permissionId });
   }
 
   async listAssignments(filter: AssignmentFilter): Promise<RoleAssignment[]> {
@@ -165,7 +200,7 @@ export class PolicyDecisionService {
       .values({ principalType: principal.type, principalId: principal.id, roleId, organisationId: BigInt(organisationId), grantedBy })
       .onConflictDoNothing();
     await this.bumpAuthzVersion(principal);
-    this.logger.info('Assigned role', { principal, roleId, organisationId });
+    this.logger.info('assigned role', { principal, roleId, organisationId, grantedBy });
   }
 
   async revokeRole(principal: Principal, roleId: number, organisationId: string): Promise<void> {
@@ -180,6 +215,7 @@ export class PolicyDecisionService {
         ),
       );
     await this.bumpAuthzVersion(principal);
+    this.logger.info('revoked role', { principal, roleId, organisationId });
   }
 
   /** Clears every product-role grant a principal holds in the organisation; used when membership ends. */
@@ -194,6 +230,7 @@ export class PolicyDecisionService {
         ),
       );
     await this.bumpAuthzVersion(principal);
+    this.logger.info('revoked all roles for principal in organisation', { principal, organisationId });
   }
 
   /** Clears every grant scoped to the organisation (org deletion); bumps each affected principal. */
@@ -204,5 +241,6 @@ export class PolicyDecisionService {
       .returning({ principalType: schema.roleAssignments.principalType, principalId: schema.roleAssignments.principalId });
     const principals = new Map(removed.map(row => [`${row.principalType}:${row.principalId}`, { type: row.principalType, id: row.principalId }]));
     for (const principal of principals.values()) await this.bumpAuthzVersion(principal);
+    this.logger.info('revoked all role assignments for organisation', { organisationId, removedCount: removed.length, affectedPrincipals: principals.size });
   }
 }

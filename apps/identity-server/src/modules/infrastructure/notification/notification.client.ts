@@ -35,15 +35,24 @@ export class NotificationClient {
   private readonly serviceName = Config.get('notification.service-name');
 
   async send(notification: SendNotification): Promise<void> {
-    const response = await fetch(`${this.baseUrl}/notifications`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ ...notification, service: this.serviceName }),
-    });
+    /** Recipients carry the target email/phone, so this trace is debug-only (dev/local, never prod). */
+    this.logger.debug('dispatching notification to pulse-server', { templateKey: notification.templateKey, recipients: notification.recipients });
+    let response: Response;
+    try {
+      response = await fetch(`${this.baseUrl}/notifications`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...notification, service: this.serviceName }),
+      });
+    } catch (error) {
+      this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, baseUrl: this.baseUrl, error });
+      throw error;
+    }
     if (!response.ok) {
       const body = await response.text().catch(() => '');
+      this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.status, body });
       throw new Error(`Notification request failed with status ${response.status}: ${body}`);
     }
-    this.logger.debug('Notification dispatched to pulse-server', { templateKey: notification.templateKey });
+    this.logger.debug('notification dispatched to pulse-server', { templateKey: notification.templateKey });
   }
 }

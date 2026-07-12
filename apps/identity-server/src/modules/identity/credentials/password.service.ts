@@ -73,6 +73,7 @@ export class PasswordService {
     const stored = identity?.password;
     if (!stored) {
       await Bun.password.verify(password, DUMMY_HASH).catch(() => false);
+      this.logger.debug('password verification failed: user has no password credential', { userId });
       return false;
     }
 
@@ -83,7 +84,9 @@ export class PasswordService {
         .update(schema.userPasswords)
         .set({ hash: rehashed.hash, version: rehashed.version, algorithm: 'ARGON2ID' })
         .where(eq(schema.userPasswords.userAuthIdentityId, stored.userAuthIdentityId));
+      this.logger.debug('upgraded stored password hash to current argon2id params', { userId });
     }
+    this.logger.debug('password verification completed', { userId, valid: result.valid });
     return result.valid;
   }
 
@@ -99,8 +102,12 @@ export class PasswordService {
       });
       if (!identity) {
         [identity] = await tx.insert(schema.userAuthIdentities).values({ userId, provider: 'PASSWORD', providerKey }).returning();
+        this.logger.debug('created password identity for user', { userId });
       }
-      if (!identity) throw new Error('Failed to resolve password identity');
+      if (!identity) {
+        this.logger.error('failed to resolve password identity during change', { userId });
+        throw new Error('Failed to resolve password identity');
+      }
 
       await tx
         .insert(schema.userPasswords)
@@ -111,6 +118,7 @@ export class PasswordService {
       await tx.update(schema.users).set({ passwordResetRequired: false }).where(eq(schema.users.id, userId));
     });
     await this.pruneHistory(userId);
+    this.logger.info('password changed', { userId });
   }
 
   /** Rejects a candidate password that matches the current or any of the recent stored hashes. */
@@ -122,8 +130,12 @@ export class PasswordService {
       .orderBy(desc(schema.passwordHistory.createdAt))
       .limit(PASSWORD_HISTORY_DEPTH);
     for (const entry of history) {
-      if (await Bun.password.verify(password, entry.hash)) return true;
+      if (await Bun.password.verify(password, entry.hash)) {
+        this.logger.debug('password reuse check: candidate matches a recent password', { userId });
+        return true;
+      }
     }
+    this.logger.debug('password reuse check: candidate is new', { userId, historyDepth: history.length });
     return false;
   }
 

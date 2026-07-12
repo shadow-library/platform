@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
+import { Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
@@ -9,6 +10,7 @@ import { type FastifyRequest } from 'fastify';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 import { SessionAuthService, ValidatedSession } from '@server/modules/auth/session';
 import { PolicyDecisionService, Principal } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
@@ -36,6 +38,7 @@ export interface AdminActor {
 
 @Injectable()
 export class AdminAccessService {
+  private readonly logger = Logger.getLogger(APP_NAME, AdminAccessService.name);
   private platformOrganisationId: string | null = null;
 
   constructor(
@@ -47,7 +50,10 @@ export class AdminAccessService {
   private async getPlatformOrganisationId(): Promise<string> {
     if (this.platformOrganisationId) return this.platformOrganisationId;
     const organisation = await this.organisationService.findTeamByName(PLATFORM_ORG_NAME);
-    if (!organisation) throw new ServerError(AppErrorCode.ADM_002);
+    if (!organisation) {
+      this.logger.error('platform organisation missing — admin authorization cannot proceed', { platformOrgName: PLATFORM_ORG_NAME });
+      throw new ServerError(AppErrorCode.ADM_002);
+    }
     this.platformOrganisationId = organisation.id.toString();
     return this.platformOrganisationId;
   }
@@ -58,8 +64,14 @@ export class AdminAccessService {
 
   private async authorize(session: ValidatedSession, permission: AdminPermission): Promise<AdminActor> {
     const organisationId = await this.getPlatformOrganisationId();
+    const userId = session.userId.toString();
     const decision = await this.policyDecisionService.check({ principal: this.principalOf(session), organisationId, action: permission });
-    if (decision.decision !== 'PERMIT') throw new ServerError(AppErrorCode.ADM_001);
+    if (decision.decision !== 'PERMIT') {
+      /** A denied admin call is a security-relevant event: surface it at warn even in production. */
+      this.logger.warn('admin access denied', { securityEvent: 'admin.access_denied', userId, permission, aal: session.aal });
+      throw new ServerError(AppErrorCode.ADM_001);
+    }
+    this.logger.debug('admin access granted', { userId, permission, aal: session.aal });
     return { session, organisationId };
   }
 
@@ -82,12 +94,20 @@ export class AdminAccessService {
     const session = await this.sessionAuthService.authenticateElevated(request);
     const organisationId = await this.getPlatformOrganisationId();
     const principal = this.principalOf(session);
+    const userId = session.userId.toString();
 
     const platform = await this.policyDecisionService.check({ principal, organisationId, action: ADMIN_PERMISSIONS.rolesManage });
-    if (platform.decision === 'PERMIT') return { session, organisationId };
+    if (platform.decision === 'PERMIT') {
+      this.logger.debug('role admin access granted platform-wide', { userId, applicationId });
+      return { session, organisationId };
+    }
 
     const scoped = await this.policyDecisionService.checkForApplication({ principal, organisationId, action: ADMIN_PERMISSIONS.appRolesManage }, applicationId);
-    if (scoped.decision === 'PERMIT') return { session, organisationId };
+    if (scoped.decision === 'PERMIT') {
+      this.logger.debug('role admin access granted for application', { userId, applicationId });
+      return { session, organisationId };
+    }
+    this.logger.warn('role admin access denied', { securityEvent: 'admin.access_denied', userId, applicationId, aal: session.aal });
     throw new ServerError(AppErrorCode.ADM_001);
   }
 }

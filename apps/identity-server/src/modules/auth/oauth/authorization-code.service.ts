@@ -4,11 +4,13 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
+import { Logger } from '@shadow-library/common';
 import { Redis } from 'ioredis';
 
 /**
  * Importing user defined packages
  */
+import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
 /**
@@ -38,6 +40,7 @@ const CODE_TTL_SECONDS = 60;
 
 @Injectable()
 export class AuthorizationCodeService {
+  private readonly logger = Logger.getLogger(APP_NAME, AuthorizationCodeService.name);
   private readonly redis: Redis;
 
   constructor(databaseService: DatabaseService) {
@@ -51,12 +54,20 @@ export class AuthorizationCodeService {
   async issue(payload: AuthorizationCodePayload): Promise<string> {
     const code = randomBytes(32).toString('base64url');
     await this.redis.set(this.key(code), JSON.stringify(payload), 'EX', CODE_TTL_SECONDS);
+    /** The code plaintext is never logged; only the bound context (debug-only, dev/local). */
+    this.logger.debug('issued authorization code', { clientId: payload.clientId, userId: payload.userId, sessionId: payload.sessionId, ttlSeconds: CODE_TTL_SECONDS });
     return code;
   }
 
   /** Atomically fetches and deletes a code, enforcing single use. */
   async consume(code: string): Promise<AuthorizationCodePayload | null> {
     const raw = await this.redis.getdel(this.key(code));
-    return raw ? (JSON.parse(raw) as AuthorizationCodePayload) : null;
+    if (!raw) {
+      this.logger.debug('authorization code consume miss: unknown, expired, or already used');
+      return null;
+    }
+    const payload = JSON.parse(raw) as AuthorizationCodePayload;
+    this.logger.debug('consumed authorization code', { clientId: payload.clientId, userId: payload.userId });
+    return payload;
   }
 }

@@ -175,13 +175,16 @@ export class OAuthService {
       targetType: 'oauth_client',
       targetId: client.id,
     });
+    this.logger.debug('authorization code granted', { clientId: client.id, userId: session.userId.toString(), scope: params.scope });
     return { kind: 'redirect', url: url.toString() };
   }
 
   async token(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
+    this.logger.debug('token request received', { grantType: params.grantType, clientId: credential.clientId, resource: params.resource });
     if (params.grantType === 'authorization_code') return this.exchangeCode(params, credential);
     if (params.grantType === 'refresh_token') return this.refresh(params, credential);
     if (params.grantType === 'client_credentials') return this.clientCredentials(params, credential);
+    this.logger.warn('token request rejected: unsupported grant type', { grantType: params.grantType, clientId: credential.clientId });
     throw new ServerError(AppErrorCode.OAU_004);
   }
 
@@ -190,12 +193,21 @@ export class OAuthService {
     if (!params.code || !params.redirectUri || !params.codeVerifier) throw new ServerError(AppErrorCode.OAU_001);
 
     const payload = await this.codeService.consume(params.code);
-    if (!payload || payload.clientId !== client.id || payload.redirectUri !== params.redirectUri) throw new ServerError(AppErrorCode.OAU_003);
-    if (!verifyPkce(params.codeVerifier, payload.codeChallenge, payload.codeChallengeMethod)) throw new ServerError(AppErrorCode.OAU_003);
+    if (!payload || payload.clientId !== client.id || payload.redirectUri !== params.redirectUri) {
+      this.logger.warn('authorization code exchange rejected: invalid, expired, or mismatched code', { clientId: client.id });
+      throw new ServerError(AppErrorCode.OAU_003);
+    }
+    if (!verifyPkce(params.codeVerifier, payload.codeChallenge, payload.codeChallengeMethod)) {
+      this.logger.warn('authorization code exchange rejected: pkce verification failed', { securityEvent: 'oauth.pkce_failed', clientId: client.id });
+      throw new ServerError(AppErrorCode.OAU_003);
+    }
 
     const userId = BigInt(payload.userId);
     const user = await this.userService.getUser(userId);
-    if (!user || user.status !== 'ACTIVE') throw new ServerError(AppErrorCode.OAU_003);
+    if (!user || user.status !== 'ACTIVE') {
+      this.logger.warn('authorization code exchange rejected: user inactive or missing', { clientId: client.id, userId: payload.userId });
+      throw new ServerError(AppErrorCode.OAU_003);
+    }
 
     const audience = payload.resource ?? DEFAULT_AUDIENCE;
     const org = user.personalOrganisationId?.toString();
@@ -232,6 +244,12 @@ export class OAuthService {
       refreshToken = issued.secret;
     }
 
+    this.logger.debug('issued tokens via authorization_code grant', {
+      clientId: client.id,
+      userId: payload.userId,
+      scope: payload.scope,
+      refreshTokenIssued: refreshToken !== undefined,
+    });
     return { accessToken, tokenType: 'Bearer', expiresIn, scope: payload.scope, idToken, refreshToken };
   }
 
@@ -240,10 +258,16 @@ export class OAuthService {
     if (!params.refreshToken) throw new ServerError(AppErrorCode.OAU_001);
 
     const rotated = await this.refreshTokenService.rotate(params.refreshToken).catch(error => {
-      if (error instanceof RefreshTokenReuseError) throw new ServerError(AppErrorCode.OAU_003);
+      if (error instanceof RefreshTokenReuseError) {
+        this.logger.warn('refresh token reuse detected, token family revoked', { securityEvent: 'oauth.refresh_token_reuse', clientId: client.id });
+        throw new ServerError(AppErrorCode.OAU_003);
+      }
       throw error;
     });
-    if (rotated.context.clientId !== client.id) throw new ServerError(AppErrorCode.OAU_003);
+    if (rotated.context.clientId !== client.id) {
+      this.logger.warn('refresh token rejected: client mismatch', { clientId: client.id, tokenClientId: rotated.context.clientId });
+      throw new ServerError(AppErrorCode.OAU_003);
+    }
 
     const scope = rotated.context.scope ?? '';
     const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
@@ -256,6 +280,7 @@ export class OAuthService {
       ttlSeconds: client.accessTokenTtl,
       actorType: 'user',
     });
+    this.logger.debug('rotated refresh token and issued access token', { clientId: client.id, userId: rotated.context.userId.toString(), scope });
     return { accessToken, tokenType: 'Bearer', expiresIn, scope, refreshToken: rotated.secret };
   }
 
@@ -265,7 +290,11 @@ export class OAuthService {
 
     const granted = await this.clientService.getGrantedScopeNames(client.id);
     const requested = (params.scope ?? '').split(' ').filter(Boolean);
-    if (requested.some(scope => !granted.includes(scope))) throw new ServerError(AppErrorCode.OAU_004);
+    const disallowed = requested.filter(scope => !granted.includes(scope));
+    if (disallowed.length > 0) {
+      this.logger.warn('client_credentials request rejected: scope not granted to client', { clientId: client.id, disallowed });
+      throw new ServerError(AppErrorCode.OAU_004);
+    }
 
     const audience = params.resource ?? DEFAULT_AUDIENCE;
     const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
@@ -276,19 +305,26 @@ export class OAuthService {
       ttlSeconds: client.accessTokenTtl,
       actorType: 'service',
     });
+    this.logger.debug('issued token via client_credentials grant', { clientId: client.id, scope: requested.join(' ') });
     return { accessToken, tokenType: 'Bearer', expiresIn, scope: requested.join(' ') };
   }
 
   private async authenticateClient(credential: ClientCredential): Promise<OAuthClient> {
     const client = await this.requireClient(credential.clientId);
     if (client.tokenEndpointAuthMethod === 'none') return client;
-    if (!credential.clientSecret || !(await this.clientService.verifySecret(client.id, credential.clientSecret))) throw new ServerError(AppErrorCode.OAU_002);
+    if (!credential.clientSecret || !(await this.clientService.verifySecret(client.id, credential.clientSecret))) {
+      this.logger.warn('client authentication failed: invalid client secret', { securityEvent: 'oauth.client_auth_failed', clientId: client.id });
+      throw new ServerError(AppErrorCode.OAU_002);
+    }
     return client;
   }
 
   private async requireClient(clientId: string): Promise<OAuthClient> {
     const client = await this.clientService.getClient(clientId);
-    if (!client || !client.isActive) throw new ServerError(AppErrorCode.OAU_002);
+    if (!client || !client.isActive) {
+      this.logger.debug('oauth client lookup failed: unknown or inactive client', { clientId });
+      throw new ServerError(AppErrorCode.OAU_002);
+    }
     return client;
   }
 
