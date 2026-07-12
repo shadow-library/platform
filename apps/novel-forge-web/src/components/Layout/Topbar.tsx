@@ -134,9 +134,9 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
       items.push({
         id: `project-${p.id}`,
         group: 'Open project',
-        label: projectTitle(p),
+        label: `${projectTitle(p)} · #${p.id}`,
         icon: <BookIcon />,
-        keywords: [p.name],
+        keywords: [p.name, p.id],
         onRun: () => navigate({ to: '/novels/$novelId/overview', params: { novelId: p.id } }),
       });
     }

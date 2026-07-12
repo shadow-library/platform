@@ -59,7 +59,16 @@
 }
 
 .chipRow {
+  display: flex;
+  align-items: center;
   margin-bottom: 6px;
+}
+
+.cardId {
+  margin-left: auto;
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
 }
 
 .cardTitle {

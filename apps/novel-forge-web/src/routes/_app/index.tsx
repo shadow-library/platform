@@ -72,6 +72,7 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
       <div className={styles.cardBody}>
         <div className={styles.chipRow}>
           <StatusChip intent={isSource ? 'info' : 'accent'}>{projectKindTag(project.kind)}</StatusChip>
+          <span className={styles.cardId}>#{project.id}</span>
         </div>
         <h3 className={styles.cardTitle}>{projectTitle(project)}</h3>
         <p className={styles.cardSub}>

@@ -129,7 +129,9 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
                   )}
                   <span className={styles.projectMeta}>
                     <span className={styles.projectName}>{projectTitle(project)}</span>
-                    <span className={styles.projectKind}>{projectKindTag(project.kind)}</span>
+                    <span className={styles.projectKind}>
+                      {projectKindTag(project.kind)} · #{project.id}
+                    </span>
                   </span>
                 </>
               ) : (
@@ -159,7 +161,9 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
                 )}
                 <span className={styles.rowMeta}>
                   <span className={styles.rowName}>{projectTitle(p)}</span>
-                  <span className={styles.projectKind}>{projectKindTag(p.kind)}</span>
+                  <span className={styles.projectKind}>
+                    {projectKindTag(p.kind)} · #{p.id}
+                  </span>
                 </span>
                 {p.id === novelId && <CheckIcon size={14} className={styles.iconAccent} />}
               </button>
