@@ -129,6 +129,13 @@ describe.if(pgAvailable)('Rebrand API', () => {
         { projectId: BigInt(projectId), chapter: 2, body: '', status: 'failed' },
       ]);
 
+      const list = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/rebrand/chapters`);
+      expect(list.statusCode).toBe(200);
+      expect(list.json().items).toMatchObject([
+        { chapter: 1, title: 'Awakening', status: 'converted', issueCount: 0, revision: 1 },
+        { chapter: 2, status: 'failed', issueCount: 0 },
+      ]);
+
       const glossary = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/rebrand/glossary?category=character`);
       expect(glossary.statusCode).toBe(200);
       expect(glossary.json().items).toEqual([{ sourceName: 'Ye Fan', variants: ['Yefan'], replacement: 'Evan Vale', category: 'character', notes: null, createdChapter: 0 }]);

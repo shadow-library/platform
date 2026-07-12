@@ -133,6 +133,25 @@ export class RebrandService {
     return this.db.query.rebrandGlossary.findMany({ where, orderBy: [asc(schema.rebrandGlossary.sourceName)], limit, offset });
   }
 
+  /** Per-chapter status summaries for the UI list — bodies stay out, they're fetched per chapter. */
+  async listConversions(
+    projectId: bigint,
+  ): Promise<{ chapter: number; title: string | null; status: Rebrand.ConversionStatus; issueCount: number; revision: number; updatedAt: Date }[]> {
+    const rows = await this.db.query.chapterConversions.findMany({
+      where: eq(schema.chapterConversions.projectId, projectId),
+      orderBy: [asc(schema.chapterConversions.chapter)],
+      columns: { chapter: true, title: true, status: true, issues: true, revision: true, updatedAt: true },
+    });
+    return rows.map(r => ({
+      chapter: r.chapter,
+      title: r.title,
+      status: r.status,
+      issueCount: Array.isArray(r.issues) ? r.issues.length : 0,
+      revision: r.revision,
+      updatedAt: r.updatedAt,
+    }));
+  }
+
   async getConversion(projectId: bigint, chapter: number): Promise<Rebrand.Conversion> {
     const conversion = await this.db.query.chapterConversions.findFirst({
       where: and(eq(schema.chapterConversions.projectId, projectId), eq(schema.chapterConversions.chapter, chapter)),

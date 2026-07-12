@@ -206,6 +206,33 @@ export class ConversionResponse {
 }
 
 @Schema()
+export class ConversionSummaryResponse {
+  @Field(() => Integer)
+  chapter: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => RebrandConversionStatus)
+  status: string;
+
+  @Field(() => Integer)
+  issueCount: number;
+
+  @Field(() => Integer)
+  revision: number;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ListConversionsResponse {
+  @Field(() => [ConversionSummaryResponse])
+  items: ConversionSummaryResponse[];
+}
+
+@Schema()
 export class ManuscriptResponse {
   @Field()
   markdown: string;

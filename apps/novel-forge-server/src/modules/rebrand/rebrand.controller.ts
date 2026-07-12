@@ -14,6 +14,7 @@ import {
   ConversionResponse,
   GlossaryListQuery,
   GlossaryListResponse,
+  ListConversionsResponse,
   ManuscriptResponse,
   RebrandChapterParams,
   RebrandConfigBody,
@@ -75,6 +76,13 @@ export class RebrandController {
   async glossary(@Params() params: RebrandParams, @Query() query: GlossaryListQuery): Promise<GlossaryListResponse> {
     const items = await this.rebrandService.listGlossary(params.projectId, query);
     return { items } as unknown as GlossaryListResponse;
+  }
+
+  @Get('/chapters')
+  @RespondFor(200, ListConversionsResponse)
+  async listConversions(@Params() params: RebrandParams): Promise<ListConversionsResponse> {
+    const items = await this.rebrandService.listConversions(params.projectId);
+    return { items } as unknown as ListConversionsResponse;
   }
 
   @Get('/chapters/:chapter')
