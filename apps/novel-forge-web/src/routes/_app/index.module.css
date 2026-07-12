@@ -34,10 +34,6 @@
   cursor: pointer;
 }
 
-.stripe {
-  height: 4px;
-}
-
 .cardCover {
   display: block;
   width: 100%;
@@ -46,12 +42,25 @@
   background: var(--sh-surface-well);
 }
 
-.stripe[data-kind='source'] {
-  background: linear-gradient(90deg, var(--sh-indigo-500), var(--sh-indigo-700));
+/* Same footprint as .cardCover so every card is the same height whether or not it has a real cover.
+   Kept to pale tints with a soft icon so the placeholder recedes rather than competing with real covers. */
+.coverPlaceholder {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 132px;
+  color: var(--sh-text-placeholder);
 }
 
-.stripe[data-kind='new_novel'] {
-  background: linear-gradient(90deg, var(--sh-green-400), var(--sh-green-600));
+.coverPlaceholder[data-kind='source'] {
+  background: var(--sh-indigo-100);
+  color: var(--sh-indigo-400);
+}
+
+.coverPlaceholder[data-kind='new_novel'] {
+  background: var(--sh-neutral-200);
+  color: var(--sh-neutral-400);
 }
 
 .cardBody {

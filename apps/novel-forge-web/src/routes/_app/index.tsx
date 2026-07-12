@@ -8,7 +8,7 @@ import { useState } from 'react';
 /**
  * Importing user defined modules
  */
-import { PlusIcon } from '@/components/icons';
+import { BookIcon, PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
 import { type ProjectKind, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
@@ -67,7 +67,9 @@ function ProjectCard({ project }: ProjectCardProps): React.JSX.Element {
       {project.coverImagePath ? (
         <img src={imageUrl(project.coverImagePath)} alt="" className={styles.cardCover} />
       ) : (
-        <div className={styles.stripe} data-kind={project.kind} />
+        <div className={styles.coverPlaceholder} data-kind={project.kind} aria-hidden="true">
+          <BookIcon size={40} />
+        </div>
       )}
       <div className={styles.cardBody}>
         <div className={styles.chipRow}>
