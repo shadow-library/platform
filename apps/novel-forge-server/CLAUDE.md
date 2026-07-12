@@ -98,6 +98,6 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RC1 — Recombine core: `chapters.mergedFrom` column, `SRC_002`/`SRC_003`, `title-parts` detection ladder, `RecombineService` (guards, transactional merge + renumber, dry-run), `POST /recombine` (recombine §2, §4). Verify: parser matrix + service/e2e tests green.
 - [x] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks on ingest completion + rebrand phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
 - [x] WN1 — Webnovel reference titles: `projects.webnovelId` + `reference_chapters`, `SRC_004`, `WebnovelCatalogService` (cookie + chapter-list fetch, positional retitle, once-only autoSync), `POST /retitle`, executor hooks before recombine (recombine §5). Verify: parser + service/hook tests green.
-- [ ] WN2 — Web UI (`novel-forge-web`): optional "Webnovel book ID" field on project creation and settings (recombine §5). Verify: web type-check/build green.
+- [x] WN2 — Web UI (`novel-forge-web`): optional "Webnovel book ID" field on project creation and settings (recombine §5). Verify: web type-check/build green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
