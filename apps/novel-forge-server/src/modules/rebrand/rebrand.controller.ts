@@ -53,7 +53,7 @@ export class RebrandController {
   @Post()
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
-  async start(@Params() params: RebrandParams, @Body() body: RebrandStartBody): Promise<JobEnqueueResponse> {
+  async startRebrand(@Params() params: RebrandParams, @Body() body: RebrandStartBody): Promise<JobEnqueueResponse> {
     const { projectId } = params;
     // The kind guard runs before enqueue so a non-source project 400s instead of parking a job.
     await this.rebrandService.getOrCreate(projectId);
