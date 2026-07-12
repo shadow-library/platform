@@ -141,3 +141,10 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 .vite/
+
+# Bundle analysis
+stats.html
+
+# Playwright
+/playwright-report/
+/test-results/

@@ -1,0 +1,389 @@
+/* Shadow UI design system: tokens, reset, utilities, and component styles. */
+@import '@shadow-library/ui/styles.css';
+
+:root {
+  /* The DS z-scale places dropdown (1000) below scrim (1100) and modal (1200), so a Select/menu
+     opened inside a Dialog renders behind the dialog scrim and its options become unclickable. Lift
+     dropdowns to the popover layer (already above modals) so they work inside dialogs. */
+  --sh-z-dropdown: 1300;
+
+  /* Shared layout dimensions — the fixed sidebar rail and the centered content column. Screens draw
+     from these so navigation never shifts the layout. */
+  --si-sidebar-width: 256px;
+  --si-page-max: 1120px;
+  --si-page-wide: 1280px;
+}
+
+/* ========================================
+   App base
+   ======================================== */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--sh-font-sans);
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+a {
+  color: var(--sh-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--sh-accent-hover);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sh-border-default);
+  border-radius: 999px;
+  border: 3px solid transparent;
+  background-clip: content-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--sh-border-strong);
+  background-clip: content-box;
+}
+
+/* ========================================
+   Primitives shared across screens
+   ======================================== */
+.si-scroll {
+  overflow-y: auto;
+}
+
+/* Centered content column shared by the portal/console screens (each screen sets its own padding). */
+.si-page {
+  max-width: var(--si-page-max);
+  margin: 0 auto;
+}
+
+.si-page-wide {
+  max-width: var(--si-page-wide);
+  margin: 0 auto;
+}
+
+/* A small uppercase eyebrow label (callers set their own margin). */
+.si-eyebrow {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.si-mono {
+  font-family: var(--sh-font-mono);
+}
+
+/* Colour-coded status chip. Each intent sets the surface/text pair and the `--si-dot` colour its
+   leading dot reads. Mirrors the design's pill vocabulary. */
+.si-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border-radius: var(--sh-radius-full);
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  white-space: nowrap;
+}
+
+.si-chip[data-intent='neutral'] {
+  background: var(--sh-bg-pressed);
+  color: var(--sh-text-secondary);
+  --si-dot: var(--sh-text-tertiary);
+}
+.si-chip[data-intent='info'] {
+  background: var(--sh-info-bg-subtle);
+  color: var(--sh-info-text-on-subtle);
+  --si-dot: var(--sh-info-solid);
+}
+.si-chip[data-intent='success'] {
+  background: var(--sh-success-bg-subtle);
+  color: var(--sh-success-text-on-subtle);
+  --si-dot: var(--sh-success-solid);
+}
+.si-chip[data-intent='warning'] {
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-text-on-subtle);
+  --si-dot: var(--sh-warning-solid);
+}
+.si-chip[data-intent='danger'] {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+  --si-dot: var(--sh-danger-solid);
+}
+.si-chip[data-intent='accent'] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  --si-dot: var(--sh-accent);
+}
+
+.si-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--si-dot);
+}
+
+/* A nav link inside a sidebar rail. */
+.si-nav {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  color: var(--sh-text-secondary);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  cursor: pointer;
+  border: none;
+  background: transparent;
+  width: 100%;
+  text-align: left;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.si-nav:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+
+.si-nav[data-active='true'] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}
+
+.si-nav[data-active='true'] svg {
+  color: var(--sh-accent);
+}
+
+/* A quiet icon button matching the design chrome (topbar actions, row triggers). */
+.si-ib {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: var(--sh-radius-md);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  border: 1px solid transparent;
+  background: transparent;
+  transition:
+    background 0.12s,
+    color 0.12s,
+    border 0.12s;
+}
+
+.si-ib:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+  border-color: var(--sh-border-subtle);
+}
+
+/* A selectable list row (org/member/session rows). */
+.si-selrow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  transition: background 0.12s;
+}
+
+.si-selrow:hover {
+  background: var(--sh-bg-hover);
+}
+
+.si-selrow[data-active='true'] {
+  background: var(--sh-accent-soft);
+}
+
+/* Row actions revealed on hover/focus. */
+.si-rowactions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+
+.si-selrow:hover .si-rowactions,
+.si-selrow:focus-within .si-rowactions {
+  opacity: 1;
+}
+
+.si-rowaction {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+  transition:
+    background 0.12s,
+    color 0.12s;
+}
+
+.si-rowaction:hover {
+  background: var(--sh-bg-pressed);
+  color: var(--sh-text-primary);
+}
+
+.si-rowaction[data-danger]:hover {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-solid);
+}
+
+/* A card that lifts slightly on hover (grid tiles). */
+.si-cardhover {
+  transition:
+    border-color 0.12s,
+    box-shadow 0.12s,
+    transform 0.12s;
+}
+
+.si-cardhover:hover {
+  border-color: var(--sh-border-strong);
+  box-shadow: var(--sh-shadow-e2);
+}
+
+.si-menuitem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  border-radius: var(--sh-radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  color: var(--sh-text-primary);
+  font-size: var(--sh-text-body-sm);
+  transition: background 0.12s;
+}
+
+.si-menuitem:hover {
+  background: var(--sh-bg-hover);
+}
+
+.si-menuitem[data-active='true'] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}
+
+/* ========================================
+   Responsive shell — sidebar collapses to an off-canvas drawer under the tablet breakpoint
+   ======================================== */
+.si-sidebar {
+  width: var(--si-sidebar-width);
+  flex-shrink: 0;
+}
+.si-hamburger {
+  display: none;
+}
+.si-shell-scrim {
+  display: none;
+}
+
+@media (max-width: 900px) {
+  .si-hamburger {
+    display: inline-flex;
+  }
+  .si-sidebar {
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: var(--sh-z-modal);
+    transform: translateX(-100%);
+    transition: transform 0.22s ease;
+    box-shadow: var(--sh-shadow-e3);
+  }
+  .si-sidebar[data-open='true'] {
+    transform: translateX(0);
+  }
+  .si-shell-scrim[data-open='true'] {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: var(--sh-z-scrim);
+    background: var(--sh-scrim);
+  }
+}
+
+/* ========================================
+   Animations
+   ======================================== */
+@keyframes si-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes si-pulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.4;
+  }
+}
+
+@keyframes si-swap {
+  from {
+    opacity: 0;
+    transform: translateX(-7px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.si-swap {
+  animation: si-swap 0.22s ease;
+}
+
+.si-spin {
+  animation: si-spin 0.8s linear infinite;
+}
+
+.si-pulse {
+  animation: si-pulse 1.4s ease-in-out infinite;
+}

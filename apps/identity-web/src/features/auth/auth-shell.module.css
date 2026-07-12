@@ -1,0 +1,215 @@
+.screen {
+  display: flex;
+  min-height: 100vh;
+  width: 100%;
+  background: var(--sh-surface-app);
+}
+
+/* ---------- brand rail ---------- */
+.brandPanel {
+  flex: 1 1 auto;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+  padding: 44px 46px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.blobA,
+.blobB {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+}
+.blobA {
+  right: -90px;
+  bottom: -90px;
+  width: 340px;
+  height: 340px;
+}
+.blobB {
+  right: 70px;
+  top: -50px;
+  width: 170px;
+  height: 170px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.brandPanelTop {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.brandPanelName {
+  font-size: 16px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+}
+
+.brandPanelBody {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 440px;
+}
+
+.brandHeadline {
+  margin: 0;
+  font-size: 31px;
+  line-height: 1.18;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.brandSub {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.65;
+  opacity: 0.85;
+}
+
+.brandPoints {
+  display: flex;
+  flex-direction: column;
+  gap: 13px;
+  margin-top: 4px;
+}
+
+.brandPoint {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13.5px;
+  opacity: 0.94;
+}
+
+.brandPanelFoot {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 16px;
+  font-size: 12px;
+  opacity: 0.72;
+}
+
+/* ---------- form column ---------- */
+.formCol {
+  flex: none;
+  width: 474px;
+  max-width: 100%;
+  box-sizing: border-box;
+  background: var(--sh-surface-app);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 30px 40px 22px;
+}
+
+.brandMark {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.brandMarkName {
+  font-size: 15px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+
+.brandMarkSub {
+  color: var(--sh-text-tertiary);
+  font-weight: 500;
+}
+
+.formMain {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 14px;
+  padding: 24px 0;
+}
+
+.formFoot {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: center;
+  padding-top: 8px;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  text-align: center;
+}
+
+.secured {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--sh-text-placeholder);
+}
+
+/* ---------- card + medallion ---------- */
+.card {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 20px;
+  box-shadow: var(--sh-shadow-e1);
+  padding: 26px 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.medallion {
+  align-self: center;
+  width: 66px;
+  height: 66px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.medallion[data-intent='accent'] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}
+.medallion[data-intent='danger'] {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-solid);
+}
+.medallion[data-intent='success'] {
+  background: var(--sh-success-bg-subtle);
+  color: var(--sh-success-solid);
+}
+.medallion[data-intent='warning'] {
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-solid);
+}
+.medallion[data-intent='neutral'] {
+  background: var(--sh-surface-well);
+  color: var(--sh-text-secondary);
+}
+
+@media (max-width: 880px) {
+  .brandPanel {
+    display: none;
+  }
+  .formCol {
+    width: 100%;
+    margin: 0 auto;
+    max-width: 520px;
+  }
+}

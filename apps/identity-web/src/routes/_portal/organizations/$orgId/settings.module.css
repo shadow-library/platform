@@ -1,0 +1,44 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 720px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  align-items: flex-start;
+}
+.form > :first-child {
+  align-self: stretch;
+}
+
+.danger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 22px;
+  background: var(--sh-danger-bg-subtle);
+  border: 1px solid var(--sh-danger-border);
+  border-radius: var(--sh-radius-xl);
+}
+
+.dangerMain {
+  min-width: 0;
+}
+
+.dangerTitle {
+  font-size: 14px;
+  font-weight: 650;
+  color: var(--sh-danger-text-on-subtle);
+}
+
+.dangerText {
+  font-size: 12.5px;
+  color: var(--sh-danger-text-on-subtle);
+  margin-top: 2px;
+  opacity: 0.9;
+}

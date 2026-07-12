@@ -1,0 +1,65 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 1040px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 14px;
+}
+
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 18px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+  text-decoration: none;
+  color: inherit;
+}
+.card:hover {
+  text-decoration: none;
+}
+
+.cardTop {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.extIcon {
+  color: var(--sh-text-tertiary);
+}
+
+.cardName {
+  font-size: 15px;
+  font-weight: 650;
+  color: var(--sh-text-primary);
+}
+
+.cardDomain {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+  font-family: var(--sh-font-mono);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cardFoot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.cardTime {
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
+}

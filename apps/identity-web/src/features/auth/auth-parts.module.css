@@ -1,0 +1,423 @@
+.progress {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.progressBar {
+  display: flex;
+  gap: 4px;
+}
+.progressSeg {
+  flex: 1;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sh-border-default);
+}
+.progressSeg[data-on] {
+  background: var(--sh-accent);
+}
+.progressLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.stepHeader {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.stepHeader[data-align='center'] {
+  align-items: center;
+  text-align: center;
+}
+
+.stepTitle {
+  margin: 0;
+  font-size: 21px;
+  line-height: 1.25;
+  font-weight: 650;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+
+.stepDesc {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+/* identifier chip */
+.idChip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 8px 6px 10px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 12px;
+}
+
+.idChipMain {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.idDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--sh-success-solid);
+  flex: none;
+}
+
+.idValue {
+  font-size: 13px;
+  color: var(--sh-text-primary);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* method rows */
+.methodRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid var(--sh-border-default);
+  border-radius: 13px;
+  background: var(--sh-surface-card);
+  cursor: pointer;
+  text-align: left;
+  transition:
+    border-color 0.12s,
+    background 0.12s;
+}
+
+.methodRow:hover {
+  border-color: var(--sh-border-interactive);
+}
+
+.methodRow[data-selected] {
+  border: 1.5px solid var(--sh-accent);
+  background: var(--sh-accent-soft);
+}
+
+.methodIcon {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--sh-surface-well);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sh-text-secondary);
+}
+
+.methodRow[data-selected] .methodIcon {
+  background: var(--sh-surface-card);
+  color: var(--sh-accent);
+}
+
+.methodBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+}
+
+.methodTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.methodDesc {
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+}
+
+.methodBadge {
+  flex: none;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-accent);
+  background: var(--sh-surface-card);
+  padding: 2px 7px;
+  border-radius: 999px;
+}
+
+.methodChevron {
+  flex: none;
+  color: var(--sh-text-tertiary);
+}
+
+/* otp */
+.otp {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.resendRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.resendHint {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.otpNote {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--sh-text-tertiary);
+  text-align: center;
+}
+
+.mfaAlts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+/* login-specific helpers */
+.orDivider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--sh-text-tertiary);
+  font-size: 11px;
+  letter-spacing: 0.04em;
+}
+.orDivider::before,
+.orDivider::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--sh-border-subtle);
+}
+
+.btnIcon {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.clientChip {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 8px 10px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 12px;
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+  line-height: 1.35;
+}
+.clientChipName {
+  color: var(--sh-text-primary);
+  font-weight: 600;
+}
+
+.forgotRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: -8px;
+}
+
+.altStack {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.footLink {
+  color: var(--sh-text-tertiary);
+}
+
+.nameRow {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.pwRules {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 2px 2px 0;
+}
+
+.pwRule {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.pwRule[data-ok] {
+  color: var(--sh-success-text);
+}
+
+.pwDot {
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 1.6px solid var(--sh-border-strong);
+  flex: none;
+}
+
+/* consent */
+.scopeList {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.scopeLead {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-secondary);
+}
+
+.scopeRow {
+  display: flex;
+  gap: 11px;
+  align-items: flex-start;
+}
+
+.scopeIconWrap {
+  flex: none;
+  margin-top: 1px;
+  color: var(--sh-accent);
+}
+
+.scopeName {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.scopeDesc {
+  display: block;
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+  line-height: 1.4;
+}
+
+.userChip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 10px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 12px;
+}
+.userChipMain {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.userChipName {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  line-height: 1.3;
+}
+.userChipEmail {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.codeBlock {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 11px 13px;
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 10px;
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-text-secondary);
+  line-height: 1.7;
+  text-align: left;
+}
+
+.btnStack {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  width: 100%;
+}
+
+/* invitation */
+.inviteHead {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  align-items: center;
+  text-align: center;
+}
+.inviteEyebrow {
+  font-size: 13px;
+  color: var(--sh-text-secondary);
+}
+.inviteOrg {
+  margin: 0;
+  font-size: 23px;
+  line-height: 1.2;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: var(--sh-text-primary);
+}
+.inviteBanner {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 11px 13px;
+  border-radius: 10px;
+  text-align: left;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.inviteBanner[data-intent='success'] {
+  background: var(--sh-success-bg-subtle);
+  border: 1px solid var(--sh-success-border);
+  color: var(--sh-success-text-on-subtle);
+}
+.inviteBanner[data-intent='neutral'] {
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  color: var(--sh-text-secondary);
+}

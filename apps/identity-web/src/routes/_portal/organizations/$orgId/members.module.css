@@ -1,0 +1,108 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.search {
+  flex: 1;
+  max-width: 300px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.memberCell {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-width: 0;
+}
+
+.memberText {
+  min-width: 0;
+}
+
+.memberName {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.you {
+  color: var(--sh-text-tertiary);
+  font-weight: 400;
+}
+
+.muted {
+  font-size: 13px;
+  color: var(--sh-text-secondary);
+}
+
+.pending {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pending > .si-eyebrow,
+.pending :global(.si-eyebrow) {
+  padding: 4px 2px 4px;
+}
+
+.inviteRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 18px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+}
+
+.inviteIcon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--sh-surface-well);
+  color: var(--sh-text-tertiary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.inviteMeta {
+  flex: 1;
+  min-width: 0;
+}
+
+.inviteEmail {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.inviteSub {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  margin-top: 1px;
+}
+
+.inviteActions {
+  display: flex;
+  gap: 6px;
+  flex: none;
+}

@@ -1,0 +1,144 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 1040px;
+}
+
+.profile {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 20px 22px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-2xl);
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.profileMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.profileName {
+  font-size: 18px;
+  font-weight: 650;
+  color: var(--sh-text-primary);
+}
+
+.profileMeta {
+  font-size: 13px;
+  color: var(--sh-text-secondary);
+}
+
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.stat {
+  padding: 16px 18px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.statValue {
+  font-size: 24px;
+  font-weight: 650;
+  color: var(--sh-text-primary);
+  margin-top: 4px;
+  font-variant-numeric: tabular-nums;
+}
+
+.statHint {
+  font-size: 12px;
+  color: var(--sh-text-secondary);
+  margin-top: 2px;
+}
+.statHint[data-tone='success'] {
+  color: var(--sh-success-text);
+}
+
+.navGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+
+.navCard {
+  padding: 18px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  text-decoration: none;
+}
+.navCard:hover {
+  text-decoration: none;
+}
+
+.navCardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.navCardIcon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.navCardTitle {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.navCardText {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+.navCardCta {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sh-accent);
+  margin-top: 2px;
+}
+
+@media (max-width: 1080px) {
+  .statGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .navGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .statGrid,
+  .navGrid {
+    grid-template-columns: 1fr;
+  }
+}
