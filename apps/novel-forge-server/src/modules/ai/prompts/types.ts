@@ -43,7 +43,10 @@ export type PromptKey =
   | 'chat-refine'
   | 'chat-compact'
   | 'arc-plan'
-  | 'chapter-extract';
+  | 'chapter-extract'
+  | 'rebrand-glossary'
+  | 'rebrand-convert'
+  | 'rebrand-audit';
 
 export interface PromptModule<TOut> {
   key: PromptKey;

@@ -29,6 +29,9 @@ import { newNovelPrompt } from './new-novel.prompt';
 import { outlinePrompt } from './outline.prompt';
 import { planPrompt } from './plan.prompt';
 import { premiseEnhancePrompt } from './premise-enhance.prompt';
+import { rebrandAuditPrompt } from './rebrand-audit.prompt';
+import { rebrandConvertPrompt } from './rebrand-convert.prompt';
+import { rebrandGlossaryPrompt } from './rebrand-glossary.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
 import { skeletonPrompt } from './skeleton.prompt';
@@ -70,6 +73,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'chat-compact': chatCompactPrompt as PromptModule<unknown>,
   'arc-plan': arcPlanPrompt as PromptModule<unknown>,
   'chapter-extract': chapterExtractPrompt as PromptModule<unknown>,
+  'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,
+  'rebrand-convert': rebrandConvertPrompt as PromptModule<unknown>,
+  'rebrand-audit': rebrandAuditPrompt as PromptModule<unknown>,
 };
 
 export * from './types';

@@ -28,3 +28,6 @@ export const ReviewSeverity = EnumType.create('ReviewSeverity', ['blocking', 'su
 export const ValidationSeverity = EnumType.create('ValidationSeverity', ['error', 'warning']);
 export const HookType = EnumType.create('HookType', ['cliffhanger', 'revelation', 'quiet_dread', 'promise', 'turn']);
 export const AuditAction = EnumType.create('AuditAction', ['add', 'revise', 'remove', 'keep']);
+export const RebrandFixKind = EnumType.create('RebrandFixKind', ['name', 'attribution', 'grammar']);
+export const RebrandAuditVerdict = EnumType.create('RebrandAuditVerdict', ['clean', 'issues']);
+export const RebrandAuditIssueType = EnumType.create('RebrandAuditIssueType', ['nationalism', 'discrimination', 'naming', 'real_world_reference']);

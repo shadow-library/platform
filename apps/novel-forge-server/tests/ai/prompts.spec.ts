@@ -8,7 +8,17 @@ import { describe, expect, it } from 'bun:test';
  */
 import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
-import { ChatRefineSchema, ExtractionSchema, FixSchema, JudgeSchema, PlanSchema, validateArcCoverage, validatePlanContiguity } from '@modules/ai/schemas';
+import {
+  ChatRefineSchema,
+  ExtractionSchema,
+  FixSchema,
+  JudgeSchema,
+  PlanSchema,
+  RebrandAuditSchema,
+  RebrandConvertSchema,
+  validateArcCoverage,
+  validatePlanContiguity,
+} from '@modules/ai/schemas';
 import { parseSchema } from '@modules/ai/schemas/validate';
 
 /**
@@ -158,6 +168,65 @@ describe('Prompt modules', () => {
       expect(validateArcCoverage([arc('a1', 1, 5), arc('a2', 7, 12)], 1, 12)[0]).toMatch(/must start at chapter 6/);
       expect(validateArcCoverage([arc('a1', 2, 12)], 1, 12)[0]).toMatch(/must start at chapter 1/);
       expect(validateArcCoverage([arc('a1', 1, 11)], 1, 12)[0]).toMatch(/must end at chapter 12/);
+    });
+  });
+
+  describe('rebrand prompt modules', () => {
+    it('registers the three rebrand prompt keys with the expected roles', () => {
+      for (const key of ['rebrand-glossary', 'rebrand-convert', 'rebrand-audit'] as const) {
+        expect(PROMPT_REGISTRY[key]).toBeDefined();
+        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
+      }
+      expect(PROMPT_REGISTRY['rebrand-glossary'].role).toBe('rebrand');
+      expect(PROMPT_REGISTRY['rebrand-convert'].role).toBe('rebrand');
+      // The audit reuses the cacheable `audit` role so identical re-audits hit llm_cache.
+      expect(PROMPT_REGISTRY['rebrand-audit'].role).toBe('audit');
+    });
+
+    it('renders rebrand-convert in cache order: system, stable pack, volatile chapter tail', async () => {
+      const messages = await PROMPT_REGISTRY['rebrand-convert'].template.formatMessages({
+        contextPack: 'STABLE-WORLD-NOTES',
+        chapterProse: 'VOLATILE-CHAPTER-PROSE',
+        repairNotes: 'fix the leftover name',
+      });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toBe('STABLE-WORLD-NOTES');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-CHAPTER-PROSE');
+      expect(String(messages[2]?.content)).toContain('fix the leftover name');
+    });
+
+    it('renders rebrand-glossary and rebrand-audit with their template vars', async () => {
+      const glossary = await PROMPT_REGISTRY['rebrand-glossary'].template.formatMessages({ contextPack: 'OVERVIEW', openingChapters: 'CH1-EXCERPT' });
+      expect(String(glossary[glossary.length - 1]?.content)).toContain('CH1-EXCERPT');
+
+      const audit = await PROMPT_REGISTRY['rebrand-audit'].template.formatMessages({ worldNotes: 'NOTES', glossarySlice: 'SLICE', convertedProse: 'PROSE' });
+      expect(String(audit[1]?.content)).toContain('SLICE');
+      expect(String(audit[2]?.content)).toContain('PROSE');
+    });
+
+    it('validates rebrand-convert output shape', () => {
+      const body = 'p'.repeat(120);
+      expect(parseSchema(RebrandConvertSchema, { title: 'The Vale Gate', body }).success).toBe(true);
+      expect(parseSchema(RebrandConvertSchema, { title: 'Too short', body: 'tiny' }).success).toBe(false);
+      const withExtras = {
+        title: 'The Vale Gate',
+        body,
+        discoveredNames: [{ sourceName: 'Li Wei', replacement: 'Liam Vey', category: 'character' }],
+        fixes: [{ kind: 'attribution', detail: 'gave the retort back to Mira' }],
+        addedScenes: [{ placement: 'after the duel', purpose: 'first romance beat' }],
+        carryState: { activeThreads: 'Mira and Evan, first spark' },
+      };
+      expect(parseSchema(RebrandConvertSchema, withExtras).success).toBe(true);
+    });
+
+    it('rebrand-audit postValidate forces verdict/issues agreement', () => {
+      const audit = PROMPT_REGISTRY['rebrand-audit'];
+      expect(audit.postValidate?.({ verdict: 'clean', issues: [] })).toEqual([]);
+      expect(audit.postValidate?.({ verdict: 'issues', issues: [] })[0]).toMatch(/at least one issue/);
+      expect(audit.postValidate?.({ verdict: 'clean', issues: [{ type: 'naming', detail: 'x' }] })[0]).toMatch(/empty issues list/);
+      expect(parseSchema(RebrandAuditSchema, { verdict: 'issues', issues: [{ type: 'real_world_reference', detail: 'mentions China' }] }).success).toBe(true);
+      expect(parseSchema(RebrandAuditSchema, { verdict: 'maybe', issues: [] }).success).toBe(false);
     });
   });
 
