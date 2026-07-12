@@ -31,6 +31,12 @@ export class AppErrorCode extends ServerErrorCode {
    * Source Errors
    */
   static readonly SRC_001 = new AppErrorCode('SRC_001', ErrorType.CLIENT_ERROR, 'No source adapter found for this URL');
+  static readonly SRC_002 = new AppErrorCode('SRC_002', ErrorType.CLIENT_ERROR, 'Recombine requires a completed scrape — finish ingesting the source first');
+  static readonly SRC_003 = new AppErrorCode(
+    'SRC_003',
+    ErrorType.CLIENT_ERROR,
+    'Recombine is unavailable once extraction, briefs, or conversions reference chapters — renumbering would corrupt them',
+  );
 
   /*!
    * Chapter Errors

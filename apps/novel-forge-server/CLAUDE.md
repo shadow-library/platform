@@ -15,6 +15,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 - `docs/interactive-refinement-design.md` — premise enhancement, bible audit, chat refinement, arc tier, ending-contract briefs, prompt caching. **Amends migration-doc §1.1.16 and adds Appendix A rules 12–13** (its §2 lists all amendments); drives tasks R1–R10.
 - `docs/chat-hub-design.md` — the central chat hub: `project` scope, auto/manual modes, per-op cherry-pick, inverse-op revert + rollback, action ops, declared-lookup protocol. **Amends Appendix A rule 2 and adds rule 14** (its §2); drives tasks H1–H6.
 - `docs/rebrand-pipeline-design.md` — the automated source-conversion pipeline: glossary/world-map, per-chapter convert + residue scan + audit graph, three-phase `rebrand` job, flag-and-continue semantics; drives tasks RB1–RB6.
+- `docs/chapter-recombine-design.md` — merging translator-split chapter parts back into source chapters: title-parsing ladder, AI boundary resolution, transactional renumber + derived-data guard, auto-run hooks; drives tasks RC1–RC2.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -94,5 +95,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RB4 — Chapter-rebrand graph: `forRebrand` context purpose + budget, graph with single-repair routing (`routeAfterAudit`), `runChapterRebrand` (rebrand §5). Verify: route matrix + mocked-router graph runs.
 - [x] RB5 — Rebrand job & endpoints: three-phase `runRebrand` executor (flag-and-continue), rebrand controller/DTOs wired via `PipelineModule` (rebrand §6–7). Verify: executor + controller e2e tests.
 - [x] RB6 — Web UI (`novel-forge-web`): rebrand panel — config, start + progress, chapter status list, original/converted reader toggle, re-run, manuscript download (rebrand §8). Verify: web type-check/build green.
+- [x] RC1 — Recombine core: `chapters.mergedFrom` column, `SRC_002`/`SRC_003`, `title-parts` detection ladder, `RecombineService` (guards, transactional merge + renumber, dry-run), `POST /recombine` (recombine §2, §4). Verify: parser matrix + service/e2e tests green.
+- [ ] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks on ingest completion + rebrand phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

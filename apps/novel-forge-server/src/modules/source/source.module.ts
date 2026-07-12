@@ -16,6 +16,7 @@ import { AdapterRegistry } from './adapters/adapter.registry';
 import { AssetService } from './asset.service';
 import { ChapterController } from './chapter/chapter.controller';
 import { ChapterService } from './chapter/chapter.service';
+import { RecombineService } from './recombine.service';
 
 /**
  * Defining types
@@ -28,7 +29,7 @@ import { ChapterService } from './chapter/chapter.service';
 @Module({
   imports: [DatabaseModule],
   controllers: [ChapterController],
-  providers: [ChapterService, AdapterRegistry, AcquireService, AssetService],
-  exports: [ChapterService, AdapterRegistry, AcquireService, AssetService],
+  providers: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService],
+  exports: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService],
 })
 export class SourceModule {}

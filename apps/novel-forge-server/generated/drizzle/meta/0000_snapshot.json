@@ -1,5 +1,5 @@
 {
-  "id": "88af0fb8-a689-41c2-bc46-3454077cdfde",
+  "id": "7b819b1a-bbab-4d19-bb40-9c9921cf46ba",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -276,6 +276,12 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "merged_from": {
+          "name": "merged_from",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
         },
         "note": {
           "name": "note",

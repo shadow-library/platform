@@ -11,6 +11,7 @@ import { bigint, bigserial, boolean, index, integer, pgEnum, pgTable, text, time
 /**
  * Importing user defined packages
  */
+import { jsonb } from './jsonb';
 import { contentGenerator, projects } from './projects';
 
 /**
@@ -20,6 +21,14 @@ import { contentGenerator, projects } from './projects';
 export namespace Chapter {
   export type Row = InferSelectModel<typeof chapters>;
   export type Status = InferEnum<typeof chapterStatus>;
+
+  /** One absorbed translator part recorded on a recombined chapter (recombine design §3). */
+  export interface MergedPart {
+    number: number;
+    title: string | null;
+    words: number;
+    url: string | null;
+  }
 }
 
 /**
@@ -48,6 +57,8 @@ export const chapters = pgTable(
     // Set true when a dependency (bible doc or an earlier chapter) changed after this chapter was validated.
     needsRevalidation: boolean('needs_revalidation').notNull().default(false),
     continuityApplied: boolean('continuity_applied').notNull().default(false),
+    // Audit trail of translator parts merged into this chapter by the recombine pass; null = never merged.
+    mergedFrom: jsonb('merged_from'),
     note: text('note'),
     scrapedAt: timestamp('scraped_at'),
     createdAt: timestamp('created_at').notNull().defaultNow(),

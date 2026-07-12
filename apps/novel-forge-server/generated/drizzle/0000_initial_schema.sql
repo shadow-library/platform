@@ -74,6 +74,7 @@ CREATE TABLE "chapters" (
 	"locked" boolean DEFAULT false NOT NULL,
 	"needs_revalidation" boolean DEFAULT false NOT NULL,
 	"continuity_applied" boolean DEFAULT false NOT NULL,
+	"merged_from" jsonb,
 	"note" text,
 	"scraped_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,

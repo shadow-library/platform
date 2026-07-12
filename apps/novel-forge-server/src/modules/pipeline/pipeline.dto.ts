@@ -91,3 +91,51 @@ export class ResumeResponse {
   @Field()
   jobId: string;
 }
+
+@Schema()
+export class RecombineBody {
+  @Field({ optional: true })
+  dryRun?: boolean;
+
+  @Field({ optional: true })
+  useAi?: boolean;
+}
+
+@Schema()
+export class MergedChapterItem {
+  @Field(() => Integer)
+  number: number;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => Integer)
+  parts: number;
+}
+
+@Schema()
+export class AmbiguousBoundaryItem {
+  @Field(() => Integer)
+  afterNumber: number;
+
+  @Field()
+  reason: string;
+}
+
+@Schema()
+export class RecombineResponse {
+  @Field()
+  applied: boolean;
+
+  @Field(() => Integer)
+  before: number;
+
+  @Field(() => Integer)
+  after: number;
+
+  @Field(() => [MergedChapterItem])
+  merged: MergedChapterItem[];
+
+  @Field(() => [AmbiguousBoundaryItem])
+  ambiguous: AmbiguousBoundaryItem[];
+}

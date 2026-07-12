@@ -10,12 +10,24 @@ import { Body, Get, HttpController, HttpStatus, Params, Post, RespondFor } from 
 /**
  * Importing user defined packages
  */
-import { AssetsResponse, ConsolidateResponse, ExtractBody, IngestBody, JobEnqueueResponse, PipelineProjectParams, ResumeResponse, SkeletonResponse } from './pipeline.dto';
+import {
+  AssetsResponse,
+  ConsolidateResponse,
+  ExtractBody,
+  IngestBody,
+  JobEnqueueResponse,
+  PipelineProjectParams,
+  RecombineBody,
+  RecombineResponse,
+  ResumeResponse,
+  SkeletonResponse,
+} from './pipeline.dto';
 import { ConsolidateService } from '../extraction/consolidate.service';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { SkeletonService } from '../planning/skeleton.service';
 import { AssetService } from '../source/asset.service';
+import { RecombineService } from '../source/recombine.service';
 
 /**
  * Defining types
@@ -33,6 +45,7 @@ export class PipelineController {
     private readonly assetService: AssetService,
     private readonly consolidateService: ConsolidateService,
     private readonly skeletonService: SkeletonService,
+    private readonly recombineService: RecombineService,
   ) {}
 
   // ─── Ingest ─────────────────────────────────────────────────────────────────
@@ -61,6 +74,14 @@ export class PipelineController {
     const jobId = await this.jobService.enqueue(projectId, 'extract', target, payload);
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
     return { jobId, kind: 'extract', status: 'pending', target };
+  }
+
+  // ─── Recombine ───────────────────────────────────────────────────────────────
+
+  @Post('/recombine')
+  @RespondFor(200, RecombineResponse)
+  recombine(@Params() params: PipelineProjectParams, @Body() body: RecombineBody): Promise<RecombineResponse> {
+    return this.recombineService.recombine(params.projectId, { dryRun: body.dryRun, useAi: body.useAi }) as unknown as Promise<RecombineResponse>;
   }
 
   // ─── Consolidate ─────────────────────────────────────────────────────────────

@@ -94,7 +94,8 @@ Kind `'rebrand'`, payload `{chapters?: number[], force?: boolean, limit?: number
 updated at phase boundaries for display only):
 
 1. **Acquire** — loop `AcquireService.ingest` until `scrapeComplete`. A stalled loop (0 pages ingested, still incomplete) throws — pre-conversion, blocking is
-   correct.
+   correct. Once complete, the recombine pass runs (`RecombineService.autoRecombine`, see `chapter-recombine-design.md`) to merge translator-split chapter parts
+   before anything downstream sees them; its guards make it a safe no-op on already-processed projects.
 2. **Glossary** — `RebrandService.seedGlossary` (no-op when `worldNotes` is already set).
 3. **Convert** — target chapters = `payload.chapters` ?? source chapters minus existing `converted`/`attention` conversions (`failed` always retried); `force`
    reconverts everything; `limit` caps the batch for trial runs. Chapters run ascending, serial. A failed run upserts a `failed` conversion row with the error in
