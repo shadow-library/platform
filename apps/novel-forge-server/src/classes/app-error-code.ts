@@ -147,6 +147,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly RFN_011 = new AppErrorCode('RFN_011', ErrorType.CLIENT_ERROR, 'Invalid op selection — indexes must reference ops in the change-set and select at least one');
 
   /*!
+   * Rebrand Errors
+   */
+  static readonly RBR_001 = new AppErrorCode('RBR_001', ErrorType.NOT_FOUND, 'Rebrand is not configured for this project');
+  static readonly RBR_002 = new AppErrorCode('RBR_002', ErrorType.NOT_FOUND, 'Converted chapter not found');
+  static readonly RBR_003 = new AppErrorCode('RBR_003', ErrorType.CLIENT_ERROR, 'Rebrand is only available for source projects');
+
+  /*!
    * Context Errors
    */
   static readonly CTX_001 = new AppErrorCode('CTX_001', ErrorType.NOT_FOUND, 'No context pack is linked to this run');

@@ -14,6 +14,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 - `docs/ai-system-design.md` — the AI subsystem blueprint. **Supersedes migration-doc §8** and the AI parts of Phases 5/7. Appendix A is a list of hard rules that must never be violated; Appendix B specifies the AI tables.
 - `docs/interactive-refinement-design.md` — premise enhancement, bible audit, chat refinement, arc tier, ending-contract briefs, prompt caching. **Amends migration-doc §1.1.16 and adds Appendix A rules 12–13** (its §2 lists all amendments); drives tasks R1–R10.
 - `docs/chat-hub-design.md` — the central chat hub: `project` scope, auto/manual modes, per-op cherry-pick, inverse-op revert + rollback, action ops, declared-lookup protocol. **Amends Appendix A rule 2 and adds rule 14** (its §2); drives tasks H1–H6.
+- `docs/rebrand-pipeline-design.md` — the automated source-conversion pipeline: glossary/world-map, per-chapter convert + residue scan + audit graph, three-phase `rebrand` job, flag-and-continue semantics; drives tasks RB1–RB6.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -87,5 +88,11 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] H4 — Hub chat turn v2: `forHubTurn` pack + `chat_hub` budget, chat prompt v2 with declared lookups (max 3 rounds, audited), session `mode` PATCH + hub scope, auto-mode in-turn apply, render goldens (chat-hub §6). Verify: mocked-model e2e both modes + lookup-loop tests.
 - [x] H5 — Hub verification sweep: full suite green, doc cross-links, `ai:smoke` still passing (chat-hub §8).
 - [x] H6 — Web UI (`novel-forge-web`): hub-first chat screen, mode toggle, per-op proposal cards with diffs + apply-selected, applied/revert cards, action chips, change-history timeline with rollback (chat-hub §7). Verify: web type-check/lint/build green.
+- [x] RB1 — Rebrand schema & error codes: `rebrands`/`rebrand_glossary`/`chapter_conversions` tables + 3 enums, `job_kind` +`rebrand`, `RBR_` codes, baseline migration regen, design doc (rebrand §3). Verify: migration applies to template DB, schema tests green.
+- [ ] RB2 — Rebrand prompt modules: `AiRole 'rebrand'`, `rebrand-glossary`/`rebrand-convert`/`rebrand-audit` prompts + class-schema outputs, registry entries, render goldens (rebrand §4). Verify: prompt suite green.
+- [ ] RB3 — Rebrand module core: `BANNED_REAL_WORLD_TERMS`, `scanResidue`/`selectGlossarySlice`/`renderGlossarySlice` pure functions, `RebrandService` (config/status/glossary/conversion/manuscript/seedGlossary) (rebrand §2, §7). Verify: residue-scan unit matrix + service template-DB tests.
+- [ ] RB4 — Chapter-rebrand graph: `forRebrand` context purpose + budget, graph with single-repair routing (`routeAfterAudit`), `runChapterRebrand` (rebrand §5). Verify: route matrix + mocked-router graph runs.
+- [ ] RB5 — Rebrand job & endpoints: three-phase `runRebrand` executor (flag-and-continue), rebrand controller/DTOs wired via `PipelineModule` (rebrand §6–7). Verify: executor + controller e2e tests.
+- [ ] RB6 — Web UI (`novel-forge-web`): rebrand panel — config, start + progress, chapter status list, original/converted reader toggle, re-run, manuscript download (rebrand §8). Verify: web type-check/build green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

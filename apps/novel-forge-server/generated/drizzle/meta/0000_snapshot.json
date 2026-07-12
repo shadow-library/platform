@@ -1,5 +1,5 @@
 {
-  "id": "6e6b75af-f5c9-4c31-9032-efada8b0154e",
+  "id": "4b2adb13-efec-4d17-9688-6c795b0e5c74",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -2999,6 +2999,378 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.chapter_conversions": {
+      "name": "chapter_conversions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chapter": {
+          "name": "chapter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary_of_changes": {
+          "name": "summary_of_changes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fixes": {
+          "name": "fixes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "added_scenes": {
+          "name": "added_scenes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "carry_state": {
+          "name": "carry_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "rebrand_conversion_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issues": {
+          "name": "issues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "glossary_count": {
+          "name": "glossary_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "chapter_conversions_project_id_status_idx": {
+          "name": "chapter_conversions_project_id_status_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "chapter_conversions_project_id_projects_id_fk": {
+          "name": "chapter_conversions_project_id_projects_id_fk",
+          "tableFrom": "chapter_conversions",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "chapter_conversions_project_id_chapter_unique": {
+          "name": "chapter_conversions_project_id_chapter_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "chapter"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rebrand_glossary": {
+      "name": "rebrand_glossary",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source_name": {
+          "name": "source_name",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "variants": {
+          "name": "variants",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "replacement": {
+          "name": "replacement",
+          "type": "varchar(300)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "category": {
+          "name": "category",
+          "type": "rebrand_glossary_category",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "notes": {
+          "name": "notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_chapter": {
+          "name": "created_chapter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "rebrand_glossary_project_id_category_idx": {
+          "name": "rebrand_glossary_project_id_category_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "category",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "rebrand_glossary_project_id_projects_id_fk": {
+          "name": "rebrand_glossary_project_id_projects_id_fk",
+          "tableFrom": "rebrand_glossary",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rebrand_glossary_project_id_source_name_unique": {
+          "name": "rebrand_glossary_project_id_source_name_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "source_name"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.rebrands": {
+      "name": "rebrands",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "rebrand_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "directives": {
+          "name": "directives",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "world_notes": {
+          "name": "world_notes",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "settings": {
+          "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "rebrands_project_id_projects_id_fk": {
+          "name": "rebrands_project_id_projects_id_fk",
+          "tableFrom": "rebrands",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "rebrands_project_id_unique": {
+          "name": "rebrands_project_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.extraction_runs": {
       "name": "extraction_runs",
       "schema": "",
@@ -4623,6 +4995,41 @@
         "reverted"
       ]
     },
+    "public.rebrand_conversion_status": {
+      "name": "rebrand_conversion_status",
+      "schema": "public",
+      "values": [
+        "converted",
+        "attention",
+        "failed"
+      ]
+    },
+    "public.rebrand_glossary_category": {
+      "name": "rebrand_glossary_category",
+      "schema": "public",
+      "values": [
+        "character",
+        "place",
+        "country",
+        "culture",
+        "faction",
+        "technique",
+        "item",
+        "term"
+      ]
+    },
+    "public.rebrand_status": {
+      "name": "rebrand_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "ingesting",
+        "glossary",
+        "converting",
+        "done",
+        "failed"
+      ]
+    },
     "public.job_kind": {
       "name": "job_kind",
       "schema": "public",
@@ -4632,7 +5039,8 @@
         "generate",
         "finalize",
         "backfill",
-        "resume"
+        "resume",
+        "rebrand"
       ]
     },
     "public.job_status": {

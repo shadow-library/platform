@@ -26,6 +26,7 @@ export * from './story';
 export * from './bible';
 export * from './generation';
 export * from './refinement';
+export * from './rebrand';
 export * from './jobs';
 export * from './vectors';
 export * from './ai';

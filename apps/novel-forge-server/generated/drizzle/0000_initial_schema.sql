@@ -20,7 +20,10 @@ CREATE TYPE "public"."chat_scope" AS ENUM('project', 'novel', 'bible_document', 
 CREATE TYPE "public"."chat_session_status" AS ENUM('active', 'archived');--> statement-breakpoint
 CREATE TYPE "public"."refinement_kind" AS ENUM('chat', 'hub', 'premise_enhance', 'bible_audit', 'arc_plan', 'chapter_extract');--> statement-breakpoint
 CREATE TYPE "public"."refinement_proposal_status" AS ENUM('pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted');--> statement-breakpoint
-CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume');--> statement-breakpoint
+CREATE TYPE "public"."rebrand_conversion_status" AS ENUM('converted', 'attention', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."rebrand_glossary_category" AS ENUM('character', 'place', 'country', 'culture', 'faction', 'technique', 'item', 'term');--> statement-breakpoint
+CREATE TYPE "public"."rebrand_status" AS ENUM('pending', 'ingesting', 'glossary', 'converting', 'done', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume', 'rebrand');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('pending', 'in_progress', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."validation_scope" AS ENUM('novel', 'chapter');--> statement-breakpoint
 CREATE TYPE "public"."draft_revision_source" AS ENUM('generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited');--> statement-breakpoint
@@ -408,6 +411,53 @@ CREATE TABLE "refinement_proposals" (
 	"updated_at" timestamp DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+CREATE TABLE "chapter_conversions" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"chapter" integer NOT NULL,
+	"title" varchar(500),
+	"body" text NOT NULL,
+	"summary_of_changes" text,
+	"fixes" jsonb,
+	"added_scenes" jsonb,
+	"carry_state" jsonb,
+	"status" "rebrand_conversion_status" NOT NULL,
+	"issues" jsonb,
+	"glossary_count" integer,
+	"run_id" uuid,
+	"revision" integer DEFAULT 1 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "chapter_conversions_project_id_chapter_unique" UNIQUE("project_id","chapter")
+);
+--> statement-breakpoint
+CREATE TABLE "rebrand_glossary" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"source_name" varchar(300) NOT NULL,
+	"variants" jsonb,
+	"replacement" varchar(300) NOT NULL,
+	"category" "rebrand_glossary_category" NOT NULL,
+	"notes" text,
+	"created_chapter" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "rebrand_glossary_project_id_source_name_unique" UNIQUE("project_id","source_name")
+);
+--> statement-breakpoint
+CREATE TABLE "rebrands" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"status" "rebrand_status" DEFAULT 'pending' NOT NULL,
+	"directives" text,
+	"world_notes" text,
+	"settings" jsonb,
+	"last_error" varchar(2000),
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "rebrands_project_id_unique" UNIQUE("project_id")
+);
+--> statement-breakpoint
 CREATE TABLE "extraction_runs" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"project_id" bigint NOT NULL,
@@ -601,6 +651,9 @@ ALTER TABLE "chat_messages" ADD CONSTRAINT "chat_messages_project_id_projects_id
 ALTER TABLE "chat_sessions" ADD CONSTRAINT "chat_sessions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refinement_proposals" ADD CONSTRAINT "refinement_proposals_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refinement_proposals" ADD CONSTRAINT "refinement_proposals_session_id_chat_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."chat_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chapter_conversions" ADD CONSTRAINT "chapter_conversions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rebrand_glossary" ADD CONSTRAINT "rebrand_glossary_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "rebrands" ADD CONSTRAINT "rebrands_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "jobs" ADD CONSTRAINT "jobs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "validation_reports" ADD CONSTRAINT "validation_reports_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapter_chunks" ADD CONSTRAINT "chapter_chunks_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -626,6 +679,8 @@ CREATE INDEX "chat_sessions_project_id_scope_idx" ON "chat_sessions" USING btree
 CREATE INDEX "refinement_proposals_project_id_status_idx" ON "refinement_proposals" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "refinement_proposals_session_id_idx" ON "refinement_proposals" USING btree ("session_id");--> statement-breakpoint
 CREATE INDEX "refinement_proposals_project_id_scope_status_idx" ON "refinement_proposals" USING btree ("project_id","scope_type","scope_ref","status");--> statement-breakpoint
+CREATE INDEX "chapter_conversions_project_id_status_idx" ON "chapter_conversions" USING btree ("project_id","status");--> statement-breakpoint
+CREATE INDEX "rebrand_glossary_project_id_category_idx" ON "rebrand_glossary" USING btree ("project_id","category");--> statement-breakpoint
 CREATE INDEX "extraction_runs_project_id_chapter_idx" ON "extraction_runs" USING btree ("project_id","chapter");--> statement-breakpoint
 CREATE INDEX "jobs_project_id_kind_status_idx" ON "jobs" USING btree ("project_id","kind","status");--> statement-breakpoint
 CREATE INDEX "validation_reports_project_id_scope_chapter_idx" ON "validation_reports" USING btree ("project_id","scope","chapter");--> statement-breakpoint
