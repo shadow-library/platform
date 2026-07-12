@@ -53,6 +53,7 @@ export const CHAT_SUMMARY_BUDGET = 1_500;
 export const ARC_PLAN_BUDGET = 16_000;
 export const PREMISE_BUDGET = 8_000;
 export const AUDIT_BUDGET = 12_000;
+export const REBRAND_SEED_BUDGET = 10_000;
 
 function makeSection(key: string, content: string, tier: ContextTier, sourceRefs: string[] = [], segment: ContextSegment = 'volatile'): ContextSection {
   const rendered = renderSection(key, content);
@@ -817,6 +818,34 @@ export class ContextAssembler {
 
   async forAudit(projectId: bigint, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
     return this.premisePack(projectId, 'audit', 5, opts?.budgetTokens ?? AUDIT_BUDGET);
+  }
+
+  /**
+   * Pack for the rebrand glossary seed (rebrand design §2): the project overview plus every known
+   * proper noun the seeder must map — the extracted entity roster (with aliases) and world facts.
+   * Both are empty on an unextracted project; the opening chapters travel as a template var instead.
+   */
+  async forRebrandSeed(projectId: bigint, opts?: { budgetTokens?: number }): Promise<AssembledPack & { id: bigint | null }> {
+    const [project, entities, facts] = await Promise.all([
+      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+      this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), with: { aliases: true }, orderBy: [schema.entities.type, schema.entities.name] }),
+      this.db.query.worldFacts.findMany({ where: eq(schema.worldFacts.projectId, projectId), orderBy: [schema.worldFacts.category, schema.worldFacts.key] }),
+    ]);
+
+    const sections: ContextSection[] = [];
+    if (project) {
+      const overview = [project.title ? `Title: ${project.title}` : '', this.renderPremise(project)].filter(Boolean).join('\n\n');
+      if (overview) sections.push(asStable(makeSection('premise', overview, 'canonical', ['premise'])));
+    }
+    if (entities.length > 0) {
+      const roster = entities.map(e => `${e.name} (${e.type})${e.aliases.length > 0 ? ` — aka ${e.aliases.map(a => a.alias).join(', ')}` : ''}`).join('\n');
+      sections.push(asStable(makeSection('entity_roster', roster, 'canonical', [])));
+    }
+    if (facts.length > 0) {
+      sections.push(asStable(makeSection('world_facts', facts.map(f => `${f.category}/${f.key}: ${f.value}`).join('\n'), 'canonical', [])));
+    }
+
+    return this.finalize(projectId, 'rebrand_seed', null, sections, [], opts?.budgetTokens ?? REBRAND_SEED_BUDGET, false);
   }
 
   private async premisePack(projectId: bigint, purpose: ContextPurpose, inventoryLines: number, budgetTokens: number): Promise<AssembledPack & { id: bigint | null }> {
