@@ -40,6 +40,11 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SRC_004 = new AppErrorCode('SRC_004', ErrorType.CLIENT_ERROR, 'No webnovel book id is configured for this project');
 
   /*!
+   * Export Errors
+   */
+  static readonly EXP_001 = new AppErrorCode('EXP_001', ErrorType.CLIENT_ERROR, 'Nothing to export — this project has no chapters yet');
+
+  /*!
    * Chapter Errors
    */
   static readonly CHP_001 = new AppErrorCode('CHP_001', ErrorType.NOT_FOUND, 'Chapter not found');

@@ -14,6 +14,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
  */
 import { AiModule } from '@modules/ai';
 import { BibleModule } from '@modules/bible';
+import { ExportModule } from '@modules/export';
 import { ExtractionModule } from '@modules/extraction';
 import { GenerationModule } from '@modules/generation';
 import { HubActionsModule } from '@modules/hub';
@@ -43,6 +44,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
   imports: [
     AppHttpCoreModule,
     AiModule,
+    ExportModule,
     ExtractionModule,
     GenerationModule,
     HubActionsModule,
