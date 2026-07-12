@@ -92,7 +92,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RB2 — Rebrand prompt modules: `AiRole 'rebrand'`, `rebrand-glossary`/`rebrand-convert`/`rebrand-audit` prompts + class-schema outputs, registry entries, render goldens (rebrand §4). Verify: prompt suite green.
 - [x] RB3 — Rebrand module core: `BANNED_REAL_WORLD_TERMS`, `scanResidue`/`selectGlossarySlice`/`renderGlossarySlice` pure functions, `RebrandService` (config/status/glossary/conversion/manuscript/seedGlossary) (rebrand §2, §7). Verify: residue-scan unit matrix + service template-DB tests.
 - [x] RB4 — Chapter-rebrand graph: `forRebrand` context purpose + budget, graph with single-repair routing (`routeAfterAudit`), `runChapterRebrand` (rebrand §5). Verify: route matrix + mocked-router graph runs.
-- [ ] RB5 — Rebrand job & endpoints: three-phase `runRebrand` executor (flag-and-continue), rebrand controller/DTOs wired via `PipelineModule` (rebrand §6–7). Verify: executor + controller e2e tests.
+- [x] RB5 — Rebrand job & endpoints: three-phase `runRebrand` executor (flag-and-continue), rebrand controller/DTOs wired via `PipelineModule` (rebrand §6–7). Verify: executor + controller e2e tests.
 - [ ] RB6 — Web UI (`novel-forge-web`): rebrand panel — config, start + progress, chapter status list, original/converted reader toggle, re-run, manuscript download (rebrand §8). Verify: web type-check/build green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

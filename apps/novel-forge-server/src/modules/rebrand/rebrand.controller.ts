@@ -1,0 +1,106 @@
+/**
+ * Importing packages with side effects
+ */
+
+/**
+ * Importing npm packages
+ */
+import { Body, Get, HttpController, HttpStatus, Params, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
+
+/**
+ * Importing user defined packages
+ */
+import {
+  ConversionResponse,
+  GlossaryListQuery,
+  GlossaryListResponse,
+  ManuscriptResponse,
+  RebrandChapterParams,
+  RebrandConfigBody,
+  RebrandParams,
+  RebrandResponse,
+  RebrandStartBody,
+  RebrandStatusResponse,
+} from './rebrand.dto';
+import { RebrandService } from './rebrand.service';
+import { JobExecutor } from '../jobs/job.executor';
+import { JobService } from '../jobs/job.service';
+import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+@HttpController('/projects/:projectId/rebrand')
+export class RebrandController {
+  constructor(
+    private readonly rebrandService: RebrandService,
+    private readonly jobService: JobService,
+    private readonly jobExecutor: JobExecutor,
+  ) {}
+
+  @Put('/config')
+  @RespondFor(200, RebrandResponse)
+  updateConfig(@Params() params: RebrandParams, @Body() body: RebrandConfigBody): Promise<RebrandResponse> {
+    return this.rebrandService.updateConfig(params.projectId, body) as unknown as Promise<RebrandResponse>;
+  }
+
+  @Post()
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async start(@Params() params: RebrandParams, @Body() body: RebrandStartBody): Promise<JobEnqueueResponse> {
+    const { projectId } = params;
+    // The kind guard runs before enqueue so a non-source project 400s instead of parking a job.
+    await this.rebrandService.getOrCreate(projectId);
+    const target = `rebrand-${projectId}`;
+    const jobId = await this.jobService.enqueue(projectId, 'rebrand', target, { force: body.force, limit: body.limit });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'rebrand', status: 'pending', target };
+  }
+
+  @Get()
+  @RespondFor(200, RebrandStatusResponse)
+  async status(@Params() params: RebrandParams): Promise<RebrandStatusResponse> {
+    const [status, jobs] = await Promise.all([this.rebrandService.status(params.projectId), this.jobService.listByProject(params.projectId)]);
+    const job = jobs.find(j => j.kind === 'rebrand') ?? null;
+    return { ...status, job } as unknown as RebrandStatusResponse;
+  }
+
+  @Get('/glossary')
+  @RespondFor(200, GlossaryListResponse)
+  async glossary(@Params() params: RebrandParams, @Query() query: GlossaryListQuery): Promise<GlossaryListResponse> {
+    const items = await this.rebrandService.listGlossary(params.projectId, query);
+    return { items } as unknown as GlossaryListResponse;
+  }
+
+  @Get('/chapters/:chapter')
+  @RespondFor(200, ConversionResponse)
+  getConversion(@Params() params: RebrandChapterParams): Promise<ConversionResponse> {
+    return this.rebrandService.getConversion(params.projectId, params.chapter) as unknown as Promise<ConversionResponse>;
+  }
+
+  @Post('/chapters/:chapter')
+  @HttpStatus(202)
+  @RespondFor(202, JobEnqueueResponse)
+  async rerunChapter(@Params() params: RebrandChapterParams): Promise<JobEnqueueResponse> {
+    const { projectId, chapter } = params;
+    await this.rebrandService.getOrCreate(projectId);
+    // A distinct target lets a single-chapter re-run coexist with the full job under the unique
+    // (projectId, kind, target) index; the per-project concurrency lock serialises the two.
+    const target = `rebrand-${projectId}-ch-${chapter}`;
+    const jobId = await this.jobService.enqueue(projectId, 'rebrand', target, { chapters: [chapter], force: true });
+    this.jobExecutor.dispatch(jobId).catch(() => undefined);
+    return { jobId, kind: 'rebrand', status: 'pending', target };
+  }
+
+  @Get('/manuscript')
+  @RespondFor(200, ManuscriptResponse)
+  async manuscript(@Params() params: RebrandParams): Promise<ManuscriptResponse> {
+    const markdown = await this.rebrandService.renderManuscript(params.projectId);
+    return { markdown };
+  }
+}

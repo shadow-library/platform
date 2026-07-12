@@ -8,17 +8,19 @@
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase } from '@server/database';
+import { type Job, type PrimaryDatabase, type Rebrand, schema } from '@server/database';
 
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
+import { RebrandService } from '../rebrand/rebrand.service';
 import { AcquireService } from '../source/acquire.service';
 
 /**
@@ -41,6 +43,12 @@ interface IngestPayload {
   delayMs?: number;
 }
 
+interface RebrandPayload {
+  chapters?: number[];
+  force?: boolean;
+  limit?: number;
+}
+
 /**
  * Declaring the constants
  */
@@ -57,6 +65,7 @@ export class JobExecutor {
     private readonly indexingService: IndexingService,
     private readonly databaseService: DatabaseService,
     private readonly acquireService: AcquireService,
+    private readonly rebrandService: RebrandService,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -118,6 +127,8 @@ export class JobExecutor {
       case 'ingest':
       case 'resume':
         return this.runIngest(job);
+      case 'rebrand':
+        return this.runRebrand(job);
       default:
         throw new Error(`Unsupported job kind: ${job.kind}`);
     }
@@ -158,5 +169,104 @@ export class JobExecutor {
     await this.jobService.progress(job.id, { done: 0, total: 1, current: 'scraping', phase: 'ingest' });
     const result = await this.acquireService.ingest(job.projectId, { limit, delayMs });
     await this.jobService.progress(job.id, { done: result.ingested, total: result.ingested, current: 'done', phase: 'ingest' });
+  }
+
+  // ─── Rebrand (rebrand design §6) ──────────────────────────────────────────────
+  // Three phases, each derived from data — never from rebrands.status, which is advisory display
+  // state updated at phase boundaries. Resume recomputes everything, so a crashed job re-posts clean.
+  private async runRebrand(job: Job.Row): Promise<void> {
+    const projectId = job.projectId;
+    const payload = (job.payload ?? {}) as RebrandPayload;
+
+    try {
+      // Phase 1: finish acquisition. Blocking on a stalled scrape is correct — nothing to convert.
+      let project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+      if (!project) throw new Error(`project ${projectId} not found`);
+      while (!project.scrapeComplete) {
+        await this.setRebrandStatus(projectId, 'ingesting');
+        await this.jobService.progress(job.id, { done: project.scrapeNextNumber ?? 0, total: 0, current: 'scraping', phase: 'ingest' });
+        const result = await this.acquireService.ingest(projectId, {});
+        project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+        if (!project) throw new Error(`project ${projectId} not found`);
+        if (result.ingested === 0 && !project.scrapeComplete) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
+      }
+
+      // Phase 2: glossary seed (idempotent inside the service — resume never re-seeds or re-bills).
+      await this.setRebrandStatus(projectId, 'glossary');
+      await this.jobService.progress(job.id, { done: 0, total: 0, current: 'glossary', phase: 'glossary' });
+      await this.rebrandService.seedGlossary(projectId, job.id);
+
+      // Phase 3: convert pending chapters ascending.
+      await this.setRebrandStatus(projectId, 'converting');
+      const targets = await this.selectRebrandChapters(projectId, payload);
+      const total = targets.length;
+      for (const [i, chapter] of targets.entries()) {
+        await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'converting' });
+        const result = await this.workflowRunService.runChapterRebrand({ projectId, chapter, jobId: job.id });
+        // Flag-and-continue — a deliberate divergence from runGenerate/runExtract's throw: a failed
+        // chapter records a failed conversion row and the loop moves on; the pipeline never blocks.
+        if (result.status === 'failed') await this.recordFailedConversion(projectId, chapter, result.runId);
+      }
+
+      await this.jobService.progress(job.id, { done: total, total, current: 'done', phase: 'converting' });
+      await this.setRebrandStatus(projectId, 'done');
+    } catch (err) {
+      await this.setRebrandStatus(projectId, 'failed', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  }
+
+  /** payload.chapters wins; otherwise every source chapter without a converted/attention row (failed rows always retry). */
+  private async selectRebrandChapters(projectId: bigint, payload: RebrandPayload): Promise<number[]> {
+    let targets: number[];
+    if (payload.chapters && payload.chapters.length > 0) {
+      targets = [...payload.chapters].sort((a, b) => a - b);
+    } else {
+      const rows = await this.db
+        .select({ number: schema.chapters.number })
+        .from(schema.chapters)
+        .where(eq(schema.chapters.projectId, projectId))
+        .orderBy(asc(schema.chapters.number));
+      targets = rows.map(r => r.number);
+    }
+
+    if (!payload.force) {
+      const done = await this.db
+        .select({ chapter: schema.chapterConversions.chapter })
+        .from(schema.chapterConversions)
+        .where(and(eq(schema.chapterConversions.projectId, projectId), ne(schema.chapterConversions.status, 'failed')));
+      const doneSet = new Set(done.map(d => d.chapter));
+      targets = targets.filter(n => !doneSet.has(n));
+    }
+
+    return payload.limit ? targets.slice(0, payload.limit) : targets;
+  }
+
+  // Insert an empty failed row for a fresh failure, but never clobber the body a previous successful
+  // conversion produced — only the status/issues flip, so the prose survives a failed forced re-run.
+  private async recordFailedConversion(projectId: bigint, chapter: number, runId: string): Promise<void> {
+    const issues = [{ source: 'run', type: 'run_failed', detail: `chapter ${chapter} rebrand failed (run ${runId})` }];
+    await this.db
+      .insert(schema.chapterConversions)
+      .values({ projectId, chapter, body: '', status: 'failed', issues, runId })
+      .onConflictDoUpdate({
+        target: [schema.chapterConversions.projectId, schema.chapterConversions.chapter],
+        set: {
+          status: sql`EXCLUDED.status`,
+          issues: sql`EXCLUDED.issues`,
+          runId: sql`EXCLUDED.run_id`,
+          revision: sql`${schema.chapterConversions.revision} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .catch(err => this.logger.error('failed to record failed conversion', { err, chapter }));
+  }
+
+  private async setRebrandStatus(projectId: bigint, status: Rebrand.Status, lastError: string | null = null): Promise<void> {
+    await this.db
+      .update(schema.rebrands)
+      .set({ status, lastError, updatedAt: new Date() })
+      .where(eq(schema.rebrands.projectId, projectId))
+      .catch(err => this.logger.warn('failed to update rebrand status', { err, status }));
   }
 }

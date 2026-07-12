@@ -17,6 +17,7 @@ import { JobExecutor } from './job.executor';
 import { JobService } from './job.service';
 import { JobsController } from './jobs.controller';
 import { AiModule } from '../ai/ai.module';
+import { RebrandModule } from '../rebrand/rebrand.module';
 import { SourceModule } from '../source/source.module';
 
 /**
@@ -28,7 +29,7 @@ import { SourceModule } from '../source/source.module';
  */
 
 @Module({
-  imports: [DatabaseModule, AiModule, SourceModule],
+  imports: [DatabaseModule, AiModule, SourceModule, RebrandModule],
   controllers: [JobsController],
   providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor],
   exports: [JobService, ConcurrencyController, JobExecutor],
