@@ -13,6 +13,7 @@ import { eq } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
+import { WebnovelCatalogService } from '@modules/source';
 import * as schema from '@server/database/schemas';
 import { TestEnvironment } from '@tests/test-environment';
 
@@ -77,6 +78,36 @@ describe.if(pgAvailable)('Recombine API', () => {
 
       const chapters = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/source/chapters`);
       expect(chapters.json().items).toHaveLength(2);
+    });
+
+    it('should fetch the reference catalog and retitle via POST /retitle', async () => {
+      const projectId = await seedProject();
+      await testEnv
+        .getPostgresClient()
+        .update(schema.projects)
+        .set({ webnovelId: 'wn-42' })
+        .where(eq(schema.projects.id, BigInt(projectId)));
+      // Stub the network fetch on the app's singleton so the test never touches third-party-site.example.
+      const catalog = testEnv.getService(WebnovelCatalogService);
+      (catalog as { fetchCatalog: (bookId: string) => Promise<unknown> }).fetchCatalog = async () => [
+        { index: 1, title: 'Chapter 1: The Gate (1/2)' },
+        { index: 2, title: 'Chapter 1: The Gate (2/2)' },
+        { index: 3, title: 'Chapter 2: The Road' },
+      ];
+
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/retitle`).body({});
+      expect(response.statusCode).toBe(200);
+      expect(response.json()).toEqual({ fetched: 3, retitled: 3, chapterCount: 3, referenceCount: 3 });
+
+      const chapters = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/source/chapters`);
+      expect(chapters.json().items.map((c: { title: string }) => c.title)).toEqual(['Chapter 1: The Gate (1/2)', 'Chapter 1: The Gate (2/2)', 'Chapter 2: The Road']);
+    });
+
+    it('should reject /retitle without a configured webnovel id', async () => {
+      const projectId = await seedProject();
+      const response = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/retitle`).body({});
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe('SRC_004');
     });
 
     it('should surface the derived-data guard as SRC_003', async () => {

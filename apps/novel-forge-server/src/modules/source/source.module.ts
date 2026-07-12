@@ -17,6 +17,7 @@ import { AssetService } from './asset.service';
 import { ChapterController } from './chapter/chapter.controller';
 import { ChapterService } from './chapter/chapter.service';
 import { RecombineService } from './recombine.service';
+import { WebnovelCatalogService } from './webnovel-catalog.service';
 import { AiModule } from '../ai/ai.module';
 
 /**
@@ -30,7 +31,7 @@ import { AiModule } from '../ai/ai.module';
 @Module({
   imports: [DatabaseModule, AiModule],
   controllers: [ChapterController],
-  providers: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService],
-  exports: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService],
+  providers: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService, WebnovelCatalogService],
+  exports: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService, WebnovelCatalogService],
 })
 export class SourceModule {}

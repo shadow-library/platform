@@ -20,6 +20,7 @@ import {
   RecombineBody,
   RecombineResponse,
   ResumeResponse,
+  RetitleResponse,
   SkeletonResponse,
 } from './pipeline.dto';
 import { ConsolidateService } from '../extraction/consolidate.service';
@@ -28,6 +29,7 @@ import { JobService } from '../jobs/job.service';
 import { SkeletonService } from '../planning/skeleton.service';
 import { AssetService } from '../source/asset.service';
 import { RecombineService } from '../source/recombine.service';
+import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
 
 /**
  * Defining types
@@ -46,6 +48,7 @@ export class PipelineController {
     private readonly consolidateService: ConsolidateService,
     private readonly skeletonService: SkeletonService,
     private readonly recombineService: RecombineService,
+    private readonly webnovelCatalog: WebnovelCatalogService,
   ) {}
 
   // ─── Ingest ─────────────────────────────────────────────────────────────────
@@ -74,6 +77,14 @@ export class PipelineController {
     const jobId = await this.jobService.enqueue(projectId, 'extract', target, payload);
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
     return { jobId, kind: 'extract', status: 'pending', target };
+  }
+
+  // ─── Retitle ─────────────────────────────────────────────────────────────────
+
+  @Post('/retitle')
+  @RespondFor(200, RetitleResponse)
+  retitle(@Params() params: PipelineProjectParams): Promise<RetitleResponse> {
+    return this.webnovelCatalog.sync(params.projectId);
   }
 
   // ─── Recombine ───────────────────────────────────────────────────────────────

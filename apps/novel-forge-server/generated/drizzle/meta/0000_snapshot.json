@@ -1,5 +1,5 @@
 {
-  "id": "7b819b1a-bbab-4d19-bb40-9c9921cf46ba",
+  "id": "f7ce7b06-c809-42b7-942b-2de49cc9b115",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -103,6 +103,12 @@
         },
         "source_novel_id": {
           "name": "source_novel_id",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "webnovel_id": {
+          "name": "webnovel_id",
           "type": "varchar",
           "primaryKey": false,
           "notNull": false
@@ -356,6 +362,73 @@
           "columns": [
             "project_id",
             "number"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reference_chapters": {
+      "name": "reference_chapters",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "index": {
+          "name": "index",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reference_chapters_project_id_projects_id_fk": {
+          "name": "reference_chapters_project_id_projects_id_fk",
+          "tableFrom": "reference_chapters",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reference_chapters_project_id_index_unique": {
+          "name": "reference_chapters_project_id_index_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "index"
           ]
         }
       },

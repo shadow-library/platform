@@ -37,6 +37,7 @@ export class AppErrorCode extends ServerErrorCode {
     ErrorType.CLIENT_ERROR,
     'Recombine is unavailable once extraction, briefs, or conversions reference chapters — renumbering would corrupt them',
   );
+  static readonly SRC_004 = new AppErrorCode('SRC_004', ErrorType.CLIENT_ERROR, 'No webnovel book id is configured for this project');
 
   /*!
    * Chapter Errors

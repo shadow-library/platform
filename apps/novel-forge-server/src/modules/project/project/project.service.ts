@@ -62,7 +62,7 @@ export class ProjectService {
 
     const [project] = await this.db
       .insert(schema.projects)
-      .values({ name: body.name, kind: body.kind, sourceUrl: body.url, title: body.title, contentMode: body.contentMode })
+      .values({ name: body.name, kind: body.kind, sourceUrl: body.url, title: body.title, webnovelId: body.webnovelId, contentMode: body.contentMode })
       .returning()
       .catch(err => this.databaseService.translateError(err));
 

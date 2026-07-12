@@ -28,3 +28,4 @@ export * from './chapter/chapter.service';
 export * from './recombine.service';
 export * from './text-cleaner';
 export * from './title-parts';
+export * from './webnovel-catalog.service';

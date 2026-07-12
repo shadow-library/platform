@@ -20,6 +20,7 @@ import { contentGenerator, projects } from './projects';
 
 export namespace Chapter {
   export type Row = InferSelectModel<typeof chapters>;
+  export type Reference = InferSelectModel<typeof referenceChapters>;
   export type Status = InferEnum<typeof chapterStatus>;
 
   /** One absorbed translator part recorded on a recombined chapter (recombine design §3). */
@@ -67,6 +68,26 @@ export const chapters = pgTable(
   t => [unique('chapters_project_id_number_unique').on(t.projectId, t.number), index('chapters_project_id_status_idx').on(t.projectId, t.status)],
 );
 
+// The authoritative chapter titles pulled from third-party-site.example's table of contents; positional 1:1 with
+// scraped chapters, since aggregator sites mirror webnovel's official translation and its splits.
+export const referenceChapters = pgTable(
+  'reference_chapters',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    index: integer('index').notNull(),
+    title: varchar('title', { length: 500 }).notNull(),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [unique('reference_chapters_project_id_index_unique').on(t.projectId, t.index)],
+);
+
 export const chaptersRelations = relations(chapters, ({ one }) => ({
   project: one(projects, { fields: [chapters.projectId], references: [projects.id] }),
+}));
+
+export const referenceChaptersRelations = relations(referenceChapters, ({ one }) => ({
+  project: one(projects, { fields: [referenceChapters.projectId], references: [projects.id] }),
 }));

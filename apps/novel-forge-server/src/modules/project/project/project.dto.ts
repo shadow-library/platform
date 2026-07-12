@@ -44,6 +44,10 @@ export class CreateProjectBody {
   @Field({ optional: true })
   title?: string;
 
+  // Optional third-party-site.example book id — the source of authoritative chapter titles for source projects.
+  @Field({ optional: true })
+  webnovelId?: string;
+
   @Field(() => ContentMode, { optional: true })
   contentMode?: Project.ContentMode;
 }
@@ -165,6 +169,9 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   sourceUrl?: string | null;
 
+  @Field({ optional: true, nullable: true })
+  webnovelId?: string | null;
+
   @Field()
   scrapeComplete: boolean;
 
@@ -201,6 +208,9 @@ export class UpdateProjectBody {
 
   @Field({ optional: true })
   brief?: string;
+
+  @Field({ optional: true, nullable: true })
+  webnovelId?: string | null;
 }
 
 @Schema()

@@ -49,6 +49,7 @@ CREATE TABLE "projects" (
 	"source_url" varchar,
 	"source_adapter" varchar,
 	"source_novel_id" varchar,
+	"webnovel_id" varchar,
 	"scrape_next_url" varchar,
 	"scrape_next_number" integer DEFAULT 1 NOT NULL,
 	"scrape_complete" boolean DEFAULT false NOT NULL,
@@ -80,6 +81,15 @@ CREATE TABLE "chapters" (
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "chapters_project_id_number_unique" UNIQUE("project_id","number")
+);
+--> statement-breakpoint
+CREATE TABLE "reference_chapters" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"index" integer NOT NULL,
+	"title" varchar(500) NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "reference_chapters_project_id_index_unique" UNIQUE("project_id","index")
 );
 --> statement-breakpoint
 CREATE TABLE "entities" (
@@ -626,6 +636,7 @@ CREATE TABLE "workflow_runs" (
 --> statement-breakpoint
 ALTER TABLE "projects" ADD CONSTRAINT "projects_source_project_id_projects_id_fk" FOREIGN KEY ("source_project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reference_chapters" ADD CONSTRAINT "reference_chapters_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entities" ADD CONSTRAINT "entities_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_aliases" ADD CONSTRAINT "entity_aliases_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_appearances" ADD CONSTRAINT "entity_appearances_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

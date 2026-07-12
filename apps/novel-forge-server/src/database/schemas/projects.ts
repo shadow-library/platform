@@ -49,6 +49,8 @@ export const projects = pgTable('projects', {
   sourceUrl: varchar('source_url'),
   sourceAdapter: varchar('source_adapter'),
   sourceNovelId: varchar('source_novel_id'),
+  // Optional third-party-site.example book id — enables the reference-title catalog (recombine design §5).
+  webnovelId: varchar('webnovel_id'),
   scrapeNextUrl: varchar('scrape_next_url'),
   scrapeNextNumber: integer('scrape_next_number').notNull().default(1),
   scrapeComplete: boolean('scrape_complete').notNull().default(false),

@@ -93,6 +93,21 @@ export class ResumeResponse {
 }
 
 @Schema()
+export class RetitleResponse {
+  @Field(() => Integer)
+  fetched: number;
+
+  @Field(() => Integer)
+  retitled: number;
+
+  @Field(() => Integer)
+  chapterCount: number;
+
+  @Field(() => Integer)
+  referenceCount: number;
+}
+
+@Schema()
 export class RecombineBody {
   @Field({ optional: true })
   dryRun?: boolean;

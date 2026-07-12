@@ -42,7 +42,19 @@ In one transaction: merged content = member bodies joined with a blank line; tit
 
 Idempotent: a second run sees clean base titles, so the plan degenerates to a no-op; post-extraction runs are guard-blocked.
 
-## 5. Limitations
+## 5. Reference titles from third-party-site.example (WN1–WN2)
+
+Aggregator sites mirror webnovel's official translation — same chapters, same splits — but frequently lose or mangle the titles. When a project carries the optional
+`projects.webnovelId`, `WebnovelCatalogService` fetches the book's table of contents once (the book page issues the `_csrfToken` cookie the chapter-list endpoint requires) into
+`reference_chapters` (`projectId`, `index`, `title`), and the retitle pass overwrites scraped titles **positionally**: chapter N takes TOC entry N. Webnovel's title wins whenever
+the id is provided; TOC gaps leave scraped titles alone; a count mismatch maps the overlap 1:1 and logs the disagreement instead of guessing.
+
+Webnovel splits chapters exactly like the mirrors do, so the catalog is NOT a merge oracle — its value for recombine is indirect: webnovel titles carry clean part markers, so the
+deterministic ladder works on novels whose source titles were blank. Hook order is therefore retitle → recombine, both on ingest completion and in rebrand phase 1.5. Manual
+lever: `POST /projects/:projectId/retitle` re-fetches the catalog and re-applies titles (`SRC_004` when no id is configured). `autoSync` fetches the catalog only once — later
+runs reuse it — and log-and-skips on any network or parse failure.
+
+## 6. Limitations
 
 - Ongoing novels: once complete, `scrapeNextUrl` is null so a resume cannot continue anyway; if the source grows later, re-ingest appends and a pre-extraction re-run handles the
   new tail.
