@@ -49,6 +49,8 @@ const cases = [
   ['SplitPane', h(UI.SplitPane, null, h(UI.SplitPane.Pane, null, 'a'), h(UI.SplitPane.Handle, null), h(UI.SplitPane.Pane, null, 'b'))],
   ['Toaster', h(UI.Toaster, null)],
   ['BannerOutlet', h(UI.BannerOutlet, null)],
+  ['ThemeProvider', h(UI.ThemeProvider, null, h('span', null, 'themed'))],
+  ['ClientOnly', h(UI.ClientOnly, null, h('span', null, 'client'))],
 ];
 for (const [name, node] of cases) {
   assert.doesNotThrow(() => renderToStaticMarkup(node), `${name} should server-render without throwing`);
@@ -76,5 +78,14 @@ UI.toast.success('leak-canary-toast');
 assert.equal(renderToStaticMarkup(h(UI.Toaster, null)), '', 'Toaster must render nothing on the server even after toast() was called');
 UI.bannerStore.register({ id: 'leak', message: 'leak-canary-banner' });
 assert.ok(!renderToStaticMarkup(h(UI.BannerOutlet, null)).includes('leak-canary-banner'), 'BannerOutlet must not emit registered banners during SSR');
+
+// 8. The standardized shared surface (moved in from the apps) must be exported and SSR-safe.
+for (const name of ['ThemeProvider', 'ClientOnly', 'useTheme', 'themeInitScript', 'derivePaginationState', 'calculatePageUpdate', 'toPositiveInt', 'copyText', 'downloadTextFile', 'getInitials']) {
+  assert.equal(typeof UI[name], 'function', `${name} should be exported from the root entry`);
+}
+assert.ok(renderToStaticMarkup(h(UI.ThemeProvider, null, h('span', null, 'themed'))).includes('themed'), 'ThemeProvider should render its children on the server');
+assert.equal(renderToStaticMarkup(h(UI.ClientOnly, null, h('span', null, 'x'))), '', 'ClientOnly should render nothing on the server');
+assert.equal(UI.derivePaginationState(95, 3, 20).skip, 40, 'derivePaginationState should be pure and correct');
+assert.equal(typeof router.NavProgress, 'function', 'router subpath should export NavProgress');
 
 console.log('SSR-SMOKE-OK');
