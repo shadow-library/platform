@@ -22,7 +22,7 @@ npm install react react-dom
 bun add react react-dom
 ```
 
-`@tanstack/react-router` is an optional peer, required only if you use the `useSearchParams` hook.
+`@tanstack/react-router` is an optional peer, required only if you use the `useSearchParams` hook — which is imported from the [`@shadow-library/ui/router`](#server-side-rendering-ssr) subpath, not the package root, so apps that don't use it never need the peer installed.
 
 ## Setup
 
@@ -51,6 +51,20 @@ Retheme by overriding any token at any scope — the tokens are the single sourc
 ```
 
 An `@layer`-wrapped variant (`@shadow-library/ui/styles.layer.css`) is also published for consumers who want to de-prioritize the library's styles in the cascade.
+
+## Server-side rendering (SSR)
+
+The package is safe to import and render on the server (Node, Next.js, Remix, Astro, …). It ships one universal ESM build with no runtime style injection — styles are a static stylesheet, so there is nothing to collect or flush during SSR. Components server-render to stable markup and hydrate without mismatches, provided you observe the notes below.
+
+- **Deterministic formatting.** Number/date components (`Statistic`, `Pagination`, `Calendar`, `DatePicker`, `DateRangePicker`, and `formatLongDate`) format with a pinned **`en-US`** default so the server and the browser always produce identical text. Pass a `locale` prop to localize — use the **same** locale on the server and the client.
+- **Time-dependent UI resolves after mount.** `Calendar` (the "today" marker) and `NotificationList` ("Today"/"Yesterday" headers) read the wall clock, which differs between server and client, so they render a clock-free result on the server and resolve the current day after hydration. Pass `today` / `now` to make them fully deterministic during SSR.
+- **Platform detection resolves after mount.** `Kbd` renders the non-Mac form (`Ctrl`) on the server and switches to `⌘` on macOS after hydration. Pass `mac` to pin it.
+- **Imperative overlays are client-only.** `toast`, `bannerStore`, and their outlets (`<Toaster />`, `<BannerOutlet />`) are client-side imperative APIs. Their state is never emitted into server HTML — render `<Toaster />` / `<BannerOutlet />` at your app root and drive them from client code. (They are module singletons; treat them as client-only and never call `toast()` during server render.)
+- **Router hook lives on a subpath.** `useSearchParams` is exported from `@shadow-library/ui/router` (it depends on the optional `@tanstack/react-router` peer). Importing the package root never pulls that peer in.
+
+```ts
+import { useSearchParams } from '@shadow-library/ui/router';
+```
 
 ## Components
 
@@ -187,9 +201,9 @@ await generateApi('https://api.example.com/openapi.json');
 
 ### Hooks
 
-| Hook              | Description                                          |
-| ----------------- | ----------------------------------------------------- |
-| `useSearchParams` | Read and update URL query params via TanStack Router |
+| Hook              | Import from                   | Description                                          |
+| ----------------- | ----------------------------- | ---------------------------------------------------- |
+| `useSearchParams` | `@shadow-library/ui/router`   | Read and update URL query params via TanStack Router |
 
 ## Full Documentation
 
