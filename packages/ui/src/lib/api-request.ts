@@ -42,8 +42,19 @@ export type QueryParams = Record<string, string | number | boolean | undefined>;
  * Declaring the constants
  */
 
+/**
+ * Read `VITE_API_BASE_URL` without assuming a Vite runtime. `import.meta.env` is injected only by
+ * Vite-family bundlers; in a plain Node/SSR runtime `import.meta.env` is `undefined`, so touching a
+ * property on it at module-evaluation time throws and makes the whole package un-importable. Reading it
+ * defensively keeps the module import-safe everywhere while still honoring the env var under Vite.
+ */
+function resolveEnvBaseUrl(): string {
+  const env = (import.meta as unknown as { env?: Record<string, string | undefined> }).env;
+  return env?.VITE_API_BASE_URL ?? '';
+}
+
 export class APIRequest {
-  private static baseUrl = import.meta.env.VITE_API_BASE_URL || '';
+  private static baseUrl = resolveEnvBaseUrl();
   private static preRequestHook: PreRequestHook | null = null;
   private static postResponseHook: PostResponseHook | null = null;
 
