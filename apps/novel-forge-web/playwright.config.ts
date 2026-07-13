@@ -24,15 +24,17 @@ export default defineConfig({
   workers: isCI ? 1 : undefined,
   reporter: 'html',
   use: {
-    baseURL: 'http://localhost:3000',
+    baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
   },
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
+  // TanStack Start serves through a Node SSR server (not `vite preview`); build once, then run it on 3000.
   webServer: {
-    command: isCI ? 'bun preview' : 'bun run build && bun preview',
-    url: 'http://localhost:3000',
+    command: isCI ? 'PORT=3000 bun run start' : 'bun run build && PORT=3000 bun run start',
+    url: 'http://127.0.0.1:3000',
     reuseExistingServer: !isCI,
+    timeout: 180_000,
   },
 });
