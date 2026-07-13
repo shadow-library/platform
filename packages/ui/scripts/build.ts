@@ -42,7 +42,7 @@ async function build() {
   };
 
   const bundle = await rollup({
-    input: path.join(srcDir, 'index.ts'),
+    input: [path.join(srcDir, 'index.ts'), path.join(srcDir, 'router.ts')],
     external: id => !id.startsWith('.') && !id.startsWith('/') && !id.startsWith('@/'),
     plugins: [
       alias({ entries: [{ find: /^@\/(.*)/, replacement: path.resolve(srcDir, '$1') }] }),
@@ -58,7 +58,7 @@ async function build() {
       }),
       banner2(chunk => {
         const id = chunk.facadeModuleId ?? '';
-        if (id.endsWith('.tsx') || id.includes('/hooks/')) return "'use client';\n";
+        if (id.endsWith('.tsx') || id.includes('/hooks/') || id.endsWith('/router.ts')) return "'use client';\n";
         return '';
       }),
     ],
@@ -72,6 +72,22 @@ async function build() {
   if (result.exitCode === 0) result = Bun.spawnSync(['bunx', 'tsc-alias', '-p', 'tsconfig.build.json'], { cwd: rootDir, stdio: ['inherit', 'inherit', 'inherit'] });
   if (result.exitCode !== 0) error('TypeScript declaration generation failed');
 
+  /** Stripping side-effect CSS imports from emitted declarations — they reference source-only paths
+   *  (e.g. './styles/index.css') that don't exist in dist and aren't needed in types (CSS ships
+   *  separately as styles.css). Left in, they make consumers with `skipLibCheck: false` fail to resolve. */
+  const stripCssImports = (dir: string): void => {
+    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+      const full = path.join(dir, entry.name);
+      if (entry.isDirectory()) stripCssImports(full);
+      else if (entry.name.endsWith('.d.ts')) {
+        const content = fs.readFileSync(full, 'utf-8');
+        const stripped = content.replace(/^\s*import\s+['"][^'"]+\.css['"];?[^\n]*\n?/gm, '');
+        if (stripped !== content) fs.writeFileSync(full, stripped);
+      }
+    }
+  };
+  stripCssImports(distDir);
+
   /** Emitting a @layer-wrapped variant so consumers can de-prioritize library styles */
   const stylesContent = fs.readFileSync(path.join(distDir, 'styles.css'), 'utf-8');
   fs.writeFileSync(path.join(distDir, 'styles.layer.css'), `@layer shadow-library {\n${stylesContent}\n}\n`);
@@ -84,8 +100,10 @@ async function build() {
   distPackageJson.types = './index.d.ts';
   distPackageJson.exports = {
     '.': { types: './index.d.ts', default: './index.js' },
+    './router': { types: './router.d.ts', default: './router.js' },
     './styles.css': './styles.css',
     './styles.layer.css': './styles.layer.css',
+    './package.json': './package.json',
   };
   distPackageJson.sideEffects = ['*.css'];
   delete distPackageJson.scripts;
