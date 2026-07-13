@@ -13,6 +13,9 @@ import { SparkIcon } from '../icons';
 import styles from './nf.module.css';
 
 export { Markdown } from './Markdown';
+export { PageSkeleton } from './PageSkeleton';
+export { RouteNotFound } from './NotFound';
+export { DefaultCatchBoundary } from './DefaultCatchBoundary';
 
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent' | 'ai';
 

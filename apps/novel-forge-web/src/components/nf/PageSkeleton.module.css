@@ -1,0 +1,74 @@
+.wrap {
+  padding: clamp(1rem, 3vw, 2.5rem);
+  max-width: var(--nf-page-max, 1120px);
+  margin: 0 auto;
+  width: 100%;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.header {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 2rem;
+}
+
+.title {
+  height: 2rem;
+  width: min(280px, 50%);
+  border-radius: 8px;
+}
+
+.subtitle {
+  height: 1rem;
+  width: min(420px, 70%);
+  border-radius: 6px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
+.card {
+  height: 180px;
+  border-radius: 12px;
+}
+
+.title,
+.subtitle,
+.card {
+  background: linear-gradient(90deg, var(--sh-surface-2, #1a1a22) 25%, var(--sh-surface-3, #24242e) 37%, var(--sh-surface-2, #1a1a22) 63%);
+  background-size: 400% 100%;
+  animation: nf-shimmer 1.4s ease infinite;
+}
+
+@keyframes nf-shimmer {
+  0% {
+    background-position: 100% 50%;
+  }
+  100% {
+    background-position: 0 50%;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title,
+  .subtitle,
+  .card {
+    animation: none;
+    background: var(--sh-surface-2, #1a1a22);
+  }
+}
