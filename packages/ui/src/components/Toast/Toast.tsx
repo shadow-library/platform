@@ -4,10 +4,12 @@
 import { type ReactElement, useEffect, useState, useSyncExternalStore } from 'react';
 import { createPortal } from 'react-dom';
 
-import styles from './Toast.module.css';
 /**
  * Importing user defined packages
  */
+import { useHydrated } from '@/hooks';
+
+import styles from './Toast.module.css';
 import { toastStore } from './Toast.store';
 import { type ToastData, type ToasterProps, type ToastIntent } from './Toast.types';
 
@@ -94,10 +96,17 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
  * The toast viewport — render one at the app root. Subscribes to the toast store and portals the
  * stack into `document.body`, newest nearest the anchored corner, capped at `max`. Toasts never steal
  * focus; each carries its own live-region role (assertive for danger, polite otherwise).
+ *
+ * The portal mounts only once hydrated: in a full-document SSR app React is hydrating `document.body`
+ * itself, and portaling a viewport into it mid-walk desyncs hydration — React then discards the entire
+ * server render. A `typeof document` guard can't catch that, because the document exists while React
+ * hydrates; `useHydrated` stays `false` until hydration has finished (and is `true` immediately in
+ * client-only apps, so SPA consumers see no behavior change).
  */
 export function Toaster({ placement = 'top-end', max = 3 }: ToasterProps): ReactElement | null {
   const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot, () => EMPTY_TOASTS as ToastData[]);
-  if (typeof document === 'undefined') return null;
+  const hydrated = useHydrated();
+  if (!hydrated) return null;
 
   const visible = toasts.slice(-max);
   return createPortal(

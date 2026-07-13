@@ -4,6 +4,7 @@
 
 import { act, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { renderToStaticMarkup } from 'react-dom/server';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Toaster } from './Toast';
@@ -84,5 +85,9 @@ describe('Toast', () => {
     expect(screen.queryByText('one')).not.toBeInTheDocument();
     expect(screen.getByText('two')).toBeInTheDocument();
     expect(screen.getByText('three')).toBeInTheDocument();
+  });
+
+  it('renders nothing on the server so hydration can never mismatch', () => {
+    expect(renderToStaticMarkup(<Toaster />)).toBe('');
   });
 });
