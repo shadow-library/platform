@@ -66,6 +66,24 @@ The package is safe to import and render on the server (Node, Next.js, Remix, As
 import { useSearchParams } from '@shadow-library/ui/router';
 ```
 
+## App foundation (providers & utilities)
+
+Shared, framework-level building blocks the Shadow apps all need — standardized here so they stay consistent and SSR-safe.
+
+- **`ThemeProvider` / `useTheme` / `themeInitScript`** — owns the light/dark choice. Styling flips on `data-theme` (and `.dark`) at the document root, so there's no visual chrome to mount. Inline `themeInitScript()` in the document `<head>` to apply the persisted (or OS-preferred) theme before first paint; the provider then reconciles React state after mount. SSR-safe: server and first client render use the deterministic `defaultTheme` (light), so hydration never mismatches. Configure with `defaultTheme` and `storageKey`.
+
+  ```tsx
+  // document head (server): <script dangerouslySetInnerHTML={{ __html: themeInitScript() }} />
+  <ThemeProvider>
+    <App />
+  </ThemeProvider>
+  // anywhere: const { theme, toggleTheme } = useTheme();
+  ```
+
+- **`ClientOnly`** — renders its children only after the client mounts (via `useSyncExternalStore`), so a genuinely browser-only subtree can't corrupt hydration. Optional `fallback` renders on the server and until mount.
+- **`NavProgress`** (from `@shadow-library/ui/router`) — a thin, `aria-hidden` top progress bar reflecting the router's pending state.
+- **Utilities** (root export): `derivePaginationState(total, page, limit)` / `calculatePageUpdate(info, page)` (pure, SSR-safe pagination math), `toPositiveInt`, `copyText`, `downloadTextFile`, `getInitials`.
+
 ## Components
 
 Every component is tree-shakeable, themeable via `--sh-*` tokens, and importable directly:
