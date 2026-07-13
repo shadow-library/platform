@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { forwardRef } from 'react';
+import { forwardRef, useEffect, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -87,7 +87,14 @@ function parseKeys(keys: string, mac: boolean): Cap[] {
  * the host control already announces the shortcut.
  */
 export const Kbd = forwardRef<HTMLElement, KbdProps>(function Kbd({ keys, bare = false, mac, className, children, ...props }, ref) {
-  const isMac = mac ?? detectMac();
+  // `detectMac` reads `navigator`, which is absent (or reflects the server OS) during SSR. Render the
+  // non-Mac glyphs on the server and the first client render, then resolve the real platform after
+  // mount so hydration always matches. Callers can pass `mac` to pin it deterministically.
+  const [detectedMac, setDetectedMac] = useState(false);
+  useEffect(() => {
+    if (mac === undefined) setDetectedMac(detectMac());
+  }, [mac]);
+  const isMac = mac ?? detectedMac;
   const caps = keys != null ? parseKeys(keys, isMac) : [];
   const spoken = caps.length > 0 ? caps.map(cap => cap.spoken).join(' ') : undefined;
 
