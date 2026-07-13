@@ -1,12 +1,13 @@
 # Novel Forge Web
 
-Authoring workspace for Shadow Applications. A React single-page app built with TanStack Router + Query, Ant Design, and Tailwind CSS, bundled with Vite and managed with Bun.
+Authoring workspace for Shadow Applications. A server-rendered React app built with TanStack Start (Router + Query) — full-document SSR with route-loader data fetching — bundled with Vite and managed with Bun.
 
 ## Tech Stack
 
 | Concern          | Choice                                              |
 | ---------------- | --------------------------------------------------- |
 | Runtime / PM     | [Bun](https://bun.sh)                               |
+| Framework        | [TanStack Start](https://tanstack.com/start) (full-document SSR) |
 | Build tool       | [Vite 7](https://vite.dev)                          |
 | UI library       | [React 19](https://react.dev)                       |
 | Routing          | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split) |
@@ -29,20 +30,25 @@ bun install
 bun dev
 ```
 
-The app runs on [http://localhost:3000](http://localhost:3000). Requests to `/api` are proxied to `SERVER_URL` (default `http://localhost:8080`).
+The dev server runs on [http://localhost:3000](http://localhost:3000). Browser requests to `/api` are proxied to the backend (`API_ORIGIN`, default `http://localhost:8080`); during SSR the route loaders call that same backend directly (an absolute URL on the server, a relative `/api` path in the browser — see `src/lib/apis/api-request.ts`).
 
 ## Scripts
 
 | Script                       | Description                                            |
 | ---------------------------- | ------------------------------------------------------ |
-| `bun dev`                    | Start the dev server on port 3000                      |
-| `bun run build`              | Type-check (`tsc`) and build for production            |
-| `bun run preview`            | Preview the production build on port 3000              |
+| `bun dev`                    | Start the TanStack Start dev server (SSR) on port 3000 |
+| `bun run build`              | Build the client + SSR server to `dist/`, then type-check (`tsc`) |
+| `bun run type-check`         | Type-check only (`tsc --noEmit`)                       |
+| `bun run start`              | Run the production SSR server (`serve.ts`): SSR + static assets + `/api` proxy on one origin |
 | `bun lint`                   | Check formatting (Prettier) and lint (ESLint)          |
 | `bun lint --fix`             | Auto-fix formatting and lint issues                    |
 | `bun run test`               | Run Playwright end-to-end tests                        |
 | `bun run test:setup`         | Install the Chromium browser Playwright needs          |
 | `bun run generate:api-types` | Regenerate API types from the backend OpenAPI spec     |
+
+## Production
+
+`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` is a small Bun server that fronts everything on one origin: it proxies `/api/*` to `API_ORIGIN`, serves the built client assets, and renders every other request server-side. The `Dockerfile` builds and runs exactly this; set `API_ORIGIN` to the backend and `PORT` to taste (default 3000). A `/healthz` endpoint answers liveness probes without touching the backend or the renderer. Put a TLS-terminating proxy in front if you need HTTPS.
 
 ## Project Structure
 
