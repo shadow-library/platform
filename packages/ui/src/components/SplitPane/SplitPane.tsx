@@ -1,11 +1,12 @@
 /**
  * Importing npm packages
  */
-import { Children, isValidElement, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { Children, isValidElement, type KeyboardEvent, type PointerEvent, type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
  */
+import { useIsomorphicLayoutEffect } from '@/hooks';
 import { cn } from '@/lib';
 
 import styles from './SplitPane.module.css';
@@ -64,7 +65,7 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
   const storageKey = autoSaveId ? `sh-splitpane:${autoSaveId}` : null;
 
   // Measure the container along the split axis.
-  useLayoutEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     const node = containerRef.current;
     if (!node) return;
     const measure = () => setContainerLen(direction === 'horizontal' ? node.clientWidth : node.clientHeight);
