@@ -8,7 +8,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
  * Importing user defined packages
  */
 import { useControllableState } from '@/hooks';
-import { addDays, addMonths, buildMonthMatrix, cn, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
+import { addDays, addMonths, buildMonthMatrix, cn, DEFAULT_LOCALE, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
 import { Input } from '../Input';
 import styles from './DatePicker.module.css';
@@ -41,9 +41,9 @@ function ChevronRight() {
   );
 }
 
-function weekdayLabels(weekStartsOn: number): string[] {
+function weekdayLabels(weekStartsOn: number, locale: string): string[] {
   const base = new Date(2024, 0, 7); // a Sunday
-  return Array.from({ length: 7 }, (_, index) => addDays(base, (weekStartsOn + index) % 7).toLocaleDateString(undefined, { weekday: 'short' }));
+  return Array.from({ length: 7 }, (_, index) => addDays(base, (weekStartsOn + index) % 7).toLocaleDateString(locale, { weekday: 'short' }));
 }
 
 /**
@@ -67,6 +67,7 @@ export function DatePicker({
   invalid = false,
   clearable = true,
   weekStartsOn = 0,
+  locale = DEFAULT_LOCALE,
   id,
   className,
   prefix,
@@ -172,9 +173,9 @@ export function DatePicker({
   }
 
   const weeks = buildMonthMatrix(viewDate.getFullYear(), viewDate.getMonth(), weekStartsOn);
-  const weekdays = weekdayLabels(weekStartsOn);
+  const weekdays = weekdayLabels(weekStartsOn, locale);
   const today = new Date();
-  const monthLabel = viewDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+  const monthLabel = viewDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
 
   return (
     <Popover.Root
@@ -268,7 +269,7 @@ export function DatePicker({
                           data-selected={selected || undefined}
                           tabIndex={isFocusTarget ? 0 : -1}
                           disabled={dayDisabled}
-                          aria-label={`${formatLongDate(day)}${selected ? ', selected' : ''}`}
+                          aria-label={`${formatLongDate(day, locale)}${selected ? ', selected' : ''}`}
                           aria-current={isToday ? 'date' : undefined}
                           onClick={() => selectDate(day)}
                         >

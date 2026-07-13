@@ -6,7 +6,7 @@ import { forwardRef } from 'react';
 /**
  * Importing user defined packages
  */
-import { cn } from '@/lib';
+import { cn, DEFAULT_LOCALE } from '@/lib';
 
 import { Select } from '../Select';
 import styles from './Pagination.module.css';
@@ -73,6 +73,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
     siblingCount = 1,
     summary = true,
     compact = false,
+    locale = DEFAULT_LOCALE,
     hasPrev,
     hasNext,
     onPrev,
@@ -110,7 +111,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
     <nav ref={ref} className={cn(styles.root, className)} aria-label='Pagination' {...props}>
       {summary ? (
         <span className={styles.summary} aria-live='polite'>
-          Showing {start.toLocaleString()} to {end.toLocaleString()} of {total.toLocaleString()}
+          Showing {start.toLocaleString(locale)} to {end.toLocaleString(locale)} of {total.toLocaleString(locale)}
         </span>
       ) : null}
 

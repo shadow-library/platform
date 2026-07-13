@@ -29,6 +29,10 @@ export interface CalendarProps {
   showOutsideDays?: boolean;
   /** 0 = Sunday, 1 = Monday. @default 0 */
   weekStartsOn?: 0 | 1;
+  /** Reference "today". Pass a fixed value for deterministic SSR; omitted, the current day is resolved on the client after mount so it never mismatches the server. */
+  today?: Date;
+  /** Locale for weekday, month, and day labels. Pinned by default so SSR and client agree. @default 'en-US' */
+  locale?: string;
   className?: string;
   'aria-label'?: string;
 }

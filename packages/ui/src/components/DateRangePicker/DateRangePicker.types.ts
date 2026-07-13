@@ -31,6 +31,8 @@ export interface DateRangePickerProps {
   size?: 'sm' | 'md' | 'lg';
   disabled?: boolean;
   placeholder?: string;
+  /** Locale for the range display and calendar labels. Pinned by default so SSR and client agree. @default 'en-US' */
+  locale?: string;
   id?: string;
   className?: string;
   'aria-label'?: string;

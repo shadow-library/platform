@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { forwardRef, type KeyboardEvent, type MouseEvent } from 'react';
+import { forwardRef, type KeyboardEvent, type MouseEvent, useEffect, useState } from 'react';
 
 /**
  * Importing user defined packages
  */
-import { addDays, cn, formatLongDate, isSameDay } from '@/lib';
+import { addDays, cn, DEFAULT_LOCALE, formatLongDate, isSameDay } from '@/lib';
 
 import { Avatar } from '../Avatar';
 import { Button } from '../Button';
@@ -23,21 +23,23 @@ interface DayGroup {
   items: NotificationItem[];
 }
 
-function groupByDay(items: NotificationItem[]): DayGroup[] {
+function groupByDay(items: NotificationItem[], now: Date | null, locale: string): DayGroup[] {
   const dated = items.some(item => item.date instanceof Date);
   if (!dated) return [{ key: 'all', label: null, items }];
 
-  const today = new Date();
-  const yesterday = addDays(today, -1);
+  const yesterday = now ? addDays(now, -1) : null;
   const groups: DayGroup[] = [];
   const index = new Map<string, DayGroup>();
 
   for (const item of items) {
-    const date = item.date ?? today;
-    const key = date.toDateString();
+    const date = item.date ?? null;
+    const key = date ? date.toDateString() : 'undated';
     let group = index.get(key);
     if (!group) {
-      const label = isSameDay(date, today) ? 'Today' : isSameDay(date, yesterday) ? 'Yesterday' : formatLongDate(date);
+      // "Today"/"Yesterday" depend on the wall clock, so they resolve only once `now` is known (after
+      // mount, or supplied by the caller). Until then — and for undated items — fall back to an absolute
+      // label so the server and the first client render produce the same headers.
+      const label = !date ? null : now && isSameDay(date, now) ? 'Today' : yesterday && isSameDay(date, yesterday) ? 'Yesterday' : formatLongDate(date, locale);
       group = { key, label, items: [] };
       index.set(key, group);
       groups.push(group);
@@ -71,9 +73,30 @@ function itemName(item: NotificationItem): string {
  * visiting are separate acts.
  */
 export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps>(function NotificationList(
-  { items, onRead, onAction, onNavigate, pendingIds = [], renderItem, emptyLabel = "You're all caught up.", 'aria-label': ariaLabel = 'Notifications', className, ...props },
+  {
+    items,
+    onRead,
+    onAction,
+    onNavigate,
+    pendingIds = [],
+    renderItem,
+    emptyLabel = "You're all caught up.",
+    now: nowProp,
+    locale = DEFAULT_LOCALE,
+    'aria-label': ariaLabel = 'Notifications',
+    className,
+    ...props
+  },
   ref,
 ) {
+  // Resolve "now" after mount (null until then) unless the caller pins it, so relative day headers never
+  // differ between the server and the first client render.
+  const [now, setNow] = useState<Date | null>(nowProp ?? null);
+  useEffect(() => {
+    if (nowProp) return;
+    setNow(new Date());
+  }, [nowProp]);
+
   if (items.length === 0)
     return (
       <div ref={ref} className={cn(styles.feed, styles.feedEmpty, className)} {...props}>
@@ -81,7 +104,7 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
       </div>
     );
 
-  const groups = groupByDay(items);
+  const groups = groupByDay(items, now, locale);
 
   function navigate(item: NotificationItem): void {
     if (item.unread) onRead?.(item.id);

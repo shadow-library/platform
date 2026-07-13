@@ -33,6 +33,8 @@ export interface DatePickerProps {
   clearable?: boolean;
   /** 0 = Sunday, 1 = Monday. @default 0 */
   weekStartsOn?: 0 | 1;
+  /** Locale for the calendar's weekday and month labels. Pinned by default so labels are stable. @default 'en-US' */
+  locale?: string;
   id?: string;
   className?: string;
   'aria-label'?: string;

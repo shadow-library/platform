@@ -2,6 +2,7 @@
  * Small, dependency-free date helpers for the calendar components. Values cross the component API as
  * ISO date strings (YYYY-MM-DD); Date objects stay internal.
  */
+import { DEFAULT_LOCALE } from './locale';
 
 export function pad2(value: number): string {
   return String(value).padStart(2, '0');
@@ -62,7 +63,7 @@ export function buildMonthMatrix(year: number, month: number, weekStartsOn = 0):
   return weeks;
 }
 
-/** Long, screen-reader-friendly label ("Tuesday, June 30, 2026"). */
-export function formatLongDate(date: Date): string {
-  return date.toLocaleDateString(undefined, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+/** Long, screen-reader-friendly label ("Tuesday, June 30, 2026"). Locale is pinned so SSR and client agree. */
+export function formatLongDate(date: Date, locale: string = DEFAULT_LOCALE): string {
+  return date.toLocaleDateString(locale, { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 }

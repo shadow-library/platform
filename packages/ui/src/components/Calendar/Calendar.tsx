@@ -7,7 +7,7 @@ import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react'
  * Importing user defined packages
  */
 import { useControllableState } from '@/hooks';
-import { addDays, addMonths, buildMonthMatrix, cn, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
+import { addDays, addMonths, buildMonthMatrix, cn, DEFAULT_LOCALE, formatLongDate, isSameDay, parseISODate, startOfMonth, toISODate } from '@/lib';
 
 import styles from './Calendar.module.css';
 import { type CalendarProps, type CalendarValue, type DateRange } from './Calendar.types';
@@ -30,9 +30,9 @@ function ChevronRight() {
   );
 }
 
-function weekdayLabels(weekStartsOn: number): string[] {
+function weekdayLabels(weekStartsOn: number, locale: string): string[] {
   const base = new Date(2024, 0, 7);
-  return Array.from({ length: 7 }, (_, index) => addDays(base, (weekStartsOn + index) % 7).toLocaleDateString(undefined, { weekday: 'narrow' }));
+  return Array.from({ length: 7 }, (_, index) => addDays(base, (weekStartsOn + index) % 7).toLocaleDateString(locale, { weekday: 'narrow' }));
 }
 
 function asRange(value: CalendarValue | undefined): DateRange {
@@ -57,6 +57,8 @@ export function Calendar({
   months = 1,
   showOutsideDays,
   weekStartsOn = 0,
+  today,
+  locale = DEFAULT_LOCALE,
   className,
   'aria-label': ariaLabel = 'Calendar',
 }: CalendarProps) {
@@ -78,15 +80,26 @@ export function Calendar({
     return null;
   }, [current, mode]);
 
-  const [viewDate, setViewDate] = useState(() => startOfMonth(firstSelected ?? new Date()));
-  const [focusedDate, setFocusedDate] = useState(() => firstSelected ?? new Date());
+  const [viewDate, setViewDate] = useState(() => startOfMonth(firstSelected ?? today ?? new Date()));
+  // The roving focus target defaults to the first of the view month (deterministic day) rather than
+  // "today", so the tab stop is identical on the server and the first client render.
+  const [focusedDate, setFocusedDate] = useState(() => firstSelected ?? today ?? startOfMonth(new Date()));
   const [hoverDate, setHoverDate] = useState<Date | null>(null);
+  // "Today" reads the wall clock, which differs between the server and the client. Resolve it after
+  // mount (null until then) so the current-day marker is absent on the server and the first client
+  // render alike, then appears once hydrated. A caller-supplied `today` pins it deterministically.
+  const [resolvedToday, setResolvedToday] = useState<Date | null>(today ?? null);
   const dayRefs = useRef(new Map<string, HTMLButtonElement>());
   const shouldFocus = useRef(false);
 
   const minDate = min ? parseISODate(min) : null;
   const maxDate = max ? parseISODate(max) : null;
   const blackout = useMemo(() => new Set(disabledDates ?? []), [disabledDates]);
+
+  useEffect(() => {
+    if (today) return;
+    setResolvedToday(new Date());
+  }, [today]);
 
   useEffect(() => {
     if (!shouldFocus.current) return;
@@ -181,8 +194,7 @@ export function Calendar({
     return undefined;
   }
 
-  const weekdays = weekdayLabels(weekStartsOn);
-  const today = new Date();
+  const weekdays = weekdayLabels(weekStartsOn, locale);
 
   return (
     // biome-ignore lint/a11y/noStaticElementInteractions: keyboard grid navigation is handled here and delegated to the day buttons
@@ -191,7 +203,7 @@ export function Calendar({
         {Array.from({ length: months }, (_, offset) => {
           const monthDate = addMonths(viewDate, offset);
           const weeks = buildMonthMatrix(monthDate.getFullYear(), monthDate.getMonth(), weekStartsOn);
-          const monthLabel = monthDate.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+          const monthLabel = monthDate.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
           return (
             <div key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`} className={styles.month}>
               <div className={styles.header}>
@@ -235,7 +247,7 @@ export function Calendar({
                         const selected = isSelected(day);
                         const within = inRange(day);
                         const edge = rangeEdge(day);
-                        const isToday = isSameDay(day, today);
+                        const isToday = resolvedToday != null && isSameDay(day, resolvedToday);
                         return (
                           <td key={iso} className={styles.cell} data-in-range={within || undefined} data-range-edge={edge}>
                             <button
@@ -251,7 +263,7 @@ export function Calendar({
                               data-in-range={within || undefined}
                               tabIndex={!outside && isSameDay(day, focusedDate) ? 0 : -1}
                               disabled={dayDisabled}
-                              aria-label={`${formatLongDate(day)}${selected ? ', selected' : ''}`}
+                              aria-label={`${formatLongDate(day, locale)}${selected ? ', selected' : ''}`}
                               aria-current={isToday ? 'date' : undefined}
                               onClick={() => selectDate(day)}
                               onPointerEnter={() => setHoverDate(day)}

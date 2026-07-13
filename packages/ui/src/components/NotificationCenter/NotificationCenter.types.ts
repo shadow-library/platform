@@ -69,7 +69,12 @@ interface NotificationListOwnProps {
   emptyLabel?: ReactNode;
 }
 
-export interface NotificationListProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onAnimationStart' | 'onDrag' | 'onDragEnd' | 'onDragStart'>, NotificationListOwnProps {}
+export interface NotificationListProps extends Omit<ComponentPropsWithoutRef<'div'>, 'onAnimationStart' | 'onDrag' | 'onDragEnd' | 'onDragStart'>, NotificationListOwnProps {
+  /** Reference "now" for the relative day headers. Pass a fixed value for deterministic SSR; omitted, it resolves on the client after mount, so the server never renders "Today"/"Yesterday". */
+  now?: Date;
+  /** Locale for absolute day-group headers. Pinned by default so SSR and client agree. @default 'en-US' */
+  locale?: string;
+}
 
 export interface NotificationCenterProps extends NotificationListOwnProps {
   /** Total unread for the bell badge. @default derived from `items` */

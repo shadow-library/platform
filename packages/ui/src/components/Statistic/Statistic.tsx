@@ -6,7 +6,7 @@ import { type ElementType, forwardRef } from 'react';
 /**
  * Importing user defined packages
  */
-import { cn } from '@/lib';
+import { cn, DEFAULT_LOCALE } from '@/lib';
 
 import { Skeleton } from '../Skeleton';
 import styles from './Statistic.module.css';
@@ -64,7 +64,7 @@ export const Statistic = forwardRef<HTMLDivElement, StatisticProps>(function Sta
     positiveIs = 'neither',
     comparison,
     format,
-    locale,
+    locale = DEFAULT_LOCALE,
     href,
     onClick,
     spark,

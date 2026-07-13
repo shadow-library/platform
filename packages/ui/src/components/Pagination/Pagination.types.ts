@@ -25,6 +25,8 @@ export interface PaginationProps extends Omit<ComponentPropsWithoutRef<'nav'>, '
   summary?: boolean;
   /** Collapse to arrows + "page / total" text. @default false */
   compact?: boolean;
+  /** Locale for the range-summary numbers. Pinned by default so SSR and client agree. @default 'en-US' */
+  locale?: string;
   /** Cursor mode — render only Prev/Next (no page numbers) when `total` is unknown. */
   hasPrev?: boolean;
   hasNext?: boolean;

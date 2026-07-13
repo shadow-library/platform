@@ -28,7 +28,7 @@ export interface StatisticProps extends Omit<ComponentPropsWithoutRef<'div'>, 't
   comparison?: string;
   /** `Intl.NumberFormat` options (compact notation, fraction digits, grouping). */
   format?: Intl.NumberFormatOptions;
-  /** Formatting locale. @default the runtime default */
+  /** Formatting locale. Pinned to a stable default so SSR and client render identical text. @default 'en-US' */
   locale?: string;
   /** Makes the whole block a drill-in link. */
   href?: string;

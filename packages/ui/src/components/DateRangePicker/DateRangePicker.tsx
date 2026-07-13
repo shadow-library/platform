@@ -8,7 +8,7 @@ import { useState } from 'react';
  * Importing user defined packages
  */
 import { useControllableState } from '@/hooks';
-import { cn, parseISODate } from '@/lib';
+import { cn, DEFAULT_LOCALE, parseISODate } from '@/lib';
 
 import { Button } from '../Button';
 import { Calendar, type DateRange } from '../Calendar';
@@ -27,10 +27,10 @@ function CalendarIcon() {
   );
 }
 
-function formatShort(iso: string | null): string | null {
+function formatShort(iso: string | null, locale: string): string | null {
   if (!iso) return null;
   const date = parseISODate(iso);
-  return date ? date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
+  return date ? date.toLocaleDateString(locale, { month: 'short', day: 'numeric', year: 'numeric' }) : null;
 }
 
 function sameRange(a: DateRange, b: DateRange): boolean {
@@ -55,6 +55,7 @@ export function DateRangePicker({
   size = 'md',
   disabled = false,
   placeholder = 'Select dates',
+  locale = DEFAULT_LOCALE,
   id,
   className,
   'aria-label': ariaLabel,
@@ -87,8 +88,8 @@ export function DateRangePicker({
     }
   }
 
-  const displayStart = formatShort(current.start);
-  const displayEnd = formatShort(current.end);
+  const displayStart = formatShort(current.start, locale);
+  const displayEnd = formatShort(current.end, locale);
   const display = displayStart ? (displayEnd ? `${displayStart} – ${displayEnd}` : `${displayStart} – …`) : null;
   const activePreset = presets.find(preset => sameRange(preset.range, current));
 
@@ -142,6 +143,7 @@ export function DateRangePicker({
               onValueChange={next => handleCalendarChange(next as DateRange)}
               min={min}
               max={max}
+              locale={locale}
               aria-label={ariaLabel ?? 'Date range'}
             />
           </div>
