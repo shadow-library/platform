@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest';
 /**
  * Importing user defined packages
  */
-import { getInitials } from './utils';
+import { getInitials, toPositiveInt } from './utils';
 
 /**
  * Declaring the constants
@@ -31,5 +31,27 @@ describe('getInitials', () => {
 
   it('returns an empty string for an empty name', () => {
     expect(getInitials('')).toBe('');
+  });
+});
+
+describe('toPositiveInt', () => {
+  it('parses a positive integer string', () => {
+    expect(toPositiveInt('25')).toBe(25);
+  });
+
+  it('floors a fractional value', () => {
+    expect(toPositiveInt('25.9')).toBe(25);
+  });
+
+  it('returns null for null, empty, non-numeric, or non-positive input', () => {
+    expect(toPositiveInt(null)).toBeNull();
+    expect(toPositiveInt('')).toBeNull();
+    expect(toPositiveInt('abc')).toBeNull();
+    expect(toPositiveInt('-3')).toBeNull();
+    expect(toPositiveInt('0')).toBeNull();
+  });
+
+  it('accepts zero only when allowZero is set', () => {
+    expect(toPositiveInt('0', true)).toBe(0);
   });
 });
