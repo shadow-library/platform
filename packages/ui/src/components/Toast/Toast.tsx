@@ -24,6 +24,11 @@ const DEFAULT_DURATION: Record<ToastIntent, number> = {
 
 const GLYPH: Record<ToastIntent, string> = { neutral: '•', info: 'i', success: '✓', warning: '!', danger: '!' };
 
+// A single stable empty snapshot for the server render — a fresh `[]` per call would violate the
+// useSyncExternalStore contract (React warns and re-renders), which is what made consumers wrap the
+// Toaster in a ClientOnly boundary.
+const EMPTY_TOASTS: readonly ToastData[] = [];
+
 function DismissIcon() {
   return (
     <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
@@ -91,7 +96,7 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
  * focus; each carries its own live-region role (assertive for danger, polite otherwise).
  */
 export function Toaster({ placement = 'top-end', max = 3 }: ToasterProps): ReactElement | null {
-  const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot, () => []);
+  const toasts = useSyncExternalStore(toastStore.subscribe, toastStore.getSnapshot, () => EMPTY_TOASTS as ToastData[]);
   if (typeof document === 'undefined') return null;
 
   const visible = toasts.slice(-max);
