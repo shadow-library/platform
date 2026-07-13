@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { type UseQueryOptions, type UseQueryResult, queryOptions, useQuery } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -20,13 +20,14 @@ const runKeys = {
   call: (projectId: string, runId: string, callId: string) => [...runKeys.detail(projectId, runId), 'calls', callId] as const,
 };
 
-export function useListRunsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListWorkflowRunResponse, ApiError> {
-  return useQuery<ListWorkflowRunResponse, ApiError>({
+export const listRunsQueryOptions = (projectId: string): UseQueryOptions<ListWorkflowRunResponse, ApiError> =>
+  queryOptions<ListWorkflowRunResponse, ApiError>({
     queryKey: runKeys.all(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/runs`).execute(),
-    enabled: enabled && Boolean(projectId),
-    refetchInterval: opts?.refetchInterval,
   });
+
+export function useListRunsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListWorkflowRunResponse, ApiError> {
+  return useQuery({ ...listRunsQueryOptions(projectId), enabled: enabled && Boolean(projectId), refetchInterval: opts?.refetchInterval });
 }
 
 export function useRunQuery(projectId: string, runId: string | undefined, enabled = true): UseQueryResult<WorkflowRunDetailResponse, ApiError> {

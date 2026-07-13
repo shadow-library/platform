@@ -30,6 +30,7 @@ import {
   useProjectQuery,
   useSeedFromBriefMutation,
   useUpdateEntityMutation,
+  listEntitiesQueryOptions,
 } from '@/lib/apis';
 import { coverColor, imageUrl } from '@/lib/format';
 
@@ -50,6 +51,8 @@ export const Route = createFileRoute('/novels/$novelId/story-bible')({
       entity: typeof search.entity === 'string' && search.entity ? search.entity : undefined,
     };
   },
+  // The entity catalog is the bible's primary data; a selected entity's full record is fetched on demand.
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(listEntitiesQueryOptions(params.novelId, { limit: 500 })),
   component: StoryBibleScreen,
 });
 

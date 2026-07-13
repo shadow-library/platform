@@ -23,11 +23,21 @@ import {
   useProjectStatusQuery,
   useResumeMutation,
   useSkeletonMutation,
+  listChaptersQueryOptions,
+  projectStatusQueryOptions,
 } from '@/lib/apis';
 
 import styles from './source.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/source')({
+  // The extracted-chapter list and lifecycle status are the pipeline screen's primary data; the ingest
+  // job stays a client (polling) query.
+  loader: async ({ context, params }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(listChaptersQueryOptions(params.novelId, { limit: 200 })),
+      context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)),
+    ]);
+  },
   component: SourceScreen,
 });
 

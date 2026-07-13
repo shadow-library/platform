@@ -25,6 +25,7 @@ import {
   usePlanMutation,
   useUpdateBriefMutation,
   useVolumeQuery,
+  listVolumesQueryOptions,
 } from '@/lib/apis';
 
 import styles from './volumes.module.css';
@@ -46,6 +47,8 @@ export const Route = createFileRoute('/novels/$novelId/volumes')({
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
     };
   },
+  // The volume list is the screen's spine; per-volume arcs/briefs and a selected brief load on demand.
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(listVolumesQueryOptions(params.novelId, { limit: 50 })),
   component: VolumesScreen,
 });
 

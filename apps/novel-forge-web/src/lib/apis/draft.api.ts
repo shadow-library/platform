@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -39,12 +39,14 @@ const draftKeys = {
   reviewQueue: (projectId: string) => ['projects', projectId, 'review-queue'] as const,
 };
 
-export function useListDraftsQuery(projectId: string, enabled = true): UseQueryResult<ListDraftResponse, ApiError> {
-  return useQuery<ListDraftResponse, ApiError>({
+export const listDraftsQueryOptions = (projectId: string): UseQueryOptions<ListDraftResponse, ApiError> =>
+  queryOptions<ListDraftResponse, ApiError>({
     queryKey: draftKeys.list(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/drafts`).execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useListDraftsQuery(projectId: string, enabled = true): UseQueryResult<ListDraftResponse, ApiError> {
+  return useQuery({ ...listDraftsQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 export function useDraftQuery(projectId: string, n: number | undefined, enabled = true): UseQueryResult<DraftResponse, ApiError> {
@@ -63,12 +65,14 @@ export function useDraftRevisionsQuery(projectId: string, n: number | undefined,
   });
 }
 
-export function useReviewQueueQuery(projectId: string, enabled = true): UseQueryResult<ReviewQueueResponse, ApiError> {
-  return useQuery<ReviewQueueResponse, ApiError>({
+export const reviewQueueQueryOptions = (projectId: string): UseQueryOptions<ReviewQueueResponse, ApiError> =>
+  queryOptions<ReviewQueueResponse, ApiError>({
     queryKey: draftKeys.reviewQueue(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/review-queue`).execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useReviewQueueQuery(projectId: string, enabled = true): UseQueryResult<ReviewQueueResponse, ApiError> {
+  return useQuery({ ...reviewQueueQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 function invalidateDraft(queryClient: ReturnType<typeof useQueryClient>, projectId: string): void {

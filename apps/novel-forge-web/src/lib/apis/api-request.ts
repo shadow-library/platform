@@ -62,7 +62,22 @@ export class ApiError extends Error {
 /**
  * Declaring the constants
  */
-const BASE_URL = '/api/v1';
+const BASE_PATH = '/api/v1';
+
+/**
+ * Route loaders are isomorphic: they run on the server for the initial document and in the browser on
+ * client navigation. In the browser a relative path is correct (same-origin, proxied to the backend); on
+ * the server there is no origin, so the backend's absolute URL is prefixed. `API_ORIGIN` is read only
+ * under `import.meta.env.SSR`, which Vite statically resolves to `false` in the client build and drops the
+ * branch — so the server-only origin never ships to (or is depended on by) the browser bundle.
+ */
+function resolveUrl(pathWithQuery: string): string {
+  if (import.meta.env.SSR) {
+    const origin = process.env.API_ORIGIN ?? 'http://localhost:8080';
+    return `${origin}${BASE_PATH}${pathWithQuery}`;
+  }
+  return `${BASE_PATH}${pathWithQuery}`;
+}
 
 export class APIRequest {
   private readonly options: APIRequestOptions;
@@ -135,7 +150,7 @@ export class APIRequest {
     const { path, method, headers, query, data } = this.options;
 
     const queryString = Object.keys(query).length > 0 ? `?${new URLSearchParams(query).toString()}` : '';
-    const url = `${BASE_URL}${path}${queryString}`;
+    const url = resolveUrl(`${path}${queryString}`);
 
     const init: RequestInit = { method, headers };
     if (data) {

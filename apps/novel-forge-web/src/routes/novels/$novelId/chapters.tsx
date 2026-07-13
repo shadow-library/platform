@@ -31,6 +31,9 @@ import {
   useListRunsQuery,
   useProjectStatusQuery,
   useUpdateDraftMutation,
+  listBriefsQueryOptions,
+  listDraftsQueryOptions,
+  projectStatusQueryOptions,
 } from '@/lib/apis';
 import { imageUrl } from '@/lib/format';
 
@@ -55,6 +58,15 @@ export const Route = createFileRoute('/novels/$novelId/chapters')({
       chapter: Number.isInteger(chapter) && chapter > 0 ? chapter : undefined,
       job: typeof search.job === 'string' && search.job ? search.job : undefined,
     };
+  },
+  // The draft list, briefs, and lifecycle status back the default chapters view. The editor, live
+  // generation progress, and per-chapter drawers are search-param / interaction driven and load on the client.
+  loader: async ({ context, params }) => {
+    await Promise.all([
+      context.queryClient.prefetchQuery(listDraftsQueryOptions(params.novelId)),
+      context.queryClient.prefetchQuery(listBriefsQueryOptions(params.novelId)),
+      context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)),
+    ]);
   },
   component: ChaptersScreen,
 });

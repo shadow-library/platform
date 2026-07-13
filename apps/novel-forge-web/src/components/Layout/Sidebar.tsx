@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Badge, IconButton, Popover, Tooltip } from '@shadow-library/ui';
+import { Avatar, Badge, IconButton, Popover, Tooltip, useTheme } from '@shadow-library/ui';
 import { Link, useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
 
@@ -10,7 +10,6 @@ import { type ReactNode, useState } from 'react';
  */
 import { useListProjectsQuery, useListProposalsQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
 import { imageUrl, lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
-import { useTheme } from '../AppProvider';
 import { type NovelParams, type ProjectRoute } from './routes';
 import {
   BookIcon,

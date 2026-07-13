@@ -11,12 +11,16 @@ import { useState } from 'react';
 import { BookIcon, PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
-import { type ProjectKind, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
+import { type ProjectKind, type ProjectResponse, listProjectsQueryOptions, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
 import { imageUrl, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './index.module.css';
 
+// The project list is the landing screen's primary data, so the loader prefetches it — the grid is
+// server-rendered on first paint. Per-card status stays a client query (secondary, one request per card).
 export const Route = createFileRoute('/_app/')({
+  head: () => ({ meta: [{ title: 'Projects · Novel Forge' }] }),
+  loader: ({ context }) => context.queryClient.prefetchQuery(listProjectsQueryOptions({ limit: 50 })),
   component: Dashboard,
 });
 

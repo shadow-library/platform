@@ -29,7 +29,7 @@
     "moduleResolution": "bundler",
     "paths": { "@/*": ["./src/*"] },
     "verbatimModuleSyntax": true,
-    "types": ["vite/client"],
+    "types": ["vite/client", "node"],
 
     /** Emit */
     "noEmit": true,

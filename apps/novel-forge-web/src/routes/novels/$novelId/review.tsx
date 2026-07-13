@@ -10,11 +10,13 @@ import { useEffect, useState } from 'react';
  */
 import { WarningIcon } from '@/components/icons';
 import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
-import { type DraftResponse, type FeedbackBody, useApproveDraftMutation, useDraftFeedbackMutation, useReviewQueueQuery, useReviseDraftMutation } from '@/lib/apis';
+import { type DraftResponse, type FeedbackBody, reviewQueueQueryOptions, useApproveDraftMutation, useDraftFeedbackMutation, useReviewQueueQuery, useReviseDraftMutation } from '@/lib/apis';
 
 import styles from './review.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/review')({
+  // The review queue is this screen's only data — prefetch it so it renders server-side.
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(reviewQueueQueryOptions(params.novelId)),
   component: ReviewScreen,
 });
 

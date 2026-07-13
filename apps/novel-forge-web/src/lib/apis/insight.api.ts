@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { type UseQueryOptions, type UseQueryResult, queryOptions, useQuery } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -28,12 +28,14 @@ export function useCostQuery(projectId: string, enabled = true): UseQueryResult<
   });
 }
 
-export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResult<AiUsageResponse, ApiError> {
-  return useQuery<AiUsageResponse, ApiError>({
+export const aiUsageQueryOptions = (projectId: string): UseQueryOptions<AiUsageResponse, ApiError> =>
+  queryOptions<AiUsageResponse, ApiError>({
     queryKey: insightKeys.aiUsage(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/ai-usage`).execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResult<AiUsageResponse, ApiError> {
+  return useQuery({ ...aiUsageQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 export function useListJobsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListGenerationJobResponse, ApiError> {

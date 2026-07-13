@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -41,15 +41,17 @@ const entityKeys = {
   detail: (projectId: string, entityKey: string) => [...entityKeys.all(projectId), entityKey] as const,
 };
 
-export function useListEntitiesQuery(projectId: string, params?: ListEntitiesQueryParams, enabled = true): UseQueryResult<ListEntityResponse, ApiError> {
-  return useQuery<ListEntityResponse, ApiError>({
+export const listEntitiesQueryOptions = (projectId: string, params?: ListEntitiesQueryParams): UseQueryOptions<ListEntityResponse, ApiError> =>
+  queryOptions<ListEntityResponse, ApiError>({
     queryKey: entityKeys.list(projectId, params),
     queryFn: () =>
       APIRequest.get(`/projects/${projectId}/entities`)
         .query(params ?? {})
         .execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useListEntitiesQuery(projectId: string, params?: ListEntitiesQueryParams, enabled = true): UseQueryResult<ListEntityResponse, ApiError> {
+  return useQuery({ ...listEntitiesQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 
 export function useEntityQuery(projectId: string, entityKey: string, enabled = true): UseQueryResult<EntityWithImages, ApiError> {

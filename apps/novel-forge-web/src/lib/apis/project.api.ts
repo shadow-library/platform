@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -31,30 +31,42 @@ const projectKeys = {
   status: (projectId: string) => [...projectKeys.all, projectId, 'status'] as const,
 };
 
-export function useListProjectsQuery(params?: ListProjectsQueryParams): UseQueryResult<ListProjectResponse, ApiError> {
-  return useQuery<ListProjectResponse, ApiError>({
+/**
+ * Query-option factories shared by route loaders and component hooks. A loader prefetches these via
+ * `context.queryClient.ensureQueryData(...)` and the matching hook reads the same cache entry — identical
+ * key + fn — so the SSR-dehydrated data hydrates without a second request.
+ */
+export const listProjectsQueryOptions = (params?: ListProjectsQueryParams): UseQueryOptions<ListProjectResponse, ApiError> =>
+  queryOptions<ListProjectResponse, ApiError>({
     queryKey: projectKeys.list(params),
     queryFn: () =>
       APIRequest.get('/projects')
         .query(params ?? {})
         .execute(),
   });
+
+export const projectQueryOptions = (projectId: string): UseQueryOptions<ProjectResponse, ApiError> =>
+  queryOptions<ProjectResponse, ApiError>({
+    queryKey: projectKeys.detail(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}`).execute(),
+  });
+
+export const projectStatusQueryOptions = (projectId: string): UseQueryOptions<ProjectStatusResponse, ApiError> =>
+  queryOptions<ProjectStatusResponse, ApiError>({
+    queryKey: projectKeys.status(projectId),
+    queryFn: () => APIRequest.get(`/projects/${projectId}/status`).execute(),
+  });
+
+export function useListProjectsQuery(params?: ListProjectsQueryParams): UseQueryResult<ListProjectResponse, ApiError> {
+  return useQuery(listProjectsQueryOptions(params));
 }
 
 export function useProjectQuery(projectId: string, enabled = true): UseQueryResult<ProjectResponse, ApiError> {
-  return useQuery<ProjectResponse, ApiError>({
-    queryKey: projectKeys.detail(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}`).execute(),
-    enabled: enabled && Boolean(projectId),
-  });
+  return useQuery({ ...projectQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 export function useProjectStatusQuery(projectId: string, enabled = true): UseQueryResult<ProjectStatusResponse, ApiError> {
-  return useQuery<ProjectStatusResponse, ApiError>({
-    queryKey: projectKeys.status(projectId),
-    queryFn: () => APIRequest.get(`/projects/${projectId}/status`).execute(),
-    enabled: enabled && Boolean(projectId),
-  });
+  return useQuery({ ...projectStatusQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
 export function useCreateProjectMutation(): UseMutationResult<ProjectResponse, ApiError, CreateProjectBody> {

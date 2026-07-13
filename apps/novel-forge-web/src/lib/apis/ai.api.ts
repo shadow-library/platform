@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { type UseQueryOptions, type UseQueryResult, queryOptions, useQuery } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -18,10 +18,13 @@ const aiKeys = {
   models: () => ['ai', 'models'] as const,
 };
 
-export function useAiModelsQuery(): UseQueryResult<AiModelsResponse, ApiError> {
-  return useQuery<AiModelsResponse, ApiError>({
+export const aiModelsQueryOptions = (): UseQueryOptions<AiModelsResponse, ApiError> =>
+  queryOptions<AiModelsResponse, ApiError>({
     queryKey: aiKeys.models(),
     queryFn: () => APIRequest.get('/ai/models').execute(),
     staleTime: 5 * 60 * 1000,
   });
+
+export function useAiModelsQuery(): UseQueryResult<AiModelsResponse, ApiError> {
+  return useQuery(aiModelsQueryOptions());
 }

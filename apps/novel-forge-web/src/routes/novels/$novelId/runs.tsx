@@ -18,12 +18,15 @@ import {
   useRunCallQuery,
   useRunContextQuery,
   useRunQuery,
+  listRunsQueryOptions,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './runs.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/runs')({
+  // The run list is the screen's primary data; the detail ladder (context, calls) is fetched on demand.
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(listRunsQueryOptions(params.novelId)),
   component: RunsScreen,
 });
 

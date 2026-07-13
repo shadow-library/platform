@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { type UseQueryOptions, type UseQueryResult, queryOptions, useQuery } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -19,15 +19,17 @@ const chapterKeys = {
   detail: (projectId: string, n: number) => [...chapterKeys.all(projectId), n] as const,
 };
 
-export function useListChaptersQuery(projectId: string, params?: ListChaptersQueryParams, enabled = true): UseQueryResult<ListChapterResponse, ApiError> {
-  return useQuery<ListChapterResponse, ApiError>({
+export const listChaptersQueryOptions = (projectId: string, params?: ListChaptersQueryParams): UseQueryOptions<ListChapterResponse, ApiError> =>
+  queryOptions<ListChapterResponse, ApiError>({
     queryKey: chapterKeys.list(projectId, params),
     queryFn: () =>
       APIRequest.get(`/projects/${projectId}/source/chapters`)
         .query(params ?? {})
         .execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useListChaptersQuery(projectId: string, params?: ListChaptersQueryParams, enabled = true): UseQueryResult<ListChapterResponse, ApiError> {
+  return useQuery({ ...listChaptersQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 
 export function useChapterQuery(projectId: string, n: number, enabled = true): UseQueryResult<ChapterResponse, ApiError> {

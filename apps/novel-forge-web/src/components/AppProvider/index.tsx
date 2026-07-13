@@ -1,36 +1,32 @@
 /**
  * Importing npm packages
  */
-import { Toaster, TooltipProvider } from '@shadow-library/ui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-/**
- *  Importing user defined modules
- */
-import ThemeProvider from './ThemeProvider';
+import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
 
 /**
  * Declaring types
  */
-
-export interface AppProviderProps {
+export interface AppProvidersProps {
   children?: React.ReactNode;
 }
 
 /**
  * Declaring constants
  */
-export const queryClient = new QueryClient();
 
-export default function AppProvider(props: AppProviderProps): React.JSX.Element {
+/**
+ * App-wide client providers, rendered inside the root document around every route. The QueryClientProvider
+ * is intentionally absent — TanStack Start's router/query SSR integration (see `src/router.tsx`) mounts a
+ * per-request QueryClient and provider for us, which is also what makes loader-hydrated data work.
+ *
+ * The Toaster is SSR-safe on its own — it returns null on the server and its store reports a stable empty
+ * server snapshot — so it no longer needs a ClientOnly boundary.
+ */
+export function AppProviders(props: AppProvidersProps): React.JSX.Element {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>{props.children}</TooltipProvider>
-        <Toaster placement="top-end" />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider storageKey="theme">
+      <TooltipProvider>{props.children}</TooltipProvider>
+      <Toaster placement="top-end" />
+    </ThemeProvider>
   );
 }
-
-export * from './ThemeProvider';

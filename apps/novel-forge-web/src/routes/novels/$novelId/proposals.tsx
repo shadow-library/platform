@@ -9,12 +9,14 @@ import { Fragment, useEffect, useMemo, useState } from 'react';
  * Importing user defined modules
  */
 import { Markdown, PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
-import { type ProposalResponse, useApplyProposalMutation, useDiscardProposalMutation, useListProposalsQuery, useRevertProposalMutation } from '@/lib/apis';
+import { type ProposalResponse, listProposalsQueryOptions, useApplyProposalMutation, useDiscardProposalMutation, useListProposalsQuery, useRevertProposalMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './proposals.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/proposals')({
+  // The pending proposals are the review surface's landing data (the screen defaults to the pending filter).
+  loader: ({ context, params }) => context.queryClient.prefetchQuery(listProposalsQueryOptions(params.novelId, { limit: 100, status: 'pending' })),
   component: ProposalsScreen,
 });
 

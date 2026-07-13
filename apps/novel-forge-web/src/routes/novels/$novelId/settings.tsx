@@ -18,12 +18,16 @@ import {
   useDeleteProjectMutation,
   useProjectQuery,
   useUpdateProjectMutation,
+  aiModelsQueryOptions,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
 
 import styles from './settings.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/settings')({
+  // The model registry backs the settings model pickers; prefetch it (project is already seeded by the
+  // parent novel loader) so the form renders populated on the server.
+  loader: ({ context }) => context.queryClient.prefetchQuery(aiModelsQueryOptions()),
   component: SettingsScreen,
 });
 

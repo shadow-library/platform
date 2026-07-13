@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -29,15 +29,17 @@ const volumeKeys = {
   detail: (projectId: string, volumeKey: string) => [...volumeKeys.all(projectId), volumeKey] as const,
 };
 
-export function useListVolumesQuery(projectId: string, params?: ListVolumesQueryParams, enabled = true): UseQueryResult<ListVolumeResponse, ApiError> {
-  return useQuery<ListVolumeResponse, ApiError>({
+export const listVolumesQueryOptions = (projectId: string, params?: ListVolumesQueryParams): UseQueryOptions<ListVolumeResponse, ApiError> =>
+  queryOptions<ListVolumeResponse, ApiError>({
     queryKey: volumeKeys.list(projectId, params),
     queryFn: () =>
       APIRequest.get(`/projects/${projectId}/volumes`)
         .query(params ?? {})
         .execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useListVolumesQuery(projectId: string, params?: ListVolumesQueryParams, enabled = true): UseQueryResult<ListVolumeResponse, ApiError> {
+  return useQuery({ ...listVolumesQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 
 export function useVolumeQuery(projectId: string, volumeKey: string, enabled = true): UseQueryResult<VolumeResponse, ApiError> {

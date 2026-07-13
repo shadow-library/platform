@@ -42,6 +42,9 @@ interface ChatSearch {
 }
 
 // The open chat lives in the URL so a refresh or shared link reopens the same conversation.
+// No loader by design (category D): the refinement chat is a live, streaming conversation whose data is
+// session-selection driven — the session list, transcript, and pending-turn polling aren't needed for the
+// first server paint. Project context is already seeded by the parent novel loader.
 export const Route = createFileRoute('/novels/$novelId/chat')({
   validateSearch: (search: Record<string, unknown>): ChatSearch => ({
     session: typeof search.session === 'string' && search.session ? search.session : undefined,

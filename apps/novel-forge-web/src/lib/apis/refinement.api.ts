@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryOptions, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
@@ -187,15 +187,17 @@ export function useUpdateChatSessionMutation(projectId: string): UseMutationResu
   });
 }
 
-export function useListProposalsQuery(projectId: string, params?: ListProposalsQueryParams, enabled = true): UseQueryResult<ListProposalResponse, ApiError> {
-  return useQuery<ListProposalResponse, ApiError>({
+export const listProposalsQueryOptions = (projectId: string, params?: ListProposalsQueryParams): UseQueryOptions<ListProposalResponse, ApiError> =>
+  queryOptions<ListProposalResponse, ApiError>({
     queryKey: refinementKeys.proposalList(projectId, params),
     queryFn: () =>
       APIRequest.get(`/projects/${projectId}/proposals`)
         .query(params ?? {})
         .execute(),
-    enabled: enabled && Boolean(projectId),
   });
+
+export function useListProposalsQuery(projectId: string, params?: ListProposalsQueryParams, enabled = true): UseQueryResult<ListProposalResponse, ApiError> {
+  return useQuery({ ...listProposalsQueryOptions(projectId, params), enabled: enabled && Boolean(projectId) });
 }
 
 export function useProposalQuery(projectId: string, proposalId: string | undefined, enabled = true): UseQueryResult<ProposalResponse, ApiError> {

@@ -1,23 +1,25 @@
 /**
  * Importing npm packages
  */
-import { TanStackDevtools } from '@tanstack/react-devtools';
-import type { QueryClient } from '@tanstack/react-query';
+import { type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { EmptyState } from '@shadow-library/ui';
-import { HeadContent, Outlet, createRootRouteWithContext, useNavigate } from '@tanstack/react-router';
+import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import { ClientOnly, themeInitScript } from '@shadow-library/ui';
+import { NavProgress } from '@shadow-library/ui/router';
+import { type ReactNode } from 'react';
 
 /**
  *  Importing user defined modules
  */
-import { AppShell } from '../components/Layout';
-import styles from './__root.module.css';
+import { AppProviders } from '@/components/AppProvider';
+import { AppShell } from '@/components/Layout';
+import { DefaultCatchBoundary, RouteNotFound } from '@/components/nf';
+import appCss from '@/styles.css?url';
 
 /**
  * Declaring types
  */
-
 interface RouterContext {
   queryClient: QueryClient;
 }
@@ -25,38 +27,67 @@ interface RouterContext {
 /**
  * Declaring constants
  */
-
-function NotFound() {
-  const navigate = useNavigate();
-  return (
+export const Route = createRootRouteWithContext<RouterContext>()({
+  head: () => ({
+    meta: [
+      { charSet: 'utf-8' },
+      { name: 'viewport', content: 'width=device-width, initial-scale=1' },
+      { name: 'theme-color', content: '#000000' },
+      { name: 'description', content: 'Novel Forge — authoring workspace for Shadow applications' },
+      { title: 'Novel Forge' },
+    ],
+    links: [
+      { rel: 'stylesheet', href: appCss },
+      { rel: 'icon', href: '/favicon.svg' },
+      { rel: 'manifest', href: '/manifest.json' },
+    ],
+  }),
+  errorComponent: props => (
+    <RootDocument>
+      <DefaultCatchBoundary {...props} />
+    </RootDocument>
+  ),
+  notFoundComponent: () => (
     <AppShell>
-      <div className={styles.notFound}>
-        <EmptyState
-          size="page"
-          title="Page not found"
-          description="That page doesn’t exist. Head back to your projects."
-          action={{ label: 'Go to projects', onClick: () => navigate({ to: '/' }) }}
-        />
-      </div>
+      <RouteNotFound />
     </AppShell>
+  ),
+  component: RootComponent,
+});
+
+function RootComponent(): React.JSX.Element {
+  return (
+    <RootDocument>
+      <Outlet />
+    </RootDocument>
   );
 }
 
-export const Route = createRootRouteWithContext<RouterContext>()({
-  notFoundComponent: NotFound,
-  component: () => (
-    <>
-      <HeadContent />
-      <Outlet />
-      {import.meta.env.DEV && (
-        <TanStackDevtools
-          config={{ position: 'bottom-right' }}
-          plugins={[
-            { name: 'Tanstack Router', render: <TanStackRouterDevtools /> },
-            { name: 'React Query', render: <ReactQueryDevtools /> },
-          ]}
-        />
-      )}
-    </>
-  ),
-});
+/**
+ * The full HTML document TanStack Start renders on the server and hydrates on the client. `themeInitScript`
+ * runs before paint to avoid a theme flash; `<html suppressHydrationWarning>` tolerates the attributes it
+ * sets. Devtools are dev-only and client-only so they never touch the server render.
+ */
+function RootDocument({ children }: { children: ReactNode }): React.JSX.Element {
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+        <script suppressHydrationWarning dangerouslySetInnerHTML={{ __html: themeInitScript('theme') }} />
+      </head>
+      <body>
+        <AppProviders>
+          <NavProgress />
+          {children}
+        </AppProviders>
+        {import.meta.env.DEV && (
+          <ClientOnly>
+            <TanStackRouterDevtools position="bottom-right" />
+            <ReactQueryDevtools buttonPosition="bottom-left" />
+          </ClientOnly>
+        )}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
