@@ -9,7 +9,7 @@ import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, eq, inArray, notInArray } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -19,7 +19,7 @@ import { arcContentHash, briefContentHash, computeBibleDocHash, renderBriefBody,
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type CollectionResult, type ImportPlanBody, type ImportPlanResponse, type PlanBundle } from './plan-import.dto';
+import { type CollectionResult, type ImportPlanBody, type ImportPlanResponse, PLAN_BUNDLE_SECTIONS, type PlanBundle, type PlanBundleSectionValue } from './plan-import.dto';
 import { validatePlanBundle } from './plan-import.validator';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 
@@ -117,8 +117,15 @@ export class PlanImportService {
       return;
     }
 
+    // Project creation seeds contentless `<section>/default` placeholder docs; only documents that
+    // were actually written (contentHash set by an upsert) count as existing plan data.
+    const authoredBibleDocs = and(
+      eq(schema.bibleDocuments.projectId, projectId),
+      inArray(schema.bibleDocuments.section, [...PLAN_BUNDLE_SECTIONS]),
+      isNotNull(schema.bibleDocuments.contentHash),
+    );
     const collections: { name: CollectionName; carried: number; count: () => Promise<number> }[] = [
-      { name: 'bible', carried: bundle.bible?.length ?? 0, count: () => this.db.$count(schema.bibleDocuments, eq(schema.bibleDocuments.projectId, projectId)) },
+      { name: 'bible', carried: bundle.bible?.length ?? 0, count: () => this.db.$count(schema.bibleDocuments, authoredBibleDocs) },
       { name: 'entities', carried: bundle.entities?.length ?? 0, count: () => this.db.$count(schema.entities, eq(schema.entities.projectId, projectId)) },
       { name: 'volumes', carried: bundle.volumes?.length ?? 0, count: () => this.db.$count(schema.volumes, eq(schema.volumes.projectId, projectId)) },
       { name: 'arcs', carried: bundle.arcs?.length ?? 0, count: () => this.db.$count(schema.arcs, eq(schema.arcs.projectId, projectId)) },
@@ -160,8 +167,12 @@ export class PlanImportService {
     }
 
     if (overwrite) {
+      // Prune only authored docs in bundle-importable sections: app-managed sections (story_state, ai)
+      // and never-written placeholder rows are not the bundle's to delete.
       const keep = docs.map(d => `${d.section}/${d.slug}`);
-      const prune = existing.filter(d => !keep.includes(`${d.section}/${d.slug}`));
+      const prunable = (d: (typeof existing)[number]): boolean =>
+        PLAN_BUNDLE_SECTIONS.includes(d.section as PlanBundleSectionValue) && d.contentHash !== null && !keep.includes(`${d.section}/${d.slug}`);
+      const prune = existing.filter(prunable);
       if (prune.length > 0) {
         await tx.delete(schema.bibleDocuments).where(
           inArray(

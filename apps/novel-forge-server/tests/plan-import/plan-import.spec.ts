@@ -9,7 +9,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
 import { AppError, ValidationError } from '@shadow-library/common';
 import { SQL } from 'bun';
-import { asc, eq } from 'drizzle-orm';
+import { and, asc, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 /**
@@ -138,6 +138,11 @@ describe.if(pgAvailable)('plan import', () => {
       .values({ name: `import-${Date.now()}-${Math.random()}`, kind })
       .returning();
     if (!project) throw new Error('failed to seed project');
+    // Mirror ProjectService.create: new novels are born with contentless `<section>/default`
+    // placeholder docs, and the import guards must see through them.
+    if (kind === 'new_novel') {
+      await db.insert(schema.bibleDocuments).values(schema.bibleSection.enumValues.map(section => ({ projectId: project.id, section, slug: 'default' })));
+    }
     return project.id;
   }
 
@@ -216,6 +221,21 @@ describe.if(pgAvailable)('plan import', () => {
 
     const arcs = await db.query.arcs.findMany({ where: eq(schema.arcs.projectId, projectId) });
     expect(arcs.every(a => a.status === 'approved')).toBe(true);
+  });
+
+  it('should leave placeholder docs and app-managed sections alone when pruning', async () => {
+    const projectId = await createProject();
+    await db
+      .update(schema.bibleDocuments)
+      .set({ body: 'extraction state', contentHash: 'hash' })
+      .where(and(eq(schema.bibleDocuments.projectId, projectId), eq(schema.bibleDocuments.section, 'story_state')));
+
+    const response = await service.import(projectId, { bundle: buildBundle(), overwrite: true });
+    expect(response.results.bible).toEqual({ created: 2, updated: 0, unchanged: 0, pruned: 0 });
+
+    const docs = await db.query.bibleDocuments.findMany({ where: eq(schema.bibleDocuments.projectId, projectId) });
+    expect(docs).toHaveLength(schema.bibleSection.enumValues.length + 2);
+    expect(docs.some(d => d.section === 'story_state' && d.body === 'extraction state')).toBe(true);
   });
 
   it('should refuse overwrite once drafts exist', async () => {

@@ -25,8 +25,9 @@ import { EndingContractSchema } from '../ai/schemas';
  */
 
 // `story_state` and `ai` are app-managed sections; an authored bundle may only carry canon sections.
-export const PlanBundleSection = EnumType.create('PlanBundleSection', ['project', 'world', 'power', 'plot', 'lore']);
-export type PlanBundleSectionValue = 'project' | 'world' | 'power' | 'plot' | 'lore';
+export const PLAN_BUNDLE_SECTIONS = ['project', 'world', 'power', 'plot', 'lore'] as const;
+export const PlanBundleSection = EnumType.create('PlanBundleSection', [...PLAN_BUNDLE_SECTIONS]);
+export type PlanBundleSectionValue = (typeof PLAN_BUNDLE_SECTIONS)[number];
 
 const KEY_PATTERN = '^[a-z0-9_]+$';
 const SLUG_PATTERN = '^[a-z0-9][a-z0-9-]*$';

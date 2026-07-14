@@ -14,7 +14,8 @@ chapter generation can start immediately after the upload. Drives tasks PI1–PI
   registered in `dynamic.modules.ts`. No schema changes — the bundle lands entirely in existing tables.
 - Guards, in order: project exists (`PRJ_001`) and kind `new_novel` (`PRJ_003`); bundle `format`/`version` supported (`IMP_002`); any bundle-carried collection already has
   rows → `IMP_001` unless `overwrite: true`; `overwrite` itself is refused once any drafts or chapters exist (`IMP_003`) — wholesale plan replacement under written prose
-  would orphan continuity, use the in-app editors instead.
+  would orphan continuity, use the in-app editors instead. For the bible collection, "has rows" means *authored* documents only: project creation seeds contentless
+  `<section>/default` placeholders (`contentHash` null), and only importable sections count — a fresh project imports cleanly without `overwrite`.
 - `approve: true` runs inside the same transaction after the upserts: the §4 approval pass. The generation precheck (approved volumes; approved covering arcs where a volume
   has arcs; briefs present) passes immediately afterwards.
 
@@ -63,7 +64,8 @@ One transaction over raw drizzle (domain services own their own connections and 
   `endingContract` and clear `staleReason`.
 - **overwrite prune** — for each collection the bundle carries, existing project rows whose natural key is absent from the bundle are deleted (entity deletes cascade their
   gallery/aliases/relationships). Without pruning, leftover volumes from a prior import would silently corrupt the cumulative chapter mapping. Collections the bundle omits
-  are untouched.
+  are untouched, and bible pruning only ever removes authored docs in importable sections — never the seeded `<section>/default` placeholders nor app-managed sections
+  (`story_state`, `ai`).
 - **approval pass** (`approve: true`) — `approveVolumePlan` (signature widened to accept the transaction handle) lays out chapter ranges and approves volumes; then every
   bundle volume that carries arcs gets its arcs flipped to `approved` with `staleReason` cleared — coverage was already proven statically in §3, and `assertWithinVolume`
   holds by construction.
