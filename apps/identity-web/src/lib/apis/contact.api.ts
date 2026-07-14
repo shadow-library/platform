@@ -1,13 +1,15 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, type ApiError } from './api-request';
+import { type ApiError, call } from './api-request';
 import { type AddContactResponse, type ContactItemDto, type ContactListResponse } from './api-types.gen';
+import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -33,18 +35,34 @@ export const contactKeys = {
 
 /* ---------- emails ---------- */
 
+const fetchEmails = createServerFn({ method: 'GET' }).handler(() => serverFetch<ContactListResponse>({ method: 'GET', path: '/me/emails' }));
+const addEmail = createServerFn({ method: 'POST' })
+  .validator((email: string) => email)
+  .handler(({ data }) => serverFetch<AddContactResult>({ method: 'POST', path: '/me/emails', body: { email: data } }));
+const verifyEmail = createServerFn({ method: 'POST' })
+  .validator((input: VerifyContactInput) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: '/me/emails/verify', body: data }));
+const setPrimaryEmail = createServerFn({ method: 'POST' })
+  .validator((email: string) => email)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: '/me/emails/primary', body: { email: data } }));
+const removeEmail = createServerFn({ method: 'POST' })
+  .validator((email: string) => email)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: '/me/emails', body: { email: data } }));
+
+export const emailsQueryOptions = () => queryOptions<ContactListResponse, ApiError>({ queryKey: contactKeys.emails, queryFn: () => call(fetchEmails()) });
+
 export function useEmailsQuery(): UseQueryResult<ContactListResponse, ApiError> {
-  return useQuery<ContactListResponse, ApiError>({ queryKey: contactKeys.emails, queryFn: () => APIRequest.get('/me/emails').execute() });
+  return useQuery(emailsQueryOptions());
 }
 
 export function useAddEmailMutation(): UseMutationResult<AddContactResult, ApiError, string> {
-  return useMutation<AddContactResult, ApiError, string>({ mutationFn: email => APIRequest.post('/me/emails').body({ email }).execute() });
+  return useMutation<AddContactResult, ApiError, string>({ mutationFn: email => call(addEmail({ data: email })) });
 }
 
 export function useVerifyEmailMutation(): UseMutationResult<undefined, ApiError, VerifyContactInput> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, VerifyContactInput>({
-    mutationFn: input => APIRequest.post('/me/emails/verify').body(input).execute(),
+    mutationFn: input => call(verifyEmail({ data: input })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.emails }),
   });
 }
@@ -52,7 +70,7 @@ export function useVerifyEmailMutation(): UseMutationResult<undefined, ApiError,
 export function useSetPrimaryEmailMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: email => APIRequest.post('/me/emails/primary').body({ email }).execute(),
+    mutationFn: email => call(setPrimaryEmail({ data: email })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.emails }),
   });
 }
@@ -60,25 +78,41 @@ export function useSetPrimaryEmailMutation(): UseMutationResult<undefined, ApiEr
 export function useRemoveEmailMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: email => APIRequest.delete('/me/emails').body({ email }).execute(),
+    mutationFn: email => call(removeEmail({ data: email })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.emails }),
   });
 }
 
 /* ---------- phones ---------- */
 
+const fetchPhones = createServerFn({ method: 'GET' }).handler(() => serverFetch<ContactListResponse>({ method: 'GET', path: '/me/phones' }));
+const addPhone = createServerFn({ method: 'POST' })
+  .validator((phone: string) => phone)
+  .handler(({ data }) => serverFetch<AddContactResult>({ method: 'POST', path: '/me/phones', body: { phone: data } }));
+const verifyPhone = createServerFn({ method: 'POST' })
+  .validator((input: VerifyContactInput) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: '/me/phones/verify', body: data }));
+const setPrimaryPhone = createServerFn({ method: 'POST' })
+  .validator((phone: string) => phone)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: '/me/phones/primary', body: { phone: data } }));
+const removePhone = createServerFn({ method: 'POST' })
+  .validator((phone: string) => phone)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: '/me/phones', body: { phone: data } }));
+
+export const phonesQueryOptions = () => queryOptions<ContactListResponse, ApiError>({ queryKey: contactKeys.phones, queryFn: () => call(fetchPhones()) });
+
 export function usePhonesQuery(): UseQueryResult<ContactListResponse, ApiError> {
-  return useQuery<ContactListResponse, ApiError>({ queryKey: contactKeys.phones, queryFn: () => APIRequest.get('/me/phones').execute() });
+  return useQuery(phonesQueryOptions());
 }
 
 export function useAddPhoneMutation(): UseMutationResult<AddContactResult, ApiError, string> {
-  return useMutation<AddContactResult, ApiError, string>({ mutationFn: phone => APIRequest.post('/me/phones').body({ phone }).execute() });
+  return useMutation<AddContactResult, ApiError, string>({ mutationFn: phone => call(addPhone({ data: phone })) });
 }
 
 export function useVerifyPhoneMutation(): UseMutationResult<undefined, ApiError, VerifyContactInput> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, VerifyContactInput>({
-    mutationFn: input => APIRequest.post('/me/phones/verify').body(input).execute(),
+    mutationFn: input => call(verifyPhone({ data: input })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.phones }),
   });
 }
@@ -86,7 +120,7 @@ export function useVerifyPhoneMutation(): UseMutationResult<undefined, ApiError,
 export function useSetPrimaryPhoneMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: phone => APIRequest.post('/me/phones/primary').body({ phone }).execute(),
+    mutationFn: phone => call(setPrimaryPhone({ data: phone })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.phones }),
   });
 }
@@ -94,7 +128,7 @@ export function useSetPrimaryPhoneMutation(): UseMutationResult<undefined, ApiEr
 export function useRemovePhoneMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: phone => APIRequest.delete('/me/phones').body({ phone }).execute(),
+    mutationFn: phone => call(removePhone({ data: phone })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: contactKeys.phones }),
   });
 }

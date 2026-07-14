@@ -52,4 +52,12 @@ export default defineConfig([
       'sort-imports': ['error', { ignoreDeclarationSort: true, allowSeparatedGroups: true }],
     },
   },
+  {
+    // `queryOptions(...)` factories and `getRouter` return complex, brand-carrying inferred types: the
+    // `DataTag` on a queryOptions result is what lets route loaders infer `ensureQueryData`'s type, and
+    // `getRouter`'s type feeds `Register` via `ReturnType<typeof getRouter>`. Hand-annotating either is
+    // impractical and would erase that inference, so the boundary-types rule is scoped off for them.
+    files: ['src/lib/apis/**/*.ts', 'src/router.tsx'],
+    rules: { '@typescript-eslint/explicit-module-boundary-types': 'off' },
+  },
 ]);

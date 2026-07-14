@@ -7,9 +7,11 @@ import { Outlet, createFileRoute } from '@tanstack/react-router';
  * Importing user defined modules
  */
 import { OrgWorkspace } from '@/features/portal';
+import { organisationQueryOptions } from '@/lib/apis';
 
 /** The single-organisation workspace layout (settings / members / domains / identity providers). */
 export const Route = createFileRoute('/_portal/organizations/$orgId')({
+  loader: ({ context, params }) => context.queryClient.ensureQueryData(organisationQueryOptions(params.orgId)),
   component: OrgLayout,
 });
 

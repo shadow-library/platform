@@ -10,12 +10,13 @@ import { createFileRoute } from '@tanstack/react-router';
 import { MonitorIcon, SmartphoneIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { type SessionItem, useRevokeOtherSessionsMutation, useRevokeSessionMutation, useSessionsQuery } from '@/lib/apis';
+import { type SessionItem, sessionsQueryOptions, useRevokeOtherSessionsMutation, useRevokeSessionMutation, useSessionsQuery } from '@/lib/apis';
 import { countryFlag, deviceSummary, relativeTime } from '@/lib/format';
 
 import styles from './sessions.module.css';
 
 export const Route = createFileRoute('/_portal/account/sessions')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(sessionsQueryOptions()),
   component: SessionsPage,
 });
 

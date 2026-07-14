@@ -14,6 +14,8 @@ import {
   type InvitableRole,
   type MemberItem,
   type MemberRole,
+  invitationsQueryOptions,
+  membersQueryOptions,
   useInvitationsQuery,
   useInviteMemberMutation,
   useMeQuery,
@@ -27,6 +29,8 @@ import { formatDate, relativeTime } from '@/lib/format';
 import styles from './members.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/members')({
+  loader: ({ context, params }) =>
+    Promise.all([context.queryClient.ensureQueryData(membersQueryOptions(params.orgId)), context.queryClient.ensureQueryData(invitationsQueryOptions(params.orgId))]),
   component: MembersPage,
 });
 

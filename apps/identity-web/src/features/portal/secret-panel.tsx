@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Button, Checkbox } from '@shadow-library/ui';
+import { Button, Checkbox, copyText, downloadTextFile } from '@shadow-library/ui';
 import { type ReactNode, useState } from 'react';
 
 /**
@@ -9,7 +9,6 @@ import { type ReactNode, useState } from 'react';
  */
 import { AlertTriangleIcon, CopyIcon, DownloadIcon } from '@/components/icons';
 import { CopyButton } from '@/components/si';
-import { copyText, downloadTextFile } from '@/lib/utils';
 
 import styles from './portal.module.css';
 

@@ -1,14 +1,18 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, type ApiError } from './api-request';
+import { type JsonObject } from '@/types';
+
+import { type ApiError, call } from './api-request';
 import { type MfaEnrollmentItem, type MfaEnrollmentsResponse, type StepUpResponse, type TotpActivateResponse, type TotpEnrollResponse } from './api-types.gen';
 import { meKeys } from './me.api';
+import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -21,9 +25,15 @@ export type TotpActivation = TotpActivateResponse;
 export type StepUpState = StepUpResponse;
 export type { MfaEnrollmentsResponse };
 
-/** The W3C credential-creation / assertion option blobs and the browser's attestation are opaque here. */
-export type WebauthnOptions = Record<string, unknown>;
-export type WebauthnAttestation = Record<string, unknown>;
+/** The W3C credential-creation / assertion option blobs and the browser's attestation are opaque JSON — typed as
+ * `JsonObject` (not `Record<string, unknown>`) so they satisfy the server-function serializability constraint. */
+export type WebauthnOptions = JsonObject;
+export type WebauthnAttestation = JsonObject;
+
+export interface WebauthnRegisterInput {
+  attestation: WebauthnAttestation;
+  label?: string;
+}
 
 /**
  * Declaring the constants
@@ -32,17 +42,40 @@ export const mfaKeys = {
   all: ['mfa'] as const,
 };
 
-export function useMfaQuery(): UseQueryResult<MfaEnrollmentsResponse, ApiError> {
-  return useQuery<MfaEnrollmentsResponse, ApiError>({
+const fetchEnrollments = createServerFn({ method: 'GET' }).handler(() => serverFetch<MfaEnrollmentsResponse>({ method: 'GET', path: '/me/mfa' }));
+const totpEnroll = createServerFn({ method: 'POST' }).handler(() => serverFetch<TotpEnrollment>({ method: 'POST', path: '/me/mfa/totp/enroll', body: {} }));
+const totpActivate = createServerFn({ method: 'POST' })
+  .validator((code: string) => code)
+  .handler(({ data }) => serverFetch<TotpActivation>({ method: 'POST', path: '/me/mfa/totp/activate', body: { code: data } }));
+const removeTotp = createServerFn({ method: 'POST' }).handler(() => serverFetch<undefined>({ method: 'DELETE', path: '/me/mfa/totp' }));
+const stepUp = createServerFn({ method: 'POST' })
+  .validator((code: string) => code)
+  .handler(({ data }) => serverFetch<StepUpState>({ method: 'POST', path: '/me/mfa/step-up', body: { code: data } }));
+const regenerateRecoveryCodes = createServerFn({ method: 'POST' }).handler(() =>
+  serverFetch<{ recoveryCodes: string[] }>({ method: 'POST', path: '/me/mfa/recovery-codes', body: {} }),
+);
+const webauthnRegisterOptions = createServerFn({ method: 'POST' }).handler(() => serverFetch<WebauthnOptions>({ method: 'POST', path: '/me/webauthn/register/options', body: {} }));
+const webauthnRegisterVerify = createServerFn({ method: 'POST' })
+  .validator((input: WebauthnRegisterInput) => input)
+  .handler(({ data }) => serverFetch<TotpActivation>({ method: 'POST', path: '/me/webauthn/register/verify', body: { ...data.attestation, label: data.label } }));
+const removePasskey = createServerFn({ method: 'POST' })
+  .validator((credentialId: string) => credentialId)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/me/webauthn/${encodeURIComponent(data)}` }));
+
+export const mfaQueryOptions = () =>
+  queryOptions<MfaEnrollmentsResponse, ApiError>({
     queryKey: mfaKeys.all,
-    queryFn: () => APIRequest.get('/me/mfa').execute(),
+    queryFn: () => call(fetchEnrollments()),
   });
+
+export function useMfaQuery(): UseQueryResult<MfaEnrollmentsResponse, ApiError> {
+  return useQuery(mfaQueryOptions());
 }
 
 /** Begin TOTP enrollment — returns the seed + otpauth URI to show once. */
 export function useTotpEnrollMutation(): UseMutationResult<TotpEnrollment, ApiError, undefined> {
   return useMutation<TotpEnrollment, ApiError, undefined>({
-    mutationFn: () => APIRequest.post('/me/mfa/totp/enroll').body({}).execute(),
+    mutationFn: () => call(totpEnroll()),
   });
 }
 
@@ -50,7 +83,7 @@ export function useTotpEnrollMutation(): UseMutationResult<TotpEnrollment, ApiEr
 export function useTotpActivateMutation(): UseMutationResult<TotpActivation, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<TotpActivation, ApiError, string>({
-    mutationFn: code => APIRequest.post('/me/mfa/totp/activate').body({ code }).execute(),
+    mutationFn: code => call(totpActivate({ data: code })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: mfaKeys.all });
       queryClient.invalidateQueries({ queryKey: meKeys.all });
@@ -61,7 +94,7 @@ export function useTotpActivateMutation(): UseMutationResult<TotpActivation, Api
 export function useRemoveTotpMutation(): UseMutationResult<undefined, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, undefined>({
-    mutationFn: () => APIRequest.delete('/me/mfa/totp').execute(),
+    mutationFn: () => call(removeTotp()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: mfaKeys.all }),
   });
 }
@@ -70,7 +103,7 @@ export function useRemoveTotpMutation(): UseMutationResult<undefined, ApiError, 
 export function useStepUpMutation(): UseMutationResult<StepUpState, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<StepUpState, ApiError, string>({
-    mutationFn: code => APIRequest.post('/me/mfa/step-up').body({ code }).execute(),
+    mutationFn: code => call(stepUp({ data: code })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: meKeys.all }),
   });
 }
@@ -78,30 +111,22 @@ export function useStepUpMutation(): UseMutationResult<StepUpState, ApiError, st
 /** Regenerate the recovery-code batch (step-up required); the previous batch is retired atomically. */
 export function useRegenerateRecoveryCodesMutation(): UseMutationResult<{ recoveryCodes: string[] }, ApiError, undefined> {
   return useMutation<{ recoveryCodes: string[] }, ApiError, undefined>({
-    mutationFn: () => APIRequest.post('/me/mfa/recovery-codes').body({}).execute(),
+    mutationFn: () => call(regenerateRecoveryCodes()),
   });
 }
 
 /** Fetch WebAuthn registration options for enrolling a passkey. */
 export function useWebauthnRegisterOptionsMutation(): UseMutationResult<WebauthnOptions, ApiError, undefined> {
   return useMutation<WebauthnOptions, ApiError, undefined>({
-    mutationFn: () => APIRequest.post('/me/webauthn/register/options').body({}).execute(),
+    mutationFn: () => call(webauthnRegisterOptions()),
   });
-}
-
-export interface WebauthnRegisterInput {
-  attestation: WebauthnAttestation;
-  label?: string;
 }
 
 /** Complete passkey registration; the first factor returns the recovery-code batch. */
 export function useWebauthnRegisterVerifyMutation(): UseMutationResult<TotpActivation, ApiError, WebauthnRegisterInput> {
   const queryClient = useQueryClient();
   return useMutation<TotpActivation, ApiError, WebauthnRegisterInput>({
-    mutationFn: ({ attestation, label }) =>
-      APIRequest.post('/me/webauthn/register/verify')
-        .body({ ...attestation, label })
-        .execute(),
+    mutationFn: input => call(webauthnRegisterVerify({ data: input })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: mfaKeys.all }),
   });
 }
@@ -109,7 +134,7 @@ export function useWebauthnRegisterVerifyMutation(): UseMutationResult<TotpActiv
 export function useRemovePasskeyMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: credentialId => APIRequest.delete(`/me/webauthn/${encodeURIComponent(credentialId)}`).execute(),
+    mutationFn: credentialId => call(removePasskey({ data: credentialId })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: mfaKeys.all }),
   });
 }

@@ -1,12 +1,13 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, type ApiError } from './api-request';
+import { type ApiError, call } from './api-request';
 import {
   type ClientDetailResponse,
   type ClientListResponse,
@@ -16,6 +17,7 @@ import {
   type RotateSecretResponse,
   type UpdateClientBody,
 } from './api-types.gen';
+import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -34,22 +36,53 @@ export const adminClientKeys = {
   detail: (clientId: string) => [...adminClientKeys.all, clientId] as const,
 };
 
+/* ---------- server functions ---------- */
+
+const fetchClients = createServerFn({ method: 'GET' }).handler(() => serverFetch<ClientListResponse>({ method: 'GET', path: '/admin/clients' }));
+const fetchClient = createServerFn({ method: 'GET' })
+  .validator((clientId: string) => clientId)
+  .handler(({ data }) => serverFetch<ClientDetailResponse>({ method: 'GET', path: `/admin/clients/${data}` }));
+const registerClient = createServerFn({ method: 'POST' })
+  .validator((body: RegisterClientBody) => body)
+  .handler(({ data }) => serverFetch<RegisterClientResponse>({ method: 'POST', path: '/admin/clients', body: data }));
+const updateClient = createServerFn({ method: 'POST' })
+  .validator((input: { clientId: string; body: UpdateClientBody }) => input)
+  .handler(({ data }) => serverFetch<ClientDetailResponse>({ method: 'PATCH', path: `/admin/clients/${data.clientId}`, body: data.body }));
+const rotateClientSecret = createServerFn({ method: 'POST' })
+  .validator((clientId: string) => clientId)
+  .handler(({ data }) => serverFetch<RotateSecretResponse>({ method: 'POST', path: `/admin/clients/${data}/rotate-secret`, body: {} }));
+const grantClientScope = createServerFn({ method: 'POST' })
+  .validator((input: { clientId: string; scopeId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: `/admin/clients/${data.clientId}/scopes`, body: { scopeId: data.scopeId } }));
+const revokeClientScope = createServerFn({ method: 'POST' })
+  .validator((input: { clientId: string; scopeId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/clients/${data.clientId}/scopes/${data.scopeId}` }));
+
+/* ---------- queries ---------- */
+
+export const adminClientsQueryOptions = () => queryOptions<ClientListResponse, ApiError>({ queryKey: adminClientKeys.list(), queryFn: () => call(fetchClients()) });
+
 export function useClientsQuery(): UseQueryResult<ClientListResponse, ApiError> {
-  return useQuery<ClientListResponse, ApiError>({ queryKey: adminClientKeys.list(), queryFn: () => APIRequest.get('/admin/clients').execute() });
+  return useQuery(adminClientsQueryOptions());
 }
 
-export function useClientQuery(clientId: string, enabled = true): UseQueryResult<ClientDetailResponse, ApiError> {
-  return useQuery<ClientDetailResponse, ApiError>({
+export const adminClientQueryOptions = (clientId: string, enabled = true) =>
+  queryOptions<ClientDetailResponse, ApiError>({
     queryKey: adminClientKeys.detail(clientId),
-    queryFn: () => APIRequest.get(`/admin/clients/${clientId}`).execute(),
+    queryFn: () => call(fetchClient({ data: clientId })),
     enabled: enabled && Boolean(clientId),
   });
+
+export function useClientQuery(clientId: string, enabled = true): UseQueryResult<ClientDetailResponse, ApiError> {
+  return useQuery(adminClientQueryOptions(clientId, enabled));
 }
+
+/* ---------- mutations ---------- */
 
 export function useRegisterClientMutation(): UseMutationResult<RegisterClientResponse, ApiError, RegisterClientBody> {
   const queryClient = useQueryClient();
   return useMutation<RegisterClientResponse, ApiError, RegisterClientBody>({
-    mutationFn: body => APIRequest.post('/admin/clients').body(body).execute(),
+    mutationFn: body => call(registerClient({ data: body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminClientKeys.list() }),
   });
 }
@@ -57,7 +90,7 @@ export function useRegisterClientMutation(): UseMutationResult<RegisterClientRes
 export function useUpdateClientMutation(): UseMutationResult<ClientDetailResponse, ApiError, { clientId: string; body: UpdateClientBody }> {
   const queryClient = useQueryClient();
   return useMutation<ClientDetailResponse, ApiError, { clientId: string; body: UpdateClientBody }>({
-    mutationFn: ({ clientId, body }) => APIRequest.patch(`/admin/clients/${clientId}`).body(body).execute(),
+    mutationFn: input => call(updateClient({ data: input })),
     onSuccess: (_data, { clientId }) => {
       queryClient.invalidateQueries({ queryKey: adminClientKeys.list() });
       queryClient.invalidateQueries({ queryKey: adminClientKeys.detail(clientId) });
@@ -66,13 +99,13 @@ export function useUpdateClientMutation(): UseMutationResult<ClientDetailRespons
 }
 
 export function useRotateClientSecretMutation(): UseMutationResult<RotateSecretResponse, ApiError, string> {
-  return useMutation<RotateSecretResponse, ApiError, string>({ mutationFn: clientId => APIRequest.post(`/admin/clients/${clientId}/rotate-secret`).body({}).execute() });
+  return useMutation<RotateSecretResponse, ApiError, string>({ mutationFn: clientId => call(rotateClientSecret({ data: clientId })) });
 }
 
 export function useGrantClientScopeMutation(): UseMutationResult<undefined, ApiError, { clientId: string; scopeId: string }> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, { clientId: string; scopeId: string }>({
-    mutationFn: ({ clientId, scopeId }) => APIRequest.post(`/admin/clients/${clientId}/scopes`).body({ scopeId }).execute(),
+    mutationFn: input => call(grantClientScope({ data: input })),
     onSuccess: (_data, { clientId }) => queryClient.invalidateQueries({ queryKey: adminClientKeys.detail(clientId) }),
   });
 }
@@ -80,7 +113,7 @@ export function useGrantClientScopeMutation(): UseMutationResult<undefined, ApiE
 export function useRevokeClientScopeMutation(): UseMutationResult<undefined, ApiError, { clientId: string; scopeId: string }> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, { clientId: string; scopeId: string }>({
-    mutationFn: ({ clientId, scopeId }) => APIRequest.delete(`/admin/clients/${clientId}/scopes/${scopeId}`).execute(),
+    mutationFn: input => call(revokeClientScope({ data: input })),
     onSuccess: (_data, { clientId }) => queryClient.invalidateQueries({ queryKey: adminClientKeys.detail(clientId) }),
   });
 }

@@ -12,11 +12,20 @@ import { MoreIcon, PlusIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import { useStepUpGate } from '@/features/portal';
-import { type ClientKind, useApplicationsQuery, useClientsQuery, useRegisterClientMutation, useRotateClientSecretMutation } from '@/lib/apis';
+import {
+  type ClientKind,
+  adminApplicationsQueryOptions,
+  adminClientsQueryOptions,
+  useApplicationsQuery,
+  useClientsQuery,
+  useRegisterClientMutation,
+  useRotateClientSecretMutation,
+} from '@/lib/apis';
 
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/clients')({
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(adminApplicationsQueryOptions()), context.queryClient.ensureQueryData(adminClientsQueryOptions())]),
   component: ClientsPage,
 });
 

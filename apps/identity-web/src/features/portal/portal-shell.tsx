@@ -1,14 +1,13 @@
 /**
  * Importing npm packages
  */
-import { Avatar, DropdownMenu, IconButton, Spinner } from '@shadow-library/ui';
+import { Avatar, DropdownMenu, IconButton, Spinner, useTheme } from '@shadow-library/ui';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
 
 /**
  * Importing user defined packages
  */
-import { useTheme } from '@/components/AppProvider';
 import { BellIcon, BuildingIcon, ChevronDownIcon, GridIcon, LogOutIcon, MailIcon, MonitorIcon, MoonIcon, PlugIcon, ShieldCheckIcon, SunIcon, UserIcon } from '@/components/icons';
 import { type MeResponse, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';

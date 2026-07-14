@@ -13,6 +13,8 @@ import { StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
   type UpdateApplicationBody,
+  adminApplicationMembersQueryOptions,
+  adminApplicationQueryOptions,
   useApplicationMembersQuery,
   useApplicationQuery,
   useCreateRoleMutation,
@@ -25,6 +27,11 @@ import { formatDate, relativeTime } from '@/lib/format';
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/applications/$appId')({
+  loader: ({ context, params }) =>
+    Promise.all([
+      context.queryClient.ensureQueryData(adminApplicationQueryOptions(params.appId)),
+      context.queryClient.ensureQueryData(adminApplicationMembersQueryOptions(params.appId)),
+    ]),
   component: ApplicationDetailPage,
 });
 

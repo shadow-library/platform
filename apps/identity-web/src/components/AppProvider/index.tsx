@@ -1,13 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Toaster, TooltipProvider } from '@shadow-library/ui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-
-/**
- *  Importing user defined modules
- */
-import ThemeProvider from './ThemeProvider';
+import { ThemeProvider, Toaster, TooltipProvider } from '@shadow-library/ui';
 
 /**
  * Declaring types
@@ -19,28 +13,17 @@ export interface AppProviderProps {
 
 /**
  * Declaring constants
+ *
+ * The QueryClient now lives in the router context (see `src/router.tsx`) and its provider is installed by
+ * the TanStack Start ↔ Query SSR integration, so this only mounts the design-system providers around the
+ * document body. `Toaster` self-gates hydration (its `useHydrated` guard renders null on the server and the
+ * first client render, then mounts the portal once React is live), so it needs no `ClientOnly` boundary.
  */
-export const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Identity data is session-scoped and changes rarely within a view; a short stale window keeps
-      // navigation snappy without serving stale security state after a mutation invalidates its keys.
-      staleTime: 30_000,
-      retry: 1,
-      refetchOnWindowFocus: false,
-    },
-  },
-});
-
 export default function AppProvider(props: AppProviderProps): React.JSX.Element {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider>
-        <TooltipProvider>{props.children}</TooltipProvider>
-        <Toaster placement="top-end" />
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider storageKey="shadow-identity-theme">
+      <TooltipProvider>{props.children}</TooltipProvider>
+      <Toaster placement="top-end" />
+    </ThemeProvider>
   );
 }
-
-export * from './ThemeProvider';

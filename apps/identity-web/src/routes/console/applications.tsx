@@ -11,12 +11,13 @@ import { useState } from 'react';
 import { PlusIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { useApplicationsQuery, useCreateApplicationMutation } from '@/lib/apis';
+import { adminApplicationsQueryOptions, useApplicationsQuery, useCreateApplicationMutation } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/applications')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
   component: ApplicationsPage,
 });
 

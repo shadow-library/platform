@@ -12,7 +12,7 @@ import { useEffect, useRef } from 'react';
 import { AlertTriangleIcon, BadgeCheckIcon, BuildingIcon, MailIcon, RefreshIcon, UserIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { type ConsentScope, authApi, useMeQuery, useSignoutMutation } from '@/lib/apis';
+import { type ConsentScope, authApi, consentPromptQueryOptions, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 /**
@@ -32,6 +32,11 @@ export const Route = createFileRoute('/_auth/consent')({
     redirectUri: typeof search.redirectUri === 'string' ? search.redirectUri : undefined,
     state: typeof search.state === 'string' ? search.state : undefined,
   }),
+  loaderDeps: ({ search }) => ({ clientId: search.clientId, scope: search.scope }),
+  loader: ({ context, deps }) => {
+    if (!deps.clientId || !deps.scope) return;
+    return context.queryClient.ensureQueryData(consentPromptQueryOptions(deps.clientId, deps.scope));
+  },
   component: ConsentPage,
 });
 
@@ -50,12 +55,7 @@ function ConsentPage(): React.JSX.Element {
   const signout = useSignoutMutation();
   const autoApproved = useRef(false);
 
-  const prompt = useQuery({
-    queryKey: ['consent', clientId, scope],
-    queryFn: () => authApi.consentPrompt(clientId ?? '', scope ?? ''),
-    retry: false,
-    enabled: Boolean(clientId && scope),
-  });
+  const prompt = useQuery(consentPromptQueryOptions(clientId ?? '', scope ?? ''));
 
   const decide = useMutation({
     mutationFn: (decision: 'APPROVE' | 'DENY') =>

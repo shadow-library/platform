@@ -10,11 +10,12 @@ import { useState } from 'react';
  */
 import { PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState } from '@/components/si';
-import { type MyOrganisation, useCreateOrganisationMutation, useLeaveOrganisationMutation, useMyOrganisationsQuery } from '@/lib/apis';
+import { type MyOrganisation, myOrganisationsQueryOptions, useCreateOrganisationMutation, useLeaveOrganisationMutation, useMyOrganisationsQuery } from '@/lib/apis';
 
 import styles from './index.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(myOrganisationsQueryOptions()),
   component: OrganizationsPage,
 });
 

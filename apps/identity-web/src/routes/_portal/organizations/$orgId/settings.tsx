@@ -10,12 +10,13 @@ import { useState } from 'react';
  */
 import { SectionCard } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { useDeleteOrganisationMutation, useMyOrganisationsQuery, useRenameOrganisationMutation } from '@/lib/apis';
+import { myOrganisationsQueryOptions, useDeleteOrganisationMutation, useMyOrganisationsQuery, useRenameOrganisationMutation } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './settings.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/settings')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(myOrganisationsQueryOptions()),
   component: SettingsPage,
 });
 

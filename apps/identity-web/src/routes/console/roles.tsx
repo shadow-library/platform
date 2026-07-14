@@ -11,11 +11,21 @@ import { useState } from 'react';
 import { PlusIcon, ShieldCheckIcon } from '@/components/icons';
 import { PageHeader } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { useApplicationQuery, useApplicationsQuery, useCreatePermissionMutation, useCreateRoleMutation, useGrantRolePermissionMutation, usePermissionsQuery } from '@/lib/apis';
+import {
+  adminApplicationsQueryOptions,
+  useApplicationQuery,
+  useApplicationsQuery,
+  useCreatePermissionMutation,
+  useCreateRoleMutation,
+  useGrantRolePermissionMutation,
+  usePermissionsQuery,
+} from '@/lib/apis';
 
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/roles')({
+  // The application list feeds the picker; permissions load once an application is chosen (client state).
+  loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
   component: RolesPage,
 });
 

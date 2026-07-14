@@ -1,4 +1,4 @@
-.notFound {
+.wrap {
   min-height: 100vh;
   display: flex;
   flex-direction: column;
@@ -9,7 +9,7 @@
   text-align: center;
 }
 
-.notFoundMark {
+.mark {
   width: 52px;
   height: 52px;
   border-radius: 14px;
@@ -20,16 +20,28 @@
   justify-content: center;
 }
 
-.notFoundTitle {
+.markDanger {
+  background: var(--sh-danger-soft, var(--sh-accent-soft));
+  color: var(--sh-danger, var(--sh-accent));
+}
+
+.title {
   margin: 6px 0 0;
   font-size: var(--sh-text-h1);
   font-weight: 700;
   letter-spacing: -0.02em;
 }
 
-.notFoundText {
+.text {
   margin: 0 0 6px;
   font-size: var(--sh-text-body);
   color: var(--sh-text-secondary);
   max-width: 420px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
 }

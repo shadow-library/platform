@@ -20,12 +20,14 @@ import {
   useRotateWebhookSecretMutation,
   useWebhookDeliveriesQuery,
   useWebhooksQuery,
+  webhooksQueryOptions,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/webhooks')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(webhooksQueryOptions()),
   component: WebhooksPage,
 });
 

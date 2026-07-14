@@ -11,12 +11,13 @@ import { useState } from 'react';
 import { PlusIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { type DomainStatus, useDomainsQuery, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';
+import { type DomainStatus, domainsQueryOptions, useDomainsQuery, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './domains.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/domains')({
+  loader: ({ context, params }) => context.queryClient.ensureQueryData(domainsQueryOptions(params.orgId)),
   component: DomainsPage,
 });
 

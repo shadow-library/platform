@@ -14,6 +14,7 @@ import { useStepUpGate } from '@/features/portal';
 import {
   type SamlNameIdFormat,
   type ServiceProviderItem,
+  serviceProvidersQueryOptions,
   useCreateServiceProviderMutation,
   useDeleteServiceProviderMutation,
   useServiceProvidersQuery,
@@ -23,6 +24,7 @@ import {
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/saml')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(serviceProvidersQueryOptions()),
   component: SamlPage,
 });
 

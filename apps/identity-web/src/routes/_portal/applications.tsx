@@ -9,12 +9,13 @@ import { createFileRoute } from '@tanstack/react-router';
  */
 import { ExternalLinkIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
-import { type MyApplication, useMyApplicationsQuery } from '@/lib/apis';
+import { type MyApplication, myApplicationsQueryOptions, useMyApplicationsQuery } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './applications.module.css';
 
 export const Route = createFileRoute('/_portal/applications')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(myApplicationsQueryOptions()),
   component: ApplicationsPage,
 });
 

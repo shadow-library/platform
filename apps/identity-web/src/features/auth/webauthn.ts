@@ -6,18 +6,20 @@ import { startAuthentication, startRegistration } from '@simplewebauthn/browser'
 /**
  * Importing user defined packages
  */
+import { type JsonObject } from '@/types';
 
 /**
  * Defining types
  *
  * The server speaks @simplewebauthn's JSON wire format (base64url throughout), so the matching browser
  * package handles all encoding; these wrappers only pin the option shapes and surface cancellation as
- * a typed outcome instead of an exception.
+ * a typed outcome instead of an exception. The blobs are opaque JSON (`JsonObject`) so they round-trip
+ * through the server functions that mint and verify them.
  */
 
-type PublicKeyOptions = Record<string, unknown>;
+type PublicKeyOptions = JsonObject;
 
-export type CeremonyResult = { outcome: 'COMPLETED'; response: Record<string, unknown> } | { outcome: 'CANCELLED' } | { outcome: 'UNSUPPORTED' };
+export type CeremonyResult = { outcome: 'COMPLETED'; response: JsonObject } | { outcome: 'CANCELLED' } | { outcome: 'UNSUPPORTED' };
 
 /**
  * Declaring the constants
@@ -34,7 +36,7 @@ export async function registerPasskey(options: PublicKeyOptions): Promise<Ceremo
   if (!isWebauthnSupported()) return { outcome: 'UNSUPPORTED' };
   try {
     const response = await startRegistration({ optionsJSON: options as never });
-    return { outcome: 'COMPLETED', response: response as unknown as Record<string, unknown> };
+    return { outcome: 'COMPLETED', response: response as unknown as JsonObject };
   } catch (error) {
     if (isAbort(error)) return { outcome: 'CANCELLED' };
     throw error;
@@ -46,7 +48,7 @@ export async function assertPasskey(options: PublicKeyOptions): Promise<Ceremony
   if (!isWebauthnSupported()) return { outcome: 'UNSUPPORTED' };
   try {
     const response = await startAuthentication({ optionsJSON: options as never });
-    return { outcome: 'COMPLETED', response: response as unknown as Record<string, unknown> };
+    return { outcome: 'COMPLETED', response: response as unknown as JsonObject };
   } catch (error) {
     if (isAbort(error)) return { outcome: 'CANCELLED' };
     throw error;

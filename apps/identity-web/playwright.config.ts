@@ -22,8 +22,8 @@ export default defineConfig({
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
-  // Reuses the running dev server (which proxies /api to the identity backend on :8080); starts one
-  // otherwise. The live-flow test needs the backend up for the login/init round-trip.
+  // Reuses a running dev server, or starts one. Start server functions reach the identity backend at
+  // SERVER_URL (default http://localhost:9091) server-side; the live-flow test needs that backend up.
   webServer: {
     command: 'bun dev',
     url: 'http://localhost:3000',

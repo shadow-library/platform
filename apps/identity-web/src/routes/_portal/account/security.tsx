@@ -15,6 +15,7 @@ import { registerPasskey } from '@/features/auth';
 import { SecretOncePanel, useStepUpGate } from '@/features/portal';
 import {
   type TotpEnrollment,
+  mfaQueryOptions,
   useMfaQuery,
   useRegenerateRecoveryCodesMutation,
   useRemovePasskeyMutation,
@@ -29,6 +30,7 @@ import { deviceSummary, relativeTime } from '@/lib/format';
 import styles from './security.module.css';
 
 export const Route = createFileRoute('/_portal/account/security')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(mfaQueryOptions()),
   component: SecurityPage,
 });
 

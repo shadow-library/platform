@@ -10,7 +10,7 @@ import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
 import { CheckIcon, MailIcon, MinusIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { useAcceptInvitationMutation, useDeclineInvitationMutation, useMeQuery } from '@/lib/apis';
+import { meQueryOptions, useAcceptInvitationMutation, useDeclineInvitationMutation, useMeQuery } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 /**
@@ -19,6 +19,15 @@ import { displayName } from '@/lib/format';
  * the page adapts purely to whether a session exists for the invited address.
  */
 export const Route = createFileRoute('/invite/$token')({
+  // Prefetch the session so the invite SSRs its signed-in / signed-out branch directly; a missing session
+  // is a valid state here (the recipient signs in first), so a 401 is swallowed rather than redirected.
+  loader: async ({ context }) => {
+    try {
+      await context.queryClient.ensureQueryData(meQueryOptions());
+    } catch {
+      /* signed-out invite landing is expected */
+    }
+  },
   component: InvitePage,
 });
 

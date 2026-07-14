@@ -13,6 +13,8 @@ import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import {
   type ApiError,
   type ContactItem,
+  emailsQueryOptions,
+  phonesQueryOptions,
   useAddEmailMutation,
   useAddPhoneMutation,
   useEmailsQuery,
@@ -28,6 +30,7 @@ import {
 import styles from './contacts.module.css';
 
 export const Route = createFileRoute('/_portal/account/contacts')({
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(emailsQueryOptions()), context.queryClient.ensureQueryData(phonesQueryOptions())]),
   component: ContactsPage,
 });
 

@@ -5,11 +5,10 @@
  * card, and a query gate — so each screen speaks the same visual language. Interactive components
  * (Dialog, Badge, DescriptionList, …) come straight from `@shadow-library/ui`; these only compose them.
  */
-import { Alert, Badge, type BadgeIntent, EmptyState, IconButton, Spinner } from '@shadow-library/ui';
+import { Alert, Badge, type BadgeIntent, EmptyState, IconButton, Spinner, copyText, toast } from '@shadow-library/ui';
 import { type ReactElement, type ReactNode } from 'react';
 
 import { type ApiError } from '@/lib/apis';
-import { copyText } from '@/lib/utils';
 
 import { CopyIcon } from '../icons';
 import styles from './si.module.css';
@@ -146,7 +145,6 @@ export function CopyButton({ value, label = 'Copy' }: CopyButtonProps): ReactEle
       icon={<CopyIcon size={15} />}
       onClick={async () => {
         const ok = await copyText(value);
-        const { toast } = await import('@shadow-library/ui');
         if (ok) toast.success('Copied to clipboard');
         else toast.danger('Couldn’t copy');
       }}

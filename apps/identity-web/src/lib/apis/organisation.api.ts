@@ -1,12 +1,13 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, type ApiError } from './api-request';
+import { type ApiError, call } from './api-request';
 import {
   type CreateIdentityProviderBody,
   type CreateOrganisationBody,
@@ -24,6 +25,7 @@ import {
   type OrganisationResponse,
   type UpdateIdentityProviderBody,
 } from './api-types.gen';
+import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -65,24 +67,101 @@ export const orgKeys = {
   idps: (id: string) => [...orgKeys.all, id, 'identity-providers'] as const,
 };
 
+/* ---------- server functions ---------- */
+
+const fetchMyOrgs = createServerFn({ method: 'GET' }).handler(() => serverFetch<MyOrganisationsResponse>({ method: 'GET', path: '/me/organisations' }));
+const fetchOrg = createServerFn({ method: 'GET' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<OrganisationResponse>({ method: 'GET', path: `/organisations/${data}` }));
+const fetchMembers = createServerFn({ method: 'GET' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<MembersResponse>({ method: 'GET', path: `/organisations/${data}/members` }));
+const fetchInvitations = createServerFn({ method: 'GET' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<InvitationsResponse>({ method: 'GET', path: `/organisations/${data}/invitations` }));
+const fetchDomains = createServerFn({ method: 'GET' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<DomainsResponse>({ method: 'GET', path: `/organisations/${data}/domains` }));
+const fetchIdps = createServerFn({ method: 'GET' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<IdentityProviderListResponse>({ method: 'GET', path: `/organisations/${data}/identity-providers` }));
+
+const createOrg = createServerFn({ method: 'POST' })
+  .validator((body: CreateOrganisationBody) => body)
+  .handler(({ data }) => serverFetch<OrganisationResponse>({ method: 'POST', path: '/organisations', body: data }));
+const renameOrg = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; name: string }) => input)
+  .handler(({ data }) => serverFetch<OrganisationResponse>({ method: 'PATCH', path: `/organisations/${data.orgId}`, body: { name: data.name } }));
+const deleteOrg = createServerFn({ method: 'POST' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data}` }));
+const leaveOrg = createServerFn({ method: 'POST' })
+  .validator((orgId: string) => orgId)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/me/organisations/${data}` }));
+
+const updateMemberRole = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; userId: string; role: MemberRole }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'PATCH', path: `/organisations/${data.orgId}/members/${data.userId}`, body: { role: data.role } }));
+const removeMember = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; userId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data.orgId}/members/${data.userId}` }));
+
+const inviteMember = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; body: InviteMemberBody }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: `/organisations/${data.orgId}/invitations`, body: data.body }));
+const revokeInvitation = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; invitationId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data.orgId}/invitations/${data.invitationId}` }));
+const acceptInvitation = createServerFn({ method: 'POST' })
+  .validator((token: string) => token)
+  .handler(({ data }) => serverFetch<OrganisationResponse>({ method: 'POST', path: '/me/invitations/accept', body: { token: data } }));
+const declineInvitation = createServerFn({ method: 'POST' })
+  .validator((token: string) => token)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: '/me/invitations/decline', body: { token: data } }));
+
+const registerDomain = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; domain: string }) => input)
+  .handler(({ data }) => serverFetch<DomainItem>({ method: 'POST', path: `/organisations/${data.orgId}/domains`, body: { domain: data.domain } }));
+const verifyDomain = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; domainId: string }) => input)
+  .handler(({ data }) => serverFetch<DomainItem>({ method: 'POST', path: `/organisations/${data.orgId}/domains/${data.domainId}/verify`, body: {} }));
+const removeDomain = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; domainId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data.orgId}/domains/${data.domainId}` }));
+
+const createIdp = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; body: CreateIdentityProviderBody }) => input)
+  .handler(({ data }) => serverFetch<IdentityProvider>({ method: 'POST', path: `/organisations/${data.orgId}/identity-providers`, body: data.body }));
+const updateIdp = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; idpId: string; body: UpdateIdentityProviderBody }) => input)
+  .handler(({ data }) => serverFetch<IdentityProvider>({ method: 'PATCH', path: `/organisations/${data.orgId}/identity-providers/${data.idpId}`, body: data.body }));
+const deleteIdp = createServerFn({ method: 'POST' })
+  .validator((input: { orgId: string; idpId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data.orgId}/identity-providers/${data.idpId}` }));
+
 /* ---------- my organisations ---------- */
 
+export const myOrganisationsQueryOptions = () => queryOptions<MyOrganisationsResponse, ApiError>({ queryKey: orgKeys.mine(), queryFn: () => call(fetchMyOrgs()) });
+
 export function useMyOrganisationsQuery(): UseQueryResult<MyOrganisationsResponse, ApiError> {
-  return useQuery<MyOrganisationsResponse, ApiError>({ queryKey: orgKeys.mine(), queryFn: () => APIRequest.get('/me/organisations').execute() });
+  return useQuery(myOrganisationsQueryOptions());
 }
 
-export function useOrganisationQuery(orgId: string, enabled = true): UseQueryResult<OrganisationResponse, ApiError> {
-  return useQuery<OrganisationResponse, ApiError>({
+export const organisationQueryOptions = (orgId: string, enabled = true) =>
+  queryOptions<OrganisationResponse, ApiError>({
     queryKey: orgKeys.detail(orgId),
-    queryFn: () => APIRequest.get(`/organisations/${orgId}`).execute(),
+    queryFn: () => call(fetchOrg({ data: orgId })),
     enabled: enabled && Boolean(orgId),
   });
+
+export function useOrganisationQuery(orgId: string, enabled = true): UseQueryResult<OrganisationResponse, ApiError> {
+  return useQuery(organisationQueryOptions(orgId, enabled));
 }
 
 export function useCreateOrganisationMutation(): UseMutationResult<OrganisationResponse, ApiError, CreateOrganisationBody> {
   const queryClient = useQueryClient();
   return useMutation<OrganisationResponse, ApiError, CreateOrganisationBody>({
-    mutationFn: body => APIRequest.post('/organisations').body(body).execute(),
+    mutationFn: body => call(createOrg({ data: body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.mine() }),
   });
 }
@@ -90,7 +169,7 @@ export function useCreateOrganisationMutation(): UseMutationResult<OrganisationR
 export function useRenameOrganisationMutation(orgId: string): UseMutationResult<OrganisationResponse, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<OrganisationResponse, ApiError, string>({
-    mutationFn: name => APIRequest.patch(`/organisations/${orgId}`).body({ name }).execute(),
+    mutationFn: name => call(renameOrg({ data: { orgId, name } })),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: orgKeys.detail(orgId) });
       queryClient.invalidateQueries({ queryKey: orgKeys.mine() });
@@ -101,7 +180,7 @@ export function useRenameOrganisationMutation(orgId: string): UseMutationResult<
 export function useDeleteOrganisationMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: orgId => APIRequest.delete(`/organisations/${orgId}`).execute(),
+    mutationFn: orgId => call(deleteOrg({ data: orgId })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.mine() }),
   });
 }
@@ -110,25 +189,28 @@ export function useDeleteOrganisationMutation(): UseMutationResult<undefined, Ap
 export function useLeaveOrganisationMutation(): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: orgId => APIRequest.delete(`/me/organisations/${orgId}`).execute(),
+    mutationFn: orgId => call(leaveOrg({ data: orgId })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.mine() }),
   });
 }
 
 /* ---------- members ---------- */
 
-export function useMembersQuery(orgId: string, enabled = true): UseQueryResult<MembersResponse, ApiError> {
-  return useQuery<MembersResponse, ApiError>({
+export const membersQueryOptions = (orgId: string, enabled = true) =>
+  queryOptions<MembersResponse, ApiError>({
     queryKey: orgKeys.members(orgId),
-    queryFn: () => APIRequest.get(`/organisations/${orgId}/members`).execute(),
+    queryFn: () => call(fetchMembers({ data: orgId })),
     enabled: enabled && Boolean(orgId),
   });
+
+export function useMembersQuery(orgId: string, enabled = true): UseQueryResult<MembersResponse, ApiError> {
+  return useQuery(membersQueryOptions(orgId, enabled));
 }
 
 export function useUpdateMemberRoleMutation(orgId: string): UseMutationResult<undefined, ApiError, { userId: string; role: MemberRole }> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, { userId: string; role: MemberRole }>({
-    mutationFn: ({ userId, role }) => APIRequest.patch(`/organisations/${orgId}/members/${userId}`).body({ role }).execute(),
+    mutationFn: ({ userId, role }) => call(updateMemberRole({ data: { orgId, userId, role } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.members(orgId) }),
   });
 }
@@ -136,25 +218,28 @@ export function useUpdateMemberRoleMutation(orgId: string): UseMutationResult<un
 export function useRemoveMemberMutation(orgId: string): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: userId => APIRequest.delete(`/organisations/${orgId}/members/${userId}`).execute(),
+    mutationFn: userId => call(removeMember({ data: { orgId, userId } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.members(orgId) }),
   });
 }
 
 /* ---------- invitations ---------- */
 
-export function useInvitationsQuery(orgId: string, enabled = true): UseQueryResult<InvitationsResponse, ApiError> {
-  return useQuery<InvitationsResponse, ApiError>({
+export const invitationsQueryOptions = (orgId: string, enabled = true) =>
+  queryOptions<InvitationsResponse, ApiError>({
     queryKey: orgKeys.invitations(orgId),
-    queryFn: () => APIRequest.get(`/organisations/${orgId}/invitations`).execute(),
+    queryFn: () => call(fetchInvitations({ data: orgId })),
     enabled: enabled && Boolean(orgId),
   });
+
+export function useInvitationsQuery(orgId: string, enabled = true): UseQueryResult<InvitationsResponse, ApiError> {
+  return useQuery(invitationsQueryOptions(orgId, enabled));
 }
 
 export function useInviteMemberMutation(orgId: string): UseMutationResult<undefined, ApiError, InviteMemberBody> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, InviteMemberBody>({
-    mutationFn: body => APIRequest.post(`/organisations/${orgId}/invitations`).body(body).execute(),
+    mutationFn: body => call(inviteMember({ data: { orgId, body } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.invitations(orgId) }),
   });
 }
@@ -162,7 +247,7 @@ export function useInviteMemberMutation(orgId: string): UseMutationResult<undefi
 export function useRevokeInvitationMutation(orgId: string): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: invitationId => APIRequest.delete(`/organisations/${orgId}/invitations/${invitationId}`).execute(),
+    mutationFn: invitationId => call(revokeInvitation({ data: { orgId, invitationId } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.invitations(orgId) }),
   });
 }
@@ -171,29 +256,32 @@ export function useRevokeInvitationMutation(orgId: string): UseMutationResult<un
 export function useAcceptInvitationMutation(): UseMutationResult<OrganisationResponse, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<OrganisationResponse, ApiError, string>({
-    mutationFn: token => APIRequest.post('/me/invitations/accept').body({ token }).execute(),
+    mutationFn: token => call(acceptInvitation({ data: token })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.mine() }),
   });
 }
 
 export function useDeclineInvitationMutation(): UseMutationResult<undefined, ApiError, string> {
-  return useMutation<undefined, ApiError, string>({ mutationFn: token => APIRequest.post('/me/invitations/decline').body({ token }).execute() });
+  return useMutation<undefined, ApiError, string>({ mutationFn: token => call(declineInvitation({ data: token })) });
 }
 
 /* ---------- domains ---------- */
 
-export function useDomainsQuery(orgId: string, enabled = true): UseQueryResult<DomainsResponse, ApiError> {
-  return useQuery<DomainsResponse, ApiError>({
+export const domainsQueryOptions = (orgId: string, enabled = true) =>
+  queryOptions<DomainsResponse, ApiError>({
     queryKey: orgKeys.domains(orgId),
-    queryFn: () => APIRequest.get(`/organisations/${orgId}/domains`).execute(),
+    queryFn: () => call(fetchDomains({ data: orgId })),
     enabled: enabled && Boolean(orgId),
   });
+
+export function useDomainsQuery(orgId: string, enabled = true): UseQueryResult<DomainsResponse, ApiError> {
+  return useQuery(domainsQueryOptions(orgId, enabled));
 }
 
 export function useRegisterDomainMutation(orgId: string): UseMutationResult<DomainItem, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<DomainItem, ApiError, string>({
-    mutationFn: domain => APIRequest.post(`/organisations/${orgId}/domains`).body({ domain }).execute(),
+    mutationFn: domain => call(registerDomain({ data: { orgId, domain } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.domains(orgId) }),
   });
 }
@@ -201,7 +289,7 @@ export function useRegisterDomainMutation(orgId: string): UseMutationResult<Doma
 export function useVerifyDomainMutation(orgId: string): UseMutationResult<DomainItem, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<DomainItem, ApiError, string>({
-    mutationFn: domainId => APIRequest.post(`/organisations/${orgId}/domains/${domainId}/verify`).body({}).execute(),
+    mutationFn: domainId => call(verifyDomain({ data: { orgId, domainId } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.domains(orgId) }),
   });
 }
@@ -209,25 +297,28 @@ export function useVerifyDomainMutation(orgId: string): UseMutationResult<Domain
 export function useRemoveDomainMutation(orgId: string): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: domainId => APIRequest.delete(`/organisations/${orgId}/domains/${domainId}`).execute(),
+    mutationFn: domainId => call(removeDomain({ data: { orgId, domainId } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.domains(orgId) }),
   });
 }
 
 /* ---------- identity providers ---------- */
 
-export function useIdentityProvidersQuery(orgId: string, enabled = true): UseQueryResult<IdentityProviderListResponse, ApiError> {
-  return useQuery<IdentityProviderListResponse, ApiError>({
+export const identityProvidersQueryOptions = (orgId: string, enabled = true) =>
+  queryOptions<IdentityProviderListResponse, ApiError>({
     queryKey: orgKeys.idps(orgId),
-    queryFn: () => APIRequest.get(`/organisations/${orgId}/identity-providers`).execute(),
+    queryFn: () => call(fetchIdps({ data: orgId })),
     enabled: enabled && Boolean(orgId),
   });
+
+export function useIdentityProvidersQuery(orgId: string, enabled = true): UseQueryResult<IdentityProviderListResponse, ApiError> {
+  return useQuery(identityProvidersQueryOptions(orgId, enabled));
 }
 
 export function useCreateIdentityProviderMutation(orgId: string): UseMutationResult<IdentityProvider, ApiError, CreateIdentityProviderBody> {
   const queryClient = useQueryClient();
   return useMutation<IdentityProvider, ApiError, CreateIdentityProviderBody>({
-    mutationFn: body => APIRequest.post(`/organisations/${orgId}/identity-providers`).body(body).execute(),
+    mutationFn: body => call(createIdp({ data: { orgId, body } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.idps(orgId) }),
   });
 }
@@ -235,7 +326,7 @@ export function useCreateIdentityProviderMutation(orgId: string): UseMutationRes
 export function useUpdateIdentityProviderMutation(orgId: string): UseMutationResult<IdentityProvider, ApiError, { idpId: string; body: UpdateIdentityProviderBody }> {
   const queryClient = useQueryClient();
   return useMutation<IdentityProvider, ApiError, { idpId: string; body: UpdateIdentityProviderBody }>({
-    mutationFn: ({ idpId, body }) => APIRequest.patch(`/organisations/${orgId}/identity-providers/${idpId}`).body(body).execute(),
+    mutationFn: ({ idpId, body }) => call(updateIdp({ data: { orgId, idpId, body } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.idps(orgId) }),
   });
 }
@@ -243,7 +334,7 @@ export function useUpdateIdentityProviderMutation(orgId: string): UseMutationRes
 export function useDeleteIdentityProviderMutation(orgId: string): UseMutationResult<undefined, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, string>({
-    mutationFn: idpId => APIRequest.delete(`/organisations/${orgId}/identity-providers/${idpId}`).execute(),
+    mutationFn: idpId => call(deleteIdp({ data: { orgId, idpId } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.idps(orgId) }),
   });
 }

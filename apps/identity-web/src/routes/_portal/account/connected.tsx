@@ -8,12 +8,13 @@ import { createFileRoute } from '@tanstack/react-router';
  * Importing user defined modules
  */
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
-import { type ConsentRecord, useMyConsentsQuery, useRevokeConsentMutation } from '@/lib/apis';
+import { type ConsentRecord, consentsQueryOptions, useMyConsentsQuery, useRevokeConsentMutation } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './connected.module.css';
 
 export const Route = createFileRoute('/_portal/account/connected')({
+  loader: ({ context }) => context.queryClient.ensureQueryData(consentsQueryOptions()),
   component: ConnectedPage,
 });
 

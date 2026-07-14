@@ -11,11 +11,12 @@ import { useState } from 'react';
 import { PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { useApplicationsQuery, useCreateResourceMutation, useCreateScopeMutation, useResourcesQuery } from '@/lib/apis';
+import { adminApplicationsQueryOptions, adminResourcesQueryOptions, useApplicationsQuery, useCreateResourceMutation, useCreateScopeMutation, useResourcesQuery } from '@/lib/apis';
 
 import styles from './console.module.css';
 
 export const Route = createFileRoute('/console/resources')({
+  loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(adminApplicationsQueryOptions()), context.queryClient.ensureQueryData(adminResourcesQueryOptions())]),
   component: ResourcesPage,
 });
 

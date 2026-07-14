@@ -11,6 +11,8 @@ import { useState } from 'react';
 import { ArrowLeftIcon } from '@/components/icons';
 import { useStepUpGate } from '@/features/portal';
 import {
+  adminUserAuditQueryOptions,
+  adminUserQueryOptions,
   useDeactivateUserMutation,
   useDeleteUserMutation,
   useForcePasswordResetMutation,
@@ -27,6 +29,8 @@ import styles from './console.module.css';
 import { userStatusChip } from './users';
 
 export const Route = createFileRoute('/console/users/$userId')({
+  loader: ({ context, params }) =>
+    Promise.all([context.queryClient.ensureQueryData(adminUserQueryOptions(params.userId)), context.queryClient.ensureQueryData(adminUserAuditQueryOptions(params.userId))]),
   component: UserDetailPage,
 });
 

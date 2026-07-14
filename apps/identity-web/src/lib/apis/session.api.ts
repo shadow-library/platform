@@ -1,13 +1,15 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type UseMutationResult, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { createServerFn } from '@tanstack/react-start';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, type ApiError } from './api-request';
+import { type ApiError, call } from './api-request';
 import { type MeSessionItem, type MeSessionsResponse } from './api-types.gen';
+import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -24,18 +26,27 @@ export const sessionKeys = {
   all: ['sessions'] as const,
 };
 
-export function useSessionsQuery(): UseQueryResult<SessionsResponse, ApiError> {
-  return useQuery<SessionsResponse, ApiError>({
+const fetchSessions = createServerFn({ method: 'GET' }).handler(() => serverFetch<SessionsResponse>({ method: 'GET', path: '/me/sessions' }));
+const revokeSession = createServerFn({ method: 'POST' })
+  .validator((sessionId: string) => sessionId)
+  .handler(({ data }) => serverFetch<{ revoked: number }>({ method: 'DELETE', path: `/me/sessions/${encodeURIComponent(data)}` }));
+const revokeOtherSessions = createServerFn({ method: 'POST' }).handler(() => serverFetch<{ revoked: number }>({ method: 'DELETE', path: '/me/sessions' }));
+
+export const sessionsQueryOptions = () =>
+  queryOptions<SessionsResponse, ApiError>({
     queryKey: sessionKeys.all,
-    queryFn: () => APIRequest.get('/me/sessions').execute(),
+    queryFn: () => call(fetchSessions()),
   });
+
+export function useSessionsQuery(): UseQueryResult<SessionsResponse, ApiError> {
+  return useQuery(sessionsQueryOptions());
 }
 
 /** Revoke one session (step-up required). Cascades to its refresh-token families server-side. */
 export function useRevokeSessionMutation(): UseMutationResult<{ revoked: number }, ApiError, string> {
   const queryClient = useQueryClient();
   return useMutation<{ revoked: number }, ApiError, string>({
-    mutationFn: sessionId => APIRequest.delete(`/me/sessions/${sessionId}`).execute(),
+    mutationFn: sessionId => call(revokeSession({ data: sessionId })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   });
 }
@@ -44,7 +55,7 @@ export function useRevokeSessionMutation(): UseMutationResult<{ revoked: number 
 export function useRevokeOtherSessionsMutation(): UseMutationResult<{ revoked: number }, ApiError, undefined> {
   const queryClient = useQueryClient();
   return useMutation<{ revoked: number }, ApiError, undefined>({
-    mutationFn: () => APIRequest.delete('/me/sessions').execute(),
+    mutationFn: () => call(revokeOtherSessions()),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   });
 }

@@ -13,6 +13,7 @@ import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
   type IdentityProvider,
+  identityProvidersQueryOptions,
   useCreateIdentityProviderMutation,
   useDeleteIdentityProviderMutation,
   useIdentityProvidersQuery,
@@ -22,6 +23,7 @@ import {
 import styles from './providers.module.css';
 
 export const Route = createFileRoute('/_portal/organizations/$orgId/providers')({
+  loader: ({ context, params }) => context.queryClient.ensureQueryData(identityProvidersQueryOptions(params.orgId)),
   component: ProvidersPage,
 });
 
