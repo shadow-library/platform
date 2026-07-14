@@ -102,6 +102,6 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] WN2 — Web UI (`novel-forge-web`): optional "Webnovel book ID" field on project creation and settings (recombine §5). Verify: web type-check/build green.
 - [x] PI1 — Plan-import module: bundle DTOs, pure `validatePlanBundle` cross-item validator, transactional import service (overwrite prune, approval pass), `POST /plan/import`, `IMP_` codes, `renderBriefBody` moved to `src/common` (plan-import §1–5). Verify: validator matrix + template-DB e2e import/idempotence/approve tests.
 - [x] PI2 — Web UI (`novel-forge-web`): "Import plan" screen — bundle picker with count preview, overwrite/approve toggles, per-collection result chips, warnings + field-error lists (plan-import §6). Verify: web type-check/lint/build green.
-- [ ] PI3 — Authoring skill (external, `~/.claude/skills/novel-plan-forge/`): SKILL.md process, workspace templates, zero-dep `pack.mjs` targeting the §2 bundle (plan-import §7). Verify: packed example workspace imports cleanly against a local server.
+- [x] PI3 — Authoring skill (external, `~/.claude/skills/novel-plan-forge/`): SKILL.md process, workspace templates, zero-dep `pack.mjs` targeting the §2 bundle (plan-import §7). Verify: packed example workspace imports cleanly against a local server.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
