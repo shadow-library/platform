@@ -1,6 +1,6 @@
 {
   "name": "@shadow-library/ui",
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "description": "Shadow UI — enterprise React component library for the Shadow Apps ecosystem, styled with CSS Modules and CSS-variable design tokens, documented in Storybook, with full TypeScript support",
   "scripts": {
