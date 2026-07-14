@@ -16,6 +16,7 @@ import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { renderBriefBody } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
@@ -115,16 +116,6 @@ export interface JobEnqueueResult {
 /**
  * Declaring the constants
  */
-
-// Folds outline-time continuation decisions into the stored brief body so the drafter — which only
-// ever reads `chapterBrief` as plain text — actually sees them (see docs on the generation prompt).
-function renderBriefBody(c: { objective: string; events: string[]; continuesIntoNextChapter?: boolean; startsFromPreviousChapter?: boolean; handoffBeat?: string }): string {
-  const lines = [c.objective, ...(c.events ?? [])];
-  if (c.continuesIntoNextChapter) lines.push("[CONTINUES INTO NEXT CHAPTER] Do not resolve this chapter's central action/tension.");
-  if (c.startsFromPreviousChapter) lines.push('[STARTS FROM PREVIOUS CHAPTER] Open in the exact beat the previous chapter handed off — no time skip, no recap.');
-  if (c.handoffBeat) lines.push(`Handoff beat: ${c.handoffBeat}`);
-  return lines.join('\n');
-}
 
 @Injectable()
 export class GenerationService {

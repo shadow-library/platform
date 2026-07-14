@@ -173,4 +173,11 @@ export class AppErrorCode extends ServerErrorCode {
    * Premise Errors
    */
   static readonly PRM_001 = new AppErrorCode('PRM_001', ErrorType.CLIENT_ERROR, 'No overview available — provide an overview or set the project brief or premise first');
+
+  /*!
+   * Plan Import Errors
+   */
+  static readonly IMP_001 = new AppErrorCode('IMP_001', ErrorType.CONFLICT, 'Project already contains plan data for a collection in this bundle — pass overwrite to replace it');
+  static readonly IMP_002 = new AppErrorCode('IMP_002', ErrorType.CLIENT_ERROR, 'Unsupported bundle format or version');
+  static readonly IMP_003 = new AppErrorCode('IMP_003', ErrorType.CLIENT_ERROR, 'Overwrite is not allowed once drafts or chapters exist — edit the plan in the app instead');
 }

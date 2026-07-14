@@ -21,7 +21,9 @@ chapter generation can start immediately after the upload. Drives tasks PI1–PI
 ## 2. Bundle format (the wire contract)
 
 One JSON document, `{"format": "novel-forge-plan", "version": 1, "bible": [...], "entities": [...], "volumes": [...], "arcs": [...], "briefs": [...]}`. Every collection is
-optional and independent — a bundle may carry only bible docs, or only briefs. Natural keys identify rows; database ids never appear.
+optional — a bundle may carry only bible docs or only entities — but arcs and briefs must ship with their volumes: their ranges validate against the bundle's computed
+volume layout, never against whatever the project happens to hold (single-brief fixes belong to the existing `PUT /briefs/:n`). Natural keys identify rows; database ids
+never appear.
 
 - **bible**: `{section, slug, frontmatter?, body}`. `section` ∈ `project|world|power|plot|lore` — `story_state` and `ai` are app-managed and rejected. The
   `REQUIRED_BIBLE_DOCS` manifest (refinement §7) is the authoring checklist but is not enforced server-side: partial bundles are legal.
