@@ -16,6 +16,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/projects/{projectId}/export/novel': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Novel */
+    get: operations['novel'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/images/{projectId}/{filename}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Serve */
+    get: operations['serve'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/projects/{projectId}/seed-from-brief': {
     parameters: {
       query?: never;
@@ -1031,23 +1065,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/api/v1/images/{projectId}/{filename}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Serve */
-    get: operations['serve'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
   '/api/v1/projects/{projectId}/entities': {
     parameters: {
       query?: never;
@@ -1580,6 +1597,23 @@ export interface paths {
     get: operations['manuscript'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/plan/import': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Import */
+    post: operations['import'];
     delete?: never;
     options?: never;
     head?: never;
@@ -2857,6 +2891,114 @@ export interface components {
     ManuscriptResponse: {
       markdown: string;
     };
+    ImportPlanBody: {
+      bundle: components['schemas']['PlanBundle'];
+      overwrite?: boolean;
+      approve?: boolean;
+    };
+    PlanBundle: {
+      format: string;
+      version: number;
+      bible?: components['schemas']['PlanBundleBibleDoc'][];
+      entities?: components['schemas']['PlanBundleEntity'][];
+      volumes?: components['schemas']['PlanBundleVolume'][];
+      arcs?: components['schemas']['PlanBundleArc'][];
+      briefs?: components['schemas']['PlanBundleBrief'][];
+    };
+    PlanBundleBibleDoc: {
+      section: components['schemas']['PlanBundleSection'];
+      slug: string;
+      frontmatter?: {
+        [key: string]: unknown;
+      };
+      body: string;
+    };
+    /** @enum {string} */
+    PlanBundleSection: 'project' | 'world' | 'power' | 'plot' | 'lore';
+    PlanBundleEntity: {
+      entityKey: string;
+      type: components['schemas']['EntityType'];
+      name: string;
+      significance?: components['schemas']['EntitySignificance'];
+      status?: string;
+      motivation?: string;
+      notes?: string;
+      body?: string;
+    };
+    PlanBundleVolume: {
+      volumeKey: string;
+      ordinal: number;
+      title: string;
+      objective: string;
+      conflict: string;
+      payoff: string;
+      targetChapterCount: number;
+      cast?: string[];
+      body?: string;
+    };
+    PlanBundleArc: {
+      arcKey: string;
+      volumeKey: string;
+      ordinal: number;
+      title: string;
+      objective: string;
+      escalation: string;
+      payoff: string;
+      hook: string;
+      chapterStart: number;
+      chapterEnd: number;
+      cast?: string[];
+      body?: string;
+    };
+    PlanBundleBrief: {
+      chapter: number;
+      volumeKey: string;
+      arcKey?: string;
+      title: string;
+      objective: string;
+      events: string[];
+      requiredContext?: string[];
+      continuesIntoNextChapter?: boolean;
+      startsFromPreviousChapter?: boolean;
+      handoffBeat?: string;
+      endingContract: components['schemas']['EndingContractSchema'];
+    };
+    EndingContractSchema: {
+      /** @description the kind of hook the closing scene must land on */
+      hookType: components['schemas']['HookType'];
+      /** @description what the reader should feel on the last line */
+      emotionalBeat: string;
+      /** @description the question the ending must leave open */
+      openQuestion: string;
+      /** @description the situation the next chapter picks up from — specific enough for a different author to continue */
+      handoffState: string;
+      /** @description refs (e.g. "thread:heir_mystery") the ending must NOT resolve */
+      mustNotResolve?: string[];
+    };
+    /** @enum {string} */
+    HookType: 'cliffhanger' | 'revelation' | 'quiet_dread' | 'promise' | 'turn';
+    ImportPlanResponse: {
+      results: components['schemas']['ImportResults'];
+      approval?: components['schemas']['ApprovalResult'];
+      warnings: string[];
+    };
+    ImportResults: {
+      bible: components['schemas']['CollectionResult'];
+      entities: components['schemas']['CollectionResult'];
+      volumes: components['schemas']['CollectionResult'];
+      arcs: components['schemas']['CollectionResult'];
+      briefs: components['schemas']['CollectionResult'];
+    };
+    CollectionResult: {
+      created: number;
+      updated: number;
+      unchanged: number;
+      pruned: number;
+    };
+    ApprovalResult: {
+      volumesApproved: number;
+      arcsApproved: number;
+    };
     CreateProjectBody: {
       name: string;
       kind: components['schemas']['ProjectKind'];
@@ -2991,6 +3133,69 @@ export interface operations {
           'application/json': components['schemas']['AiModelsResponse'];
         };
       };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  novel: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  serve: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        filename: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
       /** @description Default Response */
       '4XX': {
         headers: {
@@ -6017,38 +6222,6 @@ export interface operations {
       };
     };
   };
-  serve: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-        filename: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   listEntities: {
     parameters: {
       query?: {
@@ -7821,6 +7994,50 @@ export interface operations {
       };
     };
   };
+  import: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ImportPlanBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ImportPlanResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   listProjects: {
     parameters: {
       query?: {
@@ -8447,6 +8664,20 @@ export type RebrandConversionStatus = components['schemas']['RebrandConversionSt
 export type ConversionResponse = components['schemas']['ConversionResponse'];
 export type ConversionDetailItem = components['schemas']['ConversionDetailItem'];
 export type ManuscriptResponse = components['schemas']['ManuscriptResponse'];
+export type ImportPlanBody = components['schemas']['ImportPlanBody'];
+export type PlanBundle = components['schemas']['PlanBundle'];
+export type PlanBundleBibleDoc = components['schemas']['PlanBundleBibleDoc'];
+export type PlanBundleSection = components['schemas']['PlanBundleSection'];
+export type PlanBundleEntity = components['schemas']['PlanBundleEntity'];
+export type PlanBundleVolume = components['schemas']['PlanBundleVolume'];
+export type PlanBundleArc = components['schemas']['PlanBundleArc'];
+export type PlanBundleBrief = components['schemas']['PlanBundleBrief'];
+export type EndingContractSchema = components['schemas']['EndingContractSchema'];
+export type HookType = components['schemas']['HookType'];
+export type ImportPlanResponse = components['schemas']['ImportPlanResponse'];
+export type ImportResults = components['schemas']['ImportResults'];
+export type CollectionResult = components['schemas']['CollectionResult'];
+export type ApprovalResult = components['schemas']['ApprovalResult'];
 export type CreateProjectBody = components['schemas']['CreateProjectBody'];
 export type ProjectKind = components['schemas']['ProjectKind'];
 export type ContentMode = components['schemas']['ContentMode'];
@@ -8462,6 +8693,8 @@ export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
 export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
+export type NovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
+export type ServePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
 export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs']['get']['parameters']['path'], undefined>;
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
 export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;
@@ -8497,7 +8730,6 @@ export type ListMessagesQueryParams = Exclude<paths['/api/v1/projects/{projectId
 export type ListMessagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages']['get']['parameters']['path'], undefined>;
 export type PreviewContextQueryParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['query'], undefined>;
 export type PreviewContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/context/preview']['get']['parameters']['path'], undefined>;
-export type ServePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
 export type ListEntitiesQueryParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['query'], undefined>;
 export type ListEntitiesPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities']['get']['parameters']['path'], undefined>;
 export type GetEntityPathParams = Exclude<paths['/api/v1/projects/{projectId}/entities/{entityKey}']['get']['parameters']['path'], undefined>;

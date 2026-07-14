@@ -28,6 +28,7 @@ import {
   SettingsIcon,
   SourceIcon,
   SunIcon,
+  UploadIcon,
 } from '../icons';
 import styles from './Sidebar.module.css';
 
@@ -40,6 +41,7 @@ interface ProjectNavItem {
   icon: ReactNode;
   badge?: number;
   sourceOnly?: boolean;
+  newNovelOnly?: boolean;
   warnBadge?: boolean;
 }
 
@@ -103,6 +105,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
     { to: '/novels/$novelId/rebrand', label: 'Rebrand', icon: <GlobeIcon />, sourceOnly: true },
     { to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon /> },
     { to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon /> },
+    { to: '/novels/$novelId/import-plan', label: 'Import Plan', icon: <UploadIcon />, newNovelOnly: true },
     { to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon />, badge: status?.chaptersTotal },
     { to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon />, badge: reviewCount, warnBadge: true },
     { to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon /> },
@@ -187,6 +190,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
         <nav className={`nf-scroll nf-swap ${styles.nav}`} aria-label="Project navigation">
           {projectNav
             .filter(item => !item.sourceOnly || project?.kind === 'source')
+            .filter(item => !item.newNovelOnly || project?.kind === 'new_novel')
             .map(item => {
               const active = isActive(item.to);
               return (

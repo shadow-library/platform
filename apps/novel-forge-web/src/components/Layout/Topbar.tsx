@@ -27,6 +27,7 @@ import {
   SearchIcon,
   SettingsIcon,
   SourceIcon,
+  UploadIcon,
 } from '../icons';
 import styles from './Topbar.module.css';
 
@@ -48,6 +49,7 @@ const PROJECT_SCREENS: ScreenDef[] = [
   { segment: 'source', to: '/novels/$novelId/source', label: 'Source Pipeline', icon: <SourceIcon /> },
   { segment: 'story-bible', to: '/novels/$novelId/story-bible', label: 'Story Bible', icon: <BookIcon /> },
   { segment: 'volumes', to: '/novels/$novelId/volumes', label: 'Volumes & Arcs', icon: <ListIcon /> },
+  { segment: 'import-plan', to: '/novels/$novelId/import-plan', label: 'Import Plan', icon: <UploadIcon /> },
   { segment: 'chapters', to: '/novels/$novelId/chapters', label: 'Chapters', icon: <EditIcon /> },
   { segment: 'review', to: '/novels/$novelId/review', label: 'Review Queue', icon: <ReviewIcon /> },
   { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon /> },

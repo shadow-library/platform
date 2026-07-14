@@ -12,6 +12,7 @@ export type ProjectRoute =
   | '/novels/$novelId/rebrand'
   | '/novels/$novelId/story-bible'
   | '/novels/$novelId/volumes'
+  | '/novels/$novelId/import-plan'
   | '/novels/$novelId/chapters'
   | '/novels/$novelId/review'
   | '/novels/$novelId/chat'
