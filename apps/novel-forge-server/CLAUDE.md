@@ -16,6 +16,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 - `docs/chat-hub-design.md` — the central chat hub: `project` scope, auto/manual modes, per-op cherry-pick, inverse-op revert + rollback, action ops, declared-lookup protocol. **Amends Appendix A rule 2 and adds rule 14** (its §2); drives tasks H1–H6.
 - `docs/rebrand-pipeline-design.md` — the automated source-conversion pipeline: glossary/world-map, per-chapter convert + residue scan + audit graph, three-phase `rebrand` job, flag-and-continue semantics; drives tasks RB1–RB6.
 - `docs/chapter-recombine-design.md` — merging translator-split chapter parts back into source chapters: title-parsing ladder, AI boundary resolution, transactional renumber + derived-data guard, auto-run hooks; drives tasks RC1–RC2.
+- `docs/plan-import-design.md` — offline plan authoring: the `novel-plan-forge` skill's markdown workspace + JSON bundle contract, transactional `plan/import` endpoint with overwrite/approve semantics; drives tasks PI1–PI3.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -99,5 +100,8 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks on ingest completion + rebrand phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
 - [x] WN1 — Webnovel reference titles: `projects.webnovelId` + `reference_chapters`, `SRC_004`, `WebnovelCatalogService` (cookie + chapter-list fetch, positional retitle, once-only autoSync), `POST /retitle`, executor hooks before recombine (recombine §5). Verify: parser + service/hook tests green.
 - [x] WN2 — Web UI (`novel-forge-web`): optional "Webnovel book ID" field on project creation and settings (recombine §5). Verify: web type-check/build green.
+- [ ] PI1 — Plan-import module: bundle DTOs, pure `validatePlanBundle` cross-item validator, transactional import service (overwrite prune, approval pass), `POST /plan/import`, `IMP_` codes, `renderBriefBody` moved to `src/common` (plan-import §1–5). Verify: validator matrix + template-DB e2e import/idempotence/approve tests.
+- [ ] PI2 — Web UI (`novel-forge-web`): "Import plan" screen — bundle picker with count preview, overwrite/approve toggles, per-collection result chips, warnings + field-error lists (plan-import §6). Verify: web type-check/lint/build green.
+- [ ] PI3 — Authoring skill (external, `~/.claude/skills/novel-plan-forge/`): SKILL.md process, workspace templates, zero-dep `pack.mjs` targeting the §2 bundle (plan-import §7). Verify: packed example workspace imports cleanly against a local server.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
