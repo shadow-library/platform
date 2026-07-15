@@ -22,7 +22,7 @@ npm install react react-dom
 bun add react react-dom
 ```
 
-`@tanstack/react-router` is an optional peer, required only if you use the `useSearchParams` hook — which is imported from the [`@shadow-library/ui/router`](#server-side-rendering-ssr) subpath, not the package root, so apps that don't use it never need the peer installed.
+`@tanstack/react-router` is an optional peer, required only for the `NavProgress` component — imported from the [`@shadow-library/ui/router`](#server-side-rendering-ssr) subpath, not the package root, so apps that don't use it never need the peer installed.
 
 ## Setup
 
@@ -60,11 +60,7 @@ The package is safe to import and render on the server (Node, Next.js, Remix, As
 - **Time-dependent UI resolves after mount.** `Calendar` (the "today" marker) and `NotificationList` ("Today"/"Yesterday" headers) read the wall clock, which differs between server and client, so they render a clock-free result on the server and resolve the current day after hydration. Pass `today` / `now` to make them fully deterministic during SSR.
 - **Platform detection resolves after mount.** `Kbd` renders the non-Mac form (`Ctrl`) on the server and switches to `⌘` on macOS after hydration. Pass `mac` to pin it.
 - **Imperative overlays are client-only.** `toast`, `bannerStore`, and their outlets (`<Toaster />`, `<BannerOutlet />`) are client-side imperative APIs. Their state is never emitted into server HTML — render `<Toaster />` / `<BannerOutlet />` at your app root and drive them from client code. (They are module singletons; treat them as client-only and never call `toast()` during server render.)
-- **Router hook lives on a subpath.** `useSearchParams` is exported from `@shadow-library/ui/router` (it depends on the optional `@tanstack/react-router` peer). Importing the package root never pulls that peer in.
-
-```ts
-import { useSearchParams } from '@shadow-library/ui/router';
-```
+- **Router-bound UI lives on a subpath.** `NavProgress` is exported from `@shadow-library/ui/router` (it depends on the optional `@tanstack/react-router` peer); importing the package root never pulls that peer in. Router hooks and data utilities such as `useSearchParams` now live in [`@shadow-library/web`](https://github.com/shadow-library/web).
 
 ## App foundation (providers & utilities)
 
@@ -192,36 +188,9 @@ Gap classes follow the same scale: `gap-*`, `gap-x-*`, `gap-y-*`.
 | `select-none`, `pointer-events-none` | `user-select` / `pointer-events` |
 | `sr-only` | Visually hidden, still available to assistive tech |
 
-## What's Included
+## Data, transport, and framework wiring
 
-### API Client
-
-A chainable HTTP client with pre/post hooks and typed errors.
-
-```ts
-import { APIRequest, ApiError } from '@shadow-library/ui';
-
-const data = await APIRequest.get('/users')
-  .query({ limit: 20 })
-  .header('X-Tenant', 'acme')
-  .then((res) => res.json());
-```
-
-### OpenAPI Code Generation
-
-Generate typed API clients from an OpenAPI spec URL.
-
-```ts
-import { generateApi } from '@shadow-library/ui';
-
-await generateApi('https://api.example.com/openapi.json');
-```
-
-### Hooks
-
-| Hook              | Import from                   | Description                                          |
-| ----------------- | ----------------------------- | ---------------------------------------------------- |
-| `useSearchParams` | `@shadow-library/ui/router`   | Read and update URL query params via TanStack Router |
+The HTTP client (`APIRequest`), error model (`ApiError`), OpenAPI code generation (`generateApi`), and router hooks (`useSearchParams`) that used to live here now live in [`@shadow-library/web`](https://github.com/shadow-library/web) — Shadow UI is a component + design-token library only.
 
 ## Full Documentation
 

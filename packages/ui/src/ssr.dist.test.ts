@@ -76,13 +76,13 @@ describe('built package (dist) SSR safety', () => {
     expect(dts).not.toMatch(/\.css['"]/);
   });
 
-  it('exposes ./router with useSearchParams and keeps it off the root entry', () => {
+  it('exposes ./router with NavProgress and keeps it off the root entry', () => {
     expect(Object.keys(pkgExports())).toContain('./router');
     // The root barrel must not statically pull the optional @tanstack/react-router peer.
     const rootJs = fs.readFileSync(distEntry, 'utf-8');
     expect(rootJs).not.toMatch(/tanstack\/react-router/);
     const routerJs = fs.readFileSync(path.join(distDir, 'router.js'), 'utf-8');
-    expect(routerJs).toMatch(/useSearchParams/);
+    expect(routerJs).toMatch(/NavProgress/);
   });
 });
 
