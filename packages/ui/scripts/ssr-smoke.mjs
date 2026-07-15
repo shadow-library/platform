@@ -20,10 +20,9 @@ const routerEntry = pathToFileURL(path.join(distDir, 'router.js')).href;
 const UI = await import(distEntry);
 assert.ok(Object.keys(UI).length > 100, 'main entry should export the full public surface');
 
-// 2. The router subpath must import on its own and expose the hook that pulls @tanstack/react-router.
+// 2. The router subpath must import on its own; it holds the one export that pulls @tanstack/react-router
+//    (NavProgress, asserted in section 8), so the root entry stays free of that peer.
 const router = await import(routerEntry);
-assert.equal(typeof router.useSearchParams, 'function', 'router subpath should export useSearchParams');
-assert.ok(!('useSearchParams' in UI), 'useSearchParams must NOT be on the root entry (moved to /router)');
 
 // 3. A representative set must server-render without throwing.
 const cases = [
