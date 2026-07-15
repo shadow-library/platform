@@ -17,6 +17,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 - `docs/rebrand-pipeline-design.md` — the automated source-conversion pipeline: glossary/world-map, per-chapter convert + residue scan + audit graph, three-phase `rebrand` job, flag-and-continue semantics; drives tasks RB1–RB6.
 - `docs/chapter-recombine-design.md` — merging translator-split chapter parts back into source chapters: title-parsing ladder, AI boundary resolution, transactional renumber + derived-data guard, auto-run hooks; drives tasks RC1–RC2.
 - `docs/plan-import-design.md` — offline plan authoring: the `novel-plan-forge` skill's markdown workspace + JSON bundle contract, transactional `plan/import` endpoint with overwrite/approve semantics; drives tasks PI1–PI3.
+- `docs/character-knowledge-design.md` — epistemic filtering: `canon_facts` + `character_knowledge` ledger, per-brief `knowledgeContract`, POV-filtered generation context, judge `knowledgeCompliance` + leak pre-scan. **Adds Appendix A rule 15** (its §2); drives tasks CK1–CK5.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -103,5 +104,10 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] PI1 — Plan-import module: bundle DTOs, pure `validatePlanBundle` cross-item validator, transactional import service (overwrite prune, approval pass), `POST /plan/import`, `IMP_` codes, `renderBriefBody` moved to `src/common` (plan-import §1–5). Verify: validator matrix + template-DB e2e import/idempotence/approve tests.
 - [x] PI2 — Web UI (`novel-forge-web`): "Import plan" screen — bundle picker with count preview, overwrite/approve toggles, per-collection result chips, warnings + field-error lists (plan-import §6). Verify: web type-check/lint/build green.
 - [x] PI3 — Authoring skill (external, `~/.claude/skills/novel-plan-forge/`): SKILL.md process, workspace templates, zero-dep `pack.mjs` targeting the §2 bundle (plan-import §7). Verify: packed example workspace imports cleanly against a local server.
+- [ ] CK1 — Knowledge schema & error codes: `canon_facts` + `character_knowledge` tables, `fact_source` enum, `briefs.knowledgeContract` column, `FCT_` codes, baseline migration regen (character-knowledge §3). Verify: migration applies to template DB, schema tests green.
+- [ ] CK2 — Fact module: `src/modules/bible/fact/` CRUD + reveal/retract endpoints, `knowledge-view` pure helpers + `scanKnowledgeLeaks`, reveal-on-approve hook in `approveDraft` (character-knowledge §4, §7). Verify: pure-fn matrix + template-DB service/e2e tests incl. reveal idempotence.
+- [ ] CK3 — Context assembly: `known_facts`/`chapter_reveals`/`hidden_constraints` sections in `forChapter`, section labels, generation prompt v2.2 epistemic rule + goldens (character-knowledge §5). Verify: assembler tests — contract-bearing vs contract-less briefs, hidden fact text never in rendered pack.
+- [ ] CK4 — Judge gate: `knowledgeCompliance` schema + judge prompt bump, `## FORBIDDEN KNOWLEDGE` block, pre-scan merge, `knowledgeCompliant` routing in `routeAfterJudge` (character-knowledge §6). Verify: routing matrix + judge-node merge tests.
+- [ ] CK5 — Follow-ups: plan-import `facts` collection + brief `knowledgeContract`, `novel-plan-forge` skill update, web facts panel, `forRevision` sections, arc-planner reveal authoring (character-knowledge §8).
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
