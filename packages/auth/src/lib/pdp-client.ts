@@ -40,7 +40,8 @@ interface PdpResponse {
  * stale entries so grant changes propagate within one round-trip instead of a full TTL. Transport
  * failures and malformed responses are a DENY unless the caller explicitly opted into fail-open.
  */
-const DEFAULT_TTL_SECONDS = 60;
+const DEFAULT_TTL_SECONDS = 900;
+const HIGH_RISK_TTL_SECONDS = 60;
 const DEFAULT_MAX_ENTRIES = 1000;
 
 export class PdpClient {
@@ -64,7 +65,7 @@ export class PdpClient {
     }
 
     try {
-      return await this.request(principalKey, key, organisationId, input);
+      return await this.request(principalKey, key, organisationId, input, options);
     } catch {
       return options.failOpen ?? false;
     }
@@ -74,7 +75,7 @@ export class PdpClient {
     return Promise.all(inputs.map(input => this.check(input, options)));
   }
 
-  private async request(principalKey: string, key: string, organisationId: string, input: CheckInput): Promise<boolean> {
+  private async request(principalKey: string, key: string, organisationId: string, input: CheckInput, options: CheckOptions): Promise<boolean> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
     const token = await this.options.getToken?.().catch(() => null);
     if (token) headers.authorization = `Bearer ${token}`;
@@ -94,7 +95,9 @@ export class PdpClient {
     const authzVersion = result.authzVersion ?? 0;
     this.observeVersion(principalKey, authzVersion);
     const permitted = result.decision === 'PERMIT';
-    this.store(key, { permitted, authzVersion, expiresAt: Date.now() + (this.options.ttlSeconds ?? DEFAULT_TTL_SECONDS) * 1000 });
+    const baseTtl = this.options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
+    const ttlSeconds = options.highRisk ? Math.min(HIGH_RISK_TTL_SECONDS, baseTtl) : baseTtl;
+    this.store(key, { permitted, authzVersion, expiresAt: Date.now() + ttlSeconds * 1000 });
     return permitted;
   }
 

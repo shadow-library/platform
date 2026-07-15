@@ -50,8 +50,8 @@ interface IntrospectionResponse {
  * Declaring the constants
  */
 const DEFAULT_CLOCK_SKEW_SECONDS = 60;
-const DEFAULT_JWKS_TTL_SECONDS = 300;
-const DEFAULT_DECISION_TTL_SECONDS = 60;
+const DEFAULT_JWKS_TTL_SECONDS = 43_200;
+const DEFAULT_DECISION_TTL_SECONDS = 900;
 
 /** Matches the identity server's default token audience for its own API surface */
 const DEFAULT_IDENTITY_RESOURCE = 'shadow-identity';
