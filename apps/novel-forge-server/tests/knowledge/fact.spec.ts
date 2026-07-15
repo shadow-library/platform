@@ -8,6 +8,7 @@
 import { describe, expect, it } from 'bun:test';
 
 import { SQL } from 'bun';
+import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -147,21 +148,27 @@ describe.if(pgAvailable)('Canon Fact API', () => {
       await createEntity(projectId, 'amara', 'Detective Amara');
       await putFact(projectId, 'ledger_forgery', { text: 'The ledger is a forgery.' });
 
+      const briefUpdate = await testEnv
+        .getRouter()
+        .mockRequest()
+        .put(`/api/v1/projects/${projectId}/briefs/5`)
+        .body({
+          body: 'Amara studies the ledger and sees the forged strokes.',
+          knowledgeContract: {
+            pov: ['amara'],
+            learns: [
+              { entityKey: 'amara', factKey: 'ledger_forgery' },
+              { entityKey: 'ghost', factKey: 'ledger_forgery' },
+              { entityKey: 'amara', factKey: 'unknown_fact' },
+            ],
+          },
+        });
+      expect(briefUpdate.statusCode).toBe(200);
+
       const db = testEnv.getPostgresClient();
       const pid = BigInt(projectId);
-      await db.insert(schema.briefs).values({
-        projectId: pid,
-        chapter: 5,
-        body: 'Amara studies the ledger and sees the forged strokes.',
-        knowledgeContract: {
-          pov: ['amara'],
-          learns: [
-            { entityKey: 'amara', factKey: 'ledger_forgery' },
-            { entityKey: 'ghost', factKey: 'ledger_forgery' },
-            { entityKey: 'amara', factKey: 'unknown_fact' },
-          ],
-        } as never,
-      });
+      const brief = await db.query.briefs.findFirst({ where: eq(schema.briefs.projectId, pid) });
+      expect(brief?.knowledgeContract).toMatchObject({ pov: ['amara'] });
       await db.insert(schema.drafts).values({ projectId: pid, chapter: 5, body: 'Chapter prose.', reviewStatus: 'needs_review' });
 
       const approved = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/drafts/5/approve`).body({});

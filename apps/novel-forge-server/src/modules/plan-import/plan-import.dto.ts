@@ -14,7 +14,7 @@ import { Transform } from '@shadow-library/fastify';
 import { EntitySignificance, EntityType } from '@server/common';
 import { type Knowledge } from '@server/database';
 
-import { EndingContractSchema } from '../ai/schemas';
+import { EndingContractSchema, KnowledgeContractSchema } from '../ai/schemas';
 
 /**
  * Defining types
@@ -101,24 +101,6 @@ export class PlanBundleFact {
 
   @Field(() => Integer, { optional: true, minimum: 1 })
   revealChapter?: number;
-}
-
-@Schema()
-export class PlanBundleKnowledgeReveal {
-  @Field({ pattern: KEY_PATTERN })
-  entityKey: string;
-
-  @Field({ pattern: KEY_PATTERN })
-  factKey: string;
-}
-
-@Schema()
-export class PlanBundleKnowledgeContract {
-  @Field(() => [String], { minItems: 1 })
-  pov: string[];
-
-  @Field(() => [PlanBundleKnowledgeReveal], { optional: true })
-  learns?: PlanBundleKnowledgeReveal[];
 }
 
 @Schema()
@@ -229,8 +211,8 @@ export class PlanBundleBrief {
 
   // Optional: the epistemic contract (character-knowledge design §3) — omitting it leaves the
   // chapter unfiltered, exactly like a hand-authored brief without one.
-  @Field(() => PlanBundleKnowledgeContract, { optional: true })
-  knowledgeContract?: PlanBundleKnowledgeContract;
+  @Field(() => KnowledgeContractSchema, { optional: true })
+  knowledgeContract?: KnowledgeContractSchema;
 }
 
 @Schema()

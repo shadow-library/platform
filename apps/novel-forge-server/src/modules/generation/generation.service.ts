@@ -385,12 +385,13 @@ export class GenerationService {
   }
 
   async updateBrief(projectId: bigint, chapter: number, body: UpdateBriefBody): Promise<Generation.Brief> {
+    const contract = body.knowledgeContract ? ({ pov: body.knowledgeContract.pov, learns: body.knowledgeContract.learns ?? [] } as Record<string, unknown>) : undefined;
     const [result] = await this.db
       .insert(schema.briefs)
-      .values({ projectId, chapter, title: body.title, body: body.body })
+      .values({ projectId, chapter, title: body.title, body: body.body, knowledgeContract: contract ?? null })
       .onConflictDoUpdate({
         target: [schema.briefs.projectId, schema.briefs.chapter],
-        set: { title: body.title, body: body.body, updatedAt: new Date() },
+        set: { title: body.title, body: body.body, ...(contract !== undefined ? { knowledgeContract: contract } : {}), updatedAt: new Date() },
       })
       .returning();
     if (!result) throw new ServerError(AppErrorCode.DRF_001);

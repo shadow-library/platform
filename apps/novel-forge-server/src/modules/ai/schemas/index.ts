@@ -33,6 +33,7 @@ export * from './new-novel.schema';
 export * from './plan.schema';
 export * from './skeleton.schema';
 export * from './ending-contract.schema';
+export * from './knowledge-contract.schema';
 export * from './premise.schema';
 export * from './bible-audit.schema';
 export * from './rebrand.schema';

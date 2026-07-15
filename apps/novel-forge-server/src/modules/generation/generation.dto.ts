@@ -14,6 +14,8 @@ import { Transform } from '@shadow-library/fastify';
 import { DraftReviewStatus, DraftRevisionSource, DraftStatus, JobKind, JobStatus, PlanStatus, UserFeedbackDisposition, WorkflowRunStatus } from '@server/common';
 import { type Ai, type Generation } from '@server/database';
 
+import { KnowledgeContractSchema } from '../ai/schemas';
+
 /**
  * Defining types
  */
@@ -136,6 +138,11 @@ export class UpdateBriefBody {
 
   @Field()
   body: string;
+
+  // Omitted → unchanged; the in-app path for adopting knowledge contracts on projects whose
+  // prose already blocks an overwrite re-import (character-knowledge design §3).
+  @Field(() => KnowledgeContractSchema, { optional: true })
+  knowledgeContract?: KnowledgeContractSchema;
 }
 
 @Schema()
