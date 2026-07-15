@@ -488,3 +488,74 @@ describe('ContextAssembler.forRebrandSeed', () => {
     expect(pack.rendered).toContain('geography/capital: the Jade Capital');
   });
 });
+
+// ─── forChapter — knowledge sections (character-knowledge design §5) ─────────
+
+describe('ContextAssembler.forChapter — knowledge sections', () => {
+  const facts = [
+    { id: 1n, factKey: 'service_door', text: 'The killer used the service door.', constraintNote: null, terms: ['service door'] },
+    { id: 2n, factKey: 'ledger_forgery', text: 'The ledger is a forgery planted by Elias.', constraintNote: 'Elias steers conversation away from the study.', terms: ['forgery'] },
+    { id: 3n, factKey: 'motive_debt', text: 'Marlow owed Elias a ruinous gambling debt.', constraintNote: null, terms: ['gambling debt'] },
+  ];
+
+  function knowledgeOverrides(brief: unknown) {
+    return {
+      query: {
+        projects: { findFirst: mock(async () => ({ id: 1n, instructions: null, contentMode: 'standard' })) },
+        briefs: { findFirst: mock(async () => brief) },
+        chapters: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        volumes: { findFirst: mock(async () => null), findMany: mock(async () => []) },
+        drafts: { findFirst: mock(async () => null) },
+        entities: { findMany: mock(async () => [{ id: 10n, entityKey: 'amara' }]) },
+        canonFacts: { findMany: mock(async () => facts) },
+        characterKnowledge: { findMany: mock(async () => [{ factId: 1n, entityId: 10n, learnedInChapter: 3 }]) },
+        contextPacks: { findFirst: mock(async () => null) },
+      },
+    };
+  }
+
+  it('renders known facts, on-page reveals, and constraints while keeping hidden fact text out of the pack', async () => {
+    const brief = {
+      chapter: 5,
+      body: 'Amara studies the ledger.',
+      contextRefs: [],
+      knowledgeContract: { pov: ['amara'], learns: [{ entityKey: 'amara', factKey: 'ledger_forgery' }] },
+    };
+    const assembler = makeAssembler(knowledgeOverrides(brief));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    const known = pack.sections.find(s => s.key === 'known_facts');
+    expect(known?.rendered).toContain('[service_door] The killer used the service door.');
+    expect(known?.tier).toBe('canonical');
+
+    const reveals = pack.sections.find(s => s.key === 'chapter_reveals');
+    expect(reveals?.rendered).toContain('[ledger_forgery] The ledger is a forgery planted by Elias.');
+
+    // The hidden fact (motive_debt) must not leak into the rendered pack in any form; the revealed
+    // fact's constraint note must not appear either — it is known now, not hidden.
+    expect(pack.sections.find(s => s.key === 'hidden_constraints')).toBeUndefined();
+    expect(pack.rendered).not.toContain('gambling debt');
+    expect(pack.rendered).not.toContain('motive_debt');
+  });
+
+  it('renders hidden constraints for unrevealed facts and the placeholder when nothing is known', async () => {
+    const brief = { chapter: 5, body: 'Boone canvasses the street.', contextRefs: [], knowledgeContract: { pov: ['boone'], learns: [] } };
+    const overrides = knowledgeOverrides(brief);
+    overrides.query.entities.findMany = mock(async () => []);
+    const assembler = makeAssembler(overrides);
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+
+    expect(pack.sections.find(s => s.key === 'known_facts')?.rendered).toContain('(none established');
+    const constraints = pack.sections.find(s => s.key === 'hidden_constraints');
+    expect(constraints?.rendered).toContain('Elias steers conversation away from the study.');
+    expect(constraints?.rendered).not.toContain('forgery');
+    expect(pack.rendered).not.toContain('The killer used the service door.');
+  });
+
+  it('adds no knowledge sections when the brief has no contract', async () => {
+    const brief = { chapter: 5, body: 'A quiet chapter.', contextRefs: [], knowledgeContract: null };
+    const assembler = makeAssembler(knowledgeOverrides(brief));
+    const pack = await assembler.forChapter(1n, 5, { dryRun: true });
+    expect(pack.sections.some(s => ['known_facts', 'chapter_reveals', 'hidden_constraints'].includes(s.key))).toBe(false);
+  });
+});

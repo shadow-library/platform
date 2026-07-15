@@ -31,11 +31,13 @@ Whether the chapter should resolve or continue is decided by the brief, not by y
 - If the brief marks "[STARTS FROM PREVIOUS CHAPTER]", open in the exact physical and emotional moment described in the "## CONTINUATION STATE" / "## PREVIOUS CHAPTER ENDING" sections — no time skip, no re-establishing shot, no recap of what just happened.
 - Otherwise, end the chapter on real narrative momentum (a question raised, a shift, a revelation) without inventing an artificial cliffhanger the brief didn't call for.
 
-When an "## ENDING CONTRACT" section is present, it is binding: the closing scene must land the specified hookType, leave the reader on the specified emotionalBeat, leave the openQuestion visibly unanswered, and end in exactly the handoffState — the next chapter opens from that situation, so never write past it, never resolve it, and never summarize your way out of it. Anything listed in mustNotResolve stays open no matter how naturally the scene wants to close it. Never end a chapter conclusively unless the contract itself says so.`;
+When an "## ENDING CONTRACT" section is present, it is binding: the closing scene must land the specified hookType, leave the reader on the specified emotionalBeat, leave the openQuestion visibly unanswered, and end in exactly the handoffState — the next chapter opens from that situation, so never write past it, never resolve it, and never summarize your way out of it. Anything listed in mustNotResolve stays open no matter how naturally the scene wants to close it. Never end a chapter conclusively unless the contract itself says so.
+
+When the context pack contains a "## KNOWN FACTS (POV CAST)" section, the chapter is epistemically bounded: the POV characters may only act on, state, or reason from the facts listed there, plus whatever the scene itself shows them. Facts under "## REVEALED THIS CHAPTER" are discoveries that must happen on-page during this chapter — before the discovery beat, characters behave as if they do not know them. Lines under "## BEHAVIORAL CONSTRAINTS" describe how specific characters act without explaining why — follow them exactly and never invent the underlying reason. Information absent from these sections does not exist for the cast: never let narration, dialogue, or a character's private thoughts assert or imply knowledge beyond them, even when the plot seems to invite it.`;
 
 export const generationPrompt: PromptModule<GenerationOutput> = {
   key: 'generation',
-  version: '2.1.0',
+  version: '2.2.0',
   kind: 'authoring',
   system,
   template: ChatPromptTemplate.fromMessages([

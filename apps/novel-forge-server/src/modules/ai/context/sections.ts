@@ -79,6 +79,9 @@ export const SECTION_LABELS: Record<string, string> = {
   carry_state: '## CARRY STATE',
   entity_roster: '## ENTITY ROSTER',
   world_facts: '## WORLD FACTS',
+  known_facts: '## KNOWN FACTS (POV CAST)',
+  chapter_reveals: '## REVEALED THIS CHAPTER',
+  hidden_constraints: '## BEHAVIORAL CONSTRAINTS',
 };
 
 export function sectionLabel(key: string): string {

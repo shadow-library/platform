@@ -277,6 +277,16 @@ describe('Prompt modules', () => {
     });
   });
 
+  describe('knowledge contract (generation v2.2, character-knowledge design §5)', () => {
+    it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
+      expect(PROMPT_REGISTRY.generation.version).toBe('2.2.0');
+      expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
+      expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
+      expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');
+      expect(PROMPT_REGISTRY.generation.system).toContain('does not exist for the cast');
+    });
+  });
+
   describe('ExtractionSchema', () => {
     it('accepts minimal valid output', () => {
       const result = parseSchema(ExtractionSchema, {

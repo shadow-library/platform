@@ -20,6 +20,7 @@ import * as schema from '@server/database/schemas';
 import { CatalogService } from './catalog.service';
 import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection } from './sections';
 import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
+import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, renderHiddenConstraints, renderKnownFacts } from '../../bible/fact/knowledge-view';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
 
@@ -318,6 +319,43 @@ export class ContextAssembler {
     if (currentVolume) {
       const content = [currentVolume.objective, currentVolume.conflict].filter(Boolean).join('\n');
       sections.push(makeSection('volume_objective', content, 'approved_intent', [`volume:${currentVolume.volumeKey}`]));
+    }
+
+    // d2. knowledge sections — the epistemic filter (character-knowledge design §5). Only the POV
+    // cast's ledgered facts enter the drafting pack; still-hidden facts surface as behavioral
+    // constraints, never as text. Absent a contract the feature is off and nothing changes.
+    const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
+    if (knowledgeContract) {
+      const view = await loadKnowledgeView(this.db, projectId, chapter, knowledgeContract);
+      sections.push(
+        makeSection(
+          'known_facts',
+          renderKnownFacts(view.known),
+          'canonical',
+          view.known.map(f => `fact:${f.factKey}`),
+        ),
+      );
+      if (view.reveals.length > 0) {
+        sections.push(
+          makeSection(
+            'chapter_reveals',
+            renderChapterReveals(view.reveals),
+            'approved_intent',
+            view.reveals.map(f => `fact:${f.factKey}`),
+          ),
+        );
+      }
+      const constraints = renderHiddenConstraints(view.hidden);
+      if (constraints) {
+        sections.push(
+          makeSection(
+            'hidden_constraints',
+            constraints,
+            'approved_intent',
+            view.hidden.filter(f => f.constraintNote).map(f => `fact:${f.factKey}`),
+          ),
+        );
+      }
     }
 
     // e. Resolve contextRefs from brief
