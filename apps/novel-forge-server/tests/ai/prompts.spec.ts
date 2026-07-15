@@ -277,13 +277,24 @@ describe('Prompt modules', () => {
     });
   });
 
-  describe('knowledge contract (generation v2.2, character-knowledge design §5)', () => {
+  describe('knowledge contract (generation/judge v2.2, character-knowledge design §5–6)', () => {
     it('generation v2.2 states the epistemic rule for the knowledge sections', () => {
       expect(PROMPT_REGISTRY.generation.version).toBe('2.2.0');
       expect(PROMPT_REGISTRY.generation.system).toContain('## KNOWN FACTS (POV CAST)');
       expect(PROMPT_REGISTRY.generation.system).toContain('## REVEALED THIS CHAPTER');
       expect(PROMPT_REGISTRY.generation.system).toContain('## BEHAVIORAL CONSTRAINTS');
       expect(PROMPT_REGISTRY.generation.system).toContain('does not exist for the cast');
+    });
+
+    it('judge v2.2 explains the forbidden-knowledge assessment and its JSON field', () => {
+      expect(PROMPT_REGISTRY.judge.version).toBe('2.2.0');
+      expect(PROMPT_REGISTRY.judge.system).toContain('## FORBIDDEN KNOWLEDGE');
+      expect(PROMPT_REGISTRY.judge.system).toContain('knowledgeCompliance');
+    });
+
+    it('judge schema accepts knowledgeCompliance and keeps it optional', () => {
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [] }).success).toBe(true);
+      expect(parseSchema(JudgeSchema, { verdict: 'consistent', findings: [], knowledgeCompliance: { compliant: false, issues: ['[ledger_forgery] leaked'] } }).success).toBe(true);
     });
   });
 

@@ -17,6 +17,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
+import { type KnowledgeLeakIssue, loadKnowledgeView, parseKnowledgeContract, renderForbiddenFacts, scanKnowledgeLeaks } from '../../bible/fact/knowledge-view';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';
@@ -59,6 +60,7 @@ const ChapterGenAnnotation = Annotation.Root({
   continuationState: Annotation<Record<string, string>>({ reducer: (_, n) => n, default: () => ({}) }),
   verdict: Annotation<'consistent' | 'contradiction' | null>({ reducer: (_, n) => n, default: () => null }),
   endingCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
+  knowledgeCompliant: Annotation<boolean>({ reducer: (_, n) => n, default: () => true }),
   findings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   previousFindings: Annotation<JudgeFinding[]>({ reducer: (_, n) => n, default: () => [] }),
   attempt: Annotation<number>({ reducer: (_, n) => n, default: () => 0 }),
@@ -95,13 +97,15 @@ export function sameFinding(findings: JudgeFinding[], previousFindings: JudgeFin
   return false;
 }
 
-// Routing function after judge — exported for testing. An ending-contract violation rides the same
-// repair ladder as continuity findings (refinement design §9.2) but never hardens the verdict.
+// Routing function after judge — exported for testing. Ending-contract and knowledge-leak
+// violations ride the same repair ladder as continuity findings (refinement design §9.2,
+// character-knowledge design §6) but never harden the verdict.
 export function routeAfterJudge(
-  state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & { endingCompliant?: boolean },
+  state: Pick<ChapterGenState, 'verdict' | 'autoFix' | 'attempt' | 'maxFixes' | 'findings' | 'previousFindings'> & { endingCompliant?: boolean; knowledgeCompliant?: boolean },
 ): string {
   const endingCompliant = state.endingCompliant !== false;
-  if (state.verdict === 'consistent' && endingCompliant) return 'accept';
+  const knowledgeCompliant = state.knowledgeCompliant !== false;
+  if (state.verdict === 'consistent' && endingCompliant && knowledgeCompliant) return 'accept';
   if (!state.autoFix) return 'awaitReview';
   if (state.attempt >= state.maxFixes || sameFinding(state.findings, state.previousFindings)) return 'acceptAsIs';
   return 'repairPatch';
@@ -110,6 +114,16 @@ export function routeAfterJudge(
 // Routing function after repairPatch — exported for testing.
 export function routeAfterPatch(state: Pick<ChapterGenState, 'patchApplied'>): string {
   return state.patchApplied ? 'persistDraft' : 'repairRewrite';
+}
+
+// Merges the deterministic leak pre-scan with the judge's own knowledgeCompliance — exported for
+// testing. A pre-scan hit forces non-compliance regardless of what the model reported.
+export function mergeKnowledgeCompliance(
+  compliance: { compliant: boolean; issues: string[] } | undefined,
+  prescan: KnowledgeLeakIssue[],
+): { knowledgeCompliant: boolean; findings: JudgeFinding[] } {
+  const issues = [...prescan.map(leak => `"${leak.term}" exposes [${leak.factKey}] — ${leak.excerpt}`), ...(compliance && !compliance.compliant ? compliance.issues : [])];
+  return { knowledgeCompliant: issues.length === 0, findings: issues.map(issue => ({ severity: 'soft' as const, text: `knowledge leak: ${issue}` })) };
 }
 
 function extractJsonBlock(text: string): unknown {
@@ -299,9 +313,20 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const contractBlock = renderedContract
       ? `\n\n## ENDING CONTRACT\n${renderedContract}\n\nAlso assess the draft ending against this contract and include endingCompliance in your JSON.`
       : '';
+
+    // The judge — unlike the drafter — sees the full forbidden list (character-knowledge design §6):
+    // asymmetric visibility is what lets it catch leaks the pack-level filtering cannot prevent.
+    const knowledgeContract = parseKnowledgeContract(brief?.knowledgeContract);
+    const knowledgeView = knowledgeContract ? await loadKnowledgeView(db, projectId, state.chapter, knowledgeContract) : null;
+    const forbidden = knowledgeView?.hidden ?? [];
+    const knowledgeBlock =
+      forbidden.length > 0
+        ? `\n\n## FORBIDDEN KNOWLEDGE\n${renderForbiddenFacts(forbidden)}\n\nThe POV cast does not know these facts — assess the draft for leaks and include knowledgeCompliance in your JSON.`
+        : '';
+
     const systemMsg = new SystemMessage(PROMPT_REGISTRY.judge.system);
     const humanMsg = new HumanMessage(
-      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${contractBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
+      `Context:\n${renderedPack}\n\n---\nDraft prose to evaluate:\n${state.prose}${contractBlock}${knowledgeBlock}\n\nEvaluate this chapter draft for continuity and consistency with the established canon. Return a JSON object with verdict ("consistent" or "contradiction") and findings array.`,
     );
 
     const { messages } = await runToolLoop(model, tools, rawTools, [systemMsg, humanMsg], toolCtx, db as never);
@@ -320,7 +345,21 @@ export function createChapterGenerationGraph(services: GraphServices) {
     const compliance = renderedContract ? judgeResult?.endingCompliance : undefined;
     const endingCompliant = compliance ? compliance.compliant : true;
     if (compliance && !compliance.compliant) findings.push(...compliance.issues.map(issue => ({ severity: 'soft' as const, text: `ending contract: ${issue}` })));
-    logger.debug('generation judge', { runId: state.runId, chapter: state.chapter, attempt: state.attempt, verdict, findings: findings.length, endingCompliant });
+
+    const knowledge = mergeKnowledgeCompliance(
+      forbidden.length > 0 ? judgeResult?.knowledgeCompliance : undefined,
+      forbidden.length > 0 ? scanKnowledgeLeaks(state.prose, forbidden) : [],
+    );
+    findings.push(...knowledge.findings);
+    logger.debug('generation judge', {
+      runId: state.runId,
+      chapter: state.chapter,
+      attempt: state.attempt,
+      verdict,
+      findings: findings.length,
+      endingCompliant,
+      knowledgeCompliant: knowledge.knowledgeCompliant,
+    });
 
     // Update draft with judge result.
     if (state.draftId) {
@@ -332,7 +371,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         .where(eq(schema.drafts.id, BigInt(state.draftId)));
     }
 
-    return { verdict, findings, endingCompliant };
+    return { verdict, findings, endingCompliant, knowledgeCompliant: knowledge.knowledgeCompliant };
   }
 
   // ─── repairPatch ──────────────────────────────────────────────────────────────

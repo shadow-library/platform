@@ -10,7 +10,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { type JudgeFinding, routeAfterJudge, routeAfterPatch, sameFinding } from '@modules/ai/graphs/chapter-generation.graph';
+import { type JudgeFinding, mergeKnowledgeCompliance, routeAfterJudge, routeAfterPatch, sameFinding } from '@modules/ai/graphs/chapter-generation.graph';
 
 /**
  * Defining types
@@ -119,6 +119,47 @@ describe('routeAfterJudge', () => {
       previousFindings: [{ severity: 'hard', text: 'some other finding' }],
     });
     expect(result).toBe('repairPatch');
+  });
+
+  it('routes a knowledge leak to repairPatch with autoFix even when the verdict is consistent', () => {
+    const state = {
+      verdict: 'consistent' as const,
+      attempt: 0,
+      maxFixes: 3,
+      findings: [{ severity: 'soft' as const, text: 'knowledge leak: "forgery" exposes [ledger_forgery]' }],
+      previousFindings: [],
+      knowledgeCompliant: false,
+    };
+    expect(routeAfterJudge({ ...state, autoFix: true })).toBe('repairPatch');
+    expect(routeAfterJudge({ ...state, autoFix: false })).toBe('awaitReview');
+  });
+
+  it('accepts a consistent verdict when the draft is knowledge-compliant', () => {
+    expect(routeAfterJudge({ verdict: 'consistent', autoFix: true, attempt: 0, maxFixes: 3, findings: [], previousFindings: [], knowledgeCompliant: true })).toBe('accept');
+  });
+});
+
+// ─── mergeKnowledgeCompliance ────────────────────────────────────────────────
+
+describe('mergeKnowledgeCompliance', () => {
+  it('is compliant when neither the pre-scan nor the judge found leaks', () => {
+    expect(mergeKnowledgeCompliance({ compliant: true, issues: [] }, [])).toEqual({ knowledgeCompliant: true, findings: [] });
+    expect(mergeKnowledgeCompliance(undefined, [])).toEqual({ knowledgeCompliant: true, findings: [] });
+  });
+
+  it('lets a deterministic pre-scan hit force non-compliance over a compliant judge', () => {
+    const result = mergeKnowledgeCompliance({ compliant: true, issues: [] }, [{ factKey: 'ledger_forgery', term: 'forgery', excerpt: 'a forgery, she realized' }]);
+    expect(result.knowledgeCompliant).toBe(false);
+    expect(result.findings).toEqual([{ severity: 'soft', text: 'knowledge leak: "forgery" exposes [ledger_forgery] — a forgery, she realized' }]);
+  });
+
+  it('merges judge-reported paraphrase leaks after pre-scan hits as soft findings', () => {
+    const result = mergeKnowledgeCompliance({ compliant: false, issues: ['[motive_debt] Amara acts on the debt she cannot know about'] }, [
+      { factKey: 'ledger_forgery', term: 'forgery', excerpt: 'x' },
+    ]);
+    expect(result.knowledgeCompliant).toBe(false);
+    expect(result.findings.map(f => f.severity)).toEqual(['soft', 'soft']);
+    expect(result.findings[1]?.text).toBe('knowledge leak: [motive_debt] Amara acts on the debt she cannot know about');
   });
 });
 
