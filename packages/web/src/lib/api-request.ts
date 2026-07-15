@@ -5,8 +5,8 @@
 /**
  * Importing user defined packages
  */
-import { ApiError, type ErrorResponse } from './api-error';
 import { type JsonObject, type JsonValue, type VoidFn } from '../types';
+import { ApiError, type ErrorResponse } from './api-error';
 
 /**
  * Defining types
@@ -175,6 +175,7 @@ export class APIRequest {
     return response.json();
   }
 
+  // biome-ignore lint/suspicious/noThenProperty: this class is intentionally thenable for convenient use in async contexts
   then<T, TResult1 = T, TResult2 = never>(
     resolve?: ((value: T) => TResult1 | PromiseLike<TResult1>) | null,
     reject?: ((reason?: unknown) => TResult2 | PromiseLike<TResult2>) | null,
