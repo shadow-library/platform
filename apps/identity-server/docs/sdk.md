@@ -43,7 +43,12 @@ const auth = createAuthClient({
     id: Bun.env.IDENTITY_CLIENT_ID!,
     secret: Bun.env.IDENTITY_CLIENT_SECRET, // client_secret_basic — the only confidential auth method
   },
-  cache: { decisionTtlSeconds: 60, jwksTtlSeconds: 300 },
+  cache: { decisionTtlSeconds: 900, jwksTtlSeconds: 43200 }, // defaults: 15 min decisions, 12 h JWKS
+  roles: {
+    // this application's role catalog, owned in code and pushed on startup (see §4.1)
+    permissions: [{ name: 'posts:write', description: 'Create and edit posts' }, { name: 'posts:delete' }],
+    roles: [{ name: 'editor', description: 'Content editor', permissions: ['posts:write'] }],
+  },
 });
 ```
 
@@ -57,7 +62,7 @@ const principal = await auth.verify(bearerToken);
 // throws AuthError('TOKEN_EXPIRED' | 'TOKEN_INVALID' | 'AUDIENCE_MISMATCH' | 'ISSUER_MISMATCH' | 'ALG_REJECTED' | 'KEY_UNKNOWN')
 ```
 
-- JWKS fetched from discovery, cached (L1) for `jwksTtlSeconds`; an unknown `kid` triggers **one** immediate refetch (singleflight, 10 s negative cache) — this makes key rotation zero-config for consumers.
+- JWKS fetched from discovery, cached (L1) for `jwksTtlSeconds` (default **12 h**); an unknown `kid` triggers **one** immediate refetch (singleflight, 10 s negative cache) — this makes key rotation zero-config for consumers. The long TTL only delays propagation of a key *removal*, not the arrival of a new one.
 - Ed25519 verification via `crypto.subtle.verify`; keys imported once and cached as `CryptoKey` objects.
 - No network call on the hot path after warm-up. `introspect()` exists as an explicit fallback for opaque tokens and MUST NOT be used for routine verification.
 
@@ -76,7 +81,8 @@ export class PostController {
   list(@Principal() who: AuthPrincipal) { … }
 
   @Post()
-  @RequirePermission('posts:write')      // PDP-checked (60 s cached), org from principal
+  @RequirePermission('posts:write')      // PDP-checked (15 min cached), org from principal
+  @RequirePermission('org:delete', { highRisk: true }) // sensitive → 60 s cache for fast revocation
   create() { … }
 
   @Post('/internal/reindex')
@@ -88,6 +94,14 @@ export class PostController {
 
 Implementation notes: guards are `@Middleware`-based (see `fastify/src/decorators/middleware.decorator.ts`), attach the resolved principal to the request context, and integrate with the framework `Logger` context so every log line carries `principal.sub` and `org`. Decorator metadata degrades gracefully: `@RequirePermission` implies `@Authenticated`.
 
+### 4.1 Role catalog sync
+
+When `roles` is set (and `client` credentials are present), `AuthModule.forRoot` pushes the application's catalog to identity on startup via `auth.syncRoles(manifest)` → `PUT /api/v1/authz/catalog` (scope `authz:roles:sync`). You can also call `auth.syncRoles(...)` directly (e.g. from a migration or CI step).
+
+- **Ownership**: the catalog for an application lives in that application's code, not in hand-run admin calls. The target application is derived from the service-account token, never from the request body — a service can only touch **its own** application's catalog.
+- **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else `AuthError('ROLE_SYNC_FAILED')` / HTTP 400).
+- **Footgun**: because it deletes, a typo or truncated manifest revokes grants for that application. It is bounded to the pushing application and every sync is audited (`authz.catalog.synced`), but treat the manifest as production config. Assignments (which user has which role) are **not** managed here — they stay an admin operation.
+
 ## 5. PDP client
 
 ```ts
@@ -96,7 +110,7 @@ await auth.checkAll([{ action: 'posts:write' }, { action: 'posts:publish' }], wh
 ```
 
 - Calls `POST {issuer}/api/v1/authz/check` authenticated with the service's own M2M token. The endpoint requires the token to carry the `authz:check` scope (seeded at server bootstrap); the SDK requests that scope automatically, so the service's OAuth client **must be granted it at provisioning time** or every check denies.
-- L1 LRU cache keyed `(principal, org, action, resource, authz_version)`, TTL 60 s. The response's `authz_version` is compared on each hit; a bump (delivered piggybacked on responses) discards stale entries.
+- L1 LRU cache keyed `(principal, org, action, resource, authz_version)`, TTL **15 min** by default and **60 s** for `highRisk` decisions. The response's `authz_version` is compared on each hit; a bump (delivered piggybacked on responses) discards stale entries.
 - Deny-by-default: network failure, non-200, or malformed response ⇒ `false` (unless the route opted into fail-open).
 
 ## 6. Service-to-service tokens (M2M)

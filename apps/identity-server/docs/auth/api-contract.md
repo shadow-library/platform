@@ -260,10 +260,11 @@ Session cookie + CSRF; every endpoint is PDP-guarded in the platform organisatio
 
 ### 6.3 Roles & assignments (`/admin/roles`, `/admin/permissions`, `/admin/role-assignments`)
 
-Two-tier authorization (T-601): `iam:roles:manage` platform-wide, or `app:roles:manage` scoped to the owning application. A role can only carry permissions defined by its own application.
+Two-tier authorization (T-601): `iam:roles:manage` platform-wide, or `app:roles:manage` scoped to the owning application.
 
-- `POST /admin/roles` `{ applicationId, roleName, description? }` · `POST /admin/permissions` `{ applicationId, name, description? }` · `GET /admin/permissions?applicationId=`.
-- `POST /admin/roles/{roleId}/permissions` `{ permissionId }` · `DELETE /admin/roles/{roleId}/permissions/{permissionId}`.
+Role and permission **definitions** are no longer created here — each application owns its catalog in code and pushes it via the SDK (`PUT /api/v1/authz/catalog`, scope `authz:roles:sync`, full declarative sync; see architecture.md D-15 and sdk.md). The admin surface keeps only the read view and **assignment**:
+
+- `GET /admin/permissions?applicationId=` — read the catalog.
 - `POST /admin/role-assignments` and `POST /admin/role-assignments/revoke` `{ principalType, principalId, roleId, organisationId }` · `GET /admin/role-assignments?…` (platform tier only).
 
 ### 6.4 Webhooks (`/admin/webhooks`) — requires `iam:webhooks:manage` — _implemented (M7)_

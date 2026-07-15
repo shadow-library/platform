@@ -70,6 +70,7 @@ Decisions are binding. Changing one requires updating this document first.
 | **D-12** | Identity-probing endpoints return **neutral responses** (no account-existence oracle): registration, recovery, and login-init behave identically for known and unknown identifiers.                                                                                                                                                                                                                                                                                                                                                                                          | Enumeration resistance. Residual risk (timing, method lists) documented in §11.                                                                                                                             |
 | **D-13** | Deployment is a **modular monolith** plus a worker process, one PostgreSQL, one Redis. Background jobs use a Postgres-backed queue (`FOR UPDATE SKIP LOCKED`). No message broker until job volume proves the need.                                                                                                                                                                                                                                                                                                                                                           | Matches team size and scale; the transactional boundary is the tenant-isolation boundary.                                                                                                                   |
 | **D-14** | The repo's local `DatastoreService` is replaced by `@shadow-library/modules` **`DatabaseModule`** (≥ 0.5), which lifecycle-manages Postgres/Redis clients.                                                                                                                                                                                                                                                                                                                                                                                                                   | Removes duplicated client management and the unsafe local SQL param-interpolating logger.                                                                                                                   |
+| **D-15** | Role/permission **definitions are owned by each application in code** and pushed declaratively to identity by the SDK on startup (`PUT /api/v1/authz/catalog`, scope `authz:roles:sync`); the manifest is the source of truth and is reconciled full-sync (absent roles/permissions are deleted, cascading into assignments). Admins no longer create roles/permissions by hand. Role **assignments** (granting a defined role to a principal) remain an administrative operation — a service never assigns roles to users.                                                              | Removes manual role administration toil and drift; keeps the catalog versioned with the code that enforces it. A service is scoped to its own application, so it cannot escalate another app's privileges. Trade-off: a bad deploy can delete grants — bounded to the pushing application and audited.        |
 
 ## 4. System context
 
@@ -211,7 +212,7 @@ Client authentication uses `client_secret_basic` (secret stored argon2id-hashed,
 | Token                    | Format         | Lifetime                                        | Storage                                      | Notes                                                             |
 | :----------------------- | :------------- | :---------------------------------------------- | :------------------------------------------- | :---------------------------------------------------------------- |
 | Identity-service session | Opaque 256-bit | 30 d idle / 180 d absolute                      | `user_sessions` (hashed) + Redis cache       | The only browser credential on the identity domain                |
-| Access token (user)      | JWT (EdDSA)    | **10 minutes**                                  | Not stored server-side                       | `sub`, `org`, `aud`, `scope`, `sid`, `acr/amr`, `iat/exp/iss/jti` |
+| Access token (user)      | JWT (EdDSA)    | **60 minutes** (default; per-client)            | Not stored server-side                       | `sub`, `org`, `aud`, `scope`, `sid`, `acr/amr`, `iat/exp/iss/jti` |
 | Access token (M2M)       | JWT (EdDSA)    | 60 minutes                                      | Not stored                                   | `sub` = client ID, `aud` = API resource                           |
 | ID token                 | JWT (EdDSA)    | 5 minutes                                       | Not stored                                   | OIDC claims + `nonce`; never used for API authorization           |
 | Refresh token            | Opaque 256-bit | 30 d idle / 180 d absolute (bounded by session) | `refresh_tokens` (hashed), grouped by family | Rotates on every use (D-11)                                       |
@@ -221,8 +222,23 @@ Rules:
 
 - Tokens **never** appear in URLs, logs, or audit payloads. Refresh tokens and session IDs are stored as SHA-256 hashes only.
 - Verifiers MUST validate `iss`, `aud`, `exp` (±60 s clock skew), signature against a `kid`-matched JWKS key, and the `EdDSA`-only algorithm allowlist.
-- Access tokens contain no mutable authorization state (D-3). Revocation latency for access tokens is bounded by their 10-minute TTL; anything needing faster cutoff (session revocation, account suspension) is enforced via the PDP/session checks, which are cache-bounded at 60 s.
+- Access tokens contain no mutable authorization state (D-3). Revocation latency for access tokens is bounded by their 60-minute TTL; anything needing faster cutoff (session revocation, account suspension) is enforced via the PDP/session checks, which are cache-bounded at 15 minutes by default and **60 s for high-risk actions** (§11).
 - User-facing refresh: a rotated family; reuse of any revoked member revokes the family **and** terminates the linked session, and emits a `security.token_reuse` event.
+
+### 9.1 Latency-vs-revocation tradeoff (accepted)
+
+The token/cache windows above are tuned for throughput and low chatter against the identity service, not for near-instant revocation:
+
+| Window                         | Value      | Worst-case propagation of a revocation                       |
+| :----------------------------- | :--------- | :----------------------------------------------------------- |
+| User access-token TTL          | 60 min     | A revoked session's token keeps working until it expires     |
+| JWKS SDK cache                 | 12 h       | An unpublished signing key stays trusted in warm caches      |
+| PDP decision cache (default)   | 15 min     | A revoked grant keeps permitting until the entry expires¹    |
+| PDP decision cache (high-risk) | 60 s       | Fast cutoff for sensitive actions marked `highRisk`          |
+
+¹ `authz_version` piggybacking (§11) collapses this to one round-trip when the SDK next talks to the PDP for that principal, so the 15-minute figure is the *no-other-traffic* worst case, not the typical one.
+
+**This is a deliberate tradeoff we can afford: Shadow is not a banking/regulated-finance domain**, so a bounded window of up to 60 min for access-token revocation and 15 min for grant changes on ordinary actions is acceptable in exchange for far fewer identity round-trips per request. High-risk operations opt into the 60 s tier to keep their exposure small. If a future requirement demands near-instant, event-driven revocation (compromise response, regulated tenants), the path is to adopt **Continuous Access Evaluation / Shared Signals (CAEP/SSF)** as Microsoft Entra does — the IdP pushes revocation/session-change events to consumers instead of them polling — layered on top of this model without changing the token format.
 
 ## 10. Cryptography and key management (D-9)
 
@@ -230,16 +246,17 @@ Rules:
 - Exactly one `ACTIVE` signing key; `PENDING` is published in JWKS before activation (pre-publication window ≥ 24 h so consumer caches warm); `RETIRING` keys remain published until every token they signed has expired, then become `RETIRED` (unpublished, retained for audit).
 - Rotation cadence: 90 days, executed by a worker job; manual emergency rotation MUST be a single admin action that generates, pre-publishes, activates, and retires in an accelerated but ordered sequence.
 - KEK: 32-byte key from `SECURITY_MASTER_ENCRYPTION_KEY` env secret initially, behind a `KeyProvider` interface (`encrypt`, `decrypt`, `kekVersion`) so KMS/HSM replaces it without data migration beyond re-wrapping.
-- JWKS endpoint (`/.well-known/jwks.json`) serves public keys with `Cache-Control: max-age=300`; the SDK caches with automatic refresh on unknown `kid` (bounded retry).
+- JWKS endpoint (`/.well-known/jwks.json`) serves public keys with `Cache-Control: max-age=300`; the SDK caches in-process for **12 h** (`jwksTtlSeconds`) with automatic refresh on unknown `kid` (singleflight, 10 s negative cache). New keys are picked up on demand via the unknown-`kid` refetch, so the long TTL only delays propagation of a key **removal** — acceptable because retiring keys stay published until their tokens expire; emergency un-publication of a compromised key is bounded by this 12 h window (§9.1).
 - All other secrets at rest (TOTP seeds, client secrets where reversible storage is not needed → hash instead) follow the same envelope pattern. No custom cryptographic constructions anywhere; primitives come from WebCrypto/`node:crypto` and `Bun.password`.
 - Password hashing: argon2id via `Bun.password` with **pinned** parameters (`memoryCost: 65536`, `timeCost: 3`), parameters recorded per credential row; verify-time rehash upgrades on parameter change.
 
 ## 11. Authorization (PDP/PEP)
 
 - **Model**: RBAC. Applications define `permissions` (strings, e.g. `posts:write`) and `application_roles` mapping to permission sets. Roles are assigned to principals via `role_assignments`, always scoped to an organisation. Org administration itself uses the fixed membership roles (OWNER/ADMIN/MEMBER); fine-grained product access uses role assignments. ReBAC/ABAC are deliberately excluded until a product feature requires resource-level sharing.
+- **Catalog ownership (D-15)**: each application's role/permission catalog is declared in code and pushed by the SDK (`AuthModule.forRoot({ roles })` → `PUT /api/v1/authz/catalog`, scope `authz:roles:sync`). The push is a **full declarative sync** scoped to the caller's own application: permissions and roles absent from the manifest are deleted, cascading into `role_permissions` and `role_assignments`; every principal holding a role in that application is invalidated (`authz_version` bump) so no revoked grant survives in a PEP cache. Admin endpoints no longer create roles/permissions — only assign them.
 - **Decision API**: `POST /api/v1/authz/check` — `{ principal, organisation, action, resource? }` → `{ decision: PERMIT | DENY, reasons[] }`, plus a batch variant. Deny by default; deny always wins.
-- **Enforcement**: every consuming service uses the SDK's guard (`@RequirePermission('posts:write')`) which calls the PDP with an L1 cache (60 s TTL, LRU). The identity service uses the same PDP internally for its admin APIs — one decision path everywhere (APIs, workers, future WebSockets).
-- **Invalidation**: grant changes bump a per-principal `authz_version` (Redis); cached decisions embed the version and are discarded on mismatch. Worst-case staleness = SDK cache TTL (60 s).
+- **Enforcement**: every consuming service uses the SDK's guard (`@RequirePermission('posts:write')`) which calls the PDP with an L1 cache (**15 min TTL** default, LRU; **60 s** for routes marked `@RequirePermission('...', { highRisk: true })`). The identity service uses the same PDP internally for its admin APIs — one decision path everywhere (APIs, workers, future WebSockets).
+- **Invalidation**: grant changes bump a per-principal `authz_version` (Redis); cached decisions embed the version and are discarded on mismatch. Worst-case staleness = SDK cache TTL (15 min default / 60 s high-risk), but `authz_version` piggybacking collapses it to one round-trip once the principal has any other PDP traffic (§9.1).
 - **Auditability**: assignments and role/permission changes are audit events; the PDP MAY sample-log decisions (never bodies) for debugging.
 - **Enumeration-adjacent residual risks** (accepted, documented): available-method lists during login differ per account; response-timing differences are mitigated by constant-work lookups where practical.
 
@@ -271,9 +288,9 @@ Conformance: the OpenID Foundation conformance suite (OP Basic + Config profiles
 
 | Data                            | Cache   | TTL                         | Invalidation                 |
 | :------------------------------ | :------ | :-------------------------- | :--------------------------- |
-| JWKS / discovery                | L1 + L2 | 300 s                       | key rotation republish       |
+| JWKS / discovery                | SDK L1  | 12 h (unknown-`kid` refetch) | key rotation republish       |
 | Session lookup (hash → session) | L2      | 60 s                        | explicit delete on revoke    |
-| PDP decisions                   | SDK L1  | 60 s                        | `authz_version` bump         |
+| PDP decisions                   | SDK L1  | 15 min (60 s high-risk)     | `authz_version` bump         |
 | Client/app registry             | L1 + L2 | 300 s                       | explicit bust on admin write |
 | Auth flow state                 | L2 only | 900 s (TTL = flow lifetime) | terminal state delete        |
 | Rate-limit counters             | L2 only | window-scoped               | —                            |
@@ -388,7 +405,7 @@ sequenceDiagram
   end
   A->>Bsvc: request + Bearer AT
   Bsvc->>SDK: verify (JWKS cache, iss/aud/exp/alg, scopes)
-  Bsvc->>IdP: /authz/check (only for fine-grained decisions, 60 s cache)
+  Bsvc->>IdP: /authz/check (only for fine-grained decisions, 15 min cache / 60 s high-risk)
   Bsvc-->>A: response
 ```
 
@@ -420,7 +437,7 @@ sequenceDiagram
     PEP->>IdP: POST /authz/check {principal, org, action, resource}
     IdP->>IdP: resolve role_assignments → permissions (org-scoped)
     IdP-->>PEP: PERMIT/DENY + authz_version
-    PEP->>PEP: cache 60 s
+    PEP->>PEP: cache 15 min (60 s if high-risk)
   end
   PEP-->>PEP: enforce (deny by default)
 ```
