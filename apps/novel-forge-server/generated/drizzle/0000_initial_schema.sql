@@ -6,6 +6,7 @@ CREATE TYPE "public"."chapter_status" AS ENUM('done', 'failed', 'skipped');--> s
 CREATE TYPE "public"."entity_origin" AS ENUM('extracted', 'seeded', 'generated');--> statement-breakpoint
 CREATE TYPE "public"."entity_significance" AS ENUM('major', 'minor');--> statement-breakpoint
 CREATE TYPE "public"."entity_type" AS ENUM('character', 'faction', 'location', 'power_rule', 'item', 'concept');--> statement-breakpoint
+CREATE TYPE "public"."fact_source" AS ENUM('brief', 'manual', 'import');--> statement-breakpoint
 CREATE TYPE "public"."plan_status" AS ENUM('draft', 'approved', 'source');--> statement-breakpoint
 CREATE TYPE "public"."mystery_status" AS ENUM('open', 'resolved');--> statement-breakpoint
 CREATE TYPE "public"."thread_status" AS ENUM('open', 'closed');--> statement-breakpoint
@@ -90,6 +91,31 @@ CREATE TABLE "reference_chapters" (
 	"title" varchar(500) NOT NULL,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "reference_chapters_project_id_index_unique" UNIQUE("project_id","index")
+);
+--> statement-breakpoint
+CREATE TABLE "canon_facts" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"fact_key" varchar NOT NULL,
+	"text" text NOT NULL,
+	"subjects" jsonb,
+	"constraint_note" text,
+	"terms" jsonb,
+	"reveal_chapter" integer,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "canon_facts_project_id_fact_key_unique" UNIQUE("project_id","fact_key")
+);
+--> statement-breakpoint
+CREATE TABLE "character_knowledge" (
+	"project_id" bigint NOT NULL,
+	"fact_id" bigint NOT NULL,
+	"entity_id" bigint NOT NULL,
+	"learned_in_chapter" integer NOT NULL,
+	"source" "fact_source" DEFAULT 'manual' NOT NULL,
+	"note" text,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "character_knowledge_fact_id_entity_id_pk" PRIMARY KEY("fact_id","entity_id")
 );
 --> statement-breakpoint
 CREATE TABLE "entities" (
@@ -311,6 +337,7 @@ CREATE TABLE "briefs" (
 	"body" text NOT NULL,
 	"context_refs" jsonb,
 	"ending_contract" jsonb,
+	"knowledge_contract" jsonb,
 	"revision" integer DEFAULT 1 NOT NULL,
 	"content_hash" varchar,
 	"stale_reason" varchar,
@@ -637,6 +664,10 @@ CREATE TABLE "workflow_runs" (
 ALTER TABLE "projects" ADD CONSTRAINT "projects_source_project_id_projects_id_fk" FOREIGN KEY ("source_project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "reference_chapters" ADD CONSTRAINT "reference_chapters_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "canon_facts" ADD CONSTRAINT "canon_facts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "character_knowledge" ADD CONSTRAINT "character_knowledge_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "character_knowledge" ADD CONSTRAINT "character_knowledge_fact_id_canon_facts_id_fk" FOREIGN KEY ("fact_id") REFERENCES "public"."canon_facts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "character_knowledge" ADD CONSTRAINT "character_knowledge_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entities" ADD CONSTRAINT "entities_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_aliases" ADD CONSTRAINT "entity_aliases_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "entity_appearances" ADD CONSTRAINT "entity_appearances_entity_id_entities_id_fk" FOREIGN KEY ("entity_id") REFERENCES "public"."entities"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -677,6 +708,7 @@ ALTER TABLE "model_calls" ADD CONSTRAINT "model_calls_project_id_projects_id_fk"
 ALTER TABLE "user_feedback" ADD CONSTRAINT "user_feedback_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "workflow_runs" ADD CONSTRAINT "workflow_runs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 CREATE INDEX "chapters_project_id_status_idx" ON "chapters" USING btree ("project_id","status");--> statement-breakpoint
+CREATE INDEX "character_knowledge_project_id_idx" ON "character_knowledge" USING btree ("project_id");--> statement-breakpoint
 CREATE INDEX "entities_project_id_type_idx" ON "entities" USING btree ("project_id","type");--> statement-breakpoint
 CREATE INDEX "entity_images_entity_id_idx" ON "entity_images" USING btree ("entity_id");--> statement-breakpoint
 CREATE INDEX "arcs_project_id_volume_key_ordinal_idx" ON "arcs" USING btree ("project_id","volume_key","ordinal");--> statement-breakpoint

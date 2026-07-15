@@ -175,6 +175,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PRM_001 = new AppErrorCode('PRM_001', ErrorType.CLIENT_ERROR, 'No overview available — provide an overview or set the project brief or premise first');
 
   /*!
+   * Canon Fact Errors
+   */
+  static readonly FCT_001 = new AppErrorCode('FCT_001', ErrorType.NOT_FOUND, 'Canon fact not found');
+  static readonly FCT_002 = new AppErrorCode('FCT_002', ErrorType.CLIENT_ERROR, 'Unknown entity key referenced by the knowledge operation');
+
+  /*!
    * Plan Import Errors
    */
   static readonly IMP_001 = new AppErrorCode('IMP_001', ErrorType.CONFLICT, 'Project already contains plan data for a collection in this bundle — pass overwrite to replace it');

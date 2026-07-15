@@ -96,6 +96,7 @@ export const briefs = pgTable(
     body: text('body').notNull(),
     contextRefs: jsonb('context_refs'),
     endingContract: jsonb('ending_contract'),
+    knowledgeContract: jsonb('knowledge_contract'),
     revision: integer('revision').notNull().default(1),
     contentHash: varchar('content_hash'),
     staleReason: varchar('stale_reason'),

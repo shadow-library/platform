@@ -25,9 +25,12 @@ export namespace Knowledge {
   export type EntityRelationship = InferSelectModel<typeof entityRelationships>;
   export type EntityAppearance = InferSelectModel<typeof entityAppearances>;
   export type RelationshipObservation = InferSelectModel<typeof relationshipObservations>;
+  export type CanonFact = InferSelectModel<typeof canonFacts>;
+  export type CharacterKnowledge = InferSelectModel<typeof characterKnowledge>;
   export type EntityType = InferEnum<typeof entityType>;
   export type EntitySignificance = InferEnum<typeof entitySignificance>;
   export type EntityOrigin = InferEnum<typeof entityOrigin>;
+  export type FactSource = InferEnum<typeof factSource>;
 }
 
 /**
@@ -35,6 +38,7 @@ export namespace Knowledge {
  */
 
 export const entityType = pgEnum('entity_type', ['character', 'faction', 'location', 'power_rule', 'item', 'concept']);
+export const factSource = pgEnum('fact_source', ['brief', 'manual', 'import']);
 export const entitySignificance = pgEnum('entity_significance', ['major', 'minor']);
 export const entityOrigin = pgEnum('entity_origin', ['extracted', 'seeded', 'generated']);
 
@@ -139,6 +143,50 @@ export const relationshipObservations = pgTable(
   t => [primaryKey({ columns: [t.entityId, t.targetKey, t.kind, t.chapter] })],
 );
 
+// Spoiler-grade canon lives here, never in bible prose or entity sheets (character-knowledge design
+// §1): the drafter only ever sees a fact's `text` once the POV cast has ledgered it. While hidden,
+// `constraintNote` supplies POV-safe behavior and `terms` feeds the deterministic leak scan.
+export const canonFacts = pgTable(
+  'canon_facts',
+  {
+    id: bigserial('id', { mode: 'bigint' }).primaryKey(),
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    factKey: varchar('fact_key').notNull(),
+    text: text('text').notNull(),
+    subjects: jsonb('subjects'),
+    constraintNote: text('constraint_note'),
+    terms: jsonb('terms'),
+    revealChapter: integer('reveal_chapter'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+    updatedAt: timestamp('updated_at').notNull().defaultNow(),
+  },
+  t => [unique('canon_facts_project_id_fact_key_unique').on(t.projectId, t.factKey)],
+);
+
+// The knowledge ledger: which character knows which fact, and since which chapter. Populated
+// deterministically from brief `learns` declarations at draft approval, never by AI extraction.
+export const characterKnowledge = pgTable(
+  'character_knowledge',
+  {
+    projectId: bigint('project_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => projects.id, { onDelete: 'cascade' }),
+    factId: bigint('fact_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => canonFacts.id, { onDelete: 'cascade' }),
+    entityId: bigint('entity_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => entities.id, { onDelete: 'cascade' }),
+    learnedInChapter: integer('learned_in_chapter').notNull(),
+    source: factSource('source').notNull().default('manual'),
+    note: text('note'),
+    createdAt: timestamp('created_at').notNull().defaultNow(),
+  },
+  t => [primaryKey({ columns: [t.factId, t.entityId] }), index('character_knowledge_project_id_idx').on(t.projectId)],
+);
+
 export const entitiesRelations = relations(entities, ({ one, many }) => ({
   project: one(projects, { fields: [entities.projectId], references: [projects.id] }),
   images: many(entityImages),
@@ -166,4 +214,14 @@ export const entityAppearancesRelations = relations(entityAppearances, ({ one })
 
 export const relationshipObservationsRelations = relations(relationshipObservations, ({ one }) => ({
   entity: one(entities, { fields: [relationshipObservations.entityId], references: [entities.id] }),
+}));
+
+export const canonFactsRelations = relations(canonFacts, ({ one, many }) => ({
+  project: one(projects, { fields: [canonFacts.projectId], references: [projects.id] }),
+  knowledge: many(characterKnowledge),
+}));
+
+export const characterKnowledgeRelations = relations(characterKnowledge, ({ one }) => ({
+  fact: one(canonFacts, { fields: [characterKnowledge.factId], references: [canonFacts.id] }),
+  entity: one(entities, { fields: [characterKnowledge.entityId], references: [entities.id] }),
 }));

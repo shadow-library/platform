@@ -1,5 +1,5 @@
 {
-  "id": "f7ce7b06-c809-42b7-942b-2de49cc9b115",
+  "id": "87eed577-fe9d-45ca-ba1b-cd0c65c66f49",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -432,6 +432,226 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.canon_facts": {
+      "name": "canon_facts",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fact_key": {
+          "name": "fact_key",
+          "type": "varchar",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "text": {
+          "name": "text",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "subjects": {
+          "name": "subjects",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "constraint_note": {
+          "name": "constraint_note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "terms": {
+          "name": "terms",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "reveal_chapter": {
+          "name": "reveal_chapter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "canon_facts_project_id_projects_id_fk": {
+          "name": "canon_facts_project_id_projects_id_fk",
+          "tableFrom": "canon_facts",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "canon_facts_project_id_fact_key_unique": {
+          "name": "canon_facts_project_id_fact_key_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "fact_key"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.character_knowledge": {
+      "name": "character_knowledge",
+      "schema": "",
+      "columns": {
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "fact_id": {
+          "name": "fact_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "entity_id": {
+          "name": "entity_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "learned_in_chapter": {
+          "name": "learned_in_chapter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "source": {
+          "name": "source",
+          "type": "fact_source",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'manual'"
+        },
+        "note": {
+          "name": "note",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "character_knowledge_project_id_idx": {
+          "name": "character_knowledge_project_id_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "character_knowledge_project_id_projects_id_fk": {
+          "name": "character_knowledge_project_id_projects_id_fk",
+          "tableFrom": "character_knowledge",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "character_knowledge_fact_id_canon_facts_id_fk": {
+          "name": "character_knowledge_fact_id_canon_facts_id_fk",
+          "tableFrom": "character_knowledge",
+          "tableTo": "canon_facts",
+          "columnsFrom": [
+            "fact_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "character_knowledge_entity_id_entities_id_fk": {
+          "name": "character_knowledge_entity_id_entities_id_fk",
+          "tableFrom": "character_knowledge",
+          "tableTo": "entities",
+          "columnsFrom": [
+            "entity_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "character_knowledge_fact_id_entity_id_pk": {
+          "name": "character_knowledge_fact_id_entity_id_pk",
+          "columns": [
+            "fact_id",
+            "entity_id"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2103,6 +2323,12 @@
         },
         "ending_contract": {
           "name": "ending_contract",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "knowledge_contract": {
+          "name": "knowledge_contract",
           "type": "jsonb",
           "primaryKey": false,
           "notNull": false
@@ -4928,6 +5154,15 @@
         "power_rule",
         "item",
         "concept"
+      ]
+    },
+    "public.fact_source": {
+      "name": "fact_source",
+      "schema": "public",
+      "values": [
+        "brief",
+        "manual",
+        "import"
       ]
     },
     "public.plan_status": {
