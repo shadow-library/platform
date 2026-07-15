@@ -21,6 +21,7 @@ export interface AuthRouteMetadata {
   services?: string[];
   permission?: string;
   failOpen?: boolean;
+  highRisk?: boolean;
 }
 
 export interface PrincipalCarrier {
@@ -30,6 +31,9 @@ export interface PrincipalCarrier {
 export interface RequirePermissionOptions {
   /** Permits the action when the PDP is unreachable — explicit opt-in for availability-critical read paths */
   failOpen?: boolean;
+
+  /** Caches this route's PDP decision for ~60 s instead of the default 15 min — for sensitive operations that need fast revocation */
+  highRisk?: boolean;
 }
 
 type AuthDecorator = ClassDecorator & MethodDecorator;

@@ -66,7 +66,7 @@ export class OAuthClientService {
           tokenEndpointAuthMethod: authMethod,
           grantTypes: input.grantTypes,
           requirePkce: true,
-          accessTokenTtl: input.accessTokenTtl ?? 600,
+          accessTokenTtl: input.accessTokenTtl ?? 3600,
           organisationId: input.organisationId ?? null,
           backchannelLogoutUri: input.backchannelLogoutUri ?? null,
         })

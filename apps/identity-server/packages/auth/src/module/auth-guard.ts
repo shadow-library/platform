@@ -69,7 +69,7 @@ export class AuthGuard {
 
   private async checkPermission(principal: AuthPrincipal, auth: AuthRouteMetadata): Promise<void> {
     const permission = auth.permission as string;
-    const options = { failOpen: auth.failOpen };
+    const options = { failOpen: auth.failOpen, highRisk: auth.highRisk };
     const permitted = principal.org ? await this.client.check({ action: permission, organisationId: principal.org, principal }, options) : (auth.failOpen ?? false);
     if (!permitted) throw new ServerError(AuthGuardErrorCode.IAM_002);
   }

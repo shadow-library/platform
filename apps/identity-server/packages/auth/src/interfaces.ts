@@ -114,6 +114,13 @@ export interface CheckOptions {
    * availability-critical read paths only; a reachable PDP answering DENY is always a DENY.
    */
   failOpen?: boolean;
+
+  /**
+   * Marks the action as high-risk, caching its decision for a much shorter window so a revocation
+   * bites in ~60 s instead of the default 15 min. Reserve for sensitive operations (credential or
+   * membership changes, destructive admin actions); routine reads should keep the long default.
+   */
+  highRisk?: boolean;
 }
 
 export interface IntrospectionResult {
