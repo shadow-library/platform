@@ -50,6 +50,7 @@ import { parseSchema } from '../ai/schemas/validate';
 import { TelemetryHandler } from '../ai/telemetry.handler';
 import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
+import { applyBriefReveals } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
@@ -645,6 +646,12 @@ export class GenerationService {
         .set({ reviewStatus: 'approved', updatedAt: new Date() })
         .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
         .returning();
+
+      // Approval is the deterministic reveal gate (character-knowledge design §4): the brief's
+      // `learns` declarations become ledger rows in the same transaction as the approval itself.
+      const reveals = await applyBriefReveals(tx, projectId, chapter);
+      if (reveals.applied > 0) this.logger.info('brief reveals ledgered', { projectId, chapter, applied: reveals.applied });
+
       return row;
     });
 

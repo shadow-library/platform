@@ -18,6 +18,8 @@ import { BibleDocumentController } from './document/bible-document.controller';
 import { BibleDocumentService } from './document/bible-document.service';
 import { EntityController } from './entity/entity.controller';
 import { EntityService } from './entity/entity.service';
+import { FactController } from './fact/fact.controller';
+import { FactService } from './fact/fact.service';
 import { VolumeController } from './volume/volume.controller';
 import { VolumeService } from './volume/volume.service';
 
@@ -31,8 +33,8 @@ import { VolumeService } from './volume/volume.service';
 
 @Module({
   imports: [DatabaseModule, StorageModule],
-  controllers: [EntityController, VolumeController, ArcController, BibleDocumentController],
-  providers: [EntityService, VolumeService, ArcService, BibleDocumentService],
-  exports: [EntityService, VolumeService, ArcService, BibleDocumentService],
+  controllers: [EntityController, VolumeController, ArcController, BibleDocumentController, FactController],
+  providers: [EntityService, VolumeService, ArcService, BibleDocumentService, FactService],
+  exports: [EntityService, VolumeService, ArcService, BibleDocumentService, FactService],
 })
 export class BibleModule {}
