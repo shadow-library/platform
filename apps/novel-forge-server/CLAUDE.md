@@ -109,5 +109,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] CK3 — Context assembly: `known_facts`/`chapter_reveals`/`hidden_constraints` sections in `forChapter`, section labels, generation prompt v2.2 epistemic rule + goldens (character-knowledge §5). Verify: assembler tests — contract-bearing vs contract-less briefs, hidden fact text never in rendered pack.
 - [x] CK4 — Judge gate: `knowledgeCompliance` schema + judge prompt bump, `## FORBIDDEN KNOWLEDGE` block, pre-scan merge, `knowledgeCompliant` routing in `routeAfterJudge` (character-knowledge §6). Verify: routing matrix + judge-node merge tests.
 - [ ] CK5 — Follow-ups: plan-import `facts` collection + brief `knowledgeContract`, `novel-plan-forge` skill update, web facts panel, `forRevision` sections, arc-planner reveal authoring (character-knowledge §8).
+  - Done: bundle v2 (`facts` + brief `knowledgeContract`) in DTO/validator/import service, `knowledgeContract` in `BRIEF_HASH_FIELDS`, skill updated with fact authoring + migration guide.
+  - Remaining: web facts panel + import-result chip for facts, `forRevision` knowledge sections, arc-planner reveal authoring, bible-audit spoiler check.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

@@ -21,14 +21,20 @@ chapter generation can start immediately after the upload. Drives tasks PI1–PI
 
 ## 2. Bundle format (the wire contract)
 
-One JSON document, `{"format": "novel-forge-plan", "version": 1, "bible": [...], "entities": [...], "volumes": [...], "arcs": [...], "briefs": [...]}`. Every collection is
-optional — a bundle may carry only bible docs or only entities — but arcs and briefs must ship with their volumes: their ranges validate against the bundle's computed
-volume layout, never against whatever the project happens to hold (single-brief fixes belong to the existing `PUT /briefs/:n`). Natural keys identify rows; database ids
-never appear.
+One JSON document, `{"format": "novel-forge-plan", "version": 2, "bible": [...], "entities": [...], "facts": [...], "volumes": [...], "arcs": [...], "briefs": [...]}`.
+Every collection is optional — a bundle may carry only bible docs or only entities — but arcs and briefs must ship with their volumes: their ranges validate against the
+bundle's computed volume layout, never against whatever the project happens to hold (single-brief fixes belong to the existing `PUT /briefs/:n`). Natural keys identify
+rows; database ids never appear.
+
+**Versions:** the server accepts `version` 1 and 2. v2 (character-knowledge design) added the optional `facts` collection and the optional brief `knowledgeContract`;
+a v1 bundle is exactly a v2 bundle that omits both.
 
 - **bible**: `{section, slug, frontmatter?, body}`. `section` ∈ `project|world|power|plot|lore` — `story_state` and `ai` are app-managed and rejected. The
   `REQUIRED_BIBLE_DOCS` manifest (refinement §7) is the authoring checklist but is not enforced server-side: partial bundles are legal.
 - **entities**: `{entityKey, type, name, significance?, status?, motivation?, notes?, body?}` — field parity with `CreateEntityBody`; `origin` is forced to `seeded`.
+- **facts** (v2): `{factKey, text, subjects?, constraintNote?, terms?, revealChapter?}` — canon facts for the character-knowledge ledger (character-knowledge design §3).
+  `text` is the spoiler statement, `constraintNote` the POV-safe behavior injected while hidden, `terms` the lexical leak-scan list. No ledger rows import — knowledge is
+  ledgered when briefs' `learns` are applied at draft approval, or via the manual reveal endpoint.
 - **volumes**: `{volumeKey, ordinal, title, objective, conflict, payoff, targetChapterCount, cast?, body?}`. `startChapter`/`endChapter` never appear — approval derives them
   (§4). `epitome` is a source-pipeline field and is out of scope.
 - **arcs**: `{arcKey, volumeKey, ordinal, title, objective, escalation, payoff, hook, chapterStart, chapterEnd, cast?, body?}` — absolute chapter numbers, same shape the
@@ -36,7 +42,8 @@ never appear.
 - **briefs**: `{chapter, volumeKey, arcKey?, title, objective, events, requiredContext?, continuesIntoNextChapter?, startsFromPreviousChapter?, handoffBeat?,
   endingContract}` — the `ChapterBriefSchema` shape minus `pov` (the app itself never persists it). The server renders the stored `body` from
   `objective`/`events`/continuation flags via `renderBriefBody`, which moves from `generation.service.ts` to `src/common/brief-body.ts` so outline and import cannot drift.
-  `endingContract` is required: contract-less briefs defeat the serial-pacing machinery the skill exists to feed.
+  `endingContract` is required: contract-less briefs defeat the serial-pacing machinery the skill exists to feed. v2 adds an optional
+  `knowledgeContract: {pov, learns?: [{entityKey, factKey}]}` — omitted, the chapter is epistemically unfiltered, exactly like a hand-authored brief without one.
 
 ## 3. Validation
 
@@ -49,6 +56,9 @@ never appear.
     (`ArcService.coversExactly` invariant). A volume with zero arcs is legal — the arc-less gate path;
   - briefs: `chapter` unique and inside a computed volume range; `volumeKey` equals the covering volume; when the covering volume has arcs, `arcKey` is required and must be
     the covering arc; otherwise `arcKey` must be absent.
+- v2 knowledge checks: duplicate `factKey`s are issues; a `learns` entry naming a fact that exists neither in the bundle nor in the project is an issue (a reveal that can
+  never be ledgered); unknown `pov`/`learns` entity keys and `subjects` refs are warnings (approve-time skips are logged and recoverable via the manual reveal endpoint);
+  a bundle fact never revealed by any brief is a warning.
 - Warnings (returned, never blocking): `cast`/`requiredContext` `entity:` refs resolving to neither bundle nor existing project entities; `requiredContext` prefixes other
   than `entity:`/`volume:` (threads, mysteries, and chapter summaries do not exist pre-generation; the ContextAssembler degrades unresolved refs gracefully either way).
 

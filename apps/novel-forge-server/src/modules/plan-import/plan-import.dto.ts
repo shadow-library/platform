@@ -83,6 +83,45 @@ export class PlanBundleEntity {
 }
 
 @Schema()
+export class PlanBundleFact {
+  @Field({ pattern: KEY_PATTERN })
+  factKey: string;
+
+  @Field({ minLength: 1 })
+  text: string;
+
+  @Field(() => [String], { optional: true })
+  subjects?: string[];
+
+  @Field({ optional: true })
+  constraintNote?: string;
+
+  @Field(() => [String], { optional: true })
+  terms?: string[];
+
+  @Field(() => Integer, { optional: true, minimum: 1 })
+  revealChapter?: number;
+}
+
+@Schema()
+export class PlanBundleKnowledgeReveal {
+  @Field({ pattern: KEY_PATTERN })
+  entityKey: string;
+
+  @Field({ pattern: KEY_PATTERN })
+  factKey: string;
+}
+
+@Schema()
+export class PlanBundleKnowledgeContract {
+  @Field(() => [String], { minItems: 1 })
+  pov: string[];
+
+  @Field(() => [PlanBundleKnowledgeReveal], { optional: true })
+  learns?: PlanBundleKnowledgeReveal[];
+}
+
+@Schema()
 export class PlanBundleVolume {
   @Field({ pattern: KEY_PATTERN })
   volumeKey: string;
@@ -187,6 +226,11 @@ export class PlanBundleBrief {
   // Required: contract-less briefs defeat the serial-pacing machinery the authoring skill feeds.
   @Field(() => EndingContractSchema)
   endingContract: EndingContractSchema;
+
+  // Optional: the epistemic contract (character-knowledge design §3) — omitting it leaves the
+  // chapter unfiltered, exactly like a hand-authored brief without one.
+  @Field(() => PlanBundleKnowledgeContract, { optional: true })
+  knowledgeContract?: PlanBundleKnowledgeContract;
 }
 
 @Schema()
@@ -202,6 +246,10 @@ export class PlanBundle {
 
   @Field(() => [PlanBundleEntity], { optional: true })
   entities?: PlanBundleEntity[];
+
+  // Bundle v2 — canon facts feeding the character-knowledge ledger; ignored-free: v1 bundles simply omit it.
+  @Field(() => [PlanBundleFact], { optional: true })
+  facts?: PlanBundleFact[];
 
   @Field(() => [PlanBundleVolume], { optional: true })
   volumes?: PlanBundleVolume[];
@@ -247,6 +295,9 @@ export class ImportResults {
 
   @Field(() => CollectionResult)
   entities: CollectionResult;
+
+  @Field(() => CollectionResult)
+  facts: CollectionResult;
 
   @Field(() => CollectionResult)
   volumes: CollectionResult;

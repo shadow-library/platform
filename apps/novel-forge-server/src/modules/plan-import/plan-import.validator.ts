@@ -47,18 +47,21 @@ function findDuplicates(keys: string[]): string[] {
 
 /**
  * Cross-item invariants the DTO layer cannot express: unique natural keys, contiguous volume
- * ordinals, exact arc coverage, briefs inside their covering volume/arc. Issues abort the import;
- * warnings (dangling entity refs, pre-generation-impossible ref prefixes) are returned but never block.
+ * ordinals, exact arc coverage, briefs inside their covering volume/arc, knowledge contracts that
+ * reveal real facts. Issues abort the import; warnings (dangling entity refs,
+ * pre-generation-impossible ref prefixes) are returned but never block.
  */
-export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: ReadonlySet<string>): BundleValidation {
+export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: ReadonlySet<string>, existingFactKeys: ReadonlySet<string> = new Set()): BundleValidation {
   const issues: BundleIssue[] = [];
   const warnings: string[] = [];
   const volumes = bundle.volumes ?? [];
   const arcs = bundle.arcs ?? [];
   const briefs = bundle.briefs ?? [];
+  const facts = bundle.facts ?? [];
 
   for (const slug of findDuplicates((bundle.bible ?? []).map(d => `${d.section}/${d.slug}`))) issues.push({ field: 'bible', msg: `duplicate document '${slug}'` });
   for (const key of findDuplicates((bundle.entities ?? []).map(e => e.entityKey))) issues.push({ field: 'entities', msg: `duplicate entityKey '${key}'` });
+  for (const key of findDuplicates(facts.map(f => f.factKey))) issues.push({ field: 'facts', msg: `duplicate factKey '${key}'` });
   for (const key of findDuplicates(volumes.map(v => v.volumeKey))) issues.push({ field: 'volumes', msg: `duplicate volumeKey '${key}'` });
   for (const key of findDuplicates(arcs.map(a => a.arcKey))) issues.push({ field: 'arcs', msg: `duplicate arcKey '${key}'` });
   for (const key of findDuplicates(briefs.map(b => String(b.chapter)))) issues.push({ field: 'briefs', msg: `duplicate chapter ${key}` });
@@ -128,8 +131,34 @@ export function validatePlanBundle(bundle: PlanBundle, existingEntityKeys: Reado
     }
   }
 
-  // Warnings: dangling entity references and ref prefixes that cannot resolve before generation.
+  // Knowledge contracts (character-knowledge design §3): a reveal against a fact that exists nowhere
+  // can never be ledgered — that is an issue; unknown entity keys stay warnings like cast refs, since
+  // the approve-time skip is logged and recoverable via the manual reveal endpoint.
   const knownEntities = new Set([...existingEntityKeys, ...(bundle.entities ?? []).map(e => e.entityKey)]);
+  const knownFacts = new Set([...existingFactKeys, ...facts.map(f => f.factKey)]);
+  const revealedFactKeys = new Set<string>();
+  for (const [index, brief] of briefs.entries()) {
+    const contract = brief.knowledgeContract;
+    if (!contract) continue;
+    for (const key of contract.pov) if (!knownEntities.has(key)) warnings.push(`brief ${brief.chapter} knowledgeContract.pov names unknown entity '${key}'`);
+    for (const reveal of contract.learns ?? []) {
+      revealedFactKeys.add(reveal.factKey);
+      if (!knownFacts.has(reveal.factKey)) {
+        issues.push({
+          field: `briefs[${index}].knowledgeContract`,
+          msg: `chapter ${brief.chapter} reveals unknown fact '${reveal.factKey}' — reveals must name a bundle or project fact`,
+        });
+      }
+      if (!knownEntities.has(reveal.entityKey)) warnings.push(`brief ${brief.chapter} knowledgeContract reveals to unknown entity '${reveal.entityKey}'`);
+    }
+  }
+  for (const fact of facts) {
+    for (const key of fact.subjects ?? []) if (!knownEntities.has(key)) warnings.push(`fact '${fact.factKey}' subjects unknown entity '${key}'`);
+    if (!revealedFactKeys.has(fact.factKey))
+      warnings.push(`fact '${fact.factKey}' is never revealed by any brief in this bundle — it stays hidden until a later plan or a manual reveal`);
+  }
+
+  // Warnings: dangling entity references and ref prefixes that cannot resolve before generation.
   const warnCast = (owner: string, cast?: string[]): void => {
     for (const key of cast ?? []) if (!knownEntities.has(key)) warnings.push(`${owner} casts unknown entity '${key}'`);
   };

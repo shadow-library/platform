@@ -118,6 +118,18 @@ function buildBundle(): PlanBundle {
   } as PlanBundle;
 }
 
+function buildV2Bundle(): PlanBundle {
+  const bundle = buildBundle();
+  bundle.version = 2;
+  bundle.facts = [
+    { factKey: 'ledger_forgery', text: 'The ledger is a forgery.', subjects: ['mara'], constraintNote: 'Mara avoids the study.', terms: ['forgery'], revealChapter: 2 },
+    { factKey: 'motive_debt', text: 'The covenant paymaster is broke.', terms: ['gambling debt'] },
+  ];
+  const brief = bundle.briefs?.find(b => b.chapter === 2);
+  if (brief) brief.knowledgeContract = { pov: ['mara'], learns: [{ entityKey: 'mara', factKey: 'ledger_forgery' }] };
+  return bundle;
+}
+
 describe.if(pgAvailable)('plan import', () => {
   let db: PrimaryDatabase;
   let service: PlanImportService;
@@ -153,6 +165,7 @@ describe.if(pgAvailable)('plan import', () => {
     expect(response.results).toEqual({
       bible: { created: 2, updated: 0, unchanged: 0, pruned: 0 },
       entities: { created: 2, updated: 0, unchanged: 0, pruned: 0 },
+      facts: { created: 0, updated: 0, unchanged: 0, pruned: 0 },
       volumes: { created: 2, updated: 0, unchanged: 0, pruned: 0 },
       arcs: { created: 2, updated: 0, unchanged: 0, pruned: 0 },
       briefs: { created: 7, updated: 0, unchanged: 0, pruned: 0 },
@@ -251,8 +264,45 @@ describe.if(pgAvailable)('plan import', () => {
     expect(await codeOf(service.import(999999999n, { bundle: buildBundle() }))).toBe('PRJ_001');
 
     const projectId = await createProject();
-    const stale = { ...buildBundle(), version: 2 };
+    const stale = { ...buildBundle(), version: 3 };
     expect(await codeOf(service.import(projectId, { bundle: stale }))).toBe('IMP_002');
+  });
+
+  it('should import v2 facts and knowledge contracts, idempotently, and prune facts on overwrite', async () => {
+    const projectId = await createProject();
+    const bundle = buildV2Bundle();
+    const response = await service.import(projectId, { bundle });
+    expect(response.results.facts).toEqual({ created: 2, updated: 0, unchanged: 0, pruned: 0 });
+    expect(response.warnings).toEqual(["fact 'motive_debt' is never revealed by any brief in this bundle — it stays hidden until a later plan or a manual reveal"]);
+
+    const fact = await db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, 'ledger_forgery')) });
+    expect(fact).toMatchObject({ text: 'The ledger is a forgery.', constraintNote: 'Mara avoids the study.', terms: ['forgery'] });
+
+    const brief = await db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, 2)) });
+    expect(brief?.knowledgeContract).toEqual({ pov: ['mara'], learns: [{ entityKey: 'mara', factKey: 'ledger_forgery' }] });
+
+    const again = await service.import(projectId, { bundle: buildV2Bundle(), overwrite: true });
+    expect(again.results.facts).toEqual({ created: 0, updated: 0, unchanged: 2, pruned: 0 });
+    expect(again.results.briefs.created + again.results.briefs.updated).toBe(0);
+
+    const smaller = buildV2Bundle();
+    smaller.facts = smaller.facts?.filter(f => f.factKey === 'ledger_forgery');
+    const pruning = await service.import(projectId, { bundle: smaller, overwrite: true });
+    expect(pruning.results.facts).toEqual({ created: 0, updated: 0, unchanged: 1, pruned: 1 });
+  });
+
+  it('should reject a knowledge contract revealing an unknown fact and write nothing', async () => {
+    const projectId = await createProject();
+    const bundle = buildV2Bundle();
+    const brief = bundle.briefs?.find(b => b.chapter === 2);
+    if (brief?.knowledgeContract?.learns?.[0]) brief.knowledgeContract.learns[0].factKey = 'ghost_fact';
+
+    const error = await service.import(projectId, { bundle }).then(
+      () => null,
+      err => err,
+    );
+    expect(error).toBeInstanceOf(ValidationError);
+    expect(await db.$count(schema.canonFacts, eq(schema.canonFacts.projectId, projectId))).toBe(0);
   });
 
   it('should surface cross-item problems as a ValidationError and write nothing', async () => {

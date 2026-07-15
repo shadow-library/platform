@@ -662,6 +662,8 @@ export class ProposalApplyService {
       arcKey: op.arcKey ?? existing?.arcKey ?? null,
       contextRefs: op.contextRefs ?? existing?.contextRefs ?? null,
       endingContract: op.endingContract ?? existing?.endingContract ?? null,
+      // Not editable via ops — carried through so the hash (which includes it) matches the row.
+      knowledgeContract: existing?.knowledgeContract ?? null,
     };
     const contentHash = briefContentHash({ chapter: op.chapter, ...merged });
     const revision = (existing?.revision ?? 0) + 1;

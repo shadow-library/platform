@@ -27,14 +27,15 @@ import { approveVolumePlan } from '../bible/volume/volume.approve';
  * Defining types
  */
 
-type CollectionName = 'bible' | 'entities' | 'volumes' | 'arcs' | 'briefs';
+type CollectionName = 'bible' | 'entities' | 'facts' | 'volumes' | 'arcs' | 'briefs';
 
 /**
  * Declaring the constants
  */
 
 const BUNDLE_FORMAT = 'novel-forge-plan';
-const BUNDLE_VERSION = 1;
+// v2 added the optional `facts` collection and brief `knowledgeContract`; v1 bundles remain valid.
+const BUNDLE_VERSIONS = [1, 2];
 
 function emptyResult(): CollectionResult {
   return { created: 0, updated: 0, unchanged: 0, pruned: 0 };
@@ -55,10 +56,13 @@ export class PlanImportService {
     if (project.kind !== 'new_novel') throw new ServerError(AppErrorCode.PRJ_003);
 
     const bundle = body.bundle;
-    if (bundle.format !== BUNDLE_FORMAT || bundle.version !== BUNDLE_VERSION) throw new ServerError(AppErrorCode.IMP_002);
+    if (bundle.format !== BUNDLE_FORMAT || !BUNDLE_VERSIONS.includes(bundle.version)) throw new ServerError(AppErrorCode.IMP_002);
 
-    const existingEntities = await this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } });
-    const validation = validatePlanBundle(bundle, new Set(existingEntities.map(e => e.entityKey)));
+    const [existingEntities, existingFacts] = await Promise.all([
+      this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } }),
+      this.db.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId), columns: { factKey: true } }),
+    ]);
+    const validation = validatePlanBundle(bundle, new Set(existingEntities.map(e => e.entityKey)), new Set(existingFacts.map(f => f.factKey)));
     if (validation.issues.length > 0) {
       const error = new ValidationError();
       for (const issue of validation.issues) error.addFieldError(issue.field, issue.msg);
@@ -73,6 +77,7 @@ export class PlanImportService {
       const results = {
         bible: await this.importBible(tx, projectId, bundle, overwrite),
         entities: await this.importEntities(tx, projectId, bundle, overwrite),
+        facts: await this.importFacts(tx, projectId, bundle, overwrite),
         volumes: await this.importVolumes(tx, projectId, bundle, overwrite),
         arcs: await this.importArcs(tx, projectId, bundle, overwrite),
         briefs: await this.importBriefs(tx, projectId, bundle, overwrite),
@@ -127,6 +132,7 @@ export class PlanImportService {
     const collections: { name: CollectionName; carried: number; count: () => Promise<number> }[] = [
       { name: 'bible', carried: bundle.bible?.length ?? 0, count: () => this.db.$count(schema.bibleDocuments, authoredBibleDocs) },
       { name: 'entities', carried: bundle.entities?.length ?? 0, count: () => this.db.$count(schema.entities, eq(schema.entities.projectId, projectId)) },
+      { name: 'facts', carried: bundle.facts?.length ?? 0, count: () => this.db.$count(schema.canonFacts, eq(schema.canonFacts.projectId, projectId)) },
       { name: 'volumes', carried: bundle.volumes?.length ?? 0, count: () => this.db.$count(schema.volumes, eq(schema.volumes.projectId, projectId)) },
       { name: 'arcs', carried: bundle.arcs?.length ?? 0, count: () => this.db.$count(schema.arcs, eq(schema.arcs.projectId, projectId)) },
       { name: 'briefs', carried: bundle.briefs?.length ?? 0, count: () => this.db.$count(schema.briefs, eq(schema.briefs.projectId, projectId)) },
@@ -234,6 +240,54 @@ export class PlanImportService {
         .delete(schema.entities)
         .where(and(eq(schema.entities.projectId, projectId), notInArray(schema.entities.entityKey, keep)))
         .returning({ id: schema.entities.id });
+      result.pruned = pruned.length;
+    }
+    return result;
+  }
+
+  private async importFacts(tx: PrimaryDatabase, projectId: bigint, bundle: PlanBundle, overwrite: boolean): Promise<CollectionResult> {
+    const items = bundle.facts ?? [];
+    const result = emptyResult();
+    if (items.length === 0) return result;
+
+    const existing = await tx.query.canonFacts.findMany({ where: eq(schema.canonFacts.projectId, projectId) });
+    const existingByKey = new Map(existing.map(f => [f.factKey, f]));
+
+    for (const item of items) {
+      const row = existingByKey.get(item.factKey);
+      const values = {
+        text: item.text,
+        subjects: (item.subjects ?? null) as never,
+        constraintNote: item.constraintNote ?? null,
+        terms: (item.terms ?? null) as never,
+        revealChapter: item.revealChapter ?? null,
+      };
+      // Facts carry no content hash; field-level comparison keeps re-imports idempotent.
+      const unchanged = row && Object.entries(values).every(([key, value]) => JSON.stringify(row[key as keyof typeof values] ?? null) === JSON.stringify(value ?? null));
+      if (unchanged) {
+        result.unchanged += 1;
+        continue;
+      }
+      if (row) {
+        await tx
+          .update(schema.canonFacts)
+          .set({ ...values, updatedAt: new Date() })
+          .where(eq(schema.canonFacts.id, row.id));
+        result.updated += 1;
+      } else {
+        await tx.insert(schema.canonFacts).values({ projectId, factKey: item.factKey, ...values });
+        result.created += 1;
+      }
+    }
+
+    if (overwrite) {
+      // Pruning a fact cascades its character_knowledge ledger rows — consistent with the drafts/chapters
+      // guard: overwrite is only reachable before any prose exists, so no ledgered reveal is ever live.
+      const keep = items.map(i => i.factKey);
+      const pruned = await tx
+        .delete(schema.canonFacts)
+        .where(and(eq(schema.canonFacts.projectId, projectId), notInArray(schema.canonFacts.factKey, keep)))
+        .returning({ id: schema.canonFacts.id });
       result.pruned = pruned.length;
     }
     return result;
@@ -358,6 +412,7 @@ export class PlanImportService {
         body: renderBriefBody(item),
         contextRefs: (item.requiredContext ?? []) as never,
         endingContract: { ...item.endingContract } as Record<string, unknown>,
+        knowledgeContract: item.knowledgeContract ? ({ pov: item.knowledgeContract.pov, learns: item.knowledgeContract.learns ?? [] } as Record<string, unknown>) : null,
       };
       const contentHash = briefContentHash({ chapter: item.chapter, ...values });
       if (row && row.contentHash === contentHash) {

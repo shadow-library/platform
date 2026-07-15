@@ -146,3 +146,31 @@ describe('validatePlanBundle', () => {
     expect(result.warnings.some(w => w.includes("'hero'"))).toBe(false);
   });
 });
+
+describe('validatePlanBundle — knowledge contracts (bundle v2)', () => {
+  function fact(factKey: string, subjects?: string[]): { factKey: string; text: string; subjects?: string[] } {
+    return { factKey, text: 'the truth', subjects };
+  }
+
+  it('should reject duplicate fact keys and reveals of unknown facts', () => {
+    const withContract = { ...brief(1, 'v1'), knowledgeContract: { pov: ['hero'], learns: [{ entityKey: 'hero', factKey: 'ghost_fact' }] } };
+    const result = validatePlanBundle(bundle({ volumes: [volume('v1', 1, 4)], facts: [fact('secret'), fact('secret')] as never, briefs: [withContract] }), new Set(['hero']));
+    expect(result.issues).toContainEqual({ field: 'facts', msg: "duplicate factKey 'secret'" });
+    expect(result.issues).toContainEqual({ field: 'briefs[0].knowledgeContract', msg: "chapter 1 reveals unknown fact 'ghost_fact' — reveals must name a bundle or project fact" });
+  });
+
+  it('should accept reveals of existing project facts and warn on unknown entities and unrevealed facts', () => {
+    const withContract = { ...brief(1, 'v1'), knowledgeContract: { pov: ['hero', 'stranger'], learns: [{ entityKey: 'nobody', factKey: 'old_secret' }] } };
+    const result = validatePlanBundle(
+      bundle({ volumes: [volume('v1', 1, 4)], facts: [fact('fresh_secret', ['phantom'])] as never, briefs: [withContract] }),
+      new Set(['hero']),
+      new Set(['old_secret']),
+    );
+    expect(result.issues).toEqual([]);
+    expect(result.warnings).toContain("brief 1 knowledgeContract.pov names unknown entity 'stranger'");
+    expect(result.warnings).toContain("brief 1 knowledgeContract reveals to unknown entity 'nobody'");
+    expect(result.warnings).toContain("fact 'fresh_secret' subjects unknown entity 'phantom'");
+    expect(result.warnings).toContain("fact 'fresh_secret' is never revealed by any brief in this bundle — it stays hidden until a later plan or a manual reveal");
+    expect(result.warnings.some(w => w.includes("'hero'"))).toBe(false);
+  });
+});
