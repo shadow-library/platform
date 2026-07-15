@@ -21,6 +21,7 @@ export type AuthErrorCode =
   | 'KEY_UNKNOWN'
   | 'NONCE_MISMATCH'
   | 'PDP_UNAVAILABLE'
+  | 'ROLE_SYNC_FAILED'
   | 'TOKEN_EXPIRED'
   | 'TOKEN_INVALID'
   | 'TOKEN_REQUEST_FAILED';

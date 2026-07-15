@@ -16,51 +16,6 @@ import { Field, Schema } from '@shadow-library/class-schema';
  */
 
 @Schema()
-export class CreateRoleBody {
-  @Field(() => Number)
-  applicationId: number;
-
-  @Field({ maxLength: 64 })
-  roleName: string;
-
-  @Field({ optional: true, maxLength: 255 })
-  description?: string;
-}
-
-@Schema()
-export class CreatePermissionBody {
-  @Field(() => Number)
-  applicationId: number;
-
-  @Field({ maxLength: 128 })
-  name: string;
-
-  @Field({ optional: true, maxLength: 255 })
-  description?: string;
-}
-
-@Schema()
-export class RoleIdParams {
-  @Field({ pattern: '^\\d+$' })
-  roleId: string;
-}
-
-@Schema()
-export class RolePermissionParams {
-  @Field({ pattern: '^\\d+$' })
-  roleId: string;
-
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
-  permissionId: string;
-}
-
-@Schema()
-export class GrantRolePermissionBody {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
-  permissionId: string;
-}
-
-@Schema()
 export class RoleAssignmentBody {
   @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT'] })
   principalType: 'USER' | 'SERVICE_ACCOUNT';

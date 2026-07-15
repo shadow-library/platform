@@ -58,6 +58,39 @@ export interface AuthCacheOptions {
   jwksTtlSeconds?: number;
 }
 
+/** One permission a service's application defines; the name is unique within the application */
+export interface PermissionManifest {
+  name: string;
+  description?: string;
+}
+
+/** One role a service's application defines, carrying a set of its own permission names */
+export interface RoleManifest {
+  name: string;
+  description?: string;
+  /** Permission names this role grants; every name MUST also appear in the manifest's `permissions` */
+  permissions: string[];
+}
+
+/**
+ * The full, declarative role catalog a service owns for its application. Pushed to identity via
+ * `syncRoles`; anything absent from it is deleted there (cascading into assignments), so it must be
+ * the complete set, not a delta.
+ */
+export interface RoleCatalogManifest {
+  permissions: PermissionManifest[];
+  roles: RoleManifest[];
+}
+
+export interface RoleCatalogSyncResult {
+  permissionsUpserted: number;
+  permissionsDeleted: number;
+  rolesUpserted: number;
+  rolesDeleted: number;
+  /** Principals whose cached decisions were invalidated because a role under them changed or was removed */
+  principalsInvalidated: number;
+}
+
 export interface AuthClientConfig {
   /** Issuer base URL of the identity service; discovery is fetched from `{issuer}/.well-known/openid-configuration` */
   issuer: string;
@@ -75,6 +108,12 @@ export interface AuthClientConfig {
   clockSkewSeconds?: number;
 
   cache?: AuthCacheOptions;
+
+  /**
+   * The application's role catalog. When set (and `client` credentials are present), `AuthModule`
+   * pushes it to identity on startup so roles are owned in code, not administered by hand.
+   */
+  roles?: RoleCatalogManifest;
 
   /** Transport override, primarily for tests; defaults to global fetch */
   fetch?: FetchLike;

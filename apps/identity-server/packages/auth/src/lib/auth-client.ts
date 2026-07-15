@@ -6,7 +6,7 @@
  * Importing user defined packages
  */
 import { AuthError } from '../errors';
-import { AuthClientConfig, AuthPrincipal, CheckInput, CheckOptions, FetchLike, IntrospectionResult, JwtPayload, ServiceTokenOptions } from '../interfaces';
+import { AuthClientConfig, AuthPrincipal, CheckInput, CheckOptions, FetchLike, IntrospectionResult, JwtPayload, RoleCatalogManifest, RoleCatalogSyncResult, ServiceTokenOptions } from '../interfaces';
 import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
 import { verifyJwt } from './jwt';
@@ -31,6 +31,9 @@ export interface AuthClient {
 
   /** `fetch` with the service token injected and a single automatic retry on a stale-token 401 */
   fetch(url: string, init?: RequestInit, options?: ServiceTokenOptions): Promise<Response>;
+
+  /** Declaratively replaces this application's role catalog in identity; requires service-account credentials */
+  syncRoles(manifest: RoleCatalogManifest): Promise<RoleCatalogSyncResult>;
 
   /** Explicit fallback for opaque tokens; MUST NOT be used for routine verification */
   introspect(token: string): Promise<IntrospectionResult>;
@@ -58,6 +61,9 @@ const DEFAULT_IDENTITY_RESOURCE = 'shadow-identity';
 
 /** The server's PDP endpoint requires a service token granted this scope */
 const PDP_SCOPE = 'authz:check';
+
+/** The catalog-sync endpoint requires a service token granted this scope */
+const ROLE_SYNC_SCOPE = 'authz:roles:sync';
 
 class AuthClientImpl implements AuthClient {
   private readonly issuer: string;
@@ -109,6 +115,17 @@ class AuthClientImpl implements AuthClient {
     this.tokens.invalidate(options);
     const fresh = await this.tokens.getToken(options);
     return this.transport(url, this.withBearer(init, fresh));
+  }
+
+  async syncRoles(manifest: RoleCatalogManifest): Promise<RoleCatalogSyncResult> {
+    if (!this.config.client) throw new AuthError('CONFIG_INVALID', 'role sync requires service-account client credentials');
+    const token = await this.tokens.getToken({ resource: this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE, scopes: [ROLE_SYNC_SCOPE] });
+    const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
+    const response = await this.transport(`${this.issuer}/api/v1/authz/catalog`, { method: 'PUT', headers, body: JSON.stringify(manifest) }).catch((error: Error) => {
+      throw new AuthError('ROLE_SYNC_FAILED', `role sync failed: ${error.message}`);
+    });
+    if (!response.ok) throw new AuthError('ROLE_SYNC_FAILED', `role sync endpoint returned http ${response.status}`);
+    return (await response.json()) as RoleCatalogSyncResult;
   }
 
   async introspect(token: string): Promise<IntrospectionResult> {

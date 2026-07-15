@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Get, HttpController, HttpStatus, Post, Query, Req, RespondFor, ServerError } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -11,22 +11,10 @@ import { AppErrorCode } from '@server/classes';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Application } from '@server/modules/infrastructure/datastore';
-import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
+import { ApplicationRoleService } from '@server/modules/system/application';
 
 import { AdminAccessService, AdminActor } from './admin-access.service';
-import { CreatedResponse } from './admin-client.dto';
-import {
-  ApplicationIdQuery,
-  AssignmentListQuery,
-  AssignmentListResponse,
-  CreatePermissionBody,
-  CreateRoleBody,
-  GrantRolePermissionBody,
-  PermissionListResponse,
-  RoleAssignmentBody,
-  RoleIdParams,
-  RolePermissionParams,
-} from './admin-role.dto';
+import { ApplicationIdQuery, AssignmentListQuery, AssignmentListResponse, PermissionListResponse, RoleAssignmentBody } from './admin-role.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
 
@@ -37,10 +25,11 @@ import { ADMIN_PERMISSIONS } from './admin.constants';
 /**
  * Declaring the constants
  *
- * Role/permission administration is two-tier (T-601): `iam:roles:manage` operates anywhere while
- * `app:roles:manage` only reaches the application that owns the caller's permission. Cross-
- * application grants are structurally rejected — a role may only carry permissions owned by its
- * own application.
+ * Role and permission *definitions* are owned by each application and pushed declaratively through
+ * the SDK's catalog sync (`PUT /api/v1/authz/catalog`); admins no longer create them by hand. What
+ * remains here is *assignment* — granting a defined role to a principal — which stays a deliberate
+ * human decision, plus a read view of the catalog. `iam:roles:manage` operates anywhere while
+ * `app:roles:manage` only reaches the application that owns the caller's permission.
  */
 
 @HttpController('/api/v1/admin')
@@ -49,7 +38,6 @@ export class AdminRoleController {
     private readonly access: AdminAccessService,
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly applicationRoleService: ApplicationRoleService,
-    private readonly applicationService: ApplicationService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -63,59 +51,12 @@ export class AdminRoleController {
     await this.auditService.record({ action, outcome: 'SUCCESS', actorType: 'USER', actorId: actor.session.userId.toString(), targetType, targetId, detail: detail ?? null });
   }
 
-  @Post('/roles')
-  @RespondFor(201, CreatedResponse)
-  async createRole(@Body() body: CreateRoleBody, @Req() request: FastifyRequest): Promise<CreatedResponse> {
-    const actor = await this.access.requireRoleAdmin(request, body.applicationId);
-    const application = this.applicationService.getApplicationByIdOrThrow(body.applicationId);
-    const role = await this.applicationRoleService.addRole(application.name, { roleName: body.roleName, description: body.description });
-    await this.record(actor, 'admin.role.created', 'application_role', String(role.id), { roleName: body.roleName, applicationId: body.applicationId });
-    return { id: String(role.id) };
-  }
-
-  @Post('/permissions')
-  @RespondFor(201, CreatedResponse)
-  async createPermission(@Body() body: CreatePermissionBody, @Req() request: FastifyRequest): Promise<CreatedResponse> {
-    const actor = await this.access.requireRoleAdmin(request, body.applicationId);
-    this.applicationService.getApplicationByIdOrThrow(body.applicationId);
-    const permissionId = await this.policyDecisionService.ensurePermission(body.applicationId, body.name, body.description);
-    await this.record(actor, 'admin.permission.created', 'permission', permissionId, { name: body.name, applicationId: body.applicationId });
-    return { id: permissionId };
-  }
-
   @Get('/permissions')
   @RespondFor(200, PermissionListResponse)
   async listPermissions(@Query() query: ApplicationIdQuery, @Req() request: FastifyRequest): Promise<PermissionListResponse> {
     await this.access.requireRead(request, ADMIN_PERMISSIONS.rolesManage);
     const permissions = await this.policyDecisionService.listPermissionsForApplication(query.applicationId);
     return { items: permissions.map(permission => ({ id: permission.id, name: permission.name, description: permission.description ?? undefined })) };
-  }
-
-  @Post('/roles/:roleId/permissions')
-  @HttpStatus(200)
-  @RespondFor(200, AdminActionResponse)
-  async grantPermission(@Params() params: RoleIdParams, @Body() body: GrantRolePermissionBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const role = await this.requireRole(Number(params.roleId));
-    const actor = await this.access.requireRoleAdmin(request, role.applicationId);
-
-    const permission = await this.policyDecisionService.getPermission(body.permissionId);
-    if (!permission) throw new ServerError(AppErrorCode.ADM_003);
-    /** A role may only ever carry permissions its own application defines. */
-    if (permission.applicationId !== role.applicationId) throw new ServerError(AppErrorCode.ADM_003);
-
-    await this.policyDecisionService.grantPermissionToRole(role.id, body.permissionId);
-    await this.record(actor, 'admin.role.permission_granted', 'application_role', String(role.id), { permissionId: body.permissionId, permission: permission.name });
-    return { success: true };
-  }
-
-  @Delete('/roles/:roleId/permissions/:permissionId')
-  @RespondFor(200, AdminActionResponse)
-  async revokePermission(@Params() params: RolePermissionParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const role = await this.requireRole(Number(params.roleId));
-    const actor = await this.access.requireRoleAdmin(request, role.applicationId);
-    await this.policyDecisionService.revokePermissionFromRole(role.id, params.permissionId);
-    await this.record(actor, 'admin.role.permission_revoked', 'application_role', String(role.id), { permissionId: params.permissionId });
-    return { success: true };
   }
 
   @Post('/role-assignments')

@@ -10,7 +10,7 @@ import { type FastifyRequest } from 'fastify';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { KeyService } from '@server/modules/auth/keys';
+import { type JwtClaims, KeyService } from '@server/modules/auth/keys';
 
 /**
  * Defining types
@@ -18,6 +18,11 @@ import { KeyService } from '@server/modules/auth/keys';
 
 interface ServiceTokenPolicy {
   scope: string;
+}
+
+/** Carries the verified service-token claims the guard attaches so downstream handlers can read the caller identity */
+export interface ServiceTokenCarrier {
+  serviceToken?: JwtClaims;
 }
 
 type ServiceTokenDecorator = ClassDecorator & MethodDecorator;
@@ -35,6 +40,12 @@ const PLATFORM_AUDIENCE = 'shadow-identity';
 
 /** Restricts the route to M2M callers presenting a service token carrying the given scope */
 export const RequireServiceToken = (scope: string): ServiceTokenDecorator => Route({ [SERVICE_TOKEN_METADATA]: { scope } satisfies ServiceTokenPolicy });
+
+/** Returns the verified service-token claims the guard attached; throws 401 when the route ran unguarded */
+export function getServiceTokenClaims(request: ServiceTokenCarrier): JwtClaims {
+  if (!request.serviceToken) throw new ServerError(AppErrorCode.SEC_003);
+  return request.serviceToken;
+}
 
 @Middleware({ type: 'preHandler', weight: 100 })
 export class ServiceTokenGuard implements MiddlewareGenerator {
@@ -62,6 +73,8 @@ export class ServiceTokenGuard implements MiddlewareGenerator {
 
       const scopes = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
       if (claims.token_type !== 'service' || claims.aud !== PLATFORM_AUDIENCE || !scopes.includes(policy.scope)) throw new ServerError(AppErrorCode.SEC_004);
+
+      (request as FastifyRequest & ServiceTokenCarrier).serviceToken = claims;
     };
   }
 }

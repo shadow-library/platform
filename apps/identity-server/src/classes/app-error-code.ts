@@ -102,6 +102,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ADM_003 = new AppErrorCode('ADM_003', ErrorType.VALIDATION_ERROR, 'Invalid administrative request value', 400);
 
   /**
+   * Authorization (RBAC) Error Codes
+   */
+
+  /** A pushed role catalog is malformed — for example a role references a permission it does not declare */
+  static readonly AUTHZ_001 = new AppErrorCode('AUTHZ_001', ErrorType.VALIDATION_ERROR, 'Invalid role catalog manifest', 400);
+  /** The presented service token is not bound to an application that can own a role catalog */
+  static readonly AUTHZ_002 = new AppErrorCode('AUTHZ_002', ErrorType.UNAUTHORIZED, 'Service token is not bound to an application', 403);
+
+  /**
    * Organisation Error Codes
    */
 

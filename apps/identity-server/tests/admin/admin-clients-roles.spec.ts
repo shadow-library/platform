@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
+import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
@@ -130,23 +130,17 @@ describe('Admin client, resource and role APIs', () => {
     expect((detail.json() as { scopes: string[] }).scopes).not.toContain('read');
   });
 
-  it('should manage roles, permissions and assignments over http', async () => {
-    const role = await request('post', '/api/v1/admin/roles').body({ applicationId: platformAppId, roleName: `editor-${Date.now()}` });
-    expect(role.statusCode).toBe(201);
-    const { id: roleId } = role.json() as { id: string };
-
-    const permission = await request('post', '/api/v1/admin/permissions').body({ applicationId: platformAppId, name: `posts:write:${Date.now()}` });
-    expect(permission.statusCode).toBe(201);
-    const { id: permissionId } = permission.json() as { id: string };
-
-    const granted = await request('post', `/api/v1/admin/roles/${roleId}/permissions`).body({ permissionId });
-    expect(granted.statusCode).toBe(200);
+  it('should assign and revoke a role over http', async () => {
+    /** Role and permission definitions are owned by the application (catalog sync), so set them up through the services rather than removed admin endpoints. */
+    const role = await env.getService(ApplicationRoleService).addRole('shadow-identity', { roleName: `editor-${Date.now()}` });
+    const permissionId = await env.getService(PolicyDecisionService).ensurePermission(platformAppId, `posts:write:${Date.now()}`);
+    await env.getService(PolicyDecisionService).grantPermissionToRole(role.id, permissionId);
 
     const user = await env.getService(UserService).createUserWithPassword({ email: 'assignee@example.com', password: 'Password@123', status: 'ACTIVE' });
     const assigned = await request('post', '/api/v1/admin/role-assignments').body({
       principalType: 'USER',
       principalId: user.id.toString(),
-      roleId: Number(roleId),
+      roleId: role.id,
       organisationId: platformOrgId,
     });
     expect(assigned.statusCode).toBe(200);
@@ -157,42 +151,11 @@ describe('Admin client, resource and role APIs', () => {
     const revoked = await request('post', '/api/v1/admin/role-assignments/revoke').body({
       principalType: 'USER',
       principalId: user.id.toString(),
-      roleId: Number(roleId),
+      roleId: role.id,
       organisationId: platformOrgId,
     });
     expect(revoked.statusCode).toBe(200);
     const after = await request('get', `/api/v1/admin/role-assignments?principalType=USER&principalId=${user.id}`);
     expect((after.json() as { items: unknown[] }).items).toHaveLength(0);
-  });
-
-  it('should reject granting a permission owned by another application', async () => {
-    const apps = env.getService(ApplicationService);
-    const otherApp = await apps.createApplication({ name: `other-${Date.now()}`, subDomain: `o${Date.now()}` });
-    const foreignPermission = await env.getService(PolicyDecisionService).ensurePermission(otherApp.id, 'foreign:perm');
-
-    const role = await request('post', '/api/v1/admin/roles').body({ applicationId: platformAppId, roleName: `mixed-${Date.now()}` });
-    const { id: roleId } = role.json() as { id: string };
-
-    const denied = await request('post', `/api/v1/admin/roles/${roleId}/permissions`).body({ permissionId: foreignPermission });
-    expect(denied.statusCode).toBe(400);
-  });
-
-  it('should let an app-scoped admin manage only their application', async () => {
-    const apps = env.getService(ApplicationService);
-    const pdp = env.getService(PolicyDecisionService);
-    const appB = await apps.createApplication({ name: `scoped-${Date.now()}`, subDomain: `s${Date.now()}` });
-    const roleB = await env.getService(ApplicationRoleService).addRole(appB.name, { roleName: 'BAdmin' });
-    const scopedPermission = await pdp.ensurePermission(appB.id, ADMIN_PERMISSIONS.appRolesManage);
-    await pdp.grantPermissionToRole(roleB.id, scopedPermission);
-
-    const scopedAdmin = await env.getService(UserService).createUserWithPassword({ email: 'scoped-admin@example.com', password: 'Password@123', status: 'ACTIVE' });
-    await pdp.assignRole({ type: 'USER', id: scopedAdmin.id.toString() }, roleB.id, platformOrgId);
-    const { secret } = await env.getService(SessionService).create({ userId: scopedAdmin.id, aal: 'AAL2' });
-
-    const allowed = await request('post', '/api/v1/admin/roles', secret).body({ applicationId: appB.id, roleName: `sub-${Date.now()}` });
-    expect(allowed.statusCode).toBe(201);
-
-    const denied = await request('post', '/api/v1/admin/roles', secret).body({ applicationId: platformAppId, roleName: `nope-${Date.now()}` });
-    expect(denied.statusCode).toBe(403);
   });
 });

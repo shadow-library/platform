@@ -72,6 +72,11 @@ export class PolicyDecisionService {
     this.logger.debug('bumped authz version, cached decisions invalidated', { principal, version });
   }
 
+  /** Invalidates every cached decision for a principal; used by catalog sync when role definitions change under them. */
+  async invalidatePrincipal(principal: Principal): Promise<void> {
+    await this.bumpAuthzVersion(principal);
+  }
+
   /** Resolves a permission decision: deny by default; a matching permission on any assigned role permits. */
   async check(request: CheckRequest): Promise<Decision> {
     const authzVersion = await this.getAuthzVersion(request.principal);
