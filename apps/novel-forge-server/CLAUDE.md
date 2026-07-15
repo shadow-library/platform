@@ -18,6 +18,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 - `docs/chapter-recombine-design.md` — merging translator-split chapter parts back into source chapters: title-parsing ladder, AI boundary resolution, transactional renumber + derived-data guard, auto-run hooks; drives tasks RC1–RC2.
 - `docs/plan-import-design.md` — offline plan authoring: the `novel-plan-forge` skill's markdown workspace + JSON bundle contract, transactional `plan/import` endpoint with overwrite/approve semantics; drives tasks PI1–PI3.
 - `docs/character-knowledge-design.md` — epistemic filtering: `canon_facts` + `character_knowledge` ledger, per-brief `knowledgeContract`, POV-filtered generation context, judge `knowledgeCompliance` + leak pre-scan. **Adds Appendix A rule 15** (its §2); drives tasks CK1–CK5.
+- `docs/reader-publish-design.md` — the reader boundary: `publications`/`chapter_publications` ledger, one-way idempotent push to the external `novel-forge-reader` service, stable `publishedOrdinal`, reconcile/rebuild semantics, hard rules (its §9); drives tasks PB1–PB5.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -111,5 +112,10 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [ ] CK5 — Follow-ups: plan-import `facts` collection + brief `knowledgeContract`, `novel-plan-forge` skill update, web facts panel, `forRevision` sections, arc-planner reveal authoring (character-knowledge §8).
   - Done: bundle v2 (`facts` + brief `knowledgeContract`) in DTO/validator/import service, `knowledgeContract` in `BRIEF_HASH_FIELDS`, skill updated with fact authoring + migration guide.
   - Remaining: web facts panel + import-result chip for facts, `forRevision` knowledge sections, arc-planner reveal authoring, bible-audit spoiler check.
+- [ ] PB1 — Publishing schema & error codes: `publications` + `chapter_publications` ledger tables, 2 enums, `PUB_` codes, baseline migration regen (reader-publish §3). Verify: migration applies to template DB, schema tests green.
+- [ ] PB2 — Publishing module: publish/schedule/unpublish gates (`PUB_002`/`PUB_003`), once-only `publishedOrdinal` assignment, reader-clean payload renderer, `PublishingService` + controller/DTOs (reader-publish §4–5). Verify: gate matrix + template-DB tests incl. ordinal stability under renumber.
+- [ ] PB3 — Push executor & reconciliation: `publish` job kind, bearer-auth HTTP client, ledger-as-outbox retry + janitor sweep, manifest-diff `reconcile` endpoint (reader-publish §5–6). Verify: mocked reader-service e2e, retry idempotence, wipe-and-rebuild convergence test.
+- [ ] PB4 — Web UI (`novel-forge-web`): publish panel — novel metadata editor, per-chapter publish/schedule/republish/unpublish with ledger status chips, reconcile action (reader-publish §7). Verify: web type-check/lint/build green.
+- [ ] PB5 — Reader service (external repo `novel-forge-reader`): scaffold per reader-publish §8 — internal upsert/manifest API, public catalog/chapter/progress API, ETag-first caching. Verify: forge e2e publish → read round-trip against the local reader service.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.
