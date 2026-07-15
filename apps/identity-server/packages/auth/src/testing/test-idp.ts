@@ -64,6 +64,9 @@ export interface TestIdP {
   setEndpointFailure(pathname: string, fail: boolean): void;
   getRequestCount(pathname: string): number;
 
+  /** Returns the most recent role-catalog sync the mock received, if any */
+  getLastCatalog(): { manifest: { permissions: unknown[]; roles: unknown[] }; authorization: string | null } | undefined;
+
   stop(): void;
 }
 
@@ -90,6 +93,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const grants = new Set<string>();
   let authzVersion = 1;
   let issuer = '';
+  let lastCatalog: { manifest: { permissions: unknown[]; roles: unknown[] }; authorization: string | null } | undefined;
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
 
@@ -184,6 +188,14 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     return json({ decision, reasons: decision === 'DENY' ? ['no matching grant'] : [], authzVersion });
   };
 
+  const handleCatalog = async (request: Request): Promise<Response> => {
+    const manifest = (await request.json().catch(() => ({ permissions: [], roles: [] }))) as { permissions?: unknown[]; roles?: unknown[] };
+    const permissions = manifest.permissions ?? [];
+    const roles = manifest.roles ?? [];
+    lastCatalog = { manifest: { permissions, roles }, authorization: request.headers.get('authorization') };
+    return json({ permissionsUpserted: permissions.length, permissionsDeleted: 0, rolesUpserted: roles.length, rolesDeleted: 0, principalsInvalidated: 0 });
+  };
+
   const handle = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
     requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
@@ -204,6 +216,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
         return handleToken(request);
       case '/api/v1/authz/check':
         return handleAuthzCheck(request);
+      case '/api/v1/authz/catalog':
+        return handleCatalog(request);
       default:
         return new Response('not found', { status: 404 });
     }
@@ -232,6 +246,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     },
     setEndpointFailure: (pathname, fail) => void (fail ? failingEndpoints.add(pathname) : failingEndpoints.delete(pathname)),
     getRequestCount: pathname => requestCounts.get(pathname) ?? 0,
+    getLastCatalog: () => lastCatalog,
     stop: () => void server.stop(true),
   };
 }
