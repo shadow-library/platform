@@ -42,6 +42,11 @@ declare module '@shadow-library/common' {
     'oauth.issuer': string;
     'oauth.login-url': string;
 
+    /** Kubernetes workload identity (D-16): trusted cluster OIDC issuer for SA-token client assertions */
+    'auth.workload.issuer': string;
+    'auth.workload.audience': string;
+    'auth.workload.jwks-uri': string;
+
     /** Web UI */
     'ui.public-dir': string;
   }
@@ -70,6 +75,15 @@ Config.load('worker.poll-interval', { defaultValue: '5000', validateType: 'numbe
 
 Config.load('oauth.issuer', { defaultValue: 'https://identity.shadow-apps.com' });
 Config.load('oauth.login-url', { defaultValue: 'https://identity.shadow-apps.com/login' });
+
+/**
+ * Workload identity is opt-in: with no trusted cluster issuer configured, SA-token client
+ * assertions are rejected and clients must present their static secret. The audience defaults to
+ * the oauth issuer; the jwks uri is normally resolved via the cluster's OIDC discovery document.
+ */
+Config.load('auth.workload.issuer', { defaultValue: '' });
+Config.load('auth.workload.audience', { defaultValue: '' });
+Config.load('auth.workload.jwks-uri', { defaultValue: '' });
 
 Config.load('rate-limit.enabled', { defaultValue: 'true', validateType: 'boolean' });
 Config.load('rate-limit.ip-allowlist', { defaultValue: '' });

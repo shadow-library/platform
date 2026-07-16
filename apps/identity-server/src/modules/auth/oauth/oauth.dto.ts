@@ -72,6 +72,12 @@ export class TokenRequestBody {
 
   @Field({ optional: true })
   client_secret?: string;
+
+  @Field({ optional: true })
+  client_assertion_type?: string;
+
+  @Field({ optional: true })
+  client_assertion?: string;
 }
 
 @Schema()

@@ -97,6 +97,7 @@ export class AdminClientController {
       grantTypes: body.grantTypes,
       accessTokenTtl: body.accessTokenTtl,
       backchannelLogoutUri: body.backchannelLogoutUri,
+      workloadSubject: body.workloadSubject,
     });
     await this.record(actor, 'admin.client.registered', registered.clientId, { name: body.name, kind: body.kind });
     return { clientId: registered.clientId, secret: registered.secret };
@@ -133,6 +134,8 @@ export class AdminClientController {
       isActive: body.isActive,
       redirectUris: body.redirectUris,
       backchannelLogoutUri: body.backchannelLogoutUri,
+      /** An empty string unbinds the workload subject; undefined leaves it untouched */
+      workloadSubject: body.workloadSubject === '' ? null : body.workloadSubject,
     });
     await this.record(actor, 'admin.client.updated', params.clientId, { fields: Object.keys(body) });
     return { success: true };

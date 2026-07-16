@@ -28,6 +28,8 @@ export interface RegisterClient {
   organisationId?: bigint | null;
   accessTokenTtl?: number;
   backchannelLogoutUri?: string;
+  /** k8s SA subject allowed to authenticate this client with a projected token (D-16) */
+  workloadSubject?: string;
 }
 
 export interface RegisteredClient {
@@ -69,6 +71,7 @@ export class OAuthClientService {
           accessTokenTtl: input.accessTokenTtl ?? 3600,
           organisationId: input.organisationId ?? null,
           backchannelLogoutUri: input.backchannelLogoutUri ?? null,
+          workloadSubject: input.workloadSubject ?? null,
         })
         .returning({ id: schema.oauthClients.id });
       if (!client) throw new Error('Failed to create OAuth client');
@@ -87,6 +90,12 @@ export class OAuthClientService {
   async getClient(clientId: string): Promise<OAuthClient | null> {
     if (!this.isUuid(clientId)) return null;
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId) });
+    return client ?? null;
+  }
+
+  /** Resolves the client bound to a verified k8s workload subject (D-16) */
+  async getClientByWorkloadSubject(subject: string): Promise<OAuthClient | null> {
+    const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.workloadSubject, subject) });
     return client ?? null;
   }
 
@@ -160,15 +169,19 @@ export class OAuthClientService {
   }
 
   /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
-  async updateClient(clientId: string, update: { name?: string; isActive?: boolean; redirectUris?: string[]; backchannelLogoutUri?: string | null }): Promise<void> {
+  async updateClient(
+    clientId: string,
+    update: { name?: string; isActive?: boolean; redirectUris?: string[]; backchannelLogoutUri?: string | null; workloadSubject?: string | null },
+  ): Promise<void> {
     await this.db.transaction(async tx => {
-      if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined) {
+      if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined || update.workloadSubject !== undefined) {
         await tx
           .update(schema.oauthClients)
           .set({
             ...(update.name !== undefined ? { name: update.name } : {}),
             ...(update.isActive !== undefined ? { isActive: update.isActive } : {}),
             ...(update.backchannelLogoutUri !== undefined ? { backchannelLogoutUri: update.backchannelLogoutUri } : {}),
+            ...(update.workloadSubject !== undefined ? { workloadSubject: update.workloadSubject } : {}),
             updatedAt: new Date(),
           })
           .where(eq(schema.oauthClients.id, clientId));

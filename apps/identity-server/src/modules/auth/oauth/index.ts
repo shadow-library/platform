@@ -9,3 +9,4 @@ export * from './oauth.dto';
 export * from './oauth.module';
 export * from './oauth.service';
 export * from './pkce';
+export * from './workload-identity.service';

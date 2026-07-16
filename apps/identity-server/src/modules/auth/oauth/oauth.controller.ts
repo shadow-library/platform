@@ -25,6 +25,9 @@ import { ClientCredential, OAuthService } from './oauth.service';
  * Declaring the constants
  */
 
+/** RFC 7523 §2.2 — client authentication with a JWT (projected k8s service-account tokens, D-16) */
+const JWT_BEARER_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+
 @HttpController()
 export class OAuthController {
   private readonly issuer = Config.get('oauth.issuer');
@@ -137,12 +140,19 @@ export class OAuthController {
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
   }
 
-  private parseClientCredential(request: FastifyRequest, body: { client_id?: string; client_secret?: string }): ClientCredential {
+  private parseClientCredential(
+    request: FastifyRequest,
+    body: { client_id?: string; client_secret?: string; client_assertion_type?: string; client_assertion?: string },
+  ): ClientCredential {
     const header = request.headers.authorization;
     if (header?.startsWith('Basic ')) {
       const decoded = Buffer.from(header.slice(6), 'base64').toString();
       const separator = decoded.indexOf(':');
       if (separator !== -1) return { clientId: decoded.slice(0, separator), clientSecret: decoded.slice(separator + 1) };
+    }
+    if (body.client_assertion) {
+      if (body.client_assertion_type !== JWT_BEARER_ASSERTION_TYPE) throw new ServerError(AppErrorCode.OAU_002);
+      return { clientId: body.client_id, clientAssertion: body.client_assertion };
     }
     if (!body.client_id) throw new ServerError(AppErrorCode.OAU_002);
     return { clientId: body.client_id, clientSecret: body.client_secret };

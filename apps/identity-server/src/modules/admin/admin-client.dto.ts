@@ -61,6 +61,10 @@ export class RegisterClientBody {
   /** OIDC back-channel logout endpoint; logout tokens POST here on session termination. */
   @Field({ optional: true })
   backchannelLogoutUri?: string;
+
+  /** k8s SA subject (`system:serviceaccount:<ns>:<name>`) allowed to authenticate this client with a projected token (D-16). */
+  @Field({ optional: true, maxLength: 512 })
+  workloadSubject?: string;
 }
 
 @Schema()
@@ -131,6 +135,10 @@ export class UpdateClientBody {
 
   @Field({ optional: true })
   backchannelLogoutUri?: string;
+
+  /** k8s SA subject bound to this client; pass an empty string to unbind (D-16). */
+  @Field({ optional: true, maxLength: 512 })
+  workloadSubject?: string;
 }
 
 @Schema()

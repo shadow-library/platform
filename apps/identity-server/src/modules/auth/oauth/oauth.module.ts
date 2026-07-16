@@ -22,6 +22,7 @@ import { MeConsentController } from './me-consent.controller';
 import { OAuthClientService } from './oauth-client.service';
 import { OAuthController } from './oauth.controller';
 import { OAuthService } from './oauth.service';
+import { WorkloadIdentityService } from './workload-identity.service';
 
 /**
  * Defining types
@@ -34,7 +35,7 @@ import { OAuthService } from './oauth.service';
 @Module({
   imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule],
   controllers: [OAuthController, ConsentController, MeConsentController],
-  providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, ConsentService, OAuthService],
+  providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, ConsentService, OAuthService, WorkloadIdentityService],
   exports: [OAuthClientService, AccessTokenService, ConsentService],
 })
 export class OAuthModule {}

@@ -22,6 +22,7 @@ import { AuthorizationCodeService } from './authorization-code.service';
 import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
 import { verifyPkce } from './pkce';
+import { WorkloadIdentityService } from './workload-identity.service';
 
 /**
  * Defining types
@@ -42,8 +43,11 @@ export interface AuthorizeParams {
 export type AuthorizeResult = { kind: 'redirect'; url: string } | { kind: 'login' };
 
 export interface ClientCredential {
-  clientId: string;
+  /** Optional when a client assertion is presented: the client is then resolved from the verified workload subject */
+  clientId?: string;
   clientSecret?: string;
+  /** RFC 7523 client assertion — a projected k8s service-account token (D-16) */
+  clientAssertion?: string;
 }
 
 export interface TokenParams {
@@ -95,6 +99,7 @@ export class OAuthService {
     private readonly auditService: AuditService,
     private readonly keyService: KeyService,
     private readonly consentService: ConsentService,
+    private readonly workloadIdentityService: WorkloadIdentityService,
   ) {}
 
   /** RFC 7009 token revocation: revokes the refresh-token family. Always succeeds (even if unknown). */
@@ -310,10 +315,36 @@ export class OAuthService {
   }
 
   private async authenticateClient(credential: ClientCredential): Promise<OAuthClient> {
+    if (credential.clientAssertion) return this.authenticateWorkload(credential);
+    if (!credential.clientId) throw new ServerError(AppErrorCode.OAU_002);
+
     const client = await this.requireClient(credential.clientId);
     if (client.tokenEndpointAuthMethod === 'none') return client;
     if (!credential.clientSecret || !(await this.clientService.verifySecret(client.id, credential.clientSecret))) {
       this.logger.warn('client authentication failed: invalid client secret', { securityEvent: 'oauth.client_auth_failed', clientId: client.id });
+      throw new ServerError(AppErrorCode.OAU_002);
+    }
+    return client;
+  }
+
+  /** Authenticates via a projected k8s SA token: the verified workload subject must be bound to a registered client (D-16). */
+  private async authenticateWorkload(credential: ClientCredential): Promise<OAuthClient> {
+    const workload = await this.workloadIdentityService.verify(credential.clientAssertion as string).catch((error: Error) => {
+      this.logger.warn('client authentication failed: invalid workload assertion', {
+        securityEvent: 'oauth.client_auth_failed',
+        clientId: credential.clientId,
+        reason: error.message,
+      });
+      throw new ServerError(AppErrorCode.OAU_002);
+    });
+
+    const client = await this.clientService.getClientByWorkloadSubject(workload.subject);
+    if (!client || !client.isActive || (credential.clientId && credential.clientId !== client.id)) {
+      this.logger.warn('client authentication failed: workload subject not bound to an active client', {
+        securityEvent: 'oauth.client_auth_failed',
+        workloadSubject: workload.subject,
+        clientId: credential.clientId,
+      });
       throw new ServerError(AppErrorCode.OAU_002);
     }
     return client;
