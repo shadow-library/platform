@@ -29,11 +29,11 @@ export type { UserAuditEventItem, UserAuditEventsResponse, UserContactItem, User
 export type UserStatus = UserSummaryItem['status'];
 export type LockMode = UserSummaryItem['lockMode'];
 
-/** Query params for the admin user search (`GET /admin/users`). */
+/** Query params for the admin user search (`GET /admin/users`) — offset-based pagination. */
 export interface UserSearchParams {
   email?: string;
   status?: UserStatus;
-  page?: number;
+  offset?: number;
   limit?: number;
 }
 

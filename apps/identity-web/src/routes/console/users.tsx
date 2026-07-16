@@ -42,7 +42,7 @@ function UsersPage(): React.JSX.Element {
   const [status, setStatus] = useState<string>('all');
   const [page, setPage] = useState(1);
 
-  const users = useUsersQuery({ email: search || undefined, status: status === 'all' ? undefined : (status as UserStatus), page, limit: PAGE_SIZE });
+  const users = useUsersQuery({ email: search || undefined, status: status === 'all' ? undefined : (status as UserStatus), offset: (page - 1) * PAGE_SIZE, limit: PAGE_SIZE });
   const data = users.data;
   const rows = data?.items ?? [];
 

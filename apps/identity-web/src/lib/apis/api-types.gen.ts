@@ -2506,7 +2506,7 @@ export interface components {
     UserSearchResponse: {
       items: components['schemas']['UserSummaryItem'][];
       total: number;
-      page: number;
+      offset: number;
       limit: number;
     };
     UserSummaryItem: {
@@ -6018,8 +6018,10 @@ export interface operations {
       query?: {
         email?: string;
         status?: 'ACTIVE' | 'INACTIVE' | 'DISABLED' | 'BLOCKED' | 'SUSPENDED' | 'CLOSED';
-        page?: number | string;
+        offset?: number | string;
         limit?: number | string;
+        sortBy?: 'createdAt';
+        sortOrder?: 'asc' | 'desc';
       };
       header?: never;
       path?: never;
