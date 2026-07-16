@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, gt, isNull, or } from 'drizzle-orm';
 
 /**
@@ -87,7 +87,7 @@ export class OAuthClientService {
           workloadSubject: input.workloadSubject ?? null,
         })
         .returning({ id: schema.oauthClients.id })
-        .then(([row]) => row ?? throwError(new InternalError('Failed to create OAuth client')));
+        .then(([row]) => row ?? throwError(AppError.internal('Failed to create OAuth client')));
 
       for (const uri of input.redirectUris ?? []) await tx.insert(schema.oauthClientRedirectUris).values({ clientId: client.id, uri });
       for (const scopeId of input.scopeIds ?? []) await tx.insert(schema.oauthClientScopeGrants).values({ clientId: client.id, scopeId });
@@ -126,12 +126,12 @@ export class OAuthClientService {
     await this.db.insert(schema.apiResources).values({ applicationId, identifier: resourceIdentifier }).onConflictDoNothing();
     const resource =
       (await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, resourceIdentifier) })) ??
-      throwError(new InternalError(`API resource '${resourceIdentifier}' could not be provisioned`));
+      throwError(AppError.internal(`API resource '${resourceIdentifier}' could not be provisioned`));
 
     await this.db.insert(schema.scopes).values({ apiResourceId: resource.id, name: scopeName }).onConflictDoNothing();
     const scope =
       (await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, resource.id), eq(schema.scopes.name, scopeName)) })) ??
-      throwError(new InternalError(`Scope '${scopeName}' could not be provisioned`));
+      throwError(AppError.internal(`Scope '${scopeName}' could not be provisioned`));
     return scope.id;
   }
 
@@ -217,7 +217,7 @@ export class OAuthClientService {
       .onConflictDoNothing();
     const scope =
       (await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, apiResourceId), eq(schema.scopes.name, name)) })) ??
-      throwError(new InternalError(`Scope '${name}' could not be provisioned`));
+      throwError(AppError.internal(`Scope '${name}' could not be provisioned`));
     return scope.id;
   }
 
@@ -225,7 +225,7 @@ export class OAuthClientService {
     await this.db.insert(schema.apiResources).values({ applicationId, identifier, displayName }).onConflictDoNothing();
     const resource =
       (await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, identifier) })) ??
-      throwError(new InternalError(`API resource '${identifier}' could not be provisioned`));
+      throwError(AppError.internal(`API resource '${identifier}' could not be provisioned`));
     return resource;
   }
 

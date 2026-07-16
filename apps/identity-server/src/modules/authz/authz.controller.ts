@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Post, Put, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Get, HttpController, Post, Put, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -35,7 +36,7 @@ export class AuthzController {
   private callerClientId(request: FastifyRequest): string {
     const claims = getServiceTokenClaims(request as FastifyRequest & ServiceTokenCarrier);
     const clientId = typeof claims.client_id === 'string' ? claims.client_id : typeof claims.sub === 'string' ? claims.sub : '';
-    if (!clientId) throw new ServerError(AppErrorCode.AUTHZ_002);
+    if (!clientId) throw AppErrorCode.AUTHZ_002.create();
     return clientId;
   }
 

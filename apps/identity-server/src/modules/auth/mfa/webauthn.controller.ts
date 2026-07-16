@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
-import { Body, Delete, HttpController, HttpStatus, Params, Post, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Delete, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 import {
   type AuthenticatorAttachment,
   type AuthenticatorTransportFuture,
@@ -50,7 +50,7 @@ export class WebauthnController {
   /** Adding the first factor needs only a session; changing factors once MFA exists needs step-up. */
   private async authorizeFactorChange(request: FastifyRequest): Promise<bigint> {
     const session = await this.sessionAuthService.authenticate(request);
-    if ((await this.mfaService.hasMfa(session.userId)) && !this.sessionService.isElevated(session)) throw new ServerError(AppErrorCode.AUTH_006);
+    if ((await this.mfaService.hasMfa(session.userId)) && !this.sessionService.isElevated(session)) throw AppErrorCode.AUTH_006.create();
     return session.userId;
   }
 
@@ -67,7 +67,7 @@ export class WebauthnController {
   @RespondFor(200, WebauthnRegisterResponse)
   async registerVerify(@Body() body: WebauthnRegisterVerifyBody, @Req() request: FastifyRequest): Promise<WebauthnRegisterResponse> {
     const session = await this.sessionAuthService.authenticate(request);
-    if ((await this.mfaService.hasMfa(session.userId)) && !this.sessionService.isElevated(session)) throw new ServerError(AppErrorCode.AUTH_006);
+    if ((await this.mfaService.hasMfa(session.userId)) && !this.sessionService.isElevated(session)) throw AppErrorCode.AUTH_006.create();
 
     const response: RegistrationResponseJSON = {
       id: body.id,

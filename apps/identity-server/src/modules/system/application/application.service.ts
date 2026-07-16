@@ -5,7 +5,6 @@ import assert from 'node:assert';
 
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { InferInsertModel, eq } from 'drizzle-orm';
 
 /**
@@ -109,7 +108,7 @@ export class ApplicationService implements OnModuleInit {
 
   getApplicationOrThrow(name: string): ApplicationDetails {
     const application = this.getApplication(name);
-    if (!application) throw new ServerError(AppErrorCode.APP_001);
+    if (!application) throw AppErrorCode.APP_001.create();
     return application;
   }
 
@@ -120,7 +119,7 @@ export class ApplicationService implements OnModuleInit {
 
   getApplicationByIdOrThrow(id: number): ApplicationDetails {
     const application = this.getApplicationById(id);
-    if (!application) throw new ServerError(AppErrorCode.APP_001);
+    if (!application) throw AppErrorCode.APP_001.create();
     return application;
   }
 

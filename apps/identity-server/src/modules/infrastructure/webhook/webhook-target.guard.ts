@@ -6,7 +6,6 @@ import { isIP } from 'node:net';
 
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -68,16 +67,16 @@ export class WebhookTargetGuard {
     try {
       url = new URL(rawUrl);
     } catch {
-      throw new ServerError(AppErrorCode.WHK_002);
+      throw AppErrorCode.WHK_002.create();
     }
 
-    if (url.protocol !== 'https:' && !(this.allowInsecureTargets && url.protocol === 'http:')) throw new ServerError(AppErrorCode.WHK_002);
-    if (url.username || url.password) throw new ServerError(AppErrorCode.WHK_002);
+    if (url.protocol !== 'https:' && !(this.allowInsecureTargets && url.protocol === 'http:')) throw AppErrorCode.WHK_002.create();
+    if (url.username || url.password) throw AppErrorCode.WHK_002.create();
     if (this.allowInsecureTargets) return url;
 
     const hostname = url.hostname.toLowerCase();
-    if (BLOCKED_HOSTNAMES.has(hostname) || BLOCKED_SUFFIXES.some(suffix => hostname.endsWith(suffix))) throw new ServerError(AppErrorCode.WHK_002);
-    if (isIP(hostname.replace(/^\[|\]$/g, '')) !== 0 && isPrivateAddress(hostname.replace(/^\[|\]$/g, ''))) throw new ServerError(AppErrorCode.WHK_002);
+    if (BLOCKED_HOSTNAMES.has(hostname) || BLOCKED_SUFFIXES.some(suffix => hostname.endsWith(suffix))) throw AppErrorCode.WHK_002.create();
+    if (isIP(hostname.replace(/^\[|\]$/g, '')) !== 0 && isPrivateAddress(hostname.replace(/^\[|\]$/g, ''))) throw AppErrorCode.WHK_002.create();
     return url;
   }
 
@@ -90,7 +89,7 @@ export class WebhookTargetGuard {
     if (isIP(bare) !== 0) return;
 
     const addresses = await this.lookupAddresses(bare);
-    if (addresses.length === 0) throw new ServerError(AppErrorCode.WHK_002);
-    if (addresses.some(entry => isPrivateAddress(entry.address))) throw new ServerError(AppErrorCode.WHK_002);
+    if (addresses.length === 0) throw AppErrorCode.WHK_002.create();
+    if (addresses.some(entry => isPrivateAddress(entry.address))) throw AppErrorCode.WHK_002.create();
   }
 }

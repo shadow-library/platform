@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -47,9 +46,9 @@ export class ServiceAccessService {
 
   /** Rules a service enforces for its own routes, resolved from the caller's client id */
   async listForClient(clientId: string): Promise<ServiceRouteAccess[]> {
-    if (!UUID_PATTERN.test(clientId)) throw new ServerError(AppErrorCode.AUTHZ_002);
+    if (!UUID_PATTERN.test(clientId)) throw AppErrorCode.AUTHZ_002.create();
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
-    if (!client) throw new ServerError(AppErrorCode.AUTHZ_002);
+    if (!client) throw AppErrorCode.AUTHZ_002.create();
     return this.listForApplication(client.applicationId);
   }
 
@@ -59,11 +58,11 @@ export class ServiceAccessService {
 
   async create(input: CreateServiceAccessRule): Promise<ServiceRouteAccess> {
     const method = input.method.toUpperCase();
-    if (!ALLOWED_METHODS.has(method)) throw new ServerError(AppErrorCode.AUTHZ_003);
-    if (!input.pathPattern.startsWith('/')) throw new ServerError(AppErrorCode.AUTHZ_003);
+    if (!ALLOWED_METHODS.has(method)) throw AppErrorCode.AUTHZ_003.create();
+    if (!input.pathPattern.startsWith('/')) throw AppErrorCode.AUTHZ_003.create();
 
     const caller = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, input.callerClientId), columns: { id: true } });
-    if (!caller) throw new ServerError(AppErrorCode.AUTHZ_003);
+    if (!caller) throw AppErrorCode.AUTHZ_003.create();
 
     const [rule] = await this.db
       .insert(schema.serviceRouteAccess)
@@ -87,7 +86,7 @@ export class ServiceAccessService {
   private async getExisting(input: CreateServiceAccessRule, method: string): Promise<ServiceRouteAccess> {
     const rules = await this.listForApplication(input.applicationId);
     const existing = rules.find(rule => rule.callerClientId === input.callerClientId && rule.method === method && rule.pathPattern === input.pathPattern);
-    if (!existing) throw new ServerError(AppErrorCode.AUTHZ_003);
+    if (!existing) throw AppErrorCode.AUTHZ_003.create();
     return existing;
   }
 }

@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { and, eq, inArray, notInArray } from 'drizzle-orm';
 
 /**
@@ -78,19 +77,19 @@ export class CatalogSyncService {
 
   /** Resolves the application a service account owns from its client id; the caller can only ever touch its own application's catalog. */
   private async resolveApplicationId(clientId: string): Promise<number> {
-    if (!UUID_PATTERN.test(clientId)) throw new ServerError(AppErrorCode.AUTHZ_002);
+    if (!UUID_PATTERN.test(clientId)) throw AppErrorCode.AUTHZ_002.create();
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
-    if (!client) throw new ServerError(AppErrorCode.AUTHZ_002);
+    if (!client) throw AppErrorCode.AUTHZ_002.create();
     return client.applicationId;
   }
 
   async sync(actorClientId: string, manifest: CatalogManifest): Promise<CatalogSyncResult> {
     const applicationId = await this.resolveApplicationId(actorClientId);
     const permissionNames = new Set(manifest.permissions.map(permission => permission.name));
-    if (permissionNames.size !== manifest.permissions.length) throw new ServerError(AppErrorCode.AUTHZ_001);
+    if (permissionNames.size !== manifest.permissions.length) throw AppErrorCode.AUTHZ_001.create();
     const roleNames = new Set(manifest.roles.map(role => role.name));
-    if (roleNames.size !== manifest.roles.length) throw new ServerError(AppErrorCode.AUTHZ_001);
-    for (const role of manifest.roles) for (const permission of role.permissions) if (!permissionNames.has(permission)) throw new ServerError(AppErrorCode.AUTHZ_001);
+    if (roleNames.size !== manifest.roles.length) throw AppErrorCode.AUTHZ_001.create();
+    for (const role of manifest.roles) for (const permission of role.permissions) if (!permissionNames.has(permission)) throw AppErrorCode.AUTHZ_001.create();
 
     const { result, principals } = await this.db.transaction(async tx => {
       /** Snapshot every principal holding a role here before mutating, so a cascade-deleted assignment or a changed binding still invalidates its caches. */
@@ -139,7 +138,7 @@ export class CatalogSyncService {
 
       for (const role of manifest.roles) {
         const roleId = roleByName.get(role.name);
-        if (roleId === undefined) throw new ServerError(AppErrorCode.AUTHZ_001);
+        if (roleId === undefined) throw AppErrorCode.AUTHZ_001.create();
         const desired = new Set(role.permissions.map(name => permissionByName.get(name)).filter((id): id is string => id !== undefined));
         const current = await tx.select({ permissionId: schema.rolePermissions.permissionId }).from(schema.rolePermissions).where(eq(schema.rolePermissions.roleId, roleId));
         const currentIds = new Set(current.map(row => row.permissionId));

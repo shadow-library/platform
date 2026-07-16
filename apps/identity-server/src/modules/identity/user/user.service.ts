@@ -5,7 +5,6 @@ import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
 import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { SQL, and, eq, inArray, isNotNull } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import validator from 'validator';
@@ -197,7 +196,7 @@ export class UserService {
       .where(condition)
       .returning({ id: schema.users.id })
       .catch(error => this.databaseService.translateError(error));
-    if (result.length === 0) throw new ServerError(AppErrorCode.USR_001);
+    if (result.length === 0) throw AppErrorCode.USR_001.create();
     this.logger.debug('user status updated', { identifier, status, count: result.length });
   }
 

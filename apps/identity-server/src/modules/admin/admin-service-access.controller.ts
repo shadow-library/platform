@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -98,7 +99,7 @@ export class AdminServiceAccessController {
   async remove(@Params() params: ServiceAccessRuleParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
     const deleted = await this.serviceAccessService.delete(params.ruleId);
-    if (!deleted) throw new ServerError(AppErrorCode.ADM_003);
+    if (!deleted) throw AppErrorCode.ADM_003.create();
     await this.record(actor, 'admin.service-access.deleted', params.ruleId);
     return { success: true };
   }

@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Post, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, HttpStatus, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -52,7 +53,7 @@ export class MfaController {
   @RespondFor(200, TotpEnrollResponse)
   async enrollTotp(@Req() request: FastifyRequest): Promise<TotpEnrollResponse> {
     const session = await this.sessionAuthService.authenticate(request);
-    if ((await this.mfaService.hasMfa(session.userId)) && !this.sessionService.isElevated(session)) throw new ServerError(AppErrorCode.AUTH_006);
+    if ((await this.mfaService.hasMfa(session.userId)) && !this.sessionService.isElevated(session)) throw AppErrorCode.AUTH_006.create();
     return this.mfaService.enrollTotp(session.userId);
   }
 
@@ -92,10 +93,10 @@ export class MfaController {
   async stepUp(@Body() body: TotpCodeBody, @Req() request: FastifyRequest): Promise<StepUpResponse> {
     const session = await this.sessionAuthService.authenticate(request);
     const valid = await this.mfaService.verifyTotp(session.userId, body.code);
-    if (!valid) throw new ServerError(AppErrorCode.MFA_002);
+    if (!valid) throw AppErrorCode.MFA_002.create();
 
     const elevated = await this.sessionService.elevate(session.id);
-    if (!elevated || !elevated.elevatedUntil) throw new ServerError(AppErrorCode.AUTH_005);
+    if (!elevated || !elevated.elevatedUntil) throw AppErrorCode.AUTH_005.create();
     return { aal: elevated.aal, elevatedUntil: new Date(elevated.elevatedUntil).toISOString() };
   }
 }

@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -165,7 +164,7 @@ export class RecoveryService {
     const failureCount = flow.failureCount + 1;
     if (failureCount >= MAX_FLOW_FAILURES) {
       await this.authFlowService.delete(flow.flowId);
-      throw new ServerError(AppErrorCode.AUTH_004);
+      throw AppErrorCode.AUTH_004.create();
     }
     await this.authFlowService.update(flow, { failureCount });
     return { outcome: 'FAILED', flowId: flow.flowId, status: flow.status, attemptsLeft: MAX_FLOW_FAILURES - failureCount };
@@ -173,8 +172,8 @@ export class RecoveryService {
 
   private async requireFlow(flowId: string, expectedStatus: string): Promise<AuthFlowContext> {
     const flow = await this.authFlowService.get(flowId);
-    if (!flow || flow.kind !== 'RECOVERY') throw new ServerError(AppErrorCode.AUTH_001);
-    if (flow.status !== expectedStatus) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!flow || flow.kind !== 'RECOVERY') throw AppErrorCode.AUTH_001.create();
+    if (flow.status !== expectedStatus) throw AppErrorCode.AUTH_002.create();
     return flow;
   }
 }

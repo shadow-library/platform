@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -68,8 +69,8 @@ export class MeOrganisationController {
     const organisationId = BigInt(params.organisationId);
     const membership = await this.organisationService.getMembership(session.userId, organisationId);
     const organisation = await this.organisationService.getById(organisationId);
-    if (!membership || !organisation) throw new ServerError(AppErrorCode.ORG_001);
-    if (organisation.type === 'PERSONAL') throw new ServerError(AppErrorCode.ORG_003);
+    if (!membership || !organisation) throw AppErrorCode.ORG_001.create();
+    if (organisation.type === 'PERSONAL') throw AppErrorCode.ORG_003.create();
 
     await this.organisationService.removeMember(organisationId, session.userId);
     await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: session.userId.toString() }, params.organisationId);

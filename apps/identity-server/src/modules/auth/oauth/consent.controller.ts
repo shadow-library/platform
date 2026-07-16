@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, HttpStatus, Post, Query, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Get, HttpController, HttpStatus, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 import { inArray } from 'drizzle-orm';
 import { type FastifyRequest } from 'fastify';
 
@@ -54,7 +55,7 @@ export class ConsentController {
   async prompt(@Query() query: ConsentPromptQuery, @Req() request: FastifyRequest): Promise<ConsentPromptResponse> {
     const session = await this.sessionAuthService.authenticate(request);
     const client = await this.clientService.getClient(query.clientId);
-    if (!client || !client.isActive) throw new ServerError(AppErrorCode.OAU_001);
+    if (!client || !client.isActive) throw AppErrorCode.OAU_001.create();
 
     const requested = query.scope.split(' ').filter(Boolean);
     const active = await this.consentService.getActive(session.userId, client.id);
@@ -76,7 +77,7 @@ export class ConsentController {
   async decide(@Body() body: ConsentDecisionBody, @Req() request: FastifyRequest): Promise<ConsentDecisionResponse> {
     const session = await this.sessionAuthService.authenticate(request);
     const client = await this.clientService.getClient(body.clientId);
-    if (!client || !client.isActive) throw new ServerError(AppErrorCode.OAU_001);
+    if (!client || !client.isActive) throw AppErrorCode.OAU_001.create();
 
     const actor = { actorType: 'USER' as const, actorId: session.userId.toString(), targetType: 'oauth_client', targetId: client.id, ipAddress: request.ip };
 

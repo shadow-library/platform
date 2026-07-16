@@ -2,14 +2,14 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, InternalError, Logger, throwError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 import { SQL, and, asc, count, eq, sql } from 'drizzle-orm';
 import validator from 'validator';
 
 /**
  * Importing user defined packages
  */
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
 import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
@@ -135,7 +135,7 @@ export class ScimUserService {
       .insert(schema.scimDirectory)
       .values({ organisationId: tenant.organisationId, userId, userName: email, externalId: input.externalId, active: true, managed: !existing })
       .returning()
-      .then(([row]) => row ?? throwError(new InternalError('Scim directory insert failed')));
+      .then(([row]) => row ?? throwError(AppError.internal('Scim directory insert failed')));
 
     if (!input.active) await this.setActive(entry, false);
     await this.audit(tenant, 'scim.user.provisioned', userId, { adopted: Boolean(existing) });
@@ -250,8 +250,8 @@ export class ScimUserService {
       await this.organisationService.removeMember(entry.organisationId, entry.userId);
     } catch (error) {
       /** Absent membership is fine (already removed by an admin); a last-owner refusal is the tenant's conflict to resolve. */
-      if (error instanceof ServerError && error.getCode() === 'ORG_004') throw new ScimError(409, 'Cannot deprovision the last owner of the organisation', 'mutability');
-      if (!(error instanceof ServerError && error.getCode() === 'USR_001')) throw error;
+      if (AppError.is(error, AppErrorCode.ORG_004)) throw new ScimError(409, 'Cannot deprovision the last owner of the organisation', 'mutability');
+      if (!AppError.is(error, AppErrorCode.USR_001)) throw error;
     }
   }
 

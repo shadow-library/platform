@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -48,7 +49,7 @@ export class AdminClientController {
 
   private async requireClient(clientId: string): Promise<OAuthClient> {
     const client = await this.clientService.getClient(clientId);
-    if (!client) throw new ServerError(AppErrorCode.OAU_002);
+    if (!client) throw AppErrorCode.OAU_002.create();
     return client;
   }
 
@@ -85,7 +86,7 @@ export class AdminClientController {
   @RespondFor(201, RegisterClientResponse)
   async register(@Body() body: RegisterClientBody, @Req() request: FastifyRequest): Promise<RegisterClientResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
-    if (body.grantTypes.some(grant => !ALLOWED_GRANT_TYPES.includes(grant as (typeof ALLOWED_GRANT_TYPES)[number]))) throw new ServerError(AppErrorCode.ADM_003);
+    if (body.grantTypes.some(grant => !ALLOWED_GRANT_TYPES.includes(grant as (typeof ALLOWED_GRANT_TYPES)[number]))) throw AppErrorCode.ADM_003.create();
     this.applicationService.getApplicationByIdOrThrow(body.applicationId);
 
     const registered = await this.clientService.register({
@@ -108,7 +109,7 @@ export class AdminClientController {
   async detail(@Params() params: ClientIdParams, @Req() request: FastifyRequest): Promise<ClientDetailResponse> {
     await this.access.requireRead(request, ADMIN_PERMISSIONS.clientsRead);
     const client = await this.clientService.getClientDetail(params.clientId);
-    if (!client) throw new ServerError(AppErrorCode.OAU_002);
+    if (!client) throw AppErrorCode.OAU_002.create();
     return {
       id: client.id,
       name: client.name,
@@ -147,7 +148,7 @@ export class AdminClientController {
   async rotateSecret(@Params() params: ClientIdParams, @Req() request: FastifyRequest): Promise<RotateSecretResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
     const client = await this.requireClient(params.clientId);
-    if (client.tokenEndpointAuthMethod === 'none') throw new ServerError(AppErrorCode.ADM_003);
+    if (client.tokenEndpointAuthMethod === 'none') throw AppErrorCode.ADM_003.create();
     const rotated = await this.clientService.rotateSecretWithOverlap(params.clientId);
     await this.record(actor, 'admin.client.secret_rotated', params.clientId);
     return { secret: rotated.secret, previousSecretsExpireAt: rotated.previousSecretsExpireAt.toISOString() };

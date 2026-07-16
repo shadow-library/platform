@@ -4,8 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 
 /**
@@ -70,7 +69,7 @@ export class InvitationService {
   async invite(input: InviteInput): Promise<Organisation.Invitation> {
     const organisationId = input.organisation.id;
     const decision = await this.rateLimiterService.consume(INVITE_BUDGET.bucket, organisationId.toString(), INVITE_BUDGET.limit, INVITE_BUDGET.windowSeconds);
-    if (!decision.allowed) throw new ServerError(AppErrorCode.SEC_001);
+    if (!decision.allowed) throw AppErrorCode.SEC_001.create();
 
     const email = input.email.toLowerCase();
     const token = randomBytes(32).toString('base64url');
@@ -86,7 +85,7 @@ export class InvitationService {
         .insert(schema.organisationInvitations)
         .values({ organisationId, email, role: input.role, tokenHash: this.hashToken(token), invitedBy: input.invitedBy, expiresAt })
         .returning()
-        .then(([row]) => row ?? throwError(new InternalError('Failed to create invitation')));
+        .then(([row]) => row ?? throwError(AppError.internal('Failed to create invitation')));
       await this.notificationService.enqueue(
         { templateKey: INVITE_TEMPLATE, recipients: { email }, payload: { organisationName: input.organisation.name, role: input.role, token } },
         tx,
@@ -111,7 +110,7 @@ export class InvitationService {
       .set({ revokedAt: new Date() })
       .where(and(eq(schema.organisationInvitations.id, invitationId), eq(schema.organisationInvitations.organisationId, organisationId), this.pendingCondition()))
       .returning();
-    if (!revoked) throw new ServerError(AppErrorCode.ORG_005);
+    if (!revoked) throw AppErrorCode.ORG_005.create();
     return revoked;
   }
 
@@ -123,7 +122,7 @@ export class InvitationService {
   async accept(userId: bigint, token: string): Promise<AcceptedInvitation> {
     const invitation = await this.resolvePending(userId, token);
     const organisation = await this.db.query.organisations.findFirst({ where: eq(schema.organisations.id, invitation.organisationId) });
-    if (!organisation || organisation.status !== 'ACTIVE' || organisation.type !== 'TEAM') throw new ServerError(AppErrorCode.ORG_005);
+    if (!organisation || organisation.status !== 'ACTIVE' || organisation.type !== 'TEAM') throw AppErrorCode.ORG_005.create();
 
     await this.db.transaction(async tx => {
       await tx.update(schema.organisationInvitations).set({ acceptedAt: new Date() }).where(eq(schema.organisationInvitations.id, invitation.id));
@@ -145,12 +144,12 @@ export class InvitationService {
     const invitation = await this.db.query.organisationInvitations.findFirst({
       where: and(eq(schema.organisationInvitations.tokenHash, this.hashToken(token)), this.pendingCondition()),
     });
-    if (!invitation || invitation.expiresAt.getTime() < Date.now()) throw new ServerError(AppErrorCode.ORG_005);
+    if (!invitation || invitation.expiresAt.getTime() < Date.now()) throw AppErrorCode.ORG_005.create();
 
     const ownership = await this.db.query.userEmails.findFirst({
       where: and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.emailId, invitation.email), isNotNull(schema.userEmails.verifiedAt)),
     });
-    if (!ownership) throw new ServerError(AppErrorCode.ORG_005);
+    if (!ownership) throw AppErrorCode.ORG_005.create();
     return invitation;
   }
 

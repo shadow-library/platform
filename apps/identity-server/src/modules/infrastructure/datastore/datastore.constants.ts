@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { ServerError } from '@shadow-library/fastify';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -16,9 +16,9 @@ import { AppErrorCode } from '@server/classes';
  * Declaring the constants
  */
 
-export const constraintErrorMap: Record<string, ServerError> = {
-  applications_name_unique: new ServerError(AppErrorCode.APP_002),
-  users_username_unique: new ServerError(AppErrorCode.USR_002),
-  user_emails_verified_email_unique: new ServerError(AppErrorCode.USR_003),
-  user_phones_verified_phone_unique: new ServerError(AppErrorCode.USR_004),
+export const constraintErrorMap: Record<string, AppError> = {
+  applications_name_unique: AppErrorCode.APP_002.create(),
+  users_username_unique: AppErrorCode.USR_002.create(),
+  user_emails_verified_email_unique: AppErrorCode.USR_003.create(),
+  user_phones_verified_phone_unique: AppErrorCode.USR_004.create(),
 };

@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, ne } from 'drizzle-orm';
 
 /**
@@ -112,7 +112,7 @@ export class RefreshTokenService {
         .returning();
       if (!family) {
         this.logger.error('failed to create refresh token family', { userId: input.userId, clientId: input.clientId });
-        throw new InternalError('Failed to create refresh token family');
+        throw AppError.internal('Failed to create refresh token family');
       }
       const [token] = await tx
         .insert(schema.refreshTokens)
@@ -120,7 +120,7 @@ export class RefreshTokenService {
         .returning();
       if (!token) {
         this.logger.error('failed to create refresh token', { userId: input.userId, familyId: family.id });
-        throw new InternalError('Failed to create refresh token');
+        throw AppError.internal('Failed to create refresh token');
       }
       return { familyId: family.id, tokenId: token.id, context: this.toContext(family) };
     });
@@ -174,7 +174,7 @@ export class RefreshTokenService {
           ipCountry: context.ipCountry ?? null,
         })
         .returning({ id: schema.refreshTokens.id })
-        .then(([row]) => row ?? throwError(new InternalError('Failed to rotate refresh token')));
+        .then(([row]) => row ?? throwError(AppError.internal('Failed to rotate refresh token')));
       return token.id;
     });
     this.logger.debug('rotated refresh token', { userId: family.userId, familyId: family.id });

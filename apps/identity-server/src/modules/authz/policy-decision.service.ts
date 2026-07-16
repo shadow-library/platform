@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 
@@ -153,7 +153,7 @@ export class PolicyDecisionService {
     const [permission] = await this.db.insert(schema.permissions).values({ applicationId, name, description }).returning({ id: schema.permissions.id });
     if (!permission) {
       this.logger.error('failed to create permission', { applicationId, name });
-      throw new InternalError('Failed to create permission');
+      throw AppError.internal('Failed to create permission');
     }
     this.logger.debug('created permission', { permissionId: permission.id, applicationId, name });
     return permission.id;
@@ -165,7 +165,7 @@ export class PolicyDecisionService {
     const permission = await this.db.query.permissions.findFirst({ where: and(eq(schema.permissions.applicationId, applicationId), eq(schema.permissions.name, name)) });
     if (!permission) {
       this.logger.error('failed to provision permission', { applicationId, name });
-      throw new InternalError(`Permission '${name}' could not be provisioned`);
+      throw AppError.internal(`Permission '${name}' could not be provisioned`);
     }
     return permission.id;
   }

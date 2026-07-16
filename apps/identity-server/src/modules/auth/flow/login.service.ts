@@ -5,7 +5,6 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { type AuthenticationResponseJSON, type AuthenticatorAttachment, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 
 /**
@@ -170,8 +169,8 @@ export class LoginService {
 
   async verifyPassword(flowId: string, password: string): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
-    if (flow.federated?.enforced) throw new ServerError(AppErrorCode.AUTH_007);
-    if (flow.status !== AWAITING_PASSWORD) throw new ServerError(AppErrorCode.AUTH_002);
+    if (flow.federated?.enforced) throw AppErrorCode.AUTH_007.create();
+    if (flow.status !== AWAITING_PASSWORD) throw AppErrorCode.AUTH_002.create();
 
     const userId = flow.userId ? BigInt(flow.userId) : null;
     const valid = await this.passwordService.verifyForUser(userId, password);
@@ -209,8 +208,8 @@ export class LoginService {
     const flow = await this.requireFlow(flowId);
     const pendingSubject = flow.status === AWAITING_LINK_OTP ? flow.federated?.pendingSubject : undefined;
     if (!pendingSubject) {
-      if (flow.federated?.enforced) throw new ServerError(AppErrorCode.AUTH_007);
-      if (!OTP_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+      if (flow.federated?.enforced) throw AppErrorCode.AUTH_007.create();
+      if (!OTP_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
     }
 
     const userId = flow.userId ? BigInt(flow.userId) : null;
@@ -252,7 +251,7 @@ export class LoginService {
   async continueFederated(flowId: string, identity: UpstreamIdentity): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     const federated = flow.federated;
-    if (!federated || ![AWAITING_FEDERATED, AWAITING_PASSWORD].includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!federated || ![AWAITING_FEDERATED, AWAITING_PASSWORD].includes(flow.status)) throw AppErrorCode.AUTH_002.create();
 
     const link = await this.federatedIdentityService.findBySubject(federated.identityProviderId, identity.subject);
     if (link) {
@@ -322,8 +321,8 @@ export class LoginService {
    */
   async verifyMfa(flowId: string, proof: MfaProof): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
-    if (!MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
-    if (proof.code && flow.status !== AWAITING_TOTP) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!MFA_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
+    if (proof.code && flow.status !== AWAITING_TOTP) throw AppErrorCode.AUTH_002.create();
 
     const userId = flow.userId ? BigInt(flow.userId) : null;
     if (!userId) return this.handleFailure(flow, null, 'MFA_FAILED');
@@ -347,7 +346,7 @@ export class LoginService {
 
     const flow = await this.requireFlow(flowId);
     const firstFactor = flow.status === AWAITING_WEBAUTHN;
-    if (!firstFactor && !MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!firstFactor && !MFA_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
     const userId = flow.userId ? BigInt(flow.userId) : null;
     const options = await this.webauthnService.startAuthentication(flowId, userId, firstFactor);
     return { flowId, options };
@@ -357,7 +356,7 @@ export class LoginService {
   async verifyWebauthn(flowId: string, assertion: WebauthnAssertion): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId);
     const firstFactor = flow.status === AWAITING_WEBAUTHN;
-    if (!firstFactor && !MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!firstFactor && !MFA_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
 
     const flowUserId = flow.userId ? BigInt(flow.userId) : null;
     const result = await this.webauthnService.finishAuthentication(flowId, this.toAuthenticationResponse(assertion), firstFactor);
@@ -441,7 +440,7 @@ export class LoginService {
 
     if (failureCount >= MAX_FLOW_FAILURES) {
       await this.authFlowService.delete(flow.flowId);
-      throw new ServerError(AppErrorCode.AUTH_004);
+      throw AppErrorCode.AUTH_004.create();
     }
 
     await this.authFlowService.update(flow, { failureCount, globalFailureCount: flow.globalFailureCount + 1 });
@@ -450,7 +449,7 @@ export class LoginService {
 
   private async requireFlow(flowId: string): Promise<AuthFlowContext> {
     const flow = await this.authFlowService.get(flowId);
-    if (!flow || flow.kind !== 'LOGIN') throw new ServerError(AppErrorCode.AUTH_001);
+    if (!flow || flow.kind !== 'LOGIN') throw AppErrorCode.AUTH_001.create();
     return flow;
   }
 

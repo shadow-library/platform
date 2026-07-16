@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
-import { Delete, Get, HttpController, Params, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Delete, Get, HttpController, Params, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -111,7 +111,7 @@ export class MeSessionsController {
     const sessionId = BigInt(params.sessionId);
     const target = await this.sessionService.getById(sessionId);
     /** Absence and other-owner cases answer identically: no probing other users' session ids. */
-    if (!target || target.userId !== current.userId || target.status !== 'ACTIVE') throw new ServerError(AppErrorCode.USR_001);
+    if (!target || target.userId !== current.userId || target.status !== 'ACTIVE') throw AppErrorCode.USR_001.create();
 
     await this.sessionService.revoke(sessionId, 'REVOKED');
     await this.refreshTokenService.revokeForSession(sessionId);

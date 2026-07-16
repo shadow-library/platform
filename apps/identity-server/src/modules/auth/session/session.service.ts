@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 
@@ -111,7 +111,7 @@ export class SessionService {
         userAgent: input.userAgent ?? null,
       })
       .returning()
-      .then(([row]) => row ?? throwError(new InternalError('Session creation failed')));
+      .then(([row]) => row ?? throwError(AppError.internal('Session creation failed')));
 
     await this.redis.sadd(this.userSetKey(input.userId), sessionHash);
     await this.cache(session);
@@ -211,7 +211,7 @@ export class SessionService {
       .values({ userId, fingerprintHash, name: name ?? null })
       .onConflictDoUpdate({ target: [schema.devices.userId, schema.devices.fingerprintHash], set: { lastSeenAt: new Date() } })
       .returning({ id: schema.devices.id })
-      .then(([row]) => row ?? throwError(new InternalError('Device upsert failed')));
+      .then(([row]) => row ?? throwError(AppError.internal('Device upsert failed')));
     return device.id;
   }
 

@@ -123,7 +123,6 @@ export interface ContactItem {
 
 export interface ErrorEnvelope {
   code: string;
-  type: string;
   message: string;
   fields?: { field: string; msg: string }[];
 }

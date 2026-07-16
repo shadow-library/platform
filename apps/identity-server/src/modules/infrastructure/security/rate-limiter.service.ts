@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 import { Redis } from 'ioredis';
 
 /**
@@ -61,7 +61,7 @@ export class RateLimiterService {
     const redisKey = `rl:${bucket}:${key}`;
     const results =
       (await this.redis.multi().incr(redisKey).call('EXPIRE', redisKey, windowSeconds, 'NX').ttl(redisKey).exec()) ??
-      throwError(new InternalError('Rate limit transaction aborted'));
+      throwError(AppError.internal('Rate limit transaction aborted'));
 
     const [countResult, , ttlResult] = results;
     const count = Number(countResult?.[1] ?? 0);

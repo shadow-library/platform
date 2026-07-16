@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, Params, Patch, Post, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, Params, Patch, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -107,7 +108,7 @@ export class AdminApplicationController {
   async create(@Body() body: CreateApplicationBody, @Req() request: FastifyRequest): Promise<CreateApplicationResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
     /** Fail fast on a name collision; the unique constraint is the race-safe backstop. */
-    if (this.applicationService.getApplication(body.name)) throw new ServerError(AppErrorCode.APP_002);
+    if (this.applicationService.getApplication(body.name)) throw AppErrorCode.APP_002.create();
     const application = await this.applicationService.createApplication({
       name: body.name,
       subDomain: body.subDomain,
@@ -134,7 +135,7 @@ export class AdminApplicationController {
   async update(@Params() params: ApplicationIdParams, @Body() body: UpdateApplicationBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
     const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
-    if (application.name === APP_NAME && body.isActive === false) throw new ServerError(AppErrorCode.APP_004);
+    if (application.name === APP_NAME && body.isActive === false) throw AppErrorCode.APP_004.create();
 
     const update: ApplicationUpdate = {};
     if (body.subDomain !== undefined) update.subDomain = body.subDomain;
@@ -155,11 +156,11 @@ export class AdminApplicationController {
   async remove(@Params() params: ApplicationIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
     const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
-    if (application.name === APP_NAME) throw new ServerError(AppErrorCode.APP_004);
+    if (application.name === APP_NAME) throw AppErrorCode.APP_004.create();
 
     /** Clients FK-restrict the delete; resources, roles, permissions and keys cascade away with it. */
     const clients = await this.clientService.listClients();
-    if (clients.some(client => client.applicationId === application.id)) throw new ServerError(AppErrorCode.APP_005);
+    if (clients.some(client => client.applicationId === application.id)) throw AppErrorCode.APP_005.create();
 
     await this.applicationService.deleteApplication(application.name);
     await this.record(actor, 'admin.application.deleted', String(application.id), { name: application.name });

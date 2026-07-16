@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable, OnModuleInit } from '@shadow-library/app';
-import { Config, InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -97,7 +97,7 @@ export class BootstrapService implements OnModuleInit {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     const role =
       application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE) ??
-      throwError(new InternalError(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`));
+      throwError(AppError.internal(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`));
 
     for (const permission of Object.values(ADMIN_PERMISSIONS)) {
       const permissionId = await this.policyDecisionService.ensurePermission(application.id, permission, ADMIN_PERMISSION_DESCRIPTIONS[permission]);
@@ -134,7 +134,7 @@ export class BootstrapService implements OnModuleInit {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     const role =
       application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE) ??
-      throwError(new InternalError(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`));
+      throwError(AppError.internal(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`));
     await this.organisationService.ensureMember(organisationId, admin.id, 'OWNER');
     await this.policyDecisionService.assignRole({ type: 'USER', id: admin.id.toString() }, role.id, organisationId.toString());
   }

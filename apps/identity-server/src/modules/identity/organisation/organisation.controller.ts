@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -99,7 +100,7 @@ export class OrganisationController {
     const organisationId = BigInt(params.organisationId);
     await this.organisationService.assertMember(session.userId, organisationId);
     const organisation = await this.organisationService.getById(organisationId);
-    if (!organisation || organisation.status === 'DELETED') throw new ServerError(AppErrorCode.ORG_001);
+    if (!organisation || organisation.status === 'DELETED') throw AppErrorCode.ORG_001.create();
     return this.toResponse(organisation);
   }
 
@@ -154,10 +155,10 @@ export class OrganisationController {
     const session = ownerLevel ? await this.sessionAuthService.authenticateElevated(request) : await this.sessionAuthService.authenticate(request);
     const { membership: caller } = await this.organisationService.requireRole(session.userId, organisationId, ownerLevel ? 'OWNER' : 'ADMIN');
     const target = await this.organisationService.getMembership(targetUserId, organisationId);
-    if (!target) throw new ServerError(AppErrorCode.USR_001);
-    if (target.role === 'OWNER' && caller.role !== 'OWNER') throw new ServerError(AppErrorCode.ORG_007);
-    if (target.role === 'OWNER' && session.aal !== 'AAL2') throw new ServerError(AppErrorCode.AUTH_006);
-    if (caller.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[caller.role]) throw new ServerError(AppErrorCode.ORG_007);
+    if (!target) throw AppErrorCode.USR_001.create();
+    if (target.role === 'OWNER' && caller.role !== 'OWNER') throw AppErrorCode.ORG_007.create();
+    if (target.role === 'OWNER' && session.aal !== 'AAL2') throw AppErrorCode.AUTH_006.create();
+    if (caller.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[caller.role]) throw AppErrorCode.ORG_007.create();
 
     await this.organisationService.updateMemberRole(organisationId, targetUserId, body.role);
     await this.audit(request, session, organisationId, 'org.member_role_changed', 'user', params.userId);
@@ -175,11 +176,10 @@ export class OrganisationController {
     const session = await this.sessionAuthService.authenticate(request);
     const { membership: caller } = await this.organisationService.requireRole(session.userId, organisationId, 'ADMIN');
     const target = await this.organisationService.getMembership(targetUserId, organisationId);
-    if (!target) throw new ServerError(AppErrorCode.USR_001);
-    if (target.userId === session.userId) throw new ServerError(AppErrorCode.ORG_007);
-    if (target.role === 'OWNER' && (caller.role !== 'OWNER' || session.aal !== 'AAL2'))
-      throw new ServerError(caller.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006);
-    if (caller.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[caller.role]) throw new ServerError(AppErrorCode.ORG_007);
+    if (!target) throw AppErrorCode.USR_001.create();
+    if (target.userId === session.userId) throw AppErrorCode.ORG_007.create();
+    if (target.role === 'OWNER' && (caller.role !== 'OWNER' || session.aal !== 'AAL2')) throw (caller.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
+    if (caller.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[caller.role]) throw AppErrorCode.ORG_007.create();
 
     await this.organisationService.removeMember(organisationId, targetUserId);
     await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: params.userId }, params.organisationId);

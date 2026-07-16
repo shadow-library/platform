@@ -3,7 +3,7 @@
  */
 import { type RouteMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { AsyncRouteHandler, Middleware, MiddlewareGenerator, ServerError } from '@shadow-library/fastify';
+import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
@@ -74,13 +74,13 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
       return await check();
     } catch (error) {
       this.logger.error('Rate limit backend unavailable', { error });
-      if (failClosed) throw new ServerError(AppErrorCode.SEC_002);
+      if (failClosed) throw AppErrorCode.SEC_002.create();
       return null;
     }
   }
 
   private reject(reply: FastifyReply, retryAfterSeconds: number): never {
     reply.header('retry-after', String(retryAfterSeconds));
-    throw new ServerError(AppErrorCode.SEC_001);
+    throw AppErrorCode.SEC_001.create();
   }
 }

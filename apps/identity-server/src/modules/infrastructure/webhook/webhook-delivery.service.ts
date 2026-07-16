@@ -4,8 +4,7 @@
 import { createHmac } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger } from '@shadow-library/common';
 import { and, asc, eq, inArray, lte, sql } from 'drizzle-orm';
 
 /**
@@ -67,7 +66,7 @@ export class WebhookDeliveryService {
       .set({ status: 'PENDING', attemptCount: 0, nextAttemptAt: new Date(), lastError: null })
       .where(and(eq(schema.webhookDeliveries.id, deliveryId), eq(schema.webhookDeliveries.subscriptionId, subscriptionId)))
       .returning();
-    if (!delivery) throw new ServerError(AppErrorCode.WHK_003);
+    if (!delivery) throw AppErrorCode.WHK_003.create();
     return delivery;
   }
 
@@ -121,7 +120,7 @@ export class WebhookDeliveryService {
   /** Raw fetch, not APIRequest: the HMAC signature covers the exact payload bytes (APIRequest re-serializes) and delivery needs a hard timeout. */
   private async send(delivery: WebhookDelivery): Promise<number> {
     const subscription = await this.webhookService.getById(delivery.subscriptionId);
-    if (!subscription.isActive) throw new InternalError('subscription is disabled');
+    if (!subscription.isActive) throw AppError.internal('subscription is disabled');
     /** Re-checked at send time: DNS may have changed since registration (rebinding). */
     await this.targetGuard.assertDeliverable(subscription.targetUrl);
 
@@ -138,7 +137,7 @@ export class WebhookDeliveryService {
       body: delivery.payload,
       signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) throw new InternalError(`webhook endpoint answered ${response.status}`);
+    if (!response.ok) throw AppError.internal(`webhook endpoint answered ${response.status}`);
     return response.status;
   }
 

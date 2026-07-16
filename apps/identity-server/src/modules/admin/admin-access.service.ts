@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -52,7 +51,7 @@ export class AdminAccessService {
     const organisation = await this.organisationService.findTeamByName(PLATFORM_ORG_NAME);
     if (!organisation) {
       this.logger.error('platform organisation missing — admin authorization cannot proceed', { platformOrgName: PLATFORM_ORG_NAME });
-      throw new ServerError(AppErrorCode.ADM_002);
+      throw AppErrorCode.ADM_002.create();
     }
     this.platformOrganisationId = organisation.id.toString();
     return this.platformOrganisationId;
@@ -69,7 +68,7 @@ export class AdminAccessService {
     if (decision.decision !== 'PERMIT') {
       /** A denied admin call is a security-relevant event: surface it at warn even in production. */
       this.logger.warn('admin access denied', { securityEvent: 'admin.access_denied', userId, permission, aal: session.aal });
-      throw new ServerError(AppErrorCode.ADM_001);
+      throw AppErrorCode.ADM_001.create();
     }
     this.logger.debug('admin access granted', { userId, permission, aal: session.aal });
     return { session, organisationId };
@@ -108,6 +107,6 @@ export class AdminAccessService {
       return { session, organisationId };
     }
     this.logger.warn('role admin access denied', { securityEvent: 'admin.access_denied', userId, applicationId, aal: session.aal });
-    throw new ServerError(AppErrorCode.ADM_001);
+    throw AppErrorCode.ADM_001.create();
   }
 }

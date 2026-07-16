@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Config } from '@shadow-library/common';
-import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
@@ -125,7 +125,7 @@ export class OAuthController {
     const header = request.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     const claims = token ? this.keyService.verify(token) : null;
-    if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw new ServerError(AppErrorCode.OAU_002);
+    if (!claims || typeof claims.sub !== 'string' || typeof claims.exp !== 'number' || claims.exp * 1000 <= Date.now()) throw AppErrorCode.OAU_002.create();
 
     const email = await this.userEmailService.getPrimaryEmail(BigInt(claims.sub));
     return { sub: claims.sub, email: email ?? undefined, email_verified: email ? true : undefined };
@@ -155,10 +155,10 @@ export class OAuthController {
       if (separator !== -1) return { clientId: decoded.slice(0, separator), clientSecret: decoded.slice(separator + 1) };
     }
     if (body.client_assertion) {
-      if (body.client_assertion_type !== JWT_BEARER_ASSERTION_TYPE) throw new ServerError(AppErrorCode.OAU_002);
+      if (body.client_assertion_type !== JWT_BEARER_ASSERTION_TYPE) throw AppErrorCode.OAU_002.create();
       return { clientId: body.client_id, clientAssertion: body.client_assertion };
     }
-    if (!body.client_id) throw new ServerError(AppErrorCode.OAU_002);
+    if (!body.client_id) throw AppErrorCode.OAU_002.create();
     return { clientId: body.client_id, clientSecret: body.client_secret };
   }
 }

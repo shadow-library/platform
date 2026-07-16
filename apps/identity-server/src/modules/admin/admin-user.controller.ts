@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -30,7 +31,7 @@ export class AdminUserController {
   ) {}
 
   private parseUserId(params: UserIdParams): bigint {
-    if (!/^\d+$/.test(params.userId)) throw new ServerError(AppErrorCode.USR_001);
+    if (!/^\d+$/.test(params.userId)) throw AppErrorCode.USR_001.create();
     return BigInt(params.userId);
   }
 
@@ -84,7 +85,7 @@ export class AdminUserController {
   async lock(@Params() params: UserIdParams, @Body() body: LockUserBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
     const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
     const until = body.until ? new Date(body.until) : null;
-    if (until && Number.isNaN(until.getTime())) throw new ServerError(AppErrorCode.ADM_003);
+    if (until && Number.isNaN(until.getTime())) throw AppErrorCode.ADM_003.create();
     await this.adminUserService.lock(this.parseUserId(params), body.mode, until, this.contextOf(actor));
     return { success: true };
   }

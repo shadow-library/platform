@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Config, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -89,8 +88,8 @@ export class ChallengeFlowService {
   async changeMethod(flowId: string, method: ChallengeMethodName): Promise<MethodChangeResult> {
     const flow = await this.requireLoginFlow(flowId);
     /** Enforced federation admits no local first factor — switching methods must not reopen one (T-702). */
-    if (flow.federated?.enforced) throw new ServerError(AppErrorCode.AUTH_007);
-    if (MFA_STATUSES.includes(flow.status)) throw new ServerError(AppErrorCode.AUTH_002);
+    if (flow.federated?.enforced) throw AppErrorCode.AUTH_007.create();
+    if (MFA_STATUSES.includes(flow.status)) throw AppErrorCode.AUTH_002.create();
 
     if (method === 'PASSWORD') {
       const next = await this.authFlowService.update(flow, { status: 'AWAITING_PASSWORD' });
@@ -102,7 +101,7 @@ export class ChallengeFlowService {
     }
 
     const available = method === 'EMAIL_OTP' ? this.isEmailIdentifier(flow.identifier) : this.isPhoneIdentifier(flow.identifier);
-    if (!available) throw new ServerError(AppErrorCode.AUTH_002);
+    if (!available) throw AppErrorCode.AUTH_002.create();
 
     const status = method === 'EMAIL_OTP' ? 'AWAITING_EMAIL_OTP' : 'AWAITING_SMS_OTP';
     const next = await this.authFlowService.update(flow, { status, resendsLeft: OTP_RESEND_BUDGET, lastOtpSentAt: Date.now() });
@@ -119,7 +118,7 @@ export class ChallengeFlowService {
    */
   async resend(flowId: string, method: 'EMAIL_OTP' | 'SMS_OTP'): Promise<ResendResult> {
     const flow = await this.requireFlow(flowId);
-    if (OTP_STATUSES[flow.status] !== method) throw new ServerError(AppErrorCode.AUTH_002);
+    if (OTP_STATUSES[flow.status] !== method) throw AppErrorCode.AUTH_002.create();
 
     const cooldownRemaining = this.cooldownRemaining(flow);
     if (cooldownRemaining > 0) return { status: 'LIMITED', retryAfterSeconds: cooldownRemaining };
@@ -175,13 +174,13 @@ export class ChallengeFlowService {
 
   private async requireLoginFlow(flowId: string): Promise<AuthFlowContext> {
     const flow = await this.requireFlow(flowId);
-    if (flow.kind !== 'LOGIN') throw new ServerError(AppErrorCode.AUTH_002);
+    if (flow.kind !== 'LOGIN') throw AppErrorCode.AUTH_002.create();
     return flow;
   }
 
   private async requireFlow(flowId: string): Promise<AuthFlowContext> {
     const flow = await this.authFlowService.get(flowId);
-    if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
+    if (!flow) throw AppErrorCode.AUTH_001.create();
     return flow;
   }
 }

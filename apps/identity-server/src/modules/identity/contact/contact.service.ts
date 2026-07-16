@@ -5,7 +5,6 @@ import { randomUUID } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { and, eq, isNotNull } from 'drizzle-orm';
 import validator from 'validator';
 
@@ -114,34 +113,30 @@ export class ContactService {
    */
   async verifyEmail(userId: bigint, verificationId: string, code: string): Promise<void> {
     const challenge = await this.challengeService.verifyAndGet(verificationId, code);
-    if (!challenge || challenge.userId !== userId) throw new ServerError(AppErrorCode.MFA_002);
+    if (!challenge || challenge.userId !== userId) throw AppErrorCode.MFA_002.create();
 
     const updated = await this.db
       .update(schema.userEmails)
       .set({ verifiedAt: new Date() })
       .where(and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.emailId, challenge.target)))
       .returning({ emailId: schema.userEmails.emailId })
-      .catch(() => {
-        throw new ServerError(AppErrorCode.MFA_002);
-      });
-    if (updated.length === 0) throw new ServerError(AppErrorCode.MFA_002);
+      .catch(() => AppErrorCode.MFA_002.throw());
+    if (updated.length === 0) throw AppErrorCode.MFA_002.create();
     await this.auditService.record({ action: 'user.email_verified', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     this.logger.info('email verified', { userId });
   }
 
   async verifyPhone(userId: bigint, verificationId: string, code: string): Promise<void> {
     const challenge = await this.challengeService.verifyAndGet(verificationId, code);
-    if (!challenge || challenge.userId !== userId) throw new ServerError(AppErrorCode.MFA_002);
+    if (!challenge || challenge.userId !== userId) throw AppErrorCode.MFA_002.create();
 
     const updated = await this.db
       .update(schema.userPhones)
       .set({ verifiedAt: new Date() })
       .where(and(eq(schema.userPhones.userId, userId), eq(schema.userPhones.phoneNumber, challenge.target)))
       .returning({ phoneNumber: schema.userPhones.phoneNumber })
-      .catch(() => {
-        throw new ServerError(AppErrorCode.MFA_002);
-      });
-    if (updated.length === 0) throw new ServerError(AppErrorCode.MFA_002);
+      .catch(() => AppErrorCode.MFA_002.throw());
+    if (updated.length === 0) throw AppErrorCode.MFA_002.create();
     await this.auditService.record({ action: 'user.phone_verified', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     this.logger.info('phone verified', { userId });
   }
@@ -150,8 +145,8 @@ export class ContactService {
   async removeEmail(userId: bigint, email: string): Promise<void> {
     const emailId = email.toLowerCase();
     const row = await this.db.query.userEmails.findFirst({ where: and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.emailId, emailId)) });
-    if (!row) throw new ServerError(AppErrorCode.USR_001);
-    if (row.isPrimary) throw new ServerError(AppErrorCode.USR_005);
+    if (!row) throw AppErrorCode.USR_001.create();
+    if (row.isPrimary) throw AppErrorCode.USR_005.create();
 
     await this.db.delete(schema.userEmails).where(and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.emailId, emailId)));
     await this.auditService.record({ action: 'user.email_removed', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
@@ -161,8 +156,8 @@ export class ContactService {
 
   async removePhone(userId: bigint, phone: string): Promise<void> {
     const row = await this.db.query.userPhones.findFirst({ where: and(eq(schema.userPhones.userId, userId), eq(schema.userPhones.phoneNumber, phone)) });
-    if (!row) throw new ServerError(AppErrorCode.USR_001);
-    if (row.isPrimary) throw new ServerError(AppErrorCode.USR_005);
+    if (!row) throw AppErrorCode.USR_001.create();
+    if (row.isPrimary) throw AppErrorCode.USR_005.create();
 
     await this.db.delete(schema.userPhones).where(and(eq(schema.userPhones.userId, userId), eq(schema.userPhones.phoneNumber, phone)));
     await this.auditService.record({ action: 'user.phone_removed', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
@@ -176,7 +171,7 @@ export class ContactService {
     const target = await this.db.query.userEmails.findFirst({
       where: and(eq(schema.userEmails.userId, userId), eq(schema.userEmails.emailId, emailId), isNotNull(schema.userEmails.verifiedAt)),
     });
-    if (!target) throw new ServerError(AppErrorCode.USR_006);
+    if (!target) throw AppErrorCode.USR_006.create();
 
     await this.db
       .transaction(async tx => {
@@ -199,7 +194,7 @@ export class ContactService {
     const target = await this.db.query.userPhones.findFirst({
       where: and(eq(schema.userPhones.userId, userId), eq(schema.userPhones.phoneNumber, phone), isNotNull(schema.userPhones.verifiedAt)),
     });
-    if (!target) throw new ServerError(AppErrorCode.USR_006);
+    if (!target) throw AppErrorCode.USR_006.create();
 
     await this.db
       .transaction(async tx => {

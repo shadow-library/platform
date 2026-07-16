@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -39,12 +38,12 @@ export class SessionAuthService {
     /** The two failure modes are logged distinctly (never the secret itself) so an auth 401 can be traced to a cause. */
     if (!secret) {
       this.logger.debug('session authentication failed: no session cookie present');
-      throw new ServerError(AppErrorCode.AUTH_005);
+      throw AppErrorCode.AUTH_005.create();
     }
     const session = await this.sessionService.validate(secret);
     if (!session) {
       this.logger.debug('session authentication failed: cookie did not resolve to a live session');
-      throw new ServerError(AppErrorCode.AUTH_005);
+      throw AppErrorCode.AUTH_005.create();
     }
     this.logger.debug('session authenticated', { userId: session.userId.toString(), aal: session.aal });
     return session;
@@ -55,7 +54,7 @@ export class SessionAuthService {
     const session = await this.authenticate(request);
     if (!this.sessionService.isElevated(session)) {
       this.logger.debug('elevated authentication rejected: session lacks a recent step-up', { userId: session.userId.toString(), aal: session.aal });
-      throw new ServerError(AppErrorCode.AUTH_006);
+      throw AppErrorCode.AUTH_006.create();
     }
     return session;
   }

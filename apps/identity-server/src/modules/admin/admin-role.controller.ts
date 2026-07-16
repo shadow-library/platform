@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, HttpStatus, Post, Query, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Get, HttpController, HttpStatus, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -43,7 +44,7 @@ export class AdminRoleController {
 
   private async requireRole(roleId: number): Promise<Application.Role> {
     const role = await this.applicationRoleService.getRole(roleId);
-    if (!role) throw new ServerError(AppErrorCode.APP_003);
+    if (!role) throw AppErrorCode.APP_003.create();
     return role;
   }
 

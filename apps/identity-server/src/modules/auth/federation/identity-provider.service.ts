@@ -2,8 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq } from 'drizzle-orm';
 
 /**
@@ -80,22 +79,22 @@ export class IdentityProviderService {
     let document: DiscoveryDocument;
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS) });
-      if (!response.ok) throw new InternalError(`discovery answered ${response.status}`);
+      if (!response.ok) throw AppError.internal(`discovery answered ${response.status}`);
       document = (await response.json()) as DiscoveryDocument;
     } catch (error) {
       this.logger.warn('identity provider discovery failed', { issuer, error: error instanceof Error ? error.message : String(error) });
-      throw new ServerError(AppErrorCode.FED_001);
+      throw AppErrorCode.FED_001.create();
     }
 
-    if (document.issuer !== issuer && document.issuer !== issuer.replace(/\/$/, '')) throw new ServerError(AppErrorCode.FED_001);
-    if (!document.authorization_endpoint || !document.token_endpoint || !document.jwks_uri) throw new ServerError(AppErrorCode.FED_001);
+    if (document.issuer !== issuer && document.issuer !== issuer.replace(/\/$/, '')) throw AppErrorCode.FED_001.create();
+    if (!document.authorization_endpoint || !document.token_endpoint || !document.jwks_uri) throw AppErrorCode.FED_001.create();
     for (const endpoint of [document.authorization_endpoint, document.token_endpoint, document.jwks_uri]) this.targetGuard.assertAcceptableUrl(endpoint);
     return { authorizationEndpoint: document.authorization_endpoint, tokenEndpoint: document.token_endpoint, jwksUri: document.jwks_uri };
   }
 
   async create(organisationId: bigint, input: CreateIdentityProvider): Promise<IdentityProvider> {
     const existing = await this.db.query.identityProviders.findFirst({ where: eq(schema.identityProviders.organisationId, organisationId) });
-    if (existing) throw new ServerError(AppErrorCode.FED_003);
+    if (existing) throw AppErrorCode.FED_003.create();
 
     const endpoints = await this.discover(input.issuer);
     const secret = this.keyProvider.encrypt(Buffer.from(input.clientSecret));
@@ -115,7 +114,7 @@ export class IdentityProviderService {
         ...endpoints,
       })
       .returning()
-      .then(([row]) => row ?? throwError(new InternalError('Identity provider creation failed')));
+      .then(([row]) => row ?? throwError(AppError.internal('Identity provider creation failed')));
     this.logger.info('identity provider configured', { organisationId: organisationId.toString(), issuer: provider.issuer });
     return provider;
   }
@@ -128,7 +127,7 @@ export class IdentityProviderService {
       .set({ name: patch.name, clientId: patch.clientId, scopes: patch.scopes, enforced: patch.enforced, isActive: patch.isActive, ...secret, updatedAt: new Date() })
       .where(and(eq(schema.identityProviders.id, id), eq(schema.identityProviders.organisationId, organisationId)))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.FED_002);
+    if (!updated) throw AppErrorCode.FED_002.create();
     return updated;
   }
 
@@ -142,7 +141,7 @@ export class IdentityProviderService {
       .delete(schema.identityProviders)
       .where(and(eq(schema.identityProviders.id, id), eq(schema.identityProviders.organisationId, organisationId)))
       .returning({ id: schema.identityProviders.id });
-    if (removed.length === 0) throw new ServerError(AppErrorCode.FED_002);
+    if (removed.length === 0) throw AppErrorCode.FED_002.create();
   }
 
   async getForOrganisation(organisationId: bigint): Promise<IdentityProvider | null> {
@@ -154,7 +153,7 @@ export class IdentityProviderService {
     const provider = await this.db.query.identityProviders.findFirst({
       where: and(eq(schema.identityProviders.id, id), eq(schema.identityProviders.organisationId, organisationId)),
     });
-    if (!provider) throw new ServerError(AppErrorCode.FED_002);
+    if (!provider) throw AppErrorCode.FED_002.create();
     return provider;
   }
 

@@ -4,8 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger } from '@shadow-library/common';
 import { and, eq, isNotNull } from 'drizzle-orm';
 
 /**
@@ -65,7 +64,7 @@ export class OrganisationService {
     const [organisation] = await executor.insert(schema.organisations).values({ name, slug, type: 'PERSONAL', status: 'ACTIVE' }).returning();
     if (!organisation) {
       this.logger.error('failed to create personal workspace', { userId });
-      throw new InternalError('Failed to create personal workspace');
+      throw AppError.internal('Failed to create personal workspace');
     }
     await executor.insert(schema.organisationMembers).values({ organisationId: organisation.id, userId, role: 'OWNER', isDefault: true });
     this.logger.debug('created personal workspace', { organisationId: organisation.id, userId });
@@ -74,7 +73,7 @@ export class OrganisationService {
 
   /** Creates a team organisation with the creator as its first owner. */
   async createTeam(userId: bigint, input: CreateTeamInput): Promise<Organisation> {
-    if (input.slug && !SLUG_PATTERN.test(input.slug)) throw new ServerError(AppErrorCode.ORG_006);
+    if (input.slug && !SLUG_PATTERN.test(input.slug)) throw AppErrorCode.ORG_006.create();
     const slug = input.slug ?? this.generateSlug(input.name);
     return this.db.transaction(async tx => {
       const [organisation] = await tx
@@ -82,7 +81,7 @@ export class OrganisationService {
         .values({ name: input.name, slug, type: 'TEAM', status: 'ACTIVE' })
         .onConflictDoNothing({ target: schema.organisations.slug })
         .returning();
-      if (!organisation) throw new ServerError(AppErrorCode.ORG_006);
+      if (!organisation) throw AppErrorCode.ORG_006.create();
       await tx.insert(schema.organisationMembers).values({ organisationId: organisation.id, userId, role: 'OWNER' });
       this.logger.info('created team organisation', { organisationId: organisation.id, userId });
       return organisation;
@@ -101,7 +100,7 @@ export class OrganisationService {
       .insert(schema.organisations)
       .values({ name, slug: this.generateSlug(name), type: 'TEAM', status: 'ACTIVE' })
       .returning();
-    if (!organisation) throw new InternalError(`Failed to create organisation '${name}'`);
+    if (!organisation) throw AppError.internal(`Failed to create organisation '${name}'`);
     this.logger.info('created team organisation', { organisationId: organisation.id, name });
     return organisation;
   }
@@ -126,7 +125,7 @@ export class OrganisationService {
   /** Throws unless the user is a member of the organisation; the guard for every org-scoped read. */
   async assertMember(userId: bigint, organisationId: bigint): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
-    if (!membership) throw new ServerError(AppErrorCode.ORG_001);
+    if (!membership) throw AppErrorCode.ORG_001.create();
     return membership;
   }
 
@@ -138,11 +137,11 @@ export class OrganisationService {
   async requireRole(userId: bigint, organisationId: bigint, minimumRole: Organisation.MemberRole): Promise<MembershipWithOrganisation> {
     const membership = await this.assertMember(userId, organisationId);
     const organisation = await this.getById(organisationId);
-    if (!organisation || organisation.status === 'DELETED') throw new ServerError(AppErrorCode.ORG_001);
-    if (organisation.type === 'PERSONAL') throw new ServerError(AppErrorCode.ORG_003);
+    if (!organisation || organisation.status === 'DELETED') throw AppErrorCode.ORG_001.create();
+    if (organisation.type === 'PERSONAL') throw AppErrorCode.ORG_003.create();
     if (ROLE_RANK[membership.role] < ROLE_RANK[minimumRole]) {
       this.logger.debug('organisation role requirement not met', { userId, organisationId, role: membership.role, minimumRole });
-      throw new ServerError(AppErrorCode.ORG_007);
+      throw AppErrorCode.ORG_007.create();
     }
     return { membership, organisation };
   }
@@ -161,14 +160,14 @@ export class OrganisationService {
   /** Changes a member's org role; refuses to demote the last remaining owner. */
   async updateMemberRole(organisationId: bigint, userId: bigint, role: Organisation.MemberRole): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
-    if (!membership) throw new ServerError(AppErrorCode.USR_001);
+    if (!membership) throw AppErrorCode.USR_001.create();
     if (membership.role === 'OWNER' && role !== 'OWNER') await this.assertNotLastOwner(organisationId, userId);
     const [updated] = await this.db
       .update(schema.organisationMembers)
       .set({ role })
       .where(and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.userId, userId)))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.USR_001);
+    if (!updated) throw AppErrorCode.USR_001.create();
     this.logger.info('updated member role', { organisationId, userId, role });
     return updated;
   }
@@ -176,7 +175,7 @@ export class OrganisationService {
   /** Removes a member; refuses to remove the last remaining owner. */
   async removeMember(organisationId: bigint, userId: bigint): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
-    if (!membership) throw new ServerError(AppErrorCode.USR_001);
+    if (!membership) throw AppErrorCode.USR_001.create();
     if (membership.role === 'OWNER') await this.assertNotLastOwner(organisationId, userId);
     await this.db.delete(schema.organisationMembers).where(and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.userId, userId)));
     this.logger.info('removed organisation member', { organisationId, userId, previousRole: membership.role });
@@ -189,7 +188,7 @@ export class OrganisationService {
     });
     if (!owners.some(owner => owner.userId !== exceptUserId)) {
       this.logger.warn('last-owner protection triggered: refusing to remove or demote the only owner', { organisationId, userId: exceptUserId });
-      throw new ServerError(AppErrorCode.ORG_004);
+      throw AppErrorCode.ORG_004.create();
     }
   }
 

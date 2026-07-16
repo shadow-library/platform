@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor, ServerError } from '@shadow-library/fastify';
+
+import { Body, Get, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
@@ -176,20 +177,20 @@ export class AuthController {
 
   private async dispatchVerify(body: ChallengeVerifyBody): Promise<FlowStepResult> {
     if (body.password) return this.loginService.verifyPassword(body.flowId, body.password);
-    if (!body.code && !body.recoveryCode && !body.webauthn) throw new ServerError(AppErrorCode.AUTH_003);
+    if (!body.code && !body.recoveryCode && !body.webauthn) throw AppErrorCode.AUTH_003.create();
 
     const flow = await this.authFlowService.get(body.flowId);
-    if (!flow) throw new ServerError(AppErrorCode.AUTH_001);
+    if (!flow) throw AppErrorCode.AUTH_001.create();
 
     if (body.webauthn) {
       if (flow.kind === 'LOGIN') return this.loginService.verifyWebauthn(body.flowId, body.webauthn);
-      throw new ServerError(AppErrorCode.AUTH_002);
+      throw AppErrorCode.AUTH_002.create();
     }
 
     if (body.recoveryCode) {
       if (flow.kind === 'LOGIN') return this.loginService.verifyMfa(body.flowId, { recoveryCode: body.recoveryCode });
       if (flow.kind === 'RECOVERY') return this.recoveryService.verifyMfa(body.flowId, { recoveryCode: body.recoveryCode });
-      throw new ServerError(AppErrorCode.AUTH_002);
+      throw AppErrorCode.AUTH_002.create();
     }
 
     const code = body.code as string;
@@ -200,7 +201,7 @@ export class AuthController {
     if (flow.kind === 'REGISTRATION') return this.registrationService.verifyOtp(body.flowId, code);
     if (flow.kind === 'RECOVERY')
       return flow.status === 'AWAITING_TOTP' ? this.recoveryService.verifyMfa(body.flowId, { code }) : this.recoveryService.verifyOtp(body.flowId, code);
-    throw new ServerError(AppErrorCode.AUTH_002);
+    throw AppErrorCode.AUTH_002.create();
   }
 
   private respond(result: FlowStepResult, reply: FastifyReply): ChallengeVerifyResponse {

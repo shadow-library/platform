@@ -4,8 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger } from '@shadow-library/common';
 import { and, eq, ne } from 'drizzle-orm';
 
 /**
@@ -57,7 +56,7 @@ export class DomainService {
 
   async register(organisationId: bigint, rawDomain: string): Promise<DomainChallenge> {
     const domain = rawDomain.toLowerCase().replace(/\.$/, '');
-    if (!DOMAIN_PATTERN.test(domain)) throw new ServerError(AppErrorCode.ORG_008);
+    if (!DOMAIN_PATTERN.test(domain)) throw AppErrorCode.ORG_008.create();
 
     const token = randomBytes(16).toString('hex');
     const [created] = await this.db
@@ -65,7 +64,7 @@ export class DomainService {
       .values({ organisationId, domain, verificationToken: token })
       .onConflictDoNothing({ target: [schema.organisationDomains.organisationId, schema.organisationDomains.domain] })
       .returning();
-    if (!created) throw new ServerError(AppErrorCode.ORG_009);
+    if (!created) throw AppErrorCode.ORG_009.create();
     this.logger.info('Domain registered for verification', { organisationId, domain });
     return this.challengeOf(created);
   }
@@ -78,7 +77,7 @@ export class DomainService {
     const domain = await this.db.query.organisationDomains.findFirst({
       where: and(eq(schema.organisationDomains.id, domainId), eq(schema.organisationDomains.organisationId, organisationId)),
     });
-    if (!domain) throw new ServerError(AppErrorCode.ORG_010);
+    if (!domain) throw AppErrorCode.ORG_010.create();
     return domain;
   }
 
@@ -118,17 +117,17 @@ export class DomainService {
 
     try {
       const [updated] = await this.db.update(schema.organisationDomains).set(changes).where(eq(schema.organisationDomains.id, domain.id)).returning();
-      if (!updated) throw new ServerError(AppErrorCode.ORG_010);
+      if (!updated) throw AppErrorCode.ORG_010.create();
       return updated;
     } catch (error) {
       /** Lost the race for the partial unique index: another org verified between pre-check and update. */
-      if (error instanceof ServerError) throw error;
+      if (AppError.is(error)) throw error;
       const [failed] = await this.db
         .update(schema.organisationDomains)
         .set({ status: 'FAILED', lastCheckedAt: checkedAt, lastCheckError: 'domain is verified by another organisation' })
         .where(eq(schema.organisationDomains.id, domain.id))
         .returning();
-      if (!failed) throw new ServerError(AppErrorCode.ORG_010);
+      if (!failed) throw AppErrorCode.ORG_010.create();
       return failed;
     }
   }

@@ -4,8 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -119,7 +118,7 @@ export class WebhookService {
       .insert(schema.webhookSubscriptions)
       .values({ name: input.name, targetUrl: input.targetUrl, eventTypes: input.eventTypes, secretCiphertext: ciphertext, kekVersion })
       .returning()
-      .then(([row]) => row ?? throwError(new InternalError('Failed to create webhook subscription')));
+      .then(([row]) => row ?? throwError(AppError.internal('Failed to create webhook subscription')));
     this.invalidateCache();
     this.logger.info('Webhook subscription created', { subscriptionId: subscription.id, targetUrl: input.targetUrl });
     return { subscription, secret };
@@ -131,7 +130,7 @@ export class WebhookService {
 
   async getById(subscriptionId: bigint): Promise<WebhookSubscription> {
     const subscription = await this.db.query.webhookSubscriptions.findFirst({ where: eq(schema.webhookSubscriptions.id, subscriptionId) });
-    if (!subscription) throw new ServerError(AppErrorCode.WHK_001);
+    if (!subscription) throw AppErrorCode.WHK_001.create();
     return subscription;
   }
 
@@ -143,7 +142,7 @@ export class WebhookService {
       .set({ ...input, updatedAt: new Date() })
       .where(eq(schema.webhookSubscriptions.id, subscriptionId))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.WHK_001);
+    if (!updated) throw AppErrorCode.WHK_001.create();
     this.invalidateCache();
     return updated;
   }
@@ -164,7 +163,7 @@ export class WebhookService {
       })
       .where(eq(schema.webhookSubscriptions.id, subscriptionId))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.WHK_001);
+    if (!updated) throw AppErrorCode.WHK_001.create();
     this.invalidateCache();
     this.logger.info('Webhook secret rotated', { subscriptionId });
     return { subscription: updated, secret };

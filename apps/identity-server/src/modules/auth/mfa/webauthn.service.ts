@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import {
   type AuthenticationResponseJSON,
   type AuthenticatorTransportFuture,
@@ -99,7 +98,7 @@ export class WebauthnService {
 
   async finishRegistration(userId: bigint, response: RegistrationResponseJSON, label?: string): Promise<WebauthnCredential> {
     const expectedChallenge = await this.redis.getdel(this.registrationKey(userId));
-    if (!expectedChallenge) throw new ServerError(AppErrorCode.MFA_002);
+    if (!expectedChallenge) throw AppErrorCode.MFA_002.create();
 
     const verification = await verifyRegistrationResponse({
       response,
@@ -107,7 +106,7 @@ export class WebauthnService {
       expectedOrigin: this.origin,
       expectedRPID: this.rpId,
     }).catch(() => null);
-    if (!verification?.verified || !verification.registrationInfo) throw new ServerError(AppErrorCode.MFA_002);
+    if (!verification?.verified || !verification.registrationInfo) throw AppErrorCode.MFA_002.create();
 
     const { credential, aaguid, credentialBackedUp } = verification.registrationInfo;
     const [row] = await this.db
@@ -123,7 +122,7 @@ export class WebauthnService {
         label: label ?? 'passkey',
       })
       .returning();
-    if (!row) throw new ServerError(AppErrorCode.MFA_002);
+    if (!row) throw AppErrorCode.MFA_002.create();
 
     await this.auditService.record({ action: 'auth.mfa.webauthn_registered', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     await this.notify(userId, ENROLLED_TEMPLATE);
@@ -203,7 +202,7 @@ export class WebauthnService {
       .delete(schema.webauthnCredentials)
       .where(eq(schema.webauthnCredentials.credentialId, credentialId))
       .returning({ userId: schema.webauthnCredentials.userId });
-    if (removed.length === 0 || removed[0]?.userId !== userId) throw new ServerError(AppErrorCode.MFA_001);
+    if (removed.length === 0 || removed[0]?.userId !== userId) throw AppErrorCode.MFA_001.create();
 
     await this.auditService.record({ action: 'auth.mfa.webauthn_removed', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     await this.notify(userId, DISABLED_TEMPLATE);

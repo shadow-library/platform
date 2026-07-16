@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Config, InternalError, Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 
 /**
@@ -139,7 +139,7 @@ export class BackChannelLogoutService {
       body: `logout_token=${encodeURIComponent(token)}`,
       signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) throw new InternalError(`logout endpoint answered ${response.status}`);
+    if (!response.ok) throw AppError.internal(`logout endpoint answered ${response.status}`);
   }
 
   private async markFailed(delivery: OidcLogoutDelivery, error: unknown): Promise<void> {

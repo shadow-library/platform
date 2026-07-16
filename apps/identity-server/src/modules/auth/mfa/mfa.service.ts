@@ -5,7 +5,6 @@ import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 
 /**
@@ -112,7 +111,7 @@ export class MfaService {
    */
   async enrollTotp(userId: bigint): Promise<TotpProvisioning> {
     const active = await this.getTotpEnrollment(userId, 'verified');
-    if (active) throw new ServerError(AppErrorCode.MFA_003);
+    if (active) throw AppErrorCode.MFA_003.create();
 
     const secret = randomBytes(TOTP_SECRET_BYTES);
     const encrypted = this.keyProvider.encrypt(secret);
@@ -132,10 +131,10 @@ export class MfaService {
   /** Activates a pending TOTP enrollment once the user proves possession with a valid code. */
   async activateTotp(userId: bigint, code: string): Promise<void> {
     const pending = await this.getTotpEnrollment(userId, 'pending');
-    if (!pending) throw new ServerError(AppErrorCode.MFA_001);
+    if (!pending) throw AppErrorCode.MFA_001.create();
 
     const counter = verifyTotp(this.decryptSecret(pending), code);
-    if (counter === null) throw new ServerError(AppErrorCode.MFA_002);
+    if (counter === null) throw AppErrorCode.MFA_002.create();
 
     await this.db
       .update(schema.mfaEnrollments)
@@ -168,7 +167,7 @@ export class MfaService {
 
   async disableTotp(userId: bigint): Promise<void> {
     const enrollment = await this.getTotpEnrollment(userId, 'verified');
-    if (!enrollment) throw new ServerError(AppErrorCode.MFA_001);
+    if (!enrollment) throw AppErrorCode.MFA_001.create();
 
     await this.db.delete(schema.mfaEnrollments).where(and(eq(schema.mfaEnrollments.userId, userId), eq(schema.mfaEnrollments.type, 'TOTP')));
     await this.auditService.record({ action: 'auth.mfa.totp_disabled', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
@@ -184,7 +183,7 @@ export class MfaService {
   }
 
   private decryptSecret(enrollment: MfaEnrollment): Buffer {
-    if (!enrollment.secretCiphertext || enrollment.kekVersion === null) throw new ServerError(AppErrorCode.MFA_001);
+    if (!enrollment.secretCiphertext || enrollment.kekVersion === null) throw AppErrorCode.MFA_001.create();
     const serialized = JSON.parse(enrollment.secretCiphertext) as SerializedSecret;
     return this.keyProvider.decrypt({ ...serialized, kekVersion: enrollment.kekVersion });
   }

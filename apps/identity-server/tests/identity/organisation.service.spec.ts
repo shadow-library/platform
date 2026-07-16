@@ -64,7 +64,7 @@ describe('Tenancy', () => {
     expect(own.map(member => member.userId)).toEqual([alice.id]);
 
     const crossTenant = await rejection(orgs.listMembers(alice.id, bobOrg));
-    expect(crossTenant.getCode?.()).toBe('ORG_001');
+    expect(crossTenant.code).toBe('ORG_001');
   });
 
   it('should deny membership assertions across tenants', async () => {
@@ -73,7 +73,7 @@ describe('Tenancy', () => {
 
     await expect(orgs.assertMember(alice.id, orgId(alice.personalOrganisationId))).resolves.toBeDefined();
     const denied = await rejection(orgs.assertMember(alice.id, orgId(bob.personalOrganisationId)));
-    expect(denied.getCode?.()).toBe('ORG_001');
+    expect(denied.code).toBe('ORG_001');
   });
 
   it('should roll back the personal workspace when user creation fails', async () => {

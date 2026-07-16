@@ -3,7 +3,7 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -52,7 +52,7 @@ export function base32Decode(encoded: string): Buffer {
   const bytes: number[] = [];
   for (const char of encoded.toUpperCase().replace(/=+$/, '')) {
     const idx = BASE32_ALPHABET.indexOf(char);
-    if (idx === -1) throw new InternalError(`Invalid base32 character: ${char}`);
+    if (idx === -1) throw AppError.internal(`Invalid base32 character: ${char}`);
     value = (value << 5) | idx;
     bits += 5;
     if (bits >= 8) {

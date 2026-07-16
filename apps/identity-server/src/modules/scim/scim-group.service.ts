@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, InternalError, throwError } from '@shadow-library/common';
+import { AppError, Config, throwError } from '@shadow-library/common';
 import { SQL, and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 
 /**
@@ -64,7 +64,7 @@ export class ScimGroupService {
       .insert(schema.scimGroups)
       .values({ organisationId: tenant.organisationId, displayName: input.displayName, externalId: input.externalId })
       .returning()
-      .then(([row]) => row ?? throwError(new InternalError('Scim group insert failed')));
+      .then(([row]) => row ?? throwError(AppError.internal('Scim group insert failed')));
     if (input.members.length > 0) await this.addMembers(tenant, group.id, input.members);
     await this.audit(tenant, 'scim.group.created', group.id);
     return this.toResource(group);

@@ -5,7 +5,6 @@ import assert from 'node:assert';
 
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -69,7 +68,7 @@ export class ApplicationRoleService {
       .where(condition)
       .returning()
       .catch(error => this.databaseService.translateError(error));
-    if (!role) throw new ServerError(AppErrorCode.APP_003);
+    if (!role) throw AppErrorCode.APP_003.create();
     this.logger.info(`Updated role with ID ${roleId}`, { update });
     await this.applicationService.loadApplications();
     return role;
@@ -82,7 +81,7 @@ export class ApplicationRoleService {
       .where(condition)
       .returning()
       .catch(error => this.databaseService.translateError(error));
-    if (!role) throw new ServerError(AppErrorCode.APP_003);
+    if (!role) throw AppErrorCode.APP_003.create();
     await this.applicationService.loadApplications();
     this.logger.info(`Deleted role with ID ${roleId}`);
     return role;

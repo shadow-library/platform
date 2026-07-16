@@ -4,8 +4,7 @@
 import { createHmac, hkdfSync, randomUUID } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Config, InternalError, Logger, throwError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 import { eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 
@@ -89,16 +88,16 @@ export class SamlService {
   /* ------------------------------- service provider registry ------------------------------- */
 
   private assertValidServiceProvider(entityId: string, acsUrl: string, releasedAttributes: string[]): void {
-    if (!entityId.trim()) throw new ServerError(AppErrorCode.SML_001);
+    if (!entityId.trim()) throw AppErrorCode.SML_001.create();
     let acs: URL;
     try {
       acs = new URL(acsUrl);
     } catch {
-      throw new ServerError(AppErrorCode.SML_002);
+      throw AppErrorCode.SML_002.create();
     }
-    if (acs.protocol !== 'https:') throw new ServerError(AppErrorCode.SML_002);
+    if (acs.protocol !== 'https:') throw AppErrorCode.SML_002.create();
     const invalid = releasedAttributes.filter(attribute => !RELEASABLE_ATTRIBUTES.includes(attribute as (typeof RELEASABLE_ATTRIBUTES)[number]));
-    if (invalid.length > 0) throw new ServerError(AppErrorCode.SML_001);
+    if (invalid.length > 0) throw AppErrorCode.SML_001.create();
   }
 
   async createServiceProvider(data: CreateServiceProvider): Promise<SamlServiceProvider> {
@@ -115,7 +114,7 @@ export class SamlService {
         spCertificatePem: data.spCertificatePem,
       })
       .returning()
-      .then(([row]) => row ?? throwError(new InternalError('Service provider creation failed')));
+      .then(([row]) => row ?? throwError(AppError.internal('Service provider creation failed')));
     this.logger.info('saml service provider registered', { id: serviceProvider.id, entityId: data.entityId });
     return serviceProvider;
   }
@@ -130,18 +129,18 @@ export class SamlService {
       .set({ ...patch, acsUrl, releasedAttributes, updatedAt: new Date() })
       .where(eq(schema.samlServiceProviders.id, id))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.SML_004);
+    if (!updated) throw AppErrorCode.SML_004.create();
     return updated;
   }
 
   async removeServiceProvider(id: string): Promise<void> {
     const removed = await this.db.delete(schema.samlServiceProviders).where(eq(schema.samlServiceProviders.id, id)).returning({ id: schema.samlServiceProviders.id });
-    if (removed.length === 0) throw new ServerError(AppErrorCode.SML_004);
+    if (removed.length === 0) throw AppErrorCode.SML_004.create();
   }
 
   async getServiceProvider(id: string): Promise<SamlServiceProvider> {
     const serviceProvider = await this.db.query.samlServiceProviders.findFirst({ where: eq(schema.samlServiceProviders.id, id) });
-    if (!serviceProvider) throw new ServerError(AppErrorCode.SML_004);
+    if (!serviceProvider) throw AppErrorCode.SML_004.create();
     return serviceProvider;
   }
 
@@ -159,11 +158,11 @@ export class SamlService {
   async handleSsoRequest(samlRequest: string, relayState: string | undefined, sessionSecret: string | undefined): Promise<SsoResult> {
     const xml = decodeSamlRequest(samlRequest);
     const request = xml ? parseAuthnRequest(xml) : null;
-    if (!request) throw new ServerError(AppErrorCode.SML_001);
+    if (!request) throw AppErrorCode.SML_001.create();
 
     const serviceProvider = await this.db.query.samlServiceProviders.findFirst({ where: eq(schema.samlServiceProviders.entityId, request.issuer) });
-    if (!serviceProvider || !serviceProvider.isActive) throw new ServerError(AppErrorCode.SML_001);
-    if (request.acsUrl && request.acsUrl !== serviceProvider.acsUrl) throw new ServerError(AppErrorCode.SML_002);
+    if (!serviceProvider || !serviceProvider.isActive) throw AppErrorCode.SML_001.create();
+    if (request.acsUrl && request.acsUrl !== serviceProvider.acsUrl) throw AppErrorCode.SML_002.create();
 
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) {
@@ -181,10 +180,10 @@ export class SamlService {
     if (!session) return { kind: 'login', resumeId };
 
     const raw = await this.redis.getdel(this.pendingKey(resumeId));
-    if (!raw) throw new ServerError(AppErrorCode.SML_003);
+    if (!raw) throw AppErrorCode.SML_003.create();
     const pending = JSON.parse(raw) as PendingSsoRequest;
     const serviceProvider = await this.getServiceProvider(pending.serviceProviderId);
-    if (!serviceProvider.isActive) throw new ServerError(AppErrorCode.SML_001);
+    if (!serviceProvider.isActive) throw AppErrorCode.SML_001.create();
     return this.issueResponse(serviceProvider, session, pending.requestId, pending.relayState);
   }
 
@@ -199,7 +198,7 @@ export class SamlService {
 
   private async issueResponse(serviceProvider: SamlServiceProvider, session: ValidatedSession, requestId: string, relayState?: string): Promise<SsoResult> {
     const email = await this.userEmailService.getPrimaryEmail(session.userId);
-    if (!email) throw new ServerError(AppErrorCode.SML_001);
+    if (!email) throw AppErrorCode.SML_001.create();
     const profile = await this.db.query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, session.userId) });
 
     const attributeValues: Record<(typeof RELEASABLE_ATTRIBUTES)[number], string | null> = {

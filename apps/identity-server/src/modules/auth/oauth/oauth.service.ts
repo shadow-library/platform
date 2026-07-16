@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -142,10 +141,10 @@ export class OAuthService {
   /** Authorization Code entry point: validates the request then either issues a code or asks the caller to log in. */
   async authorize(params: AuthorizeParams, sessionSecret?: string): Promise<AuthorizeResult> {
     const client = await this.requireClient(params.clientId);
-    if (!(await this.clientService.isRedirectUriAllowed(client.id, params.redirectUri))) throw new ServerError(AppErrorCode.OAU_001);
-    if (params.responseType !== 'code') throw new ServerError(AppErrorCode.OAU_001);
-    if (!client.grantTypes.includes('authorization_code')) throw new ServerError(AppErrorCode.OAU_001);
-    if (client.requirePkce && (!params.codeChallenge || params.codeChallengeMethod !== 'S256')) throw new ServerError(AppErrorCode.OAU_001);
+    if (!(await this.clientService.isRedirectUriAllowed(client.id, params.redirectUri))) throw AppErrorCode.OAU_001.create();
+    if (params.responseType !== 'code') throw AppErrorCode.OAU_001.create();
+    if (!client.grantTypes.includes('authorization_code')) throw AppErrorCode.OAU_001.create();
+    if (client.requirePkce && (!params.codeChallenge || params.codeChallengeMethod !== 'S256')) throw AppErrorCode.OAU_001.create();
 
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) return { kind: 'login' };
@@ -190,28 +189,28 @@ export class OAuthService {
     if (params.grantType === 'refresh_token') return this.refresh(params, credential);
     if (params.grantType === 'client_credentials') return this.clientCredentials(params, credential);
     this.logger.warn('token request rejected: unsupported grant type', { grantType: params.grantType, clientId: credential.clientId });
-    throw new ServerError(AppErrorCode.OAU_004);
+    throw AppErrorCode.OAU_004.create();
   }
 
   private async exchangeCode(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
     const client = await this.authenticateClient(credential);
-    if (!params.code || !params.redirectUri || !params.codeVerifier) throw new ServerError(AppErrorCode.OAU_001);
+    if (!params.code || !params.redirectUri || !params.codeVerifier) throw AppErrorCode.OAU_001.create();
 
     const payload = await this.codeService.consume(params.code);
     if (!payload || payload.clientId !== client.id || payload.redirectUri !== params.redirectUri) {
       this.logger.warn('authorization code exchange rejected: invalid, expired, or mismatched code', { clientId: client.id });
-      throw new ServerError(AppErrorCode.OAU_003);
+      throw AppErrorCode.OAU_003.create();
     }
     if (!verifyPkce(params.codeVerifier, payload.codeChallenge, payload.codeChallengeMethod)) {
       this.logger.warn('authorization code exchange rejected: pkce verification failed', { securityEvent: 'oauth.pkce_failed', clientId: client.id });
-      throw new ServerError(AppErrorCode.OAU_003);
+      throw AppErrorCode.OAU_003.create();
     }
 
     const userId = BigInt(payload.userId);
     const user = await this.userService.getUser(userId);
     if (!user || user.status !== 'ACTIVE') {
       this.logger.warn('authorization code exchange rejected: user inactive or missing', { clientId: client.id, userId: payload.userId });
-      throw new ServerError(AppErrorCode.OAU_003);
+      throw AppErrorCode.OAU_003.create();
     }
 
     const audience = payload.resource ?? DEFAULT_AUDIENCE;
@@ -260,18 +259,18 @@ export class OAuthService {
 
   private async refresh(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
     const client = await this.authenticateClient(credential);
-    if (!params.refreshToken) throw new ServerError(AppErrorCode.OAU_001);
+    if (!params.refreshToken) throw AppErrorCode.OAU_001.create();
 
     const rotated = await this.refreshTokenService.rotate(params.refreshToken).catch(error => {
       if (error instanceof RefreshTokenReuseError) {
         this.logger.warn('refresh token reuse detected, token family revoked', { securityEvent: 'oauth.refresh_token_reuse', clientId: client.id });
-        throw new ServerError(AppErrorCode.OAU_003);
+        throw AppErrorCode.OAU_003.create();
       }
       throw error;
     });
     if (rotated.context.clientId !== client.id) {
       this.logger.warn('refresh token rejected: client mismatch', { clientId: client.id, tokenClientId: rotated.context.clientId });
-      throw new ServerError(AppErrorCode.OAU_003);
+      throw AppErrorCode.OAU_003.create();
     }
 
     const scope = rotated.context.scope ?? '';
@@ -291,14 +290,14 @@ export class OAuthService {
 
   private async clientCredentials(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
     const client = await this.authenticateClient(credential);
-    if (!client.grantTypes.includes('client_credentials')) throw new ServerError(AppErrorCode.OAU_004);
+    if (!client.grantTypes.includes('client_credentials')) throw AppErrorCode.OAU_004.create();
 
     const granted = await this.clientService.getGrantedScopeNames(client.id);
     const requested = (params.scope ?? '').split(' ').filter(Boolean);
     const disallowed = requested.filter(scope => !granted.includes(scope));
     if (disallowed.length > 0) {
       this.logger.warn('client_credentials request rejected: scope not granted to client', { clientId: client.id, disallowed });
-      throw new ServerError(AppErrorCode.OAU_004);
+      throw AppErrorCode.OAU_004.create();
     }
 
     const audience = params.resource ?? DEFAULT_AUDIENCE;
@@ -316,13 +315,13 @@ export class OAuthService {
 
   private async authenticateClient(credential: ClientCredential): Promise<OAuthClient> {
     if (credential.clientAssertion) return this.authenticateWorkload(credential);
-    if (!credential.clientId) throw new ServerError(AppErrorCode.OAU_002);
+    if (!credential.clientId) throw AppErrorCode.OAU_002.create();
 
     const client = await this.requireClient(credential.clientId);
     if (client.tokenEndpointAuthMethod === 'none') return client;
     if (!credential.clientSecret || !(await this.clientService.verifySecret(client.id, credential.clientSecret))) {
       this.logger.warn('client authentication failed: invalid client secret', { securityEvent: 'oauth.client_auth_failed', clientId: client.id });
-      throw new ServerError(AppErrorCode.OAU_002);
+      throw AppErrorCode.OAU_002.create();
     }
     return client;
   }
@@ -335,7 +334,7 @@ export class OAuthService {
         clientId: credential.clientId,
         reason: error.message,
       });
-      throw new ServerError(AppErrorCode.OAU_002);
+      throw AppErrorCode.OAU_002.create();
     });
 
     const client = await this.clientService.getClientByWorkloadSubject(workload.subject);
@@ -345,7 +344,7 @@ export class OAuthService {
         workloadSubject: workload.subject,
         clientId: credential.clientId,
       });
-      throw new ServerError(AppErrorCode.OAU_002);
+      throw AppErrorCode.OAU_002.create();
     }
     return client;
   }
@@ -354,7 +353,7 @@ export class OAuthService {
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) {
       this.logger.debug('oauth client lookup failed: unknown or inactive client', { clientId });
-      throw new ServerError(AppErrorCode.OAU_002);
+      throw AppErrorCode.OAU_002.create();
     }
     return client;
   }

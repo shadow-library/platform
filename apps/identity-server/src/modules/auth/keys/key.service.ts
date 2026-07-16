@@ -4,7 +4,7 @@
 import { KeyObject, createPrivateKey, createPublicKey, generateKeyPairSync, randomUUID } from 'node:crypto';
 
 import { Injectable, OnModuleInit } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, inArray, lt } from 'drizzle-orm';
 
 /**
@@ -154,8 +154,8 @@ export class KeyService implements OnModuleInit {
   }
 
   sign(claims: JwtClaims): SignResult {
-    const kid = this.activeKid ?? throwError(new InternalError('No active signing key available'));
-    const key = this.keys.get(kid) ?? throwError(new InternalError(`Active signing key ${kid} is not loaded`));
+    const kid = this.activeKid ?? throwError(AppError.internal('No active signing key available'));
+    const key = this.keys.get(kid) ?? throwError(AppError.internal(`Active signing key ${kid} is not loaded`));
     const token = encodeJwt({ alg: 'EdDSA', typ: 'JWT', kid }, claims, key.privateKey);
     return { token, kid };
   }

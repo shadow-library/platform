@@ -3,7 +3,7 @@
  */
 import { Route, type RouteMetadata } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
-import { AsyncRouteHandler, Middleware, MiddlewareGenerator, ServerError } from '@shadow-library/fastify';
+import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -43,7 +43,7 @@ export const RequireServiceToken = (scope: string): ServiceTokenDecorator => Rou
 
 /** Returns the verified service-token claims the guard attached; throws 401 when the route ran unguarded */
 export function getServiceTokenClaims(request: ServiceTokenCarrier): JwtClaims {
-  if (!request.serviceToken) throw new ServerError(AppErrorCode.SEC_003);
+  if (!request.serviceToken) throw AppErrorCode.SEC_003.create();
   return request.serviceToken;
 }
 
@@ -65,14 +65,14 @@ export class ServiceTokenGuard implements MiddlewareGenerator {
     return async (request: FastifyRequest): Promise<void> => {
       const header = request.headers.authorization;
       const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
-      if (!token) throw new ServerError(AppErrorCode.SEC_003);
+      if (!token) throw AppErrorCode.SEC_003.create();
 
       const claims = this.keyService.verify(token);
       const now = Math.floor(Date.now() / 1000);
-      if (!claims || typeof claims.exp !== 'number' || claims.exp <= now || claims.iss !== this.issuer) throw new ServerError(AppErrorCode.SEC_003);
+      if (!claims || typeof claims.exp !== 'number' || claims.exp <= now || claims.iss !== this.issuer) throw AppErrorCode.SEC_003.create();
 
       const scopes = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
-      if (claims.token_type !== 'service' || claims.aud !== PLATFORM_AUDIENCE || !scopes.includes(policy.scope)) throw new ServerError(AppErrorCode.SEC_004);
+      if (claims.token_type !== 'service' || claims.aud !== PLATFORM_AUDIENCE || !scopes.includes(policy.scope)) throw AppErrorCode.SEC_004.create();
 
       (request as FastifyRequest & ServiceTokenCarrier).serviceToken = claims;
     };

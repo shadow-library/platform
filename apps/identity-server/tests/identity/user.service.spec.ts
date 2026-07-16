@@ -3,8 +3,7 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-import { ValidationError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, ValidationError } from '@shadow-library/common';
 import { eq } from 'drizzle-orm';
 
 /**
@@ -88,8 +87,8 @@ describe('UserService', () => {
     it('should reject a duplicate email with a conflict error', async () => {
       await service.createUserWithPassword(buildUser({ email: 'dup@example.com' }));
       const error = await rejection(service.createUserWithPassword(buildUser({ email: 'dup@example.com' })));
-      expect(error).toBeInstanceOf(ServerError);
-      expect(error.getCode()).toBe('USR_003');
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.code).toBe('USR_003');
     });
   });
 
@@ -138,8 +137,8 @@ describe('UserService', () => {
 
     it('should throw a not-found error for an unknown identifier', async () => {
       const error = await rejection(service.updateUserStatus('ghost@example.com', 'BLOCKED'));
-      expect(error).toBeInstanceOf(ServerError);
-      expect(error.getCode()).toBe('USR_001');
+      expect(error).toBeInstanceOf(AppError);
+      expect(error.code).toBe('USR_001');
     });
   });
 });

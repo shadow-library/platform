@@ -5,7 +5,7 @@ import { createPrivateKey, generateKeyPairSync, randomUUID } from 'node:crypto';
 
 import * as x509 from '@peculiar/x509';
 import { Injectable, OnModuleInit } from '@shadow-library/app';
-import { InternalError, Logger, throwError } from '@shadow-library/common';
+import { AppError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, inArray } from 'drizzle-orm';
 
 /**
@@ -131,7 +131,7 @@ export class SamlKeyService implements OnModuleInit {
 
   getActiveKey(): SamlSigningKey {
     const kid = this.activeKid;
-    const key = (kid ? this.keys.get(kid) : undefined) ?? throwError(new InternalError('No active saml signing key available'));
+    const key = (kid ? this.keys.get(kid) : undefined) ?? throwError(AppError.internal('No active saml signing key available'));
     return { kid: key.kid, privateKeyPem: key.privateKeyPem, certificatePem: key.certificatePem };
   }
 

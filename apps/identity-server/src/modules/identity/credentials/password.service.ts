@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { InternalError, Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { and, desc, eq, notInArray } from 'drizzle-orm';
 
 /**
@@ -106,7 +106,7 @@ export class PasswordService {
       }
       if (!identity) {
         this.logger.error('failed to resolve password identity during change', { userId });
-        throw new InternalError('Failed to resolve password identity');
+        throw AppError.internal('Failed to resolve password identity');
       }
 
       await tx

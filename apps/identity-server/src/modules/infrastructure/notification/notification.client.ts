@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { APIRequest, Config, InternalError, Logger } from '@shadow-library/common';
+import { APIRequest, AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -47,7 +47,7 @@ export class NotificationClient {
       });
     if (response.statusCode >= 400) {
       this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.statusCode, body: response.data });
-      throw new InternalError(`Notification request failed with status ${response.statusCode}`);
+      throw AppError.internal(`Notification request failed with status ${response.statusCode}`);
     }
     this.logger.debug('notification dispatched to pulse-server', { templateKey: notification.templateKey });
   }

@@ -76,12 +76,12 @@ describe('AdminAccessService', () => {
   it('should reject a session without administrative assignments', async () => {
     const { secret } = await createUserSession('mortal@example.com', 'AAL2');
     const denied = await rejection(access.requireRead(requestWith(secret), ADMIN_PERMISSIONS.usersRead));
-    expect(denied.getCode?.()).toBe('ADM_001');
+    expect(denied.code).toBe('ADM_001');
   });
 
   it('should reject requests without a session entirely', async () => {
     const denied = await rejection(access.requireRead(requestWith('not-a-session'), ADMIN_PERMISSIONS.usersRead));
-    expect(denied.getCode?.()).toBe('AUTH_005');
+    expect(denied.code).toBe('AUTH_005');
   });
 
   it('should permit reads at aal1 but demand step-up for mutations', async () => {
@@ -92,7 +92,7 @@ describe('AdminAccessService', () => {
     expect(actor.organisationId).toBe(platformOrgId);
 
     const denied = await rejection(access.requireMutation(requestWith(secret), ADMIN_PERMISSIONS.usersManage));
-    expect(denied.getCode?.()).toBe('AUTH_006');
+    expect(denied.code).toBe('AUTH_006');
   });
 
   it('should permit mutations for an elevated administrator', async () => {
@@ -117,6 +117,6 @@ describe('AdminAccessService', () => {
     expect(permitted.session.userId).toBe(user.id);
 
     const denied = await rejection(access.requireRoleAdmin(requestWith(secret), platformApp.id));
-    expect(denied.getCode?.()).toBe('ADM_001');
+    expect(denied.code).toBe('ADM_001');
   });
 });

@@ -3,7 +3,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { SQL, and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 
 /**
@@ -171,7 +170,7 @@ export class AdminUserService {
 
   async setStatus(userId: bigint, status: Extract<User.Status, 'ACTIVE' | 'DISABLED'>, context: AdminActionContext): Promise<void> {
     const user = await this.requireUser(userId);
-    if (user.status === 'CLOSED') throw new ServerError(AppErrorCode.USR_001);
+    if (user.status === 'CLOSED') throw AppErrorCode.USR_001.create();
     await this.db.update(schema.users).set({ status, updatedAt: new Date() }).where(eq(schema.users.id, userId));
     if (status === 'DISABLED') await this.revokeAllAccess(userId);
     await this.record(status === 'DISABLED' ? 'admin.user.deactivated' : 'admin.user.reactivated', userId, context);
@@ -220,7 +219,7 @@ export class AdminUserService {
 
   private async requireUser(userId: bigint): Promise<User> {
     const user = await this.db.query.users.findFirst({ where: eq(schema.users.id, userId) });
-    if (!user) throw new ServerError(AppErrorCode.USR_001);
+    if (!user) throw AppErrorCode.USR_001.create();
     return user;
   }
 
