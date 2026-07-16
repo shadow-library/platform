@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { ContextService, ServerError } from '@shadow-library/fastify';
+import { ContextService } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -41,7 +41,7 @@ export function extendContextWithAuth(context: ContextService): void {
   context.extend({
     getAuthPrincipal(): AuthPrincipal {
       const principal = this.get<AuthPrincipal>(AUTH_PRINCIPAL);
-      if (!principal) throw new ServerError(AuthGuardErrorCode.IAM_001);
+      if (!principal) throw AuthGuardErrorCode.IAM_001.create();
       return principal;
     },
 

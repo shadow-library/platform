@@ -3,10 +3,13 @@
  */
 import { readFile } from 'node:fs/promises';
 
+import { AppError, Logger, throwError } from '@shadow-library/common';
+
 /**
  * Importing user defined packages
  */
-import { AuthError, AuthErrorCode } from '../errors';
+import { NAMESPACE } from '../constants';
+import { AuthErrorCode } from '../errors';
 import { AuthClientCredential, FetchLike, ServiceTokenOptions } from '../interfaces';
 import { DiscoveryClient } from './discovery';
 
@@ -44,6 +47,7 @@ const DEFAULT_REFRESH_SKEW_SECONDS = 60;
 const JWT_BEARER_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
 
 export class ServiceTokenManager {
+  private readonly logger = Logger.getLogger(NAMESPACE, ServiceTokenManager.name);
   private readonly cache = new Map<string, CachedToken>();
   private readonly inflight = new Map<string, Promise<string>>();
 
@@ -51,7 +55,7 @@ export class ServiceTokenManager {
 
   async getToken(options: ServiceTokenOptions = {}): Promise<string> {
     const client = this.options.client;
-    if (!client) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'service tokens require client credentials');
+    if (!client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service tokens require client credentials' });
 
     const key = this.cacheKey(options);
     const cached = this.cache.get(key);
@@ -66,6 +70,7 @@ export class ServiceTokenManager {
   }
 
   invalidate(options: ServiceTokenOptions = {}): void {
+    this.logger.debug('service token invalidated', { resource: options.resource, scopes: options.scopes });
     this.cache.delete(this.cacheKey(options));
   }
 
@@ -93,14 +98,18 @@ export class ServiceTokenManager {
     if (scopes.length > 0) body.scope = scopes.join(' ');
     if (options.resource) body.resource = options.resource;
 
-    const response = await this.options.fetchFn(document.token_endpoint, { method: 'POST', headers, body: JSON.stringify(body) }).catch((error: Error) => {
-      throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `token request failed: ${error.message}`);
-    });
-    if (!response.ok) throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `token endpoint returned http ${response.status}`);
+    /** Debug-only: the body may carry the client assertion */
+    this.logger.debug('requesting service token', { url: document.token_endpoint, body });
+    const response = await this.options
+      .fetchFn(document.token_endpoint, { method: 'POST', headers, body: JSON.stringify(body) })
+      .catch((error: Error) => throwError(this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: `token request failed: ${error.message}` }))));
+    if (!response.ok) throw this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: `token endpoint returned http ${response.status}` }));
 
     const payload = (await response.json()) as TokenEndpointResponse;
-    if (!payload.access_token || typeof payload.expires_in !== 'number') throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, 'malformed token endpoint response');
+    if (!payload.access_token || typeof payload.expires_in !== 'number')
+      throw this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: 'malformed token endpoint response' }));
 
+    this.logger.info('service token minted', { clientId: client.id, resource: options.resource, scopes, expiresIn: payload.expires_in });
     const refreshSkew = this.options.refreshSkewSeconds ?? DEFAULT_REFRESH_SKEW_SECONDS;
     this.cache.set(key, { token: payload.access_token, expiresAt: Date.now() + (payload.expires_in - refreshSkew) * 1000 });
     return payload.access_token;
@@ -108,11 +117,17 @@ export class ServiceTokenManager {
 
   /** Read fresh on every request — the kubelet rotates the projected token in place */
   private async readAssertion(path: string): Promise<string> {
-    const assertion = await readFile(path, 'utf8').catch((error: Error) => {
-      throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `could not read service-account token at '${path}': ${error.message}`);
-    });
+    const assertion = await readFile(path, 'utf8').catch((error: Error) =>
+      throwError(this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: `could not read service-account token at '${path}': ${error.message}` }))),
+    );
     const trimmed = assertion.trim();
-    if (!trimmed) throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `service-account token at '${path}' is empty`);
+    if (!trimmed) throw this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: `service-account token at '${path}' is empty` }));
     return trimmed;
+  }
+
+  /** Records the failure at error level before it propagates, keeping guard throws single-line */
+  private logged(error: AppError): AppError {
+    this.logger.error(error.message);
+    return error;
   }
 }

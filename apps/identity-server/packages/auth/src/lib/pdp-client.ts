@@ -1,11 +1,13 @@
 /**
  * Importing npm packages
  */
+import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { AuthError, AuthErrorCode } from '../errors';
+import { NAMESPACE } from '../constants';
+import { AuthErrorCode } from '../errors';
 import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
 
 /**
@@ -45,6 +47,7 @@ const HIGH_RISK_TTL_SECONDS = 60;
 const DEFAULT_MAX_ENTRIES = 1000;
 
 export class PdpClient {
+  private readonly logger = Logger.getLogger(NAMESPACE, PdpClient.name);
   private readonly cache = new Map<string, CachedDecision>();
   private readonly versions = new Map<string, number>();
 
@@ -66,7 +69,8 @@ export class PdpClient {
 
     try {
       return await this.request(principalKey, key, organisationId, input, options);
-    } catch {
+    } catch (error) {
+      this.logger.warn('pdp check failed; applying fallback decision', { action: input.action, failOpen: options.failOpen ?? false, reason: (error as Error).message });
       return options.failOpen ?? false;
     }
   }
@@ -77,7 +81,10 @@ export class PdpClient {
 
   private async request(principalKey: string, key: string, organisationId: string, input: CheckInput, options: CheckOptions): Promise<boolean> {
     const headers: Record<string, string> = { 'content-type': 'application/json' };
-    const token = await this.options.getToken?.().catch(() => null);
+    const token = await this.options.getToken?.().catch((error: Error) => {
+      this.logger.warn('pdp token acquisition failed; calling unauthenticated', { reason: error.message });
+      return null;
+    });
     if (token) headers.authorization = `Bearer ${token}`;
 
     const body = JSON.stringify({
@@ -87,14 +94,15 @@ export class PdpClient {
       action: input.action,
     });
     const response = await this.options.fetchFn(`${this.options.issuer}/api/v1/authz/check`, { method: 'POST', headers, body });
-    if (!response.ok) throw new AuthError(AuthErrorCode.PDP_UNAVAILABLE, `pdp returned http ${response.status}`);
+    if (!response.ok) throw AuthErrorCode.PDP_UNAVAILABLE.create({ reason: `pdp returned http ${response.status}` });
 
     const result = (await response.json()) as PdpResponse;
-    if (result.decision !== 'PERMIT' && result.decision !== 'DENY') throw new AuthError(AuthErrorCode.PDP_UNAVAILABLE, 'malformed pdp response');
+    if (result.decision !== 'PERMIT' && result.decision !== 'DENY') throw AuthErrorCode.PDP_UNAVAILABLE.create({ reason: 'malformed pdp response' });
 
     const authzVersion = result.authzVersion ?? 0;
     this.observeVersion(principalKey, authzVersion);
     const permitted = result.decision === 'PERMIT';
+    this.logger.debug('pdp decision', { principal: principalKey, organisationId, action: input.action, decision: result.decision });
     const baseTtl = this.options.ttlSeconds ?? DEFAULT_TTL_SECONDS;
     const ttlSeconds = options.highRisk ? Math.min(HIGH_RISK_TTL_SECONDS, baseTtl) : baseTtl;
     this.store(key, { permitted, authzVersion, expiresAt: Date.now() + ttlSeconds * 1000 });
@@ -104,6 +112,7 @@ export class PdpClient {
   private observeVersion(principalKey: string, version: number): void {
     const known = this.versions.get(principalKey) ?? 0;
     if (version <= known) return;
+    this.logger.debug('authz version bump observed; invalidating cached decisions', { principal: principalKey, version });
     this.versions.set(principalKey, version);
     for (const [key, entry] of this.cache) {
       if (key.startsWith(`${principalKey}:`) && entry.authzVersion < version) this.cache.delete(key);

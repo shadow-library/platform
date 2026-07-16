@@ -34,11 +34,11 @@ export type AuthModuleOptions = Partial<AuthClientConfig>;
  * presents a static secret (`AUTH_CLIENT_SECRET`) or — preferred inside Kubernetes — a projected
  * service-account token whose file path is `AUTH_CLIENT_ASSERTION_PATH`.
  */
-Config.load('auth.issuer', { envKey: 'AUTH_ISSUER' });
-Config.load('auth.audience', { envKey: 'AUTH_AUDIENCE' });
-Config.load('auth.client.id', { envKey: 'AUTH_CLIENT_ID' });
-Config.load('auth.client.secret', { envKey: 'AUTH_CLIENT_SECRET' });
-Config.load('auth.client.assertion-path', { envKey: 'AUTH_CLIENT_ASSERTION_PATH' });
+Config.load('auth.issuer');
+Config.load('auth.audience');
+Config.load('auth.client.id');
+Config.load('auth.client.secret');
+Config.load('auth.client.assertion-path');
 
 /** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */
 export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthClientConfig {

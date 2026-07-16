@@ -1,11 +1,13 @@
 /**
  * Importing npm packages
  */
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { AuthError, AuthErrorCode } from '../errors';
+import { NAMESPACE } from '../constants';
+import { AuthErrorCode } from '../errors';
 
 /**
  * Defining types
@@ -34,6 +36,7 @@ export interface ServiceDiscoveryOptions {
 const SERVICE_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/;
 
 export class ServiceDiscovery {
+  private readonly logger = Logger.getLogger(NAMESPACE, ServiceDiscovery.name);
   private readonly env: Record<string, string | undefined>;
 
   constructor(private readonly options: ServiceDiscoveryOptions = {}) {
@@ -42,22 +45,32 @@ export class ServiceDiscovery {
 
   /** Resolves a service name to its base URL: env override first, in-cluster svc DNS otherwise */
   resolve(service: string): string {
-    if (!SERVICE_NAME_PATTERN.test(service)) throw new AuthError(AuthErrorCode.SERVICE_UNKNOWN, `'${service}' is not a valid service name`);
+    if (!SERVICE_NAME_PATTERN.test(service)) throw this.logged(AuthErrorCode.SERVICE_UNKNOWN.create({ reason: `'${service}' is not a valid service name` }));
 
     const override = this.env[`SERVICE_URL_${service.toUpperCase().replaceAll('-', '_')}`];
     if (override) {
-      if (!URL.canParse(override)) throw new AuthError(AuthErrorCode.SERVICE_UNKNOWN, `service url override for '${service}' is not a valid url`);
-      return override.replace(/\/+$/, '');
+      if (!URL.canParse(override)) throw this.logged(AuthErrorCode.SERVICE_UNKNOWN.create({ reason: `service url override for '${service}' is not a valid url` }));
+      const url = override.replace(/\/+$/, '');
+      this.logger.debug('service url resolved from env override', { service, url });
+      return url;
     }
 
     const scheme = this.options.scheme ?? this.env['SERVICE_DISCOVERY_SCHEME'] ?? 'http';
     const suffix = this.options.domainSuffix ?? this.env['SERVICE_DISCOVERY_SUFFIX'] ?? '';
-    return `${scheme}://${service}${suffix}`;
+    const url = `${scheme}://${service}${suffix}`;
+    this.logger.debug('service url resolved', { service, url });
+    return url;
   }
 
   /** Builds a full URL for a path on the named service */
   url(service: string, path: string): string {
     const base = this.resolve(service);
     return path.startsWith('/') ? `${base}${path}` : `${base}/${path}`;
+  }
+
+  /** Records the failure at error level before it propagates, keeping guard throws single-line */
+  private logged(error: AppError): AppError {
+    this.logger.error(error.message);
+    return error;
   }
 }

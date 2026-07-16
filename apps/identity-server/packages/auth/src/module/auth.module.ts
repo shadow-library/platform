@@ -2,11 +2,13 @@
  * Importing npm packages
  */
 import { DynamicModule, Inject, Injectable, Module, type OnModuleInit } from '@shadow-library/app';
+import { Logger } from '@shadow-library/common';
 import { ContextService, FastifyModule } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { NAMESPACE } from '../constants';
 import { AuthGuard } from './auth-guard';
 import { AuthModuleOptions, resolveAuthClientConfig } from './config';
 import { extendContextWithAuth } from './context';
@@ -30,6 +32,8 @@ const AUTH_CONFIG: unique symbol = Symbol('shadow-library:auth-config');
 
 @Injectable()
 class AuthInitializer implements OnModuleInit {
+  private readonly logger = Logger.getLogger(NAMESPACE, AuthInitializer.name);
+
   constructor(
     private readonly client: AuthClient,
     private readonly context: ContextService,
@@ -40,6 +44,7 @@ class AuthInitializer implements OnModuleInit {
     extendContextWithAuth(this.context);
     if (this.config.roles) await this.client.syncRoles(this.config.roles);
     if (this.config.client) await this.client.loadServiceAccess();
+    this.logger.info('auth module initialised', { rolesDeclared: Boolean(this.config.roles), serviceAccessLoaded: Boolean(this.config.client) });
   }
 }
 

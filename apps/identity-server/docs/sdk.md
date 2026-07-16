@@ -73,9 +73,9 @@ Inside Kubernetes, set `client.assertionPath` (or `AUTH_CLIENT_ASSERTION_PATH`) 
 ```ts
 const principal = await auth.verify(bearerToken);
 // → { kind: 'user' | 'service', sub, org, sid?, scopes: string[], aal?, claims }
-// throws AuthError with AuthErrorCode.TOKEN_EXPIRED | TOKEN_INVALID | AUDIENCE_MISMATCH | ISSUER_MISMATCH | ALG_REJECTED | KEY_UNKNOWN
-// AuthError extends @shadow-library/common's AppError and AuthErrorCode extends its ErrorCode (same catalog pattern as the servers),
-// so getCode()/getType()/toObject() work platform-wide; AuthError.is(error, AuthErrorCode.TOKEN_EXPIRED) narrows
+// throws AppError with AuthErrorCode.TOKEN_EXPIRED | TOKEN_INVALID | AUDIENCE_MISMATCH | ISSUER_MISMATCH | ALG_REJECTED | KEY_UNKNOWN
+// AuthErrorCode extends common's ErrorCode (same catalog pattern as the servers) and the key itself throws:
+// AuthErrorCode.TOKEN_EXPIRED.throw(); narrowing via AppError.is(error, AuthErrorCode.TOKEN_EXPIRED)
 ```
 
 - JWKS fetched from discovery, cached (L1) for `jwksTtlSeconds` (default **12 h**); an unknown `kid` triggers **one** immediate refetch (singleflight, 10 s negative cache) — this makes key rotation zero-config for consumers. The long TTL only delays propagation of a key *removal*, not the arrival of a new one.
@@ -120,7 +120,7 @@ Implementation notes: guards are `@Middleware`-based (see `fastify/src/decorator
 When `roles` is set (and `client` credentials are present), `AuthModule.forRoot` pushes the application's catalog to identity on startup via `auth.syncRoles(manifest)` → `PUT /api/v1/authz/catalog` (scope `authz:roles:sync`). You can also call `auth.syncRoles(...)` directly (e.g. from a migration or CI step).
 
 - **Ownership**: the catalog for an application lives in that application's code, not in hand-run admin calls. The target application is derived from the service-account token, never from the request body — a service can only touch **its own** application's catalog.
-- **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else `AuthError(AuthErrorCode.ROLE_SYNC_FAILED)` / HTTP 400).
+- **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else an `AppError` with `AuthErrorCode.ROLE_SYNC_FAILED` / HTTP 400).
 - **Footgun**: because it deletes, a typo or truncated manifest revokes grants for that application. It is bounded to the pushing application and every sync is audited (`authz.catalog.synced`), but treat the manifest as production config. Assignments (which user has which role) are **not** managed here — they stay an admin operation.
 
 ### 4.2 Admin-managed service access (M2M route allowlist)
@@ -202,3 +202,4 @@ Deliberate deviations from this spec in the shipped v1, each to be revisited wit
 3. **RP scope.** `RelyingParty` ships the protocol core — authorization URL with PKCE S256 + `state`/`nonce`, code exchange, ID-token validation (including `nonce`), refresh. App-session cookie management and back-channel logout are the consuming app's responsibility until the session adapters land with T-303.
 4. **`@Principal()`.** The framework's parameter decorators are a fixed set, so the principal is read from the request context: `context.getAuthPrincipal()` on the injected `ContextService` replaces the spec'd param decorator.
 5. **PDP transport.** `checkAll` fans out to parallel single checks; the batch HTTP endpoint arrives with the PDP batch API.
+6. **Logging.** Every outbound call and guard decision logs under the `@shadow-library/auth` namespace via common's `Logger` — lifecycle milestones at info (discovery loaded, jwks refreshed, token minted, roles synced, rules loaded), degraded paths at warn (jwks served stale, PDP fallback, 401 retry, guard denials), failures at error. Only debug entries may carry sensitive material (token bodies, state/nonce); info and above never do.

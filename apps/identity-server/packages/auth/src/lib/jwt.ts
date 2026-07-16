@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError, AuthErrorCode } from '../errors';
+import { AuthErrorCode } from '../errors';
 import { JwtPayload } from '../interfaces';
 
 /**
@@ -44,14 +44,14 @@ function decodeSegment<T>(segment: string, description: string): T {
   try {
     return JSON.parse(Buffer.from(segment, 'base64url').toString('utf8')) as T;
   } catch {
-    throw new AuthError(AuthErrorCode.TOKEN_INVALID, `malformed jwt ${description}`);
+    throw AuthErrorCode.TOKEN_INVALID.create({ reason: `malformed jwt ${description}` });
   }
 }
 
 export function decodeJwt(token: string): DecodedJwt {
   const segments = token.split('.');
   const [head, body, signature] = segments;
-  if (segments.length !== 3 || !head || !body || !signature) throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'a jwt must have exactly three segments');
+  if (segments.length !== 3 || !head || !body || !signature) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'a jwt must have exactly three segments' });
   return {
     header: decodeSegment<JwtHeader>(head, 'header'),
     payload: decodeSegment<JwtPayload>(body, 'payload'),
@@ -64,23 +64,23 @@ export function validateClaims(payload: JwtPayload, expected: ClaimExpectations)
   const now = Math.floor(Date.now() / 1000);
   const skew = expected.clockSkewSeconds;
 
-  if (payload.iss !== expected.issuer) throw new AuthError(AuthErrorCode.ISSUER_MISMATCH, `token issued by '${String(payload.iss)}'`);
+  if (payload.iss !== expected.issuer) throw AuthErrorCode.ISSUER_MISMATCH.create({ reason: `token issued by '${String(payload.iss)}'` });
   const audiences = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
-  if (!audiences.includes(expected.audience)) throw new AuthError(AuthErrorCode.AUDIENCE_MISMATCH, `token is not addressed to '${expected.audience}'`);
-  if (typeof payload.exp !== 'number') throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'missing exp claim');
-  if (payload.exp <= now - skew) throw new AuthError(AuthErrorCode.TOKEN_EXPIRED, 'token has expired');
-  if (typeof payload.nbf === 'number' && payload.nbf > now + skew) throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'token is not yet valid');
-  if (expected.nonce !== undefined && payload.nonce !== expected.nonce) throw new AuthError(AuthErrorCode.NONCE_MISMATCH, 'token nonce does not match the expected nonce');
+  if (!audiences.includes(expected.audience)) throw AuthErrorCode.AUDIENCE_MISMATCH.create({ reason: `token is not addressed to '${expected.audience}'` });
+  if (typeof payload.exp !== 'number') throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'missing exp claim' });
+  if (payload.exp <= now - skew) throw AuthErrorCode.TOKEN_EXPIRED.create({ reason: 'token has expired' });
+  if (typeof payload.nbf === 'number' && payload.nbf > now + skew) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'token is not yet valid' });
+  if (expected.nonce !== undefined && payload.nonce !== expected.nonce) throw AuthErrorCode.NONCE_MISMATCH.create({ reason: 'token nonce does not match the expected nonce' });
 }
 
 export async function verifyJwt(token: string, getKey: (kid: string) => Promise<CryptoKey>, expected: ClaimExpectations): Promise<JwtPayload> {
   const { header, payload, signingInput, signature } = decodeJwt(token);
-  if (header.alg !== 'EdDSA') throw new AuthError(AuthErrorCode.ALG_REJECTED, `algorithm '${String(header.alg)}' is not allowed`);
-  if (!header.kid) throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'missing kid header');
+  if (header.alg !== 'EdDSA') throw AuthErrorCode.ALG_REJECTED.create({ reason: `algorithm '${String(header.alg)}' is not allowed` });
+  if (!header.kid) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'missing kid header' });
 
   const key = await getKey(header.kid);
   const isValid = await crypto.subtle.verify('Ed25519', key, signature, signingInput);
-  if (!isValid) throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'signature verification failed');
+  if (!isValid) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'signature verification failed' });
 
   validateClaims(payload, expected);
   return payload;

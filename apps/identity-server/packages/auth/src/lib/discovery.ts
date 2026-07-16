@@ -1,11 +1,13 @@
 /**
  * Importing npm packages
  */
+import { AppError, Logger, throwError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { AuthError, AuthErrorCode } from '../errors';
+import { NAMESPACE } from '../constants';
+import { AuthErrorCode } from '../errors';
 import { DiscoveryDocument, FetchLike } from '../interfaces';
 
 /**
@@ -20,6 +22,7 @@ import { DiscoveryDocument, FetchLike } from '../interfaces';
  */
 
 export class DiscoveryClient {
+  private readonly logger = Logger.getLogger(NAMESPACE, DiscoveryClient.name);
   private document: DiscoveryDocument | null = null;
   private inflight: Promise<DiscoveryDocument> | null = null;
 
@@ -35,16 +38,24 @@ export class DiscoveryClient {
   }
 
   private async load(): Promise<DiscoveryDocument> {
-    const response = await this.fetchFn(`${this.issuer}/.well-known/openid-configuration`).catch((error: Error) => {
-      throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, `discovery fetch failed: ${error.message}`);
-    });
-    if (!response.ok) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, `discovery endpoint returned http ${response.status}`);
+    this.logger.debug('fetching oidc discovery document', { issuer: this.issuer });
+    const response = await this.fetchFn(`${this.issuer}/.well-known/openid-configuration`).catch((error: Error) =>
+      throwError(this.logged(AuthErrorCode.DISCOVERY_FAILED.create({ reason: `discovery fetch failed: ${error.message}` }))),
+    );
+    if (!response.ok) throw this.logged(AuthErrorCode.DISCOVERY_FAILED.create({ reason: `discovery endpoint returned http ${response.status}` }));
 
     const document = (await response.json()) as DiscoveryDocument;
-    if (document.issuer !== this.issuer) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, 'discovery issuer does not match the configured issuer');
-    if (!document.jwks_uri || !document.token_endpoint) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, 'discovery document is missing required endpoints');
+    if (document.issuer !== this.issuer) throw this.logged(AuthErrorCode.DISCOVERY_FAILED.create({ reason: 'discovery issuer does not match the configured issuer' }));
+    if (!document.jwks_uri || !document.token_endpoint) throw this.logged(AuthErrorCode.DISCOVERY_FAILED.create({ reason: 'discovery document is missing required endpoints' }));
 
     this.document = document;
+    this.logger.info('oidc discovery document loaded', { issuer: this.issuer });
     return document;
+  }
+
+  /** Records the failure at error level before it propagates, keeping guard throws single-line */
+  private logged(error: AppError): AppError {
+    this.logger.error(error.message, { issuer: this.issuer });
+    return error;
   }
 }

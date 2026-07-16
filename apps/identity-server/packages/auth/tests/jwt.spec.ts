@@ -3,10 +3,12 @@
  */
 import { beforeAll, describe, expect, it } from 'bun:test';
 
+import { AppError } from '@shadow-library/common';
+
 /**
  * Importing user defined packages
  */
-import { AuthError, AuthErrorCode, ClaimExpectations, JwtPayload, decodeJwt, verifyJwt } from '@shadow-library/auth';
+import { AuthErrorCode, ClaimExpectations, JwtPayload, decodeJwt, verifyJwt } from '@shadow-library/auth';
 import { TestSigner, createTestSigner } from '@shadow-library/auth/testing';
 
 /**
@@ -32,15 +34,15 @@ describe('jwt verification', () => {
   beforeAll(async () => {
     signer = await createTestSigner();
     getKey = async (kid: string) => {
-      if (kid !== signer.kid) throw new AuthError(AuthErrorCode.KEY_UNKNOWN);
+      if (kid !== signer.kid) throw AuthErrorCode.KEY_UNKNOWN.create();
       return crypto.subtle.importKey('jwk', signer.publicJwk, 'Ed25519', false, ['verify']);
     };
   });
 
   const expectCode = async (token: string, code: string, options = expectations) => {
     const error = await verifyJwt(token, getKey, options).catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(AuthError);
-    expect((error as AuthError).code).toBe(code as AuthError['code']);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).code).toBe(code);
   };
 
   it('should verify a valid token and return its claims', async () => {
