@@ -6,7 +6,7 @@
  * Importing user defined packages
  */
 import { utils } from '../utils';
-import { type ErrorCode, type ErrorType } from './error-code.error';
+import { ErrorCode } from './error-code.error';
 
 /**
  * Defining types
@@ -14,51 +14,60 @@ import { type ErrorCode, type ErrorType } from './error-code.error';
 
 export interface AppErrorObject {
   code: string;
-  type: ErrorType;
   message: string;
 }
 
 /**
  * Declaring the constants
+ *
+ * The single error class of the ecosystem: which key created it decides everything — status,
+ * exposure, message. `is()` matches specific keys by code string (so it survives serialization
+ * boundaries and duplicate package copies) and whole catalogs by class.
  */
 
-export class AppError<TErrorCode extends ErrorCode = ErrorCode> extends Error {
+export class AppError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly isInternal: boolean;
+
   constructor(
-    protected readonly error: TErrorCode,
-    protected readonly data?: Record<string, any>,
+    readonly errorCode: ErrorCode,
+    readonly data?: Record<string, any>,
+    cause?: unknown,
   ) {
-    let message = error.getMessage();
-    if (data) message = utils.string.interpolate(message, data);
-    super(message);
+    super(data ? utils.string.interpolate(errorCode.message, data) : errorCode.message, cause === undefined ? undefined : { cause });
     this.name = this.constructor.name;
+    this.code = errorCode.code;
+    this.status = errorCode.status;
+    this.isInternal = errorCode.isInternal;
   }
 
-  getCause(): Error | undefined {
-    return this.cause as Error;
+  /** A free-form internal invariant: the message stays in logs, responses show the generic face */
+  static internal(reason: string, cause?: unknown): AppError {
+    return new AppError(ErrorCode.INTERNAL, { reason }, cause);
   }
 
-  setCause(cause: Error): this {
-    this.cause = cause;
-    return this;
+  /** Narrow to a specific key (matched by code string) or to a whole catalog (matched by class) */
+  static is(error: unknown, match?: ErrorCode | typeof ErrorCode): error is AppError {
+    if (!(error instanceof AppError)) return false;
+    if (match === undefined) return true;
+    if (match instanceof ErrorCode) return error.code === match.code;
+    return error.errorCode instanceof match;
   }
 
-  getType(): ErrorType {
-    return this.error.getType();
+  /** Rehydrates an error that crossed a process boundary (IPC, queue payloads, worker threads) */
+  static from(object: AppErrorObject & { status?: number }): AppError {
+    return new AppError(new ErrorCode(object.code, object.message, object.status ?? 500));
   }
 
-  getCode(): string {
-    return this.error.getCode();
-  }
-
-  getMessage(): string {
-    return this.message;
-  }
-
-  getData(): Record<string, any> | undefined {
-    return this.data;
-  }
-
+  /** Full detail — for logs and process-internal transport */
   toObject(): AppErrorObject {
-    return { code: this.getCode(), type: this.getType(), message: this.getMessage() };
+    return { code: this.code, message: this.message };
+  }
+
+  /** Masked shape for responses: internal errors expose only the generic face */
+  toResponse(): AppErrorObject {
+    if (!this.isInternal) return this.toObject();
+    return { code: ErrorCode.UNKNOWN.code, message: ErrorCode.UNKNOWN.message };
   }
 }

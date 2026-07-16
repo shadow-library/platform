@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { InternalError } from '../../errors';
+import { AppError } from '../../errors';
 
 /**
  * Defining types
@@ -21,7 +21,7 @@ export class InMemoryStore {
   private getOptionalArray<T>(key: string): T[] | undefined {
     const array = this.get<T[]>(key);
     if (Array.isArray(array) || array === undefined) return array;
-    throw new InternalError(`The value at key '${key}' is not an array`);
+    throw AppError.internal(`The value at key '${key}' is not an array`);
   }
 
   get<T>(key: string): T | undefined;
@@ -58,7 +58,7 @@ export class InMemoryStore {
 
   inc(key: string, value: number): number {
     const current = this.get<number>(key, 0);
-    if (typeof current !== 'number') throw new InternalError(`The value at key '${key}' is not a number`);
+    if (typeof current !== 'number') throw AppError.internal(`The value at key '${key}' is not a number`);
     const updated = current + value;
     this.set(key, updated);
     return updated;

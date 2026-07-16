@@ -7,7 +7,7 @@ import { Promisable } from 'type-fest';
  * Importing user defined packages
  */
 import { NAMESPACE } from '@lib/constants';
-import { InternalError } from '@lib/errors';
+import { AppError } from '@lib/errors';
 import { Fn } from '@lib/interfaces';
 import { Logger } from '@lib/services';
 
@@ -119,12 +119,12 @@ export class Task<T> {
       }
     }
 
-    throw new InternalError('Retry limit reached');
+    throw AppError.internal('Retry limit reached');
   }
 
   async executeRollback(): Promise<void> {
-    if (!this.result) throw new InternalError('No result to rollback');
-    if (!this.rollbackFn) throw new InternalError('No rollback function provided');
+    if (!this.result) throw AppError.internal('No result to rollback');
+    if (!this.rollbackFn) throw AppError.internal('No rollback function provided');
     await this.rollbackFn(this.result);
     Task.logger.debug(`Rollback executed for task: ${this.taskName}`);
   }

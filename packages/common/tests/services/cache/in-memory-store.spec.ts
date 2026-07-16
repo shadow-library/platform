@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { InMemoryStore, InternalError } from '@shadow-library/common';
+import { AppError, InMemoryStore } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -75,7 +75,7 @@ describe('InMemoryStore', () => {
 
     it('should throw an error if the existing value is not an array', () => {
       store.set('key', 'not-an-array');
-      expect(() => store.insert('key', 1)).toThrowError(InternalError);
+      expect(() => store.insert('key', 1)).toThrowError(AppError);
     });
   });
 
@@ -93,7 +93,7 @@ describe('InMemoryStore', () => {
 
     it('should throw an error if the existing value is not an array', () => {
       store.set('key', 'not-an-array');
-      expect(() => store.remove('key', 1)).toThrowError(InternalError);
+      expect(() => store.remove('key', 1)).toThrowError(AppError);
     });
   });
 
@@ -113,7 +113,7 @@ describe('InMemoryStore', () => {
 
     it('should throw an error if the value is not a number', () => {
       store.set('counter', 'not-a-number');
-      expect(() => store.inc('counter', 5)).toThrowError(InternalError);
+      expect(() => store.inc('counter', 5)).toThrowError(AppError);
     });
   });
 
@@ -124,7 +124,7 @@ describe('InMemoryStore', () => {
 
     it('should throw an error if the value is not an array', () => {
       store.set('key', 'not-an-array');
-      expect(() => (store as any).getOptionalArray('key')).toThrowError(InternalError);
+      expect(() => (store as any).getOptionalArray('key')).toThrowError(AppError);
     });
   });
 });

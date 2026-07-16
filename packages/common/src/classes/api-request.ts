@@ -11,7 +11,7 @@ import { Dispatcher, request } from 'undici';
  * Importing user defined packages
  */
 import { NAMESPACE } from '@lib/constants';
-import { InternalError } from '@lib/errors';
+import { AppError, ErrorCode } from '@lib/errors';
 import { Logger } from '@lib/services';
 import { utils } from '@lib/utils';
 
@@ -132,7 +132,7 @@ export class APIRequest {
       (requestOptions.headers as Record<string, string>)['content-type'] = 'application/json';
       /** `body(data: object)` cannot prove serializability at compile time, so a top-level function/symbol must fail loudly instead of sending an empty body. */
       const body = JSON.stringify(data);
-      if (body === undefined) throw new InternalError('API request body is not JSON-serializable');
+      if (body === undefined) throw AppError.internal('API request body is not JSON-serializable');
       requestOptions.body = body;
     }
 
@@ -156,7 +156,7 @@ export class APIRequest {
     /** Handle errors */
     if (throwErrorOnFailure && response.statusCode >= 400) {
       APIRequest.logger.error(`Request failed with status code ${response.statusCode}`, { data: resData, headers: response.headers });
-      throw new APIError(response.statusCode, resData);
+      ErrorCode.API_REQUEST_FAILED.throw({ status: response.statusCode, response: resData });
     }
 
     return {
@@ -176,14 +176,5 @@ export class APIRequest {
 
   finally(callback: () => void): Promise<APIResponse<any>> {
     return this.execute().finally(callback);
-  }
-}
-
-export class APIError extends InternalError {
-  constructor(
-    public readonly statusCode: number,
-    public readonly data?: unknown,
-  ) {
-    super(`API request failed with status code ${statusCode}`);
   }
 }

@@ -9,7 +9,7 @@ import { FSWatcher, watch } from 'chokidar';
 /**
  * Importing user defined packages
  */
-import { InternalError, NeverError } from '@lib/errors';
+import { AppError } from '@lib/errors';
 import { Utils } from '@lib/internal.utils';
 import { tryCatch } from '@lib/shorthands';
 import { utils } from '@lib/utils';
@@ -152,23 +152,23 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
   private toEnvKey(name: keyof Configs): string {
     const loadOpts = this.loadedOptions.get(name);
-    if (!loadOpts) throw new NeverError(`Config key '${name.toString()}' not loaded yet`);
+    if (!loadOpts) throw AppError.internal(`Config key '${name.toString()}' not loaded yet`);
     if (loadOpts.envKey) return loadOpts.envKey;
 
-    if (typeof name !== 'string') throw new NeverError('Config key must be a string if envKey is not provided');
+    if (typeof name !== 'string') throw AppError.internal('Config key must be a string if envKey is not provided');
     return name.toUpperCase().replace(/[.-]/g, '_');
   }
 
   private resolveConfigValue(name: keyof Configs): unknown {
     const opts = this.loadedOptions.get(name);
-    if (!opts) throw new NeverError(`Config key '${name.toString()}' not loaded yet`);
+    if (!opts) throw AppError.internal(`Config key '${name.toString()}' not loaded yet`);
 
     const envKey = this.toEnvKey(name);
     let value = this.envVars[envKey]?.trim();
     const processEnvValue = process.env[envKey]?.trim();
     if (processEnvValue) value = processEnvValue;
     if (!value) {
-      if (this.isProd() && opts.isProdRequired) throw new InternalError(`Environment Variable '${envKey}' not set`);
+      if (this.isProd() && opts.isProdRequired) throw AppError.internal(`Environment Variable '${envKey}' not set`);
       else if (opts.defaultValue !== undefined) value = opts.defaultValue;
       else return;
     }
@@ -179,7 +179,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
       for (const val of values) {
         if (!opts.allowedValues.includes(val)) {
           const allowedValues = opts.allowedValues.map(v => `'${v}'`).join(', ');
-          throw new InternalError(`Environment Variable '${envKey}' has invalid value '${val}', must be one of [${allowedValues}]`);
+          throw AppError.internal(`Environment Variable '${envKey}' has invalid value '${val}', must be one of [${allowedValues}]`);
         }
       }
     }
@@ -187,7 +187,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     /** Custom validation */
     if (opts.validator) {
       for (const val of values) {
-        if (!opts.validator(val)) throw new InternalError(`Environment Variable '${envKey}' has invalid value '${val}', validation failed`);
+        if (!opts.validator(val)) throw AppError.internal(`Environment Variable '${envKey}' has invalid value '${val}', validation failed`);
       }
     }
 
@@ -202,7 +202,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
      */
     const existingOpts = this.loadedOptions.get(name);
     if (existingOpts && existingOpts === opts) return this;
-    if (!this.isTest() && existingOpts !== undefined) throw new InternalError(`Config key '${name.toString()}' is already loaded`);
+    if (!this.isTest() && existingOpts !== undefined) throw AppError.internal(`Config key '${name.toString()}' is already loaded`);
 
     if (opts.validateType === 'boolean') Object.assign(opts, BOOLEAN_CONFIG_OPTIONS);
     else if (opts.validateType === 'number') Object.assign(opts, NUMBER_CONFIG_OPTIONS);

@@ -8,7 +8,7 @@ import { request } from 'undici';
 /**
  * Importing user defined packages
  */
-import { APIError, APIRequest, InternalError } from '@shadow-library/common';
+import { APIRequest, AppError, ErrorCode } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -54,12 +54,12 @@ describe('APIRequest', () => {
     expect(mockRequest).toHaveBeenCalledWith('/typed', expect.objectContaining({ body: JSON.stringify(payload) }));
   });
 
-  it('should throw InternalError when the body is not JSON-serializable', async () => {
+  it('should throw AppError when the body is not JSON-serializable', async () => {
     await expect(
       APIRequest.post('/test')
         .body(() => 'not-json')
         .execute(),
-    ).rejects.toBeInstanceOf(InternalError);
+    ).rejects.toBeInstanceOf(AppError);
   });
 
   it('should suppress errors', async () => {
@@ -68,9 +68,15 @@ describe('APIRequest', () => {
     expect(response).toStrictEqual({ statusCode: 400, headers: { 'content-type': 'application/json' }, data: { error: 'fail' } });
   });
 
-  it('should throw APIError on failure if throwErrorOnFailure is true', async () => {
+  it('should throw API_REQUEST_FAILED on failure if throwErrorOnFailure is true', async () => {
     mockRequest.mockResolvedValue({ statusCode: 400, headers: { 'content-type': 'application/json' }, body: { json: async () => ({ error: 'fail' }) } });
-    await expect(APIRequest.get('/fail').header('x', 'y').body({}).execute()).rejects.toBeInstanceOf(APIError);
+    const failure = await APIRequest.get('/fail')
+      .header('x', 'y')
+      .body({})
+      .execute()
+      .catch((error: unknown) => error);
+    expect(AppError.is(failure, ErrorCode.API_REQUEST_FAILED)).toBe(true);
+    expect((failure as AppError).data).toStrictEqual({ status: 400, response: { error: 'fail' } });
   });
 
   it('should create a child class with setOptions', () => {
@@ -79,15 +85,5 @@ describe('APIRequest', () => {
     Child.setOptions({ throwErrorOnFailure: false });
     const childInstance = new Child();
     expect(childInstance).toBeInstanceOf(APIRequest);
-  });
-});
-
-describe('APIError', () => {
-  it('should extend InternalError and set properties', () => {
-    const err = new APIError(404, { msg: 'not found' });
-    expect(err).toBeInstanceOf(InternalError);
-    expect(err.statusCode).toBe(404);
-    expect(err.data).toEqual({ msg: 'not found' });
-    expect(err.message).toMatch(/404/);
   });
 });

@@ -6,7 +6,7 @@ import { performance } from 'node:perf_hooks';
 /**
  * Importing user defined packages
  */
-import { InternalError } from '../../errors';
+import { AppError } from '../../errors';
 
 /**
  * Defining types
@@ -56,7 +56,7 @@ export class LRUCache {
     private readonly capacity: number,
     private readonly options: LRUCacheOptions = {},
   ) {
-    if (capacity <= 0) throw new InternalError('Cache capacity must be a positive number greater than 0');
+    if (capacity <= 0) throw AppError.internal('Cache capacity must be a positive number greater than 0');
 
     const TypedArray = LRUCache.getTypedArray(capacity);
     this.downward = new TypedArray(capacity);
@@ -72,7 +72,7 @@ export class LRUCache {
     if (capacity <= MAX_8BIT_INTEGER) return Uint8Array;
     if (capacity <= MAX_16BIT_INTEGER) return Uint16Array;
     if (capacity <= MAX_32BIT_INTEGER) return Uint32Array;
-    throw new InternalError('Cache capacity must be less than 4294967295');
+    throw AppError.internal('Cache capacity must be less than 4294967295');
   }
 
   private splayOnTop(pointer: number): LRUCache {

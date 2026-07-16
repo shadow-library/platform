@@ -27,6 +27,9 @@ export interface ValidationErrorObject extends AppErrorObject {
 
 /**
  * Declaring the constants
+ *
+ * The one deliberate AppError subclass: field-level accumulation is a genuinely different payload
+ * shape, so it keeps its own class instead of complicating the common case.
  */
 
 export class ValidationError extends AppError {
@@ -35,8 +38,7 @@ export class ValidationError extends AppError {
   constructor();
   constructor(field: string, message: string, details?: JsonObject);
   constructor(field?: string, message?: string, details?: JsonObject) {
-    super(ErrorCode.VALIDATION_ERROR);
-    this.name = this.constructor.name;
+    super(ErrorCode.VALIDATION);
     if (field && message) this.addFieldError(field, message, details);
   }
 
@@ -81,5 +83,9 @@ export class ValidationError extends AppError {
 
   override toObject(withDetails = false): ValidationErrorObject {
     return { ...super.toObject(), fields: this.getErrors(withDetails) };
+  }
+
+  override toResponse(): ValidationErrorObject {
+    return this.toObject();
   }
 }

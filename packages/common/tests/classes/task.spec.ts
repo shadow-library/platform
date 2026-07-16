@@ -6,7 +6,7 @@ import { describe, expect, it, jest } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { InternalError, Task } from '@shadow-library/common';
+import { AppError, Task } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -66,7 +66,7 @@ describe('Task', () => {
     const rollback = jest.fn();
     const task = Task.create(fn).delay(10).rollback(rollback);
     await expect(task.execute()).rejects.toThrow('fail');
-    await expect(task.executeRollback()).rejects.toThrow(InternalError);
+    await expect(task.executeRollback()).rejects.toThrow(AppError);
   });
 
   it('should throw error if rollback is missing and rollback is called', async () => {

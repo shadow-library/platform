@@ -7,7 +7,7 @@ import { performance } from 'node:perf_hooks';
 /**
  * Importing user defined packages
  */
-import { InternalError, LRUCache } from '@shadow-library/common';
+import { AppError, LRUCache } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -26,8 +26,8 @@ describe('LRUCache', () => {
 
   describe('constructor()', () => {
     it('should throw an error if capacity is less than or equal to 0', () => {
-      expect(() => new LRUCache(0)).toThrowError(InternalError);
-      expect(() => new LRUCache(-1)).toThrowError(InternalError);
+      expect(() => new LRUCache(0)).toThrowError(AppError);
+      expect(() => new LRUCache(-1)).toThrowError(AppError);
     });
 
     it('should initialize cache correctly with a valid capacity', () => {
@@ -244,7 +244,7 @@ describe('LRUCache', () => {
     });
 
     it('should throw an error if capacity exceeds 4294967296', () => {
-      expect(() => LRUCache['getTypedArray'](4294967297)).toThrow(InternalError);
+      expect(() => LRUCache['getTypedArray'](4294967297)).toThrow(AppError);
     });
   });
 

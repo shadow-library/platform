@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { FlowDefinition, FlowManager, FlowState, InternalError } from '@shadow-library/common';
+import { AppError, FlowDefinition, FlowManager, FlowState } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -77,7 +77,7 @@ describe('FlowManager', () => {
         },
       };
 
-      expect(() => FlowManager.from<OrderState, OrderContext>(wrongDefinition, snapshot)).toThrow(InternalError);
+      expect(() => FlowManager.from<OrderState, OrderContext>(wrongDefinition, snapshot)).toThrow(AppError);
     });
 
     it('should create flow manager from snapshot string', () => {
@@ -335,7 +335,7 @@ describe('FlowManager', () => {
 
     it('should throw error if target state is unknown', () => {
       const flow = FlowManager.create(orderFlowDefinition);
-      expect(() => flow.peekTransitions('unknown' as any)).toThrow(InternalError);
+      expect(() => flow.peekTransitions('unknown' as any)).toThrow(AppError);
     });
   });
 
@@ -385,8 +385,8 @@ describe('FlowManager', () => {
     it('should throw error for invalid transitions', () => {
       const flow = FlowManager.create(orderFlowDefinition);
 
-      expect(() => flow.transitionTo('shipped')).toThrow(InternalError);
-      expect(() => flow.transitionTo('delivered')).toThrow(InternalError);
+      expect(() => flow.transitionTo('shipped')).toThrow(AppError);
+      expect(() => flow.transitionTo('delivered')).toThrow(AppError);
     });
 
     it('should apply context updates during transition', () => {
@@ -403,7 +403,7 @@ describe('FlowManager', () => {
       const flow = FlowManager.create(orderFlowDefinition);
       flow.transitionTo('cancelled');
 
-      expect(() => flow.transitionTo('processing')).toThrow(InternalError);
+      expect(() => flow.transitionTo('processing')).toThrow(AppError);
     });
   });
 
@@ -462,7 +462,7 @@ describe('FlowManager', () => {
       };
 
       const flow = FlowManager.create(guardFlow, { value: 10 });
-      expect(() => flow.transitionTo('middle')).toThrow(InternalError);
+      expect(() => flow.transitionTo('middle')).toThrow(AppError);
       expect(flow.getCurrentState()).toBe('start');
     });
 
@@ -536,7 +536,7 @@ describe('FlowManager', () => {
       };
 
       const flow = FlowManager.create(loopFlow, { count: 0 });
-      expect(() => flow.transitionTo('step1')).toThrow(InternalError);
+      expect(() => flow.transitionTo('step1')).toThrow(AppError);
     });
   });
 });

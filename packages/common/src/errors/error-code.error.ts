@@ -5,131 +5,146 @@
 /**
  * Importing user defined packages
  */
+import { AppError } from './app.error';
 
 /**
  * Defining types
  */
 
-export enum ErrorType {
-  /*!
-   * Below error types need to be removed in the next major version
-   */
-
-  CLIENT_ERROR = 'CLIENT_ERROR',
-  HTTP_ERROR = 'HTTP_ERROR',
-  UNAUTHORIZED = 'UNAUTHORIZED',
-  SERVER_ERROR = 'SERVER_ERROR',
-
-  /** The operation failed because the request syntax or command structure was malformed */
-  INVALID_REQUEST = 'INVALID_REQUEST',
-
-  /** An external dependency (network, database, file system, API) failed to complete the operation */
-  IO_ERROR = 'IO_ERROR',
-
-  /** The requested resource or identifier could not be located in the system */
-  NOT_FOUND = 'NOT_FOUND',
-
-  /** The operation requires an established identity, but no valid credentials were provided */
-  UNAUTHENTICATED = 'UNAUTHENTICATED',
-
-  /** The authenticated identity lacks the necessary privileges or roles to perform this operation */
-  PERMISSION_DENIED = 'PERMISSION_DENIED',
-
-  /** The input parameters are syntactically correct but violate specific business rules or data constraints */
-  VALIDATION_ERROR = 'VALIDATION_ERROR',
-
-  /** An unexpected condition, configuration defect, or logic bug prevented the system from fulfilling the request */
-  INTERNAL_ERROR = 'INTERNAL_ERROR',
-
-  /** The operation is valid in isolation but cannot be performed due to the current state of the target resource */
-  CONFLICT = 'CONFLICT',
-}
+type ErrorCodeClass<T extends ErrorCode> = new (code: string, message: string, status?: number, isInternal?: boolean) => T;
 
 /**
  * Declaring the constants
+ *
+ * The single error catalog base: a key carries everything an error needs — machine code, message
+ * with optional `{placeholder}` interpolation, category (encoded as the HTTP status, the most
+ * widely understood numeric taxonomy; non-HTTP consumers map ranges to exit codes, retry policy,
+ * or dialog kinds), and whether the message is internal-only. `create()`/`throw()` mean the key
+ * alone decides what is thrown — packages declare catalogs by subclassing and using the factories.
  */
 
 export class ErrorCode {
-  protected constructor(
-    private readonly code: string,
-    private readonly type: ErrorType,
-    private readonly msg: string,
+  constructor(
+    readonly code: string,
+    readonly message: string,
+    readonly status = 500,
+    readonly isInternal = false,
   ) {}
 
-  getCode(): string {
-    return this.code;
+  /*!
+   * Factories — called on the catalog subclass (`AppErrorCode.notFound(...)`) so the key belongs
+   * to its catalog; the trailing status parameter covers outliers like 410, 429 and 503.
+   */
+
+  /** The request is malformed or violates a business rule (400) */
+  static badRequest<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 400): T {
+    return new this(code, message, status, false);
   }
 
-  getType(): ErrorType {
-    return this.type;
+  /** The operation requires an established identity (401) */
+  static unauthenticated<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 401): T {
+    return new this(code, message, status, false);
   }
 
-  getMessage(): string {
-    return this.msg;
+  /** The authenticated identity lacks the required privileges (403) */
+  static forbidden<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 403): T {
+    return new this(code, message, status, false);
   }
 
-  /** Unknown Error */
-  static readonly UNKNOWN = new ErrorCode('UNKNOWN', ErrorType.SERVER_ERROR, 'Unknown Error');
-  /** Unexpected Error */
-  static readonly UNEXPECTED = new ErrorCode('UNEXPECTED', ErrorType.SERVER_ERROR, 'Unexpected Error');
-  /** Validation Error */
-  static readonly VALIDATION_ERROR = new ErrorCode('VALIDATION_ERROR', ErrorType.VALIDATION_ERROR, 'Validation Error');
+  /** The requested resource or identifier could not be located (404) */
+  static notFound<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 404): T {
+    return new this(code, message, status, false);
+  }
 
-  /**
+  /** The operation conflicts with the current state of the target resource (409) */
+  static conflict<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 409): T {
+    return new this(code, message, status, false);
+  }
+
+  /** The input is syntactically correct but violates data constraints (422) */
+  static validation<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 422): T {
+    return new this(code, message, status, false);
+  }
+
+  /** A dependency failed transiently — retryable, unlike internal errors (503) */
+  static unavailable<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 503): T {
+    return new this(code, message, status, false);
+  }
+
+  /** A defect or broken invariant: the message stays in logs, responses show the generic face (500) */
+  static internal<T extends ErrorCode>(this: ErrorCodeClass<T>, code: string, message: string, status = 500): T {
+    return new this(code, message, status, true);
+  }
+
+  /** Builds this key's error; `data` interpolates the `{placeholders}` in the message */
+  create(data?: Record<string, any>, cause?: unknown): AppError {
+    return new AppError(this, data, cause);
+  }
+
+  /** Creates and throws — an expression of type `never`, usable in `??` fallbacks, ternaries, and brace-less catches */
+  throw(data?: Record<string, any>, cause?: unknown): never {
+    const error = this.create(data, cause);
+    Error.captureStackTrace(error, this.throw);
+    throw error;
+  }
+
+  /*!
+   * Shared codes
+   */
+
+  /** Unknown error — the public face every internal error presents in responses */
+  static readonly UNKNOWN = ErrorCode.internal('UNKNOWN', 'Unknown Error');
+  /** Validation error */
+  static readonly VALIDATION = ErrorCode.validation('VALIDATION_ERROR', 'Validation Error');
+  /** Free-form internal invariants raised via `AppError.internal(reason)` */
+  static readonly INTERNAL = ErrorCode.internal('INTERNAL', '{reason}');
+  /** An outbound API request answered a failure status */
+  static readonly API_REQUEST_FAILED = ErrorCode.internal('API_REQUEST_FAILED', 'API request failed with status code {status}');
+
+  /*!
    * Flow Manager and Registry System Errors
    */
 
   /** The state '{targetState}' is not defined in the flow '{flowName}'. Check your flow definition. */
-  static readonly UNKNOWN_FLOW_STATE = new ErrorCode(
-    'UNKNOWN_FLOW_STATE',
-    ErrorType.INTERNAL_ERROR,
-    "The state '{targetState}' is not defined in the flow '{flowName}'. Check your flow definition.",
-  );
+  static readonly UNKNOWN_FLOW_STATE = ErrorCode.internal('UNKNOWN_FLOW_STATE', "The state '{targetState}' is not defined in the flow '{flowName}'. Check your flow definition.");
   /** Invalid Transition: Cannot move from '{currentState}' to '{targetState}' in flow '{flowName}'. Allowed transitions: [{allowed}]. */
-  static readonly INVALID_FLOW_TRANSITION = new ErrorCode(
+  static readonly INVALID_FLOW_TRANSITION = ErrorCode.internal(
     'INVALID_FLOW_TRANSITION',
-    ErrorType.CONFLICT,
     "Invalid transition: Cannot move from '{currentState}' to '{targetState}' in flow '{flowName}'. Allowed transitions: [{allowed}].",
   );
   /** Cannot initialize FlowManager. The provided definition is missing or invalid for flow '{flowName}'. */
-  static readonly MISSING_FLOW_DEFINITION = new ErrorCode(
+  static readonly MISSING_FLOW_DEFINITION = ErrorCode.internal(
     'MISSING_FLOW_DEFINITION',
-    ErrorType.INTERNAL_ERROR,
     "Cannot initialize FlowManager. The provided definition is missing or invalid for flow '{flowName}'.",
   );
   /** Transition prevented: The guard condition (onLeave) failed when trying to leave '{currentState}' for '{targetState}'. */
-  static readonly FLOW_GUARD_VIOLATION = new ErrorCode(
+  static readonly FLOW_GUARD_VIOLATION = ErrorCode.internal(
     'FLOW_GUARD_VIOLATION',
-    ErrorType.VALIDATION_ERROR,
     "Transition prevented: The guard condition (onLeave) failed when trying to leave '{currentState}' for '{targetState}'.",
   );
   /** Flow execution stopped because it exceeded the maximum recursion depth of {maxDepth}. Check for infinite loops in your actions. */
-  static readonly FLOW_MAX_DEPTH_EXCEEDED = new ErrorCode(
+  static readonly FLOW_MAX_DEPTH_EXCEEDED = ErrorCode.internal(
     'FLOW_MAX_DEPTH_EXCEEDED',
-    ErrorType.INTERNAL_ERROR,
     'Flow execution stopped because it exceeded the maximum recursion depth of {maxDepth}. Check for infinite loops in your actions.',
   );
   /** Cannot load snapshot. The snapshot is for flow '{snapshotFlowName}', but the manager was initialized with definition '{currentFlowName}'. */
-  static readonly FLOW_SNAPSHOT_MISMATCH = new ErrorCode(
+  static readonly FLOW_SNAPSHOT_MISMATCH = ErrorCode.internal(
     'FLOW_SNAPSHOT_MISMATCH',
-    ErrorType.INTERNAL_ERROR,
     "Cannot load snapshot. The snapshot is for flow '{snapshotFlowName}', but the manager was initialized with definition '{currentFlowName}'.",
   );
-  static readonly FLOW_ALREADY_REGISTERED = new ErrorCode(
+  /** Flow definition '{flowName}' is already registered in the FlowRegistry. Duplicate registrations are not allowed. */
+  static readonly FLOW_ALREADY_REGISTERED = ErrorCode.internal(
     'FLOW_ALREADY_REGISTERED',
-    ErrorType.CONFLICT,
     "Flow definition '{flowName}' is already registered in the FlowRegistry. Duplicate registrations are not allowed.",
   );
   /** Flow definition '{flowName}' is not registered in the FlowRegistry. Cannot retrieve unregistered flows. */
-  static readonly FLOW_NOT_REGISTERED = new ErrorCode(
+  static readonly FLOW_NOT_REGISTERED = ErrorCode.internal(
     'FLOW_NOT_REGISTERED',
-    ErrorType.NOT_FOUND,
     "Flow definition '{flowName}' is not registered in the FlowRegistry. Cannot retrieve unregistered flows.",
   );
   /** Cannot restore FlowManager from snapshot. The provided snapshot is invalid or corrupted. */
-  static readonly FLOW_SNAPSHOT_INVALID = new ErrorCode(
+  static readonly FLOW_SNAPSHOT_INVALID = ErrorCode.internal(
     'FLOW_SNAPSHOT_INVALID',
-    ErrorType.INTERNAL_ERROR,
     "Failed to process flow snapshot. The snapshot is malformed or missing the required 'flowName' field.",
   );
 }

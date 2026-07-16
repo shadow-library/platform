@@ -10,7 +10,7 @@ import Transport from 'winston-transport';
 /**
  * Importing user defined packages
  */
-import { InternalError } from '@lib/errors';
+import { AppError } from '@lib/errors';
 import { MaybeUndefined } from '@lib/interfaces';
 
 import { format as formats } from './formats';
@@ -139,7 +139,7 @@ class LoggerStatic {
       }
 
       default: {
-        throw new InternalError(`Unknown transport type '${type}'`);
+        throw AppError.internal(`Unknown transport type '${type}'`);
       }
     }
 

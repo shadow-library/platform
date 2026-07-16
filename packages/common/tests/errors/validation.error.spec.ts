@@ -61,7 +61,7 @@ describe('ValidationError', () => {
     const error = new ValidationError('fieldOne', 'value one').addFieldError('fieldTwo', 'value two');
     expect(error.toObject()).toStrictEqual({
       code: 'VALIDATION_ERROR',
-      type: 'VALIDATION_ERROR',
+
       message: 'Validation Error',
       fields: [
         { field: 'fieldOne', msg: 'value one' },
@@ -168,13 +168,13 @@ describe('ValidationError', () => {
 
     expect(error.toObject()).toStrictEqual({
       code: 'VALIDATION_ERROR',
-      type: 'VALIDATION_ERROR',
+
       message: 'Validation Error',
       fields: [{ field: 'fieldOne', msg: 'Invalid: test' }],
     });
     expect(error.toObject(true)).toStrictEqual({
       code: 'VALIDATION_ERROR',
-      type: 'VALIDATION_ERROR',
+
       message: 'Validation Error',
       fields: [{ field: 'fieldOne', msg: 'Invalid: test', details }],
     });

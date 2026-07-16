@@ -6,7 +6,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { FlowDefinition, FlowManager, FlowRegistry, InternalError } from '@shadow-library/common';
+import { AppError, FlowDefinition, FlowManager, FlowRegistry } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -78,7 +78,7 @@ describe('FlowRegistry', () => {
     it('should throw error when registering duplicate flow name', () => {
       registry.register(authFlowDefinition);
 
-      expect(() => registry.register(authFlowDefinition)).toThrow(InternalError);
+      expect(() => registry.register(authFlowDefinition)).toThrow(AppError);
       expect(() => registry.register(authFlowDefinition)).toThrow("Flow definition 'auth' is already registered");
     });
 
@@ -110,7 +110,7 @@ describe('FlowRegistry', () => {
     it('should throw error if any flow is duplicate', () => {
       registry.register(authFlowDefinition);
 
-      expect(() => registry.registerAll([authFlowDefinition, approvalFlowDefinition])).toThrow(InternalError);
+      expect(() => registry.registerAll([authFlowDefinition, approvalFlowDefinition])).toThrow(AppError);
       expect(registry.has('approval')).toBe(false);
     });
   });
@@ -187,7 +187,7 @@ describe('FlowRegistry', () => {
     });
 
     it('should throw error for unregistered flow', () => {
-      expect(() => registry.get('non-existent')).toThrow(InternalError);
+      expect(() => registry.get('non-existent')).toThrow(AppError);
       expect(() => registry.get('non-existent')).toThrow("Flow definition 'non-existent' is not registered");
     });
 
@@ -250,7 +250,7 @@ describe('FlowRegistry', () => {
     });
 
     it('should throw error for unregistered flow', () => {
-      expect(() => registry.create('non-existent', {})).toThrow(InternalError);
+      expect(() => registry.create('non-existent', {})).toThrow(AppError);
       expect(() => registry.create('non-existent', {})).toThrow("Flow definition 'non-existent' is not registered");
     });
 
@@ -302,14 +302,14 @@ describe('FlowRegistry', () => {
     it('should throw error for snapshot with missing flowName', () => {
       const invalidSnapshot = JSON.stringify({ state: { currentState: 'start', history: [], context: {} } });
 
-      expect(() => registry.restore(invalidSnapshot)).toThrow(InternalError);
+      expect(() => registry.restore(invalidSnapshot)).toThrow(AppError);
       expect(() => registry.restore(invalidSnapshot)).toThrow("Failed to process flow snapshot. The snapshot is malformed or missing the required 'flowName' field.");
     });
 
     it('should throw error for unregistered flow in snapshot', () => {
       const snapshot = JSON.stringify({ flowName: 'unregistered-flow', state: { currentState: 'start', history: [], context: {} } });
 
-      expect(() => registry.restore(snapshot)).toThrow(InternalError);
+      expect(() => registry.restore(snapshot)).toThrow(AppError);
       expect(() => registry.restore(snapshot)).toThrow("Flow definition 'unregistered-flow' is not registered");
     });
 
@@ -352,7 +352,7 @@ describe('FlowRegistry', () => {
     it('should throw error for snapshot without flowName field', () => {
       const invalidSnapshot = JSON.stringify({ state: { currentState: 'start', history: [], context: {} } });
 
-      expect(() => registry.getFlowName(invalidSnapshot)).toThrow(InternalError);
+      expect(() => registry.getFlowName(invalidSnapshot)).toThrow(AppError);
       expect(() => registry.getFlowName(invalidSnapshot)).toThrow("Failed to process flow snapshot. The snapshot is malformed or missing the required 'flowName' field.");
     });
 
