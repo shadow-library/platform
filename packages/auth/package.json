@@ -33,9 +33,6 @@
     "@shadow-library/app": {
       "optional": true
     },
-    "@shadow-library/common": {
-      "optional": true
-    },
     "@shadow-library/fastify": {
       "optional": true
     }

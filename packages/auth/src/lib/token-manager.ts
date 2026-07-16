@@ -6,7 +6,7 @@ import { readFile } from 'node:fs/promises';
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 import { AuthClientCredential, FetchLike, ServiceTokenOptions } from '../interfaces';
 import { DiscoveryClient } from './discovery';
 
@@ -51,7 +51,7 @@ export class ServiceTokenManager {
 
   async getToken(options: ServiceTokenOptions = {}): Promise<string> {
     const client = this.options.client;
-    if (!client) throw new AuthError('CONFIG_INVALID', 'service tokens require client credentials');
+    if (!client) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'service tokens require client credentials');
 
     const key = this.cacheKey(options);
     const cached = this.cache.get(key);
@@ -94,12 +94,12 @@ export class ServiceTokenManager {
     if (options.resource) body.resource = options.resource;
 
     const response = await this.options.fetchFn(document.token_endpoint, { method: 'POST', headers, body: JSON.stringify(body) }).catch((error: Error) => {
-      throw new AuthError('TOKEN_REQUEST_FAILED', `token request failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `token request failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('TOKEN_REQUEST_FAILED', `token endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `token endpoint returned http ${response.status}`);
 
     const payload = (await response.json()) as TokenEndpointResponse;
-    if (!payload.access_token || typeof payload.expires_in !== 'number') throw new AuthError('TOKEN_REQUEST_FAILED', 'malformed token endpoint response');
+    if (!payload.access_token || typeof payload.expires_in !== 'number') throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, 'malformed token endpoint response');
 
     const refreshSkew = this.options.refreshSkewSeconds ?? DEFAULT_REFRESH_SKEW_SECONDS;
     this.cache.set(key, { token: payload.access_token, expiresAt: Date.now() + (payload.expires_in - refreshSkew) * 1000 });
@@ -109,10 +109,10 @@ export class ServiceTokenManager {
   /** Read fresh on every request — the kubelet rotates the projected token in place */
   private async readAssertion(path: string): Promise<string> {
     const assertion = await readFile(path, 'utf8').catch((error: Error) => {
-      throw new AuthError('TOKEN_REQUEST_FAILED', `could not read service-account token at '${path}': ${error.message}`);
+      throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `could not read service-account token at '${path}': ${error.message}`);
     });
     const trimmed = assertion.trim();
-    if (!trimmed) throw new AuthError('TOKEN_REQUEST_FAILED', `service-account token at '${path}' is empty`);
+    if (!trimmed) throw new AuthError(AuthErrorCode.TOKEN_REQUEST_FAILED, `service-account token at '${path}' is empty`);
     return trimmed;
   }
 }

@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 
 /**
  * Defining types
@@ -42,11 +42,11 @@ export class ServiceDiscovery {
 
   /** Resolves a service name to its base URL: env override first, in-cluster svc DNS otherwise */
   resolve(service: string): string {
-    if (!SERVICE_NAME_PATTERN.test(service)) throw new AuthError('SERVICE_UNKNOWN', `'${service}' is not a valid service name`);
+    if (!SERVICE_NAME_PATTERN.test(service)) throw new AuthError(AuthErrorCode.SERVICE_UNKNOWN, `'${service}' is not a valid service name`);
 
     const override = this.env[`SERVICE_URL_${service.toUpperCase().replaceAll('-', '_')}`];
     if (override) {
-      if (!URL.canParse(override)) throw new AuthError('SERVICE_UNKNOWN', `service url override for '${service}' is not a valid url`);
+      if (!URL.canParse(override)) throw new AuthError(AuthErrorCode.SERVICE_UNKNOWN, `service url override for '${service}' is not a valid url`);
       return override.replace(/\/+$/, '');
     }
 

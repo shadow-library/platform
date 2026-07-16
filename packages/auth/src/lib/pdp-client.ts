@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
 
 /**
@@ -87,10 +87,10 @@ export class PdpClient {
       action: input.action,
     });
     const response = await this.options.fetchFn(`${this.options.issuer}/api/v1/authz/check`, { method: 'POST', headers, body });
-    if (!response.ok) throw new AuthError('PDP_UNAVAILABLE', `pdp returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.PDP_UNAVAILABLE, `pdp returned http ${response.status}`);
 
     const result = (await response.json()) as PdpResponse;
-    if (result.decision !== 'PERMIT' && result.decision !== 'DENY') throw new AuthError('PDP_UNAVAILABLE', 'malformed pdp response');
+    if (result.decision !== 'PERMIT' && result.decision !== 'DENY') throw new AuthError(AuthErrorCode.PDP_UNAVAILABLE, 'malformed pdp response');
 
     const authzVersion = result.authzVersion ?? 0;
     this.observeVersion(principalKey, authzVersion);

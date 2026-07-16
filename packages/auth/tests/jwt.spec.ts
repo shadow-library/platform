@@ -6,7 +6,7 @@ import { beforeAll, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { AuthError, ClaimExpectations, JwtPayload, decodeJwt, verifyJwt } from '@shadow-library/auth';
+import { AuthError, AuthErrorCode, ClaimExpectations, JwtPayload, decodeJwt, verifyJwt } from '@shadow-library/auth';
 import { TestSigner, createTestSigner } from '@shadow-library/auth/testing';
 
 /**
@@ -32,7 +32,7 @@ describe('jwt verification', () => {
   beforeAll(async () => {
     signer = await createTestSigner();
     getKey = async (kid: string) => {
-      if (kid !== signer.kid) throw new AuthError('KEY_UNKNOWN');
+      if (kid !== signer.kid) throw new AuthError(AuthErrorCode.KEY_UNKNOWN);
       return crypto.subtle.importKey('jwk', signer.publicJwk, 'Ed25519', false, ['verify']);
     };
   });
