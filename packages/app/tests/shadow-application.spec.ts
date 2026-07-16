@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -130,15 +130,15 @@ describe('ShadowApplication', () => {
   describe('get', () => {
     it('should throw an error if application not initiated', () => {
       jest.spyOn(app, 'isInitiated').mockReturnValue(false);
-      expect(() => app.get(AppModule)).toThrowError(InternalError);
+      expect(() => app.get(AppModule)).toThrowError(AppError);
     });
 
     it('should throw an error is provider is not found', () => {
       jest.spyOn(app, 'isInitiated').mockReturnValue(true);
       jest.mocked(app['registry'].get).mockReturnValue([] as any);
 
-      expect(() => app.get(AppModule)).toThrowError(InternalError);
-      expect(() => app.get('RANDOM')).toThrowError(InternalError);
+      expect(() => app.get(AppModule)).toThrowError(AppError);
+      expect(() => app.get('RANDOM')).toThrowError(AppError);
     });
 
     it('should return the instance of the provider', () => {

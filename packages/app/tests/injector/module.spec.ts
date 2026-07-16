@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -88,7 +88,7 @@ describe('Module', () => {
       @Module(metadata)
       class InvalidModule {}
 
-      expect(() => new ModuleWrapper(InvalidModule, metadata)).toThrow(InternalError);
+      expect(() => new ModuleWrapper(InvalidModule, metadata)).toThrow(AppError);
     });
 
     it('should throw an error for duplicate providers', () => {
@@ -96,7 +96,7 @@ describe('Module', () => {
       @Module(metadata)
       class DuplicateModule {}
 
-      expect(() => new ModuleWrapper(DuplicateModule, metadata)).toThrow(InternalError);
+      expect(() => new ModuleWrapper(DuplicateModule, metadata)).toThrow(AppError);
     });
 
     it('should add the module ref provider', () => {
@@ -212,8 +212,8 @@ describe('Module', () => {
     });
 
     it('should throw an error if the provider is not exported or not found', () => {
-      expect(() => module.getProvider('NOT_FOUND')).toThrow(InternalError);
-      expect(() => module.getProvider(CatSubService)).toThrow(InternalError);
+      expect(() => module.getProvider('NOT_FOUND')).toThrow(AppError);
+      expect(() => module.getProvider(CatSubService)).toThrow(AppError);
     });
 
     it('should get the exported provider', () => {
@@ -253,7 +253,7 @@ describe('Module', () => {
     });
 
     it('should throw an error if the provider is not found', () => {
-      expect(() => moduleRef.get('NOT_FOUND')).toThrow(InternalError);
+      expect(() => moduleRef.get('NOT_FOUND')).toThrow(AppError);
     });
 
     it('should throw error if provider is not exported from the imported module', () => {
@@ -264,7 +264,7 @@ describe('Module', () => {
       const newModule = new ModuleWrapper(NewModule, metadata).addImport(module);
       const moduleRef = newModule['getInternalProvider'](ModuleRef).getInstance() as any;
 
-      expect(() => moduleRef.get(CatSubService)).toThrow(InternalError);
+      expect(() => moduleRef.get(CatSubService)).toThrow(AppError);
     });
 
     it('should get the provider', () => {
@@ -274,7 +274,7 @@ describe('Module', () => {
     });
 
     it('should throw an error if a non transient provider is resolved', async () => {
-      await expect(moduleRef.resolve(CatSubService)).rejects.toThrow(InternalError);
+      await expect(moduleRef.resolve(CatSubService)).rejects.toThrow(AppError);
     });
 
     it('should resolve the transient provider', async () => {
@@ -337,7 +337,7 @@ describe('Module', () => {
       class InvalidModule {}
 
       const module = new ModuleWrapper(InvalidModule, metadata);
-      await expect(module.init()).rejects.toThrowError(InternalError);
+      await expect(module.init()).rejects.toThrowError(AppError);
     });
 
     it('should terminate the module', async () => {

@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import { Fn, InternalError, Logger, utils } from '@shadow-library/common';
+import { AppError, Fn, Logger, utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -88,7 +88,7 @@ export class InstanceWrapper<T extends object = any> {
     const { token, useClass: Class } = isClassProvider(provider) ? provider : { token: provider, useClass: provider };
     if (injectable) {
       const injectable = Reflect.hasMetadata(INJECTABLE_METADATA, Class);
-      if (!injectable) throw new InternalError(`Class '${Class.name}' is not an injectable provider`);
+      if (!injectable) throw AppError.internal(`Class '${Class.name}' is not an injectable provider`);
     }
 
     this.isClass = true;
@@ -200,13 +200,13 @@ export class InstanceWrapper<T extends object = any> {
 
   getInstance(contextId: ContextId = STATIC_CONTEXT): T {
     const instancePerContext = this.instances.get(contextId);
-    if (!instancePerContext) throw new InternalError(`Instance of '${this.getTokenName()}' not found`);
+    if (!instancePerContext) throw AppError.internal(`Instance of '${this.getTokenName()}' not found`);
     return instancePerContext.instance;
   }
 
   loadPrototype(contextId: ContextId = STATIC_CONTEXT): T {
     const name = this.getTokenName();
-    if (this.isFactory) throw new InternalError(`Factory provider '${name}' cannot be used as a prototype`);
+    if (this.isFactory) throw AppError.internal(`Factory provider '${name}' cannot be used as a prototype`);
 
     const instancePerContext = this.instances.get(contextId);
     if (instancePerContext) return instancePerContext.instance;
@@ -289,7 +289,7 @@ export class InstanceWrapper<T extends object = any> {
       const Interceptors: InterceptorConfig[] = Reflect.getMetadata(INTERCEPTOR_METADATA, method);
       const interceptors = Interceptors.map(i => moduleRef.get<Interceptor>(i.token));
       const invalidInterceptor = interceptors.find(i => typeof i.intercept !== 'function');
-      if (invalidInterceptor) throw new InternalError(`Interceptor '${invalidInterceptor.constructor.name}' does not implement 'intercept' method`);
+      if (invalidInterceptor) throw AppError.internal(`Interceptor '${invalidInterceptor.constructor.name}' does not implement 'intercept' method`);
 
       /** create the interceptor context and intercept the original method */
       const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, method);

@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import { InternalError, Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import merge from 'deepmerge';
 import { Class } from 'type-fest';
 
@@ -75,7 +75,7 @@ export class Module {
 
       override async resolve<TInput = any, TResult = TInput>(typeOrToken: Class<TInput>, contextId?: ContextId): Promise<TResult> {
         const provider = self.getInternalProvider(typeOrToken) as InstanceWrapper;
-        if (!provider.isTransient()) throw new InternalError(`The provider '${provider.getTokenName()}' is not transient`);
+        if (!provider.isTransient()) throw AppError.internal(`The provider '${provider.getTokenName()}' is not transient`);
         if (!contextId) contextId = createContextId();
         const instance = await provider.loadInstance(contextId);
         await provider.applyInterceptors(this, contextId);
@@ -97,7 +97,7 @@ export class Module {
     for (const provider of providers) {
       const instance = new InstanceWrapper(provider, true);
       const token = instance.getToken();
-      if (providerMap.has(token)) throw new InternalError(`Duplicate provider '${token.toString()}' in module '${this.metatype.name}'`);
+      if (providerMap.has(token)) throw AppError.internal(`Duplicate provider '${token.toString()}' in module '${this.metatype.name}'`);
       providerMap.set(token, instance);
       graph.addNode(token);
     }
@@ -123,7 +123,7 @@ export class Module {
     const controllers = this.metadata.controllers ?? [];
     for (const controller of controllers) {
       const isController = Reflect.hasMetadata(CONTROLLER_METADATA, controller);
-      if (!isController) throw new InternalError(`Class '${controller.name}' is not a controller`);
+      if (!isController) throw AppError.internal(`Class '${controller.name}' is not a controller`);
       const instance = new InstanceWrapper<Controller>(controller);
       this.controllers.add(instance);
     }

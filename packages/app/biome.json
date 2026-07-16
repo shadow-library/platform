@@ -1,0 +1,62 @@
+{
+  "$schema": "https://biomejs.dev/schemas/1.9.4/schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
+  "files": {
+    "include": ["src/**/*.ts", "tests/**/*.ts", "scripts/**/*.ts"]
+  },
+  "formatter": {
+    "enabled": true,
+    "lineWidth": 180,
+    "indentStyle": "space",
+    "indentWidth": 2
+  },
+  "organizeImports": {
+    "enabled": true
+  },
+  "javascript": {
+    "formatter": {
+      "quoteStyle": "single",
+      "trailingCommas": "all",
+      "arrowParentheses": "asNeeded"
+    }
+  },
+  "linter": {
+    "enabled": true,
+    "rules": {
+      "recommended": true,
+      "correctness": {
+        "noUnusedVariables": "error",
+        "noUnusedImports": "error"
+      },
+      "style": {
+        "useNodejsImportProtocol": "error",
+        "useImportType": "error",
+        "noNonNullAssertion": "error"
+      },
+      "suspicious": {
+        "noConsole": "error",
+        "noExplicitAny": "off"
+      },
+      "complexity": {
+        "noStaticOnlyClass": "error"
+      }
+    }
+  },
+  "overrides": [
+    {
+      "include": ["tests/**/*.spec.ts"],
+      "linter": {
+        "rules": {
+          "complexity": { "noStaticOnlyClass": "off" },
+          "suspicious": { "noEmptyBlockStatements": "off" },
+          "style": { "noNonNullAssertion": "off" },
+          "correctness": { "noUnusedVariables": "off" }
+        }
+      }
+    }
+  ]
+}

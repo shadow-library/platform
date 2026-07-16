@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -69,13 +69,13 @@ describe('ModuleRegistry', () => {
       @Module({ imports: [class InvalidModule {}] })
       class AppModule {}
 
-      expect(() => new ModuleRegistry(AppModule)).toThrow(InternalError);
+      expect(() => new ModuleRegistry(AppModule)).toThrow(AppError);
     });
 
     it('should throw an error if the module import is undefined', () => {
       @Module({ imports: [undefined as any] })
       class InvalidModule {}
-      expect(() => new ModuleRegistry(InvalidModule)).toThrow(InternalError);
+      expect(() => new ModuleRegistry(InvalidModule)).toThrow(AppError);
     });
 
     it('should register all the modules in the correct order', () => {
@@ -148,7 +148,7 @@ describe('ModuleRegistry', () => {
       @Module({ imports: [DynamicModule.forRoot(), DynamicModule.forRoot()] })
       class AppModule {}
 
-      expect(() => new ModuleRegistry(AppModule)).toThrow(InternalError);
+      expect(() => new ModuleRegistry(AppModule)).toThrow(AppError);
     });
   });
 
@@ -186,7 +186,7 @@ describe('ModuleRegistry', () => {
     });
 
     it('should throw an error if the module is not found', () => {
-      expect(() => moduleRegistry.get(class InvalidModule {})).toThrow(InternalError);
+      expect(() => moduleRegistry.get(class InvalidModule {})).toThrow(AppError);
     });
 
     it('should get the module', () => {

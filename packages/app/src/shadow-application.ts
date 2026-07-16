@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { InternalError, Logger, tryCatch } from '@shadow-library/common';
+import { AppError, Logger, tryCatch } from '@shadow-library/common';
 import { AbstractClass, Class } from 'type-fest';
 
 /**
@@ -96,7 +96,7 @@ export class ShadowApplication {
   }
 
   get<TInput = any, TResult = TInput>(provider: Class<TInput> | AbstractClass<TInput> | string | symbol): TResult {
-    if (!this.isInitiated()) throw new InternalError(`Application not yet initialized`);
+    if (!this.isInitiated()) throw AppError.internal(`Application not yet initialized`);
     const modules = this.registry.get();
     for (const module of modules) {
       const result = tryCatch(() => module.getProvider(provider));
@@ -104,6 +104,6 @@ export class ShadowApplication {
     }
 
     const providerName = typeof provider === 'function' ? provider.name : provider.toString();
-    throw new InternalError(`Provider '${providerName}' not found or exported`);
+    throw AppError.internal(`Provider '${providerName}' not found or exported`);
   }
 }

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { InternalError, NeverError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -55,7 +55,7 @@ describe('InstanceWrapper', () => {
 
     it('should throw an error if the class is not injectable', () => {
       class InvalidClassProvider {}
-      expect(() => new InstanceWrapper(InvalidClassProvider, true)).toThrowError(InternalError);
+      expect(() => new InstanceWrapper(InvalidClassProvider, true)).toThrowError(AppError);
     });
 
     it('should handle alias tokens', () => {
@@ -189,7 +189,7 @@ describe('InstanceWrapper', () => {
 
     it('should throw an error of undefined dependency', () => {
       const invalidProvider = { ...provider, inject: [...provider.inject, undefined] } as any;
-      expect(() => new InstanceWrapper(invalidProvider)).toThrowError(InternalError);
+      expect(() => new InstanceWrapper(invalidProvider)).toThrowError(AppError);
     });
 
     it('should identify the dependencies', () => {
@@ -205,7 +205,7 @@ describe('InstanceWrapper', () => {
     });
 
     it('should throw an error if prototype is loaded', () => {
-      expect(() => instanceWrapper.loadPrototype()).toThrowError(InternalError);
+      expect(() => instanceWrapper.loadPrototype()).toThrowError(AppError);
     });
 
     it('should load the instance', async () => {
@@ -353,13 +353,13 @@ describe('InstanceWrapper', () => {
     });
 
     it('should throw an error if the instance is not found', () => {
-      expect(() => instanceWrapper.getInstance(createContextId())).toThrowError(InternalError);
+      expect(() => instanceWrapper.getInstance(createContextId())).toThrowError(AppError);
     });
 
     it('should throw an error if the dependencies are not set', async () => {
       instanceWrapper['instances'].clear();
       instanceWrapper['dependencies'].pop();
-      await expect(() => instanceWrapper.loadInstance()).rejects.toThrowError(NeverError);
+      await expect(() => instanceWrapper.loadInstance()).rejects.toThrowError(AppError);
     });
 
     it('should load a transient prototype of the instance', () => {
@@ -565,7 +565,7 @@ describe('InstanceWrapper', () => {
       await instanceWrapper.loadInstance();
       moduleRef.get.mockReturnValueOnce(new InvalidInterceptor());
 
-      await expect(instanceWrapper.applyInterceptors(moduleRef)).rejects.toThrowError(InternalError);
+      await expect(instanceWrapper.applyInterceptors(moduleRef)).rejects.toThrowError(AppError);
     });
 
     it('should call the interceptor with the correct context', async () => {

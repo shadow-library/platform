@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { NeverError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -23,7 +23,7 @@ export function applyDecorators(...decorators: Decorator[]): Decorator {
       /* istanbul ignore else */
       if (target instanceof Function && !descriptor) (decorator as ClassDecorator)(target);
       else if (propertyKey && descriptor) (decorator as MethodDecorator | PropertyDecorator)(target, propertyKey, descriptor);
-      else throw new NeverError('Invalid or unknown decorator type');
+      else throw AppError.internal('Invalid or unknown decorator type');
     }
   };
 }

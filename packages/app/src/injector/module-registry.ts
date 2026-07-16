@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import { InternalError, Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { Class } from 'type-fest';
 
 /**
@@ -57,7 +57,7 @@ export class ModuleRegistry {
     for (const mod of modules) {
       const ModuleClass = getModuleClass(mod);
       const isModule = Reflect.hasMetadata(MODULE_METADATA, ModuleClass);
-      if (!isModule) throw new InternalError(`Class '${ModuleClass.name}' is not a module, but is imported by '${Class.name}'`);
+      if (!isModule) throw AppError.internal(`Class '${ModuleClass.name}' is not a module, but is imported by '${Class.name}'`);
     }
 
     return { ...metadata, module: Class, imports: modules };
@@ -132,7 +132,7 @@ export class ModuleRegistry {
   get(module?: TModule): Module | Module[] {
     if (!module) return Array.from(this.modules.values());
     const mod = this.modules.get(module);
-    if (!mod) throw new InternalError(`Module '${module.name}' not found`);
+    if (!mod) throw AppError.internal(`Module '${module.name}' not found`);
     return mod;
   }
 }
