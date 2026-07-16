@@ -15,6 +15,13 @@ import { DatabaseService, PrimaryDatabase, User, UserSession, schema } from '@se
  * Defining types
  */
 
+export interface SignInDevice {
+  deviceId?: string;
+  ipAddress?: string;
+  ipCountry?: string;
+  userAgent?: string;
+}
+
 export interface SignInEventInput {
   flowId: string;
   userId?: bigint | null;
@@ -22,7 +29,7 @@ export interface SignInEventInput {
   status: UserSession.SignInEvent['status'];
   authMode: User.AuthProvider;
   mfaMode?: User.AuthProvider | null;
-  device?: { deviceId?: string; ipAddress?: string; ipCountry?: string; userAgent?: string };
+  device?: SignInDevice;
 }
 
 /**

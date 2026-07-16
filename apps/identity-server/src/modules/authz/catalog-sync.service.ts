@@ -21,9 +21,20 @@ import { PolicyDecisionService, type Principal } from './policy-decision.service
  * Defining types
  */
 
+interface CatalogPermission {
+  name: string;
+  description?: string;
+}
+
+interface CatalogRole {
+  name: string;
+  description?: string;
+  permissions: string[];
+}
+
 export interface CatalogManifest {
-  permissions: { name: string; description?: string }[];
-  roles: { name: string; description?: string; permissions: string[] }[];
+  permissions: CatalogPermission[];
+  roles: CatalogRole[];
 }
 
 export interface CatalogSyncResult {

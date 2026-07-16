@@ -30,6 +30,11 @@ export interface ContactItem {
   verifiedAt: Date | null;
 }
 
+interface ContactChangePayload {
+  action: string;
+  type: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -213,8 +218,9 @@ export class ContactService {
     this.logger.info('primary phone changed', { userId });
   }
 
-  private async notifyContactChange(userId: bigint, payload: { action: string; type: string }): Promise<void> {
+  private async notifyContactChange(userId: bigint, payload: ContactChangePayload): Promise<void> {
     const email = await this.userEmailService.getPrimaryEmail(userId);
-    if (email) await this.notificationService.enqueue({ templateKey: CONTACT_CHANGED_TEMPLATE, recipients: { email }, payload });
+    /** Spread rebuilds the payload as an object literal — interfaces lack the index signature `Record<string, unknown>` demands. */
+    if (email) await this.notificationService.enqueue({ templateKey: CONTACT_CHANGED_TEMPLATE, recipients: { email }, payload: { ...payload } });
   }
 }

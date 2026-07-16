@@ -21,16 +21,26 @@ import { ChallengeService } from './challenge.service';
 
 export type ChallengeMethodName = 'PASSWORD' | 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP';
 
+export interface ChallengeMetadata {
+  maskedEmail?: string;
+  maskedPhone?: string;
+}
+
 export interface ChallengeMethodDescriptor {
   name: ChallengeMethodName;
-  metadata?: { maskedEmail?: string; maskedPhone?: string };
+  metadata?: ChallengeMetadata;
 }
 
 export interface MethodChangeResult {
   flowId: string;
   status: string;
   resendsLeft?: number;
-  metadata?: { maskedEmail?: string; maskedPhone?: string };
+  metadata?: ChallengeMetadata;
+}
+
+interface ChallengeDelivery {
+  target: string;
+  templateKey: string;
 }
 
 export type ResendResult = { status: 'SENT'; resendsLeft: number; retryAfterSeconds: number } | { status: 'LIMITED'; retryAfterSeconds: number };
@@ -130,7 +140,7 @@ export class ChallengeFlowService {
   }
 
   /** Resolves where a resent code goes; null means the flow has no real recipient and delivery is pretend-only. */
-  private async resolveDelivery(flow: AuthFlowContext): Promise<{ target: string; templateKey: string } | null> {
+  private async resolveDelivery(flow: AuthFlowContext): Promise<ChallengeDelivery | null> {
     if (flow.kind === 'REGISTRATION') return flow.regData?.exists ? null : { target: flow.identifier, templateKey: REGISTER_OTP_TEMPLATE };
     if (flow.kind === 'LOGIN') return flow.userId ? { target: flow.identifier, templateKey: LOGIN_OTP_TEMPLATE } : null;
 

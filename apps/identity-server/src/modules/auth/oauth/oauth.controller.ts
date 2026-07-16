@@ -21,6 +21,13 @@ import { ClientCredential, OAuthService } from './oauth.service';
  * Defining types
  */
 
+interface ClientAuthenticationBody {
+  client_id?: string;
+  client_secret?: string;
+  client_assertion_type?: string;
+  client_assertion?: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -140,10 +147,7 @@ export class OAuthController {
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
   }
 
-  private parseClientCredential(
-    request: FastifyRequest,
-    body: { client_id?: string; client_secret?: string; client_assertion_type?: string; client_assertion?: string },
-  ): ClientCredential {
+  private parseClientCredential(request: FastifyRequest, body: ClientAuthenticationBody): ClientCredential {
     const header = request.headers.authorization;
     if (header?.startsWith('Basic ')) {
       const decoded = Buffer.from(header.slice(6), 'base64').toString();

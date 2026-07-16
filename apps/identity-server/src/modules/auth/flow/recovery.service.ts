@@ -32,6 +32,18 @@ export interface RecoverInitInput {
   device: DeviceContext;
 }
 
+export interface RecoveryInitResult {
+  flowId: string;
+  status: string;
+  resendsLeft: number;
+  metadata?: { maskedEmail: string };
+}
+
+export interface RecoveryMfaProof {
+  code?: string;
+  recoveryCode?: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -65,7 +77,7 @@ export class RecoveryService {
    * Starts recovery. Neutral for unknown accounts (D-12): a flow is always created but an OTP is
    * only issued (to the account's verified email) when the identifier resolves to a user.
    */
-  async init(input: RecoverInitInput): Promise<{ flowId: string; status: string; resendsLeft: number; metadata?: { maskedEmail: string } }> {
+  async init(input: RecoverInitInput): Promise<RecoveryInitResult> {
     const user = await this.userService.getUser(input.identifier);
     const email = user ? await this.userEmailService.getPrimaryEmail(user.id) : null;
     const flow = await this.authFlowService.create('RECOVERY', AWAITING_EMAIL_OTP, {
@@ -98,7 +110,7 @@ export class RecoveryService {
   }
 
   /** Satisfies the recovery MFA gate with a TOTP code or a single-use recovery code. */
-  async verifyMfa(flowId: string, proof: { code?: string; recoveryCode?: string }): Promise<FlowStepResult> {
+  async verifyMfa(flowId: string, proof: RecoveryMfaProof): Promise<FlowStepResult> {
     const flow = await this.requireFlow(flowId, AWAITING_TOTP);
     const userId = BigInt(flow.userId ?? '0');
 

@@ -41,6 +41,16 @@ export interface TestPrincipalRef {
   sub: string;
 }
 
+export interface CapturedCatalog {
+  manifest: { permissions: unknown[]; roles: unknown[] };
+  authorization: string | null;
+}
+
+export interface CapturedTokenRequest {
+  body: Record<string, unknown>;
+  authorization: string | null;
+}
+
 export interface TestIdP {
   issuer: string;
 
@@ -65,13 +75,13 @@ export interface TestIdP {
   getRequestCount(pathname: string): number;
 
   /** Returns the most recent role-catalog sync the mock received, if any */
-  getLastCatalog(): { manifest: { permissions: unknown[]; roles: unknown[] }; authorization: string | null } | undefined;
+  getLastCatalog(): CapturedCatalog | undefined;
 
   /** Configures the rules the `/api/v1/authz/service-access` endpoint returns */
   setServiceAccess(rules: ServiceAccessRule[]): void;
 
   /** Returns the most recent token-endpoint request the mock received, if any */
-  getLastTokenRequest(): { body: Record<string, unknown>; authorization: string | null } | undefined;
+  getLastTokenRequest(): CapturedTokenRequest | undefined;
 
   stop(): void;
 }
@@ -99,8 +109,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const grants = new Set<string>();
   let authzVersion = 1;
   let issuer = '';
-  let lastCatalog: { manifest: { permissions: unknown[]; roles: unknown[] }; authorization: string | null } | undefined;
-  let lastTokenRequest: { body: Record<string, unknown>; authorization: string | null } | undefined;
+  let lastCatalog: CapturedCatalog | undefined;
+  let lastTokenRequest: CapturedTokenRequest | undefined;
   let serviceAccessRules: ServiceAccessRule[] = [];
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;

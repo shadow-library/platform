@@ -34,6 +34,11 @@ export interface IdTokenInput {
   claims?: JwtClaims;
 }
 
+export interface MintedAccessToken {
+  token: string;
+  expiresIn: number;
+}
+
 /**
  * Declaring the constants
  */
@@ -50,7 +55,7 @@ export class AccessTokenService {
     return Math.floor(Date.now() / 1000) - CLOCK_SKEW_SECONDS;
   }
 
-  mintAccessToken(input: AccessTokenInput): { token: string; expiresIn: number } {
+  mintAccessToken(input: AccessTokenInput): MintedAccessToken {
     const iat = this.now();
     const claims: JwtClaims = {
       iss: this.issuer,

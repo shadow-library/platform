@@ -32,6 +32,11 @@ export interface AuditInput {
   detail?: Record<string, unknown> | null;
 }
 
+export interface ChainVerification {
+  valid: boolean;
+  brokenAt?: string;
+}
+
 /**
  * Declaring the constants
  *
@@ -125,7 +130,7 @@ export class AuditService {
   }
 
   /** Recomputes every hash in a chain and reports the first row that fails to match. */
-  async verifyChain(organisationId: string | null = null): Promise<{ valid: boolean; brokenAt?: string }> {
+  async verifyChain(organisationId: string | null = null): Promise<ChainVerification> {
     const rows = await this.db.select().from(schema.auditEvents).where(this.chainCondition(organisationId)).orderBy(asc(schema.auditEvents.id));
     let prevHash: string | null = null;
     for (const row of rows) {

@@ -23,6 +23,11 @@ import { DatabaseService, ID, PrimaryDatabase, User, schema } from '@server/modu
  * Defining types
  */
 
+export interface ProfileUpdate {
+  firstName?: string;
+  lastName?: string;
+}
+
 export interface CreateUser {
   username?: string;
   status?: User.Status;
@@ -197,8 +202,8 @@ export class UserService {
   }
 
   /** Updates the signed-in user's own profile fields; a no-op when nothing changed. */
-  async updateProfile(userId: bigint, data: { firstName?: string; lastName?: string }): Promise<void> {
-    const update: Partial<{ firstName: string; lastName: string }> = {};
+  async updateProfile(userId: bigint, data: ProfileUpdate): Promise<void> {
+    const update: ProfileUpdate = {};
     if (data.firstName !== undefined) update.firstName = data.firstName;
     if (data.lastName !== undefined) update.lastName = data.lastName;
     if (Object.keys(update).length === 0) return;

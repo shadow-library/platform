@@ -39,6 +39,16 @@ export interface ProfileInput {
   lastName: string;
 }
 
+export interface RegistrationStepState {
+  flowId: string;
+  status: string;
+}
+
+export interface RegistrationInitResult extends RegistrationStepState {
+  resendsLeft: number;
+  metadata: { maskedEmail: string };
+}
+
 /**
  * Declaring the constants
  */
@@ -66,7 +76,7 @@ export class RegistrationService {
    * Starts a registration flow. The response is identical whether or not the email already exists
    * (D-12); when it does, no OTP is issued and any code submission fails generically.
    */
-  async init(input: RegisterInitInput): Promise<{ flowId: string; status: string; resendsLeft: number; metadata: { maskedEmail: string } }> {
+  async init(input: RegisterInitInput): Promise<RegistrationInitResult> {
     const email = input.email.toLowerCase();
     const exists = await this.userEmailService.isEmailExists(email);
     const flow = await this.authFlowService.create('REGISTRATION', AWAITING_EMAIL_OTP, {
@@ -90,13 +100,13 @@ export class RegistrationService {
     return { outcome: 'CONTINUE', flowId, status: next.status };
   }
 
-  async setDemographics(flowId: string, input: DemographicsInput): Promise<{ flowId: string; status: string }> {
+  async setDemographics(flowId: string, input: DemographicsInput): Promise<RegistrationStepState> {
     const flow = await this.requireFlow(flowId, AWAITING_DEMOGRAPHICS);
     const next = await this.authFlowService.update(flow, { status: AWAITING_PROFILE, regData: { ...flow.regData, dateOfBirth: input.dateOfBirth, gender: input.gender } });
     return { flowId, status: next.status };
   }
 
-  async setProfile(flowId: string, input: ProfileInput): Promise<{ flowId: string; status: string }> {
+  async setProfile(flowId: string, input: ProfileInput): Promise<RegistrationStepState> {
     const flow = await this.requireFlow(flowId, AWAITING_PROFILE);
     const next = await this.authFlowService.update(flow, { status: AWAITING_PASSWORD_SET, regData: { ...flow.regData, firstName: input.firstName, lastName: input.lastName } });
     return { flowId, status: next.status };

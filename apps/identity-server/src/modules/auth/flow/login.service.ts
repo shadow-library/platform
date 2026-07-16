@@ -454,7 +454,7 @@ export class LoginService {
     return flow;
   }
 
-  private deviceFields(flow: AuthFlowContext): { ipAddress?: string; ipCountry?: string; userAgent?: string } {
+  private deviceFields(flow: AuthFlowContext): Omit<DeviceContext, 'fingerprint'> {
     return { ipAddress: flow.device.ipAddress, ipCountry: flow.device.ipCountry, userAgent: flow.device.userAgent };
   }
 }
