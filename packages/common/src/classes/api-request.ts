@@ -115,8 +115,9 @@ export class APIRequest {
     return this;
   }
 
-  body(data: JsonObject): this {
-    this.options.data = data;
+  /** Accepts any JSON-serializable object: `JsonObject` rejects `interface` types (no index signature), which would force `as unknown as JsonObject` casts on callers. */
+  body(data: object): this {
+    this.options.data = data as JsonObject;
     return this;
   }
 
@@ -129,7 +130,10 @@ export class APIRequest {
     if (data) {
       if (!requestOptions.headers) requestOptions.headers = {};
       (requestOptions.headers as Record<string, string>)['content-type'] = 'application/json';
-      requestOptions.body = JSON.stringify(data);
+      /** `body(data: object)` cannot prove serializability at compile time, so a top-level function/symbol must fail loudly instead of sending an empty body. */
+      const body = JSON.stringify(data);
+      if (body === undefined) throw new InternalError('API request body is not JSON-serializable');
+      requestOptions.body = body;
     }
 
     /** Log the request */

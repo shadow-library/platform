@@ -44,6 +44,24 @@ describe('APIRequest', () => {
     });
   });
 
+  it('should accept an interface-typed body without casts', async () => {
+    interface Payload {
+      action: string;
+      count: number;
+    }
+    const payload: Payload = { action: 'created', count: 1 };
+    await APIRequest.post('/typed').body(payload);
+    expect(mockRequest).toHaveBeenCalledWith('/typed', expect.objectContaining({ body: JSON.stringify(payload) }));
+  });
+
+  it('should throw InternalError when the body is not JSON-serializable', async () => {
+    await expect(
+      APIRequest.post('/test')
+        .body(() => 'not-json')
+        .execute(),
+    ).rejects.toBeInstanceOf(InternalError);
+  });
+
   it('should suppress errors', async () => {
     mockRequest.mockResolvedValue({ statusCode: 400, headers: { 'content-type': 'application/json' }, body: { json: async () => ({ error: 'fail' }) } });
     const response = await APIRequest.get('/test').suppressErrors();
