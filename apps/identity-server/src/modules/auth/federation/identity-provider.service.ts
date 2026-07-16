@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { and, eq } from 'drizzle-orm';
 
@@ -18,6 +18,12 @@ import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 /**
  * Defining types
  */
+
+interface DiscoveredEndpoints {
+  authorizationEndpoint: string;
+  tokenEndpoint: string;
+  jwksUri: string;
+}
 
 export interface CreateIdentityProvider {
   name: string;
@@ -67,13 +73,14 @@ export class IdentityProviderService {
     this.db = databaseService.getPostgresClient();
   }
 
-  private async discover(issuer: string): Promise<{ authorizationEndpoint: string; tokenEndpoint: string; jwksUri: string }> {
+  /** Raw fetch, not APIRequest: admin-supplied issuers need a hard timeout, which APIRequest does not expose. */
+  private async discover(issuer: string): Promise<DiscoveredEndpoints> {
     this.targetGuard.assertAcceptableUrl(issuer);
     const url = `${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`;
     let document: DiscoveryDocument;
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS) });
-      if (!response.ok) throw new Error(`discovery answered ${response.status}`);
+      if (!response.ok) throw new InternalError(`discovery answered ${response.status}`);
       document = (await response.json()) as DiscoveryDocument;
     } catch (error) {
       this.logger.warn('identity provider discovery failed', { issuer, error: error instanceof Error ? error.message : String(error) });
@@ -92,7 +99,7 @@ export class IdentityProviderService {
 
     const endpoints = await this.discover(input.issuer);
     const secret = this.keyProvider.encrypt(Buffer.from(input.clientSecret));
-    const [provider] = await this.db
+    const provider = await this.db
       .insert(schema.identityProviders)
       .values({
         organisationId,
@@ -107,8 +114,8 @@ export class IdentityProviderService {
         enforced: input.enforced ?? false,
         ...endpoints,
       })
-      .returning();
-    if (!provider) throw new Error('Identity provider creation failed');
+      .returning()
+      .then(([row]) => row ?? throwError(new InternalError('Identity provider creation failed')));
     this.logger.info('identity provider configured', { organisationId: organisationId.toString(), issuer: provider.issuer });
     return provider;
   }

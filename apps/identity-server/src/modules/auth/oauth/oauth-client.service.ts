@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, gt, isNull, or } from 'drizzle-orm';
 
 /**
@@ -37,6 +37,19 @@ export interface RegisteredClient {
   secret?: string;
 }
 
+export interface UpdateClient {
+  name?: string;
+  isActive?: boolean;
+  redirectUris?: string[];
+  backchannelLogoutUri?: string | null;
+  workloadSubject?: string | null;
+}
+
+export interface RotatedSecret {
+  secret: string;
+  previousSecretsExpireAt: Date;
+}
+
 /**
  * Declaring the constants
  */
@@ -58,7 +71,7 @@ export class OAuthClientService {
     const authMethod: OAuthClient.AuthMethod = isPublic ? 'none' : 'client_secret_basic';
 
     const clientId = await this.db.transaction(async tx => {
-      const [client] = await tx
+      const client = await tx
         .insert(schema.oauthClients)
         .values({
           applicationId: input.applicationId,
@@ -73,8 +86,8 @@ export class OAuthClientService {
           backchannelLogoutUri: input.backchannelLogoutUri ?? null,
           workloadSubject: input.workloadSubject ?? null,
         })
-        .returning({ id: schema.oauthClients.id });
-      if (!client) throw new Error('Failed to create OAuth client');
+        .returning({ id: schema.oauthClients.id })
+        .then(([row]) => row ?? throwError(new InternalError('Failed to create OAuth client')));
 
       for (const uri of input.redirectUris ?? []) await tx.insert(schema.oauthClientRedirectUris).values({ clientId: client.id, uri });
       for (const scopeId of input.scopeIds ?? []) await tx.insert(schema.oauthClientScopeGrants).values({ clientId: client.id, scopeId });
@@ -111,12 +124,14 @@ export class OAuthClientService {
   /** Idempotently provisions an API resource and one of its scopes, returning the scope id. */
   async ensureScope(applicationId: number, resourceIdentifier: string, scopeName: string): Promise<string> {
     await this.db.insert(schema.apiResources).values({ applicationId, identifier: resourceIdentifier }).onConflictDoNothing();
-    const resource = await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, resourceIdentifier) });
-    if (!resource) throw new Error(`API resource '${resourceIdentifier}' could not be provisioned`);
+    const resource =
+      (await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, resourceIdentifier) })) ??
+      throwError(new InternalError(`API resource '${resourceIdentifier}' could not be provisioned`));
 
     await this.db.insert(schema.scopes).values({ apiResourceId: resource.id, name: scopeName }).onConflictDoNothing();
-    const scope = await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, resource.id), eq(schema.scopes.name, scopeName)) });
-    if (!scope) throw new Error(`Scope '${scopeName}' could not be provisioned`);
+    const scope =
+      (await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, resource.id), eq(schema.scopes.name, scopeName)) })) ??
+      throwError(new InternalError(`Scope '${scopeName}' could not be provisioned`));
     return scope.id;
   }
 
@@ -142,7 +157,7 @@ export class OAuthClientService {
    * Dual-secret rotation (T-201): the new secret is live immediately while previous secrets stay
    * valid for the overlap window, so running consumers can re-configure without an outage.
    */
-  async rotateSecretWithOverlap(clientId: string, overlapHours = 24): Promise<{ secret: string; previousSecretsExpireAt: Date }> {
+  async rotateSecretWithOverlap(clientId: string, overlapHours = 24): Promise<RotatedSecret> {
     const previousSecretsExpireAt = new Date(Date.now() + overlapHours * 3_600_000);
     await this.db
       .update(schema.oauthClientSecrets)
@@ -169,10 +184,7 @@ export class OAuthClientService {
   }
 
   /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
-  async updateClient(
-    clientId: string,
-    update: { name?: string; isActive?: boolean; redirectUris?: string[]; backchannelLogoutUri?: string | null; workloadSubject?: string | null },
-  ): Promise<void> {
+  async updateClient(clientId: string, update: UpdateClient): Promise<void> {
     await this.db.transaction(async tx => {
       if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined || update.workloadSubject !== undefined) {
         await tx
@@ -203,15 +215,17 @@ export class OAuthClientService {
       .insert(schema.scopes)
       .values({ apiResourceId, name, description, isSensitive: isSensitive ?? false })
       .onConflictDoNothing();
-    const scope = await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, apiResourceId), eq(schema.scopes.name, name)) });
-    if (!scope) throw new Error(`Scope '${name}' could not be provisioned`);
+    const scope =
+      (await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, apiResourceId), eq(schema.scopes.name, name)) })) ??
+      throwError(new InternalError(`Scope '${name}' could not be provisioned`));
     return scope.id;
   }
 
   async ensureResource(applicationId: number, identifier: string, displayName?: string): Promise<ApiResource> {
     await this.db.insert(schema.apiResources).values({ applicationId, identifier, displayName }).onConflictDoNothing();
-    const resource = await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, identifier) });
-    if (!resource) throw new Error(`API resource '${identifier}' could not be provisioned`);
+    const resource =
+      (await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, identifier) })) ??
+      throwError(new InternalError(`API resource '${identifier}' could not be provisioned`));
     return resource;
   }
 

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { APIRequest, Config, InternalError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -133,12 +133,13 @@ export class WorkloadIdentityService {
 
   private async load(): Promise<void> {
     const jwksUri = this.jwksUriOverride || (await this.discoverJwksUri());
-    const response = await fetch(jwksUri);
-    if (!response.ok) throw new Error(`cluster jwks endpoint returned http ${response.status}`);
+    const response = await APIRequest.get(jwksUri).suppressErrors().execute<{ keys?: WorkloadJwk[] }>();
+    if (response.statusCode >= 400) throw new InternalError(`cluster jwks endpoint returned http ${response.statusCode}`);
+    /** APIRequest only parses `application/json` bodies — a JWKS served under another content type fails closed here. */
+    if (!response.data) throw new InternalError('cluster jwks endpoint returned no json body');
 
-    const body = (await response.json()) as { keys?: WorkloadJwk[] };
     const keys = new Map<string, CryptoKey>();
-    for (const jwk of body.keys ?? []) {
+    for (const jwk of response.data.keys ?? []) {
       if (!jwk.kid) continue;
       const importAlgorithm = this.importAlgorithm(jwk);
       if (!importAlgorithm) continue;
@@ -157,10 +158,11 @@ export class WorkloadIdentityService {
   }
 
   private async discoverJwksUri(): Promise<string> {
-    const response = await fetch(`${this.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`);
-    if (!response.ok) throw new Error(`cluster oidc discovery returned http ${response.status}`);
-    const document = (await response.json()) as { jwks_uri?: string };
-    if (!document.jwks_uri) throw new Error('cluster oidc discovery has no jwks_uri');
-    return document.jwks_uri;
+    const response = await APIRequest.get(`${this.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`)
+      .suppressErrors()
+      .execute<{ jwks_uri?: string }>();
+    if (response.statusCode >= 400) throw new InternalError(`cluster oidc discovery returned http ${response.statusCode}`);
+    if (!response.data?.jwks_uri) throw new InternalError('cluster oidc discovery has no jwks_uri');
+    return response.data.jwks_uri;
   }
 }

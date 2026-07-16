@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { and, eq, isNotNull } from 'drizzle-orm';
 
@@ -65,7 +65,7 @@ export class OrganisationService {
     const [organisation] = await executor.insert(schema.organisations).values({ name, slug, type: 'PERSONAL', status: 'ACTIVE' }).returning();
     if (!organisation) {
       this.logger.error('failed to create personal workspace', { userId });
-      throw new Error('Failed to create personal workspace');
+      throw new InternalError('Failed to create personal workspace');
     }
     await executor.insert(schema.organisationMembers).values({ organisationId: organisation.id, userId, role: 'OWNER', isDefault: true });
     this.logger.debug('created personal workspace', { organisationId: organisation.id, userId });
@@ -101,7 +101,7 @@ export class OrganisationService {
       .insert(schema.organisations)
       .values({ name, slug: this.generateSlug(name), type: 'TEAM', status: 'ACTIVE' })
       .returning();
-    if (!organisation) throw new Error(`Failed to create organisation '${name}'`);
+    if (!organisation) throw new InternalError(`Failed to create organisation '${name}'`);
     this.logger.info('created team organisation', { organisationId: organisation.id, name });
     return organisation;
   }

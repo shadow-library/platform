@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { and, eq, isNotNull, isNull } from 'drizzle-orm';
 
@@ -82,11 +82,11 @@ export class InvitationService {
         .update(schema.organisationInvitations)
         .set({ revokedAt: new Date() })
         .where(and(eq(schema.organisationInvitations.organisationId, organisationId), eq(schema.organisationInvitations.email, email), this.pendingCondition()));
-      const [created] = await tx
+      const created = await tx
         .insert(schema.organisationInvitations)
         .values({ organisationId, email, role: input.role, tokenHash: this.hashToken(token), invitedBy: input.invitedBy, expiresAt })
-        .returning();
-      if (!created) throw new Error('Failed to create invitation');
+        .returning()
+        .then(([row]) => row ?? throwError(new InternalError('Failed to create invitation')));
       await this.notificationService.enqueue(
         { templateKey: INVITE_TEMPLATE, recipients: { email }, payload: { organisationName: input.organisation.name, role: input.role, token } },
         tx,

@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Config, InternalError, Logger } from '@shadow-library/common';
 import { and, asc, eq, inArray, isNotNull, lte, sql } from 'drizzle-orm';
 
 /**
@@ -130,6 +130,7 @@ export class BackChannelLogoutService {
     return sent;
   }
 
+  /** Raw fetch, not APIRequest: the spec mandates a form-encoded body and delivery needs a hard timeout — APIRequest offers neither. */
   private async send(delivery: OidcLogoutDelivery): Promise<void> {
     const token = this.mintLogoutToken(delivery);
     const response = await fetch(delivery.logoutUri, {
@@ -138,7 +139,7 @@ export class BackChannelLogoutService {
       body: `logout_token=${encodeURIComponent(token)}`,
       signal: AbortSignal.timeout(10_000),
     });
-    if (!response.ok) throw new Error(`logout endpoint answered ${response.status}`);
+    if (!response.ok) throw new InternalError(`logout endpoint answered ${response.status}`);
   }
 
   private async markFailed(delivery: OidcLogoutDelivery, error: unknown): Promise<void> {

@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
+import { InternalError, throwError } from '@shadow-library/common';
 import { and, eq } from 'drizzle-orm';
 
 /**
@@ -33,9 +34,8 @@ export class FederatedIdentityService {
   }
 
   async link(identityProviderId: string, userId: bigint, subject: string): Promise<FederatedIdentity> {
-    const [identity] = await this.db.insert(schema.federatedIdentities).values({ identityProviderId, userId, subject }).returning();
-    if (!identity) throw new Error('Federated identity link failed');
-    return identity;
+    const rows = await this.db.insert(schema.federatedIdentities).values({ identityProviderId, userId, subject }).returning();
+    return rows[0] ?? throwError(new InternalError('Federated identity link failed'));
   }
 
   async listForUser(userId: bigint): Promise<FederatedIdentity[]> {

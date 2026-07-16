@@ -4,7 +4,7 @@
 import { KeyObject, createPrivateKey, createPublicKey, generateKeyPairSync, randomUUID } from 'node:crypto';
 
 import { Injectable, OnModuleInit } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, inArray, lt } from 'drizzle-orm';
 
 /**
@@ -39,6 +39,12 @@ interface LoadedKey {
   status: SigningKey.Status;
   publicKey: KeyObject;
   privateKey: KeyObject;
+}
+
+interface ExportedEd25519Jwk {
+  kty: string;
+  crv: string;
+  x: string;
 }
 
 /**
@@ -148,10 +154,8 @@ export class KeyService implements OnModuleInit {
   }
 
   sign(claims: JwtClaims): SignResult {
-    const kid = this.activeKid;
-    if (!kid) throw new Error('No active signing key available');
-    const key = this.keys.get(kid);
-    if (!key) throw new Error(`Active signing key ${kid} is not loaded`);
+    const kid = this.activeKid ?? throwError(new InternalError('No active signing key available'));
+    const key = this.keys.get(kid) ?? throwError(new InternalError(`Active signing key ${kid} is not loaded`));
     const token = encodeJwt({ alg: 'EdDSA', typ: 'JWT', kid }, claims, key.privateKey);
     return { token, kid };
   }
@@ -168,7 +172,7 @@ export class KeyService implements OnModuleInit {
   getJwks(): { keys: Jwk[] } {
     const keys: Jwk[] = [];
     for (const key of this.keys.values()) {
-      const jwk = key.publicKey.export({ format: 'jwk' }) as unknown as { kty: string; crv: string; x: string };
+      const jwk = key.publicKey.export({ format: 'jwk' }) as unknown as ExportedEd25519Jwk;
       keys.push({ kty: jwk.kty, crv: jwk.crv, x: jwk.x, kid: key.kid, use: 'sig', alg: 'EdDSA' });
     }
     return { keys };

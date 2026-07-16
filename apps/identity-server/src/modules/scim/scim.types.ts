@@ -93,6 +93,11 @@ export interface ScimPage {
   count: number;
 }
 
+export interface ScimListResult<TResource> {
+  total: number;
+  resources: TResource[];
+}
+
 /**
  * Declaring the constants
  *

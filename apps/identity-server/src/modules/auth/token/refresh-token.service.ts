@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, ne } from 'drizzle-orm';
 
 /**
@@ -46,6 +46,21 @@ export interface RefreshTokenResult {
   context: FamilyContext;
 }
 
+export interface RotationContext {
+  ipAddress?: string;
+  ipCountry?: string;
+}
+
+export interface RefreshTokenDescription {
+  active: boolean;
+  context: FamilyContext;
+}
+
+interface MintedSecret {
+  secret: string;
+  tokenHash: string;
+}
+
 export class RefreshTokenReuseError extends Error {
   constructor() {
     super('Refresh token reuse detected');
@@ -75,7 +90,7 @@ export class RefreshTokenService {
     return createHash('sha256').update(secret).digest('hex');
   }
 
-  private mint(): { secret: string; tokenHash: string } {
+  private mint(): MintedSecret {
     const secret = randomBytes(32).toString('base64url');
     return { secret, tokenHash: this.hash(secret) };
   }
@@ -97,7 +112,7 @@ export class RefreshTokenService {
         .returning();
       if (!family) {
         this.logger.error('failed to create refresh token family', { userId: input.userId, clientId: input.clientId });
-        throw new Error('Failed to create refresh token family');
+        throw new InternalError('Failed to create refresh token family');
       }
       const [token] = await tx
         .insert(schema.refreshTokens)
@@ -105,7 +120,7 @@ export class RefreshTokenService {
         .returning();
       if (!token) {
         this.logger.error('failed to create refresh token', { userId: input.userId, familyId: family.id });
-        throw new Error('Failed to create refresh token');
+        throw new InternalError('Failed to create refresh token');
       }
       return { familyId: family.id, tokenId: token.id, context: this.toContext(family) };
     });
@@ -122,7 +137,7 @@ export class RefreshTokenService {
    * (ROTATED/REVOKED) means the chain leaked — the entire family and its session are revoked and a
    * security event is recorded (D-11).
    */
-  async rotate(secret: string, context: { ipAddress?: string; ipCountry?: string } = {}): Promise<RefreshTokenResult> {
+  async rotate(secret: string, context: RotationContext = {}): Promise<RefreshTokenResult> {
     const presented = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
     if (!presented) {
       this.logger.warn('refresh token rotation rejected: presented token is unknown', { securityEvent: 'security.token_reuse' });
@@ -148,7 +163,7 @@ export class RefreshTokenService {
     const { secret: nextSecret, tokenHash } = this.mint();
     const tokenId = await this.db.transaction(async tx => {
       await tx.update(schema.refreshTokens).set({ status: 'ROTATED', rotatedAt: new Date() }).where(eq(schema.refreshTokens.id, presented.id));
-      const [token] = await tx
+      const token = await tx
         .insert(schema.refreshTokens)
         .values({
           familyId: family.id,
@@ -158,8 +173,8 @@ export class RefreshTokenService {
           ipAddress: context.ipAddress ?? null,
           ipCountry: context.ipCountry ?? null,
         })
-        .returning({ id: schema.refreshTokens.id });
-      if (!token) throw new Error('Failed to rotate refresh token');
+        .returning({ id: schema.refreshTokens.id })
+        .then(([row]) => row ?? throwError(new InternalError('Failed to rotate refresh token')));
       return token.id;
     });
     this.logger.debug('rotated refresh token', { userId: family.userId, familyId: family.id });
@@ -173,7 +188,7 @@ export class RefreshTokenService {
   }
 
   /** Describes a refresh token for introspection: active only if the token and its family are live. */
-  async describeBySecret(secret: string): Promise<{ active: boolean; context: FamilyContext } | null> {
+  async describeBySecret(secret: string): Promise<RefreshTokenDescription | null> {
     const token = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
     if (!token) return null;
     const family = await this.db.query.refreshTokenFamilies.findFirst({ where: eq(schema.refreshTokenFamilies.id, token.familyId) });

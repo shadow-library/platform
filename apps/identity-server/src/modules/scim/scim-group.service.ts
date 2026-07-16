@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config } from '@shadow-library/common';
+import { Config, InternalError, throwError } from '@shadow-library/common';
 import { SQL, and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 
 /**
@@ -12,7 +12,7 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, ScimGroup, schema } from '@server/modules/infrastructure/datastore';
 
 import { ScimTenant } from './scim-auth.service';
-import { GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput, ScimGroupResource, ScimPage, ScimPatchOperation, asRecord, asString } from './scim.types';
+import { GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput, ScimGroupResource, ScimListResult, ScimPage, ScimPatchOperation, asRecord, asString } from './scim.types';
 
 /**
  * Defining types
@@ -38,7 +38,7 @@ export class ScimGroupService {
     this.db = databaseService.getPostgresClient();
   }
 
-  async list(tenant: ScimTenant, filter: ScimFilter | undefined, page: ScimPage): Promise<{ total: number; resources: ScimGroupResource[] }> {
+  async list(tenant: ScimTenant, filter: ScimFilter | undefined, page: ScimPage): Promise<ScimListResult<ScimGroupResource>> {
     const conditions: SQL[] = [eq(schema.scimGroups.organisationId, tenant.organisationId)];
     if (filter?.attribute === 'displayName') conditions.push(sql`lower(${schema.scimGroups.displayName}) = ${filter.value.toLowerCase()}`);
     if (filter?.attribute === 'externalId') conditions.push(eq(schema.scimGroups.externalId, filter.value));
@@ -60,11 +60,11 @@ export class ScimGroupService {
     });
     if (duplicate) throw new ScimError(409, 'A group with this displayName already exists', 'uniqueness');
 
-    const [group] = await this.db
+    const group = await this.db
       .insert(schema.scimGroups)
       .values({ organisationId: tenant.organisationId, displayName: input.displayName, externalId: input.externalId })
-      .returning();
-    if (!group) throw new Error('Scim group insert failed');
+      .returning()
+      .then(([row]) => row ?? throwError(new InternalError('Scim group insert failed')));
     if (input.members.length > 0) await this.addMembers(tenant, group.id, input.members);
     await this.audit(tenant, 'scim.group.created', group.id);
     return this.toResource(group);

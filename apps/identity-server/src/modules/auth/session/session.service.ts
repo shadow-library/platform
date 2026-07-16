@@ -4,7 +4,7 @@
 import { createHash, randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { and, eq, ne } from 'drizzle-orm';
 import { Redis } from 'ioredis';
 
@@ -36,6 +36,19 @@ export interface SessionResult {
   session: UserSession;
   secret: string;
   cookies: CookieSpec[];
+}
+
+export interface SessionWithDevice {
+  session: UserSession;
+  deviceName: string | null;
+}
+
+interface CachedSession {
+  id: string;
+  userId: string;
+  aal: UserSession.Aal;
+  elevatedUntil: number | null;
+  expiresAt: number;
 }
 
 export interface ValidatedSession {
@@ -82,7 +95,7 @@ export class SessionService {
     const deviceId = input.deviceFingerprint ? await this.upsertDevice(input.userId, input.deviceFingerprint, input.deviceName) : null;
     const aal = input.aal ?? 'AAL1';
 
-    const [session] = await this.db
+    const session = await this.db
       .insert(schema.userSessions)
       .values({
         userId: input.userId,
@@ -97,8 +110,8 @@ export class SessionService {
         ipCountry: input.ipCountry ?? null,
         userAgent: input.userAgent ?? null,
       })
-      .returning();
-    if (!session) throw new Error('Session creation failed');
+      .returning()
+      .then(([row]) => row ?? throwError(new InternalError('Session creation failed')));
 
     await this.redis.sadd(this.userSetKey(input.userId), sessionHash);
     await this.cache(session);
@@ -178,7 +191,7 @@ export class SessionService {
   }
 
   /** Active sessions joined with their device labels, for the self-service session list (§4.4). */
-  async listActiveDetailed(userId: bigint): Promise<{ session: UserSession; deviceName: string | null }[]> {
+  async listActiveDetailed(userId: bigint): Promise<SessionWithDevice[]> {
     return this.db
       .select({ session: schema.userSessions, deviceName: schema.devices.name })
       .from(schema.userSessions)
@@ -193,12 +206,12 @@ export class SessionService {
 
   private async upsertDevice(userId: bigint, fingerprint: string, name?: string): Promise<bigint> {
     const fingerprintHash = this.hashSecret(fingerprint);
-    const [device] = await this.db
+    const device = await this.db
       .insert(schema.devices)
       .values({ userId, fingerprintHash, name: name ?? null })
       .onConflictDoUpdate({ target: [schema.devices.userId, schema.devices.fingerprintHash], set: { lastSeenAt: new Date() } })
-      .returning({ id: schema.devices.id });
-    if (!device) throw new Error('Device upsert failed');
+      .returning({ id: schema.devices.id })
+      .then(([row]) => row ?? throwError(new InternalError('Device upsert failed')));
     return device.id;
   }
 
@@ -229,7 +242,7 @@ export class SessionService {
   }
 
   private reviveCached(cached: string): ValidatedSession {
-    const parsed = JSON.parse(cached) as { id: string; userId: string; aal: UserSession.Aal; elevatedUntil: number | null; expiresAt: number };
+    const parsed = JSON.parse(cached) as CachedSession;
     return { id: BigInt(parsed.id), userId: BigInt(parsed.userId), aal: parsed.aal, elevatedUntil: parsed.elevatedUntil, expiresAt: parsed.expiresAt };
   }
 }

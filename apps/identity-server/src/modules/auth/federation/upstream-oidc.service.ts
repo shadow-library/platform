@@ -4,7 +4,7 @@
 import { type JsonWebKeyInput, KeyObject, createPublicKey, verify as cryptoVerify } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Config, LRUCache, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -64,6 +64,7 @@ const ALLOWED_ALGORITHMS: Record<string, { digest: string | null }> = {
 const CLOCK_SKEW_SECONDS = 60;
 const FETCH_TIMEOUT_MS = 10_000;
 const JWKS_CACHE_TTL_MS = 300_000;
+const JWKS_CACHE_CAPACITY = 32;
 
 const decodeSegment = (segment: string): Record<string, unknown> | null => {
   try {
@@ -77,7 +78,7 @@ const decodeSegment = (segment: string): Record<string, unknown> | null => {
 export class UpstreamOidcService {
   private readonly logger = Logger.getLogger(APP_NAME, UpstreamOidcService.name);
   private readonly issuer = Config.get('oauth.issuer');
-  private readonly jwksCache = new Map<string, { keys: UpstreamJwk[]; fetchedAt: number }>();
+  private readonly jwksCache = new LRUCache(JWKS_CACHE_CAPACITY, { ttl: JWKS_CACHE_TTL_MS });
 
   constructor(private readonly identityProviderService: IdentityProviderService) {}
 
@@ -98,7 +99,7 @@ export class UpstreamOidcService {
     return url.toString();
   }
 
-  /** Redeems the code (form-encoded, client_secret_post) and returns the verified upstream identity. */
+  /** Redeems the code (form-encoded, client_secret_post) and returns the verified upstream identity. Raw fetch, not APIRequest: form-encoded body + hard timeout. */
   async exchangeAndVerify(provider: IdentityProvider, code: string, codeVerifier: string, nonce: string): Promise<UpstreamIdentity> {
     const body = new URLSearchParams({
       grant_type: 'authorization_code',
@@ -169,15 +170,14 @@ export class UpstreamOidcService {
   }
 
   private async findJwk(provider: IdentityProvider, kid: string | undefined, forceRefresh: boolean): Promise<UpstreamJwk | null> {
-    const cached = this.jwksCache.get(provider.jwksUri);
-    let keys = !forceRefresh && cached && Date.now() - cached.fetchedAt < JWKS_CACHE_TTL_MS ? cached.keys : null;
+    let keys = forceRefresh ? null : (this.jwksCache.get<UpstreamJwk[]>(provider.jwksUri) ?? null);
     if (!keys) {
       try {
         const response = await fetch(provider.jwksUri, { signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
         if (!response.ok) return null;
         const document = (await response.json()) as { keys?: UpstreamJwk[] };
         keys = Array.isArray(document.keys) ? document.keys : [];
-        this.jwksCache.set(provider.jwksUri, { keys, fetchedAt: Date.now() });
+        this.jwksCache.set(provider.jwksUri, keys);
       } catch {
         return null;
       }

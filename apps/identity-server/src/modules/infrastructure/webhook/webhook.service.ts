@@ -4,7 +4,7 @@
 import { randomBytes } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InternalError, Logger, throwError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { eq } from 'drizzle-orm';
 
@@ -50,6 +50,16 @@ interface SerializedSecret {
   authTag: string;
 }
 
+interface EncryptedSecret {
+  ciphertext: string;
+  kekVersion: number;
+}
+
+interface SubscriptionCache {
+  subscriptions: WebhookSubscription[];
+  expiresAt: number;
+}
+
 /**
  * Declaring the constants
  *
@@ -64,7 +74,7 @@ const SUBSCRIPTION_CACHE_TTL_MS = 30_000;
 export class WebhookService {
   private readonly logger = Logger.getLogger(APP_NAME, WebhookService.name);
   private readonly db: PrimaryDatabase;
-  private cache: { subscriptions: WebhookSubscription[]; expiresAt: number } | null = null;
+  private cache: SubscriptionCache | null = null;
 
   constructor(
     databaseService: DatabaseService,
@@ -78,7 +88,7 @@ export class WebhookService {
     return `${WEBHOOK_SECRET_PREFIX}${randomBytes(32).toString('base64url')}`;
   }
 
-  private encryptSecret(secret: string): { ciphertext: string; kekVersion: number } {
+  private encryptSecret(secret: string): EncryptedSecret {
     const encrypted = this.keyProvider.encrypt(Buffer.from(secret, 'utf8'));
     const serialized: SerializedSecret = { ciphertext: encrypted.ciphertext, iv: encrypted.iv, authTag: encrypted.authTag };
     return { ciphertext: JSON.stringify(serialized), kekVersion: encrypted.kekVersion };
@@ -105,11 +115,11 @@ export class WebhookService {
     this.targetGuard.assertAcceptableUrl(input.targetUrl);
     const secret = this.generateSecret();
     const { ciphertext, kekVersion } = this.encryptSecret(secret);
-    const [subscription] = await this.db
+    const subscription = await this.db
       .insert(schema.webhookSubscriptions)
       .values({ name: input.name, targetUrl: input.targetUrl, eventTypes: input.eventTypes, secretCiphertext: ciphertext, kekVersion })
-      .returning();
-    if (!subscription) throw new Error('Failed to create webhook subscription');
+      .returning()
+      .then(([row]) => row ?? throwError(new InternalError('Failed to create webhook subscription')));
     this.invalidateCache();
     this.logger.info('Webhook subscription created', { subscriptionId: subscription.id, targetUrl: input.targetUrl });
     return { subscription, secret };

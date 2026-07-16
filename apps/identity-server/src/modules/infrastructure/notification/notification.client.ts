@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { APIRequest, Config, InternalError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -37,21 +37,17 @@ export class NotificationClient {
   async send(notification: SendNotification): Promise<void> {
     /** Recipients carry the target email/phone, so this trace is debug-only (dev/local, never prod). */
     this.logger.debug('dispatching notification to pulse-server', { templateKey: notification.templateKey, recipients: notification.recipients });
-    let response: Response;
-    try {
-      response = await fetch(`${this.baseUrl}/notifications`, {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ ...notification, service: this.serviceName }),
+    const response = await APIRequest.post(`${this.baseUrl}/notifications`)
+      .body({ ...notification, service: this.serviceName })
+      .suppressErrors()
+      .execute()
+      .catch((error: unknown) => {
+        this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, baseUrl: this.baseUrl, error });
+        throw error;
       });
-    } catch (error) {
-      this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, baseUrl: this.baseUrl, error });
-      throw error;
-    }
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.status, body });
-      throw new Error(`Notification request failed with status ${response.status}: ${body}`);
+    if (response.statusCode >= 400) {
+      this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.statusCode, body: response.data });
+      throw new InternalError(`Notification request failed with status ${response.statusCode}`);
     }
     this.logger.debug('notification dispatched to pulse-server', { templateKey: notification.templateKey });
   }

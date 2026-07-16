@@ -4,7 +4,7 @@
 import { createHmac, hkdfSync, randomUUID } from 'node:crypto';
 
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Config, InternalError, Logger, throwError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
@@ -104,7 +104,7 @@ export class SamlService {
   async createServiceProvider(data: CreateServiceProvider): Promise<SamlServiceProvider> {
     const releasedAttributes = data.releasedAttributes ?? ['email'];
     this.assertValidServiceProvider(data.entityId, data.acsUrl, releasedAttributes);
-    const [serviceProvider] = await this.db
+    const serviceProvider = await this.db
       .insert(schema.samlServiceProviders)
       .values({
         entityId: data.entityId,
@@ -114,8 +114,8 @@ export class SamlService {
         releasedAttributes,
         spCertificatePem: data.spCertificatePem,
       })
-      .returning();
-    if (!serviceProvider) throw new Error('Service provider creation failed');
+      .returning()
+      .then(([row]) => row ?? throwError(new InternalError('Service provider creation failed')));
     this.logger.info('saml service provider registered', { id: serviceProvider.id, entityId: data.entityId });
     return serviceProvider;
   }

@@ -36,6 +36,7 @@ export class PasswordPolicyService {
     if (!validator.isStrongPassword(password, STRENGTH_OPTIONS) || password.length > 128) throw new ValidationError('password', ERROR_MESSAGES.INVALID_PASSWORD);
   }
 
+  /** Raw fetch, not APIRequest: the HIBP range API answers text/plain, which APIRequest cannot parse. */
   async isBreached(password: string): Promise<boolean> {
     if (!this.breachCheckEnabled) return false;
     try {

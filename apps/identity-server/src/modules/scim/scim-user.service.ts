@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Config, InternalError, Logger, throwError } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
 import { SQL, and, asc, count, eq, sql } from 'drizzle-orm';
 import validator from 'validator';
@@ -22,7 +22,9 @@ import { ScimTenant } from './scim-auth.service';
 import {
   ScimError,
   ScimFilter,
+  ScimListResult,
   ScimMemberRef,
+  ScimName,
   ScimPage,
   ScimPatchOperation,
   ScimUserInput,
@@ -36,6 +38,13 @@ import {
 /**
  * Defining types
  */
+
+interface ScimUserChanges {
+  externalId?: string | null;
+  active?: boolean;
+  name?: ScimName;
+  displayName?: string;
+}
 
 /**
  * Declaring the constants
@@ -72,7 +81,7 @@ export class ScimUserService {
 
   /* ----------------------------------------- reads ----------------------------------------- */
 
-  async list(tenant: ScimTenant, filter: ScimFilter | undefined, page: ScimPage): Promise<{ total: number; resources: ScimUserResource[] }> {
+  async list(tenant: ScimTenant, filter: ScimFilter | undefined, page: ScimPage): Promise<ScimListResult<ScimUserResource>> {
     const conditions: SQL[] = [eq(schema.scimDirectory.organisationId, tenant.organisationId)];
     if (filter?.attribute === 'userName') conditions.push(sql`lower(${schema.scimDirectory.userName}) = ${filter.value.toLowerCase()}`);
     if (filter?.attribute === 'externalId') conditions.push(eq(schema.scimDirectory.externalId, filter.value));
@@ -122,11 +131,11 @@ export class ScimUserService {
         ).id;
 
     await this.organisationService.ensureMember(tenant.organisationId, userId, 'MEMBER');
-    const [entry] = await this.db
+    const entry = await this.db
       .insert(schema.scimDirectory)
       .values({ organisationId: tenant.organisationId, userId, userName: email, externalId: input.externalId, active: true, managed: !existing })
-      .returning();
-    if (!entry) throw new Error('Scim directory insert failed');
+      .returning()
+      .then(([row]) => row ?? throwError(new InternalError('Scim directory insert failed')));
 
     if (!input.active) await this.setActive(entry, false);
     await this.audit(tenant, 'scim.user.provisioned', userId, { adopted: Boolean(existing) });
@@ -146,7 +155,7 @@ export class ScimUserService {
 
   async patch(tenant: ScimTenant, id: string, operations: ScimPatchOperation[]): Promise<ScimUserResource> {
     const entry = await this.requireEntry(tenant, id);
-    const changes: { externalId?: string | null; active?: boolean; name?: { givenName?: string; familyName?: string }; displayName?: string } = {};
+    const changes: ScimUserChanges = {};
 
     for (const operation of operations) {
       if (operation.op !== 'add' && operation.op !== 'replace' && operation.op !== 'remove') throw new ScimError(400, `Unsupported PATCH op '${operation.op}'`, 'invalidValue');
@@ -208,10 +217,7 @@ export class ScimUserService {
     if (!verified) throw new ScimError(400, `Domain '${domain}' is not verified for this organisation`, 'invalidValue');
   }
 
-  private async applyChanges(
-    entry: ScimDirectoryEntry,
-    changes: { externalId?: string | null; active?: boolean; name?: { givenName?: string; familyName?: string }; displayName?: string },
-  ): Promise<void> {
+  private async applyChanges(entry: ScimDirectoryEntry, changes: ScimUserChanges): Promise<void> {
     if (changes.externalId !== undefined) {
       await this.db.update(schema.scimDirectory).set({ externalId: changes.externalId, updatedAt: new Date() }).where(eq(schema.scimDirectory.id, entry.id));
     }
