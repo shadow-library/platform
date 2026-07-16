@@ -3,7 +3,7 @@
  */
 import { describe, expect, it } from 'bun:test';
 
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -51,7 +51,7 @@ describe('EnumType', () => {
     });
 
     it('should throw error for mixed enum values', () => {
-      expect(() => EnumType.create('Mixed', ['active', 1, 'pending'] as any)).toThrow(InternalError);
+      expect(() => EnumType.create('Mixed', ['active', 1, 'pending'] as any)).toThrow(AppError);
     });
 
     it('should generate unique ids for different enums', () => {

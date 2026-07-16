@@ -3,7 +3,7 @@
  */
 import assert from 'node:assert';
 
-import { InternalError, MaybeNull } from '@shadow-library/common';
+import { AppError, MaybeNull } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -97,7 +97,7 @@ export class TransformerFactory {
   }
 
   hasTransformableFields(schema: JSONSchema): boolean {
-    if (!ClassSchema.isBranded(schema)) throw new InternalError('Invalid schema: only schemas built with this package are supported');
+    if (!ClassSchema.isBranded(schema)) throw AppError.internal('Invalid schema: only schemas built with this package are supported');
     return this.hasTransformTargets(schema);
   }
 

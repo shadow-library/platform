@@ -3,7 +3,7 @@
  */
 import { describe, expect, it, mock } from 'bun:test';
 
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -22,7 +22,7 @@ import { TransformerFactory } from '@shadow-library/class-schema';
 describe('TransformerFactory', () => {
   it('should throw error for custom schemas', () => {
     const transformer = new TransformerFactory(() => false);
-    expect(() => transformer.compile({ $id: 'test', type: 'object', properties: {} })).toThrow(InternalError);
+    expect(() => transformer.compile({ $id: 'test', type: 'object', properties: {} })).toThrow(AppError);
   });
 
   it('should create transforms for only required schema', () => {
@@ -205,7 +205,7 @@ describe('TransformerFactory', () => {
   describe('hasTransformableFields', () => {
     it('should throw error for non-branded schemas', () => {
       const factory = new TransformerFactory(schema => !!schema.tagged);
-      expect(() => factory.hasTransformableFields({ $id: 'test', type: 'object', properties: {} })).toThrow(InternalError);
+      expect(() => factory.hasTransformableFields({ $id: 'test', type: 'object', properties: {} })).toThrow(AppError);
     });
 
     it('should return true for schema with transformable field', () => {
