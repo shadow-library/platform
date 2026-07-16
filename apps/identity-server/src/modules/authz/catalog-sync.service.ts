@@ -105,16 +105,25 @@ export class CatalogSyncService {
         await tx
           .insert(schema.applicationRoles)
           .values({ applicationId, roleName: role.name, description: role.description ?? null })
-          .onConflictDoUpdate({ target: [schema.applicationRoles.applicationId, schema.applicationRoles.roleName], set: { description: role.description ?? null, updatedAt: new Date() } });
+          .onConflictDoUpdate({
+            target: [schema.applicationRoles.applicationId, schema.applicationRoles.roleName],
+            set: { description: role.description ?? null, updatedAt: new Date() },
+          });
 
       const roleScope = roleNames.size
         ? and(eq(schema.applicationRoles.applicationId, applicationId), notInArray(schema.applicationRoles.roleName, [...roleNames]))
         : eq(schema.applicationRoles.applicationId, applicationId);
       const deletedRoles = await tx.delete(schema.applicationRoles).where(roleScope).returning({ id: schema.applicationRoles.id });
 
-      const permissionRows = await tx.select({ id: schema.permissions.id, name: schema.permissions.name }).from(schema.permissions).where(eq(schema.permissions.applicationId, applicationId));
+      const permissionRows = await tx
+        .select({ id: schema.permissions.id, name: schema.permissions.name })
+        .from(schema.permissions)
+        .where(eq(schema.permissions.applicationId, applicationId));
       const permissionByName = new Map(permissionRows.map(row => [row.name, row.id]));
-      const roleRows = await tx.select({ id: schema.applicationRoles.id, roleName: schema.applicationRoles.roleName }).from(schema.applicationRoles).where(eq(schema.applicationRoles.applicationId, applicationId));
+      const roleRows = await tx
+        .select({ id: schema.applicationRoles.id, roleName: schema.applicationRoles.roleName })
+        .from(schema.applicationRoles)
+        .where(eq(schema.applicationRoles.applicationId, applicationId));
       const roleByName = new Map(roleRows.map(row => [row.roleName, row.id]));
 
       for (const role of manifest.roles) {
@@ -140,7 +149,15 @@ export class CatalogSyncService {
 
     for (const principal of principals) await this.policyDecisionService.invalidatePrincipal(principal);
     await this.applicationService.loadApplications();
-    await this.auditService.record({ action: 'authz.catalog.synced', outcome: 'SUCCESS', actorType: 'SERVICE_ACCOUNT', actorId: actorClientId, targetType: 'application', targetId: String(applicationId), detail: { ...result } });
+    await this.auditService.record({
+      action: 'authz.catalog.synced',
+      outcome: 'SUCCESS',
+      actorType: 'SERVICE_ACCOUNT',
+      actorId: actorClientId,
+      targetType: 'application',
+      targetId: String(applicationId),
+      detail: { ...result },
+    });
     this.logger.info('synced application role catalog', { applicationId, actorClientId, ...result });
     return result;
   }
