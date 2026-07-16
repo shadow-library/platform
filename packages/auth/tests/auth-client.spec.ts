@@ -3,10 +3,12 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
+import { AppError } from '@shadow-library/common';
+
 /**
  * Importing user defined packages
  */
-import { AuthClient, AuthError } from '@shadow-library/auth';
+import { AuthClient } from '@shadow-library/auth';
 import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -20,11 +22,11 @@ const AUDIENCE = 'api://pulse';
 
 describe('AuthClient constructor', () => {
   it('should reject invalid configuration outright', () => {
-    expect(() => new AuthClient({ issuer: '', audience: AUDIENCE })).toThrow(AuthError);
-    expect(() => new AuthClient({ issuer: 'not a url', audience: AUDIENCE })).toThrow(AuthError);
-    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: '' })).toThrow(AuthError);
-    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, client: { id: '' } })).toThrow(AuthError);
-    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, clockSkewSeconds: -1 })).toThrow(AuthError);
+    expect(() => new AuthClient({ issuer: '', audience: AUDIENCE })).toThrow(AppError);
+    expect(() => new AuthClient({ issuer: 'not a url', audience: AUDIENCE })).toThrow(AppError);
+    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: '' })).toThrow(AppError);
+    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, client: { id: '' } })).toThrow(AppError);
+    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, clockSkewSeconds: -1 })).toThrow(AppError);
   });
 });
 

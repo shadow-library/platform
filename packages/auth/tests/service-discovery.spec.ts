@@ -3,10 +3,12 @@
  */
 import { describe, expect, it } from 'bun:test';
 
+import { AppError } from '@shadow-library/common';
+
 /**
  * Importing user defined packages
  */
-import { AuthError, ServiceDiscovery } from '@shadow-library/auth';
+import { ServiceDiscovery } from '@shadow-library/auth';
 
 /**
  * Defining types
@@ -37,7 +39,7 @@ describe('ServiceDiscovery', () => {
 
   it('should reject invalid service names and malformed overrides', () => {
     const discovery = new ServiceDiscovery({ env: { SERVICE_URL_BAD: 'not a url' } });
-    expect(() => discovery.resolve('Not_A_Svc')).toThrow(AuthError);
-    expect(() => discovery.resolve('bad')).toThrow(AuthError);
+    expect(() => discovery.resolve('Not_A_Svc')).toThrow(AppError);
+    expect(() => discovery.resolve('bad')).toThrow(AppError);
   });
 });

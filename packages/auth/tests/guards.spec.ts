@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import 'reflect-metadata';
 
@@ -8,7 +9,8 @@ import 'reflect-metadata';
  * Importing user defined packages
  */
 import { type RouteMetadata } from '@shadow-library/app';
-import { ContextService, ServerError } from '@shadow-library/fastify';
+import { AppError } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
 
 import { AuthClient } from '@shadow-library/auth';
 import { AuthGuard, AuthModule, Authenticated, GuardedRequest, RequirePermission, RequireScope, extendContextWithAuth } from '@shadow-library/auth/module';
@@ -94,8 +96,8 @@ describe('AuthGuard', () => {
 
   const expectStatus = async (handler: (request: GuardedRequest) => Promise<void>, req: GuardedRequest, statusCode: number) => {
     const error = await runGuarded(handler, req).catch((caught: unknown) => caught);
-    expect(error).toBeInstanceOf(ServerError);
-    expect((error as ServerError).getStatusCode()).toBe(statusCode);
+    expect(error).toBeInstanceOf(AppError);
+    expect((error as AppError).status).toBe(statusCode);
   };
 
   const generate = (metadata: RouteMetadata): ((request: GuardedRequest) => Promise<void>) => {

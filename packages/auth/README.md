@@ -10,7 +10,7 @@ The full specification lives in [`docs/sdk.md`](../../docs/sdk.md); the task-ori
 bun add @shadow-library/auth
 ```
 
-The package is Bun-first: EdDSA (Ed25519) verification runs on `crypto.subtle` and transport is native `fetch`. `@shadow-library/common` is a required peer (`AuthError` extends its `AppError` taxonomy); the `@shadow-library/app`/`fastify` peers are only needed when you use the framework module.
+The package is Bun-first: EdDSA (Ed25519) verification runs on `crypto.subtle` and transport is native `fetch`. `@shadow-library/common` is a required peer (SDK errors are `AppError`s thrown by `AuthErrorCode` keys); the `@shadow-library/app`/`fastify` peers are only needed when you use the framework module.
 
 ## Functional core
 
@@ -25,7 +25,7 @@ const auth = new AuthClient({
   client: { id: Bun.env.AUTH_CLIENT_ID!, assertionPath: '/var/run/secrets/shadow/identity-token' },
 });
 
-const principal = await auth.verify(bearerToken); // → AuthPrincipal, throws AuthError
+const principal = await auth.verify(bearerToken); // → AuthPrincipal, throws AppError with an AuthErrorCode key
 const allowed = await auth.check({ action: 'posts:write', organisationId: principal.org, principal }); // → boolean, deny-by-default
 const token = await auth.getServiceToken({ resource: 'api://novel-forge', scopes: ['books:read'] }); // cached + singleflight
 const response = await auth.fetchService('novel-forge', '/api/v1/books', {}, { resource: 'api://novel-forge' }); // svc-DNS discovery + token, one retry on 401
