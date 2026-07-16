@@ -211,6 +211,13 @@
       "when": 1783834758282,
       "tag": "0029_wide_hiroim",
       "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1784173780376,
+      "tag": "0030_workload-identity-service-access",
+      "breakpoints": true
     }
   ]
 }

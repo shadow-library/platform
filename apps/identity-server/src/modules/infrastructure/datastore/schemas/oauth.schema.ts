@@ -47,6 +47,8 @@ export const oauthClients = pgTable('oauth_clients', {
   tokenEndpointAuthMethod: tokenEndpointAuthMethod('token_endpoint_auth_method').notNull(),
   grantTypes: text('grant_types').array().notNull(),
   requirePkce: boolean('require_pkce').notNull().default(true),
+  /** Kubernetes workload identity (D-16): the SA subject (`system:serviceaccount:<ns>:<name>`) allowed to authenticate this client with a projected token instead of a secret. */
+  workloadSubject: varchar('workload_subject', { length: 512 }).unique(),
   accessTokenTtl: integer('access_token_ttl').notNull().default(600),
   refreshTokenTtl: integer('refresh_token_ttl'),
   organisationId: bigint('organisation_id', { mode: 'bigint' }),

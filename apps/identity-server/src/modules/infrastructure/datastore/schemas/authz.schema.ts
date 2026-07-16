@@ -2,12 +2,13 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, integer, pgEnum, pgTable, primaryKey, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, index, integer, pgEnum, pgTable, primaryKey, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
  */
 import { applicationRoles, applications } from './applications.schema';
+import { oauthClients } from './oauth.schema';
 
 /**
  * Defining types
@@ -15,6 +16,7 @@ import { applicationRoles, applications } from './applications.schema';
 
 export type Permission = InferSelectModel<typeof permissions>;
 export type RoleAssignment = InferSelectModel<typeof roleAssignments>;
+export type ServiceRouteAccess = InferSelectModel<typeof serviceRouteAccess>;
 
 export namespace RoleAssignment {
   export type PrincipalType = InferEnum<typeof principalType>;
@@ -72,6 +74,31 @@ export const roleAssignments = pgTable(
     expiresAt: timestamp('expires_at', { withTimezone: true }),
   },
   t => [unique('role_assignments_unique').on(t.principalType, t.principalId, t.roleId, t.organisationId)],
+);
+
+/**
+ * Admin-configured M2M route allowlist (D-17): which caller client may invoke which routes of the
+ * target application. Consuming services load their own rules at startup through the SDK and
+ * enforce them locally (deny-by-default for service tokens); route code carries no caller names.
+ */
+export const serviceRouteAccess = pgTable(
+  'service_route_access',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    applicationId: integer('application_id')
+      .notNull()
+      .references(() => applications.id, { onDelete: 'cascade' }),
+    callerClientId: uuid('caller_client_id')
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    /** HTTP method the rule covers, or `*` for all methods */
+    method: varchar('method', { length: 10 }).notNull(),
+    /** Route path the rule covers; a trailing `*` matches any suffix */
+    pathPattern: varchar('path_pattern', { length: 512 }).notNull(),
+    createdBy: varchar('created_by', { length: 64 }),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  t => [index('service_route_access_application_id_idx').on(t.applicationId), unique('service_route_access_unique').on(t.applicationId, t.callerClientId, t.method, t.pathPattern)],
 );
 
 /**
