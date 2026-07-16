@@ -252,11 +252,21 @@ Session cookie + CSRF; every endpoint is PDP-guarded in the platform organisatio
 
 ### 6.2 Clients & resources (`/admin/clients`, `/admin/resources`) — requires `iam:clients:read` / `iam:clients:manage`
 
-- `POST /admin/clients` — register (kind, grant types, redirect URIs, `backchannelLogoutUri?`); confidential clients get their secret exactly once.
-- `GET /admin/clients` · `GET /admin/clients/{id}` · `PATCH /admin/clients/{id}` (name, `isActive`, redirect-URI set replacement, logout URI).
+- `POST /admin/clients` — register (kind, grant types, redirect URIs, `backchannelLogoutUri?`, `workloadSubject?`); confidential clients get their secret exactly once.
+- `GET /admin/clients` · `GET /admin/clients/{id}` · `PATCH /admin/clients/{id}` (name, `isActive`, redirect-URI set replacement, logout URI, `workloadSubject` — empty string unbinds).
 - `POST /admin/clients/{id}/rotate-secret` — dual-secret rotation; previous secrets expire after a 24 h overlap.
 - `POST /admin/clients/{id}/scopes` `{ scopeId }` · `DELETE /admin/clients/{id}/scopes/{scopeId}`.
 - `GET/POST /admin/resources` · `POST /admin/resources/{id}/scopes` — API resources and their scopes.
+
+`workloadSubject` binds a Kubernetes service-account subject (`system:serviceaccount:<ns>:<name>`, unique across clients) to the client; the workload then authenticates to `/oauth2/token` with its projected SA token as an RFC 7523 `client_assertion` instead of a secret (D-16).
+
+### 6.2a Service access rules (`/admin/service-access`) — requires `iam:clients:read` / `iam:clients:manage`
+
+The M2M route allowlist (D-17): which caller client may invoke which routes of a target application. Consuming services load their own application's rules at startup via `GET /api/v1/authz/service-access` (service token, scope `authz:check`) and enforce them locally, deny-by-default.
+
+- `GET /admin/service-access?applicationId=` — list an application's rules.
+- `POST /admin/service-access` `{ applicationId, callerClientId, method, pathPattern }` — `method` is an HTTP verb or `*`; `pathPattern` is an absolute path, trailing `*` matches any suffix. Idempotent on the natural key.
+- `DELETE /admin/service-access/{ruleId}`.
 
 ### 6.3 Roles & assignments (`/admin/roles`, `/admin/permissions`, `/admin/role-assignments`)
 
