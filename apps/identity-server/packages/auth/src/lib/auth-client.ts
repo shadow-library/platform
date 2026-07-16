@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 import {
   AuthClientConfig,
   AuthPrincipal,
@@ -21,7 +21,7 @@ import {
 } from '../interfaces';
 import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
-import { verifyJwt } from './jwt';
+import { type ClaimExpectations, verifyJwt } from './jwt';
 import { PdpClient } from './pdp-client';
 import { ServiceDiscovery } from './service-discovery';
 import { ServiceTokenManager } from './token-manager';
@@ -74,10 +74,10 @@ export class AuthClient {
   private serviceAccess: ServiceAccessRule[] | null = null;
 
   constructor(private readonly config: AuthClientConfig) {
-    if (!config.issuer || !URL.canParse(config.issuer)) throw new AuthError('CONFIG_INVALID', 'issuer must be a valid url');
-    if (!config.audience) throw new AuthError('CONFIG_INVALID', 'audience is required');
-    if (config.client && !config.client.id) throw new AuthError('CONFIG_INVALID', 'client credentials require an id');
-    if ((config.clockSkewSeconds ?? 0) < 0) throw new AuthError('CONFIG_INVALID', 'clock skew cannot be negative');
+    if (!config.issuer || !URL.canParse(config.issuer)) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'issuer must be a valid url');
+    if (!config.audience) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'audience is required');
+    if (config.client && !config.client.id) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'client credentials require an id');
+    if ((config.clockSkewSeconds ?? 0) < 0) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'clock skew cannot be negative');
 
     this.issuer = config.issuer.replace(/\/+$/, '');
     this.transport = config.fetch ?? ((url, init) => fetch(url, init));
@@ -96,7 +96,7 @@ export class AuthClient {
 
   /** Verifies a bearer token offline against the issuer's JWKS and returns the resolved principal */
   async verify(token: string): Promise<AuthPrincipal> {
-    if (!token) throw new AuthError('TOKEN_INVALID', 'no token provided');
+    if (!token) throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'no token provided');
     const payload = await verifyJwt(token, kid => this.jwks.getKey(kid), this.expectations());
     return this.toPrincipal(payload);
   }
@@ -138,13 +138,13 @@ export class AuthClient {
 
   /** Declaratively replaces this application's role catalog in identity; requires service-account credentials */
   async syncRoles(manifest: RoleCatalogManifest): Promise<RoleCatalogSyncResult> {
-    if (!this.config.client) throw new AuthError('CONFIG_INVALID', 'role sync requires service-account client credentials');
+    if (!this.config.client) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'role sync requires service-account client credentials');
     const token = await this.identityToken(ROLE_SYNC_SCOPE);
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
     const response = await this.transport(`${this.issuer}/api/v1/authz/catalog`, { method: 'PUT', headers, body: JSON.stringify(manifest) }).catch((error: Error) => {
-      throw new AuthError('ROLE_SYNC_FAILED', `role sync failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.ROLE_SYNC_FAILED, `role sync failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('ROLE_SYNC_FAILED', `role sync endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.ROLE_SYNC_FAILED, `role sync endpoint returned http ${response.status}`);
     return (await response.json()) as RoleCatalogSyncResult;
   }
 
@@ -154,12 +154,12 @@ export class AuthClient {
    * (deny-by-default), so a failure here should abort the boot rather than be swallowed.
    */
   async loadServiceAccess(): Promise<ServiceAccessRule[]> {
-    if (!this.config.client) throw new AuthError('CONFIG_INVALID', 'service access rules require service-account client credentials');
+    if (!this.config.client) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'service access rules require service-account client credentials');
     const token = await this.identityToken(PDP_SCOPE);
     const response = await this.transport(`${this.issuer}/api/v1/authz/service-access`, { headers: { authorization: `Bearer ${token}` } }).catch((error: Error) => {
-      throw new AuthError('SERVICE_ACCESS_FAILED', `service access fetch failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.SERVICE_ACCESS_FAILED, `service access fetch failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('SERVICE_ACCESS_FAILED', `service access endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.SERVICE_ACCESS_FAILED, `service access endpoint returned http ${response.status}`);
 
     const body = (await response.json()) as { rules?: ServiceAccessRule[] };
     this.serviceAccess = body.rules ?? [];
@@ -175,15 +175,15 @@ export class AuthClient {
   /** Explicit fallback for opaque tokens; MUST NOT be used for routine verification */
   async introspect(token: string): Promise<IntrospectionResult> {
     const client = this.config.client;
-    if (!client?.secret) throw new AuthError('CONFIG_INVALID', 'introspection requires confidential client credentials');
+    if (!client?.secret) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'introspection requires confidential client credentials');
 
     const document = await this.discovery.get();
     const endpoint = document.introspection_endpoint ?? `${this.issuer}/oauth2/introspect`;
     const headers = { 'content-type': 'application/json', authorization: `Basic ${Buffer.from(`${client.id}:${client.secret}`).toString('base64')}` };
     const response = await this.transport(endpoint, { method: 'POST', headers, body: JSON.stringify({ token }) }).catch((error: Error) => {
-      throw new AuthError('INTROSPECTION_FAILED', `introspection failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.INTROSPECTION_FAILED, `introspection failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('INTROSPECTION_FAILED', `introspection endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.INTROSPECTION_FAILED, `introspection endpoint returned http ${response.status}`);
 
     const result = (await response.json()) as IntrospectionResponse;
     return { active: result.active === true, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, clientId: result.client_id, tokenType: result.token_type };
@@ -202,12 +202,12 @@ export class AuthClient {
     return pattern === path;
   }
 
-  private expectations(): { issuer: string; audience: string; clockSkewSeconds: number } {
+  private expectations(): ClaimExpectations {
     return { issuer: this.issuer, audience: this.config.audience, clockSkewSeconds: this.clockSkewSeconds };
   }
 
   private toPrincipal(payload: JwtPayload): AuthPrincipal {
-    if (typeof payload.sub !== 'string' || !payload.sub) throw new AuthError('TOKEN_INVALID', 'missing sub claim');
+    if (typeof payload.sub !== 'string' || !payload.sub) throw new AuthError(AuthErrorCode.TOKEN_INVALID, 'missing sub claim');
     return {
       kind: payload.token_type === 'service' ? 'service' : 'user',
       sub: payload.sub,

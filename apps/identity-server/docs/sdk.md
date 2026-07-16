@@ -73,7 +73,9 @@ Inside Kubernetes, set `client.assertionPath` (or `AUTH_CLIENT_ASSERTION_PATH`) 
 ```ts
 const principal = await auth.verify(bearerToken);
 // → { kind: 'user' | 'service', sub, org, sid?, scopes: string[], aal?, claims }
-// throws AuthError('TOKEN_EXPIRED' | 'TOKEN_INVALID' | 'AUDIENCE_MISMATCH' | 'ISSUER_MISMATCH' | 'ALG_REJECTED' | 'KEY_UNKNOWN')
+// throws AuthError with AuthErrorCode.TOKEN_EXPIRED | TOKEN_INVALID | AUDIENCE_MISMATCH | ISSUER_MISMATCH | ALG_REJECTED | KEY_UNKNOWN
+// AuthError extends @shadow-library/common's AppError and AuthErrorCode extends its ErrorCode (same catalog pattern as the servers),
+// so getCode()/getType()/toObject() work platform-wide; AuthError.is(error, AuthErrorCode.TOKEN_EXPIRED) narrows
 ```
 
 - JWKS fetched from discovery, cached (L1) for `jwksTtlSeconds` (default **12 h**); an unknown `kid` triggers **one** immediate refetch (singleflight, 10 s negative cache) — this makes key rotation zero-config for consumers. The long TTL only delays propagation of a key *removal*, not the arrival of a new one.
@@ -118,7 +120,7 @@ Implementation notes: guards are `@Middleware`-based (see `fastify/src/decorator
 When `roles` is set (and `client` credentials are present), `AuthModule.forRoot` pushes the application's catalog to identity on startup via `auth.syncRoles(manifest)` → `PUT /api/v1/authz/catalog` (scope `authz:roles:sync`). You can also call `auth.syncRoles(...)` directly (e.g. from a migration or CI step).
 
 - **Ownership**: the catalog for an application lives in that application's code, not in hand-run admin calls. The target application is derived from the service-account token, never from the request body — a service can only touch **its own** application's catalog.
-- **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else `AuthError('ROLE_SYNC_FAILED')` / HTTP 400).
+- **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else `AuthError(AuthErrorCode.ROLE_SYNC_FAILED)` / HTTP 400).
 - **Footgun**: because it deletes, a typo or truncated manifest revokes grants for that application. It is bounded to the pushing application and every sync is audited (`authz.catalog.synced`), but treat the manifest as production config. Assignments (which user has which role) are **not** managed here — they stay an admin operation.
 
 ### 4.2 Admin-managed service access (M2M route allowlist)

@@ -391,7 +391,7 @@ It supports token minting, key rotation, grant/deny, injected endpoint failures,
 | :-- | :-- |
 | All requests 401 | `audience` mismatch (token `aud` ≠ your resource), wrong `issuer`, or clock skew > 60 s |
 | `@RequirePermission` always 403 | Your client lacks the `authz:check` scope, or the user genuinely has no assigned role granting the action |
-| `AuthError('KEY_UNKNOWN')` | Token signed by a key not in identity's JWKS (rotation gap, or token from a different environment) |
+| `AuthError` with `AuthErrorCode.KEY_UNKNOWN` | Token signed by a key not in identity's JWKS (rotation gap, or token from a different environment) |
 | `syncRoles` → `ROLE_SYNC_FAILED` / 403 | Missing `authz:roles:sync` scope, or a role references a permission not declared in the same manifest |
 | Revoked user still works for a bit | Expected — bounded by the token TTL (≤ 60 min) / PDP cache (≤ 15 min); use `highRisk` for faster cutoff |
 | M2M call 403 | Requested `scopes` exceed what your client was granted for that `resource`, or the callee has no service-access rule for your client + method + path (or hasn't restarted since it was added) |

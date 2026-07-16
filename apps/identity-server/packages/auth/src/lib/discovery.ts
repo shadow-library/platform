@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 import { DiscoveryDocument, FetchLike } from '../interfaces';
 
 /**
@@ -36,13 +36,13 @@ export class DiscoveryClient {
 
   private async load(): Promise<DiscoveryDocument> {
     const response = await this.fetchFn(`${this.issuer}/.well-known/openid-configuration`).catch((error: Error) => {
-      throw new AuthError('DISCOVERY_FAILED', `discovery fetch failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, `discovery fetch failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('DISCOVERY_FAILED', `discovery endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, `discovery endpoint returned http ${response.status}`);
 
     const document = (await response.json()) as DiscoveryDocument;
-    if (document.issuer !== this.issuer) throw new AuthError('DISCOVERY_FAILED', 'discovery issuer does not match the configured issuer');
-    if (!document.jwks_uri || !document.token_endpoint) throw new AuthError('DISCOVERY_FAILED', 'discovery document is missing required endpoints');
+    if (document.issuer !== this.issuer) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, 'discovery issuer does not match the configured issuer');
+    if (!document.jwks_uri || !document.token_endpoint) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, 'discovery document is missing required endpoints');
 
     this.document = document;
     return document;

@@ -10,7 +10,7 @@ The full specification lives in [`docs/sdk.md`](../../docs/sdk.md); the task-ori
 bun add @shadow-library/auth
 ```
 
-The package is Bun-first: EdDSA (Ed25519) verification runs on `crypto.subtle`, transport is native `fetch`, and there are zero runtime dependencies. The `@shadow-library/app`/`fastify`/`common` peers are only needed when you use the framework module.
+The package is Bun-first: EdDSA (Ed25519) verification runs on `crypto.subtle` and transport is native `fetch`. `@shadow-library/common` is a required peer (`AuthError` extends its `AppError` taxonomy); the `@shadow-library/app`/`fastify` peers are only needed when you use the framework module.
 
 ## Functional core
 

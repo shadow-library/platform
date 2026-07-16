@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 import { AuthCacheOptions, AuthClientCredential, FetchLike, JwtPayload } from '../interfaces';
 import { createPkcePair, randomUrlSafeString } from './pkce';
 import { DiscoveryClient } from '../lib/discovery';
@@ -89,9 +89,9 @@ export class RelyingParty {
   private readonly jwks: RemoteJwks;
 
   constructor(private readonly config: RelyingPartyConfig) {
-    if (!config.issuer || !URL.canParse(config.issuer)) throw new AuthError('CONFIG_INVALID', 'issuer must be a valid url');
-    if (!config.client?.id) throw new AuthError('CONFIG_INVALID', 'client id is required');
-    if (!config.redirectUri || !URL.canParse(config.redirectUri)) throw new AuthError('CONFIG_INVALID', 'redirect uri must be a valid url');
+    if (!config.issuer || !URL.canParse(config.issuer)) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'issuer must be a valid url');
+    if (!config.client?.id) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'client id is required');
+    if (!config.redirectUri || !URL.canParse(config.redirectUri)) throw new AuthError(AuthErrorCode.CONFIG_INVALID, 'redirect uri must be a valid url');
 
     this.issuer = config.issuer.replace(/\/+$/, '');
     this.transport = config.fetch ?? ((url, init) => fetch(url, init));
@@ -139,12 +139,12 @@ export class RelyingParty {
     else body.client_id = this.config.client.id;
 
     const response = await this.transport(document.token_endpoint, { method: 'POST', headers, body: JSON.stringify(body) }).catch((error: Error) => {
-      throw new AuthError('EXCHANGE_FAILED', `token request failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.EXCHANGE_FAILED, `token request failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('EXCHANGE_FAILED', `token endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.EXCHANGE_FAILED, `token endpoint returned http ${response.status}`);
 
     const payload = (await response.json()) as TokenEndpointResponse;
-    if (!payload.access_token || typeof payload.expires_in !== 'number') throw new AuthError('EXCHANGE_FAILED', 'malformed token endpoint response');
+    if (!payload.access_token || typeof payload.expires_in !== 'number') throw new AuthError(AuthErrorCode.EXCHANGE_FAILED, 'malformed token endpoint response');
     return {
       accessToken: payload.access_token,
       tokenType: payload.token_type ?? 'Bearer',

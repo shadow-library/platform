@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AuthError } from '../errors';
+import { AuthError, AuthErrorCode } from '../errors';
 import { FetchLike, Jwk } from '../interfaces';
 import { DiscoveryClient } from './discovery';
 
@@ -51,7 +51,7 @@ export class RemoteJwks {
       key = this.keys.get(kid);
       if (!key) this.lastMissAt = Date.now();
     }
-    if (!key) throw new AuthError('KEY_UNKNOWN', `no published key matches kid '${kid}'`);
+    if (!key) throw new AuthError(AuthErrorCode.KEY_UNKNOWN, `no published key matches kid '${kid}'`);
     return key;
   }
 
@@ -63,9 +63,9 @@ export class RemoteJwks {
   private async load(): Promise<void> {
     const document = await this.options.discovery.get();
     const response = await this.options.fetchFn(document.jwks_uri).catch((error: Error) => {
-      throw new AuthError('DISCOVERY_FAILED', `jwks fetch failed: ${error.message}`);
+      throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, `jwks fetch failed: ${error.message}`);
     });
-    if (!response.ok) throw new AuthError('DISCOVERY_FAILED', `jwks endpoint returned http ${response.status}`);
+    if (!response.ok) throw new AuthError(AuthErrorCode.DISCOVERY_FAILED, `jwks endpoint returned http ${response.status}`);
 
     const body = (await response.json()) as { keys?: Jwk[] };
     const keys = new Map<string, CryptoKey>();
