@@ -50,7 +50,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(401);
       expect(response.json()).toStrictEqual({
         code: 'S004',
-        type: 'UNAUTHENTICATED',
         message: 'Authentication credentials are required to access this resource',
       });
     });
@@ -84,7 +83,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(401);
       expect(response.json()).toStrictEqual({
         code: 'S004',
-        type: 'UNAUTHENTICATED',
         message: 'Authentication credentials are required to access this resource',
       });
     });
@@ -104,7 +102,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(401);
       expect(response.json()).toStrictEqual({
         code: 'S004',
-        type: 'UNAUTHENTICATED',
         message: 'Authentication credentials are required to access this resource',
       });
     });
@@ -114,7 +111,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(403);
       expect(response.json()).toStrictEqual({
         code: 'S005',
-        type: 'UNAUTHORIZED',
         message: 'Access denied due to insufficient permissions to perform this operation',
       });
     });
@@ -134,7 +130,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(401);
       expect(response.json()).toStrictEqual({
         code: 'S004',
-        type: 'UNAUTHENTICATED',
         message: 'Authentication credentials are required to access this resource',
       });
     });
@@ -144,7 +139,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(403);
       expect(response.json()).toStrictEqual({
         code: 'S005',
-        type: 'UNAUTHORIZED',
         message: 'Access denied due to insufficient permissions to perform this operation',
       });
     });
@@ -162,7 +156,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(401);
       expect(response.json()).toStrictEqual({
         code: 'S004',
-        type: 'UNAUTHENTICATED',
         message: 'Authentication credentials are required to access this resource',
       });
     });
@@ -172,7 +165,6 @@ describe('User Auth', () => {
       expect(response.statusCode).toBe(403);
       expect(response.json()).toStrictEqual({
         code: 'S005',
-        type: 'UNAUTHORIZED',
         message: 'Access denied due to insufficient permissions to perform this operation',
       });
     });

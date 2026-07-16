@@ -4,7 +4,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks';
 
 import { Injectable } from '@shadow-library/app';
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 import { onRequestHookHandler } from 'fastify';
 
 /**
@@ -43,7 +43,7 @@ export class ContextService implements ContextExtension {
 
       if (parentStore) {
         const isChildContext = parentStore.has(PARENT_CONTEXT);
-        if (isChildContext) throw new InternalError('Cannot create a child context within an existing child context');
+        if (isChildContext) throw AppError.internal('Cannot create a child context within an existing child context');
 
         const childRIDCounter = (this.get<number>(CHILD_RID_COUNTER) ?? 0) + 1;
         this.set(CHILD_RID_COUNTER, childRIDCounter);
@@ -66,9 +66,9 @@ export class ContextService implements ContextExtension {
   get<T>(key: Key, throwOnMissing?: boolean): T | null;
   get<T>(key: Key, throwOnMissing?: boolean): T | null {
     const store = this.storage.getStore();
-    if (!store) throw new InternalError('Context not yet initialized');
+    if (!store) throw AppError.internal('Context not yet initialized');
     const value = store.get(key) as T | undefined;
-    if (throwOnMissing && value === undefined) throw new InternalError(`Key '${key.toString()}' not found in the context`);
+    if (throwOnMissing && value === undefined) throw AppError.internal(`Key '${key.toString()}' not found in the context`);
     return value ?? null;
   }
 
@@ -78,7 +78,7 @@ export class ContextService implements ContextExtension {
     if (!this.isChildContext()) return this.get<T>(key, throwOnMissing);
     const parentStore = this.get<Map<Key, unknown>>(PARENT_CONTEXT, true);
     const value = parentStore.get(key) as T | undefined;
-    if (throwOnMissing && value === undefined) throw new InternalError(`Key '${key.toString()}' not found in the parent context`);
+    if (throwOnMissing && value === undefined) throw AppError.internal(`Key '${key.toString()}' not found in the parent context`);
     return value ?? null;
   }
 
@@ -93,7 +93,7 @@ export class ContextService implements ContextExtension {
 
   set<T>(key: Key, value: T): this {
     const store = this.storage.getStore();
-    if (!store) throw new InternalError('Context not yet initialized');
+    if (!store) throw AppError.internal('Context not yet initialized');
     store.set(key, value);
     return this;
   }

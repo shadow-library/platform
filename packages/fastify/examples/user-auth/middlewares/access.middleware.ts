@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { RouteMetadata } from '@shadow-library/app';
-import { AsyncRouteHandler, ContextService, Middleware, MiddlewareGenerator, ServerError, ServerErrorCode } from '@shadow-library/fastify';
+import { AsyncRouteHandler, ContextService, Middleware, MiddlewareGenerator, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -26,8 +26,8 @@ export class AccessMiddleware implements MiddlewareGenerator {
 
     return async () => {
       const user = this.contextService.get<User>('CURRENT_USER');
-      if (!user) throw new ServerError(ServerErrorCode.S004);
-      if (metadata.authGuard!.accessLevel > user.accessLevel) throw new ServerError(ServerErrorCode.S005);
+      if (!user) throw ServerErrorCode.S004.create();
+      if (metadata.authGuard!.accessLevel > user.accessLevel) throw ServerErrorCode.S005.create();
     };
   }
 }

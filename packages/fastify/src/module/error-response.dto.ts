@@ -30,9 +30,6 @@ export class ErrorResponseDto {
   code: string;
 
   @Field()
-  type: string;
-
-  @Field()
   message: string;
 
   @Field(() => [ErrorFieldDto], { optional: true })

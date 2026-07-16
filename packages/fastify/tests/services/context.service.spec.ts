@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { InternalError } from '@shadow-library/common';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -52,14 +52,14 @@ describe('Context', () => {
       const callback = () => {};
       store.has.mockReturnValueOnce(true);
       const middleware = context.init() as (...args: any[]) => void;
-      expect(() => middleware(data.req, data.res, callback)).toThrowError(InternalError);
+      expect(() => middleware(data.req, data.res, callback)).toThrowError(AppError);
     });
   });
 
   describe('set()', () => {
     it('should throw an error if context is not initiated', () => {
       storage.getStore.mockReturnValueOnce(undefined);
-      expect(() => context['set']('key', 'value')).toThrowError(InternalError);
+      expect(() => context['set']('key', 'value')).toThrowError(AppError);
     });
 
     it('should set the context value', () => {
@@ -77,12 +77,12 @@ describe('Context', () => {
 
     it('should throw an error if context is not initiated', () => {
       storage.getStore.mockReturnValueOnce(undefined);
-      expect(() => context.getResponse()).toThrowError(InternalError);
+      expect(() => context.getResponse()).toThrowError(AppError);
     });
 
     it('should throw an error if value not present when throwIfMissing is true', () => {
       store.get.mockReturnValueOnce(undefined);
-      expect(() => context.getRID()).toThrowError(InternalError);
+      expect(() => context.getRID()).toThrowError(AppError);
     });
 
     it('should return null if value not present when throwIfMissing is false', () => {

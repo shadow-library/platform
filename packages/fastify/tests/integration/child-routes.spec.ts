@@ -71,7 +71,7 @@ describe('Child Routes', () => {
         rid: expect.any(String),
         results: [
           { message: 'Hello World!', rid: expect.any(String) },
-          { code: 'S002', type: 'NOT_FOUND', message: 'The requested endpoint does not exist' },
+          { code: 'S002', message: 'The requested endpoint does not exist' },
         ],
       });
     });

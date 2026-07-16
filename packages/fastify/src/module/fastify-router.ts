@@ -5,7 +5,7 @@ import assert from 'node:assert';
 
 import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
 import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
-import { Config, Fn, InternalError, Logger, MaybeUndefined, utils } from '@shadow-library/common';
+import { AppError, Config, Fn, Logger, MaybeUndefined, utils } from '@shadow-library/common';
 import { all as deepmerge } from 'deepmerge';
 import { type FastifyInstance, RouteOptions, preHandlerAsyncHookHandler, preSerializationAsyncHookHandler } from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
@@ -248,7 +248,7 @@ export class FastifyRouter extends Router {
         }
 
         default: {
-          throw new InternalError(`Unknown controller type: ${controller.metadata[HTTP_CONTROLLER_TYPE]}`);
+          throw AppError.internal(`Unknown controller type: ${controller.metadata[HTTP_CONTROLLER_TYPE]}`);
         }
       }
     }
@@ -514,7 +514,7 @@ export class FastifyRouter extends Router {
    * redundant execution and ensures correct context isolation for nested route data fetching.
    */
   async resolveChildRoute<T extends JsonValue = JsonObject>(url: string, headers: Record<string, string> = {}): Promise<T> {
-    if (!this.childRouter) throw new InternalError('Child routes are not enabled');
+    if (!this.childRouter) throw AppError.internal('Child routes are not enabled');
     const childHeaders = this.config.childRouteHeaders?.(this.context) ?? {};
     Object.assign(headers, childHeaders, { 'x-service': 'internal-child-route' });
     const response = await this.instance.inject({ method: 'GET', url, headers });

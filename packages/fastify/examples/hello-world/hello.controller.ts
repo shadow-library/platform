@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { HttpController, Get, ServerError, ServerErrorCode, Post, Body, HttpStatus, Put, Patch, Delete, RespondFor } from '@shadow-library/fastify';
+import { HttpController, Get, ServerErrorCode, Post, Body, HttpStatus, Put, Patch, Delete, RespondFor } from '@shadow-library/fastify';
 import { HelloBody } from './hello-body.dto';
 import { HelloResponse } from './hello-response.dto';
 
@@ -36,13 +36,13 @@ export class HelloController {
 
   @Put('/error')
   throwError() {
-    throw new ServerError(ServerErrorCode.S008);
+    ServerErrorCode.S008.throw();
   }
 
   @Patch('/error-async')
   async throwErrorAsync() {
     await new Promise(resolve => setTimeout(resolve, 10));
-    throw new ServerError(ServerErrorCode.S008);
+    ServerErrorCode.S008.throw();
   }
 
   @Delete('/custom-error')

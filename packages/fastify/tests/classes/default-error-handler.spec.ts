@@ -8,7 +8,7 @@ import { errorCodes } from 'fastify';
 /**
  * Importing user defined packages
  */
-import { DefaultErrorHandler, ServerError, ServerErrorCode } from '@shadow-library/fastify';
+import { DefaultErrorHandler, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -21,7 +21,7 @@ import { DefaultErrorHandler, ServerError, ServerErrorCode } from '@shadow-libra
 describe('DefaultErrorHandler', () => {
   const request = {} as any;
   const response = { status: jest.fn().mockReturnThis(), send: jest.fn().mockReturnThis() } as any;
-  const body = { code: 'S001', type: 'SERVER_ERROR', message: expect.any(String) };
+  const body = { code: 'S001', message: expect.any(String) };
   let errorHandler: DefaultErrorHandler;
 
   beforeEach(() => {
@@ -30,10 +30,10 @@ describe('DefaultErrorHandler', () => {
   });
 
   it('should handle server error', () => {
-    const error = new ServerError(ServerErrorCode.S001);
+    const error = ServerErrorCode.S001.create();
     errorHandler.handle(error, request, response);
 
-    expect(response.status).toHaveBeenCalledWith(ServerErrorCode.S001.getStatusCode());
+    expect(response.status).toHaveBeenCalledWith(ServerErrorCode.S001.status);
     expect(response.send).toHaveBeenCalledWith(body);
   });
 
@@ -43,9 +43,8 @@ describe('DefaultErrorHandler', () => {
 
     expect(response.status).toHaveBeenCalledWith(422);
     expect(response.send).toHaveBeenCalledWith({
-      code: 'S003',
-      type: 'VALIDATION_ERROR',
-      message: 'The provided input data is invalid or does not meet validation requirements',
+      code: 'VALIDATION_ERROR',
+      message: 'Validation Error',
       fields: [{ field: 'name', msg: 'Invalid Name' }],
     });
   });
@@ -64,7 +63,6 @@ describe('DefaultErrorHandler', () => {
 
     expect(response.status).toHaveBeenCalledWith(415);
     expect(response.send).toHaveBeenCalledWith({
-      type: 'CLIENT_ERROR',
       code: 'S006',
       message: 'Unsupported Media Type: application/unknown',
     });
@@ -75,14 +73,14 @@ describe('DefaultErrorHandler', () => {
     errorHandler.handle(error, request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
-    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
   });
 
   it('should log the cause of the error', () => {
-    const error = new AppError(ServerErrorCode.S001).setCause(new Error('Test Cause'));
+    const error = new AppError(ServerErrorCode.S001, undefined, new Error('Test Cause'));
     const fn = jest.spyOn(errorHandler['logger'], 'warn');
     errorHandler.handle(error, request, response);
-    expect(fn).toHaveBeenCalledWith('Caused by', error.getCause());
+    expect(fn).toHaveBeenCalledWith('Caused by', error.cause);
   });
 
   it('should handle unknown error of type Error', () => {
@@ -90,7 +88,7 @@ describe('DefaultErrorHandler', () => {
     errorHandler.handle(error, request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
-    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
   });
 
   it('should handle unknown error of type unknown', () => {
@@ -98,7 +96,7 @@ describe('DefaultErrorHandler', () => {
     errorHandler.handle(error, request, response);
 
     expect(response.status).toHaveBeenCalledWith(500);
-    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request', type: 'SERVER_ERROR' });
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
   });
 
   describe('stack trace', () => {
@@ -108,7 +106,7 @@ describe('DefaultErrorHandler', () => {
 
     it('should include stack trace in error response when enabled', () => {
       const handler = new DefaultErrorHandler();
-      const error = new ServerError(ServerErrorCode.S001);
+      const error = ServerErrorCode.S001.create();
       handler.handle(error, request, response);
 
       expect(response.send).toHaveBeenCalledWith(expect.objectContaining({ stack: expect.any(String) }));

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ValidationError } from '@shadow-library/common';
+import { AppError, ValidationError } from '@shadow-library/common';
 import Ajv from 'ajv';
 import { FastifyInstance } from 'fastify';
 
@@ -10,7 +10,6 @@ import { FastifyInstance } from 'fastify';
  * Importing user defined packages
  */
 import { AjvValidators, compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } from '@lib/module/fastify.utils';
-import { ServerError } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -80,7 +79,7 @@ describe('Create Fastify Instance', () => {
   });
 
   it('should handle not found error', () => {
-    expect(() => notFoundHandler()).toThrow(ServerError);
+    expect(() => notFoundHandler()).toThrow(AppError);
   });
 
   it('should format the schema errors', () => {

@@ -153,8 +153,7 @@ describe('FastifyModule', () => {
       const response = await router.mockRequest().post('/test').body({ name: '' });
       expect(response.statusCode).toBe(422);
       expect(response.json()).toMatchObject({
-        code: 'S003',
-        type: 'VALIDATION_ERROR',
+        code: 'VALIDATION_ERROR',
         fields: [{ field: 'body.name', msg: expect.stringContaining('must NOT have fewer than 1 character') }],
       });
     });

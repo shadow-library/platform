@@ -6,7 +6,7 @@ import { describe, expect, it } from '@jest/globals';
 /**
  * Importing user defined packages
  */
-import { ServerError, ServerErrorCode } from '@shadow-library/fastify';
+import { ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -16,14 +16,18 @@ import { ServerError, ServerErrorCode } from '@shadow-library/fastify';
  * Declaring the constants
  */
 
-describe('ServerError', () => {
-  it('should return the custom status code', () => {
-    const error = new ServerError(ServerErrorCode.S007);
-    expect(error.getStatusCode()).toBe(429);
+describe('ServerErrorCode', () => {
+  it('should carry the custom status code', () => {
+    expect(ServerErrorCode.S007.status).toBe(429);
+    expect(ServerErrorCode.S007.create().status).toBe(429);
   });
 
-  it('should return the default status code', () => {
-    const error = new ServerError(ServerErrorCode.S002);
-    expect(error.getStatusCode()).toBe(404);
+  it('should carry the factory default status code', () => {
+    expect(ServerErrorCode.S002.status).toBe(404);
+    expect(ServerErrorCode.S001.status).toBe(500);
+  });
+
+  it('should not mask public keys in the response shape', () => {
+    expect(ServerErrorCode.S001.create().toResponse()).toStrictEqual({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
   });
 });

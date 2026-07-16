@@ -4,7 +4,7 @@
 import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { ControllerRouteMetadata } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
-import { Config, Fn, InternalError, Logger, utils, withThis } from '@shadow-library/common';
+import { AppError, Config, Fn, Logger, utils, withThis } from '@shadow-library/common';
 import { FastifyInstance, fastify } from 'fastify';
 
 /**
@@ -131,7 +131,7 @@ describe('FastifyRouter', () => {
 
     it('should throw error if controller type is not supported', () => {
       const controller = { metadata: { [HTTP_CONTROLLER_TYPE]: 'unknown' } } as any;
-      expect(() => parseControllers([controller])).toThrow(InternalError);
+      expect(() => parseControllers([controller])).toThrow(AppError);
     });
 
     it('should parse router controller', () => {
@@ -702,7 +702,7 @@ describe('FastifyRouter', () => {
 
     it('should throw error if child routes are not enabled', async () => {
       const nonChildRouter = new FastifyRouter({ ...config, enableChildRoutes: false }, instance, context);
-      await expect(nonChildRouter.resolveChildRoute('/child')).rejects.toThrow(InternalError);
+      await expect(nonChildRouter.resolveChildRoute('/child')).rejects.toThrow(AppError);
     });
 
     it('should resolve child route with default headers only', async () => {

@@ -46,9 +46,8 @@ describe('Hello World', () => {
       const response = await router.mockRequest().post('/api/hello').body({ name: '' });
       expect(response.statusCode).toBe(422);
       expect(response.json()).toStrictEqual({
-        code: 'S003',
-        type: 'VALIDATION_ERROR',
-        message: 'The provided input data is invalid or does not meet validation requirements',
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Error',
         fields: [{ field: 'body.name', msg: 'must NOT have fewer than 3 characters' }],
       });
     });
@@ -58,9 +57,8 @@ describe('Hello World', () => {
       const response = await router.mockRequest().post('/api/hello').body({ name });
       expect(response.statusCode).toBe(422);
       expect(response.json()).toStrictEqual({
-        code: 'S003',
-        type: 'VALIDATION_ERROR',
-        message: 'The provided input data is invalid or does not meet validation requirements',
+        code: 'VALIDATION_ERROR',
+        message: 'Validation Error',
         fields: [{ field: 'body.name', msg: 'must NOT have more than 12 characters' }],
       });
     });
@@ -71,7 +69,6 @@ describe('Hello World', () => {
     expect(response.statusCode).toBe(409);
     expect(response.json()).toStrictEqual({
       code: 'S008',
-      type: 'CONFLICT',
       message: 'Resource conflict as the requested operation conflicts with existing data',
     });
   });
@@ -81,7 +78,6 @@ describe('Hello World', () => {
     expect(response.statusCode).toBe(409);
     expect(response.json()).toStrictEqual({
       code: 'S008',
-      type: 'CONFLICT',
       message: 'Resource conflict as the requested operation conflicts with existing data',
     });
   });
@@ -91,7 +87,6 @@ describe('Hello World', () => {
     expect(response.statusCode).toBe(500);
     expect(response.json()).toStrictEqual({
       code: 'S001',
-      type: 'SERVER_ERROR',
       message: 'An unexpected server error occurred while processing the request',
     });
   });
@@ -101,7 +96,6 @@ describe('Hello World', () => {
     expect(response.statusCode).toBe(404);
     expect(response.json()).toStrictEqual({
       code: 'S002',
-      type: 'NOT_FOUND',
       message: 'The requested endpoint does not exist',
     });
   });

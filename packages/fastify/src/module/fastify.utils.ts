@@ -4,7 +4,7 @@
 import assert from 'node:assert';
 
 import { JSONSchema } from '@shadow-library/class-schema';
-import { ValidationError, throwError, utils } from '@shadow-library/common';
+import { ValidationError, utils } from '@shadow-library/common';
 import Ajv, { Options as AjvOptions, SchemaObject, ValidateFunction } from 'ajv';
 import { FastifyInstance, fastify } from 'fastify';
 import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationResult, SchemaErrorDataVar } from 'fastify/types/schema';
@@ -12,7 +12,7 @@ import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationR
 /**
  * Importing user defined packages
  */
-import { ServerError, ServerErrorCode } from '../server.error';
+import { ServerErrorCode } from '../server.error';
 import { FastifyConfig, FastifyModuleOptions } from './fastify-module.interface';
 
 /**
@@ -29,10 +29,9 @@ export interface AjvValidators {
  */
 const keywords = ['x-fastify'];
 const allowedHttpParts = ['body', 'params', 'querystring'];
-const notFoundError = new ServerError(ServerErrorCode.S002);
 const defaultAjvOptions: AjvOptions = { allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords };
 
-export const notFoundHandler = (): never => throwError(notFoundError);
+export const notFoundHandler = (): never => ServerErrorCode.S002.throw();
 
 function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> {
   if (!schema.$id) return ajv.compile(schema);
