@@ -8,7 +8,7 @@ import { createHash } from 'node:crypto';
  * Importing user defined packages
  */
 import { AuthError } from '@shadow-library/auth';
-import { RelyingParty, createPkcePair, createRelyingParty } from '@shadow-library/auth/rp';
+import { RelyingParty, createPkcePair } from '@shadow-library/auth/rp';
 import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -30,11 +30,11 @@ describe('pkce', () => {
   });
 });
 
-describe('createRelyingParty', () => {
+describe('RelyingParty constructor', () => {
   it('should reject invalid configuration outright', () => {
-    expect(() => createRelyingParty({ issuer: 'nope', client: { id: CLIENT_ID }, redirectUri: REDIRECT_URI })).toThrow(AuthError);
-    expect(() => createRelyingParty({ issuer: 'https://identity.test', client: { id: '' }, redirectUri: REDIRECT_URI })).toThrow(AuthError);
-    expect(() => createRelyingParty({ issuer: 'https://identity.test', client: { id: CLIENT_ID }, redirectUri: 'nope' })).toThrow(AuthError);
+    expect(() => new RelyingParty({ issuer: 'nope', client: { id: CLIENT_ID }, redirectUri: REDIRECT_URI })).toThrow(AuthError);
+    expect(() => new RelyingParty({ issuer: 'https://identity.test', client: { id: '' }, redirectUri: REDIRECT_URI })).toThrow(AuthError);
+    expect(() => new RelyingParty({ issuer: 'https://identity.test', client: { id: CLIENT_ID }, redirectUri: 'nope' })).toThrow(AuthError);
   });
 });
 
@@ -44,7 +44,7 @@ describe('RelyingParty', () => {
 
   beforeAll(async () => {
     idp = await createTestIdP({ clientId: CLIENT_ID, clientSecret: CLIENT_SECRET });
-    rp = createRelyingParty({ issuer: idp.issuer, client: { id: CLIENT_ID, secret: CLIENT_SECRET }, redirectUri: REDIRECT_URI });
+    rp = new RelyingParty({ issuer: idp.issuer, client: { id: CLIENT_ID, secret: CLIENT_SECRET }, redirectUri: REDIRECT_URI });
   });
   afterAll(() => idp.stop());
 

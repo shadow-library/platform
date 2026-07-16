@@ -14,8 +14,8 @@ import { PolicyDecisionService } from '@server/modules/authz';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
-import { AuthClient, FetchLike, createAuthClient } from '@shadow-library/auth';
-import { createRelyingParty } from '@shadow-library/auth/rp';
+import { AuthClient, FetchLike } from '@shadow-library/auth';
+import { RelyingParty } from '@shadow-library/auth/rp';
 
 import { TestEnvironment } from '../test-environment';
 
@@ -55,7 +55,7 @@ describe('@shadow-library/auth against the real identity server', () => {
       .getService(OAuthClientService)
       .register({ applicationId, name: 'SDK Service', kind: 'SERVICE', grantTypes: ['client_credentials'], scopeIds: [scopeId] });
     serviceClientId = service.clientId;
-    auth = createAuthClient({ issuer, audience: 'shadow-identity', client: { id: service.clientId, secret: service.secret }, fetch: fetchViaRouter });
+    auth = new AuthClient({ issuer, audience: 'shadow-identity', client: { id: service.clientId, secret: service.secret }, fetch: fetchViaRouter });
   });
 
   it('should mint a service token and verify it through the real jwks', async () => {
@@ -74,11 +74,11 @@ describe('@shadow-library/auth against the real identity server', () => {
       .getService(OAuthClientService)
       .register({ applicationId, name: 'Reporter', kind: 'SERVICE', grantTypes: ['client_credentials'], scopeIds: [scope.id] });
 
-    const reporterAuth = createAuthClient({ issuer, audience: 'shadow-identity', client: { id: reporter.clientId, secret: reporter.secret }, fetch: fetchViaRouter });
+    const reporterAuth = new AuthClient({ issuer, audience: 'shadow-identity', client: { id: reporter.clientId, secret: reporter.secret }, fetch: fetchViaRouter });
     const foreign = await reporterAuth.getServiceToken({ resource: 'api://reports', scopes: ['reports:read'] });
     await expect(auth.verify(foreign)).rejects.toMatchObject({ code: 'AUDIENCE_MISMATCH' });
 
-    const scoped = createAuthClient({ issuer, audience: 'api://reports', fetch: fetchViaRouter });
+    const scoped = new AuthClient({ issuer, audience: 'api://reports', fetch: fetchViaRouter });
     const principal = await scoped.verify(foreign);
     expect(principal.scopes).toEqual(['reports:read']);
   });
@@ -115,7 +115,7 @@ describe('@shadow-library/auth against the real identity server', () => {
     const user = await env.getService(UserService).createUserWithPassword({ email: 'rp@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
     const { session, secret } = await env.getService(SessionService).create({ userId: user.id });
 
-    const rp = createRelyingParty({ issuer, client: { id: web.clientId, secret: web.secret }, redirectUri: REDIRECT_URI, fetch: fetchViaRouter });
+    const rp = new RelyingParty({ issuer, client: { id: web.clientId, secret: web.secret }, redirectUri: REDIRECT_URI, fetch: fetchViaRouter });
     const request = await rp.createAuthorizationUrl();
     const authorizeUrl = new URL(request.url);
     expect(`${authorizeUrl.protocol}//${authorizeUrl.host}${authorizeUrl.pathname}`).toBe(`${issuer}/oauth2/authorize`);

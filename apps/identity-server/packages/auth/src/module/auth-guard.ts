@@ -1,24 +1,24 @@
 /**
  * Importing npm packages
  */
-import { Inject } from '@shadow-library/app';
 import { type RouteMetadata } from '@shadow-library/app';
-import { Middleware, ServerError } from '@shadow-library/fastify';
+import { ContextService, Middleware, ServerError } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AuthPrincipal } from '../interfaces';
-import { AUTH_CLIENT, AUTH_ROUTE_METADATA } from './constants';
-import { AuthRouteMetadata, PrincipalCarrier } from './decorators';
+import { AUTH_ROUTE_METADATA } from './constants';
+import { AUTH_PRINCIPAL } from './context';
+import { AuthRouteMetadata } from './decorators';
 import { AuthGuardErrorCode } from './errors';
-import { type AuthClient } from '../lib/auth-client';
+import { AuthClient } from '../lib/auth-client';
 
 /**
  * Defining types
  */
 
-export interface GuardedRequest extends PrincipalCarrier {
+export interface GuardedRequest {
   headers: Record<string, string | string[] | undefined>;
 }
 
@@ -29,12 +29,17 @@ export type AuthGuardHandler = (request: GuardedRequest) => Promise<void>;
  *
  * The guard only attaches to routes that carry auth metadata, so unguarded routes pay no cost.
  * Every failure is deliberately mapped to the same generic 401/403 pair — the response never
- * explains which check failed, only the audit-friendly error code differs.
+ * explains which check failed, only the audit-friendly error code differs. M2M callers are
+ * deny-by-default: a service token passes only when an admin-configured service-access rule
+ * (loaded from identity at startup) covers this route for that caller.
  */
 
 @Middleware({ type: 'preHandler', weight: 100 })
 export class AuthGuard {
-  constructor(@Inject(AUTH_CLIENT) private readonly client: AuthClient) {}
+  constructor(
+    private readonly client: AuthClient,
+    private readonly context: ContextService,
+  ) {}
 
   /** The router caches generated handlers by metadata alone; namespacing avoids colliding with other generating middlewares on the same route */
   cacheKey(metadata: RouteMetadata): string {
@@ -45,11 +50,13 @@ export class AuthGuard {
     const auth = metadata[AUTH_ROUTE_METADATA] as AuthRouteMetadata | undefined;
     if (!auth?.authenticated) return undefined;
 
+    const method = String(metadata.method ?? '*');
+    const path = String(metadata.path ?? '/');
     return async (request: GuardedRequest): Promise<void> => {
       const principal = await this.authenticate(request);
-      this.authorize(principal, auth);
+      this.authorize(principal, auth, method, path);
       if (auth.permission) await this.checkPermission(principal, auth);
-      request.authPrincipal = principal;
+      this.context.set(AUTH_PRINCIPAL, principal);
     };
   }
 
@@ -62,8 +69,10 @@ export class AuthGuard {
     });
   }
 
-  private authorize(principal: AuthPrincipal, auth: AuthRouteMetadata): void {
-    if (auth.services && (principal.kind !== 'service' || !principal.clientId || !auth.services.includes(principal.clientId))) throw new ServerError(AuthGuardErrorCode.IAM_002);
+  private authorize(principal: AuthPrincipal, auth: AuthRouteMetadata, method: string, path: string): void {
+    if (principal.kind === 'service' && (!principal.clientId || !this.client.isServiceCallerAllowed(principal.clientId, method, path))) {
+      throw new ServerError(AuthGuardErrorCode.IAM_002);
+    }
     if (auth.scopes?.some(scope => !principal.scopes.includes(scope))) throw new ServerError(AuthGuardErrorCode.IAM_002);
   }
 

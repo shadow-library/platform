@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { Jwk, JwtPayload, PrincipalKind } from '../interfaces';
+import { Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
 import { TestSigner, createTestSigner } from './signer';
 
 /**
@@ -67,6 +67,12 @@ export interface TestIdP {
   /** Returns the most recent role-catalog sync the mock received, if any */
   getLastCatalog(): { manifest: { permissions: unknown[]; roles: unknown[] }; authorization: string | null } | undefined;
 
+  /** Configures the rules the `/api/v1/authz/service-access` endpoint returns */
+  setServiceAccess(rules: ServiceAccessRule[]): void;
+
+  /** Returns the most recent token-endpoint request the mock received, if any */
+  getLastTokenRequest(): { body: Record<string, unknown>; authorization: string | null } | undefined;
+
   stop(): void;
 }
 
@@ -94,6 +100,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let authzVersion = 1;
   let issuer = '';
   let lastCatalog: { manifest: { permissions: unknown[]; roles: unknown[] }; authorization: string | null } | undefined;
+  let lastTokenRequest: { body: Record<string, unknown>; authorization: string | null } | undefined;
+  let serviceAccessRules: ServiceAccessRule[] = [];
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
 
@@ -125,6 +133,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       const decoded = Buffer.from(header.slice(6), 'base64').toString();
       return decoded === `${options.clientId}:${options.clientSecret ?? ''}`;
     }
+    /** RFC 7523 client assertions (projected SA tokens) are accepted verbatim; tests inspect them via getLastTokenRequest */
+    if (typeof body.client_assertion === 'string' && body.client_assertion.length > 0) return body.client_id === options.clientId;
     return body.client_id === options.clientId && (options.clientSecret === undefined || body.client_secret === options.clientSecret);
   };
 
@@ -137,6 +147,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
 
   const handleToken = async (request: Request): Promise<Response> => {
     const body = await readTokenBody(request);
+    lastTokenRequest = { body, authorization: request.headers.get('authorization') };
     if (!isClientAuthorized(request, body)) return json({ error: 'invalid_client' }, 401);
 
     if (body.grant_type === 'client_credentials') {
@@ -218,6 +229,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
         return handleAuthzCheck(request);
       case '/api/v1/authz/catalog':
         return handleCatalog(request);
+      case '/api/v1/authz/service-access':
+        return json({ rules: serviceAccessRules });
       default:
         return new Response('not found', { status: 404 });
     }
@@ -247,6 +260,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     setEndpointFailure: (pathname, fail) => void (fail ? failingEndpoints.add(pathname) : failingEndpoints.delete(pathname)),
     getRequestCount: pathname => requestCounts.get(pathname) ?? 0,
     getLastCatalog: () => lastCatalog,
+    setServiceAccess: rules => void (serviceAccessRules = rules),
+    getLastTokenRequest: () => lastTokenRequest,
     stop: () => void server.stop(true),
   };
 }

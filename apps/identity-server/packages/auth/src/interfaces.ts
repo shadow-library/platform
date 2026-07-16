@@ -51,6 +51,13 @@ export type FetchLike = (url: string, init?: RequestInit) => Promise<Response>;
 export interface AuthClientCredential {
   id: string;
   secret?: string;
+
+  /**
+   * Path to a projected Kubernetes service-account token. When set, the SDK authenticates to the
+   * token endpoint with the file's JWT as an RFC 7523 client assertion instead of a static secret;
+   * the file is re-read on every token request because the kubelet rotates it in place.
+   */
+  assertionPath?: string;
 }
 
 export interface AuthCacheOptions {
@@ -117,6 +124,15 @@ export interface AuthClientConfig {
 
   /** Transport override, primarily for tests; defaults to global fetch */
   fetch?: FetchLike;
+}
+
+/** One admin-configured allowance: the caller client may invoke routes matching `method` + `path` */
+export interface ServiceAccessRule {
+  callerClientId: string;
+  /** HTTP method the rule covers, or `*` for all methods */
+  method: string;
+  /** Route path the rule covers; a trailing `*` matches any suffix (e.g. `/api/v1/posts/*`) */
+  path: string;
 }
 
 export interface DiscoveryDocument {
