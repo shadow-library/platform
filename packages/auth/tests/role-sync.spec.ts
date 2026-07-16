@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { RoleCatalogManifest, createAuthClient } from '@shadow-library/auth';
+import { AuthClient, RoleCatalogManifest } from '@shadow-library/auth';
 import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -32,7 +32,7 @@ describe('AuthClient.syncRoles', () => {
   afterAll(() => idp.stop());
 
   it('should push the catalog with a service bearer token and return the sync result', async () => {
-    const auth = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
+    const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
     const result = await auth.syncRoles(MANIFEST);
 
     expect(result).toMatchObject({ permissionsUpserted: 2, rolesUpserted: 1 });
@@ -43,12 +43,12 @@ describe('AuthClient.syncRoles', () => {
   });
 
   it('should require service-account credentials', async () => {
-    const auth = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE });
+    const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE });
     await expect(auth.syncRoles(MANIFEST)).rejects.toMatchObject({ code: 'CONFIG_INVALID' });
   });
 
   it('should surface a failing catalog endpoint as ROLE_SYNC_FAILED', async () => {
-    const auth = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
+    const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
     idp.setEndpointFailure('/api/v1/authz/catalog', true);
     await expect(auth.syncRoles(MANIFEST)).rejects.toMatchObject({ code: 'ROLE_SYNC_FAILED' });
     idp.setEndpointFailure('/api/v1/authz/catalog', false);

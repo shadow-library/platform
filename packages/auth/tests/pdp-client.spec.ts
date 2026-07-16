@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { AuthClient, CheckPrincipal, createAuthClient } from '@shadow-library/auth';
+import { AuthClient, CheckPrincipal } from '@shadow-library/auth';
 import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -27,7 +27,7 @@ describe('AuthClient.check (pdp client)', () => {
 
   beforeAll(async () => {
     idp = await createTestIdP();
-    auth = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE });
+    auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE });
   });
   afterAll(() => idp.stop());
 

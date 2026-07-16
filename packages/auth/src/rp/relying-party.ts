@@ -58,16 +58,6 @@ export interface TokenSet {
   idTokenClaims?: JwtPayload;
 }
 
-export interface RelyingParty {
-  /** Builds the `/oauth2/authorize` redirect with PKCE (S256), `state`, and `nonce` */
-  createAuthorizationUrl(options?: AuthorizationUrlOptions): Promise<AuthorizationRequest>;
-
-  /** Exchanges the callback code, validating the ID token (signature, `iss`/`aud`/`exp`/`nonce`) */
-  exchangeCode(input: CodeExchangeInput): Promise<TokenSet>;
-
-  refresh(refreshToken: string): Promise<TokenSet>;
-}
-
 interface TokenEndpointResponse {
   access_token?: string;
   token_type?: string;
@@ -88,19 +78,28 @@ const DEFAULT_SCOPES = ['openid'];
 const DEFAULT_CLOCK_SKEW_SECONDS = 60;
 const DEFAULT_JWKS_TTL_SECONDS = 300;
 
-class RelyingPartyImpl implements RelyingParty {
+/**
+ * Injectable class: `RelyingPartyModule.forRoot()` registers it under its own class token so app
+ * services take it as an ordinary constructor dependency.
+ */
+export class RelyingParty {
   private readonly issuer: string;
   private readonly transport: FetchLike;
   private readonly discovery: DiscoveryClient;
   private readonly jwks: RemoteJwks;
 
   constructor(private readonly config: RelyingPartyConfig) {
+    if (!config.issuer || !URL.canParse(config.issuer)) throw new AuthError('CONFIG_INVALID', 'issuer must be a valid url');
+    if (!config.client?.id) throw new AuthError('CONFIG_INVALID', 'client id is required');
+    if (!config.redirectUri || !URL.canParse(config.redirectUri)) throw new AuthError('CONFIG_INVALID', 'redirect uri must be a valid url');
+
     this.issuer = config.issuer.replace(/\/+$/, '');
     this.transport = config.fetch ?? ((url, init) => fetch(url, init));
     this.discovery = new DiscoveryClient(this.issuer, this.transport);
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
   }
 
+  /** Builds the `/oauth2/authorize` redirect with PKCE (S256), `state`, and `nonce` */
   async createAuthorizationUrl(options: AuthorizationUrlOptions = {}): Promise<AuthorizationRequest> {
     const document = await this.discovery.get();
     const pkce = await createPkcePair();
@@ -121,6 +120,7 @@ class RelyingPartyImpl implements RelyingParty {
     return { url: url.toString(), state, nonce, codeVerifier: pkce.verifier };
   }
 
+  /** Exchanges the callback code, validating the ID token (signature, `iss`/`aud`/`exp`/`nonce`) */
   async exchangeCode(input: CodeExchangeInput): Promise<TokenSet> {
     const body: Record<string, string> = { grant_type: 'authorization_code', code: input.code, redirect_uri: this.config.redirectUri, code_verifier: input.codeVerifier };
     const tokens = await this.requestTokens(body);
@@ -159,11 +159,4 @@ class RelyingPartyImpl implements RelyingParty {
     const expectations = { issuer: this.issuer, audience: this.config.client.id, clockSkewSeconds: this.config.clockSkewSeconds ?? DEFAULT_CLOCK_SKEW_SECONDS, nonce };
     return verifyJwt(idToken, kid => this.jwks.getKey(kid), expectations);
   }
-}
-
-export function createRelyingParty(config: RelyingPartyConfig): RelyingParty {
-  if (!config.issuer || !URL.canParse(config.issuer)) throw new AuthError('CONFIG_INVALID', 'issuer must be a valid url');
-  if (!config.client?.id) throw new AuthError('CONFIG_INVALID', 'client id is required');
-  if (!config.redirectUri || !URL.canParse(config.redirectUri)) throw new AuthError('CONFIG_INVALID', 'redirect uri must be a valid url');
-  return new RelyingPartyImpl(config);
 }

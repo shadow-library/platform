@@ -6,7 +6,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { AuthClient, AuthError, createAuthClient } from '@shadow-library/auth';
+import { AuthClient, AuthError } from '@shadow-library/auth';
 import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -18,13 +18,13 @@ import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
  */
 const AUDIENCE = 'api://pulse';
 
-describe('createAuthClient', () => {
+describe('AuthClient constructor', () => {
   it('should reject invalid configuration outright', () => {
-    expect(() => createAuthClient({ issuer: '', audience: AUDIENCE })).toThrow(AuthError);
-    expect(() => createAuthClient({ issuer: 'not a url', audience: AUDIENCE })).toThrow(AuthError);
-    expect(() => createAuthClient({ issuer: 'https://identity.test', audience: '' })).toThrow(AuthError);
-    expect(() => createAuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, client: { id: '' } })).toThrow(AuthError);
-    expect(() => createAuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, clockSkewSeconds: -1 })).toThrow(AuthError);
+    expect(() => new AuthClient({ issuer: '', audience: AUDIENCE })).toThrow(AuthError);
+    expect(() => new AuthClient({ issuer: 'not a url', audience: AUDIENCE })).toThrow(AuthError);
+    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: '' })).toThrow(AuthError);
+    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, client: { id: '' } })).toThrow(AuthError);
+    expect(() => new AuthClient({ issuer: 'https://identity.test', audience: AUDIENCE, clockSkewSeconds: -1 })).toThrow(AuthError);
   });
 });
 
@@ -34,7 +34,7 @@ describe('AuthClient.verify', () => {
 
   beforeAll(async () => {
     idp = await createTestIdP();
-    auth = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE });
+    auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE });
   });
   afterAll(() => idp.stop());
 
@@ -80,7 +80,7 @@ describe('AuthClient.verify', () => {
   });
 
   it('should keep verifying with cached keys when the jwks endpoint goes down', async () => {
-    const client = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE, cache: { jwksTtlSeconds: 0 } });
+    const client = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, cache: { jwksTtlSeconds: 0 } });
     await client.verify(await idp.issueToken({ sub: '42', audience: AUDIENCE }));
     idp.setEndpointFailure('/.well-known/jwks.json', true);
     const principal = await client.verify(await idp.issueToken({ sub: '43', audience: AUDIENCE }));
@@ -95,7 +95,7 @@ describe('AuthClient service tokens', () => {
 
   beforeAll(async () => {
     idp = await createTestIdP({ clientId: 'svc-pulse', clientSecret: 's3cret' });
-    auth = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 's3cret' } });
+    auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 's3cret' } });
   });
   afterAll(() => idp.stop());
 
@@ -120,12 +120,12 @@ describe('AuthClient service tokens', () => {
   });
 
   it('should surface credential failures immediately without caching them', async () => {
-    const bad = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 'wrong' } });
+    const bad = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 'wrong' } });
     await expect(bad.getServiceToken()).rejects.toMatchObject({ code: 'TOKEN_REQUEST_FAILED' });
   });
 
   it('should require client credentials for service tokens', async () => {
-    const anonymous = createAuthClient({ issuer: idp.issuer, audience: AUDIENCE });
+    const anonymous = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE });
     await expect(anonymous.getServiceToken()).rejects.toMatchObject({ code: 'CONFIG_INVALID' });
   });
 
