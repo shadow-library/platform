@@ -242,7 +242,7 @@ Session cookie + CSRF; every endpoint is PDP-guarded in the platform organisatio
 
 ### 6.1 Users (`/admin/users`) — requires `iam:users:read` / `iam:users:manage`
 
-- `GET /admin/users?email=&status=&page=&limit=` — paginated search (email substring matches any address).
+- `GET /admin/users?email=&status=&offset=&limit=&sortBy=&sortOrder=` — offset-paginated search (email substring matches any address) → `{ items, total, offset, limit }`.
 - `GET /admin/users/{id}` — detail: identifiers, MFA summary, lock state, active-session count. Never credential material.
 - `POST /admin/users/{id}/lock` `{ mode: OTP_ONLY|FULL, until? }` — `FULL` also revokes sessions + refresh tokens. `POST …/unlock` clears (including Tier-4 locks).
 - `POST /admin/users/{id}/force-password-reset` — flags the account (§2.5) and revokes everything issued.

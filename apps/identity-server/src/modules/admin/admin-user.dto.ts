@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Field, Schema } from '@shadow-library/class-schema';
+import { EnumType, Field, Schema } from '@shadow-library/class-schema';
+import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -18,6 +19,8 @@ type UserStatus = (typeof USER_STATUSES)[number];
  * Declaring the constants
  */
 
+const USER_SORT_FIELDS = EnumType.create('UserSortBy', ['createdAt'] as const);
+
 @Schema()
 export class UserIdParams {
   @Field({ pattern: '^\\d+$' })
@@ -25,18 +28,12 @@ export class UserIdParams {
 }
 
 @Schema()
-export class UserSearchQuery {
+export class UserSearchQuery extends PaginationQuery(USER_SORT_FIELDS) {
   @Field({ optional: true })
   email?: string;
 
   @Field(() => String, { enum: [...USER_STATUSES], optional: true })
   status?: UserStatus;
-
-  @Field(() => Number, { optional: true, minimum: 1 })
-  page?: number;
-
-  @Field(() => Number, { optional: true, minimum: 1, maximum: 100 })
-  limit?: number;
 }
 
 @Schema()
@@ -61,19 +58,7 @@ export class UserSummaryItem {
 }
 
 @Schema()
-export class UserSearchResponse {
-  @Field(() => [UserSummaryItem])
-  items: UserSummaryItem[];
-
-  @Field(() => Number)
-  total: number;
-
-  @Field(() => Number)
-  page: number;
-
-  @Field(() => Number)
-  limit: number;
-}
+export class UserSearchResponse extends Paginated(UserSummaryItem) {}
 
 @Schema()
 export class UserContactItem {

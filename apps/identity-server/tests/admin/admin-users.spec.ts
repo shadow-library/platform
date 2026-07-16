@@ -86,8 +86,10 @@ describe('Admin user lifecycle APIs', () => {
   it('should search users by email fragment with pagination metadata', async () => {
     const response = await request('get', '/api/v1/admin/users?email=subject&limit=10');
     expect(response.statusCode).toBe(200);
-    const body = response.json() as { items: { primaryEmail?: string }[]; total: number; page: number };
+    const body = response.json() as { items: { primaryEmail?: string }[]; total: number; offset: number; limit: number };
     expect(body.total).toBe(1);
+    expect(body.offset).toBe(0);
+    expect(body.limit).toBe(10);
     expect(body.items[0]?.primaryEmail).toBe('subject@example.com');
   });
 

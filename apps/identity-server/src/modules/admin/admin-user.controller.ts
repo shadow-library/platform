@@ -42,12 +42,10 @@ export class AdminUserController {
   @RespondFor(200, UserSearchResponse)
   async search(@Query() query: UserSearchQuery, @Req() request: FastifyRequest): Promise<UserSearchResponse> {
     await this.access.requireRead(request, ADMIN_PERMISSIONS.usersRead);
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const result = await this.adminUserService.search({ email: query.email, status: query.status, page, limit });
+    const result = await this.adminUserService.search({ email: query.email, status: query.status, offset: query.offset, limit: query.limit, sortOrder: query.sortOrder });
     return {
-      page,
-      limit,
+      offset: query.offset,
+      limit: query.limit,
       total: result.total,
       items: result.items.map(item => ({
         id: item.id.toString(),

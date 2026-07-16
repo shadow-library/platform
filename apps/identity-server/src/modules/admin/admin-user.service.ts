@@ -4,7 +4,7 @@
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ServerError } from '@shadow-library/fastify';
-import { SQL, and, count, eq, ilike, inArray } from 'drizzle-orm';
+import { SQL, and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -24,8 +24,9 @@ import { AuditEvent, DatabaseService, PrimaryDatabase, User, schema } from '@ser
 export interface UserSearchFilter {
   email?: string;
   status?: User.Status;
-  page: number;
+  offset: number;
   limit: number;
+  sortOrder?: 'asc' | 'desc';
 }
 
 export interface UserSummary {
@@ -42,11 +43,17 @@ export interface UserSearchResult {
   total: number;
 }
 
+export interface UserMfaStatus {
+  totp: boolean;
+  webauthn: boolean;
+  passkeyCount: number;
+}
+
 export interface UserAdminDetail {
   user: User;
   emails: User.Email[];
   phones: User.Phone[];
-  mfa: { totp: boolean; webauthn: boolean; passkeyCount: number };
+  mfa: UserMfaStatus;
   activeSessionCount: number;
 }
 
@@ -97,9 +104,9 @@ export class AdminUserService {
       .select()
       .from(schema.users)
       .where(where)
-      .orderBy(schema.users.id)
+      .orderBy(filter.sortOrder === 'desc' ? desc(schema.users.id) : schema.users.id)
       .limit(filter.limit)
-      .offset((filter.page - 1) * filter.limit);
+      .offset(filter.offset);
 
     const userIds = rows.map(row => row.id);
     const emails =
