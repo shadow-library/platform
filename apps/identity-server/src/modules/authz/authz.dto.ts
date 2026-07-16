@@ -90,3 +90,21 @@ export class CatalogSyncResponse {
   @Field(() => Number)
   principalsInvalidated: number;
 }
+
+@Schema()
+export class ServiceAccessRuleDto {
+  @Field()
+  callerClientId: string;
+
+  @Field()
+  method: string;
+
+  @Field()
+  path: string;
+}
+
+@Schema()
+export class ServiceAccessResponse {
+  @Field(() => [ServiceAccessRuleDto])
+  rules: ServiceAccessRuleDto[];
+}

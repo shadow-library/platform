@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Body, HttpController, Post, Put, Req, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Post, Put, Req, RespondFor, ServerError } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
 
 /**
@@ -9,9 +9,10 @@ import { type FastifyRequest } from 'fastify';
  */
 import { AppErrorCode } from '@server/classes';
 
-import { CatalogSyncBody, CatalogSyncResponse, CheckRequestBody, CheckResponse } from './authz.dto';
+import { CatalogSyncBody, CatalogSyncResponse, CheckRequestBody, CheckResponse, ServiceAccessResponse } from './authz.dto';
 import { CatalogSyncService } from './catalog-sync.service';
 import { PolicyDecisionService } from './policy-decision.service';
+import { ServiceAccessService } from './service-access.service';
 import { RequireServiceToken, type ServiceTokenCarrier, getServiceTokenClaims } from './service-token.guard';
 
 /**
@@ -27,7 +28,16 @@ export class AuthzController {
   constructor(
     private readonly pdp: PolicyDecisionService,
     private readonly catalogSyncService: CatalogSyncService,
+    private readonly serviceAccessService: ServiceAccessService,
   ) {}
+
+  /** Extracts the caller's client id from the verified service-token claims */
+  private callerClientId(request: FastifyRequest): string {
+    const claims = getServiceTokenClaims(request as FastifyRequest & ServiceTokenCarrier);
+    const clientId = typeof claims.client_id === 'string' ? claims.client_id : typeof claims.sub === 'string' ? claims.sub : '';
+    if (!clientId) throw new ServerError(AppErrorCode.AUTHZ_002);
+    return clientId;
+  }
 
   @Post('/check')
   @RequireServiceToken('authz:check')
@@ -41,9 +51,15 @@ export class AuthzController {
   @RequireServiceToken('authz:roles:sync')
   @RespondFor(200, CatalogSyncResponse)
   async syncCatalog(@Body() body: CatalogSyncBody, @Req() request: FastifyRequest): Promise<CatalogSyncResponse> {
-    const claims = getServiceTokenClaims(request as FastifyRequest & ServiceTokenCarrier);
-    const clientId = typeof claims.client_id === 'string' ? claims.client_id : typeof claims.sub === 'string' ? claims.sub : '';
-    if (!clientId) throw new ServerError(AppErrorCode.AUTHZ_002);
-    return this.catalogSyncService.sync(clientId, { permissions: body.permissions, roles: body.roles });
+    return this.catalogSyncService.sync(this.callerClientId(request), { permissions: body.permissions, roles: body.roles });
+  }
+
+  /** A service fetches the admin-configured M2M allowlist for its own routes; the application is derived from the caller's token (D-17). */
+  @Get('/service-access')
+  @RequireServiceToken('authz:check')
+  @RespondFor(200, ServiceAccessResponse)
+  async serviceAccess(@Req() request: FastifyRequest): Promise<ServiceAccessResponse> {
+    const rules = await this.serviceAccessService.listForClient(this.callerClientId(request));
+    return { rules: rules.map(rule => ({ callerClientId: rule.callerClientId, method: rule.method, path: rule.pathPattern })) };
   }
 }

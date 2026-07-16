@@ -109,6 +109,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUTHZ_001 = new AppErrorCode('AUTHZ_001', ErrorType.VALIDATION_ERROR, 'Invalid role catalog manifest', 400);
   /** The presented service token is not bound to an application that can own a role catalog */
   static readonly AUTHZ_002 = new AppErrorCode('AUTHZ_002', ErrorType.UNAUTHORIZED, 'Service token is not bound to an application', 403);
+  /** A service-access rule is malformed — bad method, path pattern, or an unknown caller client */
+  static readonly AUTHZ_003 = new AppErrorCode('AUTHZ_003', ErrorType.VALIDATION_ERROR, 'Invalid service access rule', 400);
 
   /**
    * Organisation Error Codes
