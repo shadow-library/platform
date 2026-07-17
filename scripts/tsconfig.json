@@ -19,12 +19,11 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "baseUrl": ".",
     "module": "ES2022",
-    "moduleResolution": "node",
+    "moduleResolution": "node10",
     "paths": {
-      "@lib/*": ["src/*"],
-      "@shadow-library/scripts": ["src/index.ts"]
+      "@lib/*": ["./src/*"],
+      "@shadow-library/scripts": ["./src/index.ts"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
