@@ -31,6 +31,16 @@ export interface ClassSchemaOptions {
  */
 const primitiveTypes: Class<unknown>[] = [String, Number, Boolean, Object, Array];
 
+/** Maps the runtime type tokens to their JSON Schema `type`, including the library-defined `Integer` marker */
+const primitiveSchemaTypes = new Map<unknown, JSONSchemaType>([
+  [String, 'string'],
+  [Number, 'number'],
+  [Boolean, 'boolean'],
+  [Integer, 'integer'],
+  [Object, 'object'],
+  [Array, 'array'],
+]);
+
 export class ClassSchema<T extends SchemaClass = SchemaClass> {
   private readonly schema: ParsedSchema;
   private readonly options: ClassSchemaOptions;
@@ -68,7 +78,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
 
   private getSchema(Class: EnumType | Class<unknown>): ParsedSchema {
     if (Class instanceof EnumType) return Class.toSchema();
-    if (primitiveTypes.includes(Class)) return { $id: Class.name, type: Class.name.toLowerCase() as JSONSchemaType };
+    if (primitiveTypes.includes(Class)) return { $id: Class.name, type: primitiveSchemaTypes.get(Class) as JSONSchemaType };
     const schema = Reflect.getMetadata(METADATA_KEYS.SCHEMA_OPTIONS, Class) as ParsedSchema | undefined;
     if (!schema) throw new Error(`Class '${Class.name}' is not a schema. Add the @Schema() to the class`);
     return structuredClone(schema);
@@ -100,17 +110,13 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
       fieldType = getType();
     }
 
-    if (fieldType === String) schema.type = 'string';
-    else if (fieldType === Boolean) schema.type = 'boolean';
-    else if (fieldType === Number) schema.type = 'number';
-    else if (fieldType === Integer) schema.type = 'integer';
-    else if (fieldType === Object) schema.type = 'object';
-    else if (fieldType === Array) schema.type = 'array';
-    else if (!Array.isArray(fieldType)) schema.$ref ??= this.getSchemaId(fieldType);
+    const primitiveType = primitiveSchemaTypes.get(fieldType);
+    if (primitiveType) schema.type = primitiveType;
+    else if (!Array.isArray(fieldType)) schema.$ref = this.getSchemaId(fieldType);
     else {
       const Class = fieldType[0] as Class<unknown>;
       schema.type = 'array';
-      schema.items ??= this.getFieldSchema(Class);
+      schema.items = this.getFieldSchema(Class);
     }
 
     return schema;
@@ -118,47 +124,56 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
 
   private populateSchema(schema: ParsedSchema, Class: Class<unknown>): void {
     if (schema.type !== 'object') return;
-    const instance = new Class();
+    this.applyExtraProperties(schema, Class);
+    this.applyComposition(schema, Class);
+    this.applyFields(schema, Class);
+  }
 
-    /** Adding the extra properties to the schema */
-    const extraProperties = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'>;
-    if (extraProperties) {
-      const { additionalProperties, patternProperties } = extraProperties;
-      if (typeof additionalProperties === 'boolean') schema.additionalProperties = additionalProperties;
-      else if (additionalProperties) schema.additionalProperties = this.getFieldSchema(additionalProperties);
+  /** Resolves the class-valued `additionalProperties`/`patternProperties` schema options into their JSON Schema form */
+  private applyExtraProperties(schema: ParsedSchema, Class: Class<unknown>): void {
+    const extraProperties = Reflect.getMetadata(METADATA_KEYS.SCHEMA_EXTRA_PROPERTIES, Class) as Pick<SchemaOptions, 'additionalProperties' | 'patternProperties'> | undefined;
+    if (!extraProperties) return;
 
-      if (patternProperties) {
-        schema.patternProperties ??= {};
-        for (const pattern in patternProperties) {
-          const Class = patternProperties[pattern] as Class<unknown>;
-          const patternSchema = this.getFieldSchema(Class);
-          schema.patternProperties[pattern] = patternSchema;
-        }
+    const { additionalProperties, patternProperties } = extraProperties;
+    if (typeof additionalProperties === 'boolean') schema.additionalProperties = additionalProperties;
+    else if (additionalProperties) schema.additionalProperties = this.getFieldSchema(additionalProperties);
+
+    if (patternProperties) {
+      schema.patternProperties ??= {};
+      for (const pattern in patternProperties) {
+        schema.patternProperties[pattern] = this.getFieldSchema(patternProperties[pattern] as Class<unknown>);
       }
     }
+  }
 
-    /** Adding the composed classes to the schema */
-    const composedMetadata = Reflect.getMetadata(METADATA_KEYS.COMPOSED_CLASS, Class) as SchemaComposerMetadata;
-    if (composedMetadata) {
-      const subSchemas = composedMetadata.classes.map(cls => this.getSchemaId(cls));
-      schema[composedMetadata.op] = subSchemas.map(id => ({ $ref: id }));
-      if (composedMetadata.discriminatorKey) {
-        const mapping: Record<string, string> = {};
-        for (const schemaName of subSchemas) {
-          const constValue = this.schema.definitions?.[schemaName]?.properties?.[composedMetadata.discriminatorKey]?.const;
-          mapping[constValue] = schemaName;
-        }
-        schema.discriminator = { propertyName: composedMetadata.discriminatorKey, mapping };
-      }
+  /** Expands a composed (`anyOf`/`oneOf`/discriminator) class into its keyword and discriminator mapping */
+  private applyComposition(schema: ParsedSchema, Class: Class<unknown>): void {
+    const composedMetadata = Reflect.getMetadata(METADATA_KEYS.COMPOSED_CLASS, Class) as SchemaComposerMetadata | undefined;
+    if (!composedMetadata) return;
+
+    const subSchemas = composedMetadata.classes.map(cls => this.getSchemaId(cls));
+    schema[composedMetadata.op] = subSchemas.map(id => ({ $ref: id }));
+    if (!composedMetadata.discriminatorKey) return;
+
+    const mapping: Record<string, string> = {};
+    for (const schemaName of subSchemas) {
+      const constValue = this.schema.definitions?.[schemaName]?.properties?.[composedMetadata.discriminatorKey]?.const;
+      mapping[constValue] = schemaName;
     }
+    schema.discriminator = { propertyName: composedMetadata.discriminatorKey, mapping };
+  }
 
-    /** Adding the object properties to the schema */
+  /** Builds the object `properties`, `required` list and `dependencies` from the decorated fields */
+  private applyFields(schema: ParsedSchema, Class: Class<unknown>): void {
     const fields: string[] = Reflect.getMetadata(METADATA_KEYS.SCHEMA_FIELDS, Class.prototype) ?? [];
+    if (fields.length === 0) return;
+    const instance = new Class() as Record<string, unknown>;
+
     for (const field of fields) {
       const fieldMetadata = Reflect.getMetadata(METADATA_KEYS.FIELD_OPTIONS, Class.prototype, field) as AnyFieldSchema;
       const { optional, requiredIf, nullable, ...fieldSchema } = fieldMetadata;
 
-      const instanceValue = (instance as Record<string, unknown>)[field];
+      const instanceValue = instance[field];
       const derivedSchema = this.getFieldSchema(Class, field);
       if (!schema.properties) schema.properties = {};
       if (nullable) derivedSchema.type = [derivedSchema.type as JSONSchemaType, 'null'];
