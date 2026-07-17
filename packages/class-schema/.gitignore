@@ -15,6 +15,7 @@ CHANGELOG.md
 npm-debug.log
 *.tsbuildinfo
 .npmrc
+.claude/worktrees/
 
 # tests
 /coverage
