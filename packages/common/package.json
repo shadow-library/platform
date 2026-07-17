@@ -3,7 +3,9 @@
   "type": "module",
   "version": "1.6.5",
   "description": "Essential TypeScript utilities for task management, HTTP clients, caching, logging, configuration, and error handling in the Shadow Library ecosystem",
-  "sideEffects": false,
+  "sideEffects": [
+    "**/index.js"
+  ],
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
@@ -48,7 +50,6 @@
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {
-    "@aws-sdk/client-cloudwatch-logs": "^3.734.0",
     "@colors/colors": "^1.6.0",
     "chokidar": "^5.0.0",
     "deepmerge": "^4.3.1",

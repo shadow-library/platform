@@ -52,13 +52,6 @@ export interface ConfigRecords {
   /** Log configs */
   'log.level': LogLevel;
   'log.dir': string;
-  'log.buffer.size': number;
-
-  /** AWS configs */
-  'aws.region': string;
-  'aws.cloudwatch.log-group': string;
-  'aws.cloudwatch.log-stream': string;
-  'aws.cloudwatch.upload-rate': number;
 }
 
 /**
@@ -101,12 +94,6 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
     this.load('log.level', { allowedValues: logLevels, defaultValue: this.isDev() ? 'debug' : 'info' });
     this.load('log.dir', { defaultValue: 'logs' });
-    this.load('log.buffer.size', { defaultValue: '10000', validateType: 'number' });
-
-    this.load('aws.region', { defaultValue: 'ap-south-1' });
-    this.load('aws.cloudwatch.log-group', { defaultValue: defaultAppName });
-    this.load('aws.cloudwatch.log-stream', { defaultValue: defaultAppName });
-    this.load('aws.cloudwatch.upload-rate', { defaultValue: '2000', validateType: 'number' });
 
     if (configs && Object.keys(configs).length > 0) {
       for (const key in configs) this.cache.set(key, configs[key]);

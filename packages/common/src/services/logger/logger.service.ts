@@ -1,8 +1,6 @@
 /**
  * Importing npm packages
  */
-import { hostname } from 'node:os';
-
 import fastRedact from 'fast-redact';
 import { Logform, createLogger, format as customFormat } from 'winston';
 import Transport from 'winston-transport';
@@ -14,7 +12,7 @@ import { AppError } from '@lib/errors';
 import { MaybeUndefined } from '@lib/interfaces';
 
 import { format as formats } from './formats';
-import { CloudWatchTransport, ConsoleTransport, FileTransport } from './transports';
+import { ConsoleTransport, FileTransport } from './transports';
 import { Config } from '../config.service';
 
 /**
@@ -25,7 +23,7 @@ export type LogData = Record<string | number | symbol, unknown>;
 
 export type redactFn = <T>(input: T) => string | T;
 
-export type AttachableTransports = 'console:pretty' | 'console:json' | 'file:json' | 'cloudwatch:json';
+export type AttachableTransports = 'console:pretty' | 'console:json' | 'file:json';
 
 export type ContextProvider = () => MaybeUndefined<LogData>;
 
@@ -130,14 +128,6 @@ class LoggerStatic {
         break;
       }
 
-      case 'cloudwatch:json': {
-        const format = formats.combine(...baseFormats);
-        const definedLogStreamName = Config.get('aws.cloudwatch.log-stream');
-        const logStreamName = definedLogStreamName === appName ? hostname() : definedLogStreamName;
-        transport = new CloudWatchTransport({ handleExceptions: true, handleRejections: true, logStreamName }).addFormat(format);
-        break;
-      }
-
       default: {
         throw AppError.internal(`Unknown transport type '${type}'`);
       }
@@ -169,8 +159,8 @@ class LoggerStatic {
     }
 
     if (env === 'production') {
-      const format = formats.combine(...baseFormats);
-      const transport = new CloudWatchTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
+      const format = formats.combine(...baseFormats, formats.json());
+      const transport = new ConsoleTransport({ handleExceptions: true, handleRejections: true }).addFormat(format);
       this.addTransport(transport);
     }
 
