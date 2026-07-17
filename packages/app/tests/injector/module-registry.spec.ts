@@ -9,7 +9,7 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { HookTypes, InstanceWrapper, ModuleRegistry } from '@lib/injector';
-import { Controller, DynamicModule, Injectable, Module, Route, forwardRef } from '@shadow-library/app';
+import { Controller, DynamicModule, Handler, Injectable, Module, forwardRef } from '@shadow-library/app';
 
 /**
  * Defining types
@@ -32,7 +32,7 @@ describe('ModuleRegistry', () => {
   class CatController {
     constructor(public readonly catService: CatService) {}
 
-    @Route()
+    @Handler()
     method() {}
   }
 
@@ -40,7 +40,7 @@ describe('ModuleRegistry', () => {
   class DogController {
     constructor(public readonly dogProvider: DogProvider) {}
 
-    @Route()
+    @Handler()
     method() {}
   }
 

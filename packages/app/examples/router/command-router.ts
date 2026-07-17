@@ -3,7 +3,7 @@
  */
 import { createInterface } from 'node:readline/promises';
 
-import { ControllerRouteMetadata, Injectable, Router } from '@shadow-library/app';
+import { DispatchMetadata, Injectable, Dispatcher } from '@shadow-library/app';
 
 import { OutputService } from './output.service';
 
@@ -27,14 +27,14 @@ export interface Command {
  */
 
 @Injectable()
-export class CommandRouter extends Router {
+export class CommandRouter extends Dispatcher {
   private readonly commands: Command[] = [];
 
   constructor(private readonly outputService: OutputService) {
     super();
   }
 
-  override register(controllers: ControllerRouteMetadata[]): void {
+  override register(controllers: DispatchMetadata[]): void {
     for (const controller of controllers) {
       const metadata = controller.metadata;
       const command: Command = {
@@ -44,7 +44,7 @@ export class CommandRouter extends Router {
         handler: () => this.outputService.printError(`Command "${metadata.cmd}" does not have a default handler defined.`),
       };
 
-      for (const route of controller.routes) {
+      for (const route of controller.handlers) {
         const routeMetadata = route.metadata;
         if (routeMetadata.default) command.handler = route.handler;
         command.children.push({ cmd: routeMetadata.cmd, description: routeMetadata.description ?? '', handler: route.handler, children: [] });
@@ -80,7 +80,7 @@ export class CommandRouter extends Router {
   }
 
   stop(): void {
-    this.outputService.print('Command Router stopped');
+    this.outputService.print('Command Dispatcher stopped');
   }
 
   handleCommand(command: string, options?: object): void | Promise<void> {

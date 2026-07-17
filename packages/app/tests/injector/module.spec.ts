@@ -8,7 +8,7 @@ import { AppError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { HookTypes, ModuleRef, Module as ModuleWrapper } from '@lib/injector';
-import { Controller, EnableIf, Inject, Injectable, Module, OnApplicationReady, OnModuleDestroy, OnModuleInit, Optional, Route, forwardRef } from '@shadow-library/app';
+import { Controller, EnableIf, Handler, Inject, Injectable, Module, OnApplicationReady, OnModuleDestroy, OnModuleInit, Optional, forwardRef } from '@shadow-library/app';
 
 /**
  * Defining types
@@ -51,7 +51,7 @@ describe('Module', () => {
       return true;
     }
 
-    @Route()
+    @Handler()
     getCat(): boolean {
       return this.isBound();
     }
@@ -360,15 +360,15 @@ describe('Module', () => {
     });
   });
 
-  describe('Router', () => {
+  describe('Dispatcher', () => {
     const router = { register: jest.fn() };
 
     @Controller()
-    @Route({ type: 'controller', isController: true })
+    @Handler({ type: 'controller', isController: true })
     class DogController {
       constructor(public catService: CatService) {}
 
-      @Route({ type: 'route', isRoute: true })
+      @Handler({ type: 'route', isRoute: true })
       getDog() {}
     }
 
@@ -384,19 +384,19 @@ describe('Module', () => {
 
     it('should do nothing if the router is not registered', async () => {
       jest.spyOn(module as any, 'getChildModules');
-      await module.registerRoutes();
+      await module.registerControllers();
 
       expect(module['getChildModules']).not.toBeCalled();
     });
 
     it('should register the routes for all the controllers', async () => {
       const dogModule = new ModuleWrapper(DogModule, dogModuleMetadata);
-      jest.spyOn(dogModule as any, 'getRouter').mockReturnValue(router);
+      jest.spyOn(dogModule as any, 'getDispatcher').mockReturnValue(router);
 
       dogModule.addImport(module);
       dogModule.loadDependencies();
       await dogModule.init();
-      await dogModule.registerRoutes();
+      await dogModule.registerControllers();
 
       expect(router.register).toBeCalledTimes(1);
       expect(router.register).toBeCalledWith([
@@ -404,7 +404,7 @@ describe('Module', () => {
           metadata: {},
           instance: expect.any(DogController),
           metatype: DogController,
-          routes: [
+          handlers: [
             {
               metadata: { type: 'route', isController: true, isRoute: true },
               handler: expect.any(Function),
@@ -418,17 +418,17 @@ describe('Module', () => {
           metadata: {},
           instance: expect.any(CatController),
           metatype: CatController,
-          routes: [{ metadata: {}, handler: expect.any(Function), handlerName: CatController.prototype.getCat.name, paramtypes: [], returnType: Boolean }],
+          handlers: [{ metadata: {}, handler: expect.any(Function), handlerName: CatController.prototype.getCat.name, paramtypes: [], returnType: Boolean }],
         },
       ]);
     });
 
-    it('should bind the controller instance to the route handler', () => {
+    it('should bind the controller instance to the handler', () => {
       const catController = Array.from(module['controllers'].values())[0]!;
-      const routeController = module['getControllerRouteMetadata'](catController);
-      const route = routeController?.routes[0];
+      const dispatchMetadata = module['getDispatchMetadata'](catController);
+      const handlerEntry = dispatchMetadata?.handlers[0];
 
-      expect(route?.handler()).toBe(true);
+      expect(handlerEntry?.handler()).toBe(true);
     });
 
     it('should register controllers only once for cyclic dependent modules', async () => {
@@ -437,11 +437,11 @@ describe('Module', () => {
       dogModule.addImport(animalModule).addImport(module);
       animalModule.addImport(dogModule);
 
-      jest.spyOn(dogModule as any, 'getRouter').mockReturnValue(router);
+      jest.spyOn(dogModule as any, 'getDispatcher').mockReturnValue(router);
       dogModule.loadDependencies();
       animalModule.loadDependencies();
       await dogModule.init();
-      await dogModule.registerRoutes();
+      await dogModule.registerControllers();
 
       expect(router.register.mock.lastCall?.[0]).toHaveLength(2);
     });
@@ -450,10 +450,10 @@ describe('Module', () => {
       @Controller()
       @EnableIf(false)
       class TestController {
-        @Route()
+        @Handler()
         getMethod() {}
 
-        @Route()
+        @Handler()
         postMethod() {}
       }
 
@@ -462,9 +462,9 @@ describe('Module', () => {
       class TestModule {}
 
       const moduleWrapper = new ModuleWrapper(TestModule, testModuleMetadata);
-      jest.spyOn(moduleWrapper as any, 'getRouter').mockReturnValue(router);
+      jest.spyOn(moduleWrapper as any, 'getDispatcher').mockReturnValue(router);
       await moduleWrapper.init();
-      await moduleWrapper.registerRoutes();
+      await moduleWrapper.registerControllers();
 
       expect(router.register).toBeCalledTimes(1);
       expect(router.register).toBeCalledWith([]);
@@ -473,11 +473,11 @@ describe('Module', () => {
     it('should not register routes marked as disabled', async () => {
       @Controller()
       class TestController {
-        @Route()
+        @Handler()
         @EnableIf(() => false)
         getMethod() {}
 
-        @Route()
+        @Handler()
         postMethod() {}
       }
 
@@ -486,9 +486,9 @@ describe('Module', () => {
       class TestModule {}
 
       const moduleWrapper = new ModuleWrapper(TestModule, testModuleMetadata);
-      jest.spyOn(moduleWrapper as any, 'getRouter').mockReturnValue(router);
+      jest.spyOn(moduleWrapper as any, 'getDispatcher').mockReturnValue(router);
       await moduleWrapper.init();
-      await moduleWrapper.registerRoutes();
+      await moduleWrapper.registerControllers();
 
       expect(router.register).toBeCalledTimes(1);
       expect(router.register).toBeCalledWith([
@@ -496,14 +496,14 @@ describe('Module', () => {
           metadata: {},
           instance: expect.any(TestController),
           metatype: TestController,
-          routes: [{ metadata: {}, handler: expect.any(Function), handlerName: TestController.prototype.postMethod.name, paramtypes: [], returnType: undefined }],
+          handlers: [{ metadata: {}, handler: expect.any(Function), handlerName: TestController.prototype.postMethod.name, paramtypes: [], returnType: undefined }],
         },
       ]);
     });
 
     it('should start the router', async () => {
       const router = { start: jest.fn() };
-      jest.spyOn(module as any, 'getRouter').mockReturnValue(router);
+      jest.spyOn(module as any, 'getDispatcher').mockReturnValue(router);
 
       await module.start();
 
@@ -512,7 +512,7 @@ describe('Module', () => {
 
     it('should stop the router', async () => {
       const router = { stop: jest.fn() };
-      jest.spyOn(module as any, 'getRouter').mockReturnValue(router);
+      jest.spyOn(module as any, 'getDispatcher').mockReturnValue(router);
 
       await module.stop();
 

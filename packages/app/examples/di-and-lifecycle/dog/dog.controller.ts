@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Controller, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Route } from '@shadow-library/app';
+import { Controller, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -40,7 +40,7 @@ export class DogController implements OnModuleInit, OnModuleDestroy, OnApplicati
     this.outputService.info('DogController is stopping');
   }
 
-  @Route({ method: 'GET', path: '/dogs/:id' })
+  @Handler({ method: 'GET', path: '/dogs/:id' })
   getDog(id: string): string {
     return this.dogService.getDog(id);
   }

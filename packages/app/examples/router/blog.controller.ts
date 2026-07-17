@@ -3,7 +3,7 @@
  */
 import { utils } from '@shadow-library/common';
 
-import { Controller, Route } from '@shadow-library/app';
+import { Controller, Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -26,7 +26,7 @@ export class BlogController {
     private readonly storageService: StorageService,
   ) {}
 
-  @Route({ cmd: 'list' })
+  @Handler({ cmd: 'list' })
   async listPosts(): Promise<void> {
     await utils.temporal.sleep(10);
     const data = this.storageService.blogs.map(post => ({ id: post.id, title: post.title }));
@@ -34,7 +34,7 @@ export class BlogController {
     else this.outputService.printData('Blog Posts', data);
   }
 
-  @Route({ cmd: 'create' })
+  @Handler({ cmd: 'create' })
   async createPost(options: { title: string; content: string }): Promise<void> {
     await utils.temporal.sleep(10);
     const newPost: BlogPost = { id: this.storageService.blogs.length.toString(), title: options.title, content: options.content };
@@ -42,7 +42,7 @@ export class BlogController {
     this.outputService.printData('Created Blog Post', newPost);
   }
 
-  @Route({ cmd: 'delete' })
+  @Handler({ cmd: 'delete' })
   async deletePost(options: { id: string }): Promise<void> {
     await utils.temporal.sleep(10);
     const postIndex = this.storageService.blogs.findIndex(post => post.id === options.id);
@@ -51,7 +51,7 @@ export class BlogController {
     this.outputService.printData('Deleted Blog Post', { id: options.id });
   }
 
-  @Route({ cmd: 'update' })
+  @Handler({ cmd: 'update' })
   async updatePost(options: BlogPost): Promise<void> {
     await utils.temporal.sleep(10);
     const postIndex = this.storageService.blogs.findIndex(post => post.id === options.id);
@@ -60,14 +60,14 @@ export class BlogController {
     this.outputService.printData('Updated Blog Post', this.storageService.blogs[postIndex]);
   }
 
-  @Route({ cmd: 'get' })
+  @Handler({ cmd: 'get' })
   getPost(options: { id: string }): void {
     const post = this.storageService.blogs.find(post => post.id === options.id);
     if (!post) return this.outputService.printWarning('Post not found');
     this.outputService.printData('Blog Post', post);
   }
 
-  @Route({ cmd: 'help', default: true })
+  @Handler({ cmd: 'help', default: true })
   help(): void {
     this.outputService.printHelp([
       { cmd: 'list', description: 'List all blog posts' },

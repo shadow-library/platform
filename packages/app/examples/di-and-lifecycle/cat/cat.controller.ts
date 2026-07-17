@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Controller, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Route } from '@shadow-library/app';
+import { Controller, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -40,7 +40,7 @@ export class CatController implements OnModuleInit, OnModuleDestroy, OnApplicati
     this.outputService.info('CatController is stopping');
   }
 
-  @Route({ method: 'GET', path: '/cats/:id' })
+  @Handler({ method: 'GET', path: '/cats/:id' })
   getCat(id: string): string {
     return this.catService.getCat(id);
   }

@@ -108,8 +108,8 @@ export class ModuleRegistry {
     for (const module of modules) await module.init();
     this.logger.debug('Modules initialized');
 
-    for (const module of modules) await module.registerRoutes();
-    this.logger.debug('Routes registered');
+    for (const module of modules) await module.registerControllers();
+    this.logger.debug('Controllers registered');
 
     for (const module of modules) await module.callHook(HookTypes.ON_APPLICATION_READY);
     this.logger.debug('Application ready');
@@ -121,7 +121,7 @@ export class ModuleRegistry {
     for (const module of modules) await module.callHook(HookTypes.ON_APPLICATION_STOP);
 
     for (const module of modules) await module.stop();
-    this.logger.debug('Routes stopped');
+    this.logger.debug('Dispatchers stopped');
 
     for (const module of modules) await module.terminate();
     this.logger.debug('Modules terminated');

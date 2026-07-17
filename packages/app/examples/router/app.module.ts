@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Module, Router } from '@shadow-library/app';
+import { Module, Dispatcher } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -22,7 +22,7 @@ import { UserController } from './user.controller';
 
 @Module({
   controllers: [BlogController, UserController],
-  providers: [OutputService, StorageService, { token: Router, useClass: CommandRouter }],
-  exports: [Router, OutputService],
+  providers: [OutputService, StorageService, { token: Dispatcher, useClass: CommandRouter }],
+  exports: [Dispatcher, OutputService],
 })
 export class AppModule {}

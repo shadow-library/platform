@@ -15,9 +15,9 @@ import { InternalOperationMetadata } from '@lib/internal.types';
 import { DIErrors, DependencyGraph } from './helpers';
 import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
-import { ControllerRouteMetadata, Router } from '../classes';
-import { CONTROLLER_METADATA, INTERNAL_OPERATION_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, ROUTE_METADATA } from '../constants';
-import { RouteMetadata } from '../decorators';
+import { DispatchMetadata, Dispatcher } from '../classes';
+import { CONTROLLER_METADATA, HANDLER_METADATA, INTERNAL_OPERATION_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA } from '../constants';
+import { HandlerMetadata } from '../decorators';
 import { InjectionToken, ModuleMetadata, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 
@@ -200,9 +200,9 @@ export class Module {
     return instances;
   }
 
-  private getRouter(): Router | undefined {
-    const router = this.providers.get(Router) as InstanceWrapper<Router> | undefined;
-    return router?.getInstance();
+  private getDispatcher(): Dispatcher | undefined {
+    const dispatcher = this.providers.get(Dispatcher) as InstanceWrapper<Dispatcher> | undefined;
+    return dispatcher?.getInstance();
   }
 
   loadDependencies(): void {
@@ -260,69 +260,69 @@ export class Module {
     return { enabled };
   }
 
-  private getControllerRouteMetadata(controller: InstanceWrapper<Controller>): ControllerRouteMetadata | null {
-    /* Extracting the route methods present in the instance */
+  private getDispatchMetadata(controller: InstanceWrapper<Controller>): DispatchMetadata | null {
+    /* Extracting the handler methods present in the instance */
     const methods = new Set<() => any>();
     const instance = controller.getInstance();
     let prototype = instance;
     do {
       for (const propertyName of Object.getOwnPropertyNames(prototype)) {
         const method = instance[propertyName];
-        const isRouteMethod = typeof method === 'function' && Reflect.hasMetadata(ROUTE_METADATA, method) && method !== instance.constructor;
-        if (isRouteMethod) methods.add(method);
+        const isHandlerMethod = typeof method === 'function' && Reflect.hasMetadata(HANDLER_METADATA, method) && method !== instance.constructor;
+        if (isHandlerMethod) methods.add(method);
       }
     } while ((prototype = Object.getPrototypeOf(prototype)));
 
-    /* Extracting the route metadata from the route methods */
+    /* Extracting the handler metadata from the handler methods */
     const metatype = controller.getMetatype() as Class<Controller>;
     const metadata = Reflect.getMetadata(CONTROLLER_METADATA, metatype);
-    const controllerRouteMetadata = Reflect.getMetadata(ROUTE_METADATA, metatype);
+    const controllerHandlerMetadata = Reflect.getMetadata(HANDLER_METADATA, metatype);
     const internalControllerMetadata = this.getParsedInternalMetadata(metatype);
     if (!internalControllerMetadata.enabled) return null;
 
-    const routes: ControllerRouteMetadata['routes'] = [];
+    const handlers: DispatchMetadata['handlers'] = [];
     for (const method of methods) {
       const internalMethodMetadata = this.getParsedInternalMetadata(method);
       if (!internalMethodMetadata.enabled) continue;
 
       const handlerName = method.name;
-      const routeMetadata = Reflect.getMetadata(ROUTE_METADATA, method);
-      const metadata = merge<RouteMetadata>(controllerRouteMetadata, routeMetadata);
+      const handlerMetadata = Reflect.getMetadata(HANDLER_METADATA, method);
+      const metadata = merge<HandlerMetadata>(controllerHandlerMetadata, handlerMetadata);
       const paramtypes = Reflect.getMetadata(PARAMTYPES_METADATA, instance, handlerName);
       const returnType = Reflect.getMetadata(RETURN_TYPE_METADATA, instance, handlerName);
-      routes.push({ metadata, handler: method.bind(instance), paramtypes, returnType, handlerName });
+      handlers.push({ metadata, handler: method.bind(instance), paramtypes, returnType, handlerName });
     }
 
-    return { metadata, metatype, routes, instance };
+    return { metadata, metatype, handlers, instance };
   }
 
-  async registerRoutes(): Promise<void> {
-    const router = this.getRouter();
-    if (!router) return;
+  async registerControllers(): Promise<void> {
+    const dispatcher = this.getDispatcher();
+    if (!dispatcher) return;
 
-    this.logger.debug(`Registering routes in module '${this.metatype.name}'`);
+    this.logger.debug(`Registering controllers in module '${this.metatype.name}'`);
     const modules = this.getChildModules();
     const controllers = new Set(this.controllers);
-    const controllerRouteMetadata: ControllerRouteMetadata[] = [];
+    const dispatchMetadata: DispatchMetadata[] = [];
     modules.forEach(module => module.controllers.forEach(controller => controllers.add(controller)));
 
     for (const controller of controllers) {
-      const metadata = this.getControllerRouteMetadata(controller);
-      if (metadata) controllerRouteMetadata.push(metadata);
+      const metadata = this.getDispatchMetadata(controller);
+      if (metadata) dispatchMetadata.push(metadata);
     }
 
-    await router.register(controllerRouteMetadata);
-    this.logger.debug(`Routes registered in module '${this.metatype.name}'`);
+    await dispatcher.register(dispatchMetadata);
+    this.logger.debug(`Controllers registered in module '${this.metatype.name}'`);
   }
 
   async start(): Promise<void> {
-    const router = this.getRouter();
-    if (router) await router.start();
+    const dispatcher = this.getDispatcher();
+    if (dispatcher) await dispatcher.start();
   }
 
   async stop(): Promise<void> {
-    const router = this.getRouter();
-    if (router) await router.stop();
+    const dispatcher = this.getDispatcher();
+    if (dispatcher) await dispatcher.stop();
   }
 
   async terminate(): Promise<void> {

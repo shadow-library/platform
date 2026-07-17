@@ -4,7 +4,7 @@ export * from './enable-if.decorator';
 export * from './inject.decorator';
 export * from './injectable.decorator';
 export * from './module.decorator';
+export * from './handler.decorator';
 export * from './optional.decorator';
-export * from './route.decorator';
 export * from './set-metadata.decorator';
 export * from './use-interceptors.decorator';

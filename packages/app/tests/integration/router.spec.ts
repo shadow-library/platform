@@ -10,7 +10,7 @@ import { AppModule } from '@examples/router/app.module';
 import { CommandRouter } from '@examples/router/command-router';
 import { OutputService } from '@examples/router/output.service';
 import { StorageService } from '@examples/router/storage.service';
-import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { Dispatcher, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
 /**
  * Defining types
@@ -20,7 +20,7 @@ import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
  * Declaring the constants
  */
 
-describe('Router', () => {
+describe('Dispatcher', () => {
   let app: ShadowApplication;
   let router: CommandRouter;
   let storage: StorageService;
@@ -28,7 +28,7 @@ describe('Router', () => {
 
   beforeEach(async () => {
     app = await ShadowFactory.create(AppModule);
-    router = app.get(Router);
+    router = app.get(Dispatcher);
     storage = app.select(AppModule).get(StorageService);
 
     output = [];

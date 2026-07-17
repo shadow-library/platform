@@ -8,7 +8,7 @@ Unlike NestJS which is tightly coupled to HTTP servers and web applications, Sha
 
 - **SOLID Principles:** Write maintainable and scalable code following the SOLID design principles.
 - **Platform Agnostic:** Unlike NestJS, not tied to HTTP/web servers - build any type of Node.js application.
-- **Custom Router Support:** Implement your own router logic to integrate with any framework or protocol.
+- **Custom Dispatcher Support:** Implement your own router logic to integrate with any framework or protocol.
 - **Modular Architecture:** Provides a highly modular architecture with modules, controllers, and providers.
 - **Dependency Injection:** Sophisticated system for enhancing testability and managing dependencies.
 - **Interceptors:** AOP (Aspect-Oriented Programming) support for cross-cutting concerns.
@@ -191,24 +191,24 @@ Marks a class as a controller. Controllers handle the application logic and can 
 class UserController {
   constructor(private userService: UserService) {}
 
-  @Route({ path: '/users', method: 'GET' })
+  @Handler({ path: '/users', method: 'GET' })
   findAll() {
     return this.userService.findAll();
   }
 }
 ```
 
-### @Route
+### @Handler
 
 Defines routing metadata for controller methods. The metadata is flexible and can be adapted to any routing system. Accepts an optional second parameter for merge options.
 
 ```ts
-@Route({ path: '/users/:id', method: 'GET' })
+@Handler({ path: '/users/:id', method: 'GET' })
 getUserById(id: string) {
   return this.userService.findById(id);
 }
 
-@Route({
+@Handler({
   path: '/users',
   method: 'POST',
   guards: ['auth'],
@@ -219,8 +219,8 @@ createUser(userData: CreateUserDto) {
 }
 
 // Using options to control metadata merge behaviour
-@Route({ data: ['item2'] }, { arrayStrategy: 'replace' })
-@Route({ data: ['item1'] })
+@Handler({ data: ['item2'] }, { arrayStrategy: 'replace' })
+@Handler({ data: ['item1'] })
 replaceArrays() {
   // metadata.data will be ['item2'] instead of merged arrays
 }
@@ -259,7 +259,7 @@ Apply interceptors to methods for cross-cutting concerns like logging, caching, 
 ```ts
 // On controller methods
 @UseInterceptors(LoggingInterceptor, CacheInterceptor)
-@Route({ path: '/users', method: 'GET' })
+@Handler({ path: '/users', method: 'GET' })
 findAll() {
   return this.userService.findAll();
 }
@@ -285,7 +285,7 @@ Attach custom metadata to classes or methods that can be accessed via reflection
 
 ```ts
 @SetMetadata('roles', ['admin', 'user'])
-@Route({ path: '/admin', method: 'GET' })
+@Handler({ path: '/admin', method: 'GET' })
 adminOnly() {
   return 'Admin data';
 }
@@ -300,7 +300,7 @@ Conditionally enable or disable controllers or routes based on runtime condition
 @EnableIf(process.env.FEATURE_FLAG === 'enabled')
 @Controller()
 class FeatureController {
-  @Route({ path: '/feature', method: 'GET' })
+  @Handler({ path: '/feature', method: 'GET' })
   getFeature() {
     return 'Feature enabled';
   }
@@ -310,7 +310,7 @@ class FeatureController {
 @Controller()
 class UserController {
   @EnableIf(() => process.env.NODE_ENV === 'production')
-  @Route({ path: '/admin', method: 'GET' })
+  @Handler({ path: '/admin', method: 'GET' })
   adminRoute() {
     return 'Admin only in production';
   }
@@ -329,7 +329,7 @@ const Auth = (roles: string[]) =>
   );
 
 @Auth(['admin'])
-@Route({ path: '/admin', method: 'GET' })
+@Handler({ path: '/admin', method: 'GET' })
 adminEndpoint() {
   return 'Protected data';
 }
@@ -475,20 +475,20 @@ export class AppService {
 - **`register`**: Instance configuration (can be used multiple times)
 - **`forFeature`**: Feature-specific registration within a configured module
 
-## Custom Router Implementation
+## Custom Dispatcher Implementation
 
-Shadow Application provides a `Router` abstract class that you can extend to implement your own routing logic:
+Shadow Application provides a `Dispatcher` abstract class that you can extend to implement your own routing logic:
 
 ```ts
-import { Router, ControllerRouteMetadata } from '@shadow-library/app';
+import { Dispatcher, DispatchMetadata } from '@shadow-library/app';
 
 @Injectable()
-class ExpressRouter extends Router {
+class ExpressRouter extends Dispatcher {
   private app = express();
 
-  async register(controllers: ControllerRouteMetadata[]) {
+  async register(controllers: DispatchMetadata[]) {
     for (const controller of controllers) {
-      for (const route of controller.routes) {
+      for (const route of controller.handlers) {
         const { method, path } = route.metadata;
         this.app[method.toLowerCase()](path, async (req, res) => {
           const result = await route.handler.call(controller.instance, req, res);
@@ -726,16 +726,16 @@ Available lifecycle hooks:
 ### Creating a CLI Application
 
 ```ts
-import { Module, Injectable, Controller, Route, ShadowFactory } from '@shadow-library/app';
+import { Module, Injectable, Controller, Handler, ShadowFactory } from '@shadow-library/app';
 
 @Injectable()
-class CLIRouter extends Router {
-  async register(controllers: ControllerRouteMetadata[]) {
+class CLIRouter extends Dispatcher {
+  async register(controllers: DispatchMetadata[]) {
     const args = process.argv.slice(2);
     const command = args[0];
 
     for (const controller of controllers) {
-      for (const route of controller.routes) {
+      for (const route of controller.handlers) {
         if (route.metadata.command === command) {
           await route.handler.call(controller.instance, ...args.slice(1));
           return;
@@ -757,12 +757,12 @@ class CLIRouter extends Router {
 
 @Controller()
 class CLIController {
-  @Route({ command: 'hello' })
+  @Handler({ command: 'hello' })
   hello(name: string = 'World') {
     console.log(`Hello, ${name}!`);
   }
 
-  @Route({ command: 'version' })
+  @Handler({ command: 'version' })
   version() {
     console.log('v1.0.0');
   }
@@ -782,10 +782,10 @@ class CLIModule {}
 
 ```ts
 @Injectable()
-class WebSocketRouter extends Router {
+class WebSocketRouter extends Dispatcher {
   private wss: WebSocketServer;
 
-  async register(controllers: ControllerRouteMetadata[]) {
+  async register(controllers: DispatchMetadata[]) {
     this.wss = new WebSocketServer({ port: 8080 });
 
     this.wss.on('connection', ws => {
@@ -793,7 +793,7 @@ class WebSocketRouter extends Router {
         const message = JSON.parse(data.toString());
 
         for (const controller of controllers) {
-          for (const route of controller.routes) {
+          for (const route of controller.handlers) {
             if (route.metadata.event === message.event) {
               const result = await route.handler.call(controller.instance, message.data);
               ws.send(JSON.stringify({ event: message.event, data: result }));
@@ -816,12 +816,12 @@ class WebSocketRouter extends Router {
 
 @Controller()
 class ChatController {
-  @Route({ event: 'join-room' })
+  @Handler({ event: 'join-room' })
   joinRoom(data: { room: string; user: string }) {
     return { message: `${data.user} joined ${data.room}` };
   }
 
-  @Route({ event: 'send-message' })
+  @Handler({ event: 'send-message' })
   sendMessage(data: { room: string; message: string; user: string }) {
     return {
       room: data.room,
@@ -868,7 +868,7 @@ describe('UserService', () => {
 | Feature            | Shadow Application               | NestJS                        |
 | ------------------ | -------------------------------- | ----------------------------- |
 | **Platform**       | Platform-agnostic                | HTTP/Web focused              |
-| **Router**         | Custom implementable             | Built-in Express/Fastify      |
+| **Dispatcher**         | Custom implementable             | Built-in Express/Fastify      |
 | **Interceptors**   | Controller & Service methods     | Controller methods only       |
 | **Flexibility**    | High - any application type      | Medium - web applications     |
 | **Bundle Size**    | Lightweight                      | Heavier (includes HTTP stack) |
