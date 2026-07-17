@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import fastRedact from 'fast-redact';
-import { Logform, createLogger, format as customFormat } from 'winston';
+import { createLogger, format as customFormat, Logform } from 'winston';
 import Transport from 'winston-transport';
 
 /**
@@ -11,9 +11,9 @@ import Transport from 'winston-transport';
 import { AppError } from '@lib/errors';
 import { MaybeUndefined } from '@lib/interfaces';
 
+import { Config } from '../config.service';
 import { format as formats } from './formats';
 import { ConsoleTransport, FileTransport } from './transports';
-import { Config } from '../config.service';
 
 /**
  * Defining types
@@ -101,7 +101,7 @@ class LoggerStatic {
 
   /* istanbul ignore next */
   attachTransport(type: AttachableTransports, format?: Logform.Format): this {
-    let transport: Transport | null = null;
+    let transport: Transport;
     const appName = Config.get('app.name');
     const metadataFormat = customFormat(info => Object.assign(info, this.getLogMetadata(), this.getLogContext()));
     const baseFormats = [formats.errors({ stack: true }), metadataFormat()];
@@ -133,7 +133,7 @@ class LoggerStatic {
       }
     }
 
-    if (transport) this.addTransport(transport);
+    this.addTransport(transport);
     return this;
   }
 

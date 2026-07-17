@@ -2,10 +2,9 @@
  * Importing npm packages
  */
 import qs from 'node:querystring';
-
+import { Dispatcher, request } from 'undici';
 import deepmerge from 'deepmerge';
 import { JsonObject, JsonValue } from 'type-fest';
-import { Dispatcher, request } from 'undici';
 
 /**
  * Importing user defined packages

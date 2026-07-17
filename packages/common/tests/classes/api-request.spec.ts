@@ -1,8 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Mock, beforeEach, describe, expect, it, mock } from 'bun:test';
-
+import { beforeEach, describe, expect, it, Mock, mock } from 'bun:test';
 import { request } from 'undici';
 
 /**

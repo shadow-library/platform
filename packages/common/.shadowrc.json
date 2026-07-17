@@ -1,0 +1,15 @@
+{
+  "build": {
+    "exports": {
+      ".": "index",
+      "./errors": "errors/index",
+      "./utils": "utils/index",
+      "./interfaces": "interfaces/index",
+      "./cache": "services/cache/index",
+      "./config": "services/config.service",
+      "./logger": "services/logger/index",
+      "./http": "classes/api-request",
+      "./reflect": "services/reflector.service"
+    }
+  }
+}

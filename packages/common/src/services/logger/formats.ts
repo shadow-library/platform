@@ -3,7 +3,7 @@
  * Importing npm packages
  */
 import colors from '@colors/colors';
-import { Logform, format } from 'winston';
+import { format, Logform } from 'winston';
 
 /**
  * Importing user defined packages

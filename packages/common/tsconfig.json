@@ -21,12 +21,11 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "baseUrl": ".",
-    "module": "ES2022",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "paths": {
-      "@lib/*": ["src/*"],
-      "@shadow-library/common": ["src/index.ts"]
+      "@lib/*": ["./src/*"],
+      "@shadow-library/common": ["./src/index.ts"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
@@ -43,5 +42,5 @@
     /** Completeness */
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

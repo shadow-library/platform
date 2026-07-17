@@ -3,7 +3,7 @@
  */
 import fs from 'node:fs';
 
-import { Logform, format, transports } from 'winston';
+import { format, Logform, transports } from 'winston';
 
 /**
  * Importing user defined packages

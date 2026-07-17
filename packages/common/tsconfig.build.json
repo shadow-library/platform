@@ -4,7 +4,8 @@
   "compilerOptions": {
     /** Emit */
     "noEmit": false,
-    "declaration": true
+    "declaration": true,
+    "rootDir": "src"
   },
   "include": ["src/**/*.ts"]
 }

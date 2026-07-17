@@ -1,19 +1,24 @@
 # CLAUDE.md — @shadow-library/common
 
 Framework-agnostic core library shared by every app in the Shadow Library ecosystem: errors, config,
-logging, caching, HTTP client, reflection, flow state machines, and utilities. Published dual ESM/CJS.
-Currently `2.0.0-beta.0` (unreleased). Requires Node `>=23`; developed and tested with **Bun**.
+logging, caching, HTTP client, reflection, flow state machines, and utilities. Published **ESM-only**
+(`type: module`). Currently `2.0.0-beta.0` (unreleased). Requires Node `>=23`; developed and tested with **Bun**.
+
+All build/verify/release tooling is centralized in **`@shadow-library/scripts`** (the `shadow` CLI), driven
+by `.shadowrc.json`. There is no local eslint/prettier/release-it config — do not re-add them; tweak via
+`.shadowrc.json` (`verify.lint` / `verify.format`) instead. The toolchain (typescript, eslint, prettier,
+tsc-alias, …) ships as that package's dependencies, so this repo pins none of them.
 
 ## Commands
 
 | Task | Command |
 | --- | --- |
+| Verify (format + lint + type-check + test) | `bun run verify` (autofix: `bunx shadow verify --fix`) |
 | Run tests | `bun test` (single file: `bun test tests/errors/app.error.spec.ts`) |
-| Type-check | `bun run type-check` (`tsc --noEmit`) |
-| Lint | `bun run lint` |
-| Build (dual ESM/CJS → `dist/`) | `bun run build` |
+| Type-check | `bun run type-check` (`tsc`) |
+| Build (ESM-only → `dist/`) | `bun run build` (`shadow build`) |
 
-The husky pre-commit hook runs lint + type-check + `bun test`; keep all three green before committing.
+The husky pre-commit hook runs `bun verify` (format + lint + type-check + test); keep it green before committing.
 
 ## Layout
 
@@ -22,7 +27,7 @@ The husky pre-commit hook runs lint + type-check + `bun test`; keep all three gr
 - `src/classes/` — `APIRequest` (undici HTTP client), `Task`/`TaskManager`, `FlowManager`/`FlowRegistry` + `FlowErrorCode` (the flow domain's own error catalog).
 - `src/interfaces/` — shared types (`Fn`, `Nullable`, `AsType`, pagination, dot-notation, …).
 - `src/utils/` — pure helpers (`string`, `object`, `pagination`, `temporal`), exposed as `utils`.
-- `scripts/build.ts` — owns the `exports` map (subpath entry points) and the dual build.
+- `.shadowrc.json` — the `build.exports` map (subpath entry points). `shadow build` reads it to emit the flat ESM `dist/` and synthesize `dist/package.json` (`exports`/`typesVersions`/`sideEffects`).
 
 ## Conventions (authoritative: README → "Conventions & Standards")
 
@@ -32,7 +37,7 @@ The husky pre-commit hook runs lint + type-check + `bun test`; keep all three gr
 
 ## Gotchas
 
-- **Subpath exports & the framework-agnostic core.** `./errors`, `./utils`, `./cache`, `./interfaces` pull in **no** winston/undici/chokidar, so they stay browser/edge-safe — don't add a Node-only import to those trees. The root barrel (`.`) is deprecated in favour of subpaths. New subpaths must be registered in `scripts/build.ts`.
+- **Subpath exports & the framework-agnostic core.** `./errors`, `./utils`, `./cache`, `./interfaces` pull in **no** winston/undici/chokidar, so they stay browser/edge-safe — don't add a Node-only import to those trees. The root barrel (`.`) is deprecated in favour of subpaths. New subpaths must be registered in `.shadowrc.json` (`build.exports`, mapping the subpath to its source-relative base, no extension).
 - **Native-ESM CJS interop.** Import CJS default-only modules as defaults, e.g. `import deepmerge from 'deepmerge'` then `deepmerge.all(...)` — a named `{ all }` import breaks under Node's native ESM. Bundlers/Bun mask this, so verify with a real Node ESM resolve.
 - **Global singletons.** `Config` and `Logger` are stored on `globalThis` so duplicate package copies share one instance. Preserve that pattern.
 - **Error exposure.** `toObject()` is full-fidelity (logs/IPC, round-trips via `AppError.from`); `toResponse()` masks internal errors. `from()` fails closed to internal — never loosen that.
