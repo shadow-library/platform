@@ -87,6 +87,8 @@ describe('ClassSchema', () => {
     @Field({ optional: true })
     size?: number;
 
+    // A scalar reference to a class declared later in a circular pair must stay `object`: under
+    // emitDecoratorMetadata, annotating it `Folder` emits a runtime reference before Folder exists.
     @Field(() => Folder)
     parent: object;
 
@@ -100,10 +102,10 @@ describe('ClassSchema', () => {
     name: string;
 
     @Field(() => [File])
-    files: File;
+    files: File[];
 
     @Field(() => [Folder])
-    folders: Folder;
+    folders: Folder[];
   }
 
   describe('isBranded', () => {
