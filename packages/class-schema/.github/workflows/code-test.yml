@@ -19,17 +19,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint code
-        run: bun lint
-
-      - name: Type check
-        run: bun type-check
+      - name: Verify code
+        run: bun run verify
 
       - name: Build the code
         run: bun run build
-
-      - name: Clean build
-        run: bun clean
-
-      - name: Test the code
-        run: bun test
