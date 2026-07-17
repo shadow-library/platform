@@ -328,8 +328,19 @@ export class Module {
   async terminate(): Promise<void> {
     this.logger.debug(`Terminating module '${this.metatype.name}'`);
     await this.callHook(HookTypes.ON_MODULE_DESTROY);
+    await this.disposeInstances();
     for (const provider of this.getAllInstances().reverse()) provider.clearInstance();
     this.logger.debug(`Module '${this.metatype.name}' terminated`);
+  }
+
+  private async disposeInstances(): Promise<void> {
+    const instances = this.getAllInstances()
+      .reverse()
+      .flatMap(instance => instance.getAllInstances());
+    for (const instance of instances) {
+      const dispose = instance[Symbol.asyncDispose] ?? instance[Symbol.dispose];
+      if (typeof dispose === 'function') await dispose.call(instance);
+    }
   }
 
   async callHook(method: HookTypes): Promise<void> {

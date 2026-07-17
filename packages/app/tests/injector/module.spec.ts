@@ -345,6 +345,37 @@ describe('Module', () => {
       await module.terminate();
       expect(onModuleDestroyMock).toBeCalledTimes(1);
     });
+
+    it('should dispose instances implementing Symbol.asyncDispose and Symbol.dispose on terminate', async () => {
+      const asyncDisposeMock = jest.fn(async () => {});
+      const disposeMock = jest.fn(() => {});
+
+      @Injectable()
+      class AsyncDisposableService {
+        async [Symbol.asyncDispose](): Promise<void> {
+          await asyncDisposeMock();
+        }
+      }
+
+      @Injectable()
+      class DisposableService {
+        [Symbol.dispose](): void {
+          disposeMock();
+        }
+      }
+
+      const metadata = { providers: [AsyncDisposableService, DisposableService] };
+      @Module(metadata)
+      class DisposableModule {}
+
+      const disposableModule = new ModuleWrapper(DisposableModule, metadata);
+      disposableModule.loadDependencies();
+      await disposableModule.init();
+      await disposableModule.terminate();
+
+      expect(asyncDisposeMock).toBeCalledTimes(1);
+      expect(disposeMock).toBeCalledTimes(1);
+    });
   });
 
   describe('Hooks', () => {

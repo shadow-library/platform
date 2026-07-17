@@ -721,6 +721,25 @@ Available lifecycle hooks:
 - `OnApplicationReady`: Called when application is ready
 - `OnApplicationStop`: Called when application is stopping
 
+### Resource Disposal
+
+On teardown, after `OnModuleDestroy` runs, any provider instance implementing the standard disposal
+protocol is disposed automatically (dependents first). Use this to release resources such as database
+pools, sockets, or file handles without wiring an explicit hook:
+
+```ts
+@Injectable()
+class DatabaseService {
+  private readonly pool = createPool();
+
+  async [Symbol.asyncDispose]() {
+    await this.pool.end();
+  }
+}
+```
+
+`Symbol.dispose` (synchronous) is also supported; `Symbol.asyncDispose` takes precedence when both exist.
+
 ## Advanced Examples
 
 ### Creating a CLI Application
