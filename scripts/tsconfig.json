@@ -19,8 +19,8 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "module": "ES2022",
-    "moduleResolution": "node10",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "paths": {
       "@lib/*": ["./src/*"],
       "@shadow-library/scripts": ["./src/index.ts"]

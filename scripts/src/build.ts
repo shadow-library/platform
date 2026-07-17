@@ -130,7 +130,9 @@ export async function build(options: BuildOptions): Promise<void> {
 
   if (config.target === 'backend') {
     const cjsDir = path.join(distDir, 'cjs');
-    compile(rootDir, cjsDir, 'CJS', ['--module', 'CommonJS']);
+    // The base config resolves modules with `bundler`, which can't pair with CommonJS emit — so the CJS
+    // pass overrides moduleResolution to node10 (the classic algorithm CommonJS requires).
+    compile(rootDir, cjsDir, 'CJS', ['--module', 'CommonJS', '--moduleResolution', 'node10']);
     fs.writeFileSync(path.join(cjsDir, 'package.json'), JSON.stringify({ type: 'commonjs' }));
   }
 
