@@ -18,6 +18,16 @@ export interface AppErrorObject {
 }
 
 /**
+ * Full-fidelity wire shape for process-boundary transport (IPC, queues, worker threads). Carries the
+ * status and exposure that responses deliberately omit, so `from()` can restore an error without
+ * downgrading an internal one into an exposed one.
+ */
+export interface SerializedAppError extends AppErrorObject {
+  status: number;
+  isInternal: boolean;
+}
+
+/**
  * Declaring the constants
  *
  * The single error class of the ecosystem: which key created it decides everything — status,
@@ -55,19 +65,23 @@ export class AppError extends Error {
     return error.errorCode instanceof match;
   }
 
-  /** Rehydrates an error that crossed a process boundary (IPC, queue payloads, worker threads) */
-  static from(object: AppErrorObject & { status?: number }): AppError {
-    return new AppError(new ErrorCode(object.code, object.message, object.status ?? 500));
+  /**
+   * Rehydrates an error that crossed a process boundary (IPC, queue payloads, worker threads).
+   * Exposure defaults to internal when the wire object omits it, so masking fails closed rather than
+   * leaking a reconstructed error's raw message.
+   */
+  static from(object: AppErrorObject & { status?: number; isInternal?: boolean }): AppError {
+    return new AppError(new ErrorCode(object.code, object.message, object.status ?? 500, object.isInternal ?? true));
   }
 
-  /** Full detail — for logs and process-internal transport */
-  toObject(): AppErrorObject {
-    return { code: this.code, message: this.message };
+  /** Full detail — for logs and process-internal transport; round-trips through `from()` */
+  toObject(): SerializedAppError {
+    return { code: this.code, message: this.message, status: this.status, isInternal: this.isInternal };
   }
 
   /** Masked shape for responses: internal errors expose only the generic face */
   toResponse(): AppErrorObject {
-    if (!this.isInternal) return this.toObject();
-    return { code: ErrorCode.UNKNOWN.code, message: ErrorCode.UNKNOWN.message };
+    if (this.isInternal) return { code: ErrorCode.UNKNOWN.code, message: ErrorCode.UNKNOWN.message };
+    return { code: this.code, message: this.message };
   }
 }

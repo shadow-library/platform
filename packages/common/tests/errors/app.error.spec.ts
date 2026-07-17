@@ -52,11 +52,25 @@ describe('AppError', () => {
 
   it('should mask internal errors in the response shape but not in the log shape', () => {
     const internal = AppError.internal('secret detail');
-    expect(internal.toObject()).toStrictEqual({ code: 'INTERNAL', message: 'secret detail' });
+    expect(internal.toObject()).toStrictEqual({ code: 'INTERNAL', message: 'secret detail', status: 500, isInternal: true });
     expect(internal.toResponse()).toStrictEqual({ code: 'UNKNOWN', message: 'Unknown Error' });
 
     const publicError = TestErrorCode.CUSTOM.create({ message: 'oops' });
     expect(publicError.toResponse()).toStrictEqual({ code: 'CUSTOM_ERROR', message: 'Custom error: oops' });
+  });
+
+  it('should keep an internal error masked after a serialization round-trip', () => {
+    const internal = AppError.internal('secret detail');
+    const rehydrated = AppError.from(internal.toObject());
+    expect(rehydrated.isInternal).toBe(true);
+    expect(rehydrated.status).toBe(500);
+    expect(rehydrated.toResponse()).toStrictEqual({ code: 'UNKNOWN', message: 'Unknown Error' });
+  });
+
+  it('should fail closed to internal when the wire object omits exposure', () => {
+    const rehydrated = AppError.from({ code: 'MYSTERY', message: 'no exposure flag' });
+    expect(rehydrated.isInternal).toBe(true);
+    expect(rehydrated.toResponse()).toStrictEqual({ code: 'UNKNOWN', message: 'Unknown Error' });
   });
 
   it('should narrow by key, by catalog, and by presence', () => {

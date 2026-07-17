@@ -8,7 +8,7 @@ import { JsonObject } from 'type-fest';
  */
 import { utils } from '@lib/utils';
 
-import { AppError, AppErrorObject } from './app.error';
+import { AppError, AppErrorObject, SerializedAppError } from './app.error';
 import { ErrorCode } from './error-code.error';
 
 /**
@@ -81,11 +81,11 @@ export class ValidationError extends AppError {
     return `Validation failed for ${fields.join(', ')} and ${lastField}`;
   }
 
-  override toObject(withDetails = false): ValidationErrorObject {
+  override toObject(withDetails = false): SerializedAppError & { fields: FieldError[] } {
     return { ...super.toObject(), fields: this.getErrors(withDetails) };
   }
 
   override toResponse(): ValidationErrorObject {
-    return this.toObject();
+    return { ...super.toResponse(), fields: this.getErrors() };
   }
 }
