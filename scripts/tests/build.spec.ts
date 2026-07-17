@@ -53,7 +53,7 @@ describe('build', () => {
 
     it('should write a bin map from config, one entry per binary, pointing at the output', () => {
       const result = computeDistPackageJson({ name: 'pkg' }, cfg({ '.': 'index' }, { foo: 'bin/foo', bar: 'bin/bar' }));
-      expect(result.bin).toStrictEqual({ foo: './bin/foo.js', bar: './bin/bar.js' });
+      expect(result.bin).toStrictEqual({ foo: 'bin/foo.js', bar: 'bin/bar.js' });
     });
 
     it('should leave a boolean sideEffects untouched', () => {

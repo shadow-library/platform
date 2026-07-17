@@ -74,7 +74,8 @@ export function computeDistPackageJson(packageJson: PackageJson, config: BuildCo
     });
   }
 
-  if (config.bin) distPackageJson.bin = Object.fromEntries(Object.entries(config.bin).map(([name, base]) => [name, `./${base}.js`]));
+  // npm strips bin values with a leading `./` on publish, so emit them bare (unlike exports/main, which require `./`).
+  if (config.bin) distPackageJson.bin = Object.fromEntries(Object.entries(config.bin).map(([name, base]) => [name, `${base}.js`]));
 
   delete distPackageJson.scripts;
   delete distPackageJson.devDependencies;
