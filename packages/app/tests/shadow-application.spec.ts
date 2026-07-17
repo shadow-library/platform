@@ -134,8 +134,9 @@ describe('ShadowApplication', () => {
     });
 
     it('should throw an error is provider is not found', () => {
+      const module = { getProvider: jest.fn().mockReturnValue(undefined) };
       jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      jest.mocked(app['registry'].get).mockReturnValue([] as any);
+      jest.mocked(app['registry'].get).mockReturnValue([module] as any);
 
       expect(() => app.get(AppModule)).toThrowError(AppError);
       expect(() => app.get('RANDOM')).toThrowError(AppError);
@@ -149,7 +150,7 @@ describe('ShadowApplication', () => {
 
       app.get(AppModule);
 
-      expect(module.getProvider).toBeCalledWith(AppModule);
+      expect(module.getProvider).toBeCalledWith(AppModule, true);
       expect(instanceWrapper.getInstance).toBeCalledTimes(1);
     });
   });

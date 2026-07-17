@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { AppError, Logger, tryCatch } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { AbstractClass, Class } from 'type-fest';
 
 /**
@@ -99,8 +99,8 @@ export class ShadowApplication {
     if (!this.isInitiated()) throw AppError.internal(`Application not yet initialized`);
     const modules = this.registry.get();
     for (const module of modules) {
-      const result = tryCatch(() => module.getProvider(provider));
-      if (result.success) return result.data.getInstance() as TResult;
+      const wrapper = module.getProvider(provider, true);
+      if (wrapper) return wrapper.getInstance() as TResult;
     }
 
     const providerName = typeof provider === 'function' ? provider.name : provider.toString();
