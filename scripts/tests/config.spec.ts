@@ -30,7 +30,6 @@ describe('config', () => {
   it('should apply defaults when no .shadowrc.json is present', () => {
     fixtureDir = createFixtureDir('shadow-config-defaults-');
     const config = loadConfig(fixtureDir);
-    expect(config.build.target).toBe('backend');
     expect(config.build.exports).toStrictEqual({ '.': 'index' });
     expect(config.build.outDir).toBe('dist');
     expect(config.verify.files).toBe('{src,tests,scripts}/**/*.ts');
@@ -41,11 +40,11 @@ describe('config', () => {
   it('should read build config from .shadowrc.json', () => {
     fixtureDir = createFixtureDir('shadow-config-build-');
     writeFixtureFiles(fixtureDir, {
-      '.shadowrc.json': JSON.stringify({ build: { target: 'frontend', exports: { '.': 'index', './hooks': 'hooks/index' } } }),
+      '.shadowrc.json': JSON.stringify({ build: { exports: { '.': 'index', './hooks': 'hooks/index' }, outDir: 'build' } }),
     });
     const config = loadConfig(fixtureDir);
-    expect(config.build.target).toBe('frontend');
     expect(config.build.exports).toStrictEqual({ '.': 'index', './hooks': 'hooks/index' });
+    expect(config.build.outDir).toBe('build');
   });
 
   it('should normalize a string bin shorthand using the unscoped package name', () => {
@@ -73,12 +72,6 @@ describe('config', () => {
     expect(config.verify.format).toStrictEqual({ printWidth: 120 });
     // the base ruleset is unchanged by a merge
     expect(PRETTIER_BASE.printWidth).toBe(180);
-  });
-
-  it('should reject an invalid build target', () => {
-    fixtureDir = createFixtureDir('shadow-config-bad-target-');
-    writeFixtureFiles(fixtureDir, { '.shadowrc.json': JSON.stringify({ build: { target: 'mobile' } }) });
-    expect(() => loadConfig(fixtureDir!)).toThrow(ShadowError);
   });
 
   it('should reject an exports map without a "." entry', () => {

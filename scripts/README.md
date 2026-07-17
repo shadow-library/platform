@@ -33,7 +33,6 @@ apply when the file (or a field) is absent.
 ```jsonc
 {
   "build": {
-    "target": "backend",              // "backend" (dual ESM/CJS) | "frontend" (ESM only)
     "exports": { ".": "index" },       // public subpath → source-relative base (no extension)
     "bin": { "my-cli": "bin/my-cli" }, // optional; string shorthand also accepted
     "outDir": "dist"
@@ -66,19 +65,16 @@ Cleans `outDir`, compiles the package with `tsc` + `tsc-alias`, synthesizes `dis
 (`main`/`module`/`types`/`exports`/`typesVersions`, rewritten `sideEffects` and `bin` paths), and copies
 `README.md`/`LICENSE` into the output if present.
 
-- **`target: "backend"`** — a dual **ESM + CJS** build (node libraries consumed by both module systems).
-  Emits `esm/` and `cjs/` trees and `import`/`require` export conditions.
-- **`target: "frontend"`** — a single **ESM** build (browser/react libraries). Emits only `esm/`.
-
-Both targets emit type declarations and correct subpath exports. The `exports` map is keyed by public
-subpath and valued by the source-relative base:
+Produces a single, flat **ESM** tree (no `esm/`/`cjs/` subdirectories, no CommonJS) with type
+declarations and correct subpath exports. The `exports` map is keyed by public subpath and valued by the
+source-relative base:
 
 ```jsonc
 { "build": { "exports": { ".": "index", "./errors": "errors/index", "./utils": "utils/index" } } }
 ```
 
 A `bin` entry (string shorthand or `name → base` map) is rewritten into `dist/package.json` pointing at
-the compiled `./esm/…js`, gets a `bun` shebang injected if missing, and is `chmod 755`'d.
+the compiled `./…js`, gets a `bun` shebang injected if missing, and is `chmod 755`'d.
 
 **Prerequisites:** a `tsconfig.build.json` extending your `tsconfig.json` (`noEmit: false`,
 `declaration: true`). `typescript` and `tsc-alias` ship as dependencies of this package.
@@ -132,12 +128,12 @@ both modified **and** untracked files (`git status --porcelain`), since a new mi
 `git diff` alone would never flag. `--dir` defaults to `checkMigrations.dir` and must resolve inside the
 repo.
 
-## Example — a backend library repo
+## Example — a library repo
 
 `.shadowrc.json`:
 
 ```json
-{ "build": { "target": "backend", "exports": { ".": "index" } } }
+{ "build": { "exports": { ".": "index" } } }
 ```
 
 `package.json`:

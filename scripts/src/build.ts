@@ -7,7 +7,7 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
-import { type BuildConfig, type BuildTarget, loadConfig } from '@lib/config';
+import { type BuildConfig, loadConfig } from '@lib/config';
 import { formatDuration, log, type PackageJson, readPackageJson, run, ShadowError } from '@lib/utils';
 
 /**
@@ -33,15 +33,9 @@ export function ensureShebang(source: string): string {
   return source.startsWith('#!') ? source : `#!/usr/bin/env bun\n${source}`;
 }
 
-/**
- * A subpath's dist-relative export conditions for the given base (source-relative, no extension, e.g.
- * `errors/index`). `backend` emits dual import/require conditions over the ESM and CJS trees; `frontend`
- * emits a single ESM condition, since a browser/react library ships ESM only.
- */
-function buildExportConditions(base: string, target: BuildTarget) {
-  const esm = { types: `./esm/${base}.d.ts`, default: `./esm/${base}.js` };
-  if (target === 'frontend') return esm;
-  return { import: esm, require: { types: `./cjs/${base}.d.ts`, default: `./cjs/${base}.js` } };
+/** A subpath's dist-relative export conditions for the given base (source-relative, no extension, e.g. `errors/index`). ESM only. */
+function buildExportConditions(base: string) {
+  return { types: `./${base}.d.ts`, default: `./${base}.js` };
 }
 
 /**
@@ -51,37 +45,36 @@ function buildExportConditions(base: string, target: BuildTarget) {
  * subpath type resolution — with no filesystem or process access, so it is fully unit-testable.
  */
 export function computeDistPackageJson(packageJson: PackageJson, config: BuildConfig): PackageJson {
-  const { target, exports: exportsConfig } = config;
+  const { exports: exportsConfig } = config;
   const rootBase = exportsConfig['.'] as string;
   const subpaths = Object.keys(exportsConfig).filter(subpath => subpath !== '.');
 
   const distPackageJson: PackageJson = structuredClone(packageJson);
-  distPackageJson.module = `./esm/${rootBase}.js`;
-  distPackageJson.types = `./esm/${rootBase}.d.ts`;
-  distPackageJson.main = target === 'frontend' ? `./esm/${rootBase}.js` : `./cjs/${rootBase}.js`;
+  distPackageJson.type = 'module';
+  distPackageJson.main = `./${rootBase}.js`;
+  distPackageJson.module = `./${rootBase}.js`;
+  distPackageJson.types = `./${rootBase}.d.ts`;
   distPackageJson.exports = {
-    ...Object.fromEntries(Object.entries(exportsConfig).map(([subpath, base]) => [subpath, buildExportConditions(base, target)])),
+    ...Object.fromEntries(Object.entries(exportsConfig).map(([subpath, base]) => [subpath, buildExportConditions(base)])),
     './package.json': './package.json',
   };
 
   if (subpaths.length > 0) {
     const typesVersions: Record<string, string[]> = {};
-    for (const subpath of subpaths) typesVersions[subpath.replace(/^\.\//, '')] = [`./esm/${exportsConfig[subpath]}.d.ts`];
+    for (const subpath of subpaths) typesVersions[subpath.replace(/^\.\//, '')] = [`./${exportsConfig[subpath]}.d.ts`];
     distPackageJson.typesVersions = { '*': typesVersions };
   }
 
-  // `src/foo.ts` sideEffects entries are source paths and must be rewritten into each emitted tree;
-  // glob patterns (e.g. `**/index.js`) already apply to both and pass through unchanged.
+  // `src/foo.ts` sideEffects entries are source paths and must be rewritten into the output tree;
+  // glob patterns (e.g. `**/index.js`) already apply and pass through unchanged.
   if (Array.isArray(distPackageJson.sideEffects)) {
-    const trees = target === 'frontend' ? ['esm'] : ['esm', 'cjs'];
-    distPackageJson.sideEffects = distPackageJson.sideEffects.flatMap(entry => {
-      if (!entry.startsWith('src/')) return [entry];
-      const relativePath = entry.replace(/^src\//, '').replace(/\.ts$/, '.js');
-      return trees.map(tree => `./${tree}/${relativePath}`);
+    distPackageJson.sideEffects = distPackageJson.sideEffects.map(entry => {
+      if (!entry.startsWith('src/')) return entry;
+      return `./${entry.replace(/^src\//, '').replace(/\.ts$/, '.js')}`;
     });
   }
 
-  if (config.bin) distPackageJson.bin = Object.fromEntries(Object.entries(config.bin).map(([name, base]) => [name, `./esm/${base}.js`]));
+  if (config.bin) distPackageJson.bin = Object.fromEntries(Object.entries(config.bin).map(([name, base]) => [name, `./${base}.js`]));
 
   delete distPackageJson.scripts;
   delete distPackageJson.devDependencies;
@@ -90,22 +83,21 @@ export function computeDistPackageJson(packageJson: PackageJson, config: BuildCo
 }
 
 /**
- * Runs `tsc` then `tsc-alias` into `outDir`, optionally overriding `--module`. Throws with a stage-specific
- * message on failure so callers don't have to guess whether tsc or the alias rewrite broke.
+ * Runs `tsc` then `tsc-alias` into `outDir`. Throws with a stage-specific message on failure so callers
+ * don't have to guess whether tsc or the alias rewrite broke.
  */
-function compile(rootDir: string, outDir: string, label: string, extraTscArgs: string[] = []): void {
-  const tsc = run('bunx', ['tsc', '--outDir', outDir, '--project', 'tsconfig.build.json', ...extraTscArgs], { cwd: rootDir });
-  if (tsc.status !== 0) throw new ShadowError(`${label} build failed: tsc exited with code ${tsc.status}`);
+function compile(rootDir: string, outDir: string): void {
+  const tsc = run('bunx', ['tsc', '--outDir', outDir, '--project', 'tsconfig.build.json'], { cwd: rootDir });
+  if (tsc.status !== 0) throw new ShadowError(`Build failed: tsc exited with code ${tsc.status}`);
 
   const alias = run('bunx', ['tsc-alias', '--outDir', outDir, '--project', 'tsconfig.build.json'], { cwd: rootDir });
-  if (alias.status !== 0) throw new ShadowError(`${label} build failed: tsc-alias exited with code ${alias.status}`);
+  if (alias.status !== 0) throw new ShadowError(`Build failed: tsc-alias exited with code ${alias.status}`);
 }
 
 /**
- * Centralizes the tsc + tsc-alias library build. `backend` targets emit a dual ESM/CJS tree (node
- * packages consumed by both module systems); `frontend` targets emit a single ESM tree (browser/react
- * packages). Both synthesize `dist/package.json` with correct subpath exports, types, and (optionally) a
- * bin — routed entirely by `.shadowrc.json`'s `build` block.
+ * Centralizes the ESM library build (tsc + tsc-alias). Emits a single ESM tree with type declarations and
+ * subpath exports, synthesizing `dist/package.json` (`main`/`module`/`types`/`exports`/`typesVersions`,
+ * rewritten `sideEffects`, and an optional bin) — routed entirely by `.shadowrc.json`'s `build` block.
  */
 export async function build(options: BuildOptions): Promise<void> {
   const rootDir = options.cwd;
@@ -126,15 +118,7 @@ export async function build(options: BuildOptions): Promise<void> {
     if (fs.existsSync(source)) fs.copyFileSync(source, path.join(distDir, file));
   }
 
-  compile(rootDir, path.join(distDir, 'esm'), 'ESM');
-
-  if (config.target === 'backend') {
-    const cjsDir = path.join(distDir, 'cjs');
-    // The base config resolves modules with `bundler`, which can't pair with CommonJS emit — so the CJS
-    // pass overrides moduleResolution to node10 (the classic algorithm CommonJS requires).
-    compile(rootDir, cjsDir, 'CJS', ['--module', 'CommonJS', '--moduleResolution', 'node10']);
-    fs.writeFileSync(path.join(cjsDir, 'package.json'), JSON.stringify({ type: 'commonjs' }));
-  }
+  compile(rootDir, distDir);
 
   if (distPackageJson.bin) {
     for (const [name, binPath] of Object.entries(distPackageJson.bin as Record<string, string>)) {
@@ -150,5 +134,5 @@ export async function build(options: BuildOptions): Promise<void> {
 
   const [seconds, nanoseconds] = process.hrtime(startTime);
   const packageLabel = packageJson.name ?? path.basename(rootDir);
-  log.success(`Built ${packageLabel} (${config.target}) successfully in ${formatDuration(seconds * 1e3 + nanoseconds * 1e-6)}`);
+  log.success(`Built ${packageLabel} successfully in ${formatDuration(seconds * 1e3 + nanoseconds * 1e-6)}`);
 }

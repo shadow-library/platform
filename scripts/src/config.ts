@@ -12,16 +12,7 @@ import { ShadowError } from '@lib/utils';
 /**
  * Defining types
  */
-
-/**
- * `backend` builds a dual ESM/CJS library (node packages consumed by both module systems). `frontend`
- * builds a single ESM library (browser/react packages). Both emit type declarations and subpath exports —
- * the only difference is whether a CommonJS tree is produced alongside the ESM one.
- */
-export type BuildTarget = 'backend' | 'frontend';
-
 export interface BuildConfig {
-  target: BuildTarget;
   /** Public subpath → source-relative base (no extension), e.g. `{ ".": "index", "./errors": "errors/index" }`. */
   exports: Record<string, string>;
   /** Binary name → source-relative base. Normalized from the `.shadowrc.json` string shorthand or map. */
@@ -77,7 +68,6 @@ export interface ShadowConfig {
 /** The raw, fully-optional shape a user writes in `.shadowrc.json`. Every field is narrowed and defaulted by {@link loadConfig}. */
 export interface RawShadowConfig {
   build?: {
-    target?: string;
     exports?: Record<string, string>;
     bin?: string | Record<string, string>;
     outDir?: string;
@@ -96,7 +86,6 @@ export interface RawShadowConfig {
  * Declaring the constants
  */
 const CONFIG_FILENAME = '.shadowrc.json';
-const VALID_TARGETS: BuildTarget[] = ['backend', 'frontend'];
 
 /** Base prettier ruleset. A repo's `verify.format` in `.shadowrc.json` is merged over this, so any option can be overridden. */
 export const PRETTIER_BASE: FormatConfig = {
@@ -107,7 +96,7 @@ export const PRETTIER_BASE: FormatConfig = {
 };
 
 const DEFAULT_CONFIG: ShadowConfig = {
-  build: { target: 'backend', exports: { '.': 'index' }, outDir: 'dist' },
+  build: { exports: { '.': 'index' }, outDir: 'dist' },
   verify: { lint: { rules: {}, ignores: [] }, format: {}, files: '{src,tests,scripts}/**/*.ts' },
   release: { npm: true, publishDir: 'dist', changelog: true },
   genApiTypes: { outputPath: 'src/lib/apis/api-types.gen.ts' },
@@ -124,12 +113,6 @@ function normalizeBin(bin: string | Record<string, string> | undefined, packageN
   const derivedName = packageName?.replace(/^@[^/]+\//, '');
   if (!derivedName) throw new ShadowError('build.bin is a string but package.json has no "name" to derive the binary name from');
   return { [derivedName]: bin };
-}
-
-function resolveTarget(target: string | undefined): BuildTarget {
-  if (target === undefined) return DEFAULT_CONFIG.build.target;
-  if (!(VALID_TARGETS as string[]).includes(target)) throw new ShadowError(`Invalid build.target "${target}" — expected one of: ${VALID_TARGETS.join(', ')}`);
-  return target as BuildTarget;
 }
 
 /** Reads and parses `<dir>/.shadowrc.json` if present, failing with a diagnostic on invalid JSON. Absent file → empty config. */
@@ -155,7 +138,6 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
 
   return {
     build: {
-      target: resolveTarget(raw.build?.target),
       exports: exportsConfig,
       bin: normalizeBin(raw.build?.bin, packageName),
       outDir: raw.build?.outDir ?? DEFAULT_CONFIG.build.outDir,

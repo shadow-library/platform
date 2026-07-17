@@ -16,79 +16,59 @@ import { type BuildConfig } from '@lib/config';
 /**
  * Declaring the constants
  */
-const backend = (exports: Record<string, string> = { '.': 'index' }, bin?: Record<string, string>): BuildConfig => ({ target: 'backend', exports, outDir: 'dist', bin });
-const frontend = (exports: Record<string, string> = { '.': 'index' }): BuildConfig => ({ target: 'frontend', exports, outDir: 'dist' });
+const cfg = (exports: Record<string, string> = { '.': 'index' }, bin?: Record<string, string>): BuildConfig => ({ exports, outDir: 'dist', bin });
 
 describe('build', () => {
-  describe('computeDistPackageJson (backend)', () => {
+  describe('computeDistPackageJson', () => {
     it('should synthesize main/module/types/exports for the default single root export', () => {
-      const result = computeDistPackageJson({ name: 'pkg', version: '1.0.0' }, backend());
-      expect(result.main).toBe('./cjs/index.js');
-      expect(result.module).toBe('./esm/index.js');
-      expect(result.types).toBe('./esm/index.d.ts');
+      const result = computeDistPackageJson({ name: 'pkg', version: '1.0.0' }, cfg());
+      expect(result.type).toBe('module');
+      expect(result.main).toBe('./index.js');
+      expect(result.module).toBe('./index.js');
+      expect(result.types).toBe('./index.d.ts');
       expect(result.exports).toStrictEqual({
-        '.': {
-          import: { types: './esm/index.d.ts', default: './esm/index.js' },
-          require: { types: './cjs/index.d.ts', default: './cjs/index.js' },
-        },
+        '.': { types: './index.d.ts', default: './index.js' },
         './package.json': './package.json',
       });
       expect(result.typesVersions).toBeUndefined();
     });
 
     it('should build exports and typesVersions for every declared subpath', () => {
-      const result = computeDistPackageJson({ name: 'pkg' }, backend({ '.': 'index', './errors': 'errors/index', './utils': 'utils/index' }));
-      expect(result.exports).toMatchObject({
-        './errors': { import: { default: './esm/errors/index.js' } },
-        './utils': { import: { default: './esm/utils/index.js' } },
-      });
-      expect(result.typesVersions).toStrictEqual({
-        '*': { errors: ['./esm/errors/index.d.ts'], utils: ['./esm/utils/index.d.ts'] },
-      });
-    });
-
-    it('should rewrite src/-relative sideEffects entries to both output trees and pass globs through unchanged', () => {
-      const result = computeDistPackageJson({ name: 'pkg', sideEffects: ['src/index.ts', 'src/reflector.service.ts', '**/index.js'] }, backend());
-      expect(result.sideEffects).toStrictEqual(['./esm/index.js', './cjs/index.js', './esm/reflector.service.js', './cjs/reflector.service.js', '**/index.js']);
-    });
-
-    it('should write a bin map from config, one entry per binary, pointing at the esm output', () => {
-      const result = computeDistPackageJson({ name: 'pkg' }, backend({ '.': 'index' }, { foo: 'bin/foo', bar: 'bin/bar' }));
-      expect(result.bin).toStrictEqual({ foo: './esm/bin/foo.js', bar: './esm/bin/bar.js' });
-    });
-  });
-
-  describe('computeDistPackageJson (frontend)', () => {
-    it('should emit an ESM-only exports condition and point main at the esm output', () => {
-      const result = computeDistPackageJson({ name: 'pkg' }, frontend());
-      expect(result.main).toBe('./esm/index.js');
-      expect(result.module).toBe('./esm/index.js');
+      const result = computeDistPackageJson({ name: 'pkg' }, cfg({ '.': 'index', './errors': 'errors/index', './utils': 'utils/index' }));
       expect(result.exports).toStrictEqual({
-        '.': { types: './esm/index.d.ts', default: './esm/index.js' },
+        '.': { types: './index.d.ts', default: './index.js' },
+        './errors': { types: './errors/index.d.ts', default: './errors/index.js' },
+        './utils': { types: './utils/index.d.ts', default: './utils/index.js' },
         './package.json': './package.json',
       });
+      expect(result.typesVersions).toStrictEqual({
+        '*': { errors: ['./errors/index.d.ts'], utils: ['./utils/index.d.ts'] },
+      });
     });
 
-    it('should rewrite src/-relative sideEffects into the esm tree only', () => {
-      const result = computeDistPackageJson({ name: 'pkg', sideEffects: ['src/index.ts', '**/index.js'] }, frontend());
-      expect(result.sideEffects).toStrictEqual(['./esm/index.js', '**/index.js']);
+    it('should rewrite src/-relative sideEffects entries and pass globs through unchanged', () => {
+      const result = computeDistPackageJson({ name: 'pkg', sideEffects: ['src/index.ts', 'src/reflector.service.ts', '**/index.js'] }, cfg());
+      expect(result.sideEffects).toStrictEqual(['./index.js', './reflector.service.js', '**/index.js']);
     });
-  });
 
-  describe('computeDistPackageJson (shared)', () => {
+    it('should write a bin map from config, one entry per binary, pointing at the output', () => {
+      const result = computeDistPackageJson({ name: 'pkg' }, cfg({ '.': 'index' }, { foo: 'bin/foo', bar: 'bin/bar' }));
+      expect(result.bin).toStrictEqual({ foo: './bin/foo.js', bar: './bin/bar.js' });
+    });
+
     it('should leave a boolean sideEffects untouched', () => {
-      expect(computeDistPackageJson({ name: 'pkg', sideEffects: false }, backend()).sideEffects).toBe(false);
+      expect(computeDistPackageJson({ name: 'pkg', sideEffects: false }, cfg()).sideEffects).toBe(false);
     });
 
     it('should strip scripts and devDependencies from the output', () => {
-      const result = computeDistPackageJson({ name: 'pkg', scripts: { build: 'x' }, devDependencies: { x: '1' } }, backend());
+      const result = computeDistPackageJson({ name: 'pkg', scripts: { build: 'x' }, devDependencies: { x: '1' } }, cfg());
       expect(result.scripts).toBeUndefined();
       expect(result.devDependencies).toBeUndefined();
     });
 
     it('should not mutate the input package.json', () => {
       const input = { name: 'pkg', sideEffects: ['src/index.ts'] };
-      computeDistPackageJson(input, backend());
+      computeDistPackageJson(input, cfg());
       expect(input.sideEffects).toStrictEqual(['src/index.ts']);
     });
   });
