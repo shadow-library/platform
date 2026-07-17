@@ -7,7 +7,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { InjectionToken } from '../../interfaces';
+import { ProviderToken } from '../../interfaces';
 
 /**
  * Defining types
@@ -18,7 +18,7 @@ import { InjectionToken } from '../../interfaces';
  */
 
 export class DIErrorsStatic {
-  private getTokenName(token: InjectionToken): string {
+  private getTokenName(token: ProviderToken): string {
     return typeof token === 'function' ? token.name : token.toString();
   }
 
@@ -27,7 +27,7 @@ export class DIErrorsStatic {
     return AppError.internal(message);
   }
 
-  undefinedDependency(parent: InjectionToken, index: number): never {
+  undefinedDependency(parent: ProviderToken, index: number): never {
     parent = this.getTokenName(parent);
     let message = `Cannot resolve dependencies of ${parent}.`;
     message += ` The dependency at index ${index} cannot be resolved.`;
@@ -35,14 +35,14 @@ export class DIErrorsStatic {
     throw AppError.internal(message);
   }
 
-  unknownExport(token: InjectionToken, module: Class<unknown>): never {
+  unknownExport(token: ProviderToken, module: Class<unknown>): never {
     token = this.getTokenName(token);
     let message = `You cannot export a provider that is not a part of the currently processed module (${module.name}).`;
     message += `Please verify whether the exported ${token} is available in this particular context.`;
     throw AppError.internal(message);
   }
 
-  notFound(token: InjectionToken, module: Class<unknown>): never {
+  notFound(token: ProviderToken, module: Class<unknown>): never {
     const tokenName = this.getTokenName(token);
     let message = `Provider '${tokenName}' not found or exported in module '${module.name}'.`;
     message += ` Make sure that it is part of the providers array of the current module.`;

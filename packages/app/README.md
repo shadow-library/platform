@@ -148,7 +148,7 @@ interface ModuleMetadata {
   imports?: (Class<unknown> | ForwardReference<Class<unknown>>)[];
   controllers?: Class<unknown>[];
   providers?: Provider[];
-  exports?: InjectionToken[];
+  exports?: ProviderToken[];
 }
 
 @Module({
@@ -336,6 +336,34 @@ adminEndpoint() {
 ```
 
 ## Dependency Injection
+
+### Injection Tokens
+
+Providers are identified by a token: a class, a string, a symbol, or a typed `InjectionToken<T>`. Prefer
+`InjectionToken<T>` for non-class providers — it carries the value type, so `app.get(token)` and injected
+values are typed without a manual cast, and the provider's `useValue`/`useFactory`/`useClass` is checked
+against `T`.
+
+```ts
+import { InjectionToken } from '@shadow-library/app';
+
+interface AppConfig {
+  name: string;
+  port: number;
+}
+
+const CONFIG = new InjectionToken<AppConfig>('CONFIG');
+
+@Module({
+  providers: [{ token: CONFIG, useValue: { name: 'app', port: 8080 } }], // useValue must match AppConfig
+  exports: [CONFIG],
+})
+class AppModule {}
+
+const config = app.get(CONFIG); // typed as AppConfig — no cast needed
+```
+
+Inject a typed token with `@Inject(CONFIG)`. Any value usable as a token is a `ProviderToken`.
 
 ### Provider Types
 

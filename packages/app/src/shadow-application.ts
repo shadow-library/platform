@@ -2,13 +2,14 @@
  * Importing npm packages
  */
 import { AppError, Logger } from '@shadow-library/common';
-import { AbstractClass, Class } from 'type-fest';
+import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages
  */
 import { NAMESPACE } from './constants';
 import { InstanceWrapper, ModuleRef, ModuleRegistry } from './injector';
+import { ProviderToken, TokenValue } from './interfaces';
 
 /**
  * Defining types
@@ -95,15 +96,15 @@ export class ShadowApplication {
     return moduleRef.getInstance();
   }
 
-  get<TInput = any, TResult = TInput>(provider: Class<TInput> | AbstractClass<TInput> | string | symbol): TResult {
+  get<Token extends ProviderToken>(token: Token): TokenValue<Token> {
     if (!this.isInitiated()) throw AppError.internal(`Application not yet initialized`);
     const modules = this.registry.get();
     for (const module of modules) {
-      const wrapper = module.getProvider(provider, true);
-      if (wrapper) return wrapper.getInstance() as TResult;
+      const wrapper = module.getProvider(token, true);
+      if (wrapper) return wrapper.getInstance() as TokenValue<Token>;
     }
 
-    const providerName = typeof provider === 'function' ? provider.name : provider.toString();
+    const providerName = typeof token === 'function' ? token.name : token.toString();
     throw AppError.internal(`Provider '${providerName}' not found or exported`);
   }
 }

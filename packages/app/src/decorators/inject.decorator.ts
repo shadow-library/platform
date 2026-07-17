@@ -7,7 +7,7 @@ import { Reflector } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { SELF_DECLARED_DEPS_METADATA } from '../constants';
-import { InjectionToken } from '../interfaces';
+import { ProviderToken } from '../interfaces';
 import { ForwardReference } from '../utils';
 
 /**
@@ -15,7 +15,7 @@ import { ForwardReference } from '../utils';
  */
 
 export interface InjectMetadata {
-  token: InjectionToken | ForwardReference<InjectionToken>;
+  token: ProviderToken | ForwardReference<ProviderToken>;
   index: number;
 }
 

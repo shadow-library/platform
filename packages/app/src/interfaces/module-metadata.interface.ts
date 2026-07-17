@@ -6,7 +6,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { InjectionToken, Provider } from './provider.interface';
+import { Provider, ProviderToken } from './provider.interface';
 import { ForwardReference } from '../utils';
 import { DynamicModule } from './dynamic-module.interface';
 
@@ -41,5 +41,5 @@ export interface ModuleMetadata {
    * List of the subset of providers that are provided by this module and should be available
    * in other modules which import this module.
    */
-  exports?: InjectionToken[];
+  exports?: ProviderToken[];
 }

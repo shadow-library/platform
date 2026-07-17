@@ -28,7 +28,7 @@ describe('Dispatcher', () => {
 
   beforeEach(async () => {
     app = await ShadowFactory.create(AppModule);
-    router = app.get(Dispatcher);
+    router = app.get(Dispatcher) as CommandRouter;
     storage = app.select(AppModule).get(StorageService);
 
     output = [];

@@ -10,7 +10,7 @@ import { Class } from 'type-fest';
  * Importing user defined packages
  */
 import { INTERCEPTOR_METADATA } from '../constants';
-import { InjectionToken, Interceptor, InterceptorConfig } from '../interfaces';
+import { Interceptor, InterceptorConfig, ProviderToken } from '../interfaces';
 
 /**
  * Defining types
@@ -20,7 +20,7 @@ import { InjectionToken, Interceptor, InterceptorConfig } from '../interfaces';
  * Declaring the constants
  */
 
-export function UseInterceptors(...interceptors: (InterceptorConfig | InjectionToken)[]): MethodDecorator {
+export function UseInterceptors(...interceptors: (InterceptorConfig | ProviderToken)[]): MethodDecorator {
   return (_target: object, _propertyKey: string | symbol, descriptor: TypedPropertyDescriptor<any>): void => {
     assert(typeof descriptor.value === 'function', 'UseInterceptors decorator can only be applied to method');
     assert(interceptors.length > 0, 'UseInterceptors decorator requires at least one interceptor class');

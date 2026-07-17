@@ -6,7 +6,7 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { ClassToken, InjectionToken } from '../interfaces';
+import { ProviderToken, TokenValue } from '../interfaces';
 import { ContextId } from '../utils';
 
 /**
@@ -19,14 +19,13 @@ import { ContextId } from '../utils';
 
 export abstract class ModuleRef {
   /**
-   * Retrieves an instance of a provider otherwise, throws exception.
-   * @returns {TResult}
+   * Retrieves an instance of a provider, otherwise throws an exception.
+   * The return type is inferred from the token when it is a class or a typed InjectionToken.
    */
-  abstract get<TInput = any, TResult = TInput>(token: ClassToken<TInput> | InjectionToken): TResult;
+  abstract get<Token extends ProviderToken>(token: Token): TokenValue<Token>;
 
   /**
-   * Resolves transient instance of a provider otherwise, throws exception.
-   * @returns {Array<TResult>}
+   * Resolves a transient instance of a provider, otherwise throws an exception.
    */
-  abstract resolve<TInput = any, TResult = TInput>(typeOrToken: Class<TInput>, contextId?: ContextId): Promise<TResult>;
+  abstract resolve<T>(typeOrToken: Class<T>, contextId?: ContextId): Promise<T>;
 }

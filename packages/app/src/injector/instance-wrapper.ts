@@ -12,7 +12,7 @@ import { Class } from 'type-fest';
 import { DIErrors, isAliasProvider, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
 import { INJECTABLE_METADATA, INTERCEPTOR_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
 import { InjectMetadata, InjectableOptions } from '../decorators';
-import { FactoryDependency, FactoryProvider, InjectionToken, Interceptor, InterceptorConfig, InterceptorContext, Provider } from '../interfaces';
+import { FactoryDependency, FactoryProvider, Interceptor, InterceptorConfig, InterceptorContext, Provider, ProviderToken } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 import { ModuleRef } from './module-ref';
 
@@ -47,7 +47,7 @@ const STATIC_CONTEXT: ContextId = Object.freeze({ id: 0 });
 export class InstanceWrapper<T extends object = any> {
   private readonly logger = Logger.getLogger(NAMESPACE, 'InstanceWrapper');
 
-  private readonly token: InjectionToken;
+  private readonly token: ProviderToken;
   private readonly inject: InjectionMetadata[];
   private readonly metatype?: Class<T> | Factory<T>;
   private readonly dependencies: (InstanceWrapper | undefined)[];
@@ -141,7 +141,7 @@ export class InstanceWrapper<T extends object = any> {
     return dependencies;
   }
 
-  getToken(): InjectionToken {
+  getToken(): ProviderToken {
     return this.token;
   }
 
@@ -162,7 +162,7 @@ export class InstanceWrapper<T extends object = any> {
     return this.isAlias;
   }
 
-  getAliasToken(): InjectionToken {
+  getAliasToken(): ProviderToken {
     const actualProvider = this.inject[0];
     assert(actualProvider, `Alias provider '${this.getTokenName()}' has no target token`);
     return actualProvider.token;
@@ -293,7 +293,7 @@ export class InstanceWrapper<T extends object = any> {
     for (const method of methods) {
       /** resolve the interceptors and validate the interceptors */
       const Interceptors: InterceptorConfig[] = Reflect.getMetadata(INTERCEPTOR_METADATA, method);
-      const interceptors = Interceptors.map(i => moduleRef.get<Interceptor>(i.token));
+      const interceptors = Interceptors.map(i => moduleRef.get(i.token) as Interceptor);
       const invalidInterceptor = interceptors.find(i => typeof i.intercept !== 'function');
       if (invalidInterceptor) throw AppError.internal(`Interceptor '${invalidInterceptor.constructor.name}' does not implement 'intercept' method`);
 

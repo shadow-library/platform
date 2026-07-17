@@ -6,7 +6,7 @@ import { Class, Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { InjectionToken } from './provider.interface';
+import { ProviderToken } from './provider.interface';
 
 /**
  * Defining types
@@ -14,7 +14,7 @@ import { InjectionToken } from './provider.interface';
 
 export interface InterceptorConfig<T = any> {
   /** The interceptor token to be resolved from the dependency injection container */
-  token: InjectionToken;
+  token: ProviderToken;
 
   /** Optional configuration options for the interceptor */
   options?: T;

@@ -18,7 +18,7 @@ import { ModuleRef } from './module-ref';
 import { DispatchMetadata, Dispatcher } from '../classes';
 import { CONTROLLER_METADATA, HANDLER_METADATA, INTERNAL_OPERATION_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA } from '../constants';
 import { HandlerMetadata } from '../decorators';
-import { InjectionToken, ModuleMetadata, ValueProvider } from '../interfaces';
+import { ModuleMetadata, ProviderToken, TokenValue, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 
 /**
@@ -47,8 +47,8 @@ export class Module {
 
   private readonly imports = [] as Module[];
   private readonly controllers = new Set<InstanceWrapper<Controller>>();
-  private readonly providers = new Map<InjectionToken, InstanceWrapper>();
-  private readonly exports = new Set<InjectionToken>();
+  private readonly providers = new Map<ProviderToken, InstanceWrapper>();
+  private readonly exports = new Set<ProviderToken>();
 
   private readonly instance: InstanceWrapper;
 
@@ -68,18 +68,18 @@ export class Module {
     /* eslint-disable-next-line @typescript-eslint/no-this-alias */
     const self = this;
     const CustomModuleRef = class extends ModuleRef {
-      override get<TInput = any, TResult = TInput>(token: InjectionToken): TResult {
+      override get<Token extends ProviderToken>(token: Token): TokenValue<Token> {
         const provider = self.getInternalProvider(token);
-        return provider.getInstance() as TResult;
+        return provider.getInstance() as TokenValue<Token>;
       }
 
-      override async resolve<TInput = any, TResult = TInput>(typeOrToken: Class<TInput>, contextId?: ContextId): Promise<TResult> {
+      override async resolve<T>(typeOrToken: Class<T>, contextId?: ContextId): Promise<T> {
         const provider = self.getInternalProvider(typeOrToken) as InstanceWrapper;
         if (!provider.isTransient()) throw AppError.internal(`The provider '${provider.getTokenName()}' is not transient`);
         if (!contextId) contextId = createContextId();
         const instance = await provider.loadInstance(contextId);
         await provider.applyInterceptors(this, contextId);
-        return instance;
+        return instance as T;
       }
     };
 
@@ -90,7 +90,7 @@ export class Module {
 
   private loadProviders() {
     const providers = this.metadata.providers ?? [];
-    const providerMap = new Map<InjectionToken, InstanceWrapper>();
+    const providerMap = new Map<ProviderToken, InstanceWrapper>();
     const graph = new DependencyGraph();
 
     /** Create instance wrapper for all the providers */
@@ -152,9 +152,9 @@ export class Module {
     return modules;
   }
 
-  private getInternalProvider<T extends object = object>(token: InjectionToken): InstanceWrapper<T>;
-  private getInternalProvider<T extends object = object>(token: InjectionToken, optional: boolean): InstanceWrapper<T> | undefined;
-  private getInternalProvider<T extends object = object>(token: InjectionToken, optional?: boolean): InstanceWrapper<T> | undefined {
+  private getInternalProvider<T extends object = object>(token: ProviderToken): InstanceWrapper<T>;
+  private getInternalProvider<T extends object = object>(token: ProviderToken, optional: boolean): InstanceWrapper<T> | undefined;
+  private getInternalProvider<T extends object = object>(token: ProviderToken, optional?: boolean): InstanceWrapper<T> | undefined {
     const provider = this.providers.get(token);
     if (provider) return provider;
 
@@ -171,9 +171,9 @@ export class Module {
     return this.metatype;
   }
 
-  getProvider(token: InjectionToken): InstanceWrapper;
-  getProvider(token: InjectionToken, optional: boolean): InstanceWrapper | undefined;
-  getProvider(token: InjectionToken, optional?: boolean): InstanceWrapper | undefined {
+  getProvider(token: ProviderToken): InstanceWrapper;
+  getProvider(token: ProviderToken, optional: boolean): InstanceWrapper | undefined;
+  getProvider(token: ProviderToken, optional?: boolean): InstanceWrapper | undefined {
     const isExported = this.exports.has(token);
     if (!isExported) {
       if (optional) return;

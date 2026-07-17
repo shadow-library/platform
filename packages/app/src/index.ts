@@ -9,6 +9,7 @@ import 'reflect-metadata';
 export * from './classes';
 export * from './decorators';
 export { ModuleRef } from './injector';
+export * from './injection-token';
 export * from './interfaces';
 export * from './utils';
 

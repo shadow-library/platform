@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { InjectionToken } from '../../interfaces';
+import { ProviderToken } from '../../interfaces';
 
 /**
  * Defining types
@@ -28,7 +28,7 @@ function tieBreakerSort(a: NodeMetadata, b: NodeMetadata): number {
   return 0;
 }
 
-export class DependencyGraph<T extends InjectionToken> {
+export class DependencyGraph<T extends ProviderToken> {
   private readonly nodeMap = new Map<T, Set<T>>();
 
   getNodes(): T[] {
