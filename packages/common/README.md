@@ -39,7 +39,7 @@ The **@shadow-library/common** package provides a comprehensive collection of es
 
 ### 📝 **Advanced Logging System**
 
-- **Multi-transport logging** (Console, File, CloudWatch)
+- **Multi-transport logging** (Console, File) — structured stdout is the production default, shipped by your log agent
 - **Configurable log levels** and formats
 - **Metadata injection** and structured logging
 - **Dynamic context providers** for automatic metadata injection
@@ -95,6 +95,26 @@ pnpm add @shadow-library/common
 # bun
 bun add @shadow-library/common
 ```
+
+### Entry points
+
+The root import re-exports everything for convenience, but it pulls in the Node/AWS-oriented services
+(logger, config, http client). Import a subpath to get only what you need — the framework-agnostic core
+(`./errors`, `./utils`, `./cache`, `./interfaces`) carries no `winston`, `undici`, or `chokidar`, so it is
+safe for browser and edge bundles.
+
+```ts
+import { AppError, HttpErrorCode } from '@shadow-library/common/errors';
+import { utils } from '@shadow-library/common/utils';
+import { LRUCache } from '@shadow-library/common/cache';
+import { Config } from '@shadow-library/common/config'; // Node only
+import { Logger } from '@shadow-library/common/logger'; // Node only
+import { APIRequest } from '@shadow-library/common/http'; // Node only
+import { Reflector } from '@shadow-library/common/reflect';
+```
+
+> The root `@shadow-library/common` barrel remains available but is deprecated in favour of subpaths and
+> will be slimmed in the next major.
 
 ---
 
@@ -848,8 +868,8 @@ Logger.addTransport(customTransport);
 
 // Attach predefined transport types
 Logger.attachTransport('console:pretty'); // Console with colors and brief format
+Logger.attachTransport('console:json'); // Console with structured JSON (ship stdout at the infra layer)
 Logger.attachTransport('file:json'); // File logging with JSON format
-Logger.attachTransport('cloudwatch:json'); // CloudWatch logging
 
 // Attach transport with custom format
 import { format } from 'winston';
@@ -1194,14 +1214,6 @@ The package uses environment variables for configuration. Below are the key vari
 
 - `LOG_LEVEL`: Logging level (`silly`, `debug`, `http`, `info`, `warn`, `error`)
 - `LOG_DIR`: Log directory path (default: `logs`, set to `false` to disable file logging)
-- `LOG_BUFFER_SIZE`: Log buffer size for batch processing (default: `10000`)
-
-### AWS CloudWatch Configuration
-
-- `AWS_REGION`: AWS region for CloudWatch logs (default: `ap-south-1`)
-- `AWS_CLOUDWATCH_LOG_GROUP`: CloudWatch log group name (default: app name)
-- `AWS_CLOUDWATCH_LOG_STREAM`: CloudWatch log stream name (default: app name)
-- `AWS_CLOUDWATCH_UPLOAD_RATE`: CloudWatch upload rate in ms (default: `2000`)
 
 ---
 
@@ -1417,7 +1429,7 @@ The package uses environment variables for configuration. Below are the key vari
 type NodeEnv = 'development' | 'production' | 'test';
 type LogLevel = 'silly' | 'debug' | 'http' | 'info' | 'warn' | 'error';
 type TimeUnit = 'ms' | 's' | 'm' | 'h';
-type AttachableTransports = 'pretty-console' | 'structured-file' | 'structured-cloudwatch';
+type AttachableTransports = 'console:pretty' | 'console:json' | 'file:json';
 ```
 
 ### Masking Types
