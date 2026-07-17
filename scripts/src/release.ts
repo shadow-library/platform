@@ -17,11 +17,13 @@ import { log, readPackageJson, run, ShadowError } from '@lib/utils';
  * Defining types
  */
 export type BumpLevel = 'major' | 'minor' | 'patch';
+export type ReleaseChannel = 'alpha' | 'beta';
+export type ReleaseType = BumpLevel | ReleaseChannel;
 
 export interface ReleaseOptions {
-  /** The bump to apply: `major`, `minor`, or `patch`. */
-  level: string;
-  /** Release even when the commits require a higher bump than `level`. */
+  /** `major`/`minor`/`patch` for a stable release at that level, or `alpha`/`beta` for a prerelease. */
+  release: string;
+  /** For a level release, proceed (with a warning) even when the commits require a higher bump. */
   force?: boolean;
   /** Target package directory. Defaults to `process.cwd()`. */
   path?: string;
@@ -37,6 +39,8 @@ interface SemVer {
   major: number;
   minor: number;
   patch: number;
+  preid?: string;
+  prenum?: number;
 }
 
 /** The subset of Octokit used here — narrowed so tests can pass a fake client without the full SDK. */
@@ -72,11 +76,20 @@ export interface ReleaseDependencies {
  * Declaring the constants
  */
 const VALID_LEVELS: BumpLevel[] = ['major', 'minor', 'patch'];
+const VALID_CHANNELS: ReleaseChannel[] = ['alpha', 'beta'];
 const LEVEL_RANK: Record<BumpLevel, number> = { patch: 0, minor: 1, major: 2 };
 const defaultDependencies: ReleaseDependencies = { run, build, createClient: token => new Octokit({ auth: token }) };
 
 export function isValidLevel(value: string): value is BumpLevel {
   return (VALID_LEVELS as string[]).includes(value);
+}
+
+export function isReleaseChannel(value: string): value is ReleaseChannel {
+  return (VALID_CHANNELS as string[]).includes(value);
+}
+
+export function isValidRelease(value: string): value is ReleaseType {
+  return isValidLevel(value) || isReleaseChannel(value);
 }
 
 /** Extracts `owner/repo` from a GitHub remote URL — `git@github.com:owner/repo.git` or `https://github.com/owner/repo.git`. */
@@ -110,10 +123,10 @@ export function computeBumpLevel(commits: ParsedCommit[]): BumpLevel {
 }
 
 function parseSemVer(version: string): SemVer {
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(version);
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)\.(\d+))?$/.exec(version);
   if (!match) throw new ShadowError(`Cannot parse a semver version from "${version}"`);
-  const [, major, minor, patch] = match;
-  return { major: Number(major), minor: Number(minor), patch: Number(patch) };
+  const [, major, minor, patch, preid, prenum] = match;
+  return { major: Number(major), minor: Number(minor), patch: Number(patch), preid, prenum: prenum === undefined ? undefined : Number(prenum) };
 }
 
 /** Applies a bump `level` to `currentVersion`, producing the next stable version (dropping any prerelease tag). */
@@ -132,6 +145,20 @@ export function bumpVersion(currentVersion: string, level: BumpLevel): string {
 export function applySemverPolicy(level: BumpLevel, currentVersion: string): BumpLevel {
   if (parseSemVer(currentVersion).major > 0) return level;
   return level === 'major' ? 'minor' : 'patch';
+}
+
+/**
+ * Computes the next prerelease version for an `alpha`/`beta` channel, off the inferred bump `level`:
+ *  - same channel as the current prerelease → bump its counter (`1.3.0-alpha.0` → `1.3.0-alpha.1`);
+ *  - a different channel → switch it in place, keeping the core (`1.3.0-alpha.2` → `1.3.0-beta.0`);
+ *  - from a stable version → apply the level, then start the channel at `.0` (`1.2.3` +minor → `1.3.0-alpha.0`).
+ */
+export function computeNextVersion(currentVersion: string, level: BumpLevel, channel: ReleaseChannel): string {
+  const current = parseSemVer(currentVersion);
+  const core = `${current.major}.${current.minor}.${current.patch}`;
+  if (current.preid === channel) return `${core}-${channel}.${(current.prenum ?? 0) + 1}`;
+  if (current.preid) return `${core}-${channel}.0`;
+  return `${bumpVersion(currentVersion, level)}-${channel}.0`;
 }
 
 /** Builds a terse markdown changelog grouping features and fixes — used as the GitHub release body. */
@@ -187,15 +214,16 @@ async function commitVersionBump(client: GitHubClient, slug: { owner: string; re
 }
 
 /**
- * Centralizes the release workflow: the caller picks the bump `level` (`major`/`minor`/`patch`); the level
- * the commits actually require is inferred and, unless `force` is set, choosing a lower level than required
- * errors out (0.x aware — a breaking change requires only `minor` while the major is 0). It then builds and
- * tests, performs every remote git operation through Octokit — a Verified `package.json` commit on `main`,
- * the `v<version>` tag, and the GitHub release — and publishes to npm.
+ * Centralizes the release workflow. The caller picks a `release`: a stable level (`major`/`minor`/`patch`) or
+ * a prerelease channel (`alpha`/`beta`). For a level, the level the commits require is inferred and — unless
+ * `force` is set — choosing a lower level than required errors out (0.x aware: a breaking change requires only
+ * `minor` while the major is 0); with `force` it warns and proceeds. A channel cuts/advances a prerelease at the
+ * inferred level. It then builds and tests, performs every remote git operation through Octokit — a Verified
+ * `package.json` commit on `main`, the `v<version>` tag, and the GitHub release — and publishes to npm.
  */
 export async function release(options: ReleaseOptions, deps: ReleaseDependencies = defaultDependencies): Promise<void> {
-  if (!isValidLevel(options.level)) throw new ShadowError(`Invalid level "${options.level}" — expected one of: ${VALID_LEVELS.join(', ')}`);
-  const level = options.level;
+  if (!isValidRelease(options.release)) throw new ShadowError(`Invalid release "${options.release}" — expected one of: ${[...VALID_LEVELS, ...VALID_CHANNELS].join(', ')}`);
+  const selection = options.release;
 
   const targetDir = path.resolve(options.path ?? process.cwd());
   if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) throw new ShadowError(`Not a directory: ${targetDir}`);
@@ -219,12 +247,24 @@ export async function release(options: ReleaseOptions, deps: ReleaseDependencies
   if (commits.length === 0) throw new ShadowError('No commits since the last release — nothing to release');
 
   const required = applySemverPolicy(computeBumpLevel(commits), packageJson.version);
-  if (!options.force && LEVEL_RANK[level] < LEVEL_RANK[required]) {
-    throw new ShadowError(`The commits since the last release require a "${required}" bump, but "${level}" was requested. Re-run with --force to release "${level}" anyway.`);
+
+  let version: string;
+  let prerelease: boolean;
+  if (isReleaseChannel(selection)) {
+    version = computeNextVersion(packageJson.version, required, selection);
+    prerelease = true;
+    log.info(`releasing ${packageJson.name}: ${packageJson.version} → ${version} (${selection} prerelease)`);
+  } else {
+    if (LEVEL_RANK[selection] < LEVEL_RANK[required]) {
+      const message = `The commits since the last release require a "${required}" bump, but "${selection}" was requested.`;
+      if (!options.force) throw new ShadowError(`${message} Re-run with --force to release "${selection}" anyway.`);
+      log.warn(`${message} Proceeding anyway because --force was set.`);
+    }
+    version = bumpVersion(packageJson.version, selection);
+    prerelease = false;
+    log.info(`releasing ${packageJson.name}: ${packageJson.version} → ${version} (${selection})`);
   }
-  const version = bumpVersion(packageJson.version, level);
   const tag = `v${version}`;
-  log.info(`releasing ${packageJson.name}: ${packageJson.version} → ${version} (${level}${options.force ? ', forced' : ''})`);
 
   runPreReleaseChecks(targetDir, deps);
 
@@ -242,7 +282,7 @@ export async function release(options: ReleaseOptions, deps: ReleaseDependencies
     tag_name: tag,
     name: tag,
     body: config.changelog ? buildChangelog(commits) : '',
-    prerelease: false,
+    prerelease,
   });
   log.info(`created release ${gitHubRelease.data.html_url}`);
 

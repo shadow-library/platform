@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import fs from 'node:fs';
 import path from 'node:path';
 
@@ -9,6 +9,7 @@ import path from 'node:path';
  * Importing user defined packages
  */
 import { type GitHubClient, release, type ReleaseDependencies } from '@lib/release';
+import { log } from '@lib/utils';
 import { type RunResult } from '@lib/utils';
 
 import { createFixtureDir, removeFixtureDir, writeFixtureFiles } from './helpers/fixture';
@@ -91,35 +92,35 @@ describe('release (validation)', () => {
     fixtureDir = undefined;
   });
 
-  it('should reject an invalid level before touching the filesystem', async () => {
-    await expect(release({ level: 'huge', path: '/nonexistent' })).rejects.toThrow(/Invalid level/);
+  it('should reject an invalid release type before touching the filesystem', async () => {
+    await expect(release({ release: 'stable', path: '/nonexistent' })).rejects.toThrow(/Invalid release/);
   });
 
   it('should reject a non-existent target directory', async () => {
-    await expect(release({ level: 'patch', path: '/definitely/not/a/real/path' })).rejects.toThrow(/Not a directory/);
+    await expect(release({ release: 'patch', path: '/definitely/not/a/real/path' })).rejects.toThrow(/Not a directory/);
   });
 
   it('should reject a target with no package.json', async () => {
     fixtureDir = createFixtureDir('shadow-release-no-pkg-');
-    await expect(release({ level: 'patch', path: fixtureDir })).rejects.toThrow(/No package\.json/);
+    await expect(release({ release: 'patch', path: fixtureDir })).rejects.toThrow(/No package\.json/);
   });
 
   it('should reject a package.json with no "name"', async () => {
     fixtureDir = createFixtureDir('shadow-release-no-name-');
     writeFixtureFiles(fixtureDir, { 'package.json': JSON.stringify({ version: '1.0.0' }) });
-    await expect(release({ level: 'patch', path: fixtureDir })).rejects.toThrow(/no "name"/);
+    await expect(release({ release: 'patch', path: fixtureDir })).rejects.toThrow(/no "name"/);
   });
 
   it('should reject a package.json with no "version"', async () => {
     fixtureDir = createFixtureDir('shadow-release-no-version-');
     writeFixtureFiles(fixtureDir, { 'package.json': JSON.stringify({ name: '@fixtures/pkg' }) });
-    await expect(release({ level: 'patch', path: fixtureDir })).rejects.toThrow(/no "version"/);
+    await expect(release({ release: 'patch', path: fixtureDir })).rejects.toThrow(/no "version"/);
   });
 
   it('should require GITHUB_TOKEN', async () => {
     fixtureDir = createFixtureDir('shadow-release-no-token-');
     writeFixtureFiles(fixtureDir, { 'package.json': JSON.stringify({ name: '@fixtures/pkg', version: '1.0.0' }) });
-    await expect(release({ level: 'patch', path: fixtureDir })).rejects.toThrow(/GITHUB_TOKEN/);
+    await expect(release({ release: 'patch', path: fixtureDir })).rejects.toThrow(/GITHUB_TOKEN/);
   });
 });
 
@@ -153,7 +154,7 @@ describe('release (with injected dependencies)', () => {
     const { deps, recorder } = withGitRoot(fixtureDir);
 
     // default commits (a feat) require "minor"; choosing minor is allowed
-    await release({ level: 'minor', path: fixtureDir }, deps);
+    await release({ release: 'minor', path: fixtureDir }, deps);
 
     expect(recorder.buildCalls).toStrictEqual([fixtureDir]);
     expect(recorder.commands).toContain('bun test');
@@ -168,16 +169,22 @@ describe('release (with injected dependencies)', () => {
     fixtureDir = setup('shadow-release-toolow-');
     const { deps, recorder } = withGitRoot(fixtureDir, { 'git log': ok('feat!: a breaking change\x00') });
 
-    await expect(release({ level: 'minor', path: fixtureDir }, deps)).rejects.toThrow(/require a "major" bump, but "minor" was requested.*--force/s);
+    await expect(release({ release: 'minor', path: fixtureDir }, deps)).rejects.toThrow(/require a "major" bump, but "minor" was requested.*--force/s);
     expect(recorder.buildCalls).toHaveLength(0);
     expect(recorder.clientCalls).toHaveLength(0);
   });
 
-  it('should proceed under --force even when the commits require a higher bump', async () => {
+  it('should warn but proceed under --force when the commits require a higher bump', async () => {
     fixtureDir = setup('shadow-release-force-');
     const { deps, recorder } = withGitRoot(fixtureDir, { 'git log': ok('feat!: a breaking change\x00') });
+    const warn = spyOn(log, 'warn').mockImplementation(() => undefined);
 
-    await release({ level: 'minor', force: true, path: fixtureDir }, deps);
+    try {
+      await release({ release: 'minor', force: true, path: fixtureDir }, deps);
+      expect(warn.mock.calls.some(([msg]) => /Proceeding anyway because --force/.test(String(msg)))).toBe(true);
+    } finally {
+      warn.mockRestore();
+    }
 
     expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v1.1.0', sha: 'newsha' }]);
     expect(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'package.json'), 'utf-8')).version).toBe('1.1.0');
@@ -187,7 +194,7 @@ describe('release (with injected dependencies)', () => {
     fixtureDir = setup('shadow-release-zerox-', '0.1.1');
     const { deps, recorder } = withGitRoot(fixtureDir, { 'git log': ok('feat!: a breaking change\x00') });
 
-    await release({ level: 'minor', path: fixtureDir }, deps);
+    await release({ release: 'minor', path: fixtureDir }, deps);
 
     expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v0.2.0', sha: 'newsha' }]);
     expect(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'package.json'), 'utf-8')).version).toBe('0.2.0');
@@ -197,16 +204,26 @@ describe('release (with injected dependencies)', () => {
     fixtureDir = setup('shadow-release-over-');
     const { deps, recorder } = withGitRoot(fixtureDir, { 'git log': ok('fix: only a patch-worthy change\x00') });
 
-    await release({ level: 'major', path: fixtureDir }, deps);
+    await release({ release: 'major', path: fixtureDir }, deps);
 
     expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v2.0.0', sha: 'newsha' }]);
+  });
+
+  it('should cut an alpha prerelease at the inferred level and mark the release as prerelease', async () => {
+    fixtureDir = setup('shadow-release-alpha-');
+    const { deps, recorder } = withGitRoot(fixtureDir); // default commits require "minor"
+
+    await release({ release: 'alpha', path: fixtureDir }, deps);
+
+    expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v1.1.0-alpha.0', sha: 'newsha' }]);
+    expect(recorder.createReleaseArgs).toStrictEqual([{ tag_name: 'v1.1.0-alpha.0', prerelease: true }]);
   });
 
   it('should skip npm publish when release.npm is false', async () => {
     fixtureDir = setup('shadow-release-nonpm-', '1.0.0', { release: { npm: false } });
     const { deps, recorder } = withGitRoot(fixtureDir);
 
-    await release({ level: 'minor', path: fixtureDir }, deps);
+    await release({ release: 'minor', path: fixtureDir }, deps);
 
     expect(recorder.commands).not.toContain('npm publish');
     expect(recorder.createReleaseArgs).toHaveLength(1);
@@ -216,7 +233,7 @@ describe('release (with injected dependencies)', () => {
     fixtureDir = setup('shadow-release-testfail-');
     const { deps, recorder } = withGitRoot(fixtureDir, { 'bun test': fail(1, 'boom') });
 
-    await expect(release({ level: 'minor', path: fixtureDir }, deps)).rejects.toThrow(/Tests failed/);
+    await expect(release({ release: 'minor', path: fixtureDir }, deps)).rejects.toThrow(/Tests failed/);
     expect(recorder.buildCalls).toHaveLength(0);
     expect(recorder.clientCalls).toHaveLength(0);
   });
@@ -225,6 +242,6 @@ describe('release (with injected dependencies)', () => {
     fixtureDir = setup('shadow-release-nocommits-');
     const { deps } = withGitRoot(fixtureDir, { 'git log': ok('') });
 
-    await expect(release({ level: 'minor', path: fixtureDir }, deps)).rejects.toThrow(/No commits/);
+    await expect(release({ release: 'minor', path: fixtureDir }, deps)).rejects.toThrow(/No commits/);
   });
 });

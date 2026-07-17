@@ -6,7 +6,18 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { applySemverPolicy, buildChangelog, bumpVersion, computeBumpLevel, isValidLevel, parseConventionalCommit, parseGitHubRepoSlug } from '@lib/release';
+import {
+  applySemverPolicy,
+  buildChangelog,
+  bumpVersion,
+  computeBumpLevel,
+  computeNextVersion,
+  isReleaseChannel,
+  isValidLevel,
+  isValidRelease,
+  parseConventionalCommit,
+  parseGitHubRepoSlug,
+} from '@lib/release';
 
 /**
  * Defining types
@@ -25,6 +36,22 @@ describe('release', () => {
 
     it.each(['', 'MAJOR', 'stable', 'alpha', 'prerelease'])('should reject "%s"', level => {
       expect(isValidLevel(level)).toBe(false);
+    });
+  });
+
+  describe('isReleaseChannel / isValidRelease', () => {
+    it.each(['alpha', 'beta'])('should accept the prerelease channel "%s"', channel => {
+      expect(isReleaseChannel(channel)).toBe(true);
+      expect(isValidRelease(channel)).toBe(true);
+    });
+
+    it('should treat a level as a valid release but not a channel', () => {
+      expect(isReleaseChannel('minor')).toBe(false);
+      expect(isValidRelease('minor')).toBe(true);
+    });
+
+    it.each(['stable', 'rc', ''])('should reject "%s" as a release', value => {
+      expect(isValidRelease(value)).toBe(false);
     });
   });
 
@@ -119,6 +146,20 @@ describe('release', () => {
 
     it('should drop a prerelease tag when bumping', () => {
       expect(bumpVersion('1.3.0-alpha.2', 'patch')).toBe('1.3.1');
+    });
+  });
+
+  describe('computeNextVersion (prerelease channels)', () => {
+    it('should start a prerelease off the applied level from a stable version', () => {
+      expect(computeNextVersion('1.2.3', 'minor', 'alpha')).toBe('1.3.0-alpha.0');
+    });
+
+    it('should bump the counter for a prerelease of the same channel', () => {
+      expect(computeNextVersion('1.3.0-alpha.0', 'minor', 'alpha')).toBe('1.3.0-alpha.1');
+    });
+
+    it('should switch channels in place, keeping the core', () => {
+      expect(computeNextVersion('1.3.0-alpha.2', 'minor', 'beta')).toBe('1.3.0-beta.0');
     });
   });
 

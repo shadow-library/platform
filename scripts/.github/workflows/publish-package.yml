@@ -3,17 +3,19 @@ name: Publish package to NPM
 on:
   workflow_dispatch:
     inputs:
-      level:
+      release:
         type: choice
-        description: 'Version bump to release'
+        description: 'Release type (major/minor/patch = stable, alpha/beta = prerelease)'
         default: 'patch'
         options:
           - 'patch'
           - 'minor'
           - 'major'
+          - 'alpha'
+          - 'beta'
       force:
         type: boolean
-        description: 'Force the release even if the commits require a higher bump'
+        description: 'Force a stable release even if the commits require a higher bump'
         default: false
 
 jobs:
@@ -49,11 +51,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # `shadow release <level>` bumps the chosen level and performs every remote git operation (Verified
-      # package.json commit on main, tag, GitHub release) through Octokit before publishing to npm. It
-      # errors if the commits require a higher bump than the chosen level, unless "force" is checked.
+      # `shadow release` bumps the chosen level (or cuts an alpha/beta prerelease) and performs every remote
+      # git operation (Verified package.json commit on main, tag, GitHub release) through Octokit before
+      # publishing to npm. A stable level errors if the commits require a higher bump, unless "force" is checked.
       - name: Release
-        run: bun run src/bin/shadow.ts release ${{ github.event.inputs.level }} ${{ github.event.inputs.force == 'true' && '--force' || '' }}
+        run: bun run src/bin/shadow.ts release ${{ github.event.inputs.release }} ${{ github.event.inputs.force == 'true' && '--force' || '' }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

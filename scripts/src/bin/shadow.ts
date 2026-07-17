@@ -31,7 +31,7 @@ Usage:
   shadow verify [--fix]
   shadow commit-msg <file>
   shadow gen-api-types <url> [--out <path>]
-  shadow release <major|minor|patch> [--force] [--path <path>]
+  shadow release <major|minor|patch|alpha|beta> [--force] [--path <path>]
   shadow check-migrations [--dir <path>]
 
 Commands:
@@ -40,7 +40,7 @@ Commands:
   verify [--fix]         Format + lint the whole repo, then type-check + test
   commit-msg <file>      Lint a commit message (drives the husky commit-msg hook)
   gen-api-types <url>    Fetch an OpenAPI document and generate TypeScript types
-  release <level>        Bump major|minor|patch and publish; errors if commits need more (--force overrides)
+  release <type>         Release major|minor|patch (stable, guarded) or alpha|beta (prerelease); --force overrides
   check-migrations       Fail if "db:generate" leaves uncommitted migration changes
 
 Configuration lives in .shadowrc.json. See https://github.com/shadow-library/scripts#readme.
@@ -86,10 +86,10 @@ async function main(): Promise<number> {
     }
 
     case 'release': {
-      const level = positionals[0];
-      if (!level) throw new ShadowError('Usage: shadow release <major|minor|patch> [--force] [--path <path>]');
+      const releaseType = positionals[0];
+      if (!releaseType) throw new ShadowError('Usage: shadow release <major|minor|patch|alpha|beta> [--force] [--path <path>]');
       const targetPath = flags.path;
-      await release({ level, force: flags.force === true, path: typeof targetPath === 'string' ? targetPath : undefined });
+      await release({ release: releaseType, force: flags.force === true, path: typeof targetPath === 'string' ? targetPath : undefined });
       return 0;
     }
 
