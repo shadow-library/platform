@@ -3,14 +3,20 @@ name: Publish package to NPM
 on:
   workflow_dispatch:
     inputs:
-      channel:
+      release:
         type: choice
-        description: 'Release channel'
-        default: 'stable'
+        description: 'Release type — stable level (major/minor/patch) or prerelease channel (alpha/beta)'
+        default: 'patch'
         options:
-          - 'stable'
+          - 'major'
+          - 'minor'
+          - 'patch'
           - 'alpha'
           - 'beta'
+      force:
+        type: boolean
+        description: 'Release the chosen level even if the commits require a higher bump'
+        default: false
 
 jobs:
   publish:
@@ -47,6 +53,6 @@ jobs:
 
       # npm publish authenticates via OIDC trusted publishing (id-token: write) — no NODE_AUTH_TOKEN needed.
       - name: Release
-        run: bunx shadow release ${{ github.event.inputs.channel }}
+        run: bunx shadow release ${{ inputs.release }} ${{ inputs.force && '--force' || '' }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
