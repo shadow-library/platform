@@ -198,8 +198,9 @@ object omits exposure, so a rehydrated error can never be downgraded from masked
 
 ### Config key hierarchy — the standard
 
-Config keys are **dot-delimited paths**, `<domain>.<area>.<name>`, lowercase, most-general segment first.
-The hierarchy is load-bearing: it drives env-var naming and prefix subscriptions.
+Config keys are **dot-delimited paths** of **2 to 7 segments** (`<domain>.<name>` at minimum, deepening to
+`<domain>.<area>.<sub>.<name>` as needed), lowercase, most-general segment first. The hierarchy is
+load-bearing: it drives env-var naming and prefix subscriptions.
 
 **The rules:**
 
@@ -208,8 +209,8 @@ The hierarchy is load-bearing: it drives env-var naming and prefix subscriptions
    uppercase, underscores, spaces, or digits in a key.
 2. **The first segment is a bounded context / subsystem** — `app`, `log`, `db`, `redis`, `auth`, `mail`,
    `stripe`. Everything a subsystem owns lives under its prefix.
-3. **Dots express hierarchy, never the value.** Add depth only when a subsystem has distinct areas:
-   `db.url`, `db.pool.max`, `auth.jwt.secret`.
+3. **Dots express hierarchy, never the value.** A key has **2 segments at minimum and 7 at most**; add depth
+   only when a subsystem has distinct areas: `db.url` (2), `db.pool.max` (3), `auth.jwt.access.secret` (4).
 4. **The env var is derived** by uppercasing the key and replacing `.`/`-` with `_`. So `db.pool.max` ⇄
    `DB_POOL_MAX` and `db.read-replica.url` ⇄ `DB_READ_REPLICA_URL`. Set `envKey` explicitly only for
    third-party names you do not own (e.g. `app.env` reads `NODE_ENV`).
