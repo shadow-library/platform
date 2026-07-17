@@ -84,15 +84,16 @@ export function computeDistPackageJson(packageJson: PackageJson, config: BuildCo
 }
 
 /**
- * Runs `tsc` then `tsc-alias` into `outDir`. Throws with a stage-specific message on failure so callers
- * don't have to guess whether tsc or the alias rewrite broke.
+ * Runs `tsc` then `tsc-alias` into `outDir`. Output is captured (not streamed) and surfaced only through the
+ * thrown error on failure — so a compile error is still shown to the user, but an *expected* failure (e.g. the
+ * build integration test) doesn't spray raw `file(line,col): error` lines into CI logs and annotations.
  */
 function compile(rootDir: string, outDir: string): void {
-  const tsc = run('bunx', ['tsc', '--outDir', outDir, '--project', 'tsconfig.build.json'], { cwd: rootDir });
-  if (tsc.status !== 0) throw new ShadowError(`Build failed: tsc exited with code ${tsc.status}`);
+  const tsc = run('bunx', ['tsc', '--outDir', outDir, '--project', 'tsconfig.build.json'], { cwd: rootDir, stream: false });
+  if (tsc.status !== 0) throw new ShadowError(`Build failed: tsc exited with code ${tsc.status}\n${`${tsc.stdout}${tsc.stderr}`.trim()}`);
 
-  const alias = run('bunx', ['tsc-alias', '--outDir', outDir, '--project', 'tsconfig.build.json'], { cwd: rootDir });
-  if (alias.status !== 0) throw new ShadowError(`Build failed: tsc-alias exited with code ${alias.status}`);
+  const alias = run('bunx', ['tsc-alias', '--outDir', outDir, '--project', 'tsconfig.build.json'], { cwd: rootDir, stream: false });
+  if (alias.status !== 0) throw new ShadowError(`Build failed: tsc-alias exited with code ${alias.status}\n${`${alias.stdout}${alias.stderr}`.trim()}`);
 }
 
 /**
