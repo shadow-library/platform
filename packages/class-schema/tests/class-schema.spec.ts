@@ -11,6 +11,7 @@ import { Class } from 'type-fest';
 import { BRAND } from '@lib/constants';
 import { EnumType } from '@lib/enum-type';
 import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schema';
+import { type AsType } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -87,10 +88,10 @@ describe('ClassSchema', () => {
     @Field({ optional: true })
     size?: number;
 
-    // A scalar reference to a class declared later in a circular pair must stay `object`: under
-    // emitDecoratorMetadata, annotating it `Folder` emits a runtime reference before Folder exists.
+    // `AsType` keeps the compile-time type `Folder` while erasing to `Object` in the emitted
+    // `design:type`, so the circular pair never triggers a runtime "used before initialization".
     @Field(() => Folder)
-    parent: object;
+    parent: AsType<Folder>;
 
     @Field({ requiredIf: 'size' })
     unit: string;
