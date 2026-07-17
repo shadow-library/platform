@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { ShadowScriptsError, findScript, readPackageJson, resolveExistingDir } from '@lib/utils';
+import { findScript, readPackageJson, resolveExistingDir, ShadowError } from '@lib/utils';
 
 import { createFixtureDir, removeFixtureDir, writeFixtureFiles } from '../helpers/fixture';
 
@@ -58,13 +58,13 @@ describe('utils/package-json', () => {
 
     it('should throw for a path that does not exist', () => {
       fixtureDir = createFixtureDir('shadow-scripts-resolve-dir-missing-');
-      expect(() => resolveExistingDir('nope', fixtureDir!)).toThrow(ShadowScriptsError);
+      expect(() => resolveExistingDir('nope', fixtureDir!)).toThrow(ShadowError);
     });
 
     it('should throw for a path that is a file, not a directory', () => {
       fixtureDir = createFixtureDir('shadow-scripts-resolve-dir-file-');
       writeFixtureFiles(fixtureDir, { 'file.txt': 'x' });
-      expect(() => resolveExistingDir('file.txt', fixtureDir!)).toThrow(ShadowScriptsError);
+      expect(() => resolveExistingDir('file.txt', fixtureDir!)).toThrow(ShadowError);
     });
   });
 
@@ -86,13 +86,13 @@ describe('utils/package-json', () => {
 
     it('should throw when package.json is missing', () => {
       fixtureDir = createFixtureDir('shadow-scripts-read-pkg-missing-');
-      expect(() => readPackageJson(fixtureDir!)).toThrow(ShadowScriptsError);
+      expect(() => readPackageJson(fixtureDir!)).toThrow(ShadowError);
     });
 
     it('should throw when package.json is not valid JSON', () => {
       fixtureDir = createFixtureDir('shadow-scripts-read-pkg-invalid-');
       writeFixtureFiles(fixtureDir, { 'package.json': '{ not valid json' });
-      expect(() => readPackageJson(fixtureDir!)).toThrow(ShadowScriptsError);
+      expect(() => readPackageJson(fixtureDir!)).toThrow(ShadowError);
     });
   });
 });

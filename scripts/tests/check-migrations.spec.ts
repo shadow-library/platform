@@ -7,7 +7,7 @@ import { describe, expect, it } from 'bun:test';
  * Importing user defined packages
  */
 import { resolveMigrationsDir } from '@lib/check-migrations';
-import { ShadowScriptsError } from '@lib/utils';
+import { ShadowError } from '@lib/utils';
 
 /**
  * Defining types
@@ -28,8 +28,8 @@ describe('check-migrations', () => {
     });
 
     it('should reject a --dir that escapes the repository', () => {
-      expect(() => resolveMigrationsDir('/repo', '../../etc')).toThrow(ShadowScriptsError);
-      expect(() => resolveMigrationsDir('/repo', '../sibling')).toThrow(ShadowScriptsError);
+      expect(() => resolveMigrationsDir('/repo', '../../etc')).toThrow(ShadowError);
+      expect(() => resolveMigrationsDir('/repo', '../sibling')).toThrow(ShadowError);
     });
 
     it('should accept "." as the whole repo', () => {

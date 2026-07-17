@@ -6,8 +6,8 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { type OpenApiDocument, buildTypeAliases, transformOpenApiDocument, validateOpenApiDocument } from '@lib/gen-api-types';
-import { ShadowScriptsError } from '@lib/utils';
+import { buildTypeAliases, type OpenApiDocument, transformOpenApiDocument, validateOpenApiDocument } from '@lib/gen-api-types';
+import { ShadowError } from '@lib/utils';
 
 /**
  * Defining types
@@ -25,12 +25,12 @@ describe('gen-api-types', () => {
     });
 
     it('should reject a non-object', () => {
-      expect(() => validateOpenApiDocument('nope', 'http://x')).toThrow(ShadowScriptsError);
-      expect(() => validateOpenApiDocument(null, 'http://x')).toThrow(ShadowScriptsError);
+      expect(() => validateOpenApiDocument('nope', 'http://x')).toThrow(ShadowError);
+      expect(() => validateOpenApiDocument(null, 'http://x')).toThrow(ShadowError);
     });
 
     it('should reject an object without "paths"', () => {
-      expect(() => validateOpenApiDocument({ openapi: '3.0.0' }, 'http://x')).toThrow(ShadowScriptsError);
+      expect(() => validateOpenApiDocument({ openapi: '3.0.0' }, 'http://x')).toThrow(ShadowError);
     });
   });
 

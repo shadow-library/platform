@@ -1,0 +1,7 @@
+{
+  "build": {
+    "target": "backend",
+    "exports": { ".": "index" },
+    "bin": { "shadow": "bin/shadow" }
+  }
+}

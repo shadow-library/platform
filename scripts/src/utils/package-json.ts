@@ -7,7 +7,7 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
-import { ShadowScriptsError } from '@lib/utils/errors';
+import { ShadowError } from '@lib/utils/errors';
 
 /**
  * Defining types
@@ -19,7 +19,6 @@ export interface PackageJson {
   scripts?: Record<string, string>;
   sideEffects?: boolean | string[];
   bin?: string | Record<string, string>;
-  shadowLibrary?: { exports?: Record<string, string> };
   [key: string]: unknown;
 }
 
@@ -33,13 +32,13 @@ export function readPackageJson(dir: string): {
   data: PackageJson;
 } {
   const filePath = path.join(dir, 'package.json');
-  if (!fs.existsSync(filePath)) throw new ShadowScriptsError(`No package.json found at ${filePath}`);
+  if (!fs.existsSync(filePath)) throw new ShadowError(`No package.json found at ${filePath}`);
 
   const raw = fs.readFileSync(filePath, 'utf-8');
   try {
     return { filePath, data: JSON.parse(raw) as PackageJson };
   } catch (cause) {
-    throw new ShadowScriptsError(`Failed to parse ${filePath}: not valid JSON`, { cause });
+    throw new ShadowError(`Failed to parse ${filePath}: not valid JSON`, { cause });
   }
 }
 
@@ -59,6 +58,6 @@ export function findScript(scripts: Record<string, string> | undefined, names: s
 /** Resolves `dirArg` (defaulting to `cwd`) to an absolute path and confirms it is an existing directory. */
 export function resolveExistingDir(dirArg: string | undefined, cwd: string): string {
   const resolved = path.resolve(cwd, dirArg ?? '.');
-  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) throw new ShadowScriptsError(`Not a directory: ${resolved}`);
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) throw new ShadowError(`Not a directory: ${resolved}`);
   return resolved;
 }

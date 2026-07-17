@@ -4,182 +4,270 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
+import { Octokit } from '@octokit/rest';
+
 /**
  * Importing user defined packages
  */
-import { ShadowScriptsError, log, readPackageJson, run } from '@lib/utils';
+import { build } from '@lib/build';
+import { loadConfig, type ReleaseConfig } from '@lib/config';
+import { log, readPackageJson, run, ShadowError } from '@lib/utils';
 
 /**
  * Defining types
  */
-export type Bump = 'patch' | 'minor' | 'major' | 'prepatch' | 'preminor' | 'premajor';
+export type ReleaseChannel = 'stable' | 'alpha' | 'beta';
+export type BumpLevel = 'major' | 'minor' | 'patch';
 
 export interface ReleaseOptions {
-  bump: string;
+  /** Release channel. `stable` finalizes; `alpha`/`beta` cut a prerelease. */
+  channel: string;
   /** Target package directory. Defaults to `process.cwd()`. */
   path?: string;
 }
 
-/** The one external side effect this command has — injectable so tests can exercise the full flow without spawning `release-it`/`gh` for real. */
-export interface ReleaseDependencies {
-  run: typeof run;
+export interface ParsedCommit {
+  type: string;
+  breaking: boolean;
+  subject: string;
 }
 
-interface ReleaseItConfig {
-  git?: { push?: boolean };
+interface SemVer {
+  major: number;
+  minor: number;
+  patch: number;
+  preid?: string;
+  prenum?: number;
+}
+
+/** The subset of Octokit used here — narrowed so tests can pass a fake client without the full SDK. */
+export interface GitHubClient {
+  rest: {
+    repos: {
+      getContent(params: { owner: string; repo: string; path: string; ref: string }): Promise<{ data: unknown }>;
+      createOrUpdateFileContents(params: {
+        owner: string;
+        repo: string;
+        path: string;
+        message: string;
+        content: string;
+        branch: string;
+        sha?: string;
+      }): Promise<{ data: { commit: { sha?: string } } }>;
+      createRelease(params: { owner: string; repo: string; tag_name: string; name: string; body: string; prerelease: boolean }): Promise<{ data: { html_url: string } }>;
+    };
+    git: {
+      createRef(params: { owner: string; repo: string; ref: string; sha: string }): Promise<unknown>;
+    };
+  };
+}
+
+/** External effects, injectable so tests can exercise the full flow without git/GitHub/npm side effects. */
+export interface ReleaseDependencies {
+  run: typeof run;
+  build: typeof build;
+  createClient: (token: string) => GitHubClient;
 }
 
 /**
  * Declaring the constants
  */
-const VALID_BUMPS: Bump[] = ['patch', 'minor', 'major', 'prepatch', 'preminor', 'premajor'];
-const defaultDependencies: ReleaseDependencies = { run };
+const VALID_CHANNELS: ReleaseChannel[] = ['stable', 'alpha', 'beta'];
+const defaultDependencies: ReleaseDependencies = { run, build, createClient: token => new Octokit({ auth: token }) };
 
-export function isValidBump(value: string): value is Bump {
-  return (VALID_BUMPS as string[]).includes(value);
-}
-
-/**
- * Every existing `.release-it.json` in the ecosystem sets `git.push: false` — release-it bumps, commits,
- * and tags locally but deliberately does not push, because a GitHub Contents API commit (used for the
- * back-sync) is shown as "Verified" automatically, while a raw authenticated `git push` is not unless the
- * repo also has commit signing configured, which none of these repos do. We investigated dropping the
- * back-sync in favor of `git.push: true` (see README "Deviations from ../common") and kept it, since
- * eliminating it would silently downgrade release commits from Verified to unverified. If a package
- * opts into `git.push: true` — e.g. once signing is configured — the back-sync becomes redundant and is
- * skipped, so this centralizes today's behavior without locking in the old model forever.
- */
-export function shouldBackSync(releaseItConfig: ReleaseItConfig): boolean {
-  return releaseItConfig.git?.push === false;
+export function isValidChannel(value: string): value is ReleaseChannel {
+  return (VALID_CHANNELS as string[]).includes(value);
 }
 
 /** Extracts `owner/repo` from a GitHub remote URL — `git@github.com:owner/repo.git` or `https://github.com/owner/repo.git`. */
-export function parseGitHubRepoSlug(remoteUrl: string): string {
-  const match = /github\.com[:/]([^/]+\/[^/]+?)(\.git)?$/.exec(remoteUrl.trim());
-  if (!match) throw new ShadowScriptsError(`Could not parse a GitHub owner/repo from remote URL: ${remoteUrl}`);
-  return match[1] as string;
+export function parseGitHubRepoSlug(remoteUrl: string): { owner: string; repo: string } {
+  const match = /github\.com[:/]([^/]+)\/([^/]+?)(?:\.git)?$/.exec(remoteUrl.trim());
+  if (!match) throw new ShadowError(`Could not parse a GitHub owner/repo from remote URL: ${remoteUrl}`);
+  return { owner: match[1] as string, repo: match[2] as string };
 }
 
-function readReleaseItConfig(targetDir: string): ReleaseItConfig {
-  const configPath = path.join(targetDir, '.release-it.json');
-  if (!fs.existsSync(configPath))
-    throw new ShadowScriptsError(`No .release-it.json found at ${configPath} — this command runs the target's existing release-it config, it does not create one`);
-  try {
-    return JSON.parse(fs.readFileSync(configPath, 'utf-8')) as ReleaseItConfig;
-  } catch (cause) {
-    throw new ShadowScriptsError(`Failed to parse ${configPath}: not valid JSON`, { cause });
+/** Parses a single commit's raw message (`git log %B`) into its conventional-commit type, breaking flag, and subject. */
+export function parseConventionalCommit(message: string): ParsedCommit {
+  const [header = '', ...bodyLines] = message.split('\n');
+  const headerMatch = /^(\w+)(?:\([^)]*\))?(!)?:\s*(.*)$/.exec(header.trim());
+  const body = bodyLines.join('\n');
+  const breaking = Boolean(headerMatch?.[2]) || /^BREAKING[ -]CHANGE:/m.test(body);
+  return { type: headerMatch?.[1]?.toLowerCase() ?? '', breaking, subject: headerMatch?.[3]?.trim() ?? header.trim() };
+}
+
+/**
+ * Derives the semver bump level from the commits since the last release, following Conventional Commits:
+ * any breaking change → major, any `feat` → minor, otherwise → patch. This is what lets the caller pick
+ * only a channel — the magnitude is inferred, never asked for.
+ */
+export function computeBumpLevel(commits: ParsedCommit[]): BumpLevel {
+  let level: BumpLevel = 'patch';
+  for (const commit of commits) {
+    if (commit.breaking) return 'major';
+    if (commit.type === 'feat') level = 'minor';
   }
+  return level;
+}
+
+function parseSemVer(version: string): SemVer {
+  const match = /^(\d+)\.(\d+)\.(\d+)(?:-([a-z]+)\.(\d+))?$/.exec(version);
+  if (!match) throw new ShadowError(`Cannot parse a semver version from "${version}"`);
+  const [, major, minor, patch, preid, prenum] = match;
+  return {
+    major: Number(major),
+    minor: Number(minor),
+    patch: Number(patch),
+    preid: preid,
+    prenum: prenum === undefined ? undefined : Number(prenum),
+  };
+}
+
+function applyLevel(version: SemVer, level: BumpLevel): string {
+  if (level === 'major') return `${version.major + 1}.0.0`;
+  if (level === 'minor') return `${version.major}.${version.minor + 1}.0`;
+  return `${version.major}.${version.minor}.${version.patch + 1}`;
+}
+
+/**
+ * Computes the next version from the current one, the inferred bump level, and the chosen channel:
+ *  - `stable`: finalize an in-progress prerelease (drop the tag, keep its core) or apply the level to a
+ *    stable version.
+ *  - prerelease of the *same* channel: bump its counter (`1.3.0-alpha.0` → `1.3.0-alpha.1`).
+ *  - prerelease of a *different* channel: promote in place, keeping the core (`1.3.0-alpha.2` → `1.3.0-beta.0`).
+ *  - stable → prerelease: apply the level, then start the channel at `.0` (`1.2.3` +minor → `1.3.0-alpha.0`).
+ */
+export function computeNextVersion(currentVersion: string, level: BumpLevel, channel: ReleaseChannel): string {
+  const current = parseSemVer(currentVersion);
+  const core = `${current.major}.${current.minor}.${current.patch}`;
+
+  if (channel === 'stable') return current.preid ? core : applyLevel(current, level);
+  if (current.preid === channel) return `${core}-${channel}.${(current.prenum ?? 0) + 1}`;
+  if (current.preid) return `${core}-${channel}.0`;
+  return `${applyLevel(current, level)}-${channel}.0`;
+}
+
+/** Builds a terse markdown changelog grouping features and fixes — used as the GitHub release body. */
+export function buildChangelog(commits: ParsedCommit[]): string {
+  const features = commits.filter(commit => commit.type === 'feat').map(commit => `- ${commit.subject}`);
+  const fixes = commits.filter(commit => commit.type === 'fix').map(commit => `- ${commit.subject}`);
+  const sections: string[] = [];
+  if (features.length > 0) sections.push(`### Features\n${features.join('\n')}`);
+  if (fixes.length > 0) sections.push(`### Bug Fixes\n${fixes.join('\n')}`);
+  return sections.join('\n\n') || '_No notable changes._';
 }
 
 function requireEnv(name: string): string {
   const value = process.env[name];
-  if (!value) throw new ShadowScriptsError(`Missing required environment variable: ${name}`);
+  if (!value) throw new ShadowError(`Missing required environment variable: ${name}`);
   return value;
 }
 
-function requireTool(command: string, deps: ReleaseDependencies): void {
-  const result = deps.run(command, ['--version'], {
-    cwd: process.cwd(),
-    stream: false,
+/** Reads the raw commit messages since `lastTag` (or from the repo root when there is no prior tag). */
+function readCommitsSince(cwd: string, lastTag: string | undefined, deps: ReleaseDependencies): ParsedCommit[] {
+  const range = lastTag ? `${lastTag}..HEAD` : 'HEAD';
+  const result = deps.run('git', ['log', range, '--format=%B%x00'], { cwd, stream: false });
+  if (result.status !== 0) throw new ShadowError('Could not read git history — is this a git repository with commits?');
+  return result.stdout
+    .split('\x00')
+    .map(message => message.trim())
+    .filter(Boolean)
+    .map(parseConventionalCommit);
+}
+
+function readLastTag(cwd: string, deps: ReleaseDependencies): string | undefined {
+  const result = deps.run('git', ['describe', '--tags', '--match', 'v*', '--abbrev=0'], { cwd, stream: false });
+  return result.status === 0 ? result.stdout.trim() || undefined : undefined;
+}
+
+/** Commits the bumped package.json to `main` via the Contents API (a Verified commit) and returns the new commit SHA. */
+async function commitVersionBump(client: GitHubClient, slug: { owner: string; repo: string }, relativePath: string, contents: string, version: string): Promise<string> {
+  const existing = await client.rest.repos.getContent({ ...slug, path: relativePath, ref: 'main' });
+  const sha = (existing.data as { sha?: string }).sha;
+
+  const result = await client.rest.repos.createOrUpdateFileContents({
+    ...slug,
+    path: relativePath,
+    message: `chore: release v${version}`,
+    content: Buffer.from(contents, 'utf-8').toString('base64'),
+    branch: 'main',
+    sha,
   });
-  if (result.status !== 0) throw new ShadowScriptsError(`Required tool "${command}" was not found on PATH`);
+
+  const commitSha = result.data.commit.sha;
+  if (!commitSha) throw new ShadowError('GitHub did not return a commit SHA for the version bump');
+  return commitSha;
 }
 
 /**
- * Re-syncs `package.json` on `main` after a `git.push: false` release-it run, using the same GitHub
- * Contents API call every publish workflow in the ecosystem hand-rolls: read the post-bump file, look up
- * the previous commit's blob SHA for it (so the API call updates rather than creates), and PUT it back
- * with the release commit's own message. Requires `gh` and a token with repo-content write access —
- * `GITHUB_TOKEN` is expected to be a GitHub App installation token (see README), not a plain PAT.
- */
-function backSyncPackageJson(targetDir: string, deps: ReleaseDependencies): void {
-  requireTool('gh', deps);
-  const token = requireEnv('GITHUB_TOKEN');
-
-  const remote = deps.run('git', ['remote', 'get-url', 'origin'], {
-    cwd: targetDir,
-    stream: false,
-  });
-  if (remote.status !== 0) throw new ShadowScriptsError('Could not resolve git remote "origin" for the back-sync step');
-  const repoSlug = parseGitHubRepoSlug(remote.stdout);
-
-  const gitRoot = deps.run('git', ['rev-parse', '--show-toplevel'], {
-    cwd: targetDir,
-    stream: false,
-  });
-  if (gitRoot.status !== 0) throw new ShadowScriptsError('Could not resolve the git repository root for the back-sync step');
-  const relativePackageJsonPath = path.relative(gitRoot.stdout.trim(), path.join(targetDir, 'package.json')).split(path.sep).join('/');
-
-  const previousBlobSha = deps.run('git', ['rev-parse', `HEAD~1:${relativePackageJsonPath}`], { cwd: targetDir, stream: false });
-  if (previousBlobSha.status !== 0) throw new ShadowScriptsError('Could not resolve the previous package.json blob SHA — was a release commit actually created?');
-
-  const commitMessage = deps.run('git', ['show', '-s', '--format=%s'], {
-    cwd: targetDir,
-    stream: false,
-  });
-  if (commitMessage.status !== 0) throw new ShadowScriptsError('Could not read the release commit message for the back-sync step');
-
-  const packageJsonContent = fs.readFileSync(path.join(targetDir, 'package.json'), 'utf-8');
-  const base64Content = Buffer.from(packageJsonContent, 'utf-8').toString('base64');
-
-  const result = deps.run(
-    'gh',
-    [
-      'api',
-      '--method',
-      'PUT',
-      `/repos/${repoSlug}/contents/${relativePackageJsonPath}`,
-      '--field',
-      'branch=main',
-      '--field',
-      'encoding=base64',
-      '--field',
-      `content=${base64Content}`,
-      '--field',
-      `message=${commitMessage.stdout.trim()}`,
-      '--field',
-      `sha=${previousBlobSha.stdout.trim()}`,
-    ],
-    { cwd: targetDir, env: { ...process.env, GH_TOKEN: token }, stream: false },
-  );
-  if (result.status !== 0)
-    throw new ShadowScriptsError(
-      `package.json back-sync failed (gh api exited with code ${result.status}) — release-it already bumped and tagged; main's package.json may now be stale`,
-    );
-}
-
-/**
- * Centralizes the release workflow duplicated across every library repo's `publish-package.yml`:
- * validate the target, run its own `release-it` config for the requested bump, then re-sync
- * `package.json` to `main` if (and only if) the target's config still needs it (see {@link shouldBackSync}).
+ * Centralizes the release workflow: infer the bump level from commits since the last tag, compute the next
+ * version for the chosen channel, build and test, then perform every remote git operation through Octokit —
+ * a Verified `package.json` commit on `main`, the `v<version>` tag, and the GitHub release — before publishing
+ * to npm. The caller only chooses `stable | alpha | beta`; the magnitude is derived from the commit history.
  */
 export async function release(options: ReleaseOptions, deps: ReleaseDependencies = defaultDependencies): Promise<void> {
-  if (!isValidBump(options.bump)) throw new ShadowScriptsError(`Invalid bump "${options.bump}" — expected one of: ${VALID_BUMPS.join(', ')}`);
+  if (!isValidChannel(options.channel)) throw new ShadowError(`Invalid channel "${options.channel}" — expected one of: ${VALID_CHANNELS.join(', ')}`);
+  const channel = options.channel;
 
   const targetDir = path.resolve(options.path ?? process.cwd());
-  if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) throw new ShadowScriptsError(`Not a directory: ${targetDir}`);
+  if (!fs.existsSync(targetDir) || !fs.statSync(targetDir).isDirectory()) throw new ShadowError(`Not a directory: ${targetDir}`);
 
-  const { data: packageJson } = readPackageJson(targetDir);
-  if (!packageJson.name) throw new ShadowScriptsError(`package.json at ${targetDir} has no "name" — refusing to release`);
+  const { filePath: packageJsonPath, data: packageJson } = readPackageJson(targetDir);
+  if (!packageJson.name) throw new ShadowError(`package.json at ${targetDir} has no "name" — refusing to release`);
+  if (!packageJson.version) throw new ShadowError(`package.json at ${targetDir} has no "version" — refusing to release`);
 
-  const releaseItConfig = readReleaseItConfig(targetDir);
-  const needsBackSync = shouldBackSync(releaseItConfig);
-  if (needsBackSync) {
-    requireEnv('GITHUB_TOKEN');
-    requireTool('gh', deps);
-  }
+  const config = loadConfig(targetDir, packageJson.name).release;
+  const token = requireEnv('GITHUB_TOKEN');
 
-  log.info(`releasing ${packageJson.name} (${options.bump}) from ${targetDir}`);
+  const remote = deps.run('git', ['remote', 'get-url', 'origin'], { cwd: targetDir, stream: false });
+  if (remote.status !== 0) throw new ShadowError('Could not resolve git remote "origin"');
+  const slug = parseGitHubRepoSlug(remote.stdout);
 
-  const preRelease = options.bump.startsWith('pre') ? ['--preRelease=beta'] : [];
-  const releaseItResult = deps.run('bunx', ['release-it', options.bump, ...preRelease, '--ci'], { cwd: targetDir });
-  if (releaseItResult.status !== 0) throw new ShadowScriptsError(`release-it failed (exit code ${releaseItResult.status}) — no back-sync attempted`);
+  const gitRoot = deps.run('git', ['rev-parse', '--show-toplevel'], { cwd: targetDir, stream: false });
+  if (gitRoot.status !== 0) throw new ShadowError('Could not resolve the git repository root');
+  const relativePackageJsonPath = path.relative(gitRoot.stdout.trim(), packageJsonPath).split(path.sep).join('/');
 
-  if (!needsBackSync) {
-    log.success(`Released ${packageJson.name} — release-it pushed directly (git.push !== false), no back-sync needed`);
-    return;
-  }
+  const commits = readCommitsSince(targetDir, readLastTag(targetDir, deps), deps);
+  if (commits.length === 0) throw new ShadowError('No commits since the last release — nothing to release');
 
-  backSyncPackageJson(targetDir, deps);
-  log.success(`Released ${packageJson.name} and synced package.json to main`);
+  const level = computeBumpLevel(commits);
+  const version = computeNextVersion(packageJson.version, level, channel);
+  const tag = `v${version}`;
+  log.info(`releasing ${packageJson.name}: ${packageJson.version} → ${version} (${level}, ${channel})`);
+
+  runPreReleaseChecks(targetDir, deps);
+
+  packageJson.version = version;
+  const updatedContents = `${JSON.stringify(packageJson, null, 2)}\n`;
+  fs.writeFileSync(packageJsonPath, updatedContents);
+
+  await deps.build({ cwd: targetDir });
+
+  const client = deps.createClient(token);
+  const commitSha = await commitVersionBump(client, slug, relativePackageJsonPath, updatedContents, version);
+  await client.rest.git.createRef({ ...slug, ref: `refs/tags/${tag}`, sha: commitSha });
+  const gitHubRelease = await client.rest.repos.createRelease({
+    ...slug,
+    tag_name: tag,
+    name: tag,
+    body: config.changelog ? buildChangelog(commits) : '',
+    prerelease: channel !== 'stable',
+  });
+  log.info(`created release ${gitHubRelease.data.html_url}`);
+
+  if (config.npm) publishToNpm(targetDir, config, deps);
+
+  log.success(`Released ${packageJson.name}@${version}`);
+}
+
+/** Runs the pre-release gate — `bun test` — so a broken build never reaches a tag or npm. */
+function runPreReleaseChecks(targetDir: string, deps: ReleaseDependencies): void {
+  const test = deps.run('bun', ['test'], { cwd: targetDir });
+  if (test.status !== 0) throw new ShadowError(`Tests failed (exit code ${test.status}) — aborting before any release action`);
+}
+
+/** Publishes the built package directory to npm. Runs after the tag/release so a publish failure leaves a recoverable state. */
+function publishToNpm(targetDir: string, config: ReleaseConfig, deps: ReleaseDependencies): void {
+  const publishDir = path.join(targetDir, config.publishDir);
+  const result = deps.run('npm', ['publish', '--access', 'public'], { cwd: publishDir });
+  if (result.status !== 0) throw new ShadowError(`npm publish failed (exit code ${result.status}) — the tag and GitHub release already exist; re-run publish manually`);
 }

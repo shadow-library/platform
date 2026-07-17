@@ -6,7 +6,7 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
-import { buildLib } from '@lib/build-lib';
+import { build } from '@lib/build';
 import { log } from '@lib/utils';
 
 /**
@@ -18,11 +18,11 @@ import { log } from '@lib/utils';
  */
 
 /**
- * This package dogfoods its own `build-lib` command — it is itself a tsc + tsc-alias dual ESM/CJS
- * library (see package.json `shadowLibrary.exports`), so there is no separate build script to
- * maintain, and every release doubles as an integration check of `build-lib` itself.
+ * This package dogfoods its own `build` command — it is itself a tsc + tsc-alias dual ESM/CJS backend
+ * library (see `.shadowrc.json`), so there is no separate build script to maintain, and every release
+ * doubles as an integration check of `build` itself.
  */
-buildLib({ cwd: path.join(import.meta.dirname, '..') }).catch((error: unknown) => {
+build({ cwd: path.join(import.meta.dirname, '..') }).catch((error: unknown) => {
   log.error(error instanceof Error ? error.message : String(error));
   process.exit(1);
 });

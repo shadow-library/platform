@@ -19,17 +19,17 @@ import { isRecursiveVerifyCall } from '@lib/verify';
 describe('verify', () => {
   describe('isRecursiveVerifyCall', () => {
     it('should detect a direct invocation', () => {
-      expect(isRecursiveVerifyCall('shadow-scripts verify')).toBe(true);
+      expect(isRecursiveVerifyCall('shadow verify')).toBe(true);
     });
 
     it('should detect a bunx/npx-prefixed invocation', () => {
-      expect(isRecursiveVerifyCall('bunx shadow-scripts verify')).toBe(true);
-      expect(isRecursiveVerifyCall('npx shadow-scripts verify')).toBe(true);
+      expect(isRecursiveVerifyCall('bunx shadow verify')).toBe(true);
+      expect(isRecursiveVerifyCall('npx shadow verify')).toBe(true);
     });
 
     it('should not flag unrelated commands', () => {
       expect(isRecursiveVerifyCall('bun run scripts/lint.ts')).toBe(false);
-      expect(isRecursiveVerifyCall('shadow-scripts build-lib')).toBe(false);
+      expect(isRecursiveVerifyCall('shadow build')).toBe(false);
       expect(isRecursiveVerifyCall('eslint src')).toBe(false);
     });
 

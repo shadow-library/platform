@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type SpawnSyncOptions, spawnSync } from 'node:child_process';
+import { spawnSync, type SpawnSyncOptions } from 'node:child_process';
 
 /**
  * Importing user defined packages

@@ -5,11 +5,13 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 import openapiTS, { astToString } from 'openapi-typescript';
+import prettier from 'prettier';
 
 /**
  * Importing user defined packages
  */
-import { ShadowScriptsError, log, run } from '@lib/utils';
+import { loadConfig, PRETTIER_BASE } from '@lib/config';
+import { log, ShadowError } from '@lib/utils';
 
 /**
  * Defining types
@@ -43,14 +45,13 @@ export interface OpenApiDocument {
 /**
  * Declaring the constants
  */
-const DEFAULT_OUTPUT_PATH = 'src/lib/apis/api-types.gen.ts';
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'options', 'head'] as const;
 
 /** Narrows an unknown parsed JSON value to an OpenAPI document, rejecting anything without a `paths` object. */
 export function validateOpenApiDocument(value: unknown, sourceUrl: string): OpenApiDocument {
-  if (typeof value !== 'object' || value === null) throw new ShadowScriptsError(`Malformed OpenAPI document fetched from ${sourceUrl}: not a JSON object`);
+  if (typeof value !== 'object' || value === null) throw new ShadowError(`Malformed OpenAPI document fetched from ${sourceUrl}: not a JSON object`);
   const document = value as OpenApiDocument;
-  if (typeof document.paths !== 'object' || document.paths === null) throw new ShadowScriptsError(`Malformed OpenAPI document fetched from ${sourceUrl}: missing "paths"`);
+  if (typeof document.paths !== 'object' || document.paths === null) throw new ShadowError(`Malformed OpenAPI document fetched from ${sourceUrl}: missing "paths"`);
   return document;
 }
 
@@ -140,32 +141,34 @@ export function buildTypeAliases(document: OpenApiDocument): string {
  */
 export async function genApiTypes(options: GenApiTypesOptions): Promise<void> {
   const response = await fetch(options.url);
-  if (!response.ok) throw new ShadowScriptsError(`Failed to fetch OpenAPI spec from ${options.url}: ${response.status} ${response.statusText}`);
+  if (!response.ok) throw new ShadowError(`Failed to fetch OpenAPI spec from ${options.url}: ${response.status} ${response.statusText}`);
 
   let rawDocument: unknown;
   try {
     rawDocument = await response.json();
   } catch (cause) {
-    throw new ShadowScriptsError(`Malformed OpenAPI document fetched from ${options.url}: not valid JSON`, { cause });
+    throw new ShadowError(`Malformed OpenAPI document fetched from ${options.url}: not valid JSON`, { cause });
   }
 
   const document = transformOpenApiDocument(validateOpenApiDocument(rawDocument, options.url));
 
   const ast = await openapiTS(document as any); // openapi-typescript's input type is narrower than our validated document shape
-  const contents = `${astToString(ast)}${buildTypeAliases(document)}`;
+  const rawContents = `${astToString(ast)}${buildTypeAliases(document)}`;
 
-  const outputPath = path.join(options.cwd, options.outputPath ?? DEFAULT_OUTPUT_PATH);
+  const config = loadConfig(options.cwd);
+  const outputPath = path.join(options.cwd, options.outputPath ?? config.genApiTypes.outputPath);
+
+  let contents: string;
+  try {
+    contents = await prettier.format(rawContents, { ...PRETTIER_BASE, ...config.verify.format, parser: 'typescript' });
+  } catch (cause) {
+    throw new ShadowError(`Generated API types failed formatting — left ${outputPath} untouched`, { cause });
+  }
+
+  // Write atomically via a temp file so a failure mid-write never leaves a truncated types file behind.
   const tempPath = `${outputPath}.tmp`;
   fs.mkdirSync(path.dirname(outputPath), { recursive: true });
   fs.writeFileSync(tempPath, contents);
-
-  // --parser is explicit because the temp file ends in ".tmp", which prettier can't infer a parser from.
-  const format = run('bunx', ['prettier', '--write', '--parser=typescript', '--log-level', 'error', tempPath], { cwd: options.cwd });
-  if (format.status !== 0) {
-    fs.rmSync(tempPath, { force: true });
-    throw new ShadowScriptsError(`Generated API types failed formatting — left ${outputPath} untouched`);
-  }
-
   fs.renameSync(tempPath, outputPath);
   log.success(`Generated API types at ${path.relative(options.cwd, outputPath)}`);
 }
