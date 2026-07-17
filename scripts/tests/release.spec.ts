@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { buildChangelog, computeBumpLevel, computeNextVersion, isValidChannel, parseConventionalCommit, parseGitHubRepoSlug } from '@lib/release';
+import { applySemverPolicy, buildChangelog, computeBumpLevel, computeNextVersion, isValidChannel, parseConventionalCommit, parseGitHubRepoSlug } from '@lib/release';
 
 /**
  * Defining types
@@ -79,6 +79,29 @@ describe('release', () => {
 
     it('should default to patch when nothing is releasable', () => {
       expect(computeBumpLevel(parse(['chore: a']))).toBe('patch');
+    });
+  });
+
+  describe('applySemverPolicy', () => {
+    it('should leave the level unchanged at 1.0.0 and above', () => {
+      expect(applySemverPolicy('major', '1.2.3')).toBe('major');
+      expect(applySemverPolicy('minor', '1.2.3')).toBe('minor');
+      expect(applySemverPolicy('patch', '1.2.3')).toBe('patch');
+    });
+
+    it('should demote every level one step while the major is 0', () => {
+      expect(applySemverPolicy('major', '0.1.0')).toBe('minor');
+      expect(applySemverPolicy('minor', '0.1.0')).toBe('patch');
+      expect(applySemverPolicy('patch', '0.1.0')).toBe('patch');
+    });
+
+    it('should treat a 0.x prerelease as pre-1.0 too', () => {
+      expect(applySemverPolicy('major', '0.2.0-alpha.0')).toBe('minor');
+    });
+
+    it('should compose with computeNextVersion so a 0.x breaking change bumps minor', () => {
+      expect(computeNextVersion('0.1.0', applySemverPolicy('major', '0.1.0'), 'stable')).toBe('0.2.0');
+      expect(computeNextVersion('0.1.0', applySemverPolicy('minor', '0.1.0'), 'stable')).toBe('0.1.1');
     });
   });
 

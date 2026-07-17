@@ -96,9 +96,9 @@ export function parseConventionalCommit(message: string): ParsedCommit {
 }
 
 /**
- * Derives the semver bump level from the commits since the last release, following Conventional Commits:
- * any breaking change → major, any `feat` → minor, otherwise → patch. This is what lets the caller pick
- * only a channel — the magnitude is inferred, never asked for.
+ * Derives the raw Conventional-Commits bump level from the commits since the last release: any breaking
+ * change → major, any `feat` → minor, otherwise → patch. This is what lets the caller pick only a channel —
+ * the magnitude is inferred, never asked for. {@link applySemverPolicy} then adjusts it for 0.x versions.
  */
 export function computeBumpLevel(commits: ParsedCommit[]): BumpLevel {
   let level: BumpLevel = 'patch';
@@ -126,6 +126,16 @@ function applyLevel(version: SemVer, level: BumpLevel): string {
   if (level === 'major') return `${version.major + 1}.0.0`;
   if (level === 'minor') return `${version.major}.${version.minor + 1}.0`;
   return `${version.major}.${version.minor}.${version.patch + 1}`;
+}
+
+/**
+ * Applies the 0.x semver convention on top of the raw conventional bump: while the current major is `0`
+ * the public API is unstable, so a breaking change is only a `minor` bump and a feature only a `patch`
+ * (every level is demoted one step). At `1.0.0` and above the raw level is used unchanged.
+ */
+export function applySemverPolicy(level: BumpLevel, currentVersion: string): BumpLevel {
+  if (parseSemVer(currentVersion).major > 0) return level;
+  return level === 'major' ? 'minor' : 'patch';
 }
 
 /**
@@ -229,7 +239,7 @@ export async function release(options: ReleaseOptions, deps: ReleaseDependencies
   const commits = readCommitsSince(targetDir, readLastTag(targetDir, deps), deps);
   if (commits.length === 0) throw new ShadowError('No commits since the last release — nothing to release');
 
-  const level = computeBumpLevel(commits);
+  const level = applySemverPolicy(computeBumpLevel(commits), packageJson.version);
   const version = computeNextVersion(packageJson.version, level, channel);
   const tag = `v${version}`;
   log.info(`releasing ${packageJson.name}: ${packageJson.version} → ${version} (${level}, ${channel})`);
