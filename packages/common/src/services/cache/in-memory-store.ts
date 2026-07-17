@@ -30,24 +30,24 @@ export class InMemoryStore {
     return this.store.get(key) ?? defaultValue;
   }
 
-  set<T>(key: string, value: T): InMemoryStore {
+  set<T>(key: string, value: T): this {
     this.store.set(key, value);
     return this;
   }
 
-  del(key: string): InMemoryStore {
+  del(key: string): this {
     this.store.delete(key);
     return this;
   }
 
-  insert<T>(key: string, value: T): InMemoryStore {
+  insert<T>(key: string, value: T): this {
     const array = this.getOptionalArray<T>(key);
     if (array) array.push(value);
     else this.set(key, [value]);
     return this;
   }
 
-  remove<T>(key: string, value: T): InMemoryStore {
+  remove<T>(key: string, value: T): this {
     const array = this.getOptionalArray<T>(key);
     if (array) {
       const updatedArray = array.filter(item => item != value);

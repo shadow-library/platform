@@ -204,10 +204,21 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     if (this.cache.has(name)) return this;
 
     const result = tryCatch(() => this.resolveConfigValue(name));
-    if (!result.success) Utils.exit(result.error.message);
+    if (!result.success) throw result.error;
     if (result.data !== undefined) this.cache.set(name, result.data);
 
     return this;
+  }
+
+  /**
+   * Like `load`, but on a resolution failure prints the reason and exits the process. For the app's
+   * own composition root that wants fail-fast-at-boot; the plain `load` throws so callers stay in
+   * control. Never call this from library code.
+   */
+  loadOrExit(name: keyof Configs, opts: ConfigOptions = DEFAULT_CONFIG_OPTIONS): this {
+    const result = tryCatch(() => this.load(name, opts));
+    if (result.success) return result.data;
+    return Utils.exit(result.error.message);
   }
 
   register<T extends keyof Configs>(name: T, opts: ConfigOptions = DEFAULT_CONFIG_OPTIONS): Configs[T] {
@@ -267,7 +278,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     this.log('info', 'Hot reloading disabled');
   }
 
-  subscribe(key: ConfigKey<ConfigRecords>, callback: ConfigChangeCallback<Configs>): () => void {
+  subscribe(key: ConfigKey<Configs>, callback: ConfigChangeCallback<Configs>): () => void {
     if (!this.subscribers.has(key)) this.subscribers.set(key, new Set());
     this.subscribers.get(key)?.add(callback);
 
@@ -306,7 +317,7 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
 
   getOrThrow<T extends keyof Configs>(key: T): Exclude<Configs[T], null> {
     const value = this.cache.get(key);
-    if (value == null) throw new Error(`Expected config value for '${key.toString()}' to be set`);
+    if (value == null) throw AppError.internal(`Config value for '${key.toString()}' is not set`);
     return value;
   }
 

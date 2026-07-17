@@ -10,7 +10,7 @@ import path from 'node:path';
  */
 import { Utils } from '@lib/internal.utils';
 import { throwError } from '@lib/shorthands';
-import { Config, type ConfigRecords, ConfigService } from '@shadow-library/common';
+import { AppError, Config, type ConfigRecords, ConfigService } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -129,9 +129,20 @@ describe('Config Service', () => {
     });
   });
 
+  describe('loadOrExit', () => {
+    it('should load the value and return the config on success', () => {
+      expect(config.loadOrExit('custom.key', { defaultValue: 'ok' })).toBe(config);
+      expect(config.get('custom.key')).toBe('ok');
+    });
+
+    it('should exit (mocked to throw) when resolution fails', () => {
+      expect(() => config.loadOrExit('number.key', { defaultValue: 'abc', validateType: 'number' })).toThrow();
+    });
+  });
+
   describe('getOrThrow', () => {
-    it('should throw an error if the key is not found', () => {
-      expect(() => config.getOrThrow('random.key' as any)).toThrow();
+    it('should throw a typed AppError if the key is not found', () => {
+      expect(() => config.getOrThrow('random.key' as any)).toThrow(AppError);
     });
 
     it('should return the value if the key is found', () => {
