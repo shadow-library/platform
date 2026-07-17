@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { ErrorCode } from '@lib/errors';
+import { FlowErrorCode } from './flow.error';
 
 /**
  * Defining types
@@ -86,7 +86,7 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
     if (typeof stateOrSnapshot === 'string') {
       const parsed = JSON.parse(stateOrSnapshot);
       if (parsed.flowName !== definition.name) {
-        ErrorCode.FLOW_SNAPSHOT_MISMATCH.throw({ snapshotFlowName: parsed.flowName, currentFlowName: definition.name });
+        FlowErrorCode.FLOW_SNAPSHOT_MISMATCH.throw({ snapshotFlowName: parsed.flowName, currentFlowName: definition.name });
       }
       stateOrSnapshot = parsed.state as FlowState<StateNames, Context>;
     }
@@ -142,7 +142,7 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
   peekTransitions(targetState: StateNames): StateNames[] {
     const stateDefinition = this.definition.states[targetState];
     if (!stateDefinition) {
-      ErrorCode.UNKNOWN_FLOW_STATE.throw({ targetState, flowName: this.definition.name });
+      FlowErrorCode.UNKNOWN_FLOW_STATE.throw({ targetState, flowName: this.definition.name });
     }
 
     if (!stateDefinition.getNextStates) return [];
@@ -165,7 +165,7 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
     if (!availableTransitions.includes(nextState)) {
       const flowName = this.definition.name;
       const transitions = availableTransitions.join(', ');
-      ErrorCode.INVALID_FLOW_TRANSITION.throw({ currentState, targetState: nextState, flowName, allowed: transitions });
+      FlowErrorCode.INVALID_FLOW_TRANSITION.throw({ currentState, targetState: nextState, flowName, allowed: transitions });
     }
 
     /** Handle onLeave hook */
@@ -173,7 +173,7 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
     if (currentStateDef.onLeave) {
       const result = currentStateDef.onLeave(this.state.context, nextState);
       if (result === false) {
-        ErrorCode.FLOW_GUARD_VIOLATION.throw({ currentState, targetState: nextState });
+        FlowErrorCode.FLOW_GUARD_VIOLATION.throw({ currentState, targetState: nextState });
       } else if (typeof result === 'object') onLeaveUpdates = result;
     }
 
@@ -212,6 +212,6 @@ export class FlowManager<StateNames extends string = string, Context extends Rec
       depth += 1;
     }
 
-    ErrorCode.FLOW_MAX_DEPTH_EXCEEDED.throw({ maxDepth });
+    FlowErrorCode.FLOW_MAX_DEPTH_EXCEEDED.throw({ maxDepth });
   }
 }

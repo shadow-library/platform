@@ -5,9 +5,8 @@
 /**
  * Importing user defined packages
  */
-import { ErrorCode } from '@lib/errors';
-
 import { FlowDefinition, FlowManager, FlowState } from './flow-manager';
+import { FlowErrorCode } from './flow.error';
 
 /**
  * Defining types
@@ -27,7 +26,7 @@ export class FlowRegistry {
 
   register(definition: FlowDefinition<any, any>): this {
     if (this.flows.has(definition.name)) {
-      ErrorCode.FLOW_ALREADY_REGISTERED.throw({ flowName: definition.name });
+      FlowErrorCode.FLOW_ALREADY_REGISTERED.throw({ flowName: definition.name });
     }
     this.flows.set(definition.name, definition);
     return this;
@@ -53,7 +52,7 @@ export class FlowRegistry {
   get<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>>(flowName: string): FlowDefinition<StateNames, Context> {
     const definition = this.flows.get(flowName);
     if (!definition) {
-      ErrorCode.FLOW_NOT_REGISTERED.throw({ flowName });
+      FlowErrorCode.FLOW_NOT_REGISTERED.throw({ flowName });
     }
     return definition as FlowDefinition<StateNames, Context>;
   }
@@ -73,7 +72,7 @@ export class FlowRegistry {
   restore<StateNames extends string = string, Context extends Record<string, any> = Record<string, any>>(snapshot: string): FlowManager<StateNames, Context> {
     const parsed: ParsedSnapshot<StateNames, Context> = JSON.parse(snapshot);
     if (!parsed.flowName) {
-      ErrorCode.FLOW_SNAPSHOT_INVALID.throw();
+      FlowErrorCode.FLOW_SNAPSHOT_INVALID.throw();
     }
     const definition = this.get<StateNames, Context>(parsed.flowName);
     return FlowManager.from(definition, parsed.state);
@@ -81,6 +80,6 @@ export class FlowRegistry {
 
   getFlowName(snapshot: string): string {
     const match = snapshot.match(/"flowName"\s*:\s*"([^"]+)"/);
-    return match?.[1] ?? ErrorCode.FLOW_SNAPSHOT_INVALID.throw();
+    return match?.[1] ?? FlowErrorCode.FLOW_SNAPSHOT_INVALID.throw();
   }
 }

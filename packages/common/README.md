@@ -203,14 +203,17 @@ The hierarchy is load-bearing: it drives env-var naming and prefix subscriptions
 
 **The rules:**
 
-1. **The first segment is a bounded context / subsystem** — `app`, `log`, `db`, `redis`, `auth`, `mail`,
+1. **A key may contain only lowercase letters, dots, and hyphens** (`[a-z.-]`) — nothing else. The dot is the
+   hierarchy separator; use a hyphen inside a segment for multi-word names (`db.read-replica.url`). No
+   uppercase, underscores, spaces, or digits in a key.
+2. **The first segment is a bounded context / subsystem** — `app`, `log`, `db`, `redis`, `auth`, `mail`,
    `stripe`. Everything a subsystem owns lives under its prefix.
-2. **Dots express hierarchy, never the value.** Add depth only when a subsystem has distinct areas:
+3. **Dots express hierarchy, never the value.** Add depth only when a subsystem has distinct areas:
    `db.url`, `db.pool.max`, `auth.jwt.secret`.
-3. **lowercase and dot-separated in code; the env var is derived** by uppercasing and replacing `.`/`-` with
-   `_`. So `db.pool.max` ⇄ `DB_POOL_MAX`. Set `envKey` explicitly only for third-party names you do not own
-   (e.g. `app.env` reads `NODE_ENV`).
-4. **Declare keys and their value types by extending `ConfigRecords`** so every `get`/`load` is typed:
+4. **The env var is derived** by uppercasing the key and replacing `.`/`-` with `_`. So `db.pool.max` ⇄
+   `DB_POOL_MAX` and `db.read-replica.url` ⇄ `DB_READ_REPLICA_URL`. Set `envKey` explicitly only for
+   third-party names you do not own (e.g. `app.env` reads `NODE_ENV`).
+5. **Declare keys and their value types by extending `ConfigRecords`** so every `get`/`load` is typed:
 
    ```ts
    import { ConfigService, ConfigRecords } from '@shadow-library/common/config';
@@ -225,7 +228,7 @@ The hierarchy is load-bearing: it drives env-var naming and prefix subscriptions
    Config.load('db.url', { isProdRequired: true });
    Config.load('db.pool.max', { validateType: 'integer', defaultValue: '10' });
    ```
-5. **Any prefix is subscribable.** Because keys are hierarchical, `Config.subscribe('db', cb)` fires for
+6. **Any prefix is subscribable.** Because keys are hierarchical, `Config.subscribe('db', cb)` fires for
    every `db.*` change, while `Config.subscribe('db.pool.max', cb)` fires only for that key.
 
 | Config key        | Env var (derived)      | Example type                          |
