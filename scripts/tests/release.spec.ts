@@ -15,6 +15,7 @@ import {
   isReleaseChannel,
   isValidLevel,
   isValidRelease,
+  npmDistTag,
   parseConventionalCommit,
   parseGitHubRepoSlug,
 } from '@lib/release';
@@ -160,6 +161,18 @@ describe('release', () => {
 
     it('should switch channels in place, keeping the core', () => {
       expect(computeNextVersion('1.3.0-alpha.2', 'minor', 'beta')).toBe('1.3.0-beta.0');
+    });
+  });
+
+  describe('npmDistTag', () => {
+    it('should use "latest" for a stable version', () => {
+      expect(npmDistTag('2.0.0')).toBe('latest');
+      expect(npmDistTag('0.1.2')).toBe('latest');
+    });
+
+    it('should use the prerelease channel as the dist-tag', () => {
+      expect(npmDistTag('2.0.0-alpha.0')).toBe('alpha');
+      expect(npmDistTag('1.3.0-beta.4')).toBe('beta');
     });
   });
 

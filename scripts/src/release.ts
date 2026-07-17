@@ -286,9 +286,17 @@ export async function release(options: ReleaseOptions, deps: ReleaseDependencies
   });
   log.info(`created release ${gitHubRelease.data.html_url}`);
 
-  if (config.npm) publishToNpm(targetDir, config, deps);
+  if (config.npm) publishToNpm(targetDir, config, version, deps);
 
   log.success(`Released ${packageJson.name}@${version}`);
+}
+
+/**
+ * The npm dist-tag for a version: a prerelease (`2.0.0-alpha.0`) publishes under its channel (`alpha`) —
+ * npm *requires* a non-`latest` tag for prereleases — while a stable version publishes under `latest`.
+ */
+export function npmDistTag(version: string): string {
+  return /-([a-z]+)\.\d+$/.exec(version)?.[1] ?? 'latest';
 }
 
 /** Runs the pre-release gate — `bun test` — so a broken build never reaches a tag or npm. */
@@ -297,9 +305,9 @@ function runPreReleaseChecks(targetDir: string, deps: ReleaseDependencies): void
   if (test.status !== 0) throw new ShadowError(`Tests failed (exit code ${test.status}) — aborting before any release action`);
 }
 
-/** Publishes the built package directory to npm. Runs after the tag/release so a publish failure leaves a recoverable state. */
-function publishToNpm(targetDir: string, config: ReleaseConfig, deps: ReleaseDependencies): void {
+/** Publishes the built package directory to npm under the version's dist-tag. Runs after the tag/release so a publish failure leaves a recoverable state. */
+function publishToNpm(targetDir: string, config: ReleaseConfig, version: string, deps: ReleaseDependencies): void {
   const publishDir = path.join(targetDir, config.publishDir);
-  const result = deps.run('npm', ['publish', '--access', 'public'], { cwd: publishDir });
+  const result = deps.run('npm', ['publish', '--access', 'public', '--tag', npmDistTag(version)], { cwd: publishDir });
   if (result.status !== 0) throw new ShadowError(`npm publish failed (exit code ${result.status}) — the tag and GitHub release already exist; re-run publish manually`);
 }

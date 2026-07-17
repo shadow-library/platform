@@ -24,6 +24,7 @@ interface Recorder {
   createRefArgs: { ref: string; sha: string }[];
   createReleaseArgs: { tag_name: string; prerelease: boolean }[];
   buildCalls: string[];
+  publishArgs: string[];
 }
 
 /**
@@ -34,7 +35,15 @@ const fail = (status = 1, stderr = ''): RunResult => ({ status, stdout: '', stde
 
 /** Builds injectable release dependencies with canned git/npm responses and a recording fake Octokit client. */
 function fakeDeps(overrides: Partial<Record<string, RunResult>> = {}): { deps: ReleaseDependencies; recorder: Recorder } {
-  const recorder: Recorder = { commands: [], client: undefined as unknown as GitHubClient, clientCalls: [], createRefArgs: [], createReleaseArgs: [], buildCalls: [] };
+  const recorder: Recorder = {
+    commands: [],
+    client: undefined as unknown as GitHubClient,
+    clientCalls: [],
+    createRefArgs: [],
+    createReleaseArgs: [],
+    buildCalls: [],
+    publishArgs: [],
+  };
 
   recorder.client = {
     rest: {
@@ -64,7 +73,7 @@ function fakeDeps(overrides: Partial<Record<string, RunResult>> = {}): { deps: R
       if (command === 'git' && args[0] === 'describe') return fail(); // no prior tag → release from repo root
       if (command === 'git' && args[0] === 'log') return ok('feat: add a thing\x00fix: patch a bug\x00');
       if (command === 'bun' && args[0] === 'test') return ok();
-      if (command === 'npm' && args[0] === 'publish') return ok();
+      if (command === 'npm' && args[0] === 'publish') return ((recorder.publishArgs = args), ok());
       throw new Error(`fakeDeps: unexpected command "${command} ${args.join(' ')}"`);
     },
   };
@@ -162,6 +171,8 @@ describe('release (with injected dependencies)', () => {
     expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v1.1.0', sha: 'newsha' }]);
     expect(recorder.createReleaseArgs).toStrictEqual([{ tag_name: 'v1.1.0', prerelease: false }]);
     expect(recorder.commands).toContain('npm publish');
+    expect(recorder.publishArgs).toContain('--tag');
+    expect(recorder.publishArgs).toContain('latest');
     expect(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'package.json'), 'utf-8')).version).toBe('1.1.0');
   });
 
@@ -217,6 +228,7 @@ describe('release (with injected dependencies)', () => {
 
     expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v1.1.0-alpha.0', sha: 'newsha' }]);
     expect(recorder.createReleaseArgs).toStrictEqual([{ tag_name: 'v1.1.0-alpha.0', prerelease: true }]);
+    expect(recorder.publishArgs.slice(-2)).toStrictEqual(['--tag', 'alpha']);
   });
 
   it('should skip npm publish when release.npm is false', async () => {
