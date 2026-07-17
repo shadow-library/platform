@@ -254,7 +254,13 @@ export class InstanceWrapper<T extends object = any> {
     let instance: T;
     if (this.isFactory) instance = await (this.metatype as Factory<T>)(...dependencies);
     else instance = new (this.metatype as Class<T>)(...dependencies);
-    if (instancePerContext) instance = Object.assign(instance, instancePerContext.instance);
+    /**
+     * When a prototype shell already exists for this context, it was handed to a circular
+     * dependency before this instance could be constructed. Copy the constructed instance's
+     * own properties into that shell and keep the shell as the canonical instance so the
+     * reference already held by the circular peer resolves to the fully-initialised instance.
+     */
+    if (instancePerContext) instance = Object.assign(instancePerContext.instance, instance);
     this.instances.set(contextId, { instance, resolved: true });
     this.logger.debug(`Instance '${this.getTokenName()}' loaded`);
 

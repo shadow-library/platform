@@ -88,6 +88,26 @@ describe('Lifecycle', () => {
     expect(dogService['catInternalService']).toBeUndefined();
   });
 
+  it('should resolve forwardRef circular dependencies to fully-initialised instances', () => {
+    const catService = app.select(CatModule).get(CatService);
+    const dogService = app.select(DogModule).get(DogService);
+
+    /** The reference each peer holds must be the canonical instance, not an empty prototype shell */
+    expect(catService['dogService']).toBe(dogService);
+    expect(dogService['catService']).toBe(catService);
+
+    /** Calling across the cycle must reach constructor-injected dependencies (would throw on an empty shell) */
+    dogService.setDog('d1', 'Rex');
+    catService.setCat('c1', 'Tom');
+    expect(() => catService.attackDog('c1', 'd1')).not.toThrow();
+    expect(dogService.getDog('d1')).toBeUndefined();
+
+    dogService.setDog('d2', 'Max');
+    catService.setCat('c2', 'Jerry');
+    expect(() => dogService.attackCat('d2', 'c2')).not.toThrow();
+    expect(catService.getCat('c2')).toBeUndefined();
+  });
+
   it('should handle module destruction', async () => {
     output = [];
     await app.stop();
