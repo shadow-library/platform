@@ -98,13 +98,13 @@ bun add @shadow-library/common
 
 ### Entry points
 
-The root import re-exports everything for convenience, but it pulls in the Node/AWS-oriented services
+The root import re-exports everything for convenience, but it pulls in the Node-oriented services
 (logger, config, http client). Import a subpath to get only what you need — the framework-agnostic core
 (`./errors`, `./utils`, `./cache`, `./interfaces`) carries no `winston`, `undici`, or `chokidar`, so it is
 safe for browser and edge bundles.
 
 ```ts
-import { AppError, HttpErrorCode } from '@shadow-library/common/errors';
+import { AppError, ErrorCode } from '@shadow-library/common/errors';
 import { utils } from '@shadow-library/common/utils';
 import { LRUCache } from '@shadow-library/common/cache';
 import { Config } from '@shadow-library/common/config'; // Node only
@@ -115,6 +115,127 @@ import { Reflector } from '@shadow-library/common/reflect';
 
 > The root `@shadow-library/common` barrel remains available but is deprecated in favour of subpaths and
 > will be slimmed in the next major.
+
+---
+
+## Conventions & Standards
+
+> This section is the contract every app in the ecosystem follows. If you are an AI or a developer writing
+> code against this package, treat these rules as mandatory — they keep errors and configuration uniform
+> across every service, so the same patterns read the same way everywhere.
+
+### Error creation — the standard
+
+Every failure in the ecosystem is an **`AppError`** produced by an **`ErrorCode`**. You never throw a bare
+`Error`, and you never call `new AppError(...)` or `new ErrorCode(...)` directly. Instead each domain
+declares a **catalog** by subclassing `ErrorCode`, and each entry is built with the factory that names its
+category. The category fixes two things at once: the HTTP status, and whether the message may be shown to a
+client.
+
+**The rules:**
+
+1. **One catalog per domain, declared by subclassing `ErrorCode`.** Name it `<Domain>ErrorCode`
+   (`UserErrorCode`, `BillingErrorCode`). All of a module's failures live in its catalog.
+2. **One `static readonly` entry per failure, built with a category factory** — never `new ErrorCode(...)`.
+   The factory encodes the status and the exposure:
+
+   | Factory            | Status | When to use                                       | Shown to client? |
+   | ------------------ | ------ | ------------------------------------------------- | ---------------- |
+   | `badRequest`       | 400    | malformed input or business-rule violation        | yes              |
+   | `unauthenticated`  | 401    | no established identity                            | yes              |
+   | `forbidden`        | 403    | identity lacks the required privilege              | yes              |
+   | `notFound`         | 404    | resource or identifier does not exist              | yes              |
+   | `conflict`         | 409    | conflicts with the current state of the resource   | yes              |
+   | `validation`       | 422    | syntactically valid but violates data constraints  | yes              |
+   | `unavailable`      | 503    | a dependency failed transiently (retryable)        | yes              |
+   | `internal`         | 500    | a defect or broken invariant                       | **no — masked**  |
+
+   Pass a trailing status argument only for outliers the factory name still fits (`badRequest(code, msg, 429)`).
+3. **Code strings are `UPPER_SNAKE_CASE`, semantic, and unique.** `USER_NOT_FOUND`, `EMAIL_ALREADY_EXISTS` —
+   a reader knows what happened from the code alone. Never opaque codes like `S001`. The static property name
+   and the code string are identical.
+4. **Messages describe the failure and interpolate context with `{placeholder}`.** Placeholders are filled
+   from the `data` object passed when the error is created or thrown.
+5. **Throw with `.throw(data?)`, create with `.create(data?)`, match with `AppError.is(err, catalogOrKey)`.**
+   `.throw()` has return type `never`, so it composes inside `??`, ternaries, and guard clauses.
+
+```ts
+import { AppError, ErrorCode } from '@shadow-library/common/errors';
+
+class UserErrorCode extends ErrorCode {
+  static readonly USER_NOT_FOUND = UserErrorCode.notFound('USER_NOT_FOUND', 'User {id} not found');
+  static readonly EMAIL_TAKEN = UserErrorCode.conflict('EMAIL_TAKEN', 'Email {email} is already registered');
+  static readonly RATE_LIMITED = UserErrorCode.badRequest('RATE_LIMITED', 'Too many attempts, retry in {seconds}s', 429);
+}
+
+// throw — composes as a `never` expression
+const user = (await repo.find(id)) ?? UserErrorCode.USER_NOT_FOUND.throw({ id });
+
+// create without throwing
+return UserErrorCode.EMAIL_TAKEN.create({ email });
+
+// match one key, or a whole catalog
+if (AppError.is(err, UserErrorCode.USER_NOT_FOUND)) retryWithNewId();
+if (AppError.is(err, UserErrorCode)) reportToDomainTeam(err); // any error from this catalog
+```
+
+**Internal invariants** that must never reach a client use `AppError.internal(reason, cause?)`. The reason is
+kept in logs (`toObject()`) but the response body (`toResponse()`) shows the generic `UNKNOWN` face — an
+internal message is never leaked.
+
+```ts
+const row = insert(session) ?? AppError.internal('session insert returned no row').throw();
+```
+
+**Exposure & serialization.** `toResponse()` is the client-facing shape — internal errors are masked to
+`UNKNOWN`. `toObject()` is the full-fidelity shape for logs and process-boundary transport (IPC, queues,
+worker threads); it round-trips through `AppError.from(obj)` and **fails closed to internal** if the wire
+object omits exposure, so a rehydrated error can never be downgraded from masked to exposed.
+
+> **Why no built-in HTTP catalog?** There is deliberately no generic `HttpErrorCode`. A shared catalog forces
+> opaque codes (`S001`…) that violate rule 3. Every app declares its own semantic catalog instead; the
+> category factory already carries the HTTP status.
+
+### Config key hierarchy — the standard
+
+Config keys are **dot-delimited paths**, `<domain>.<area>.<name>`, lowercase, most-general segment first.
+The hierarchy is load-bearing: it drives env-var naming and prefix subscriptions.
+
+**The rules:**
+
+1. **The first segment is a bounded context / subsystem** — `app`, `log`, `db`, `redis`, `auth`, `mail`,
+   `stripe`. Everything a subsystem owns lives under its prefix.
+2. **Dots express hierarchy, never the value.** Add depth only when a subsystem has distinct areas:
+   `db.url`, `db.pool.max`, `auth.jwt.secret`.
+3. **lowercase and dot-separated in code; the env var is derived** by uppercasing and replacing `.`/`-` with
+   `_`. So `db.pool.max` ⇄ `DB_POOL_MAX`. Set `envKey` explicitly only for third-party names you do not own
+   (e.g. `app.env` reads `NODE_ENV`).
+4. **Declare keys and their value types by extending `ConfigRecords`** so every `get`/`load` is typed:
+
+   ```ts
+   import { ConfigService, ConfigRecords } from '@shadow-library/common/config';
+
+   interface AppConfigs extends ConfigRecords {
+     'db.url': string;
+     'db.pool.max': number;
+     'auth.jwt.secret': string;
+   }
+
+   const Config = new ConfigService<AppConfigs>();
+   Config.load('db.url', { isProdRequired: true });
+   Config.load('db.pool.max', { validateType: 'integer', defaultValue: '10' });
+   ```
+5. **Any prefix is subscribable.** Because keys are hierarchical, `Config.subscribe('db', cb)` fires for
+   every `db.*` change, while `Config.subscribe('db.pool.max', cb)` fires only for that key.
+
+| Config key        | Env var (derived)      | Example type                          |
+| ----------------- | ---------------------- | ------------------------------------- |
+| `app.env`         | `NODE_ENV` (override)  | `development \| production \| test`   |
+| `app.name`        | `APP_NAME`             | `string`                              |
+| `log.level`       | `LOG_LEVEL`            | `silly \| debug \| http \| info \| …` |
+| `log.dir`         | `LOG_DIR`              | `string`                              |
+| `db.url`          | `DB_URL`               | `string`                              |
+| `db.pool.max`     | `DB_POOL_MAX`          | `number`                              |
 
 ---
 
@@ -930,19 +1051,33 @@ Logger.clearContextProviders();
 
 #### Structured Error Management
 
-```ts
-import { AppError, ValidationError, ErrorCode, ErrorType } from '@shadow-library/common';
+> See [Conventions & Standards → Error creation](#error-creation--the-standard) for the full rules. The
+> snippet below is a quick tour of the API.
 
-// Custom error codes
+```ts
+import { AppError, ValidationError, ErrorCode } from '@shadow-library/common/errors';
+
+// A domain catalog — one static entry per failure, built with a category factory
 class UserErrorCode extends ErrorCode {
-  static readonly USER_NOT_FOUND = new ErrorCode('USER_NOT_FOUND', ErrorType.NOT_FOUND, 'User with ID {userId} not found');
+  static readonly USER_NOT_FOUND = UserErrorCode.notFound('USER_NOT_FOUND', 'User with ID {userId} not found');
 }
 
-// Create structured errors
-const error = new AppError(UserErrorCode.USER_NOT_FOUND, { userId: 123 });
-console.log(error.getCode()); // 'USER_NOT_FOUND'
-console.log(error.getType()); // 'NOT_FOUND'
-console.log(error.getMessage()); // 'User with ID 123 not found'
+// Create a structured error; `data` fills the {placeholders}
+const error = UserErrorCode.USER_NOT_FOUND.create({ userId: 123 });
+console.log(error.code); // 'USER_NOT_FOUND'
+console.log(error.status); // 404
+console.log(error.message); // 'User with ID 123 not found'
+
+// Or throw directly — `.throw()` is typed `never`, so it works in guard clauses and `??`
+const user = (await repo.find(123)) ?? UserErrorCode.USER_NOT_FOUND.throw({ userId: 123 });
+
+// Masked wire shapes: responses hide internal messages, logs keep them
+error.toResponse(); // { code: 'USER_NOT_FOUND', message: 'User with ID 123 not found' } (exposed)
+AppError.internal('db offline').toResponse(); // { code: 'UNKNOWN', message: 'Unknown Error' } (masked)
+
+// Match a specific key or a whole catalog
+if (AppError.is(error, UserErrorCode.USER_NOT_FOUND)) recreate();
+if (AppError.is(error, UserErrorCode)) reportToDomainTeam(error);
 
 // Validation errors with field-level details
 const validation = new ValidationError().addFieldError('email', 'Invalid email format').addFieldError('age', 'Age must be between {min} and {max}', { min: 18, max: 100 });
@@ -1309,15 +1444,24 @@ The package uses environment variables for configuration. Below are the key vari
 
 ### Error Classes
 
+#### ErrorCode (catalog base)
+
+Subclass to declare a domain catalog; build entries with a category factory (see
+[Conventions](#error-creation--the-standard)).
+
+- `ErrorCode.badRequest | unauthenticated | forbidden | notFound | conflict | validation | unavailable | internal(code, message, status?)` - category factories that set status + exposure
+- `.create(data?, cause?)` - build the `AppError` for this key (`data` fills `{placeholders}`)
+- `.throw(data?, cause?)` - build and throw; returns `never`
+
 #### AppError
 
-- `new AppError(errorCode, data?)` - Create structured error
-- `.getCode()` - Get error code
-- `.getType()` - Get error type
-- `.getMessage()` - Get formatted message
-- `.getData()` - Get error data
-- `.setCause(error)` - Set underlying cause
-- `.toObject()` - Convert to plain object
+- `errorCode.create(data?, cause?)` - preferred way to build (via a catalog key)
+- `AppError.internal(reason, cause?)` - free-form internal invariant, masked in responses
+- `AppError.is(error, catalogOrKey?)` - narrow to a key (by code) or a whole catalog (by class)
+- `AppError.from(object)` - rehydrate a serialized error across a process boundary (fails closed to internal)
+- `.code` / `.status` / `.isInternal` / `.message` / `.data` - read the resolved fields
+- `.toObject()` - full-fidelity shape for logs and IPC (round-trips through `from()`)
+- `.toResponse()` - client-facing shape; internal errors are masked to `UNKNOWN`
 
 #### ValidationError
 
@@ -1622,9 +1766,10 @@ class CacheManager {
 
 ### Error Handling
 
-- Use `AppError` with custom error codes for business logic errors
+- Follow the [error-creation standard](#error-creation--the-standard): one catalog per domain, category factories, `UPPER_SNAKE_CASE` semantic codes
+- Use `AppError` with custom error codes for business logic errors; never throw bare `Error`
+- Use `AppError.internal(reason)` for invariants that must stay out of client responses
 - Use `ValidationError` for input validation with field-level details
-- Implement proper error logging with context information
 - Use `tryCatch` for safe execution of risky operations
 
 ### Task Management
