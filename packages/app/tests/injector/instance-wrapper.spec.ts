@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AppError } from '@shadow-library/common';
+import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -23,7 +23,11 @@ describe('InstanceWrapper', () => {
   let instanceWrapper: InstanceWrapper;
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
+    jest.restoreAllMocks();
+  });
+
+  afterEach(() => {
     jest.restoreAllMocks();
   });
 
@@ -359,7 +363,7 @@ describe('InstanceWrapper', () => {
     it('should throw an error if the dependencies are not set', async () => {
       instanceWrapper['instances'].clear();
       instanceWrapper['dependencies'].pop();
-      await expect(() => instanceWrapper.loadInstance()).rejects.toThrowError(AppError);
+      await expect(instanceWrapper.loadInstance()).rejects.toThrowError(AppError);
     });
 
     it('should load a transient prototype of the instance', () => {
@@ -388,8 +392,8 @@ describe('InstanceWrapper', () => {
       const provider = new InstanceWrapper(Provider);
       provider['inject'].push({ token: DependencyOne, optional: false });
       provider.setDependency(0, dependencyOne);
-      dependencyOne.isResolved = jest.fn(() => true);
-      dependencyOne.loadInstance = jest.fn(() => ({}) as any);
+      dependencyOne.isResolved = mock(() => true);
+      dependencyOne.loadInstance = mock(() => ({}) as any);
 
       await provider.loadInstance();
 
@@ -403,8 +407,8 @@ describe('InstanceWrapper', () => {
       const provider = new InstanceWrapper(Provider);
       provider['inject'].push({ token: DependencyOne, optional: false });
       provider.setDependency(0, dependencyOne);
-      dependencyOne.isResolved = jest.fn(() => false);
-      dependencyOne.loadPrototype = jest.fn(() => ({}) as any);
+      dependencyOne.isResolved = mock(() => false);
+      dependencyOne.loadPrototype = mock(() => ({}) as any);
 
       await provider.loadInstance();
 
@@ -413,8 +417,8 @@ describe('InstanceWrapper', () => {
   });
 
   describe('applyInterceptors', () => {
-    const moduleRef = { get: jest.fn() } as any;
-    const interceptor = jest.fn();
+    const moduleRef = { get: mock() } as any;
+    const interceptor = mock();
 
     class InvalidInterceptor {
       intercept = 'Hello, World!';
@@ -441,7 +445,7 @@ describe('InstanceWrapper', () => {
     it('should skip interceptor application for non-class instances', async () => {
       const valueProvider = { token: 'CONFIG', useValue: 'CONFIG_VALUE' };
       const instanceWrapper = new InstanceWrapper(valueProvider);
-      instanceWrapper['instances'].get = jest.fn() as any;
+      instanceWrapper['instances'].get = mock() as any;
 
       await instanceWrapper.applyInterceptors(moduleRef);
 
@@ -451,7 +455,7 @@ describe('InstanceWrapper', () => {
     it('should skip interceptor application for factory providers', async () => {
       const factoryProvider = { token: 'FACTORY', useFactory: () => ({ testMethod: () => 'result' }) };
       const instanceWrapper = new InstanceWrapper(factoryProvider);
-      instanceWrapper['instances'].get = jest.fn() as any;
+      instanceWrapper['instances'].get = mock() as any;
 
       await instanceWrapper.applyInterceptors(moduleRef);
 
@@ -467,8 +471,8 @@ describe('InstanceWrapper', () => {
       }
 
       const instanceWrapper = new InstanceWrapper(TestClass);
-      instanceWrapper['instances'].get = jest.fn().mockReturnValue({ intercepted: true }) as any;
-      jest.spyOn(Reflect, 'getMetadata').mockReturnValue([]);
+      instanceWrapper['instances'].get = mock().mockReturnValue({ intercepted: true }) as any;
+      spyOn(Reflect, 'getMetadata').mockReturnValue([]);
 
       await instanceWrapper.applyInterceptors(moduleRef);
 
@@ -485,7 +489,7 @@ describe('InstanceWrapper', () => {
       }
 
       const testInterceptor = new TestInterceptor();
-      const spy = jest.spyOn(testInterceptor, 'intercept');
+      const spy = spyOn(testInterceptor, 'intercept');
       const instanceWrapper = new InstanceWrapper(TestClass);
       const instance = await instanceWrapper.loadInstance();
       moduleRef.get.mockReturnValueOnce(testInterceptor);
@@ -530,7 +534,7 @@ describe('InstanceWrapper', () => {
 
       const instanceWrapper = new InstanceWrapper(TestClass);
       await instanceWrapper.loadInstance();
-      jest.spyOn(Reflect, 'getMetadata').mockReturnValue([]);
+      spyOn(Reflect, 'getMetadata').mockReturnValue([]);
 
       await instanceWrapper.applyInterceptors(moduleRef);
       expect(Reflect.getMetadata).not.toHaveBeenCalled();
@@ -546,7 +550,7 @@ describe('InstanceWrapper', () => {
 
       const instanceWrapper = new InstanceWrapper(TestClass);
       await instanceWrapper.loadInstance();
-      jest.spyOn(Reflect, 'getMetadata').mockReturnValue([]);
+      spyOn(Reflect, 'getMetadata').mockReturnValue([]);
 
       await instanceWrapper.applyInterceptors(moduleRef);
       expect(Reflect.getMetadata).not.toHaveBeenCalled();
@@ -581,7 +585,7 @@ describe('InstanceWrapper', () => {
       const instanceWrapper = new InstanceWrapper(TestClass);
       const instance = await instanceWrapper.loadInstance();
       moduleRef.get.mockReturnValueOnce(testInterceptor);
-      testInterceptor.intercept = jest.fn().mockImplementation((context: any, next: any) => {
+      testInterceptor.intercept = mock().mockImplementation((context: any, next: any) => {
         expect(context.getClass()).toBe(TestClass);
         expect(context.getMethodName()).toBe('testMethod');
         expect(context.isPromise()).toBe(false);

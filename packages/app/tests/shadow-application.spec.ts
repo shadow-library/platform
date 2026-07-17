@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AppError } from '@shadow-library/common';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -16,97 +16,97 @@ import { Module, ModuleRef, ShadowApplication } from '@shadow-library/app';
 /**
  * Declaring the constants
  */
-jest.mock('@lib/injector/module-registry', () => ({
-  ModuleRegistry: jest.fn().mockImplementation(() => ({
-    get: jest.fn(() => []),
-    init: jest.fn(async () => {}),
-    terminate: jest.fn(async () => {}),
-  })),
-}));
 
 describe('ShadowApplication', () => {
   let app: ShadowApplication;
+  let registry: any;
 
   @Module({})
   class AppModule {}
 
   beforeEach(() => {
     app = new ShadowApplication(AppModule);
+    registry = { get: mock(() => []), init: mock(async () => {}), terminate: mock(async () => {}) };
+    (app as any).registry = registry;
+  });
+
+  afterEach(() => {
+    mock.restore();
   });
 
   describe('initialization and termination', () => {
     it('should initialize the application', async () => {
-      jest.mocked(app['registry'].get).mockReturnValue({ isInitiated: () => false } as any);
+      registry.get.mockReturnValue({ isInitiated: () => false });
       await app.init();
-      expect(app['registry'].init).toBeCalledTimes(1);
+      expect(registry.init).toBeCalledTimes(1);
     });
 
     it('should not initialize the application if already initiated', async () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
+      spyOn(app, 'isInitiated').mockReturnValue(true);
       await app.init();
-      expect(app['registry'].init).not.toBeCalled();
+      expect(registry.init).not.toBeCalled();
     });
 
     it('should start the application', async () => {
-      const module = { start: jest.fn() };
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      jest.mocked(app['registry'].get).mockReturnValue([module] as any);
+      const module = { start: mock() };
+      spyOn(app, 'isInitiated').mockReturnValue(true);
+      registry.get.mockReturnValue([module]);
 
       await app.start();
       expect(module.start).toBeCalledTimes(1);
     });
 
     it('should initialize the application if not initiated when starting the application', async () => {
-      const module = { start: jest.fn(), init: jest.fn() };
-      jest.spyOn(app, 'isInitiated').mockReturnValue(false);
-      jest.mocked(app['registry'].get).mockReturnValue([module] as any);
+      const module = { start: mock(), init: mock() };
+      spyOn(app, 'isInitiated').mockReturnValue(false);
+      registry.get.mockReturnValue([module]);
 
       await app.start();
       expect(module.start).toBeCalledTimes(1);
     });
 
     it('should stop the application', async () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
+      spyOn(app, 'isInitiated').mockReturnValue(true);
       await app.stop();
-      expect(app['registry'].terminate).toBeCalledTimes(1);
+      expect(registry.terminate).toBeCalledTimes(1);
     });
 
     it('should not stop the application if not initiated', async () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(false);
+      spyOn(app, 'isInitiated').mockReturnValue(false);
       await app.stop();
-      expect(app['registry'].terminate).not.toBeCalled();
+      expect(registry.terminate).not.toBeCalled();
     });
 
     it('should stop the application when signal is received', async () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      jest.spyOn(process, 'kill').mockResolvedValue(null as never);
-      jest.spyOn(process, 'removeListener').mockReturnThis();
-      const stop = jest.spyOn(app, 'stop').mockReturnThis();
+      spyOn(app, 'isInitiated').mockReturnValue(true);
+      spyOn(process, 'kill').mockResolvedValue(null as never);
+      spyOn(process, 'removeListener').mockReturnThis();
+      const stop = spyOn(app, 'stop').mockReturnThis();
 
       await app.start();
       const listeners = process.listeners('SIGINT');
-      listeners[2]?.('SIGINT');
+      listeners.at(-1)?.('SIGINT');
 
       expect(listeners.length).toBeGreaterThanOrEqual(1);
       expect(stop).toBeCalledTimes(1);
     });
 
     it('should stop the application only once when signal is received', async () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      jest.spyOn(process, 'kill').mockResolvedValue(null as never);
-      const stop = jest.spyOn(app, 'stop').mockReturnThis();
+      spyOn(app, 'isInitiated').mockReturnValue(true);
+      spyOn(process, 'kill').mockResolvedValue(null as never);
+      const stop = spyOn(app, 'stop').mockReturnThis();
 
       await app.start();
       const listeners = process.listeners('SIGINT');
-      listeners[3]?.('SIGINT');
-      listeners[3]?.('SIGINT');
+      listeners.at(-1)?.('SIGINT');
+      listeners.at(-1)?.('SIGINT');
 
       expect(stop).toBeCalledTimes(1);
     });
 
     it('should not enable graceful shutdown if no signals are provided', async () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      const onSignal = jest.spyOn(process, 'on').mockReturnThis();
+      spyOn(app, 'isInitiated').mockReturnValue(true);
+      const onSignal = spyOn(process, 'on').mockReturnThis();
       app['options'].enableShutdownHooks = false;
 
       await app.start();
@@ -116,9 +116,9 @@ describe('ShadowApplication', () => {
 
   describe('select', () => {
     it('should return the module ref', () => {
-      const instanceWrapper = { getInstance: jest.fn() };
-      const module = { getInternalProvider: jest.fn().mockReturnValue(instanceWrapper) };
-      jest.mocked(app['registry'].get).mockReturnValue(module as any);
+      const instanceWrapper = { getInstance: mock() };
+      const module = { getInternalProvider: mock().mockReturnValue(instanceWrapper) };
+      registry.get.mockReturnValue(module);
 
       app.select(AppModule);
 
@@ -129,24 +129,24 @@ describe('ShadowApplication', () => {
 
   describe('get', () => {
     it('should throw an error if application not initiated', () => {
-      jest.spyOn(app, 'isInitiated').mockReturnValue(false);
+      spyOn(app, 'isInitiated').mockReturnValue(false);
       expect(() => app.get(AppModule)).toThrowError(AppError);
     });
 
     it('should throw an error is provider is not found', () => {
-      const module = { getProvider: jest.fn().mockReturnValue(undefined) };
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      jest.mocked(app['registry'].get).mockReturnValue([module] as any);
+      const module = { getProvider: mock().mockReturnValue(undefined) };
+      spyOn(app, 'isInitiated').mockReturnValue(true);
+      registry.get.mockReturnValue([module]);
 
       expect(() => app.get(AppModule)).toThrowError(AppError);
       expect(() => app.get('RANDOM')).toThrowError(AppError);
     });
 
     it('should return the instance of the provider', () => {
-      const instanceWrapper = { getInstance: jest.fn() };
-      const module = { getProvider: jest.fn().mockReturnValue(instanceWrapper) };
-      jest.spyOn(app, 'isInitiated').mockReturnValue(true);
-      jest.mocked(app['registry'].get).mockReturnValue([module] as any);
+      const instanceWrapper = { getInstance: mock() };
+      const module = { getProvider: mock().mockReturnValue(instanceWrapper) };
+      spyOn(app, 'isInitiated').mockReturnValue(true);
+      registry.get.mockReturnValue([module]);
 
       app.get(AppModule);
 

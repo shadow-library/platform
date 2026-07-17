@@ -14,12 +14,12 @@ bun run lint                 # Run Prettier + ESLint checks
 bun run lint --fix           # Auto-fix lint issues
 bun run type-check           # TypeScript type checking (tsc)
 bun run build                # Build ESM and CJS to /dist
-bun test                     # Run all tests (unit + integration)
-bun test:unit                # Jest unit tests only (enforces 100% coverage)
-bun test:integration         # Bun native integration tests
+bun run test                 # Run all tests: unit (with coverage) + integration
+bun run test:unit            # Unit tests only (bun test + coverage threshold)
+bun run test:integration     # Integration tests only
 ```
 
-To run a single unit test file: `bun jest tests/path/to/file.spec.ts`
+To run a single unit test file: `bun test tests/path/to/file.spec.ts`
 To run a single integration test: `bun test ./tests/integration/path/to/file.spec.ts`
 
 **Pre-commit hook** runs: `bun lint && bun type-check && bun run test`
@@ -96,6 +96,6 @@ Format: `<type>(<scope>): <subject>` (max 100 chars, imperative present tense, n
 
 ## Testing
 
-- **Unit tests** (Jest): in `tests/` with `.spec.ts` suffix, use `@jest/globals` imports, mock `@lib/` paths with `jest.mock()`. 100% coverage threshold on lines/branches/functions/statements.
+- **Unit tests** (Bun's runner): in `tests/` with `.spec.ts` suffix, use `bun:test` imports; create test doubles with `mock()` / `spyOn()`. Avoid `mock.module()` — Bun's module mocks leak across files in a shared process, so isolate at the instance level instead (overwrite the field / spy the prototype and restore in `afterEach`).
 - **Integration tests** (Bun native runner): in `tests/integration/`, use `bun:test` imports.
-- `reflect-metadata` is auto-loaded via Jest setupFiles.
+- Coverage runs on the unit suite via `--coverage`; the `bunfig.toml` threshold (`lines = 0.97`, `functions = 0.95`) reflects Bun's coverage instrumentation, which under-reports vs Jest/istanbul (it counts TS parameter-property/field declarations as executable lines and ignores `istanbul ignore` pragmas). `reflect-metadata` is preloaded via `bunfig.toml`.

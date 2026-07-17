@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it } from '@jest/globals';
 import { Reflector } from '@shadow-library/common';
+import { describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages

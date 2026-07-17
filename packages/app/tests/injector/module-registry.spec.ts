@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AppError } from '@shadow-library/common';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import { Class } from 'type-fest';
 
 /**
@@ -162,19 +162,19 @@ describe('ModuleRegistry', () => {
 
   describe('initiation and termination', () => {
     it('should initialize the modules', async () => {
-      const mock = jest.fn() as any;
-      const hook = jest.fn() as any;
-      Array.from(moduleRegistry['modules'].values()).forEach(m => ((m.init = mock), (m.callHook = hook)));
+      const initMock = mock() as any;
+      const hook = mock() as any;
+      Array.from(moduleRegistry['modules'].values()).forEach(m => ((m.init = initMock), (m.callHook = hook)));
 
       await moduleRegistry.init();
 
-      expect(mock).toBeCalledTimes(5);
+      expect(initMock).toBeCalledTimes(5);
       expect(hook).toBeCalledTimes(5);
       new Array(5).forEach((_, index) => expect(hook).toHaveBeenNthCalledWith(index + 1, HookTypes.ON_APPLICATION_READY));
     });
 
     it('should terminate the modules', async () => {
-      const hook = jest.fn(async () => {});
+      const hook = mock(async () => {});
       Array.from(moduleRegistry['modules'].values()).forEach(m => (m.callHook = hook));
 
       await moduleRegistry.terminate();

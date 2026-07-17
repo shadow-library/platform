@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
 import { AppError } from '@shadow-library/common';
+import { beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -20,9 +20,9 @@ import { Controller, EnableIf, Handler, Inject, Injectable, Module, OnApplicatio
 
 describe('Module', () => {
   const testConfig = Symbol('CONFIG');
-  const onModuleInitMock = jest.fn(() => {});
-  const onAppReadyMock = jest.fn(() => {});
-  const onModuleDestroyMock = jest.fn(() => {});
+  const onModuleInitMock = mock(() => {});
+  const onAppReadyMock = mock(() => {});
+  const onModuleDestroyMock = mock(() => {});
   let module: ModuleWrapper;
 
   @Injectable()
@@ -76,7 +76,7 @@ describe('Module', () => {
   }
 
   beforeEach(() => {
-    jest.resetAllMocks();
+    jest.clearAllMocks();
     module = new ModuleWrapper(CatModule, catModuleMetadata);
     module.loadDependencies();
   });
@@ -250,7 +250,7 @@ describe('Module', () => {
 
     it('should return the init status', () => {
       expect(module.isInitiated()).toBe(false);
-      module['instance'].isResolved = jest.fn(() => true);
+      module['instance'].isResolved = mock(() => true);
       expect(module.isInitiated()).toBe(true);
     });
   });
@@ -289,19 +289,19 @@ describe('Module', () => {
     });
 
     it('should resolve the transient provider', async () => {
-      const mock = jest.fn(async () => ({}) as any);
+      const loadMock = mock(async () => ({}) as any);
       const service = module['providers'].get(CatService)!;
-      service.loadInstance = mock;
-      service.applyInterceptors = mock;
+      service.loadInstance = loadMock;
+      service.applyInterceptors = loadMock;
       await moduleRef.resolve(CatService);
-      expect(mock).toBeCalledTimes(2);
+      expect(loadMock).toBeCalledTimes(2);
     });
 
     it('should resolve the provider exported from the imported module', async () => {
-      const mock = jest.fn(async () => 'RESULT' as any);
+      const loadMock = mock(async () => 'RESULT' as any);
       const service = module['providers'].get(CatService)!;
-      service.loadInstance = mock;
-      service.applyInterceptors = mock;
+      service.loadInstance = loadMock;
+      service.applyInterceptors = loadMock;
 
       const metadata = { imports: [CatModule] };
       @Module(metadata)
@@ -311,7 +311,7 @@ describe('Module', () => {
       const moduleRef = newModule['getInternalProvider'](ModuleRef).getInstance() as any;
       const instance = await moduleRef.resolve(CatService);
 
-      expect(mock).toBeCalledTimes(2);
+      expect(loadMock).toBeCalledTimes(2);
       expect(instance).toBe('RESULT');
     });
   });
@@ -358,8 +358,8 @@ describe('Module', () => {
     });
 
     it('should dispose instances implementing Symbol.asyncDispose and Symbol.dispose on terminate', async () => {
-      const asyncDisposeMock = jest.fn(async () => {});
-      const disposeMock = jest.fn(() => {});
+      const asyncDisposeMock = mock(async () => {});
+      const disposeMock = mock(() => {});
 
       @Injectable()
       class AsyncDisposableService {
@@ -403,7 +403,7 @@ describe('Module', () => {
   });
 
   describe('Dispatcher', () => {
-    const router = { register: jest.fn() };
+    const router = { register: mock() };
 
     @Controller()
     @Handler({ type: 'controller', isController: true })
@@ -425,7 +425,7 @@ describe('Module', () => {
     beforeEach(() => module.init());
 
     it('should do nothing if the router is not registered', async () => {
-      jest.spyOn(module as any, 'getChildModules');
+      spyOn(module as any, 'getChildModules');
       await module.registerControllers();
 
       expect(module['getChildModules']).not.toBeCalled();
@@ -433,7 +433,7 @@ describe('Module', () => {
 
     it('should register the routes for all the controllers', async () => {
       const dogModule = new ModuleWrapper(DogModule, dogModuleMetadata);
-      jest.spyOn(dogModule as any, 'getDispatcher').mockReturnValue(router);
+      spyOn(dogModule as any, 'getDispatcher').mockReturnValue(router);
 
       dogModule.addImport(module);
       dogModule.loadDependencies();
@@ -479,13 +479,13 @@ describe('Module', () => {
       dogModule.addImport(animalModule).addImport(module);
       animalModule.addImport(dogModule);
 
-      jest.spyOn(dogModule as any, 'getDispatcher').mockReturnValue(router);
+      spyOn(dogModule as any, 'getDispatcher').mockReturnValue(router);
       dogModule.loadDependencies();
       animalModule.loadDependencies();
       await dogModule.init();
       await dogModule.registerControllers();
 
-      expect(router.register.mock.lastCall?.[0]).toHaveLength(2);
+      expect(router.register.mock.calls.at(-1)?.[0]).toHaveLength(2);
     });
 
     it('should not register controllers marked as disabled', async () => {
@@ -504,7 +504,7 @@ describe('Module', () => {
       class TestModule {}
 
       const moduleWrapper = new ModuleWrapper(TestModule, testModuleMetadata);
-      jest.spyOn(moduleWrapper as any, 'getDispatcher').mockReturnValue(router);
+      spyOn(moduleWrapper as any, 'getDispatcher').mockReturnValue(router);
       await moduleWrapper.init();
       await moduleWrapper.registerControllers();
 
@@ -528,7 +528,7 @@ describe('Module', () => {
       class TestModule {}
 
       const moduleWrapper = new ModuleWrapper(TestModule, testModuleMetadata);
-      jest.spyOn(moduleWrapper as any, 'getDispatcher').mockReturnValue(router);
+      spyOn(moduleWrapper as any, 'getDispatcher').mockReturnValue(router);
       await moduleWrapper.init();
       await moduleWrapper.registerControllers();
 
@@ -544,8 +544,8 @@ describe('Module', () => {
     });
 
     it('should start the router', async () => {
-      const router = { start: jest.fn() };
-      jest.spyOn(module as any, 'getDispatcher').mockReturnValue(router);
+      const router = { start: mock() };
+      spyOn(module as any, 'getDispatcher').mockReturnValue(router);
 
       await module.start();
 
@@ -553,8 +553,8 @@ describe('Module', () => {
     });
 
     it('should stop the router', async () => {
-      const router = { stop: jest.fn() };
-      jest.spyOn(module as any, 'getDispatcher').mockReturnValue(router);
+      const router = { stop: mock() };
+      spyOn(module as any, 'getDispatcher').mockReturnValue(router);
 
       await module.stop();
 
