@@ -1,0 +1,95 @@
+/**
+ * Importing npm packages
+ */
+import fs from 'node:fs';
+import path from 'node:path';
+
+/**
+ * Importing user defined packages
+ */
+import { log, readPackageJson, run } from '@lib/utils';
+
+/**
+ * Defining types
+ */
+export interface InitOptions {
+  cwd: string;
+}
+
+/**
+ * Declaring the constants
+ */
+const PRE_COMMIT_HOOK = 'shadow verify\n';
+const COMMIT_MSG_HOOK = 'shadow commit-msg "$1"\n';
+const STARTER_SHADOWRC = `${JSON.stringify({ build: { exports: { '.': 'index' } } }, null, 2)}\n`;
+
+/** Old/known hook contents that `init` may safely overwrite when re-wiring a repo onto shadow. */
+const REPLACEABLE_HOOKS = new Set([
+  'bun verify',
+  'shadow verify',
+  'bunx shadow verify',
+  'bun lint\n\nbun type-check\n\nbun test',
+  'bunx commitlint --edit $1',
+  'bunx commitlint --edit "$1"',
+  'npx commitlint --edit $1',
+  'shadow commit-msg "$1"',
+]);
+
+/**
+ * Writes a husky hook, but never clobbers one whose contents this command doesn't recognize — a repo
+ * that has customized its `pre-commit`/`commit-msg` keeps it, and is told so.
+ */
+function writeHook(huskyDir: string, name: string, content: string): void {
+  const hookPath = path.join(huskyDir, name);
+  if (fs.existsSync(hookPath)) {
+    const existing = fs.readFileSync(hookPath, 'utf-8').trim();
+    if (existing === content.trim()) {
+      log.info(`unchanged  .husky/${name}`);
+      return;
+    }
+    if (!REPLACEABLE_HOOKS.has(existing)) {
+      log.warn(`skipped    .husky/${name} (has custom content — left as-is)`);
+      return;
+    }
+    fs.writeFileSync(hookPath, content);
+    log.info(`updated    .husky/${name}`);
+    return;
+  }
+  fs.writeFileSync(hookPath, content);
+  log.info(`created    .husky/${name}`);
+}
+
+/**
+ * Sets up husky the ecosystem way: ensures a `prepare: husky` script, activates husky, and wires the
+ * `pre-commit` → `shadow verify` and `commit-msg` → `shadow commit-msg "$1"` hooks — so a repo needs no
+ * hand-written hooks or `commitlint.config.js`. Drops a starter `.shadowrc.json` if absent. Idempotent.
+ */
+export async function init(options: InitOptions): Promise<void> {
+  const { filePath: packageJsonPath, data: packageJson } = readPackageJson(options.cwd);
+
+  const scripts = (packageJson.scripts ??= {});
+  if (scripts.prepare !== 'husky') {
+    scripts.prepare = 'husky';
+    fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
+    log.info('set        package.json scripts.prepare = "husky"');
+  }
+
+  // Activate husky (creates .husky/_ and points git at it); tolerate a not-yet-initialized git repo.
+  const husky = run('bunx', ['husky'], { cwd: options.cwd, stream: false });
+  if (husky.status !== 0) log.warn('husky activation skipped (not a git repo yet?) — re-run after "git init"');
+
+  const huskyDir = path.join(options.cwd, '.husky');
+  fs.mkdirSync(huskyDir, { recursive: true });
+  writeHook(huskyDir, 'pre-commit', PRE_COMMIT_HOOK);
+  writeHook(huskyDir, 'commit-msg', COMMIT_MSG_HOOK);
+
+  const shadowrcPath = path.join(options.cwd, '.shadowrc.json');
+  if (fs.existsSync(shadowrcPath)) {
+    log.info('unchanged  .shadowrc.json (already present)');
+  } else {
+    fs.writeFileSync(shadowrcPath, STARTER_SHADOWRC);
+    log.info('created    .shadowrc.json');
+  }
+
+  log.success('shadow init complete');
+}

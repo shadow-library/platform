@@ -33,6 +33,7 @@ describe('config', () => {
     expect(config.build.exports).toStrictEqual({ '.': 'index' });
     expect(config.build.outDir).toBe('dist');
     expect(config.verify.files).toBe('{src,tests,scripts}/**/*.ts');
+    expect(config.verify.commit).toStrictEqual({ extends: ['@commitlint/config-conventional'], rules: {} });
     expect(config.release).toStrictEqual({ npm: true, publishDir: 'dist', changelog: true });
     expect(config.checkMigrations.dir).toBe('generated/drizzle');
   });
@@ -72,6 +73,14 @@ describe('config', () => {
     expect(config.verify.format).toStrictEqual({ printWidth: 120 });
     // the base ruleset is unchanged by a merge
     expect(PRETTIER_BASE.printWidth).toBe(180);
+  });
+
+  it('should merge verify.commit overrides over the base commitlint config', () => {
+    fixtureDir = createFixtureDir('shadow-config-commit-');
+    writeFixtureFiles(fixtureDir, { '.shadowrc.json': JSON.stringify({ verify: { commit: { rules: { 'type-enum': [2, 'always', ['feat', 'fix']] } } } }) });
+    const config = loadConfig(fixtureDir);
+    expect(config.verify.commit.extends).toStrictEqual(['@commitlint/config-conventional']);
+    expect(config.verify.commit.rules).toStrictEqual({ 'type-enum': [2, 'always', ['feat', 'fix']] });
   });
 
   it('should reject an exports map without a "." entry', () => {

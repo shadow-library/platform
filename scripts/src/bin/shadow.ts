@@ -7,7 +7,9 @@
  */
 import { build } from '@lib/build';
 import { checkMigrations } from '@lib/check-migrations';
+import { commitMsg } from '@lib/commit-msg';
 import { genApiTypes } from '@lib/gen-api-types';
+import { init } from '@lib/init';
 import { release } from '@lib/release';
 import { log, ShadowError } from '@lib/utils';
 import { verify } from '@lib/verify';
@@ -24,15 +26,19 @@ import { parseArgs } from './args';
 const HELP_TEXT = `shadow — shared CLI for the Shadow Library ecosystem
 
 Usage:
+  shadow init
   shadow build
   shadow verify [--fix]
+  shadow commit-msg <file>
   shadow gen-api-types <url> [--out <path>]
   shadow release <stable|alpha|beta> [--path <path>]
   shadow check-migrations [--dir <path>]
 
 Commands:
-  build                  Build the current repo per .shadowrc.json (backend: dual ESM/CJS, frontend: ESM)
+  init                   Set up husky hooks + a starter .shadowrc.json for this repo
+  build                  Build the current repo per .shadowrc.json (ESM-only, flat dist)
   verify [--fix]         Format + lint the whole repo, then type-check + test
+  commit-msg <file>      Lint a commit message (drives the husky commit-msg hook)
   gen-api-types <url>    Fetch an OpenAPI document and generate TypeScript types
   release <channel>      Auto-bump from commits and publish; channel is stable | alpha | beta
   check-migrations       Fail if "db:generate" leaves uncommitted migration changes
@@ -57,12 +63,19 @@ async function main(): Promise<number> {
   const cwd = process.cwd();
 
   switch (command) {
+    case 'init':
+      await init({ cwd });
+      return 0;
+
     case 'build':
       await build({ cwd });
       return 0;
 
     case 'verify':
       return verify({ cwd, fix: flags.fix === true });
+
+    case 'commit-msg':
+      return commitMsg({ cwd, file: positionals[0] ?? '' });
 
     case 'gen-api-types': {
       const url = positionals[0];

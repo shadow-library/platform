@@ -31,9 +31,18 @@ export interface LintConfig {
 /** Prettier options merged over {@link PRETTIER_BASE}. Kept open — every prettier option is a valid override. */
 export type FormatConfig = Record<string, unknown>;
 
+export interface CommitConfig {
+  /** commitlint configs to extend — replaced (not merged) by a `.shadowrc.json` override. */
+  extends: string[];
+  /** commitlint rules merged over the extended config. */
+  rules: Record<string, unknown>;
+}
+
 export interface VerifyConfig {
   lint: LintConfig;
   format: FormatConfig;
+  /** Commit-message linting config, applied by `shadow commit-msg`. */
+  commit: CommitConfig;
   /** Glob of files lint + format cover, relative to the repo root. */
   files: string;
 }
@@ -75,6 +84,7 @@ export interface RawShadowConfig {
   verify?: {
     lint?: { rules?: Record<string, unknown>; ignores?: string[] };
     format?: FormatConfig;
+    commit?: { extends?: string[]; rules?: Record<string, unknown> };
     files?: string;
   };
   release?: { npm?: boolean; publishDir?: string; changelog?: boolean };
@@ -87,6 +97,9 @@ export interface RawShadowConfig {
  */
 const CONFIG_FILENAME = '.shadowrc.json';
 
+/** Base commitlint config the shipped commit-message linting extends. Overridable via `.shadowrc.json` `verify.commit`. */
+export const COMMITLINT_BASE_EXTENDS = ['@commitlint/config-conventional'];
+
 /** Base prettier ruleset. A repo's `verify.format` in `.shadowrc.json` is merged over this, so any option can be overridden. */
 export const PRETTIER_BASE: FormatConfig = {
   singleQuote: true,
@@ -97,7 +110,7 @@ export const PRETTIER_BASE: FormatConfig = {
 
 const DEFAULT_CONFIG: ShadowConfig = {
   build: { exports: { '.': 'index' }, outDir: 'dist' },
-  verify: { lint: { rules: {}, ignores: [] }, format: {}, files: '{src,tests,scripts}/**/*.ts' },
+  verify: { lint: { rules: {}, ignores: [] }, format: {}, commit: { extends: COMMITLINT_BASE_EXTENDS, rules: {} }, files: '{src,tests,scripts}/**/*.ts' },
   release: { npm: true, publishDir: 'dist', changelog: true },
   genApiTypes: { outputPath: 'src/lib/apis/api-types.gen.ts' },
   checkMigrations: { dir: 'generated/drizzle' },
@@ -148,6 +161,10 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
         ignores: [...DEFAULT_CONFIG.verify.lint.ignores, ...(raw.verify?.lint?.ignores ?? [])],
       },
       format: { ...DEFAULT_CONFIG.verify.format, ...raw.verify?.format },
+      commit: {
+        extends: raw.verify?.commit?.extends ?? DEFAULT_CONFIG.verify.commit.extends,
+        rules: { ...DEFAULT_CONFIG.verify.commit.rules, ...raw.verify?.commit?.rules },
+      },
       files: raw.verify?.files ?? DEFAULT_CONFIG.verify.files,
     },
     release: {
