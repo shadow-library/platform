@@ -9,7 +9,7 @@ import { Class } from 'type-fest';
  */
 import { NAMESPACE } from './constants';
 import { InstanceWrapper, ModuleRef, ModuleRegistry } from './injector';
-import { ProviderToken, TokenValue } from './interfaces';
+import { Provider, ProviderToken, TokenValue } from './interfaces';
 
 /**
  * Defining types
@@ -17,6 +17,12 @@ import { ProviderToken, TokenValue } from './interfaces';
 
 export interface ShadowApplicationOptions {
   enableShutdownHooks?: false | NodeJS.Signals[];
+
+  /**
+   * Providers that replace existing providers by token, wherever they are declared.
+   * Intended for tests: swap a real provider for a fake without editing module metadata.
+   */
+  overrides?: Provider[];
 }
 
 /**
@@ -34,7 +40,7 @@ export class ShadowApplication {
   constructor(module: Class<unknown>, options: ShadowApplicationOptions = {}) {
     this.main = module;
     this.options = { ...DEFAULT_OPTIONS, ...options };
-    this.registry = new ModuleRegistry(module);
+    this.registry = new ModuleRegistry(module, this.options.overrides);
   }
 
   private enableGracefulShutdown(): void {

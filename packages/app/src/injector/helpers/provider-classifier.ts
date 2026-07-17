@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AliasProvider, ClassProvider, FactoryProvider, Provider, ValueProvider } from '../../interfaces';
+import { AliasProvider, ClassProvider, FactoryProvider, Provider, ProviderToken, ValueProvider } from '../../interfaces';
 
 /**
  * Defining types
@@ -29,4 +29,8 @@ export function isFactoryProvider<T = any>(provider: Provider): provider is Fact
 
 export function isAliasProvider(provider: Provider): provider is AliasProvider {
   return 'useExisting' in provider && typeof provider?.useExisting !== 'undefined';
+}
+
+export function getProviderToken(provider: Provider): ProviderToken {
+  return typeof provider === 'function' ? provider : provider.token;
 }

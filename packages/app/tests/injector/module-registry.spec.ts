@@ -100,6 +100,14 @@ describe('ModuleRegistry', () => {
       expect(modules).toStrictEqual([EmptyModule]);
     });
 
+    it('should apply provider overrides to the module that declares them', () => {
+      const override = { token: CatService, useValue: { overridden: true } };
+      const registry = new ModuleRegistry(AppModule, [override]);
+      const catModule = registry.get(CatModule);
+
+      expect(catModule['providers'].get(CatService)?.getInstance()).toEqual({ overridden: true });
+    });
+
     it('should register the module with dynamic imports', () => {
       @Module({})
       class DynamicModule {

@@ -12,13 +12,13 @@ import { Class } from 'type-fest';
  */
 import { InternalOperationMetadata } from '@lib/internal.types';
 
-import { DIErrors, DependencyGraph } from './helpers';
+import { DIErrors, DependencyGraph, getProviderToken } from './helpers';
 import { InstanceWrapper } from './instance-wrapper';
 import { ModuleRef } from './module-ref';
 import { DispatchMetadata, Dispatcher } from '../classes';
 import { CONTROLLER_METADATA, HANDLER_METADATA, INTERNAL_OPERATION_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA } from '../constants';
 import { HandlerMetadata } from '../decorators';
-import { ModuleMetadata, ProviderToken, TokenValue, ValueProvider } from '../interfaces';
+import { ModuleMetadata, Provider, ProviderToken, TokenValue, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
 
 /**
@@ -55,6 +55,7 @@ export class Module {
   constructor(
     private readonly metatype: Class<unknown>,
     private readonly metadata: ModuleMetadata,
+    private readonly overrides: Map<ProviderToken, Provider> = new Map(),
   ) {
     this.instance = new InstanceWrapper(metatype);
 
@@ -89,7 +90,8 @@ export class Module {
   }
 
   private loadProviders() {
-    const providers = this.metadata.providers ?? [];
+    const declared = this.metadata.providers ?? [];
+    const providers = declared.map(provider => this.overrides.get(getProviderToken(provider)) ?? provider);
     const providerMap = new Map<ProviderToken, InstanceWrapper>();
     const graph = new DependencyGraph();
 

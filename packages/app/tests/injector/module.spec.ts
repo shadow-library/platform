@@ -132,6 +132,17 @@ describe('Module', () => {
       expect(emptyModule['controllers'].size).toBe(0);
     });
 
+    it('should replace a declared provider with a matching override', () => {
+      const metadata = { providers: [MockCatService], exports: [MockCatService] };
+      @Module(metadata)
+      class OverrideModule {}
+
+      const overrides = new Map([[MockCatService, { token: MockCatService, useValue: { overridden: true } }]]);
+      const overrideModule = new ModuleWrapper(OverrideModule, metadata, overrides as any);
+
+      expect(overrideModule.getProvider(MockCatService)?.getInstance()).toEqual({ overridden: true });
+    });
+
     it('should load only the providers from the imports', () => {
       @Injectable()
       class AnimalService {

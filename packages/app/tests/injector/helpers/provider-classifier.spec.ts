@@ -6,7 +6,7 @@ import { describe, expect, it } from '@jest/globals';
 /**
  * Importing user defined packages
  */
-import { isClassProvider, isFactoryProvider, isValueProvider } from '@lib/injector/helpers';
+import { getProviderToken, isClassProvider, isFactoryProvider, isValueProvider } from '@lib/injector/helpers';
 import { ClassProvider, FactoryProvider, ValueProvider } from '@shadow-library/app';
 
 /**
@@ -81,6 +81,18 @@ describe('Provider Classifier', () => {
     it('should return false if the provider is a value provider', () => {
       const provider: ValueProvider = { token: 'test', useValue: 'test' };
       expect(isClassProvider(provider)).toBe(false);
+    });
+  });
+
+  describe('getProviderToken', () => {
+    it('should return the class itself for a shorthand class provider', () => {
+      class Class {}
+      expect(getProviderToken(Class)).toBe(Class);
+    });
+
+    it('should return the token for an object provider', () => {
+      const provider: ValueProvider = { token: 'test', useValue: 'test' };
+      expect(getProviderToken(provider)).toBe('test');
     });
   });
 });

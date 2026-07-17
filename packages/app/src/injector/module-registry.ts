@@ -9,10 +9,10 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { DIErrors, DependencyGraph } from './helpers';
+import { DIErrors, DependencyGraph, getProviderToken } from './helpers';
 import { HookTypes, Module } from './module';
 import { MODULE_METADATA, NAMESPACE } from '../constants';
-import { DynamicModule, ModuleMetadata } from '../interfaces';
+import { DynamicModule, ModuleMetadata, Provider, ProviderToken } from '../interfaces';
 
 /**
  * Defining types
@@ -38,8 +38,10 @@ const isDynamicModule = (module: TParsedModule): module is DynamicModule => 'mod
 export class ModuleRegistry {
   private readonly logger = Logger.getLogger(NAMESPACE, 'ModuleRegistry');
   private readonly modules = new Map<TModule, Module>();
+  private readonly overrides: Map<ProviderToken, Provider>;
 
-  constructor(root: TModule) {
+  constructor(root: TModule, overrides: Provider[] = []) {
+    this.overrides = new Map(overrides.map(provider => [getProviderToken(provider), provider]));
     const modules = this.scan(root);
     for (const module of modules) this.modules.set(module.getMetatype(), module);
   }
@@ -75,7 +77,7 @@ export class ModuleRegistry {
       const existingMetadata = moduleMetadata.get(metadata.module);
       if (existingMetadata && !isDynamic) return;
       if (existingMetadata && !existingMetadata.isNoop) DIErrors.duplicateDynamicModule(metadata.module);
-      modules.set(metadata.module, new Module(metadata.module, metadata));
+      modules.set(metadata.module, new Module(metadata.module, metadata, this.overrides));
       moduleMetadata.set(metadata.module, { ...metadata, isDynamic });
       metadata.imports?.forEach(imp => scanModule(imp));
     };

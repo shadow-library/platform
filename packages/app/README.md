@@ -910,6 +910,21 @@ describe('UserService', () => {
 });
 ```
 
+### Overriding Providers
+
+To swap a real provider for a fake without editing module metadata, pass `overrides` when creating the
+application. Each override replaces the provider with the same token wherever it is declared:
+
+```ts
+const app = await ShadowFactory.create(AppModule, {
+  overrides: [{ token: DatabaseService, useValue: mockDatabase }],
+});
+
+// Every provider that depends on DatabaseService now receives mockDatabase.
+```
+
+An override whose token matches no declared provider is ignored.
+
 ## Comparison with NestJS
 
 | Feature            | Shadow Application               | NestJS                        |
