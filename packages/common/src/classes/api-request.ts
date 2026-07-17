@@ -39,7 +39,6 @@ export interface CustomAPIRequest {
 /**
  * Declaring the constants
  */
-const isDebug = Logger.isDebugEnabled();
 
 export class APIRequest {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');
@@ -136,7 +135,8 @@ export class APIRequest {
       requestOptions.body = body;
     }
 
-    /** Log the request */
+    /** Log the request. Read the level per request so a runtime level change is honoured. */
+    const isDebug = Logger.isDebugEnabled();
     const reqLog = `${this.options.method} ${uri}`;
     if (isDebug) APIRequest.logger.debug(reqLog, requestOptions);
     else APIRequest.logger.info(reqLog);

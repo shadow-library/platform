@@ -100,6 +100,12 @@ export class ConfigService<Configs extends ConfigRecords = ConfigRecords> {
     }
   }
 
+  /** Wires the config's own logger once the logger singleton is ready; until then config logs to the console. */
+  setLogger(logger: Logger): this {
+    this.logger = logger;
+    return this;
+  }
+
   private log(level: Exclude<LogLevel, 'silly'>, message: string) {
     if (this.logger) this.logger[level](message);
     else console.log(`{"level":"${level}","timestamp": "${new Date().toISOString()}","label": "ConfigService","message": "${message}"}`); // eslint-disable-line no-console

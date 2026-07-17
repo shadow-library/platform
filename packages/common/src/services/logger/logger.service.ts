@@ -52,7 +52,7 @@ class LoggerStatic {
   private readonly contextProviders: ContextProviderConfig[] = [];
 
   constructor() {
-    Config['logger'] = this.getLogger(Config.get('app.name'), 'ConfigService');
+    Config.setLogger(this.getLogger(Config.get('app.name'), 'ConfigService'));
   }
 
   private getLogContext(): LogData {
@@ -182,4 +182,5 @@ class LoggerStatic {
   }
 }
 
-export const Logger = new LoggerStatic();
+const globalRef = global as any;
+export const Logger: LoggerStatic = globalRef.loggerService || (globalRef.loggerService = new LoggerStatic());

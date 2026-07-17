@@ -403,29 +403,31 @@ describe('LRUCache', () => {
 
     describe('TTL with updates and access patterns', () => {
       it('should reset TTL on update', () => {
-        const ttlCache = new LRUCache(3, { ttl: 3 });
+        const ttlCache = new LRUCache(3, { ttl: 100 });
         ttlCache.set('key1', 'value1');
 
-        Bun.sleepSync(2);
-        ttlCache.set('key1', 'updated'); // Reset TTL
+        Bun.sleepSync(90); // near the original 100ms expiry
+        ttlCache.set('key1', 'updated'); // refreshes the entry: new expiry ~100ms from here
 
-        Bun.sleepSync(2); // Original would expire now, but reset TTL keeps it
+        // Short observation window (small sleeps drift the least under load): we are now well past
+        // the original 100ms expiry yet far inside the refreshed window, so the item is still alive.
+        Bun.sleepSync(20);
 
         expect(ttlCache.get('key1')).toBe('updated');
       });
 
       it('should extend lifetime with get() moving item to top', () => {
-        const ttlCache = new LRUCache(3, { ttl: 3 });
+        const ttlCache = new LRUCache(3, { ttl: 50 });
         ttlCache.set('key1', 'value1');
         ttlCache.set('key2', 'value2');
         ttlCache.set('key3', 'value3');
 
-        Bun.sleepSync(2);
+        Bun.sleepSync(30);
 
         // Access key1 to move to top (but TTL doesn't reset on get)
         ttlCache.get('key1');
 
-        Bun.sleepSync(2); // key1 should be expired now
+        Bun.sleepSync(30); // ~60ms from start: past the 50ms TTL, so key1 is expired
 
         expect(ttlCache.get('key1')).toBeUndefined();
       });
