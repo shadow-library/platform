@@ -25,6 +25,43 @@ describe('TransformerFactory', () => {
     expect(() => transformer.compile({ $id: 'test', type: 'object', properties: {} })).toThrow(AppError);
   });
 
+  describe('codegen hardening', () => {
+    it('should transform fields whose keys are not valid identifiers', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: 'KebabSchema',
+        type: 'object',
+        required: ['foo-bar', 'nested'],
+        properties: {
+          'foo-bar': { type: 'string', tagged: true },
+          nested: { $ref: 'Child' },
+        },
+        definitions: { Child: { $id: 'Child', type: 'object', properties: { 'a.b': { type: 'string', tagged: true } } } },
+      };
+
+      const factory = new TransformerFactory(fieldSchema => !!(fieldSchema as any).tagged);
+      const transformer = factory.compile(schema as any);
+      const result = transformer({ 'foo-bar': 'hello', nested: { 'a.b': 'world' } }, () => 'xxx');
+
+      expect(result).toStrictEqual({ 'foo-bar': 'xxx', nested: { 'a.b': 'xxx' } });
+    });
+
+    it('should transform schemas whose $id contains quotes and special characters', () => {
+      const schema = {
+        [BRAND]: true,
+        $id: `class-schema:oneOf?Classes=A'B,"C"`,
+        type: 'object',
+        required: ['value'],
+        properties: { value: { type: 'string', tagged: true } },
+      };
+
+      const factory = new TransformerFactory(fieldSchema => !!(fieldSchema as any).tagged);
+      const transformer = factory.compile(schema as any);
+
+      expect(transformer({ value: 'hello' }, () => 'xxx')).toStrictEqual({ value: 'xxx' });
+    });
+  });
+
   it('should create transforms for only required schema', () => {
     const schema = {
       [BRAND]: true,

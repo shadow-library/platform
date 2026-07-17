@@ -58,25 +58,19 @@ interface FieldDefinition {
   variants: Record<string, FieldVariantSpec>;
 }
 
-type Runtime = 'node' | 'deno' | 'bun';
-
 /**
  * Declaring the constants
  */
 const noop: Transformer = value => value;
-declare const Deno: any;
+
+/** Renders a bracketed member access so arbitrary keys (kebab-case, quotes, reserved words) stay valid in generated code */
+const member = (base: string, key: string | number): string => `${base}[${JSON.stringify(key.toString())}]`;
 
 export class TransformerFactory {
   private readonly context: ContextState;
 
   constructor(private readonly filter: FieldFilter) {
     this.context = { transformers: {}, schemas: {}, constructPath: (prefix, field) => (prefix ? `${prefix}.${field.toString()}` : field.toString()) };
-  }
-
-  private getRuntime(): Runtime {
-    if (typeof Bun !== 'undefined') return 'bun';
-    if (typeof Deno !== 'undefined') return 'deno';
-    return 'node';
   }
 
   private hasTransformTargets(schema: JSONSchema): boolean {
@@ -161,7 +155,7 @@ export class TransformerFactory {
         const variantSpec = validConstDiscriminator.variants[variant.$id];
         assert(variantSpec?.const !== undefined, 'Variant must have a const value for the discriminator field');
         const value = JSON.stringify(variantSpec.const);
-        const condition = `data.${validConstDiscriminator.name} === ${value}`;
+        const condition = `${member('data', validConstDiscriminator.name)} === ${value}`;
         discriminator.push({ condition, schemaId: variant.$id });
       }
 
@@ -175,7 +169,7 @@ export class TransformerFactory {
       if (typeDiscriminators.has(typeField.name)) continue;
       for (const schemaId in typeField.variants) {
         const variantSpec = typeField.variants[schemaId] as FieldVariantSpec;
-        const condition = `typeof data.${typeField.name} === '${variantSpec.type}'`;
+        const condition = `typeof ${member('data', typeField.name)} === ${JSON.stringify(variantSpec.type)}`;
         typeDiscriminators.set(schemaId, condition);
       }
     }
@@ -187,11 +181,11 @@ export class TransformerFactory {
     /** Trying to find a valid enum discriminator */
     const validEnumDiscriminator = fields.find(fieldDef => this.hasUniqueFieldValues(fieldDef, 'enum'));
     if (validEnumDiscriminator) {
+      const access = member('data', validEnumDiscriminator.name);
       for (const variant of variants) {
         const variantSpec = validEnumDiscriminator.variants[variant.$id] as FieldVariantSpec;
         assert(variantSpec?.enum !== undefined, 'Variant must have an enum value for the discriminator field');
-        let condition = `${JSON.stringify(variantSpec.enum)}.includes(data.${validEnumDiscriminator.name})`;
-        if (this.getRuntime() === 'bun') condition = variantSpec.enum.map(value => `data.${validEnumDiscriminator.name} === ${JSON.stringify(value)}`).join(' || ');
+        const condition = variantSpec.enum.map(value => `${access} === ${JSON.stringify(value)}`).join(' || ');
         discriminator.push({ condition, schemaId: variant.$id });
       }
 
@@ -207,7 +201,7 @@ export class TransformerFactory {
     this.context.schemas[schema.$id] = schema;
 
     let ops = '';
-    if (this.filter(schema)) ops += `data = action(data, this.schemas['${schema.$id}'], ctx);`;
+    if (this.filter(schema)) ops += `data = action(data, ${member('this.schemas', schema.$id)}, ctx);`;
 
     /** Handling root array schema */
     if (schema.type === 'array' && schema.items) {
@@ -217,13 +211,13 @@ export class TransformerFactory {
         ops += `
           if (Array.isArray(data)) {
             const getContext = (index) => ({ ...ctx, field: index.toString(), path: this.constructPath(ctx.prefix, index) });
-            data = data.map((value, index) => action(value, this.schemas['${schema.$id}'], getContext(index))).filter(value => value !== undefined);
+            data = data.map((value, index) => action(value, ${member('this.schemas', schema.$id)}, getContext(index))).filter(value => value !== undefined);
           }
         `;
       } else {
         ops += `
           if (Array.isArray(data)) {
-            const transformer = this.transformers['${schema.items.$ref}'];
+            const transformer = ${member('this.transformers', schema.items.$ref as string)};
             if (transformer) {
               const getContext = (index) => ({ ...ctx, prefix: this.constructPath(ctx.prefix, index) });
               data = data.map((value, index) => transformer(value, action, getContext(index))).filter(value => value !== undefined);
@@ -242,7 +236,7 @@ export class TransformerFactory {
         for (const { condition, schemaId } of discriminators) {
           ops += `
           if (${condition}) {
-            const transformer = this.transformers['${schemaId}'];
+            const transformer = ${member('this.transformers', schemaId)};
             if (transformer) data = transformer(data, action, ctx);
           }
         `;
@@ -251,7 +245,7 @@ export class TransformerFactory {
         for (const variant of variants) {
           ops += `
           {
-            const transformer = this.transformers['${variant.$id}'];
+            const transformer = ${member('this.transformers', variant.$id)};
             if (transformer) data = transformer(data, action, ctx);
           }
           `;
@@ -270,36 +264,38 @@ export class TransformerFactory {
       }
 
       for (const field of fields) {
+        const access = member('data', field);
         ops += `
-          if ('${field}' in data) {
-            const value = data.${field};
-            const childContext = { parent: data, root: ctx.root, field: '${field}', path: this.constructPath(ctx.prefix, '${field}') };
-            data.${field} = action(value, this.schemas['${schema.$id}'].properties.${field}, childContext);
-            if (data.${field} === undefined) delete data.${field};
+          if (${JSON.stringify(field)} in data) {
+            const value = ${access};
+            const childContext = { parent: data, root: ctx.root, field: ${JSON.stringify(field)}, path: this.constructPath(ctx.prefix, ${JSON.stringify(field)}) };
+            ${access} = action(value, ${member('this.schemas', schema.$id)}.properties[${JSON.stringify(field)}], childContext);
+            if (${access} === undefined) delete ${access};
           }
         `;
       }
 
       for (const field of refFields) {
+        const access = member('data', field);
         const refSchema = schema.properties[field] as JSONSchema;
         if (refSchema.type === 'array') {
           ops += `
-            if (Array.isArray(data.${field})) {
-              const transformer = this.transformers['${refSchema.items?.$ref}'];
+            if (Array.isArray(${access})) {
+              const transformer = ${member('this.transformers', refSchema.items?.$ref as string)};
               if (transformer) {
-                const getContext = (index) => ({ parent: data, root: ctx.root, prefix: this.constructPath(ctx.prefix, '${field}.' + index) });
-                data.${field} = data.${field}.map((value, index) => transformer(value, action, getContext(index))).filter(value => value !== undefined);
+                const getContext = (index) => ({ parent: data, root: ctx.root, prefix: this.constructPath(ctx.prefix, ${JSON.stringify(field + '.')} + index) });
+                ${access} = ${access}.map((value, index) => transformer(value, action, getContext(index))).filter(value => value !== undefined);
               }
             }
           `;
         } else {
           ops += `
-            if ('${field}' in data) {
-              const transformer = this.transformers['${refSchema.$ref}'];
+            if (${JSON.stringify(field)} in data) {
+              const transformer = ${member('this.transformers', refSchema.$ref as string)};
               if (transformer) {
-                const childContext = { parent: data, root: ctx.root, prefix: this.constructPath(ctx.prefix, '${field}') };
-                data.${field} = transformer(data.${field}, action, childContext);
-                if (data.${field} === undefined) delete data.${field};
+                const childContext = { parent: data, root: ctx.root, prefix: this.constructPath(ctx.prefix, ${JSON.stringify(field)}) };
+                ${access} = transformer(${access}, action, childContext);
+                if (${access} === undefined) delete ${access};
               }
             }
           `;
