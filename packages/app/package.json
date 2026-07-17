@@ -7,9 +7,9 @@
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "lint": "bun run scripts/lint.ts",
-    "type-check": "bun run tsc",
-    "build": "bun run scripts/build.ts",
+    "type-check": "tsc",
+    "build": "shadow build",
+    "verify": "shadow verify",
     "test": "bun run test:unit && bun run test:integration",
     "test:unit": "bun test tests/decorators tests/injector tests/utils tests/injection-token.spec.ts tests/shadow-application.spec.ts tests/shadow-factory.spec.ts --coverage",
     "test:integration": "bun test tests/integration"
@@ -24,29 +24,18 @@
     "url": "https://github.com/shadow-library/app/issues"
   },
   "homepage": "https://github.com/shadow-library/app#readme",
+  "engines": {
+    "node": ">=23.0.0"
+  },
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
-    "@eslint/js": "^9.29.0",
-    "@release-it/conventional-changelog": "^10.0.1",
-    "@shadow-library/common": "^1.5.2",
+    "@shadow-library/common": "^2.0.0-alpha.1",
+    "@shadow-library/scripts": "^0.2.1",
     "@types/bun": "^1.2.17",
-    "@typescript-eslint/parser": "^8.35.0",
-    "eslint": "^9.29.0",
-    "eslint-import-resolver-typescript": "^3.10.1",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-n": "^17.20.0",
-    "globals": "^15.15.0",
     "husky": "^9.1.7",
-    "prettier": "^3.6.0",
-    "reflect-metadata": "^0.2.2",
-    "release-it": "^17.11.0",
-    "tsc-alias": "^1.8.16",
-    "typescript": "^5.8.3",
-    "typescript-eslint": "^8.35.0"
+    "reflect-metadata": "^0.2.2"
   },
   "peerDependencies": {
-    "@shadow-library/common": "^1.5.2",
+    "@shadow-library/common": "^2.0.0-alpha.1",
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {

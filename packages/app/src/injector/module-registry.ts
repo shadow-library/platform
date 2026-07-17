@@ -3,16 +3,16 @@
  */
 import assert from 'node:assert';
 
-import { AppError, Logger } from '@shadow-library/common';
 import { Class } from 'type-fest';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { DIErrors, DependencyGraph, getProviderToken } from './helpers';
-import { HookTypes, Module } from './module';
 import { MODULE_METADATA, NAMESPACE } from '../constants';
 import { DynamicModule, ModuleMetadata, Provider, ProviderToken } from '../interfaces';
+import { DependencyGraph, DIErrors, getProviderToken } from './helpers';
+import { HookTypes, Module } from './module';
 
 /**
  * Defining types

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Reflector } from '@shadow-library/common';
 import { describe, expect, it } from 'bun:test';
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

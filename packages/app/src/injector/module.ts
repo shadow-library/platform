@@ -3,23 +3,23 @@
  */
 import assert from 'node:assert';
 
-import { AppError, Logger } from '@shadow-library/common';
 import merge from 'deepmerge';
 import { Class } from 'type-fest';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { InternalOperationMetadata } from '@lib/internal.types';
 
-import { DIErrors, DependencyGraph, getProviderToken } from './helpers';
-import { InstanceWrapper } from './instance-wrapper';
-import { ModuleRef } from './module-ref';
-import { DispatchMetadata, Dispatcher } from '../classes';
+import { Dispatcher, DispatchMetadata } from '../classes';
 import { CONTROLLER_METADATA, HANDLER_METADATA, INTERNAL_OPERATION_METADATA, NAMESPACE, PARAMTYPES_METADATA, RETURN_TYPE_METADATA } from '../constants';
 import { HandlerMetadata } from '../decorators';
 import { ModuleMetadata, Provider, ProviderToken, TokenValue, ValueProvider } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
+import { DependencyGraph, DIErrors, getProviderToken } from './helpers';
+import { InstanceWrapper } from './instance-wrapper';
+import { ModuleRef } from './module-ref';
 
 /**
  * Defining types

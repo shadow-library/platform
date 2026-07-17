@@ -3,17 +3,17 @@
  */
 import assert from 'node:assert';
 
-import { AppError, Fn, Logger, utils } from '@shadow-library/common';
 import { Class } from 'type-fest';
+import { AppError, Fn, Logger, utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { DIErrors, isAliasProvider, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
 import { INJECTABLE_METADATA, INTERCEPTOR_METADATA, NAMESPACE, OPTIONAL_DEPS_METADATA, PARAMTYPES_METADATA, RETURN_TYPE_METADATA, SELF_DECLARED_DEPS_METADATA } from '../constants';
-import { InjectMetadata, InjectableOptions } from '../decorators';
+import { InjectableOptions, InjectMetadata } from '../decorators';
 import { FactoryDependency, FactoryProvider, Interceptor, InterceptorConfig, InterceptorContext, Provider, ProviderToken } from '../interfaces';
 import { ContextId, createContextId } from '../utils';
+import { DIErrors, isAliasProvider, isClassProvider, isFactoryProvider, isValueProvider } from './helpers';
 import { ModuleRef } from './module-ref';
 
 /**

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { AppError } from '@shadow-library/common';
 import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

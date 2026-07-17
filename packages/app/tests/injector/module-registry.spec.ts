@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
-import { AppError } from '@shadow-library/common';
 import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import { Class } from 'type-fest';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { HookTypes, InstanceWrapper, ModuleRegistry } from '@lib/injector';
-import { Controller, DynamicModule, Handler, Injectable, Module, forwardRef } from '@shadow-library/app';
+import { Controller, DynamicModule, forwardRef, Handler, Injectable, Module } from '@shadow-library/app';
 
 /**
  * Defining types

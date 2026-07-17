@@ -1,0 +1,10 @@
+{
+  "build": {
+    "exports": {
+      ".": "index"
+    }
+  },
+  "verify": {
+    "files": "{src,tests}/**/*.ts"
+  }
+}

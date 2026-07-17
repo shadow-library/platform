@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
-import { AppError } from '@shadow-library/common';
 import { afterEach, beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { InstanceWrapper } from '@lib/injector';
 import { CallHandler, Interceptor, InterceptorContext } from '@lib/interfaces';
-import { Inject, Injectable, Optional, UseInterceptor, UseInterceptors, createContextId, forwardRef } from '@shadow-library/app';
+import { createContextId, forwardRef, Inject, Injectable, Optional, UseInterceptor, UseInterceptors } from '@shadow-library/app';
 
 /**
  * Importing npm packages

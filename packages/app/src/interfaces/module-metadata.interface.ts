@@ -6,9 +6,9 @@ import { Class } from 'type-fest';
 /**
  * Importing user defined packages
  */
-import { Provider, ProviderToken } from './provider.interface';
 import { ForwardReference } from '../utils';
 import { DynamicModule } from './dynamic-module.interface';
+import { Provider, ProviderToken } from './provider.interface';
 
 /**
  * Defining types

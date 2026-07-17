@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { AppError } from '@shadow-library/common';
 import { beforeEach, describe, expect, it, jest, mock, spyOn } from 'bun:test';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { HookTypes, ModuleRef, Module as ModuleWrapper } from '@lib/injector';
-import { Controller, EnableIf, Handler, Inject, Injectable, Module, OnApplicationReady, OnModuleDestroy, OnModuleInit, Optional, forwardRef } from '@shadow-library/app';
+import { Controller, EnableIf, forwardRef, Handler, Inject, Injectable, Module, OnApplicationReady, OnModuleDestroy, OnModuleInit, Optional } from '@shadow-library/app';
 
 /**
  * Defining types

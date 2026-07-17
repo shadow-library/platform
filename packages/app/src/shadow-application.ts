@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { AppError, Logger } from '@shadow-library/common';
 import { Class } from 'type-fest';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

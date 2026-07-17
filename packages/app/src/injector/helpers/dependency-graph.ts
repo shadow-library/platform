@@ -69,7 +69,7 @@ export class DependencyGraph<T extends ProviderToken> {
       }
     }
 
-    let current: T | null = null;
+    let current: T | null;
     const orderedNodes = new Set<T>();
     while ((current = getNextNode()) !== null) {
       const currentMetadata = metadata.get(current) as NodeMetadata;

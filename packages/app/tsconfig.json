@@ -21,13 +21,12 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "baseUrl": ".",
-    "module": "ES2022",
-    "moduleResolution": "node",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "paths": {
-      "@lib/*": ["src/*"],
-      "@shadow-library/app": ["src/index.ts"],
-      "@examples/*": ["examples/*"]
+      "@lib/*": ["./src/*"],
+      "@shadow-library/app": ["./src/index.ts"],
+      "@examples/*": ["./examples/*"]
     },
     "resolveJsonModule": true,
     "types": ["bun"],
@@ -44,5 +43,5 @@
     /** Completeness */
     "skipLibCheck": true
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
+  "include": ["src/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]
 }
