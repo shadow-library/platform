@@ -20,7 +20,7 @@ export function isClassProvider<T = any>(provider: Provider): provider is ClassP
 }
 
 export function isValueProvider<T = any>(provider: Provider): provider is ValueProvider<T> {
-  return 'useValue' in provider && typeof provider?.useValue !== 'undefined';
+  return typeof provider === 'object' && 'useValue' in provider;
 }
 
 export function isFactoryProvider<T = any>(provider: Provider): provider is FactoryProvider<T> {

@@ -24,6 +24,11 @@ describe('Provider Classifier', () => {
       expect(isValueProvider(provider)).toBe(true);
     });
 
+    it('should return true if the value provider holds an undefined value', () => {
+      const provider: ValueProvider = { token: 'test', useValue: undefined };
+      expect(isValueProvider(provider)).toBe(true);
+    });
+
     it('should return false if the provider is a class provider', () => {
       class Class {}
       const provider: ClassProvider = { token: Class, useClass: Class };
