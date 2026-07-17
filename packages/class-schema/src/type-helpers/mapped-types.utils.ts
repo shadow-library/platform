@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Reflector } from '@shadow-library/common';
 import { Class } from 'type-fest';
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

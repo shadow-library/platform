@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { Reflector } from '@shadow-library/common';
 import { Class } from 'type-fest';
+import { Reflector } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { METADATA_KEYS, getCounterId } from '@lib/constants';
+import { getCounterId, METADATA_KEYS } from '@lib/constants';
 import { JSONSchema } from '@lib/interfaces';
 
 /**
