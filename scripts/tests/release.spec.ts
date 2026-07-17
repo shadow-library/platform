@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { applySemverPolicy, buildChangelog, computeBumpLevel, computeNextVersion, isValidChannel, parseConventionalCommit, parseGitHubRepoSlug } from '@lib/release';
+import { applySemverPolicy, buildChangelog, bumpVersion, computeBumpLevel, isValidLevel, parseConventionalCommit, parseGitHubRepoSlug } from '@lib/release';
 
 /**
  * Defining types
@@ -18,13 +18,13 @@ import { applySemverPolicy, buildChangelog, computeBumpLevel, computeNextVersion
 const parse = (messages: string[]) => messages.map(parseConventionalCommit);
 
 describe('release', () => {
-  describe('isValidChannel', () => {
-    it.each(['stable', 'alpha', 'beta'])('should accept "%s"', channel => {
-      expect(isValidChannel(channel)).toBe(true);
+  describe('isValidLevel', () => {
+    it.each(['major', 'minor', 'patch'])('should accept "%s"', level => {
+      expect(isValidLevel(level)).toBe(true);
     });
 
-    it.each(['', 'STABLE', 'patch', 'rc', 'gamma'])('should reject "%s"', channel => {
-      expect(isValidChannel(channel)).toBe(false);
+    it.each(['', 'MAJOR', 'stable', 'alpha', 'prerelease'])('should reject "%s"', level => {
+      expect(isValidLevel(level)).toBe(false);
     });
   });
 
@@ -99,33 +99,26 @@ describe('release', () => {
       expect(applySemverPolicy('major', '0.2.0-alpha.0')).toBe('minor');
     });
 
-    it('should compose with computeNextVersion so a 0.x breaking change bumps minor', () => {
-      expect(computeNextVersion('0.1.0', applySemverPolicy('major', '0.1.0'), 'stable')).toBe('0.2.0');
-      expect(computeNextVersion('0.1.0', applySemverPolicy('minor', '0.1.0'), 'stable')).toBe('0.1.1');
+    it('should mean a 0.x breaking change only requires a minor release', () => {
+      // a breaking change in 0.x resolves to a "minor" requirement, so `release minor` is allowed
+      expect(applySemverPolicy(computeBumpLevel(parse(['feat!: break'])), '0.1.0')).toBe('minor');
     });
   });
 
-  describe('computeNextVersion', () => {
-    it('should apply the level for a stable release from a stable version', () => {
-      expect(computeNextVersion('1.2.3', 'minor', 'stable')).toBe('1.3.0');
-      expect(computeNextVersion('1.2.3', 'major', 'stable')).toBe('2.0.0');
-      expect(computeNextVersion('1.2.3', 'patch', 'stable')).toBe('1.2.4');
+  describe('bumpVersion', () => {
+    it('should apply each level to a stable version', () => {
+      expect(bumpVersion('1.2.3', 'major')).toBe('2.0.0');
+      expect(bumpVersion('1.2.3', 'minor')).toBe('1.3.0');
+      expect(bumpVersion('1.2.3', 'patch')).toBe('1.2.4');
     });
 
-    it('should finalize an in-progress prerelease for a stable release, keeping its core', () => {
-      expect(computeNextVersion('1.3.0-alpha.2', 'minor', 'stable')).toBe('1.3.0');
+    it('should bump a 0.x version by the chosen level', () => {
+      expect(bumpVersion('0.1.1', 'minor')).toBe('0.2.0');
+      expect(bumpVersion('0.1.1', 'patch')).toBe('0.1.2');
     });
 
-    it('should start a prerelease off the applied level from a stable version', () => {
-      expect(computeNextVersion('1.2.3', 'minor', 'alpha')).toBe('1.3.0-alpha.0');
-    });
-
-    it('should bump the counter for a prerelease of the same channel', () => {
-      expect(computeNextVersion('1.3.0-alpha.0', 'minor', 'alpha')).toBe('1.3.0-alpha.1');
-    });
-
-    it('should promote across channels in place, keeping the core', () => {
-      expect(computeNextVersion('1.3.0-alpha.2', 'minor', 'beta')).toBe('1.3.0-beta.0');
+    it('should drop a prerelease tag when bumping', () => {
+      expect(bumpVersion('1.3.0-alpha.2', 'patch')).toBe('1.3.1');
     });
   });
 

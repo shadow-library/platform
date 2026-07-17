@@ -3,14 +3,18 @@ name: Publish package to NPM
 on:
   workflow_dispatch:
     inputs:
-      channel:
+      level:
         type: choice
-        description: 'Release channel (the bump level is inferred from the commits)'
-        default: 'stable'
+        description: 'Version bump to release'
+        default: 'patch'
         options:
-          - 'stable'
-          - 'alpha'
-          - 'beta'
+          - 'patch'
+          - 'minor'
+          - 'major'
+      force:
+        type: boolean
+        description: 'Force the release even if the commits require a higher bump'
+        default: false
 
 jobs:
   publish:
@@ -45,11 +49,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # `shadow release` infers the semver bump from the commits since the last tag, then performs every
-      # remote git operation (Verified package.json commit on main, tag, GitHub release) through Octokit
-      # before publishing to npm. The only choice is the channel.
+      # `shadow release <level>` bumps the chosen level and performs every remote git operation (Verified
+      # package.json commit on main, tag, GitHub release) through Octokit before publishing to npm. It
+      # errors if the commits require a higher bump than the chosen level, unless "force" is checked.
       - name: Release
-        run: bun run src/bin/shadow.ts release ${{ github.event.inputs.channel }}
+        run: bun run src/bin/shadow.ts release ${{ github.event.inputs.level }} ${{ github.event.inputs.force == 'true' && '--force' || '' }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
