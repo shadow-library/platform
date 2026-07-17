@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/scripts",
   "type": "module",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Shared CLI for the Shadow Library ecosystem — centralizes the library build, local verification (lint + format + type-check + test), OpenAPI type generation, release, and migration-drift-check workflows behind a single .shadowrc.json config",
   "sideEffects": false,
   "bin": {
