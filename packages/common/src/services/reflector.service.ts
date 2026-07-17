@@ -1,7 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Options as DeepMergeOpts, all as merge } from 'deepmerge';
+import 'reflect-metadata';
+
+import deepmerge, { type Options as DeepMergeOpts } from 'deepmerge';
 
 /**
  * Importing user defined packages
@@ -54,7 +56,7 @@ class ReflectorService {
   updateMetadata<T extends object = object>(key: MetadataKey, value: T, target: object, propertyKey?: string | symbol, options?: UpdateMetadataOptions): void {
     const opts: DeepMergeOpts = options?.arrayStrategy === 'replace' ? { arrayMerge: (_, src) => src } : {};
     const oldMetadata = Reflect.getMetadata(key, target, propertyKey as string | symbol);
-    const newMetadata = typeof oldMetadata === 'object' && oldMetadata !== null ? merge([oldMetadata, value], opts) : value;
+    const newMetadata = typeof oldMetadata === 'object' && oldMetadata !== null ? deepmerge.all([oldMetadata, value], opts) : value;
     Reflect.defineMetadata(key, newMetadata, target, propertyKey as string | symbol);
   }
 

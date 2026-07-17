@@ -32,12 +32,34 @@ const packageJsonPath = path.join(rootDir, 'package.json');
 const packageJsonString = fs.readFileSync(packageJsonPath, 'utf-8');
 const packageJson = JSON.parse(packageJsonString);
 
+/**
+ * Subpath entry points. The root '.' keeps the full barrel for backward compatibility (deprecated,
+ * to be slimmed in the next major); the rest let consumers import just what they need so a browser
+ * or edge bundle can pull errors/utils without dragging in winston, undici, or chokidar.
+ */
+const subpathBases: Record<string, string> = {
+  '.': 'index',
+  './errors': 'errors/index',
+  './utils': 'utils/index',
+  './interfaces': 'interfaces/index',
+  './cache': 'services/cache/index',
+  './config': 'services/config.service',
+  './logger': 'services/logger/index',
+  './http': 'classes/api-request',
+  './reflect': 'services/reflector.service',
+};
+const buildExportConditions = (base: string) => ({
+  import: { types: `./esm/${base}.d.ts`, default: `./esm/${base}.js` },
+  require: { types: `./cjs/${base}.d.ts`, default: `./cjs/${base}.js` },
+});
+
 /** modifying package.json and saving to 'dist' */
 const distPackageJson = structuredClone(packageJson);
 distPackageJson.main = './cjs/index.js';
 distPackageJson.module = './esm/index.js';
 distPackageJson.types = './esm/index.d.ts';
-distPackageJson.exports = { '.': { import: './esm/index.js', require: './cjs/index.js' } };
+distPackageJson.exports = Object.fromEntries(Object.entries(subpathBases).map(([subpath, base]) => [subpath, buildExportConditions(base)]));
+distPackageJson.exports['./package.json'] = './package.json';
 delete distPackageJson.scripts;
 delete distPackageJson.devDependencies;
 
