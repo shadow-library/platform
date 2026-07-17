@@ -15,7 +15,7 @@
         "winston-transport": "^4.9.0",
       },
       "devDependencies": {
-        "@shadow-library/scripts": "^0.2.0",
+        "@shadow-library/scripts": "^0.2.1",
         "@types/bun": "^1.1.13",
         "@types/fast-redact": "^3.0.4",
         "husky": "^9.1.6",
@@ -125,7 +125,7 @@
 
     "@redocly/openapi-core": ["@redocly/openapi-core@1.34.17", "", { "dependencies": { "@redocly/ajv": "8.11.2", "@redocly/config": "0.22.0", "colorette": "1.4.0", "https-proxy-agent": "7.0.6", "js-levenshtein": "1.1.6", "js-yaml": "4.2.0", "minimatch": "5.1.9", "pluralize": "8.0.0", "yaml-ast-parser": "0.0.43" } }, "sha512-wsV2keCt6B806XpSdezbWZ9aFJYf14YVh+XQf0ESt7M90yqVuxH9//PxvtC70sgj9OCkRM3nRaLfu4MsGQZRig=="],
 
-    "@shadow-library/scripts": ["@shadow-library/scripts@0.2.0", "", { "dependencies": { "@commitlint/config-conventional": "^21.2.0", "@commitlint/format": "^21.2.0", "@commitlint/lint": "^21.2.0", "@commitlint/load": "^21.2.0", "@eslint/js": "^10.0.1", "@octokit/rest": "^22.0.1", "eslint": "^10.7.0", "eslint-plugin-n": "^18.2.2", "eslint-plugin-perfectionist": "^5.10.0", "globals": "^17.7.0", "husky": "^9.1.7", "openapi-typescript": "^7.13.0", "prettier": "^3.9.5", "tsc-alias": "^1.9.1", "typescript": "^6.0.3", "typescript-eslint": "^8.64.0" }, "bin": { "shadow": "bin/shadow.js" } }, "sha512-SYTlVCpsirG5l1x+RZd2CIed1hgNi4CLC6AUgIn6Img1EA/WnhSQNlRyVkwbnQPLUM5iqilJY9X1OiZ5dyCbqg=="],
+    "@shadow-library/scripts": ["@shadow-library/scripts@0.2.1", "", { "dependencies": { "@commitlint/config-conventional": "^21.2.0", "@commitlint/format": "^21.2.0", "@commitlint/lint": "^21.2.0", "@commitlint/load": "^21.2.0", "@eslint/js": "^10.0.1", "@octokit/rest": "^22.0.1", "eslint": "^10.7.0", "eslint-plugin-n": "^18.2.2", "eslint-plugin-perfectionist": "^5.10.0", "globals": "^17.7.0", "husky": "^9.1.7", "openapi-typescript": "^7.13.0", "prettier": "^3.9.5", "tsc-alias": "^1.9.1", "typescript": "^6.0.3", "typescript-eslint": "^8.64.0" }, "bin": { "shadow": "bin/shadow.js" } }, "sha512-vZolmNSFYyEV4MuVwGPNwEjn7jp80vPCT1/NBnq3NDuaApgIMczr4u5eQUzsdASw39T0aeXtkLNhdB3rakvjJg=="],
 
     "@simple-libs/stream-utils": ["@simple-libs/stream-utils@2.0.0", "", {}, "sha512-fCTuZK4QBa+39Oz9l4OGfJfz+GpwCp3AqO7Zch3to99xHPgstVsRFpeQ8LNd2o1Gv8raL2mCFwiaHh7bFSp5DQ=="],
 
