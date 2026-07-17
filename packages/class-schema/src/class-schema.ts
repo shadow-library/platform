@@ -176,7 +176,7 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
       const instanceValue = instance[field];
       const derivedSchema = this.getFieldSchema(Class, field);
       if (!schema.properties) schema.properties = {};
-      if (nullable) derivedSchema.type = [derivedSchema.type as JSONSchemaType, 'null'];
+      if (nullable) this.applyNullable(derivedSchema);
       if (instanceValue !== undefined) derivedSchema.default = instanceValue;
       schema.properties[field] = merge(derivedSchema, fieldSchema);
 
@@ -190,6 +190,16 @@ export class ClassSchema<T extends SchemaClass = SchemaClass> {
         schema.dependencies[requiredIf] = dependencies;
       }
     }
+  }
+
+  /** Applies the unified nullability rule: typed schemas gain a `null` type member, while `$ref`s become a nullable `anyOf` since a `$ref` cannot carry its own type */
+  private applyNullable(schema: JSONSchema): void {
+    if (schema.$ref) {
+      schema.anyOf = [{ $ref: schema.$ref }, { type: 'null' }];
+      delete schema.$ref;
+      return;
+    }
+    schema.type = [schema.type as JSONSchemaType, 'null'];
   }
 
   getId(): string {

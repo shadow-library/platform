@@ -430,4 +430,33 @@ describe('ClassSchema', () => {
       expect(schema.definitions).toBeUndefined();
     });
   });
+
+  describe('nullable fields', () => {
+    @Schema({ $id: NullableHost.name })
+    class NullableHost {
+      @Field(() => String, { nullable: true })
+      text: string | null;
+
+      @Field(() => Sample, { nullable: true })
+      ref: Sample | null;
+
+      @Field(() => [Sample], { nullable: true })
+      list: Sample[] | null;
+    }
+
+    it('should extend the type array for nullable primitive fields', () => {
+      const schema = ClassSchema.generate(NullableHost);
+      expect(schema.properties?.text).toStrictEqual({ type: ['string', 'null'] });
+    });
+
+    it('should wrap nullable $ref fields in a nullable anyOf instead of emitting an invalid type', () => {
+      const schema = ClassSchema.generate(NullableHost);
+      expect(schema.properties?.ref).toStrictEqual({ anyOf: [{ $ref: Sample.name }, { type: 'null' }] });
+    });
+
+    it('should extend the type array for nullable array fields', () => {
+      const schema = ClassSchema.generate(NullableHost);
+      expect(schema.properties?.list).toStrictEqual({ type: ['array', 'null'], items: { $ref: Sample.name } });
+    });
+  });
 });
