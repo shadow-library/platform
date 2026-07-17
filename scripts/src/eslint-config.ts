@@ -2,10 +2,12 @@
  * Importing npm packages
  */
 import eslintJs from '@eslint/js';
+import { type Linter } from 'eslint';
 import nodePlugin from 'eslint-plugin-n';
 import perfectionist from 'eslint-plugin-perfectionist';
+import { defineConfig } from 'eslint/config';
 import globals from 'globals';
-import tseslint, { type ConfigArray } from 'typescript-eslint';
+import tseslint from 'typescript-eslint';
 
 /**
  * Importing user defined packages
@@ -28,8 +30,8 @@ const DEFAULT_IGNORES = ['**/dist/**', '**/node_modules/**', '**/*.gen.ts', '**/
  * banner blocks intact while sorting within each. A repo layers its own `rules`/`ignores` on top through
  * `.shadowrc.json` `verify.lint`, so nothing here is locked in.
  */
-export function createLintConfig(overrides: LintConfig = { rules: {}, ignores: [] }): ConfigArray {
-  return tseslint.config(
+export function createLintConfig(overrides: LintConfig = { rules: {}, ignores: [] }): Linter.Config[] {
+  return defineConfig([
     { ignores: [...DEFAULT_IGNORES, ...overrides.ignores] },
     eslintJs.configs.recommended,
     ...tseslint.configs.strict,
@@ -74,5 +76,5 @@ export function createLintConfig(overrides: LintConfig = { rules: {}, ignores: [
         'no-console': 'off',
       },
     },
-  );
+  ]) as Linter.Config[];
 }
