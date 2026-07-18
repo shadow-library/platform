@@ -75,7 +75,8 @@ describe('Template Group', () => {
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
-        total: 5,
+        /** 5 sample groups plus the 14-key identity-server notification catalog */
+        total: 19,
         limit: 20,
         offset: 0,
         items: expect.arrayContaining([

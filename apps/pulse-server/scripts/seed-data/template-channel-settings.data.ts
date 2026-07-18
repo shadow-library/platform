@@ -44,4 +44,86 @@ export const templateChannelSettings: TemplateChannelSettingInsertModel[] = [
     channel: 'PUSH',
     isEnabled: true,
   },
+
+  /** Identity-server notification catalog: OTP flows that can target a phone identifier enable SMS alongside EMAIL */
+  {
+    templateGroupId: 6n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 6n,
+    channel: 'SMS',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 7n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 7n,
+    channel: 'SMS',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 8n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 9n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 10n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 11n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 12n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 13n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 14n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 15n,
+    channel: 'SMS',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 16n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 17n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 18n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
+  {
+    templateGroupId: 19n,
+    channel: 'EMAIL',
+    isEnabled: true,
+  },
 ];
