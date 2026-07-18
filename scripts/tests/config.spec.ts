@@ -147,6 +147,24 @@ describe('config', () => {
     expect(config.build.target).toBe('node');
   });
 
+  it('should read the component type with css and alias build fields', () => {
+    fixtureDir = createFixtureDir('shadow-config-component-');
+    writeFixtureFiles(fixtureDir, {
+      '.shadowrc.json': JSON.stringify({
+        type: 'component',
+        build: {
+          exports: { '.': 'index', './styles.css': 'styles.css' },
+          alias: { '@/': 'src/' },
+          css: { layer: 'shadow-library', scopedName: 'x-[local]', useClient: ['**/*.tsx'] },
+        },
+      }),
+    });
+    const config = loadConfig(fixtureDir);
+    expect(config.type).toBe('component');
+    expect(config.build.alias).toStrictEqual({ '@/': 'src/' });
+    expect(config.build.css).toStrictEqual({ layer: 'shadow-library', scopedName: 'x-[local]', useClient: ['**/*.tsx'] });
+  });
+
   it('should not eagerly reject an exports map without a "." entry (validated at library build time)', () => {
     fixtureDir = createFixtureDir('shadow-config-no-root-');
     writeFixtureFiles(fixtureDir, { '.shadowrc.json': JSON.stringify({ build: { exports: { './errors': 'errors/index' } } }) });

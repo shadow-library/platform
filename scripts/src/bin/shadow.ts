@@ -27,8 +27,8 @@ import { parseArgs, type ParsedArgs } from './args';
 const HELP_TEXT = `shadow — shared CLI for the Shadow Library ecosystem
 
 Usage:
-  shadow init [--type <library|backend|spa|ssr>]
-  shadow build [--type <library|backend|spa|ssr>]
+  shadow init [--type <library|component|backend|spa|ssr>]
+  shadow build [--type <library|component|backend|spa|ssr>]
   shadow verify [--fix]
   shadow commit-msg <file>
   shadow gen-api-types <url> [--out <path>]
@@ -37,7 +37,7 @@ Usage:
 
 Commands:
   init [--type <t>]      Set up husky hooks + a starter .shadowrc.json (prompts for the repo type; --type skips it)
-  build [--type <t>]     Build the current repo per .shadowrc.json by type: library (flat dist), backend (single-file bundle), spa/ssr (vite)
+  build [--type <t>]     Build per .shadowrc.json by type: library (flat dist), component (Rollup+CSS Modules), backend (single-file bundle), spa/ssr (vite)
   verify [--fix]         Format + lint the whole repo, then type-check + test
   commit-msg <file>      Lint a commit message (drives the husky commit-msg hook)
   gen-api-types <url>    Fetch an OpenAPI document and generate TypeScript types

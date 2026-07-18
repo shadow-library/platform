@@ -14,12 +14,14 @@ import { ShadowError } from '@lib/utils';
  */
 /**
  * What a repo is, which decides how `shadow build` builds it (and whether `shadow release` applies):
- *  - `library`  — a published package → `tsc` + `tsc-alias` (or a custom bundler) to a flat `dist/` with exports; releasable.
- *  - `backend`  — a runnable service → a single-file, tree-shaken `Bun.build` bundle (`bun dist/main.js`); not released.
- *  - `spa`      — a client React app → the repo's `vite build`; not released.
- *  - `ssr`      — a server-rendered React app → the repo's `vite build` (server + client); not released.
+ *  - `library`   — a published package → `tsc` + `tsc-alias` (or a custom bundler) to a flat `dist/` with exports; releasable.
+ *  - `component` — a published React component library with CSS Modules → a Rollup + PostCSS build (`shadow init` installs the
+ *                  bundler stack); releasable.
+ *  - `backend`   — a runnable service → a single-file, tree-shaken `Bun.build` bundle (`bun dist/main.js`); not released.
+ *  - `spa`       — a client React app → the repo's `vite build`; not released.
+ *  - `ssr`       — a server-rendered React app → the repo's `vite build` (server + client); not released.
  */
-export type RepoType = 'library' | 'backend' | 'spa' | 'ssr';
+export type RepoType = 'library' | 'component' | 'backend' | 'spa' | 'ssr';
 
 export interface BuildConfig {
   /**
@@ -51,10 +53,30 @@ export interface BuildConfig {
   minify?: boolean;
   /** Bun.build target for a backend bundle. Defaults to `bun`. */
   target?: 'bun' | 'node';
+
+  // --- `component` type only (Rollup + PostCSS) ---
+  /** CSS Modules / stylesheet options for a component-library build. */
+  css?: CssBuildConfig;
+  /** Import-alias prefix → source-relative dir for the Rollup bundle, e.g. `{ "@/": "src/" }` (mirror the tsconfig `paths`). */
+  alias?: Record<string, string>;
 }
 
 /** Which runtime globals the lint config treats as defined — a Node library, a browser library, or both. */
 export type GlobalsEnv = 'node' | 'browser' | 'both';
+
+/** CSS Modules / stylesheet options for a `component` build (Rollup + PostCSS). Every field has a default matching the ecosystem's UI library. */
+export interface CssBuildConfig {
+  /** CSS Modules scoped-name template. Default `sh-[local]_[hash:base64:5]`. */
+  scopedName?: string;
+  /** Filename the extracted CSS is written to, under the output dir. Default `styles.css`. */
+  extract?: string;
+  /** When set, also emit `<extract-basename>.layer.css` wrapping the CSS in `@layer <name>` so consumers can de-prioritize it. */
+  layer?: string;
+  /** Minify the extracted CSS. Default true. */
+  minify?: boolean;
+  /** Source globs whose emitted module gets a `'use client'` banner (RSC). Defaults to every `.tsx` module. */
+  useClient?: string[];
+}
 
 /** A file-scoped rule override a consuming repo layers onto the shipped flat config (e.g. relax rules for colocated tests). */
 export interface LintOverride {
@@ -144,6 +166,8 @@ export interface RawShadowConfig {
     assets?: string[];
     minify?: boolean;
     target?: 'bun' | 'node';
+    css?: CssBuildConfig;
+    alias?: Record<string, string>;
   };
   verify?: {
     lint?: { rules?: Record<string, unknown>; ignores?: string[]; overrides?: LintOverride[]; globals?: GlobalsEnv; react?: boolean; reactVersion?: string };
@@ -164,12 +188,36 @@ export interface RawShadowConfig {
 const CONFIG_FILENAME = '.shadowrc.json';
 
 /** The valid repo types, in the order presented by `shadow init`'s prompt. */
-export const REPO_TYPES: RepoType[] = ['library', 'backend', 'spa', 'ssr'];
+export const REPO_TYPES: RepoType[] = ['library', 'component', 'backend', 'spa', 'ssr'];
 
 /** Narrows an arbitrary string to a {@link RepoType} — used to validate the `--type` flag and the init prompt. */
 export function isRepoType(value: string): value is RepoType {
   return (REPO_TYPES as string[]).includes(value);
 }
+
+/**
+ * The build tooling each repo type needs, installed into the repo by `shadow init` (not shipped in shadow's own
+ * dependencies) — so a backend never pulls the CSS/Rollup stack and every repo installs only what its type builds
+ * with. `backend` uses Bun's built-in bundler and `spa`/`ssr` bring their own Vite, so only `component` needs any.
+ */
+export const TYPE_DEPENDENCIES: Record<RepoType, string[]> = {
+  library: [],
+  component: [
+    'rollup',
+    '@rollup/plugin-alias',
+    '@rollup/plugin-node-resolve',
+    'rollup-plugin-esbuild',
+    'esbuild',
+    'rollup-plugin-postcss',
+    'postcss',
+    'postcss-import',
+    'rollup-plugin-banner2',
+    'cssnano',
+  ],
+  backend: [],
+  spa: [],
+  ssr: [],
+};
 
 /** Base commitlint config the shipped commit-message linting extends. Overridable via `.shadowrc.json` `verify.commit`. */
 export const COMMITLINT_BASE_EXTENDS = ['@commitlint/config-conventional'];
@@ -249,6 +297,8 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
       assets: raw.build?.assets,
       minify: raw.build?.minify,
       target: raw.build?.target,
+      css: raw.build?.css,
+      alias: raw.build?.alias,
     },
     verify: {
       lint: {

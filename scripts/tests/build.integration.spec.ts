@@ -176,6 +176,60 @@ describe('build (integration)', () => {
     expect(manifest.dependencies).toBeUndefined(); // deps are inlined, not declared
   });
 
+  it('should build a component library with CSS Modules, use-client banners, and a @layer variant', async () => {
+    fixtureDir = createFixtureDir('shadow-build-component-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/kit', version: '1.0.0', type: 'module', devDependencies: { typescript: '^6.0.3', 'tsc-alias': '^1.9.1' } }),
+      '.shadowrc.json': JSON.stringify({
+        type: 'component',
+        build: { exports: { '.': 'index', './styles.css': 'styles.css' }, alias: { '@/': 'src/' }, css: { layer: 'demo', useClient: ['**/*.tsx', '**/client.ts'] } },
+      }),
+      'tsconfig.json': JSON.stringify({
+        compilerOptions: { module: 'ESNext', moduleResolution: 'bundler', target: 'ES2022', strict: true, skipLibCheck: true, declaration: true, paths: { '@/*': ['./src/*'] } },
+      }),
+      'tsconfig.build.json': JSON.stringify({
+        extends: './tsconfig.json',
+        'tsc-alias': { resolveFullPaths: true },
+        compilerOptions: { noEmit: false, declaration: true, emitDeclarationOnly: true, outDir: 'dist', rootDir: 'src' },
+        include: ['src/**/*.ts', 'src/**/*.tsx'],
+      }),
+      'src/css.d.ts': "declare module '*.module.css' {\n  const classes: Record<string, string>;\n  export default classes;\n}\ndeclare module '*.css';\n",
+      'src/index.ts': "import './global.css';\nexport * from '@/widget';\nexport * from '@/client';\n",
+      'src/widget.ts': "import styles from '@/widget.module.css';\nexport const boxClass: string = styles.box ?? '';\n",
+      'src/client.ts': 'export const CLIENT = true;\n',
+      'src/widget.module.css': '.box {\n  color: red;\n  padding: 4px;\n}\n',
+      'src/global.css': 'body {\n  margin: 0;\n}\n',
+    });
+    installFixture(fixtureDir);
+
+    await build({ cwd: fixtureDir });
+
+    const distDir = path.join(fixtureDir, 'dist');
+    expect(fs.existsSync(path.join(distDir, 'index.js'))).toBe(true);
+    expect(fs.existsSync(path.join(distDir, 'widget.js'))).toBe(true); // preserveModules keeps per-module files
+
+    // CSS Modules: one extracted, minified stylesheet with the scoped class name
+    const styles = fs.readFileSync(path.join(distDir, 'styles.css'), 'utf-8');
+    expect(styles).toMatch(/\.sh-box_[\w-]+/);
+
+    // @layer variant wraps the extracted CSS
+    const layer = fs.readFileSync(path.join(distDir, 'styles.layer.css'), 'utf-8');
+    expect(layer.startsWith('@layer demo {')).toBe(true);
+
+    // 'use client' banner injected for the matched module, not others
+    expect(fs.readFileSync(path.join(distDir, 'client.js'), 'utf-8')).toContain("'use client'");
+    expect(fs.readFileSync(path.join(distDir, 'widget.js'), 'utf-8')).not.toContain("'use client'");
+
+    // .d.ts emitted by tsc, with the side-effect CSS import stripped
+    const indexDts = fs.readFileSync(path.join(distDir, 'index.d.ts'), 'utf-8');
+    expect(indexDts).not.toContain('global.css');
+
+    // package.json synthesized with the raw-asset CSS export
+    const distPackageJson = JSON.parse(fs.readFileSync(path.join(distDir, 'package.json'), 'utf-8'));
+    expect(distPackageJson.exports['./styles.css']).toBe('./styles.css');
+    expect(distPackageJson.exports['.']).toStrictEqual({ types: './index.d.ts', default: './index.js' });
+  });
+
   it('should orchestrate the repo build command for a web (spa/ssr) type without synthesizing package.json', async () => {
     fixtureDir = createFixtureDir('shadow-build-web-');
     const fakeVite = 'const fs=require("fs");fs.mkdirSync("dist",{recursive:true});fs.writeFileSync("dist/index.html","<html></html>");';

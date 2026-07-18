@@ -7,7 +7,7 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
-import { type BuildConfig, loadConfig, type RepoType } from '@lib/config';
+import { type BuildConfig, type CssBuildConfig, loadConfig, type RepoType, TYPE_DEPENDENCIES } from '@lib/config';
 import { formatDuration, log, type PackageJson, readPackageJson, run, ShadowError } from '@lib/utils';
 
 /**
@@ -235,6 +235,159 @@ async function buildBackend(rootDir: string, packageJson: PackageJson, config: B
   copyAssets(rootDir, distDir, [...SUPPORTING_FILES, ...(config.assets ?? [])]);
 }
 
+/** A {@link CssBuildConfig} with every field resolved to its default. */
+interface ResolvedCss {
+  scopedName: string;
+  extract: string;
+  minify: boolean;
+  useClient: string[];
+  layer?: string;
+}
+
+/** Applies the component-build CSS defaults (matching the ecosystem UI library) over the user's `build.css`. */
+function resolveCss(css: CssBuildConfig = {}): ResolvedCss {
+  return {
+    scopedName: css.scopedName ?? 'sh-[local]_[hash:base64:5]',
+    extract: css.extract ?? 'styles.css',
+    minify: css.minify ?? true,
+    useClient: css.useClient ?? ['**/*.tsx'],
+    layer: css.layer,
+  };
+}
+
+/** Dynamically imports a bundler package installed by `shadow init --type component`, with a clear error if it's absent. */
+async function importBundler(name: string): Promise<Record<string, unknown>> {
+  try {
+    return (await import(name)) as Record<string, unknown>;
+  } catch (cause) {
+    const install = TYPE_DEPENDENCIES.component.join(' ');
+    throw new ShadowError(`The "component" build needs "${name}" — run \`shadow init --type component\` to install the toolchain (or \`bun add -D ${install}\`).`, { cause });
+  }
+}
+
+/** Imports a package's default export (the shape Rollup plugins ship), tolerating CJS/ESM interop. */
+async function importPlugin(name: string): Promise<(options?: unknown) => unknown> {
+  const mod = await importBundler(name);
+  return (mod.default ?? mod) as (options?: unknown) => unknown;
+}
+
+/** Converts `.shadowrc.json` `build.alias` (prefix → repo-relative dir) into `@rollup/plugin-alias` regex entries. */
+function toRollupAlias(rootDir: string, alias: Record<string, string>): { find: RegExp; replacement: string }[] {
+  return Object.entries(alias).map(([prefix, dir]) => {
+    const escaped = prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    return { find: new RegExp(`^${escaped}(.*)`), replacement: `${path.join(rootDir, dir)}/$1` };
+  });
+}
+
+/** Resolves each JS export base to its `src/<base>.ts[x]` entrypoint — the Rollup inputs. Asset exports (CSS) are skipped. */
+function resolveRollupInputs(rootDir: string, config: BuildConfig): string[] {
+  const srcDir = path.join(rootDir, 'src');
+  return Object.values(config.exports)
+    .filter(base => !isAssetBase(base))
+    .map(base => {
+      const found = [`${base}.tsx`, `${base}.ts`].map(candidate => path.join(srcDir, candidate)).find(fs.existsSync);
+      if (!found) throw new ShadowError(`Component build: no source for export base "${base}" (looked for src/${base}.ts and .tsx)`);
+      return found;
+    });
+}
+
+/** Returns the `'use client'` banner for a chunk whose source module matches one of the `useClient` globs, else empty. */
+function useClientBanner(rootDir: string, facadeModuleId: string | null | undefined, globs: string[]): string {
+  if (!facadeModuleId) return '';
+  const relative = path.relative(rootDir, facadeModuleId);
+  return globs.some(glob => new Bun.Glob(glob).match(relative)) ? "'use client';\n" : '';
+}
+
+/**
+ * Runs the Rollup pipeline: esbuild transpile (TSX, automatic JSX) + PostCSS (auto CSS Modules with scoped names,
+ * single extracted stylesheet, minify) + a per-chunk `'use client'` banner, emitting a `preserveModules` ES tree
+ * (`dist/<module>.js`) plus `dist/<extract>`. Deps stay external; `build.alias` maps the repo's import prefix.
+ */
+async function runRollupBuild(rootDir: string, distDir: string, config: BuildConfig, css: ResolvedCss): Promise<void> {
+  const { rollup } = (await importBundler('rollup')) as { rollup: (options: unknown) => Promise<{ write: (o: unknown) => Promise<unknown>; close: () => Promise<void> }> };
+  const [alias, nodeResolve, esbuild, postcss, banner2, postcssImport] = await Promise.all([
+    importPlugin('@rollup/plugin-alias'),
+    importPlugin('@rollup/plugin-node-resolve'),
+    importPlugin('rollup-plugin-esbuild'),
+    importPlugin('rollup-plugin-postcss'),
+    importPlugin('rollup-plugin-banner2'),
+    importPlugin('postcss-import'),
+  ]);
+
+  const aliasPrefixes = Object.keys(config.alias ?? {});
+  const aliasEntries = toRollupAlias(rootDir, config.alias ?? {});
+  const plugins = [
+    aliasEntries.length > 0 ? alias({ entries: aliasEntries }) : undefined,
+    nodeResolve({ extensions: ['.ts', '.tsx', '.js', '.jsx'] }),
+    esbuild({ target: 'es2022', jsx: 'automatic', tsconfig: path.join(rootDir, 'tsconfig.build.json') }),
+    postcss({ plugins: [postcssImport()], autoModules: true, modules: { generateScopedName: css.scopedName }, extract: css.extract, minimize: css.minify, sourceMap: true }),
+    banner2((chunk: { facadeModuleId?: string | null }) => useClientBanner(rootDir, chunk.facadeModuleId, css.useClient)),
+  ].filter(Boolean);
+
+  const bundle = await rollup({
+    input: resolveRollupInputs(rootDir, config),
+    external: (id: string) => !id.startsWith('.') && !id.startsWith('/') && !aliasPrefixes.some(prefix => id.startsWith(prefix)),
+    plugins,
+  });
+  await bundle.write({ format: 'es', dir: distDir, preserveModules: true, preserveModulesRoot: 'src', entryFileNames: '[name].js', sourcemap: true });
+  await bundle.close();
+}
+
+/** Emits declaration files only (`tsc --emitDeclarationOnly` + `tsc-alias`) — Rollup owns the JS, `tsc` owns the types. */
+function compileTypesOnly(rootDir: string, distDir: string): void {
+  const tsc = run('bunx', ['tsc', '--declaration', '--emitDeclarationOnly', '--outDir', distDir, '--project', 'tsconfig.build.json'], { cwd: rootDir, stream: false });
+  if (tsc.status !== 0) throw new ShadowError(`Build failed: tsc exited with code ${tsc.status}\n${`${tsc.stdout}${tsc.stderr}`.trim()}`);
+
+  const alias = run('bunx', ['tsc-alias', '--outDir', distDir, '--project', 'tsconfig.build.json'], { cwd: rootDir, stream: false });
+  if (alias.status !== 0) throw new ShadowError(`Build failed: tsc-alias exited with code ${alias.status}\n${`${alias.stdout}${alias.stderr}`.trim()}`);
+}
+
+/**
+ * Strips side-effect `import './x.css'` lines from emitted `.d.ts` files — they point at source-only paths that
+ * don't exist in `dist` (CSS ships separately as the extracted stylesheet) and break consumers with `skipLibCheck: false`.
+ */
+function stripCssImportsFromDts(dir: string): void {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) stripCssImportsFromDts(full);
+    else if (entry.name.endsWith('.d.ts')) {
+      const content = fs.readFileSync(full, 'utf-8');
+      const stripped = content.replace(/^\s*import\s+['"][^'"]+\.css['"];?[^\n]*\n?/gm, '');
+      if (stripped !== content) fs.writeFileSync(full, stripped);
+    }
+  }
+}
+
+/** Emits a `@layer`-wrapped variant of the extracted stylesheet so consumers can de-prioritize the library's styles. */
+function emitLayerVariant(distDir: string, css: ResolvedCss): void {
+  const source = path.join(distDir, css.extract);
+  if (!css.layer || !fs.existsSync(source)) return;
+  const layerFile = css.extract.replace(/\.css$/, '.layer.css');
+  fs.writeFileSync(path.join(distDir, layerFile), `@layer ${css.layer} {\n${fs.readFileSync(source, 'utf-8')}\n}\n`);
+}
+
+/**
+ * The React component-library build: a Rollup + PostCSS pipeline (CSS Modules → scoped names + one extracted
+ * stylesheet, `'use client'` banners) for the JS/CSS, plus `tsc --emitDeclarationOnly` for the types, then CSS-import
+ * stripping and an optional `@layer` variant. Synthesizes `dist/package.json` (JS + asset exports) like a library.
+ */
+async function buildComponent(rootDir: string, packageJson: PackageJson, config: BuildConfig): Promise<void> {
+  const css = resolveCss(config.css);
+  const distDir = path.join(rootDir, config.outDir);
+
+  if (fs.existsSync(distDir)) fs.rmSync(distDir, { recursive: true });
+  fs.mkdirSync(distDir, { recursive: true });
+
+  await runRollupBuild(rootDir, distDir, config, css);
+  compileTypesOnly(rootDir, distDir);
+  stripCssImportsFromDts(distDir);
+  emitLayerVariant(distDir, css);
+
+  const distPackageJson = computeDistPackageJson(packageJson, config);
+  fs.writeFileSync(path.join(distDir, 'package.json'), `${JSON.stringify(distPackageJson, null, 2)}\n`);
+  copyAssets(rootDir, distDir, SUPPORTING_FILES);
+}
+
 /**
  * The web-app build (SPA or SSR): orchestrates the repo's own Vite build — Vite, plus any framework plugin such as
  * TanStack Start for SSR, owns CSS, code-splitting, hashing, tree-shaking, and the SSR server/client output. A
@@ -262,6 +415,7 @@ export async function build(options: BuildOptions): Promise<void> {
   const startTime = process.hrtime();
 
   if (type === 'library') await buildLibrary(rootDir, packageJson, config.build);
+  else if (type === 'component') await buildComponent(rootDir, packageJson, config.build);
   else if (type === 'backend') await buildBackend(rootDir, packageJson, config.build);
   else buildWeb(rootDir, config.build, type);
 

@@ -7,8 +7,8 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
-import { isRepoType, type RepoType } from '@lib/config';
-import { log, readPackageJson, run } from '@lib/utils';
+import { isRepoType, type RepoType, TYPE_DEPENDENCIES } from '@lib/config';
+import { log, type PackageJson, readPackageJson, run } from '@lib/utils';
 
 /**
  * Defining types
@@ -28,10 +28,27 @@ const COMMIT_MSG_HOOK = 'shadow commit-msg "$1"\n';
 /** The `.shadowrc.json` a fresh repo of each type starts from — only the fields that type actually uses. */
 const STARTER_CONFIG: Record<RepoType, Record<string, unknown>> = {
   library: { type: 'library', build: { exports: { '.': 'index' } } },
+  component: { type: 'component', build: { exports: { '.': 'index', './styles.css': 'styles.css' }, alias: { '@/': 'src/' } } },
   backend: { type: 'backend', build: { entry: 'src/main.ts' } },
   spa: { type: 'spa' },
   ssr: { type: 'ssr' },
 };
+
+/** The build-tooling packages a repo of `type` needs that aren't already declared in its package.json. */
+export function missingDependencies(packageJson: PackageJson, type: RepoType): string[] {
+  const declared = new Set([...Object.keys(packageJson.dependencies ?? {}), ...Object.keys(packageJson.devDependencies ?? {}), ...Object.keys(packageJson.peerDependencies ?? {})]);
+  return TYPE_DEPENDENCIES[type].filter(dep => !declared.has(dep));
+}
+
+/** Installs the repo type's build tooling as devDependencies (idempotent) — so each repo pulls only what its type builds with. */
+function installTypeDependencies(cwd: string, packageJson: PackageJson, type: RepoType): void {
+  const missing = missingDependencies(packageJson, type);
+  if (missing.length === 0) return;
+  log.info(`installing  ${type} build tooling: ${missing.join(', ')}`);
+  const result = run('bun', ['add', '-D', ...missing], { cwd, stream: false });
+  if (result.status !== 0) log.warn(`failed to install build tooling — run manually: bun add -D ${missing.join(' ')}`);
+  else log.info(`installed   ${missing.length} package(s)`);
+}
 
 /** Resolves the repo type: the `--type` flag if valid, otherwise an interactive prompt on a TTY, otherwise `library`. */
 function resolveRepoType(explicit: RepoType | undefined): RepoType {
@@ -111,6 +128,8 @@ export async function init(options: InitOptions): Promise<void> {
     fs.writeFileSync(shadowrcPath, `${JSON.stringify(STARTER_CONFIG[repoType], null, 2)}\n`);
     log.info(`created    .shadowrc.json (type: ${repoType})`);
   }
+
+  installTypeDependencies(options.cwd, packageJson, repoType);
 
   log.success('shadow init complete');
 }
