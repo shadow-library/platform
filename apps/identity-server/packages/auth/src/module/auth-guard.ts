@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type RouteMetadata } from '@shadow-library/app';
+import { type HandlerMetadata } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 import { ContextService, Middleware } from '@shadow-library/fastify';
 
@@ -46,11 +46,11 @@ export class AuthGuard {
   ) {}
 
   /** The router caches generated handlers by metadata alone; namespacing avoids colliding with other generating middlewares on the same route */
-  cacheKey(metadata: RouteMetadata): string {
+  cacheKey(metadata: HandlerMetadata): string {
     return `shadow-auth:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
-  generate(metadata: RouteMetadata): AuthGuardHandler | undefined {
+  generate(metadata: HandlerMetadata): AuthGuardHandler | undefined {
     const auth = metadata[AUTH_ROUTE_METADATA] as AuthRouteMetadata | undefined;
     if (!auth?.authenticated) return undefined;
 

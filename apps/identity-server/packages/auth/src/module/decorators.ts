@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -38,7 +38,7 @@ type AuthDecorator = ClassDecorator & MethodDecorator;
  * at startup, so route code never hard-codes caller identities.
  */
 
-const authRoute = (metadata: AuthRouteMetadata): AuthDecorator => Route({ [AUTH_ROUTE_METADATA]: metadata });
+const authRoute = (metadata: AuthRouteMetadata): AuthDecorator => Handler({ [AUTH_ROUTE_METADATA]: metadata });
 
 /** Requires a valid bearer token; the resolved principal is exposed via `context.getAuthPrincipal()` */
 export const Authenticated = (): AuthDecorator => authRoute({ authenticated: true });
