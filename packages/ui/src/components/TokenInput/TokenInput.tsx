@@ -17,8 +17,8 @@ import { type TokenInputProps, type TokenValue } from './TokenInput.types';
  */
 function RemoveIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -163,8 +163,8 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
   const anyInvalid = tokens.some(token => !token.valid);
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: clicking the field chrome focuses the real input inside it
-    // biome-ignore lint/a11y/useKeyWithClickEvents: the click only forwards focus to the real input, which owns all keyboard behavior
+    // clicking the field chrome focuses the real input inside it
+    // the click only forwards focus to the real input, which owns all keyboard behavior
     <div
       className={cn(styles.root, className)}
       data-size={size}
@@ -185,7 +185,7 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
           {token.value}
           {!readOnly ? (
             <button
-              type='button'
+              type="button"
               className={styles.tokenRemove}
               aria-label={`Remove ${token.value}`}
               onClick={() => removeAt(index)}
@@ -200,8 +200,8 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
         ref={mergeRefs(ref, inputRef)}
         id={id}
         className={styles.input}
-        type='text'
-        autoComplete='off'
+        type="text"
+        autoComplete="off"
         spellCheck={false}
         value={draft}
         placeholder={tokens.length === 0 ? placeholder : ''}
@@ -215,7 +215,7 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
         onBlur={handleBlur}
         onPaste={handlePaste}
       />
-      <span id={describedById} className={styles.srOnly} aria-live='polite'>
+      <span id={describedById} className={styles.srOnly} aria-live="polite">
         {tokens.length} {tokens.length === 1 ? 'value' : 'values'}
         {anyInvalid ? `, ${tokens.filter(token => !token.valid).length} invalid` : ''}
       </span>

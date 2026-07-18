@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -64,9 +64,9 @@ function parseTime(input: string): number | null {
 
 function ClockIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <circle cx='8' cy='8' r='6' />
-      <path d='M8 4.5V8l2.5 1.5' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <circle cx="8" cy="8" r="6" />
+      <path d="M8 4.5V8l2.5 1.5" />
     </svg>
   );
 }
@@ -93,7 +93,7 @@ export function TimePicker({
   id,
   className,
   'aria-label': ariaLabel,
-}: TimePickerProps) {
+}: TimePickerProps): ReactElement {
   const [currentValue, setCurrentValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
@@ -192,9 +192,9 @@ export function TimePicker({
             ref={inputRef}
             id={id}
             className={styles.input}
-            type='text'
-            role='combobox'
-            autoComplete='off'
+            type="text"
+            role="combobox"
+            autoComplete="off"
             spellCheck={false}
             placeholder={placeholder ?? (hour12 ? '--:-- --' : '--:--')}
             value={text}
@@ -202,7 +202,7 @@ export function TimePicker({
             readOnly={readOnly}
             aria-expanded={open}
             aria-controls={listId}
-            aria-autocomplete='none'
+            aria-autocomplete="none"
             aria-activedescendant={activeId}
             aria-invalid={invalid || invalidTyped || undefined}
             aria-label={ariaLabel}
@@ -212,7 +212,7 @@ export function TimePicker({
             onBlur={handleBlur}
           />
           <Popover.Trigger asChild>
-            <button type='button' className={styles.trigger} aria-label='Choose time' disabled={disabled || readOnly} tabIndex={-1}>
+            <button type="button" className={styles.trigger} aria-label="Choose time" disabled={disabled || readOnly} tabIndex={-1}>
               <ClockIcon />
             </button>
           </Popover.Trigger>
@@ -220,17 +220,17 @@ export function TimePicker({
       </Popover.Anchor>
 
       <Popover.Portal>
-        <Popover.Content className={styles.content} align='start' sideOffset={4} onOpenAutoFocus={event => event.preventDefault()}>
-          <div id={listId} role='listbox' aria-label='Times' className={styles.list}>
+        <Popover.Content className={styles.content} align="start" sideOffset={4} onOpenAutoFocus={event => event.preventDefault()}>
+          <div id={listId} role="listbox" aria-label="Times" className={styles.list}>
             {options.map((minutes, index) => {
               const selected = currentMinutes === minutes;
               return (
-                // biome-ignore lint/a11y/useFocusableInteractive: virtual option (aria-activedescendant); focus stays in the field
-                // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard is handled on the field input
+                // virtual option (aria-activedescendant); focus stays in the field
+                // keyboard is handled on the field input
                 <div
                   key={minutes}
                   id={`${listId}-opt-${index}`}
-                  role='option'
+                  role="option"
                   aria-selected={selected}
                   className={styles.option}
                   data-active={activeIndex === index || undefined}

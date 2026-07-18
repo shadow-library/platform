@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as HoverCardPrimitive from '@radix-ui/react-hover-card';
-import { type CSSProperties, useRef, useState } from 'react';
+import { type CSSProperties, type ReactElement, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -37,7 +37,7 @@ export function HoverCard<T = unknown>({
   align = 'start',
   sideOffset = 6,
   'aria-label': ariaLabel = 'Preview',
-}: HoverCardProps<T>) {
+}: HoverCardProps<T>): ReactElement {
   const [state, setState] = useState<LoadState<T>>({ status: 'idle' });
   const startedRef = useRef(false);
 
@@ -64,7 +64,7 @@ export function HoverCard<T = unknown>({
       <HoverCardPrimitive.Portal>
         <HoverCardPrimitive.Content
           className={styles.card}
-          role='dialog'
+          role="dialog"
           aria-label={ariaLabel}
           side={side}
           align={align}

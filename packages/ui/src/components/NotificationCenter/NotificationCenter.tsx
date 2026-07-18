@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { useState } from 'react';
+import { type ReactElement, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -19,9 +19,9 @@ import { NotificationList } from './NotificationList';
  */
 function BellIcon() {
   return (
-    <svg viewBox='0 0 20 20' width='20' height='20' fill='none' stroke='currentColor' strokeWidth={1.6} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M10 2.5a5 5 0 0 0-5 5c0 4-1.5 5.5-1.5 5.5h13S15 11.5 15 7.5a5 5 0 0 0-5-5Z' />
-      <path d='M8.5 16a1.5 1.5 0 0 0 3 0' />
+    <svg viewBox="0 0 20 20" width="20" height="20" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 2.5a5 5 0 0 0-5 5c0 4-1.5 5.5-1.5 5.5h13S15 11.5 15 7.5a5 5 0 0 0-5-5Z" />
+      <path d="M8.5 16a1.5 1.5 0 0 0 3 0" />
     </svg>
   );
 }
@@ -58,7 +58,7 @@ export function NotificationCenter({
   open,
   defaultOpen,
   onOpenChange,
-}: NotificationCenterProps) {
+}: NotificationCenterProps): ReactElement {
   const firstFilter = defaultFilter ?? filters?.[0]?.id ?? 'all';
   const [activeFilter, setActiveFilter] = useState(firstFilter);
 
@@ -77,23 +77,23 @@ export function NotificationCenter({
     <Popover open={open} defaultOpen={defaultOpen} onOpenChange={onOpenChange}>
       <div className={styles.bell}>
         <Popover.Trigger asChild>
-          <IconButton icon={<BellIcon />} variant='ghost' aria-label={bellLabel} aria-haspopup='dialog' />
+          <IconButton icon={<BellIcon />} variant="ghost" aria-label={bellLabel} aria-haspopup="dialog" />
         </Popover.Trigger>
         {unread > 0 ? (
-          <span className={styles.badge} data-dot={badge === 'dot' || undefined} aria-hidden='true'>
+          <span className={styles.badge} data-dot={badge === 'dot' || undefined} aria-hidden="true">
             {badgeText}
           </span>
         ) : null}
-        <span className={styles.srOnly} aria-live='polite'>
+        <span className={styles.srOnly} aria-live="polite">
           {unread > 0 ? `${unread} unread notifications` : ''}
         </span>
       </div>
 
-      <Popover.Content className={styles.panel} align='end' aria-label={ariaLabel}>
+      <Popover.Content className={styles.panel} align="end" aria-label={ariaLabel}>
         <div className={styles.header}>
           <span className={styles.panelTitle}>{ariaLabel}</span>
           {onReadAll ? (
-            <Button variant='text' size='sm' onClick={onReadAll}>
+            <Button variant="text" size="sm" onClick={onReadAll}>
               Mark all read
             </Button>
           ) : null}

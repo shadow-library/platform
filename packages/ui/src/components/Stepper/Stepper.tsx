@@ -19,7 +19,7 @@ import { type StepperProps, type StepperStepProps, type StepState } from './Step
 const STATE_WORD: Record<StepState, string> = { completed: 'completed', current: 'current', upcoming: 'upcoming', error: 'needs review', skipped: 'skipped' };
 
 /** Marker component — the parent reads its props and renders the current step's children. */
-export function StepperStep(_: StepperStepProps): null {
+export function StepperStep(_props: StepperStepProps): null {
   return null;
 }
 
@@ -29,8 +29,8 @@ function isStepElement(node: ReactNode): node is ReactElement<StepperStepProps> 
 
 function CheckGlyph() {
   return (
-    <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={2.25} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3.5 8.5l3 3 6-6.5' />
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={2.25} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 8.5l3 3 6-6.5" />
     </svg>
   );
 }
@@ -145,7 +145,7 @@ function StepperRoot({
 
   return (
     <div className={cn(styles.root, className)} data-orientation={orientation}>
-      <nav className={styles.indicator} aria-label='Progress'>
+      <nav className={styles.indicator} aria-label="Progress">
         <ol className={styles.list}>
           {steps.map((step, i) => {
             const state = stateOf(step, i);
@@ -153,9 +153,9 @@ function StepperRoot({
             const label = `${typeof step.label === 'string' ? step.label : `Step ${i + 1}`}, step ${i + 1} of ${total}, ${STATE_WORD[state]}`;
             return (
               <li key={step.id} className={styles.stepItem}>
-                {i > 0 ? <span className={styles.connector} data-done={completed.has(steps[i - 1]?.id ?? '') || undefined} aria-hidden='true' /> : null}
+                {i > 0 ? <span className={styles.connector} data-done={completed.has(steps[i - 1]?.id ?? '') || undefined} aria-hidden="true" /> : null}
                 <button
-                  type='button'
+                  type="button"
                   className={styles.step}
                   data-state={state}
                   aria-current={i === index ? 'step' : undefined}
@@ -163,7 +163,7 @@ function StepperRoot({
                   aria-label={label}
                   onClick={() => onStepClick(step, i)}
                 >
-                  <span className={styles.dot} data-state={state} aria-hidden='true'>
+                  <span className={styles.dot} data-state={state} aria-hidden="true">
                     {state === 'completed' ? <CheckGlyph /> : state === 'error' ? '!' : state === 'skipped' ? '–' : i + 1}
                   </span>
                   <span className={styles.labels}>
@@ -182,19 +182,19 @@ function StepperRoot({
       </section>
 
       <div className={styles.footer}>
-        <Button variant='secondary' onClick={() => goTo(index - 1)} disabled={index === 0}>
+        <Button variant="secondary" onClick={() => goTo(index - 1)} disabled={index === 0}>
           Back
         </Button>
-        <span className={styles.status} aria-live='polite'>
+        <span className={styles.status} aria-live="polite">
           {status ?? defaultStatus}
         </span>
         <span className={styles.footerActions}>
           {currentStep?.optional && !isLast ? (
-            <Button variant='ghost' onClick={onSkip}>
+            <Button variant="ghost" onClick={onSkip}>
               Skip
             </Button>
           ) : null}
-          <Button variant='primary' loading={busy} onClick={onContinue}>
+          <Button variant="primary" loading={busy} onClick={onContinue}>
             {isLast ? finishLabel : continueLabel}
           </Button>
         </span>

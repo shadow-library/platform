@@ -28,10 +28,10 @@ type Story = StoryObj<typeof meta>;
 function FakeEditor({ onInput }: { onInput?: (text: string) => void }) {
   const { labelId, descriptionId, errorId, disabled, invalid } = useRTEField();
   return (
-    // biome-ignore lint/a11y/useSemanticElements: stand-in for an engine's contenteditable, which is role=textbox
+    // stand-in for an engine's contenteditable, which is role=textbox
     <div
-      role='textbox'
-      aria-multiline='true'
+      role="textbox"
+      aria-multiline="true"
       aria-labelledby={labelId}
       aria-describedby={[descriptionId, errorId].filter(Boolean).join(' ') || undefined}
       aria-disabled={disabled || undefined}
@@ -52,14 +52,14 @@ function Toolbar() {
   const toggle = (key: 'bold' | 'italic') => setMarks(m => ({ ...m, [key]: !m[key] }));
   return (
     <RTEField.Toolbar>
-      <RTEField.ToolbarButton aria-label='Bold' pressed={marks.bold} onClick={() => toggle('bold')}>
+      <RTEField.ToolbarButton aria-label="Bold" pressed={marks.bold} onClick={() => toggle('bold')}>
         B
       </RTEField.ToolbarButton>
-      <RTEField.ToolbarButton aria-label='Italic' pressed={marks.italic} onClick={() => toggle('italic')}>
+      <RTEField.ToolbarButton aria-label="Italic" pressed={marks.italic} onClick={() => toggle('italic')}>
         <em>I</em>
       </RTEField.ToolbarButton>
       <RTEField.ToolbarDivider />
-      <RTEField.ToolbarButton aria-label='Code'>&lt;/&gt;</RTEField.ToolbarButton>
+      <RTEField.ToolbarButton aria-label="Code">&lt;/&gt;</RTEField.ToolbarButton>
     </RTEField.Toolbar>
   );
 }
@@ -68,14 +68,14 @@ export const Default: Story = {
   render: () => {
     const [len, setLen] = useState(54);
     return (
-      <RTEField label='Release notes' required description='Shown to customers on the changelog page. Markdown supported.' length={len} maxLength={2000} fullscreenEnabled>
+      <RTEField label="Release notes" required description="Shown to customers on the changelog page. Markdown supported." length={len} maxLength={2000} fullscreenEnabled>
         <Toolbar />
         <RTEField.Content>
           <FakeEditor onInput={text => setLen(text.length)} />
         </RTEField.Content>
         <RTEField.Attachments value={[{ id: 'a', label: 'screenshot.png' }]} onRemove={() => {}} />
         <RTEField.Footer>
-          <Button variant='ghost'>Cancel</Button>
+          <Button variant="ghost">Cancel</Button>
           <Button>Publish</Button>
         </RTEField.Footer>
       </RTEField>
@@ -85,7 +85,7 @@ export const Default: Story = {
 
 export const ErrorState: Story = {
   render: () => (
-    <RTEField label='Release notes' required length={2214} maxLength={2000} error='Release notes must be 2,000 characters or fewer.'>
+    <RTEField label="Release notes" required length={2214} maxLength={2000} error="Release notes must be 2,000 characters or fewer.">
       <Toolbar />
       <RTEField.Content>
         <FakeEditor />
@@ -96,7 +96,7 @@ export const ErrorState: Story = {
 
 export const ReadOnly: Story = {
   render: () => (
-    <RTEField label='Published notes' readOnly>
+    <RTEField label="Published notes" readOnly>
       <RTEField.Content>
         <FakeEditor />
       </RTEField.Content>

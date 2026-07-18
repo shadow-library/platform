@@ -15,31 +15,31 @@ import { IconButton } from './IconButton';
 /**
  * Declaring the constants
  */
-const Icon = () => <svg data-testid='icon' viewBox='0 0 16 16' aria-hidden='true' />;
+const Icon = () => <svg data-testid="icon" viewBox="0 0 16 16" aria-hidden="true" />;
 
 describe('IconButton', () => {
   it('uses aria-label as the accessible name and renders the icon', () => {
-    render(<IconButton icon={<Icon />} aria-label='Add' />);
+    render(<IconButton icon={<Icon />} aria-label="Add" />);
     const button = screen.getByRole('button', { name: 'Add' });
     expect(within(button).getByTestId('icon')).toBeInTheDocument();
   });
 
   it('defaults to the ghost variant and md size', () => {
-    render(<IconButton icon={<Icon />} aria-label='Add' />);
+    render(<IconButton icon={<Icon />} aria-label="Add" />);
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('data-variant', 'ghost');
     expect(button).toHaveAttribute('data-size', 'md');
   });
 
   it('reflects variant and size as data attributes', () => {
-    render(<IconButton icon={<Icon />} aria-label='Add' variant='primary' size='lg' />);
+    render(<IconButton icon={<Icon />} aria-label="Add" variant="primary" size="lg" />);
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('data-variant', 'primary');
     expect(button).toHaveAttribute('data-size', 'lg');
   });
 
   it('mirrors aria-label into a native title tooltip by default', () => {
-    render(<IconButton icon={<Icon />} aria-label='Search' />);
+    render(<IconButton icon={<Icon />} aria-label="Search" />);
     expect(screen.getByRole('button')).toHaveAttribute('title', 'Search');
   });
 
@@ -51,7 +51,7 @@ describe('IconButton', () => {
   it('calls onClick when clicked', async () => {
     const onClick = vi.fn();
     const user = userEvent.setup();
-    render(<IconButton icon={<Icon />} aria-label='Add' onClick={onClick} />);
+    render(<IconButton icon={<Icon />} aria-label="Add" onClick={onClick} />);
     await user.click(screen.getByRole('button'));
     expect(onClick).toHaveBeenCalledTimes(1);
   });
@@ -59,7 +59,7 @@ describe('IconButton', () => {
   it('does not fire onClick when disabled', async () => {
     const onClick = vi.fn();
     const user = userEvent.setup();
-    render(<IconButton icon={<Icon />} aria-label='Add' disabled onClick={onClick} />);
+    render(<IconButton icon={<Icon />} aria-label="Add" disabled onClick={onClick} />);
     await user.click(screen.getByRole('button'));
     expect(onClick).not.toHaveBeenCalled();
   });
@@ -67,7 +67,7 @@ describe('IconButton', () => {
   it('replaces the icon with a spinner and blocks clicks while loading', async () => {
     const onClick = vi.fn();
     const user = userEvent.setup();
-    render(<IconButton icon={<Icon />} aria-label='Saving' loading onClick={onClick} />);
+    render(<IconButton icon={<Icon />} aria-label="Saving" loading onClick={onClick} />);
     const button = screen.getByRole('button');
     expect(button).toHaveAttribute('aria-busy', 'true');
     expect(button).toBeDisabled();
@@ -77,30 +77,30 @@ describe('IconButton', () => {
   });
 
   it('exposes toggle state via aria-pressed and data-pressed', () => {
-    const { rerender } = render(<IconButton icon={<Icon />} aria-label='Pin' pressed={false} />);
+    const { rerender } = render(<IconButton icon={<Icon />} aria-label="Pin" pressed={false} />);
     const button = screen.getByRole('button', { pressed: false });
     expect(button).toHaveAttribute('aria-pressed', 'false');
     expect(button).not.toHaveAttribute('data-pressed');
-    rerender(<IconButton icon={<Icon />} aria-label='Pin' pressed />);
+    rerender(<IconButton icon={<Icon />} aria-label="Pin" pressed />);
     expect(screen.getByRole('button', { pressed: true })).toHaveAttribute('data-pressed', 'true');
   });
 
   it('omits aria-pressed when pressed is undefined', () => {
-    render(<IconButton icon={<Icon />} aria-label='Add' />);
+    render(<IconButton icon={<Icon />} aria-label="Add" />);
     expect(screen.getByRole('button')).not.toHaveAttribute('aria-pressed');
   });
 
   it('forwards the ref to the underlying button element', () => {
     const ref = createRef<HTMLButtonElement>();
-    render(<IconButton ref={ref} icon={<Icon />} aria-label='Add' />);
+    render(<IconButton ref={ref} icon={<Icon />} aria-label="Add" />);
     expect(ref.current).toBeInstanceOf(HTMLButtonElement);
   });
 
   it('renders as the child element with asChild, injecting the icon and aria-label', () => {
     render(
-      <IconButton asChild icon={<Icon />} aria-label='Home'>
-        {/* biome-ignore lint/a11y/useAnchorContent: the icon is injected into the anchor via Slot */}
-        <a href='/home' />
+      <IconButton asChild icon={<Icon />} aria-label="Home">
+        {/* the icon is injected into the anchor via Slot */}
+        <a href="/home" />
       </IconButton>,
     );
     const link = screen.getByRole('link', { name: 'Home' });

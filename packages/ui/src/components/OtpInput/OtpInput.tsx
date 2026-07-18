@@ -68,9 +68,10 @@ export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function Otp
 
   const boxesRef = useRef<(HTMLInputElement | null)[]>([]);
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: autoFocus is a mount-only intent, not a live prop
+  // autoFocus is a mount-only intent, not a live prop
   useEffect(() => {
     if (autoFocus) boxesRef.current[0]?.focus();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- autoFocus is a mount-only intent, not a live prop
   }, []);
 
   function commit(next: string): void {
@@ -175,7 +176,7 @@ export const OtpInput = forwardRef<HTMLInputElement, OtpInputProps>(function Otp
           onFocus={event => event.currentTarget.select()}
         />
       ))}
-      {name ? <input type='hidden' name={name} value={currentValue} /> : null}
+      {name ? <input type="hidden" name={name} value={currentValue} /> : null}
     </fieldset>
   );
 });

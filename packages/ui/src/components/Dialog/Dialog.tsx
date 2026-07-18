@@ -3,7 +3,7 @@
  */
 import * as AlertDialogPrimitive from '@radix-ui/react-alert-dialog';
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { forwardRef, useState } from 'react';
+import { forwardRef, type ReactElement, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -22,8 +22,8 @@ import { type ConfirmDialogProps, type DialogBodyProps, type DialogContentProps,
  */
 function CloseIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -56,7 +56,7 @@ function DialogHeader({ title, description, showClose = true, className, ...prop
       </div>
       {showClose ? (
         <DialogPrimitive.Close asChild>
-          <IconButton className={styles.close} variant='ghost' size='sm' aria-label='Close' icon={<CloseIcon />} />
+          <IconButton className={styles.close} variant="ghost" size="sm" aria-label="Close" icon={<CloseIcon />} />
         </DialogPrimitive.Close>
       ) : null}
     </div>
@@ -76,11 +76,11 @@ function DialogFooter({ cancel, action, onAction, loading = false, className, ch
         <>
           {cancel != null ? (
             <DialogPrimitive.Close asChild>
-              <Button variant='ghost'>{cancel}</Button>
+              <Button variant="ghost">{cancel}</Button>
             </DialogPrimitive.Close>
           ) : null}
           {action != null ? (
-            <Button variant='primary' loading={loading} onClick={onAction}>
+            <Button variant="primary" loading={loading} onClick={onAction}>
               {action}
             </Button>
           ) : null}
@@ -123,7 +123,7 @@ export function ConfirmDialog({
   typedConfirmation,
   onConfirm,
   loading = false,
-}: ConfirmDialogProps) {
+}: ConfirmDialogProps): ReactElement {
   const [typed, setTyped] = useState('');
   const gated = typedConfirmation != null && typed !== typedConfirmation;
 
@@ -133,7 +133,7 @@ export function ConfirmDialog({
       <AlertDialogPrimitive.Portal>
         <AlertDialogPrimitive.Overlay className={styles.scrim} />
         <div className={styles.positioner}>
-          <AlertDialogPrimitive.Content className={styles.panel} data-size='sm'>
+          <AlertDialogPrimitive.Content className={styles.panel} data-size="sm">
             <div className={styles.header}>
               <div className={styles.heading}>
                 <AlertDialogPrimitive.Title className={styles.title}>{title}</AlertDialogPrimitive.Title>
@@ -143,13 +143,13 @@ export function ConfirmDialog({
             {typedConfirmation != null ? (
               <div className={styles.body}>
                 <FormField label={`Type ${typedConfirmation} to confirm`}>
-                  <Input value={typed} onValueChange={setTyped} autoComplete='off' spellCheck={false} />
+                  <Input value={typed} onValueChange={setTyped} autoComplete="off" spellCheck={false} />
                 </FormField>
               </div>
             ) : null}
             <div className={styles.footer}>
               <AlertDialogPrimitive.Cancel asChild>
-                <Button variant='ghost'>{cancelLabel}</Button>
+                <Button variant="ghost">{cancelLabel}</Button>
               </AlertDialogPrimitive.Cancel>
               <AlertDialogPrimitive.Action asChild>
                 <Button variant={intent === 'danger' ? 'danger' : 'primary'} loading={loading} disabled={gated} onClick={onConfirm}>

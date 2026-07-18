@@ -58,6 +58,7 @@ export const ButtonGroup = forwardRef<HTMLDivElement, ButtonGroupProps>(function
     if (!container) return;
     const groupRole = container.getAttribute('role');
     if ((groupRole === 'group' || groupRole === 'toolbar') && !container.hasAttribute('aria-label') && !container.hasAttribute('aria-labelledby'))
+      // eslint-disable-next-line no-console -- intentional dev-only guidance, stripped in production builds
       console.warn('ButtonGroup: a role="%s" group needs an `aria-label` or `aria-labelledby` describing the set.', groupRole);
   }, []);
 
@@ -105,7 +106,7 @@ export const ButtonGroup = forwardRef<HTMLDivElement, ButtonGroupProps>(function
 
   return (
     <ButtonGroupContext.Provider value={contextValue}>
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: the container always carries a group/toolbar role; the handlers implement toolbar roving-tabindex */}
+      {/* the container always carries a group/toolbar role; the handlers implement toolbar roving-tabindex */}
       <div
         ref={mergeRefs(ref, containerRef)}
         className={cn(styles.root, className)}

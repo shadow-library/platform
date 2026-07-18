@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { type CSSProperties, type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from 'react';
+import { type CSSProperties, type KeyboardEvent, type PointerEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -49,7 +49,7 @@ export function BottomSheet({
   'aria-label': ariaLabel,
   children,
   className,
-}: BottomSheetProps) {
+}: BottomSheetProps): ReactElement {
   const startIndex = Math.max(0, defaultSnap ? snapPoints.indexOf(defaultSnap) : 0);
   const [snapIndex, setSnapIndex] = useState(startIndex);
   const [offset, setOffset] = useState(0);
@@ -148,7 +148,7 @@ export function BottomSheet({
         >
           <div className={styles.handle} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp}>
             {showGrabber ? (
-              <button type='button' className={styles.grabber} aria-label={`Resize sheet, ${SNAP_LABEL[snap]}`} onClick={() => cycleSnap(1)} onKeyDown={onGrabberKeyDown} />
+              <button type="button" className={styles.grabber} aria-label={`Resize sheet, ${SNAP_LABEL[snap]}`} onClick={() => cycleSnap(1)} onKeyDown={onGrabberKeyDown} />
             ) : null}
             {title != null || headerAction != null ? (
               <div className={styles.header}>

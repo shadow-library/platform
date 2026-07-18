@@ -33,8 +33,8 @@ const EMPTY_TOASTS: readonly ToastData[] = [];
 
 function DismissIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -51,7 +51,7 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
   }, [paused, duration, toast.id, toast.loading]);
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: the hover/focus handlers only pause the auto-dismiss timer (WCAG 2.2.1); the toast is not itself a control
+    // the hover/focus handlers only pause the auto-dismiss timer (WCAG 2.2.1); the toast is not itself a control
     <div
       className={styles.toast}
       data-intent={toast.intent}
@@ -63,9 +63,9 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
       onBlur={() => setPaused(false)}
     >
       {toast.loading ? (
-        <span className={styles.spinner} aria-hidden='true' />
+        <span className={styles.spinner} aria-hidden="true" />
       ) : (
-        <span className={styles.icon} aria-hidden='true'>
+        <span className={styles.icon} aria-hidden="true">
           {GLYPH[toast.intent]}
         </span>
       )}
@@ -75,7 +75,7 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
       </div>
       {toast.action != null ? (
         <button
-          type='button'
+          type="button"
           className={styles.action}
           onClick={() => {
             toast.action?.onClick();
@@ -85,7 +85,7 @@ function ToastItem({ toast }: { toast: ToastData }): ReactElement {
           {toast.action.label}
         </button>
       ) : null}
-      <button type='button' className={styles.dismiss} aria-label='Dismiss' onClick={() => toastStore.dismiss(toast.id)}>
+      <button type="button" className={styles.dismiss} aria-label="Dismiss" onClick={() => toastStore.dismiss(toast.id)}>
         <DismissIcon />
       </button>
     </div>

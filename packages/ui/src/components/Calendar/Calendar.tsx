@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -17,15 +17,15 @@ import { type CalendarProps, type CalendarValue, type DateRange } from './Calend
  */
 function ChevronLeft() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M10 4L6 8l4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 4L6 8l4 4" />
     </svg>
   );
 }
 function ChevronRight() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6 4l4 4-4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4l4 4-4 4" />
     </svg>
   );
 }
@@ -61,7 +61,7 @@ export function Calendar({
   locale = DEFAULT_LOCALE,
   className,
   'aria-label': ariaLabel = 'Calendar',
-}: CalendarProps) {
+}: CalendarProps): ReactElement {
   // Multi-month views hide adjacent-month days by default so a boundary date never appears in both grids.
   const renderOutsideDays = showOutsideDays ?? months === 1;
   const [current, setCurrent] = useControllableState<CalendarValue>({
@@ -197,7 +197,7 @@ export function Calendar({
   const weekdays = weekdayLabels(weekStartsOn, locale);
 
   return (
-    // biome-ignore lint/a11y/noStaticElementInteractions: keyboard grid navigation is handled here and delegated to the day buttons
+    // keyboard grid navigation is handled here and delegated to the day buttons
     <div className={cn(styles.root, className)} onKeyDown={handleKeyDown}>
       <div className={styles.months} data-count={months}>
         {Array.from({ length: months }, (_, offset) => {
@@ -208,29 +208,29 @@ export function Calendar({
             <div key={`${monthDate.getFullYear()}-${monthDate.getMonth()}`} className={styles.month}>
               <div className={styles.header}>
                 {offset === 0 ? (
-                  <button type='button' className={styles.nav} aria-label='Previous month' onClick={() => setViewDate(addMonths(viewDate, -1))}>
+                  <button type="button" className={styles.nav} aria-label="Previous month" onClick={() => setViewDate(addMonths(viewDate, -1))}>
                     <ChevronLeft />
                   </button>
                 ) : (
                   <span className={styles.navSpacer} />
                 )}
-                <span className={styles.monthLabel} aria-live='polite'>
+                <span className={styles.monthLabel} aria-live="polite">
                   {monthLabel}
                 </span>
                 {offset === months - 1 ? (
-                  <button type='button' className={styles.nav} aria-label='Next month' onClick={() => setViewDate(addMonths(viewDate, 1))}>
+                  <button type="button" className={styles.nav} aria-label="Next month" onClick={() => setViewDate(addMonths(viewDate, 1))}>
                     <ChevronRight />
                   </button>
                 ) : (
                   <span className={styles.navSpacer} />
                 )}
               </div>
-              {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: <table role="grid"> is the WAI-ARIA date-grid pattern; roving-tabindex day buttons are the interactive cells */}
-              <table className={styles.grid} role='grid' aria-label={`${ariaLabel}, ${monthLabel}`}>
+              {/* <table role="grid"> is the WAI-ARIA date-grid pattern; roving-tabindex day buttons are the interactive cells */}
+              <table className={styles.grid} role="grid" aria-label={`${ariaLabel}, ${monthLabel}`}>
                 <thead>
                   <tr>
                     {weekdays.map((day, index) => (
-                      <th key={`${day}-${index}`} scope='col' className={styles.weekday}>
+                      <th key={`${day}-${index}`} scope="col" className={styles.weekday}>
                         {day}
                       </th>
                     ))}
@@ -242,7 +242,7 @@ export function Calendar({
                       {week.map(day => {
                         const iso = toISODate(day);
                         const outside = day.getMonth() !== monthDate.getMonth();
-                        if (outside && !renderOutsideDays) return <td key={iso} className={styles.cell} aria-hidden='true' />;
+                        if (outside && !renderOutsideDays) return <td key={iso} className={styles.cell} aria-hidden="true" />;
                         const dayDisabled = isDisabled(day);
                         const selected = isSelected(day);
                         const within = inRange(day);
@@ -255,7 +255,7 @@ export function Calendar({
                                 if (node) dayRefs.current.set(iso, node);
                                 else dayRefs.current.delete(iso);
                               }}
-                              type='button'
+                              type="button"
                               className={styles.day}
                               data-outside={outside || undefined}
                               data-today={isToday || undefined}

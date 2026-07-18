@@ -15,18 +15,18 @@ import { RTEField, useRTEField } from './RTEField';
  */
 function Editable() {
   const { labelId, disabled, invalid } = useRTEField();
-  // biome-ignore lint/a11y/useSemanticElements: stand-in for an engine's contenteditable, which is role=textbox
-  return <div role='textbox' aria-multiline='true' aria-labelledby={labelId} aria-disabled={disabled || undefined} aria-invalid={invalid || undefined} tabIndex={0} />;
+  // stand-in for an engine's contenteditable, which is role=textbox
+  return <div role="textbox" aria-multiline="true" aria-labelledby={labelId} aria-disabled={disabled || undefined} aria-invalid={invalid || undefined} tabIndex={0} />;
 }
 
 function Field(props: Partial<Parameters<typeof RTEField>[0]>) {
   return (
-    <RTEField label='Release notes' required length={props.length ?? 412} maxLength={2000} {...props}>
+    <RTEField label="Release notes" required length={props.length ?? 412} maxLength={2000} {...props}>
       <RTEField.Toolbar>
-        <RTEField.ToolbarButton aria-label='Bold' pressed={false}>
+        <RTEField.ToolbarButton aria-label="Bold" pressed={false}>
           B
         </RTEField.ToolbarButton>
-        <RTEField.ToolbarButton aria-label='Italic' pressed>
+        <RTEField.ToolbarButton aria-label="Italic" pressed>
           I
         </RTEField.ToolbarButton>
       </RTEField.Toolbar>
@@ -60,7 +60,7 @@ describe('RTEField', () => {
   });
 
   it('shows the error line and marks the frame invalid past the limit', () => {
-    render(<Field length={2214} error='Release notes must be 2,000 characters or fewer.' />);
+    render(<Field length={2214} error="Release notes must be 2,000 characters or fewer." />);
     expect(screen.getByRole('alert')).toHaveTextContent('2,000 characters or fewer');
     expect(screen.getByText('2214 / 2000')).toHaveAttribute('data-state', 'error');
   });

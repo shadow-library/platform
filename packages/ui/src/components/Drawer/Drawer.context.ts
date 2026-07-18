@@ -12,4 +12,4 @@ export interface DrawerContextValue {
   onClose: () => void;
 }
 
-export const DrawerContext = createContext<DrawerContextValue>({ modal: true, titleId: '', onClose: () => {} });
+export const DrawerContext = createContext<DrawerContextValue>({ modal: true, titleId: '', onClose: () => undefined });

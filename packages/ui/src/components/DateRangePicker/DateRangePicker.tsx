@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { useState } from 'react';
+import { type ReactElement, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -20,9 +20,9 @@ import { type DateRangePickerProps } from './DateRangePicker.types';
  */
 function CalendarIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <rect x='2.5' y='3' width='11' height='10.5' rx='1.5' />
-      <path d='M2.5 6h11M5.5 1.5v3M10.5 1.5v3' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" />
+      <path d="M2.5 6h11M5.5 1.5v3M10.5 1.5v3" />
     </svg>
   );
 }
@@ -59,7 +59,7 @@ export function DateRangePicker({
   id,
   className,
   'aria-label': ariaLabel,
-}: DateRangePickerProps) {
+}: DateRangePickerProps): ReactElement {
   const [current, setCurrent] = useControllableState<DateRange>({ value, defaultValue: defaultValue ?? { start: null, end: null }, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
@@ -97,14 +97,14 @@ export function DateRangePicker({
     <Popover.Root open={open} onOpenChange={handleOpenChange}>
       <Popover.Trigger asChild>
         <button
-          type='button'
+          type="button"
           id={id}
           className={cn(styles.field, className)}
           data-size={size}
           data-empty={display == null || undefined}
           disabled={disabled}
           aria-label={ariaLabel}
-          aria-haspopup='dialog'
+          aria-haspopup="dialog"
         >
           <span className={styles.value}>{display ?? placeholder}</span>
           <span className={styles.icon}>
@@ -114,17 +114,17 @@ export function DateRangePicker({
       </Popover.Trigger>
 
       <Popover.Portal>
-        <Popover.Content className={styles.content} align='start' sideOffset={4} role='dialog' aria-label='Choose date range'>
+        <Popover.Content className={styles.content} align="start" sideOffset={4} role="dialog" aria-label="Choose date range">
           <div className={styles.body}>
             {presets.length > 0 ? (
-              <div className={styles.rail} role='listbox' aria-label='Presets'>
+              <div className={styles.rail} role="listbox" aria-label="Presets">
                 {presets.map(preset => {
                   const selected = activePreset?.label === preset.label;
                   return (
                     <button
                       key={preset.label}
-                      type='button'
-                      role='option'
+                      type="button"
+                      role="option"
                       aria-selected={selected}
                       className={styles.preset}
                       data-selected={selected || undefined}
@@ -137,7 +137,7 @@ export function DateRangePicker({
               </div>
             ) : null}
             <Calendar
-              mode='range'
+              mode="range"
               months={months}
               value={draft}
               onValueChange={next => handleCalendarChange(next as DateRange)}
@@ -150,12 +150,12 @@ export function DateRangePicker({
           {confirm ? (
             <div className={styles.footer}>
               <Popover.Close asChild>
-                <Button variant='ghost' size='sm'>
+                <Button variant="ghost" size="sm">
                   Cancel
                 </Button>
               </Popover.Close>
               <Button
-                size='sm'
+                size="sm"
                 onClick={() => {
                   commit(draft);
                   setOpen(false);

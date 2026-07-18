@@ -26,10 +26,11 @@ export function useBanner(config: BannerConfig): void {
   const actionHref = config.action?.href;
   const actionLoading = config.action?.loading;
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: the config object is re-registered whenever any registered field changes; deps are spread to avoid churn on a fresh object literal each render
+  // the config object is re-registered whenever any registered field changes; deps are spread to avoid churn on a fresh object literal each render
   useEffect(() => {
     bannerStore.register(config);
     return () => bannerStore.unregister(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- deps are the individual config fields, spread to avoid churn on a fresh object literal each render
   }, [id, intent, message, lead, dismissable, when, actionLabel, actionHref, actionLoading]);
 }
 

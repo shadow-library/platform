@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, useEffect, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useEffect, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -19,24 +19,24 @@ import { type DatePickerProps } from './DatePicker.types';
  */
 function CalendarIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <rect x='2.5' y='3' width='11' height='10.5' rx='1.5' />
-      <path d='M2.5 6h11M5.5 1.5v3M10.5 1.5v3' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="2.5" y="3" width="11" height="10.5" rx="1.5" />
+      <path d="M2.5 6h11M5.5 1.5v3M10.5 1.5v3" />
     </svg>
   );
 }
 
 function ChevronLeft() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M10 4L6 8l4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 4L6 8l4 4" />
     </svg>
   );
 }
 function ChevronRight() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6 4l4 4-4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4l4 4-4 4" />
     </svg>
   );
 }
@@ -72,7 +72,7 @@ export function DatePicker({
   className,
   prefix,
   'aria-label': ariaLabel,
-}: DatePickerProps) {
+}: DatePickerProps): ReactElement {
   const [currentValue, setCurrentValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
   const selectedDate = currentValue ? parseISODate(currentValue) : null;
 
@@ -198,10 +198,10 @@ export function DatePicker({
             readOnly={readOnly}
             invalid={invalid || invalidTyped}
             clearable={clearable}
-            inputMode='numeric'
-            autoComplete='off'
+            inputMode="numeric"
+            autoComplete="off"
             aria-label={ariaLabel}
-            aria-haspopup='dialog'
+            aria-haspopup="dialog"
             aria-expanded={open}
             onValueChange={next => {
               if (next === '') commit(null);
@@ -210,7 +210,7 @@ export function DatePicker({
             onBlur={handleBlur}
             suffix={
               <Popover.Trigger asChild>
-                <button type='button' className={styles.trigger} aria-label='Open calendar' disabled={disabled || readOnly}>
+                <button type="button" className={styles.trigger} aria-label="Open calendar" disabled={disabled || readOnly}>
                   <CalendarIcon />
                 </button>
               </Popover.Trigger>
@@ -220,25 +220,25 @@ export function DatePicker({
       </Popover.Anchor>
 
       <Popover.Portal>
-        <Popover.Content className={styles.content} align='start' sideOffset={4} role='dialog' aria-label='Choose date' onOpenAutoFocus={event => event.preventDefault()}>
+        <Popover.Content className={styles.content} align="start" sideOffset={4} role="dialog" aria-label="Choose date" onOpenAutoFocus={event => event.preventDefault()}>
           <div className={styles.header}>
-            <button type='button' className={styles.navButton} aria-label='Previous month' onClick={() => setViewDate(addMonths(viewDate, -1))}>
+            <button type="button" className={styles.navButton} aria-label="Previous month" onClick={() => setViewDate(addMonths(viewDate, -1))}>
               <ChevronLeft />
             </button>
-            <span className={styles.monthLabel} aria-live='polite'>
+            <span className={styles.monthLabel} aria-live="polite">
               {monthLabel}
             </span>
-            <button type='button' className={styles.navButton} aria-label='Next month' onClick={() => setViewDate(addMonths(viewDate, 1))}>
+            <button type="button" className={styles.navButton} aria-label="Next month" onClick={() => setViewDate(addMonths(viewDate, 1))}>
               <ChevronRight />
             </button>
           </div>
 
-          {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: <table role="grid"> is the WAI-ARIA date-grid pattern; roving-tabindex day buttons are the interactive cells */}
-          <table role='grid' className={styles.grid} aria-label={monthLabel} onKeyDown={handleGridKeyDown}>
+          {/* <table role="grid"> is the WAI-ARIA date-grid pattern; roving-tabindex day buttons are the interactive cells */}
+          <table role="grid" className={styles.grid} aria-label={monthLabel} onKeyDown={handleGridKeyDown}>
             <thead>
               <tr>
                 {weekdays.map(day => (
-                  <th key={day} scope='col' className={styles.weekday}>
+                  <th key={day} scope="col" className={styles.weekday}>
                     {day}
                   </th>
                 ))}
@@ -261,7 +261,7 @@ export function DatePicker({
                             if (node) dayRefs.current.set(iso, node);
                             else dayRefs.current.delete(iso);
                           }}
-                          type='button'
+                          type="button"
                           className={styles.day}
                           data-date={iso}
                           data-outside={outside || undefined}
@@ -284,7 +284,7 @@ export function DatePicker({
           </table>
 
           <div className={styles.footer}>
-            <button type='button' className={styles.today} onClick={() => selectDate(today)} disabled={isDisabled(today)}>
+            <button type="button" className={styles.today} onClick={() => selectDate(today)} disabled={isDisabled(today)}>
               Today
             </button>
           </div>

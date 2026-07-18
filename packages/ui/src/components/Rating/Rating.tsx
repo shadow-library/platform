@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type KeyboardEvent, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -17,8 +17,8 @@ import { type RatingProps } from './Rating.types';
  */
 function StarIcon() {
   return (
-    <svg viewBox='0 0 20 20' fill='currentColor' aria-hidden='true'>
-      <path d='M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 15l-5.3 2.8 1-5.8L1.5 7.7l5.9-.9L10 1.5Z' />
+    <svg viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+      <path d="M10 1.5l2.6 5.3 5.9.9-4.2 4.1 1 5.8L10 15l-5.3 2.8 1-5.8L1.5 7.7l5.9-.9L10 1.5Z" />
     </svg>
   );
 }
@@ -42,7 +42,7 @@ export function Rating({
   labels,
   reviewCount,
   'aria-label': ariaLabel,
-}: RatingProps) {
+}: RatingProps): ReactElement {
   const [current, setCurrent] = useControllableState({ value, defaultValue, onChange: onValueChange });
   const [hover, setHover] = useState<number | null>(null);
 
@@ -51,11 +51,11 @@ export function Rating({
   if (readOnly) {
     const label = ariaLabel ?? `Rated ${current} out of ${max}${reviewCount != null ? `, ${reviewCount} reviews` : ''}`;
     return (
-      <div className={styles.root} data-size={size} role='img' aria-label={label}>
+      <div className={styles.root} data-size={size} role="img" aria-label={label}>
         {stars.map(star => {
           const fill = Math.max(0, Math.min(1, current - (star - 1)));
           return (
-            <span key={star} className={styles.star} aria-hidden='true'>
+            <span key={star} className={styles.star} aria-hidden="true">
               <span className={styles.outline}>
                 <StarIcon />
               </span>
@@ -100,17 +100,17 @@ export function Rating({
         data-size={size}
         data-invalid={invalid || undefined}
         data-disabled={disabled || undefined}
-        role='radiogroup'
+        role="radiogroup"
         aria-label={ariaLabel ?? 'Rating'}
         onKeyDown={handleKeyDown}
         onPointerLeave={() => setHover(null)}
       >
         {stars.map(star => (
-          // biome-ignore lint/a11y/useSemanticElements: a star radio can't be a native <input type="radio">; role="radio" buttons in a role="radiogroup" is the sanctioned pattern
+          // a star radio can't be a native <input type="radio">; role="radio" buttons in a role="radiogroup" is the sanctioned pattern
           <button
             key={star}
-            type='button'
-            role='radio'
+            type="button"
+            role="radio"
             aria-checked={current === star}
             aria-label={`${star} ${star === 1 ? 'star' : 'stars'}`}
             className={styles.starButton}

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -25,9 +25,9 @@ function fold(text: string): string {
 
 function SearchIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <circle cx='7' cy='7' r='4.5' />
-      <path d='M10.5 10.5L14 14' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
     </svg>
   );
 }
@@ -56,7 +56,7 @@ export function CommandPalette({
   hotkey = 'mod+k',
   placeholder = 'Type a command or search…',
   emptyMessage = 'No results',
-}: CommandPaletteProps) {
+}: CommandPaletteProps): ReactElement {
   const [isOpen, setOpenState] = useControllableState({ value: open, defaultValue: defaultOpen, onChange: onOpenChange });
 
   const [query, setQuery] = useState('');
@@ -147,28 +147,28 @@ export function CommandPalette({
               <input
                 ref={inputRef}
                 className={styles.input}
-                type='text'
-                role='combobox'
-                autoComplete='off'
+                type="text"
+                role="combobox"
+                autoComplete="off"
                 spellCheck={false}
                 placeholder={placeholder}
                 value={query}
                 aria-expanded
                 aria-controls={listId}
                 aria-activedescendant={activeId}
-                aria-label='Command palette'
+                aria-label="Command palette"
                 onChange={event => {
                   setQuery(event.target.value);
                   setActiveIndex(0);
                 }}
                 onKeyDown={handleKeyDown}
-                // biome-ignore lint/a11y/noAutofocus: focus belongs in the palette's search field the instant it opens (it is a modal accelerator)
+                // focus belongs in the palette's search field the instant it opens (it is a modal accelerator)
                 autoFocus
               />
-              <Kbd keys='esc' bare />
+              <Kbd keys="esc" bare />
             </div>
 
-            <div id={listId} role='listbox' aria-label='Commands' className={styles.list}>
+            <div id={listId} role="listbox" aria-label="Commands" className={styles.list}>
               {flat.length === 0 ? (
                 <div className={styles.empty}>
                   {emptyMessage}
@@ -176,18 +176,18 @@ export function CommandPalette({
                 </div>
               ) : (
                 groups.map(group => (
-                  // biome-ignore lint/a11y/useSemanticElements: a listbox option group uses role="group" on a div, not a form fieldset
-                  <div key={group.name} role='group' aria-label={group.name} className={styles.group}>
+                  // a listbox option group uses role="group" on a div, not a form fieldset
+                  <div key={group.name} role="group" aria-label={group.name} className={styles.group}>
                     <div className={styles.groupLabel}>{group.name}</div>
                     {group.items.map(command => {
                       const index = indexOf.get(command.id) ?? 0;
                       return (
-                        // biome-ignore lint/a11y/useFocusableInteractive: virtual option (aria-activedescendant); focus stays in the field
-                        // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard handled on the field input
+                        // virtual option (aria-activedescendant); focus stays in the field
+                        // keyboard handled on the field input
                         <div
                           key={command.id}
                           id={`${listId}-row-${index}`}
-                          role='option'
+                          role="option"
                           aria-selected={activeIndex === index}
                           className={styles.row}
                           data-active={activeIndex === index || undefined}
@@ -210,16 +210,16 @@ export function CommandPalette({
 
             <div className={styles.hintBar}>
               <span className={styles.hint}>
-                <Kbd keys='up' bare />
-                <Kbd keys='down' bare />
+                <Kbd keys="up" bare />
+                <Kbd keys="down" bare />
                 to navigate
               </span>
               <span className={styles.hint}>
-                <Kbd keys='enter' bare />
+                <Kbd keys="enter" bare />
                 to select
               </span>
               <span className={styles.hint}>
-                <Kbd keys='esc' bare />
+                <Kbd keys="esc" bare />
                 to close
               </span>
             </div>

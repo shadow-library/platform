@@ -100,7 +100,7 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
   if (items.length === 0)
     return (
       <div ref={ref} className={cn(styles.feed, styles.feedEmpty, className)} {...props}>
-        <EmptyState size='inline' title={emptyLabel} />
+        <EmptyState size="inline" title={emptyLabel} />
       </div>
     );
 
@@ -124,7 +124,7 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
   }
 
   return (
-    <div ref={ref} className={cn(styles.feed, className)} role='feed' aria-label={ariaLabel} {...props}>
+    <div ref={ref} className={cn(styles.feed, className)} role="feed" aria-label={ariaLabel} {...props}>
       {groups.map(group => (
         <div key={group.key} className={styles.group}>
           {group.label ? <div className={styles.groupLabel}>{group.label}</div> : null}
@@ -136,15 +136,15 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
                 key={item.id}
                 className={styles.item}
                 data-unread={item.unread || undefined}
-                // biome-ignore lint/a11y/noNoninteractiveTabindex: the row is a click/keyboard target in the ARIA feed pattern
+                // the row is a click/keyboard target in the ARIA feed pattern
                 tabIndex={0}
                 aria-label={itemName(item)}
                 onClick={() => navigate(item)}
                 onKeyDown={event => onRowKeyDown(event, item)}
               >
-                {item.unread ? <span className={styles.dot} aria-hidden='true' /> : null}
+                {item.unread ? <span className={styles.dot} aria-hidden="true" /> : null}
                 <span className={styles.leading}>
-                  {item.icon ? <span className={styles.icon}>{item.icon}</span> : <Avatar size='sm' name={item.avatar?.name ?? item.actor} src={item.avatar?.src} />}
+                  {item.icon ? <span className={styles.icon}>{item.icon}</span> : <Avatar size="sm" name={item.avatar?.name ?? item.actor} src={item.avatar?.src} />}
                 </span>
                 <span className={styles.body}>
                   {renderItem ? renderItem(item) : <DefaultItemBody item={item} />}
@@ -156,7 +156,7 @@ export const NotificationList = forwardRef<HTMLDivElement, NotificationListProps
                       {item.actions.slice(0, 2).map((action, i) => (
                         <Button
                           key={action.id}
-                          size='sm'
+                          size="sm"
                           variant={action.variant ?? (i === 0 ? 'primary' : 'secondary')}
                           loading={pending}
                           onClick={event => onActionClick(event, item, action.id)}

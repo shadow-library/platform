@@ -19,12 +19,12 @@ const COLLAPSE_SLOP = 40; // drag this many px past a collapsible pane's min to 
 const KEY_STEP = 16; // px moved per arrow key
 
 /** Marker component — the container reads its props and renders the pane content. */
-export function SplitPanePane(_: SplitPanePaneProps): null {
+export function SplitPanePane(_props: SplitPanePaneProps): null {
   return null;
 }
 
 /** Marker component — the container reads its aria-label and renders the actual handle. */
-export function SplitPaneHandle(_: SplitPaneHandleProps): null {
+export function SplitPaneHandle(_props: SplitPaneHandleProps): null {
   return null;
 }
 
@@ -77,7 +77,7 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
   }, [direction]);
 
   // Initialize (from storage or defaultSize) once the container is measured.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: one-time init guarded by `size === null`; only the container measurement should retrigger it
+  // one-time init guarded by `size === null`; only the container measurement should retrigger it
   useEffect(() => {
     if (containerLen === 0 || size !== null) return;
     let fraction: number | null = null;
@@ -87,6 +87,7 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
     }
     const initial = fraction != null && Number.isFinite(fraction) ? fraction * containerLen : resolveSize(first?.defaultSize, containerLen, containerLen * 0.3);
     setSize(clamp(initial));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- one-time init guarded by `size === null`; only the container measurement should retrigger it
   }, [containerLen]);
 
   function bounds(): { min: number; max: number } {
@@ -187,15 +188,15 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
       </div>
 
       {collapsed ? (
-        <button type='button' className={styles.rail} onClick={toggleCollapse}>
+        <button type="button" className={styles.rail} onClick={toggleCollapse}>
           {first?.collapseLabel ?? 'panel'}
         </button>
       ) : null}
 
-      {/* biome-ignore lint/a11y/useSemanticElements: a focusable window-splitter is role=separator with valuenow, not an <hr> */}
+      {/* a focusable window-splitter is role=separator with valuenow, not an <hr> */}
       <div
         className={styles.handle}
-        role='separator'
+        role="separator"
         tabIndex={0}
         aria-label={handleLabel}
         aria-orientation={direction === 'horizontal' ? 'vertical' : 'horizontal'}
@@ -209,7 +210,7 @@ function SplitPaneRoot({ direction = 'horizontal', autoSaveId, onResize, childre
         onDoubleClick={onDoubleClick}
         onKeyDown={onKeyDown}
       >
-        <span className={styles.handleLine} aria-hidden='true' />
+        <span className={styles.handleLine} aria-hidden="true" />
       </div>
 
       <div className={styles.pane} style={{ flex: '1 1 0' }}>

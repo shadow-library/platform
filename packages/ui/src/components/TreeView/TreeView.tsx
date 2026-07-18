@@ -28,16 +28,16 @@ function leafIds(node: TreeNode): string[] {
 
 function ChevronRight() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6 4l4 4-4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4l4 4-4 4" />
     </svg>
   );
 }
 
 function CheckMark() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3 8.5l3.5 3.5L13 5' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3 8.5l3.5 3.5L13 5" />
     </svg>
   );
 }
@@ -60,7 +60,7 @@ export function TreeView({
   checkboxes = false,
   className,
   'aria-label': ariaLabel,
-}: TreeViewProps) {
+}: TreeViewProps): ReactElement {
   const expandedControlled = expanded !== undefined;
   const [internalExpanded, setInternalExpanded] = useState<string[]>(defaultExpanded);
   const expandedSet = useMemo(() => new Set(expandedControlled ? expanded : internalExpanded), [expandedControlled, expanded, internalExpanded]);
@@ -203,7 +203,7 @@ export function TreeView({
   }
 
   const renderNodes = (list: TreeNode[], level: number, parentId: string | null): ReactElement => (
-    // biome-ignore lint/a11y/useAriaPropsSupportedByRole: aria-multiselectable is only set on the level-1 role="tree" (undefined on nested role="group"); the role is dynamic so it can't be verified statically
+    // aria-multiselectable is only set on the level-1 role="tree" (undefined on nested role="group"); the role is dynamic so it can't be verified statically
     <ul
       className={styles.group}
       role={level === 1 ? 'tree' : 'group'}
@@ -222,7 +222,7 @@ export function TreeView({
               if (row) rowRefs.current.set(node.id, row);
               else rowRefs.current.delete(node.id);
             }}
-            role='treeitem'
+            role="treeitem"
             aria-level={level}
             aria-setsize={list.length}
             aria-posinset={index + 1}
@@ -240,29 +240,29 @@ export function TreeView({
             }}
             onKeyDown={event => handleKeyDown(event, { node, level, parentId, hasChildren })}
           >
-            {/* biome-ignore lint/a11y/useKeyWithClickEvents: keyboard is handled on the treeitem (li); this row only forwards pointer intent */}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: the row is a presentational surface inside the treeitem, not an independent control */}
+            {/* keyboard is handled on the treeitem (li); this row only forwards pointer intent */}
+            {/* the row is a presentational surface inside the treeitem, not an independent control */}
             <div className={styles.row} style={{ paddingLeft: 8 + (level - 1) * 16 }} onClick={event => handleRowClick(event, node, hasChildren)}>
               {hasChildren ? (
-                <span className={styles.chevron} data-tree-toggle='' data-expanded={isExpanded || undefined} aria-hidden='true'>
+                <span className={styles.chevron} data-tree-toggle="" data-expanded={isExpanded || undefined} aria-hidden="true">
                   <ChevronRight />
                 </span>
               ) : (
-                <span className={styles.chevronSpacer} aria-hidden='true' />
+                <span className={styles.chevronSpacer} aria-hidden="true" />
               )}
               {checkboxes ? (
                 <span
                   className={styles.checkbox}
-                  data-tree-check=''
+                  data-tree-check=""
                   data-checked={checkState === true || undefined}
                   data-indeterminate={checkState === 'mixed' || undefined}
-                  aria-hidden='true'
+                  aria-hidden="true"
                 >
                   {checkState === true ? <CheckMark /> : checkState === 'mixed' ? <span className={styles.dash} /> : null}
                 </span>
               ) : null}
               {node.icon != null ? (
-                <span className={styles.icon} aria-hidden='true'>
+                <span className={styles.icon} aria-hidden="true">
                   {node.icon}
                 </span>
               ) : null}

@@ -11,7 +11,7 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 /**
  * Defining types
  */
-export interface DropdownMenuContentProps extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content> {}
+export type DropdownMenuContentProps = ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Content>;
 
 export interface DropdownMenuItemProps extends ComponentPropsWithoutRef<typeof DropdownMenuPrimitive.Item> {
   /** Leading 16px icon — use icons on all rows or none. */

@@ -19,29 +19,29 @@ const PARTIAL = /^-?\d*\.?\d*$/;
 
 function MinusIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 8h8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 8h8" />
     </svg>
   );
 }
 function PlusIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M8 4v8M4 8h8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M8 4v8M4 8h8" />
     </svg>
   );
 }
 function ChevronUp() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4.5 10L8 6.5l3.5 3.5' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 10L8 6.5l3.5 3.5" />
     </svg>
   );
 }
 function ChevronDown() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4.5 6L8 9.5 11.5 6' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4.5 6L8 9.5 11.5 6" />
     </svg>
   );
 }
@@ -82,9 +82,10 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   const [invalidTyped, setInvalidTyped] = useState(false);
   const holdRef = useRef<{ timeout?: ReturnType<typeof setTimeout>; interval?: ReturnType<typeof setInterval> }>({});
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: sync the field text from the external value only
+  // sync the field text from the external value only
   useEffect(() => {
     setText(current != null ? format(current) : '');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- sync the field text from the external value only; `format` is stable
   }, [current]);
 
   function clampRound(input: number): number {
@@ -155,7 +156,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
 
   const decButton = (
     <button
-      type='button'
+      type="button"
       tabIndex={-1}
       className={styles.step}
       aria-label={decLabel}
@@ -169,7 +170,7 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
   );
   const incButton = (
     <button
-      type='button'
+      type="button"
       tabIndex={-1}
       className={styles.step}
       aria-label={incLabel}
@@ -197,10 +198,10 @@ export const NumberStepper = forwardRef<HTMLInputElement, NumberStepperProps>(fu
         ref={ref}
         id={id}
         className={styles.input}
-        type='text'
+        type="text"
         inputMode={precision != null ? 'decimal' : 'numeric'}
-        role='spinbutton'
-        autoComplete='off'
+        role="spinbutton"
+        autoComplete="off"
         value={text}
         disabled={disabled}
         readOnly={readOnly}

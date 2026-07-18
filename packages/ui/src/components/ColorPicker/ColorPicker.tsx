@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, type PointerEvent, useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactElement, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -36,7 +36,11 @@ const DEFAULT_PALETTE = [
   { label: 'Indigo tint', value: '#c7d2fe' },
 ];
 
-type Hsv = { h: number; s: number; v: number };
+interface Hsv {
+  h: number;
+  s: number;
+  v: number;
+}
 
 const clamp = (value: number, min: number, max: number): number => Math.min(max, Math.max(min, value));
 const clamp01 = (value: number): number => clamp(value, 0, 1);
@@ -141,7 +145,7 @@ export function ColorPicker({
   disabled = false,
   className,
   'aria-label': ariaLabel = 'Color',
-}: ColorPickerProps) {
+}: ColorPickerProps): ReactElement {
   const [current, setCurrent] = useControllableState({ value, defaultValue, onChange: onValueChange });
 
   const hasPalette = palette.length > 0;
@@ -281,27 +285,27 @@ export function ColorPicker({
       }}
     >
       <Popover.Trigger asChild>
-        <button type='button' className={cn(styles.trigger, className)} data-size={size} disabled={disabled} aria-label={`${ariaLabel}: ${current}`} aria-haspopup='dialog'>
+        <button type="button" className={cn(styles.trigger, className)} data-size={size} disabled={disabled} aria-label={`${ariaLabel}: ${current}`} aria-haspopup="dialog">
           <span className={styles.triggerSwatch} style={{ background: current }} />
           <span className={styles.triggerHex}>{current}</span>
-          <span className={styles.triggerChevron} aria-hidden='true'>
+          <span className={styles.triggerChevron} aria-hidden="true">
             <ChevronDownIcon />
           </span>
         </button>
       </Popover.Trigger>
 
       <Popover.Portal>
-        <Popover.Content className={styles.content} align='start' sideOffset={4} role='dialog' aria-label={`Choose ${ariaLabel.toLowerCase()}`}>
+        <Popover.Content className={styles.content} align="start" sideOffset={4} role="dialog" aria-label={`Choose ${ariaLabel.toLowerCase()}`}>
           {hasPalette ? (
-            <div className={styles.palette} role='radiogroup' aria-label='Palette'>
+            <div className={styles.palette} role="radiogroup" aria-label="Palette">
               {palette.map(swatch => {
                 const selected = normalizeHex(swatch.value) === normalizeHex(current);
                 return (
-                  // biome-ignore lint/a11y/useSemanticElements: a color swatch is a colored button, not an <input type="radio">
+                  // a color swatch is a colored button, not an <input type="radio">
                   <button
                     key={swatch.value}
-                    type='button'
-                    role='radio'
+                    type="button"
+                    role="radio"
                     aria-checked={selected}
                     aria-label={swatch.label}
                     className={styles.swatch}
@@ -321,7 +325,7 @@ export function ColorPicker({
           ) : null}
 
           {hasPalette && allowCustom ? (
-            <button type='button' className={styles.customToggle} aria-expanded={showCustom} onClick={() => setShowCustom(shown => !shown)}>
+            <button type="button" className={styles.customToggle} aria-expanded={showCustom} onClick={() => setShowCustom(shown => !shown)}>
               Custom…
             </button>
           ) : null}
@@ -330,9 +334,9 @@ export function ColorPicker({
             <div className={styles.spectrum}>
               <div
                 className={styles.field2d}
-                role='slider'
+                role="slider"
                 tabIndex={disabled ? -1 : 0}
-                aria-label='Saturation and brightness'
+                aria-label="Saturation and brightness"
                 aria-valuemin={0}
                 aria-valuemax={100}
                 aria-valuenow={round(hsv.s)}
@@ -345,9 +349,9 @@ export function ColorPicker({
               </div>
               <div
                 className={styles.hue}
-                role='slider'
+                role="slider"
                 tabIndex={disabled ? -1 : 0}
-                aria-label='Hue'
+                aria-label="Hue"
                 aria-valuemin={0}
                 aria-valuemax={360}
                 aria-valuenow={round(hsv.h)}
@@ -366,10 +370,10 @@ export function ColorPicker({
               className={styles.hexInput}
               data-invalid={hexInvalid || undefined}
               value={hexText}
-              aria-label='Hex color'
+              aria-label="Hex color"
               spellCheck={false}
-              autoCapitalize='off'
-              inputMode='text'
+              autoCapitalize="off"
+              inputMode="text"
               onChange={event => handleHexChange(event.target.value)}
               onBlur={commitHex}
               onKeyDown={event => {
@@ -379,7 +383,7 @@ export function ColorPicker({
           </label>
 
           {ratio != null ? (
-            <div className={styles.contrast} data-verdict={verdict} role='status'>
+            <div className={styles.contrast} data-verdict={verdict} role="status">
               <span className={styles.contrastDot} style={{ background: current }} />
               {ratio.toFixed(2)}:1 · {verdict === 'pass' ? 'AA' : verdict === 'large' ? 'AA large text' : 'below 3:1'}
             </div>
@@ -390,7 +394,7 @@ export function ColorPicker({
               {recent.map(color => (
                 <button
                   key={color}
-                  type='button'
+                  type="button"
                   className={styles.recentSwatch}
                   aria-label={`Recent ${color}`}
                   style={{ background: color }}

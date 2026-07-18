@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type KeyboardEvent, type PointerEvent, useEffect, useRef, useState } from 'react';
+import { type KeyboardEvent, type PointerEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -26,7 +26,7 @@ function cellValue<T>(column: GridColumn<T>, row: T): string {
  * reverts, Tab commits + moves), and multi-column sort with ordinal superscripts. The Grid inherits
  * Table's tokens; virtualization, pinning, and grouping are further layers not enabled here.
  */
-export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, density = 'comfortable', caption, 'aria-label': ariaLabel }: DataGridProps<T>) {
+export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, density = 'comfortable', caption, 'aria-label': ariaLabel }: DataGridProps<T>): ReactElement {
   const keyOf = (row: T): string => (typeof rowKey === 'function' ? rowKey(row) : String(row[rowKey]));
 
   const [widths, setWidths] = useState<Record<string, number>>({});
@@ -156,8 +156,8 @@ export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, d
     <div className={styles.wrapper}>
       {caption != null ? <div className={styles.caption}>{caption}</div> : null}
       <div className={styles.scroll}>
-        {/* biome-ignore lint/a11y/noNoninteractiveElementToInteractiveRole: an editable data grid is the WAI-ARIA grid pattern — <table role="grid"> with focusable gridcells */}
-        <table className={styles.grid} role='grid' aria-label={ariaLabel} aria-rowcount={data.length + 1} aria-colcount={columns.length}>
+        {/* an editable data grid is the WAI-ARIA grid pattern — <table role="grid"> with focusable gridcells */}
+        <table className={styles.grid} role="grid" aria-label={ariaLabel} aria-rowcount={data.length + 1} aria-colcount={columns.length}>
           <colgroup>
             {columns.map(column => (
               <col key={column.id} style={{ width: widthOf(column) }} />
@@ -172,12 +172,12 @@ export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, d
                   <th
                     key={column.id}
                     className={styles.headerCell}
-                    scope='col'
+                    scope="col"
                     data-align={column.align ?? 'start'}
                     aria-sort={column.sortable ? (sorted ? ARIA_SORT[sorted] : 'none') : undefined}
                   >
                     {column.sortable ? (
-                      <button type='button' className={styles.headerButton} onClick={event => toggleSort(column.id, event.shiftKey)}>
+                      <button type="button" className={styles.headerButton} onClick={event => toggleSort(column.id, event.shiftKey)}>
                         {column.header}
                         {sorted ? (
                           <span className={styles.sortMark}>
@@ -189,7 +189,7 @@ export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, d
                     ) : (
                       column.header
                     )}
-                    <span className={styles.resizeHandle} onPointerDown={event => startResize(event, column)} aria-hidden='true' />
+                    <span className={styles.resizeHandle} onPointerDown={event => startResize(event, column)} aria-hidden="true" />
                   </th>
                 );
               })}
@@ -220,7 +220,7 @@ export function DataGrid<T>({ data, columns, rowKey, onCellEdit, onSortChange, d
                       {isEditing ? (
                         <input
                           className={styles.editor}
-                          // biome-ignore lint/a11y/noAutofocus: focus must enter the just-opened cell editor immediately
+                          // focus must enter the just-opened cell editor immediately
                           autoFocus
                           value={draft}
                           aria-label={`Edit ${cellValue(column, row)}`}

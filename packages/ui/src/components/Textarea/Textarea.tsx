@@ -69,7 +69,7 @@ export const Textarea = forwardRef<HTMLTextAreaElement, TextareaProps>(function 
   }, [autoGrow, minRows, maxRows]);
 
   // Re-fit whenever the value or bounds change (covers controlled updates and programmatic resets).
-  // biome-ignore lint/correctness/useExhaustiveDependencies: currentValue is an intentional re-fit trigger; resize reads the DOM, not the value.
+  // currentValue is an intentional re-fit trigger; resize reads the DOM, not the value.
   useEffect(resize, [resize, currentValue]);
 
   function handleChange(event: ChangeEvent<HTMLTextAreaElement>): void {

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type ReactElement, useEffect, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -26,8 +26,8 @@ function fold(text: string): string {
 
 function ClearIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -61,7 +61,7 @@ export function Combobox({
   contentClassName,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledby,
-}: ComboboxProps) {
+}: ComboboxProps): ReactElement {
   const [selectedValue, setSelectedValue] = useControllableState<string | null>({ value, defaultValue, onChange: onValueChange });
 
   const [open, setOpen] = useState(false);
@@ -213,9 +213,9 @@ export function Combobox({
             ref={inputRef}
             id={id}
             className={styles.input}
-            type='text'
-            role='combobox'
-            autoComplete='off'
+            type="text"
+            role="combobox"
+            autoComplete="off"
             spellCheck={false}
             placeholder={placeholder}
             value={inputValue}
@@ -223,7 +223,7 @@ export function Combobox({
             readOnly={readOnly}
             aria-expanded={open}
             aria-controls={listId}
-            aria-autocomplete='list'
+            aria-autocomplete="list"
             aria-activedescendant={activeDescendant}
             aria-invalid={invalid || undefined}
             aria-label={ariaLabel}
@@ -240,12 +240,12 @@ export function Combobox({
             onKeyDown={handleKeyDown}
           />
           {clearable && selectedValue != null && !disabled && !readOnly ? (
-            <button type='button' className={styles.clear} aria-label='Clear' onClick={clear} onPointerDown={event => event.preventDefault()}>
+            <button type="button" className={styles.clear} aria-label="Clear" onClick={clear} onPointerDown={event => event.preventDefault()}>
               <ClearIcon />
             </button>
           ) : null}
           <button
-            type='button'
+            type="button"
             className={styles.chevron}
             tabIndex={-1}
             aria-label={open ? 'Close options' : 'Open options'}
@@ -271,7 +271,7 @@ export function Combobox({
       <Popover.Portal>
         <Popover.Content
           className={cn(styles.content, contentClassName)}
-          align='start'
+          align="start"
           sideOffset={4}
           onOpenAutoFocus={event => event.preventDefault()}
           onPointerDownOutside={event => {
@@ -281,10 +281,10 @@ export function Combobox({
             if (isInsideField(event.detail.originalEvent.target)) event.preventDefault();
           }}
         >
-          <div className={styles.srOnly} aria-live='polite'>
+          <div className={styles.srOnly} aria-live="polite">
             {busy ? 'Searching…' : `${filtered.length} results`}
           </div>
-          <div id={listId} role='listbox' aria-label={ariaLabel ?? 'Options'} aria-busy={busy || undefined} className={styles.list}>
+          <div id={listId} role="listbox" aria-label={ariaLabel ?? 'Options'} aria-busy={busy || undefined} className={styles.list}>
             {busy ? (
               Array.from({ length: 3 }, (_, index) => (
                 <div key={`skeleton-${index}`} className={styles.skeletonRow}>
@@ -300,12 +300,12 @@ export function Combobox({
               filtered.map((option, index) => {
                 const selected = option.value === selectedValue;
                 return (
-                  // biome-ignore lint/a11y/useFocusableInteractive: options are virtual (aria-activedescendant); focus stays in the field
-                  // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation is handled on the field input, not per option
+                  // options are virtual (aria-activedescendant); focus stays in the field
+                  // keyboard activation is handled on the field input, not per option
                   <div
                     key={option.value}
                     id={`${listId}-row-${index}`}
-                    role='option'
+                    role="option"
                     aria-selected={selected}
                     aria-disabled={option.disabled || undefined}
                     className={styles.option}
@@ -327,11 +327,11 @@ export function Combobox({
             )}
 
             {showCreate && !busy ? (
-              // biome-ignore lint/a11y/useFocusableInteractive: virtual option (aria-activedescendant); focus stays in the field
-              // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation handled on the field input
+              // virtual option (aria-activedescendant); focus stays in the field
+              // keyboard activation handled on the field input
               <div
                 id={`${listId}-row-${filtered.length}`}
-                role='option'
+                role="option"
                 aria-selected={false}
                 className={cn(styles.option, styles.create)}
                 data-active={activeIndex === filtered.length || undefined}

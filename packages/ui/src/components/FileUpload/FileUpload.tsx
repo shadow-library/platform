@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type DragEvent, useEffect, useRef, useState } from 'react';
+import { type DragEvent, type ReactElement, useEffect, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -42,8 +42,8 @@ function accepts(file: File, accept: string[] | undefined): boolean {
 
 function RemoveIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -66,7 +66,7 @@ export function FileUpload({
   invalid = false,
   className,
   'aria-label': ariaLabel,
-}: FileUploadProps) {
+}: FileUploadProps): ReactElement {
   const [items, setItems] = useState<FileItem[]>([]);
   const [dragging, setDragging] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -161,19 +161,19 @@ export function FileUpload({
     <div className={cn(styles.root, className)} data-disabled={disabled || undefined}>
       <input
         ref={inputRef}
-        type='file'
+        type="file"
         className={styles.hiddenInput}
         multiple
         accept={accept?.join(',')}
         disabled={disabled}
         onChange={event => event.target.files && addFiles(event.target.files)}
         tabIndex={-1}
-        aria-hidden='true'
+        aria-hidden="true"
       />
 
       {variant === 'zone' ? (
         <button
-          type='button'
+          type="button"
           className={styles.zone}
           data-drag={dragging || undefined}
           data-invalid={invalid || undefined}
@@ -191,7 +191,7 @@ export function FileUpload({
           {constraints ? <span className={styles.zoneMeta}>{constraints}</span> : null}
         </button>
       ) : (
-        <Button variant='secondary' disabled={disabled} aria-label={zoneLabel} onClick={() => inputRef.current?.click()}>
+        <Button variant="secondary" disabled={disabled} aria-label={zoneLabel} onClick={() => inputRef.current?.click()}>
           Choose files
         </Button>
       )}
@@ -200,7 +200,7 @@ export function FileUpload({
         <ul className={styles.list}>
           {items.map(item => (
             <li key={item.id} className={styles.row} data-status={item.status}>
-              <span className={styles.tile} aria-hidden='true'>
+              <span className={styles.tile} aria-hidden="true">
                 {extensionOf(item.name)}
               </span>
               <div className={styles.rowText}>
@@ -214,11 +214,11 @@ export function FileUpload({
                 )}
               </div>
               {item.status === 'error' && upload ? (
-                <Button variant='text' size='sm' onClick={() => retry(item.id)}>
+                <Button variant="text" size="sm" onClick={() => retry(item.id)}>
                   Retry
                 </Button>
               ) : null}
-              <button type='button' className={styles.remove} aria-label={`Remove ${item.name}`} onClick={() => remove(item.id)}>
+              <button type="button" className={styles.remove} aria-label={`Remove ${item.name}`} onClick={() => remove(item.id)}>
                 <RemoveIcon />
               </button>
             </li>

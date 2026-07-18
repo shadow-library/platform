@@ -33,6 +33,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
 
   const nodeEnv = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.NODE_ENV;
   if (nodeEnv !== 'production' && group && ((variantProp != null && variantProp !== group.variant) || (sizeProp != null && sizeProp !== group.size)))
+    // eslint-disable-next-line no-console -- intentional dev-only guidance, stripped in production builds
     console.warn('Button: `variant`/`size` are controlled by the enclosing ButtonGroup and the value passed here is ignored.');
 
   const rootClassName = cn(styles.root, className);
@@ -64,11 +65,11 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button
       aria-busy={loading || undefined}
       {...props}
     >
-      {loading && !showLoadingText ? <span className={styles.spinner} data-overlay='true' aria-hidden='true' /> : null}
+      {loading && !showLoadingText ? <span className={styles.spinner} data-overlay="true" aria-hidden="true" /> : null}
       <span className={styles.content} data-hidden={loading && !showLoadingText ? 'true' : undefined}>
         {showLoadingText ? (
           <>
-            <span className={styles.spinner} aria-hidden='true' />
+            <span className={styles.spinner} aria-hidden="true" />
             {loadingText}
           </>
         ) : (

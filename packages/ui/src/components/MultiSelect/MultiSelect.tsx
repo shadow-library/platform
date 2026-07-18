@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as Popover from '@radix-ui/react-popover';
-import { type KeyboardEvent, type MouseEvent, useId, useMemo, useRef, useState } from 'react';
+import { type KeyboardEvent, type MouseEvent, type ReactElement, useId, useMemo, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -19,8 +19,8 @@ import { type MultiSelectOption, type MultiSelectProps } from './MultiSelect.typ
  */
 function CloseIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -52,7 +52,7 @@ export function MultiSelect({
   contentClassName,
   'aria-label': ariaLabel,
   'aria-labelledby': ariaLabelledby,
-}: MultiSelectProps) {
+}: MultiSelectProps): ReactElement {
   const [selected, setSelected] = useControllableState<string[]>({ value, defaultValue: defaultValue ?? [], onChange: onValueChange });
   const [isOpen, setOpenState] = useControllableState({ value: open, defaultValue: defaultOpen ?? false, onChange: onOpenChange });
 
@@ -127,10 +127,12 @@ export function MultiSelect({
   function moveActive(delta: number): void {
     if (rows.length === 0) return;
     let next = activeIndex;
-    for (let step = 0; step < rows.length; step++) {
+    let step = 0;
+    while (step < rows.length) {
       next = (next + delta + rows.length) % rows.length;
       const row = rows[next];
       if (row && (row.kind === 'all' || !row.option.disabled)) break;
+      step++;
     }
     setActiveIndex(next);
   }
@@ -171,7 +173,7 @@ export function MultiSelect({
     <Popover.Root open={isOpen} onOpenChange={setOpen}>
       <Popover.Trigger
         id={id}
-        type='button'
+        type="button"
         disabled={disabled}
         className={cn(styles.trigger, className)}
         data-size={size}
@@ -186,9 +188,9 @@ export function MultiSelect({
           {visibleTags.map(option => (
             <span key={option.value} className={styles.tag}>
               {option.label}
-              {/* biome-ignore lint/a11y/useSemanticElements: a native <button> can't nest inside the trigger button; role="button" span is the valid alternative */}
+              {/* a native <button> can't nest inside the trigger button; role="button" span is the valid alternative */}
               <span
-                role='button'
+                role="button"
                 tabIndex={-1}
                 aria-label={`Remove ${option.label}`}
                 className={styles.tagRemove}
@@ -212,7 +214,7 @@ export function MultiSelect({
       <Popover.Portal>
         <Popover.Content
           className={cn(styles.content, contentClassName)}
-          align='start'
+          align="start"
           sideOffset={6}
           onOpenAutoFocus={event => {
             if (!searchable) {
@@ -226,10 +228,10 @@ export function MultiSelect({
               <input
                 ref={searchRef}
                 className={styles.searchInput}
-                type='text'
-                placeholder='Search…'
+                type="text"
+                placeholder="Search…"
                 value={query}
-                aria-label='Search options'
+                aria-label="Search options"
                 aria-controls={listId}
                 aria-activedescendant={activeDescendant}
                 onChange={event => {
@@ -244,8 +246,8 @@ export function MultiSelect({
           <div
             ref={listRef}
             id={listId}
-            role='listbox'
-            aria-multiselectable='true'
+            role="listbox"
+            aria-multiselectable="true"
             aria-label={ariaLabel ?? 'Options'}
             aria-activedescendant={searchable ? undefined : activeDescendant}
             tabIndex={searchable ? -1 : 0}
@@ -253,11 +255,11 @@ export function MultiSelect({
             onKeyDown={searchable ? undefined : handleListKeyDown}
           >
             {selectAll ? (
-              // biome-ignore lint/a11y/useFocusableInteractive: options are managed via aria-activedescendant; focus stays on the listbox container
-              // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation is handled on the listbox container, not per option
+              // options are managed via aria-activedescendant; focus stays on the listbox container
+              // keyboard activation is handled on the listbox container, not per option
               <div
                 id={`${listId}-row-0`}
-                role='option'
+                role="option"
                 aria-selected={allSelected}
                 className={styles.option}
                 data-active={activeIndex === 0 || undefined}
@@ -279,12 +281,12 @@ export function MultiSelect({
                 const checked = selected.includes(option.value);
                 const rowDisabled = option.disabled || (limitReached && !checked);
                 return (
-                  // biome-ignore lint/a11y/useFocusableInteractive: options are managed via aria-activedescendant; focus stays on the listbox container
-                  // biome-ignore lint/a11y/useKeyWithClickEvents: keyboard activation is handled on the listbox container, not per option
+                  // options are managed via aria-activedescendant; focus stays on the listbox container
+                  // keyboard activation is handled on the listbox container, not per option
                   <div
                     key={option.value}
                     id={`${listId}-row-${rowIndex}`}
-                    role='option'
+                    role="option"
                     aria-selected={checked}
                     aria-disabled={rowDisabled || undefined}
                     className={styles.option}
@@ -308,7 +310,7 @@ export function MultiSelect({
                 <div className={styles.footer}>
                   <span className={styles.count}>{limitReached ? `Max ${maxSelected}` : `${selected.length} selected`}</span>
                   {clearable && selected.length > 0 ? (
-                    <button type='button' className={styles.clearAll} onClick={() => commit([])}>
+                    <button type="button" className={styles.clearAll} onClick={() => commit([])}>
                       Clear all
                     </button>
                   ) : null}
