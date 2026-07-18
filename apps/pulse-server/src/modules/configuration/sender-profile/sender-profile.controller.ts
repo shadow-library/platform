@@ -6,6 +6,7 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Que
 /**
  * Importing user defined packages
  */
+import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
 import {
@@ -27,18 +28,21 @@ export class SenderProfileController {
   constructor(private readonly senderProfileService: SenderProfileService) {}
 
   @Post()
+  @RequirePermission(PULSE_PERMISSIONS.sendersWrite)
   @RespondFor(201, SenderProfileResponse)
   createSenderProfile(@Body() body: CreateSenderProfileBody): Promise<SenderProfileResponse> {
     return this.senderProfileService.createSenderProfile(body);
   }
 
   @Get()
+  @RequirePermission(PULSE_PERMISSIONS.sendersRead)
   @RespondFor(200, ListSenderProfileResponse)
   listSenderProfiles(@Query() query: ListSenderProfilesQuery): Promise<ListSenderProfileResponse> {
     return this.senderProfileService.listSenderProfiles(query);
   }
 
   @Get('/:profileId')
+  @RequirePermission(PULSE_PERMISSIONS.sendersRead)
   @RespondFor(200, SenderProfileResponse)
   async getSenderProfile(@Params() params: SenderProfileParams): Promise<SenderProfileResponse> {
     const senderProfile = await this.senderProfileService.getSenderProfile(params.profileId);
@@ -47,12 +51,14 @@ export class SenderProfileController {
   }
 
   @Patch('/:profileId')
+  @RequirePermission(PULSE_PERMISSIONS.sendersWrite)
   @RespondFor(200, SenderProfileResponse)
   updateSenderProfile(@Params() params: SenderProfileParams, @Body() body: UpdateSenderProfileBody): Promise<SenderProfileResponse> {
     return this.senderProfileService.updateSenderProfile(params.profileId, body);
   }
 
   @Delete('/:profileId')
+  @RequirePermission(PULSE_PERMISSIONS.sendersWrite)
   @HttpStatus(204)
   deleteSenderProfile(@Params() params: SenderProfileParams): Promise<void> {
     return this.senderProfileService.deleteSenderProfile(params.profileId);

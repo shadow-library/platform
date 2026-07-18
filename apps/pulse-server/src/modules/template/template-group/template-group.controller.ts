@@ -6,6 +6,7 @@ import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor, Serv
 /**
  * Importing user defined packages
  */
+import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
 import {
@@ -31,18 +32,21 @@ export class TemplateGroupController {
   constructor(private readonly templateGroupService: TemplateGroupService) {}
 
   @Post()
+  @RequirePermission(PULSE_PERMISSIONS.templatesWrite)
   @RespondFor(201, TemplateGroupResponse)
   createTemplateGroup(@Body() body: CreateTemplateGroupBody): Promise<TemplateGroupResponse> {
     return this.templateGroupService.createTemplateGroup(body);
   }
 
   @Get()
+  @RequirePermission(PULSE_PERMISSIONS.templatesRead)
   @RespondFor(200, ListTemplateGroupResponse)
   listTemplateGroups(@Query() query: ListTemplateGroupsQuery): Promise<ListTemplateGroupResponse> {
     return this.templateGroupService.listTemplateGroups(query);
   }
 
   @Get('/:groupId')
+  @RequirePermission(PULSE_PERMISSIONS.templatesRead)
   @RespondFor(200, TemplateGroupResponse)
   async getTemplateGroup(@Params() params: TemplateGroupParams): Promise<TemplateGroupResponse> {
     const templateGroup = await this.templateGroupService.getTemplateGroup(params.groupId);
@@ -51,6 +55,7 @@ export class TemplateGroupController {
   }
 
   @Patch('/:groupId')
+  @RequirePermission(PULSE_PERMISSIONS.templatesWrite)
   @RespondFor(200, TemplateGroupResponse)
   updateTemplateGroup(@Params() params: TemplateGroupParams, @Body() body: UpdateTemplateGroupBody): Promise<TemplateGroupResponse> {
     return this.templateGroupService.updateTemplateGroup(params.groupId, body);

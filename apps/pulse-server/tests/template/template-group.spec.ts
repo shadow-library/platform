@@ -30,7 +30,7 @@ describe('Template Group', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -50,7 +50,7 @@ describe('Template Group', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups').body(body);
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'TPL_GRP_002' });
@@ -63,7 +63,7 @@ describe('Template Group', () => {
         description: 'Test Template Group',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -71,7 +71,7 @@ describe('Template Group', () => {
 
   describe('GET /v1/template-groups', () => {
     it('should list all template groups', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -94,7 +94,7 @@ describe('Template Group', () => {
     });
 
     it('should filter template groups by key', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups?key=reset');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups?key=reset');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -119,7 +119,7 @@ describe('Template Group', () => {
 
   describe('GET /v1/template-groups/:groupId', () => {
     it('should get a template group by ID', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -135,13 +135,13 @@ describe('Template Group', () => {
     });
 
     it('should return 404 for non-existent template group', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/99999');
 
       expect(response.statusCode).toBe(404);
     });
 
     it('should return 422 for invalid group ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });
@@ -155,7 +155,7 @@ describe('Template Group', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -171,7 +171,7 @@ describe('Template Group', () => {
     it('should partially update a template group', async () => {
       const updateBody = { description: 'Only Update Description' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/2').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/2').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -189,13 +189,13 @@ describe('Template Group', () => {
     it('should return 404 for non-existent template group', async () => {
       const updateBody = { description: 'Updated Description' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/99999').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/99999').body(updateBody);
 
       expect(response.statusCode).toBe(404);
     });
 
     it('should return 422 for empty update body', async () => {
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/3').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/3').body({});
 
       expect(response.statusCode).toBe(422);
     });
@@ -203,7 +203,7 @@ describe('Template Group', () => {
     it('should return 422 for invalid priority in update', async () => {
       const updateBody = { priority: 'INVALID_PRIORITY' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/4').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/4').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });

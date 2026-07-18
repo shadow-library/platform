@@ -30,7 +30,7 @@ describe('Notification', () => {
         service: 'default',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/notifications').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/notifications').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -48,7 +48,7 @@ describe('Notification', () => {
         recipients: { email: 'valid@example.com', phone: 'invalid' },
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/notifications').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/notifications').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -66,7 +66,7 @@ describe('Notification', () => {
         recipients: { email: 'invalid-email', phone: 'invalid-phone' },
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/notifications').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/notifications').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -84,7 +84,7 @@ describe('Notification', () => {
         recipients: { email: 'test@example.com' },
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/notifications').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/notifications').body(body);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_GRP_001' });
@@ -96,7 +96,7 @@ describe('Notification', () => {
         recipients: { email: 'promo@example.com' },
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/notifications').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/notifications').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({ status: 'ACCEPTED', channelResults: [] });
@@ -109,7 +109,7 @@ describe('Notification', () => {
         locale: 'ja-JP',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/notifications').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/notifications').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -124,7 +124,7 @@ describe('Notification', () => {
 
   describe('GET /v1/notifications/messages', () => {
     it('should return all notification messages', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/notifications/messages');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/notifications/messages');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -149,7 +149,7 @@ describe('Notification', () => {
     });
 
     it('should filter notification messages by channel', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/notifications/messages?channel=SMS');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/notifications/messages?channel=SMS');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -174,7 +174,7 @@ describe('Notification', () => {
     });
 
     it('should filter notification messages by recipient', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/notifications/messages?recipient=alice@example.com');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/notifications/messages?recipient=alice@example.com');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({

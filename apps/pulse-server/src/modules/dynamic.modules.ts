@@ -7,6 +7,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AuthModule } from '@modules/auth';
 import { ConfigurationModule } from '@modules/configuration';
 import { MetricsModule } from '@modules/metrics';
 import { NotificationModule } from '@modules/notification';
@@ -31,7 +32,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, ConfigurationModule, NotificationModule, TemplateModule, MetricsModule],
+  imports: [AppHttpCoreModule, AuthModule.forRoot(), ConfigurationModule, NotificationModule, TemplateModule, MetricsModule],
 
   routePrefix: '/api',
   prefixVersioning: true,

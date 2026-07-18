@@ -6,6 +6,8 @@ import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
+
 import { DashboardStats } from './dashboard-stats.dto';
 
 /**
@@ -19,6 +21,7 @@ import { DashboardStats } from './dashboard-stats.dto';
 @HttpController('/dashboard')
 export class DashboardController {
   @Get('/stats')
+  @RequirePermission(PULSE_PERMISSIONS.metricsRead)
   @RespondFor(200, DashboardStats)
   getStats(): DashboardStats {
     return {

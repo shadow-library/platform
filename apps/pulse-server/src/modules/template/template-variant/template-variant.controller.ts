@@ -6,6 +6,7 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Que
 /**
  * Importing user defined packages
  */
+import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
 import { TemplateVariantService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 
@@ -32,18 +33,21 @@ export class TemplateVariantController {
   constructor(private readonly templateVariantService: TemplateVariantService) {}
 
   @Get()
+  @RequirePermission(PULSE_PERMISSIONS.templatesRead)
   @RespondFor(200, ListTemplateVariantResponse)
   listTemplateVariants(@Params() params: TemplateGroupParams, @Query() filter: ListTemplateVariantQuery): Promise<ListTemplateVariantResponse> {
     return this.templateVariantService.listTemplateVariants(params.groupId, filter);
   }
 
   @Post()
+  @RequirePermission(PULSE_PERMISSIONS.templatesWrite)
   @RespondFor(201, TemplateVariantResponse)
   createTemplateVariant(@Params() params: TemplateGroupParams, @Body() body: CreateTemplateVariantBody): Promise<TemplateVariantResponse> {
     return this.templateVariantService.addTemplateVariant(params.groupId, body);
   }
 
   @Get('/:variantId')
+  @RequirePermission(PULSE_PERMISSIONS.templatesRead)
   @RespondFor(200, TemplateVariantResponse)
   async getTemplateVariant(@Params() params: TemplateVariantParams): Promise<TemplateVariantResponse> {
     const templateVariant = await this.templateVariantService.getTemplateVariantById(params.groupId, params.variantId);
@@ -52,12 +56,14 @@ export class TemplateVariantController {
   }
 
   @Patch('/:variantId')
+  @RequirePermission(PULSE_PERMISSIONS.templatesWrite)
   @RespondFor(200, TemplateVariantResponse)
   updateTemplateVariant(@Params() params: TemplateVariantParams, @Body() body: UpdateTemplateVariantBody): Promise<TemplateVariantResponse> {
     return this.templateVariantService.updateTemplateVariant(params.groupId, params.variantId, body);
   }
 
   @Delete('/:variantId')
+  @RequirePermission(PULSE_PERMISSIONS.templatesWrite)
   @HttpStatus(204)
   deleteTemplateVariant(@Params() params: TemplateVariantParams): Promise<void> {
     return this.templateVariantService.deleteTemplateVariant(params.groupId, params.variantId);

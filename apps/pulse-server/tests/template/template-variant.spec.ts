@@ -30,7 +30,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -49,7 +49,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -72,7 +72,7 @@ describe('Template Variant', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -92,7 +92,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_002' });
@@ -107,7 +107,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/99999/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/99999/variants').body(body);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_GRP_001' });
@@ -121,7 +121,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -134,7 +134,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -148,7 +148,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/invalid-id/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/invalid-id/variants').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -158,7 +158,7 @@ describe('Template Variant', () => {
         channel: 'SMS',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -173,7 +173,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/5/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/5/variants').body(body);
       expect(response.statusCode).toBe(201);
 
       const settingsAfter = await db.query.templateChannelSettings.findMany({ where: (settings, { eq }) => eq(settings.templateGroupId, 5n) });
@@ -194,7 +194,7 @@ describe('Template Variant', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/template-groups/1/variants').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/template-groups/1/variants').body(body);
       expect(response.statusCode).toBe(201);
 
       const setting = await db.query.templateChannelSettings.findFirst({ where: (settings, { and, eq }) => and(eq(settings.templateGroupId, 1n), eq(settings.channel, 'SMS')) });
@@ -210,7 +210,7 @@ describe('Template Variant', () => {
 
   describe('GET /v1/template-groups/:groupId/variants', () => {
     it('should list all template variants for a group', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -232,7 +232,7 @@ describe('Template Variant', () => {
     });
 
     it('should filter template variants by channel', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants?channel=EMAIL');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants?channel=EMAIL');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -265,7 +265,7 @@ describe('Template Variant', () => {
     });
 
     it('should filter template variants by locale', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants?locale=en-US');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants?locale=en-US');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -277,7 +277,7 @@ describe('Template Variant', () => {
     });
 
     it('should filter template variants by both channel and locale', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants?channel=SMS&locale=en-US');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants?channel=SMS&locale=en-US');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -299,7 +299,7 @@ describe('Template Variant', () => {
     });
 
     it('should return empty list when no variants match filter', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants?channel=PUSH');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants?channel=PUSH');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -311,7 +311,7 @@ describe('Template Variant', () => {
     });
 
     it('should support pagination', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants?limit=1&offset=0');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants?limit=1&offset=0');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -324,20 +324,20 @@ describe('Template Variant', () => {
     });
 
     it('should return 404 when template group does not exist', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/99999/variants');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/99999/variants');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_GRP_001' });
     });
 
     it('should return 422 for invalid group ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/invalid-id/variants');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/invalid-id/variants');
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should ignore invalid channel filter and return all variants', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants?channel=INVALID');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants?channel=INVALID');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -350,7 +350,7 @@ describe('Template Variant', () => {
 
   describe('GET /v1/template-groups/:groupId/variants/:variantId', () => {
     it('should get a template variant by ID', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants/1');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -366,7 +366,7 @@ describe('Template Variant', () => {
     });
 
     it('should get SMS template variant', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants/2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants/2');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -381,27 +381,27 @@ describe('Template Variant', () => {
     });
 
     it('should return 404 for non-existent template variant', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants/99999');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_001' });
     });
 
     it('should return 404 when variant exists but group does not match', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/2/variants/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/2/variants/1');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_001' });
     });
 
     it('should return 422 for invalid group ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/invalid-id/variants/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/invalid-id/variants/1');
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 for invalid variant ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });
@@ -415,7 +415,7 @@ describe('Template Variant', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -431,7 +431,7 @@ describe('Template Variant', () => {
     it('should partially update only the body', async () => {
       const updateBody = { body: 'Only body updated' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -449,7 +449,7 @@ describe('Template Variant', () => {
     it('should partially update only the subject', async () => {
       const updateBody = { subject: 'New Subject Only' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -461,7 +461,7 @@ describe('Template Variant', () => {
     it('should update isActive status', async () => {
       const updateBody = { isActive: false };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/2').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/2').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -473,7 +473,7 @@ describe('Template Variant', () => {
     it('should return 404 for non-existent template variant', async () => {
       const updateBody = { body: 'Updated body' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/99999').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/99999').body(updateBody);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_001' });
@@ -482,14 +482,14 @@ describe('Template Variant', () => {
     it('should return 404 when variant exists but group does not match', async () => {
       const updateBody = { body: 'Updated body' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/2/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/2/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_001' });
     });
 
     it('should return 422 for empty update body', async () => {
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/1').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/1').body({});
 
       expect(response.statusCode).toBe(422);
     });
@@ -497,7 +497,7 @@ describe('Template Variant', () => {
     it('should return 422 for invalid group ID format', async () => {
       const updateBody = { body: 'Updated body' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/invalid-id/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/invalid-id/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -505,7 +505,7 @@ describe('Template Variant', () => {
     it('should return 422 for invalid variant ID format', async () => {
       const updateBody = { body: 'Updated body' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/invalid-id').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/invalid-id').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -513,7 +513,7 @@ describe('Template Variant', () => {
     it('should not allow updating channel', async () => {
       const updateBody = { channel: 'SMS' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -521,7 +521,7 @@ describe('Template Variant', () => {
     it('should not allow updating locale', async () => {
       const updateBody = { locale: 'fr-FR' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/template-groups/1/variants/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/template-groups/1/variants/1').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -529,48 +529,48 @@ describe('Template Variant', () => {
 
   describe('DELETE /v1/template-groups/:groupId/variants/:variantId', () => {
     it('should delete a template variant', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/template-groups/1/variants/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/template-groups/1/variants/1');
 
       expect(response.statusCode).toBe(204);
 
       // Verify deletion
-      const getResponse = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants/1');
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants/1');
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should return 404 for non-existent template variant', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/template-groups/1/variants/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/template-groups/1/variants/99999');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_001' });
     });
 
     it('should return 404 when variant exists but group does not match', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/template-groups/2/variants/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/template-groups/2/variants/1');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'TPL_VRT_001' });
     });
 
     it('should return 422 for invalid group ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/template-groups/invalid-id/variants/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/template-groups/invalid-id/variants/1');
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 for invalid variant ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/template-groups/1/variants/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/template-groups/1/variants/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should delete SMS template variant', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/template-groups/1/variants/2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/template-groups/1/variants/2');
 
       expect(response.statusCode).toBe(204);
 
       // Verify deletion
-      const getResponse = await testEnv.getRouter().mockRequest().get('/api/v1/template-groups/1/variants/2');
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/template-groups/1/variants/2');
       expect(getResponse.statusCode).toBe(404);
     });
   });

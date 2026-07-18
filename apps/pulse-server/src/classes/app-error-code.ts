@@ -88,4 +88,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly NTF_003 = new AppErrorCode('NTF_003', ErrorType.CLIENT_ERROR, 'No valid recipients provided for Push notification');
   /** Notification template not found for the given key and locale */
   static readonly NTF_004 = new AppErrorCode('NTF_004', ErrorType.CLIENT_ERROR, 'Notification template not found for the given key and locale');
+
+  /*!
+   * Authorization Errors
+   */
+
+  /** Authentication is required but no valid bearer token accompanied the request */
+  static readonly SEC_001 = new AppErrorCode('SEC_001', ErrorType.UNAUTHENTICATED, 'Authentication required');
+  /** The authenticated principal may not perform this operation */
+  static readonly SEC_002 = new AppErrorCode('SEC_002', ErrorType.UNAUTHORIZED, 'Permission denied');
+  /** A route reached the default-deny sentinel without declaring an access policy */
+  static readonly SEC_003 = new AppErrorCode('SEC_003', ErrorType.UNAUTHORIZED, 'Access denied');
 }

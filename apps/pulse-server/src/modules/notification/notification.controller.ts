@@ -8,6 +8,7 @@ import { Body, Get, HttpController, Post, Query, RespondFor } from '@shadow-libr
 /**
  * Importing user defined packages
  */
+import { PULSE_PERMISSIONS, PULSE_SCOPES, RequirePermission, RequireScope } from '@modules/auth';
 import { NotificationService } from '@modules/notification';
 
 import { CreateNotificationBody, CreateNotificationResponse, ListNotificationMessagesQuery, ListNotificationMessagesResponse } from './notifications.dto';
@@ -25,6 +26,7 @@ export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 
   @Post()
+  @RequireScope(PULSE_SCOPES.notificationsSend)
   @RespondFor(201, CreateNotificationResponse)
   createNotification(@Body() body: CreateNotificationBody): Promise<CreateNotificationResponse> {
     return this.notificationService.send(body);
@@ -32,6 +34,7 @@ export class NotificationController {
 
   @Get('/messages')
   @EnableIf(() => Config.get('app.stage') === 'dev')
+  @RequirePermission(PULSE_PERMISSIONS.logsRead)
   @RespondFor(200, ListNotificationMessagesResponse)
   listMessages(@Query() query: ListNotificationMessagesQuery): Promise<ListNotificationMessagesResponse> {
     return this.notificationService.listMessages(query);

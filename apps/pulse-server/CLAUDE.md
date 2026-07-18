@@ -34,6 +34,7 @@ Tests require a running PostgreSQL instance. The template database must be creat
 - **template/** - Template groups, variants (locale/channel-specific), and channel settings
 - **configuration/** - Sender profiles, endpoints, and routing rules (vendor selection by service/region/message type)
 - **metrics/** - Dashboard controller
+- **auth/** - OAuth2 resource-server integration (`@shadow-library/auth`): bearer verification, the RBAC guard + route decorators, and a default-deny sentinel
 
 Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts`, plus DTOs and domain logic. Modules are registered in `src/modules/dynamic.modules.ts` which sets up HTTP routing with prefix `/api` and versioning.
 
@@ -44,7 +45,13 @@ Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts
 - Database constraint errors are mapped to custom app error codes in `database.constants.ts`
 - Type alias `PrimaryDatabase` exported from `database.module.ts`
 
-**Configuration:** Uses `@shadow-library/common` Config system. Key env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod).
+**Configuration:** Uses `@shadow-library/common` Config system. Key env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod); auth: `AUTH_ISSUER`, `AUTH_AUDIENCE` (default `shadow-pulse`), `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET`, `AUTH_IDENTITY_RESOURCE` (default `shadow-identity`).
+
+**Authentication & Authorization** (`src/modules/auth/`):
+
+- Pulse is an OAuth2 **resource server**: the `AuthGuard` preHandler verifies EdDSA bearer tokens offline against the identity JWKS and enforces access per route. Only the SDK's framework-free functional core (`createAuthClient`) is used; the decorators and guard are pulse-native so all router/DI metadata lives in a single framework instance.
+- Route decorators (imported from `@modules/auth`): `@RequireScope('notifications:send')` gates machine-to-machine sending (token scope only, no PDP); `@RequirePermission('pulse:...')` calls the identity PDP (`POST /api/v1/authz/check`) in the caller's org; `@Public()` exempts a route from the default-deny `RouteGuardSentinel`.
+- The RBAC catalog (`rbac.constants.ts`) — permissions `pulse:{templates,senders}:{read,write}`, `pulse:metrics:read`, `pulse:logs:read`; scope `notifications:send`; roles PulseViewer/Operator/Admin — is seeded into identity by its BootstrapService, so the strings must stay in sync.
 
 ## Path Aliases
 
@@ -64,7 +71,8 @@ Tests use Bun's native test runner (`bun:test`). Test files live in `tests/` wit
 - Per-test database isolation (clones template DB with unique suffix per spec file)
 - App lifecycle (beforeAll/afterAll)
 - Mocks `NotificationService.executeNotificationJob` to avoid real provider calls
-- Provides `getRouter()` for HTTP assertions via `Router.mockRequest()`
+- Boots an in-process mock IdP (`@shadow-library/auth/testing`) and injects auth config before init
+- Provides `getRouter()` for HTTP assertions via `Router.mockRequest()`, plus `authHeaders()`/`userHeaders()`/`serviceHeaders()` for authenticated requests
 
 ## Commit Convention
 

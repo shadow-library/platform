@@ -28,7 +28,7 @@ describe('Sender Profile', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -44,7 +44,7 @@ describe('Sender Profile', () => {
     it('should create a sender profile with only required key field', async () => {
       const body = { key: 'minimal-profile' };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -63,7 +63,7 @@ describe('Sender Profile', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toMatchObject({
@@ -80,7 +80,7 @@ describe('Sender Profile', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body(body);
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_002' });
@@ -89,13 +89,13 @@ describe('Sender Profile', () => {
     it('should return 422 when key field is missing', async () => {
       const body = { displayName: 'No Key Profile', isActive: true };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body(body);
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 when body is empty', async () => {
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body({});
 
       expect(response.statusCode).toBe(422);
     });
@@ -112,7 +112,7 @@ describe('Sender Profile', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles').body(body);
       expect(response.statusCode).toBe(201);
 
       const profileId = BigInt(response.json().id);
@@ -130,7 +130,7 @@ describe('Sender Profile', () => {
 
   describe('GET /v1/sender-profiles', () => {
     it('should list all sender profiles', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -150,7 +150,7 @@ describe('Sender Profile', () => {
     });
 
     it('should filter sender profiles by key', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles?key=marketing');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles?key=marketing');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -171,7 +171,7 @@ describe('Sender Profile', () => {
     });
 
     it('should filter sender profiles by partial key match', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles?key=core');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles?key=core');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -181,7 +181,7 @@ describe('Sender Profile', () => {
     });
 
     it('should filter sender profiles by isActive', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles?isActive=false');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles?isActive=false');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -191,7 +191,7 @@ describe('Sender Profile', () => {
     });
 
     it('should return empty list when no profiles match filter', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles?key=nonexistent');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles?key=nonexistent');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -203,7 +203,7 @@ describe('Sender Profile', () => {
     });
 
     it('should support pagination', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles?limit=2&offset=0');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles?limit=2&offset=0');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -215,7 +215,7 @@ describe('Sender Profile', () => {
     });
 
     it('should support pagination with offset', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles?limit=2&offset=2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles?limit=2&offset=2');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -229,7 +229,7 @@ describe('Sender Profile', () => {
 
   describe('GET /v1/sender-profiles/:profileId', () => {
     it('should get a sender profile by ID', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -243,7 +243,7 @@ describe('Sender Profile', () => {
     });
 
     it('should get sender profile without displayName', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/4');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/4');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -256,14 +256,14 @@ describe('Sender Profile', () => {
     });
 
     it('should return 404 for non-existent sender profile', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/99999');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_001' });
     });
 
     it('should return 422 for invalid profile ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });
@@ -276,7 +276,7 @@ describe('Sender Profile', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -292,7 +292,7 @@ describe('Sender Profile', () => {
     it('should partially update only displayName', async () => {
       const updateBody = { displayName: 'New Display Name' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/2').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/2').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -306,7 +306,7 @@ describe('Sender Profile', () => {
     it('should partially update only isActive', async () => {
       const updateBody = { isActive: false };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/3').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/3').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -318,14 +318,14 @@ describe('Sender Profile', () => {
     it('should return 404 for non-existent sender profile', async () => {
       const updateBody = { displayName: 'Updated Name' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/99999').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/99999').body(updateBody);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_001' });
     });
 
     it('should return 422 for empty update body', async () => {
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1').body({});
 
       expect(response.statusCode).toBe(422);
     });
@@ -333,7 +333,7 @@ describe('Sender Profile', () => {
     it('should return 422 for invalid profile ID format', async () => {
       const updateBody = { displayName: 'Updated Name' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/invalid-id').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/invalid-id').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -341,7 +341,7 @@ describe('Sender Profile', () => {
     it('should ignore key field in update body', async () => {
       const updateBody = { key: 'new-key', displayName: 'Updated With Key' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/5').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/5').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -357,30 +357,30 @@ describe('Sender Profile', () => {
       const db = testEnv.getPostgresClient();
       await db.delete(db._.fullSchema.senderRoutingRules);
 
-      const response = await testEnv.getRouter().mockRequest().delete(`/api/v1/sender-profiles/1`);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete(`/api/v1/sender-profiles/1`);
 
       expect(response.statusCode).toBe(204);
 
-      const getResponse = await testEnv.getRouter().mockRequest().get(`/api/v1/sender-profiles/1`);
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get(`/api/v1/sender-profiles/1`);
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should fail when deleting profile with active routing rules', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/2');
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_003' });
     });
 
     it('should return 404 for non-existent sender profile', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/99999');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_001' });
     });
 
     it('should return 422 for invalid profile ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });

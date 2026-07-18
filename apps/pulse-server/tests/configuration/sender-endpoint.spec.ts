@@ -30,7 +30,7 @@ describe('Sender Endpoint', () => {
         isActive: true,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -53,7 +53,7 @@ describe('Sender Endpoint', () => {
         identifier: '+15559990001',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/2/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/2/endpoints').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toStrictEqual({
@@ -77,7 +77,7 @@ describe('Sender Endpoint', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/3/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/3/endpoints').body(body);
 
       expect(response.statusCode).toBe(201);
       expect(response.json()).toMatchObject({
@@ -95,7 +95,7 @@ describe('Sender Endpoint', () => {
         identifier: 'test@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/99999/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/99999/endpoints').body(body);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_001' });
@@ -108,7 +108,7 @@ describe('Sender Endpoint', () => {
         identifier: 'marketing@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(409);
       expect(response.json()).toMatchObject({ code: 'SND_EP_002' });
@@ -120,7 +120,7 @@ describe('Sender Endpoint', () => {
         identifier: 'test@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -131,7 +131,7 @@ describe('Sender Endpoint', () => {
         identifier: 'test@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -142,13 +142,13 @@ describe('Sender Endpoint', () => {
         provider: 'SENDGRID',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 when body is empty', async () => {
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body({});
 
       expect(response.statusCode).toBe(422);
     });
@@ -160,7 +160,7 @@ describe('Sender Endpoint', () => {
         identifier: 'test@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/invalid-id/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/invalid-id/endpoints').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -172,7 +172,7 @@ describe('Sender Endpoint', () => {
         identifier: 'test@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -184,7 +184,7 @@ describe('Sender Endpoint', () => {
         identifier: 'test@shadow.test',
       };
 
-      const response = await testEnv.getRouter().mockRequest().post('/api/v1/sender-profiles/1/endpoints').body(body);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).post('/api/v1/sender-profiles/1/endpoints').body(body);
 
       expect(response.statusCode).toBe(422);
     });
@@ -192,7 +192,7 @@ describe('Sender Endpoint', () => {
 
   describe('GET /v1/sender-profiles/:profileId/endpoints', () => {
     it('should list all sender endpoints for a profile', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -216,7 +216,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should return all sender endpoints for profile 1', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?sortBy=createdAt&sortOrder=asc');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?sortBy=createdAt&sortOrder=asc');
 
       expect(response.statusCode).toBe(200);
       const json = response.json();
@@ -226,7 +226,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by channel EMAIL', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?channel=EMAIL');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?channel=EMAIL');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -236,7 +236,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by channel SMS', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?channel=SMS');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?channel=SMS');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -246,7 +246,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by channel PUSH', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?channel=PUSH');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?channel=PUSH');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -256,7 +256,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by provider SENDGRID', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?provider=SENDGRID');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?provider=SENDGRID');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -266,7 +266,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by provider AWS_SES', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?provider=AWS_SES');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?provider=AWS_SES');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -276,7 +276,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by provider TWILIO', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?provider=TWILIO');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?provider=TWILIO');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -286,7 +286,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by provider FIREBASE', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?provider=FIREBASE');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?provider=FIREBASE');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -296,7 +296,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by isActive true', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?isActive=true');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?isActive=true');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -310,7 +310,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should filter sender endpoints by isActive false', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?isActive=false');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?isActive=false');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -320,7 +320,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should combine multiple filters', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?channel=EMAIL&isActive=true');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?channel=EMAIL&isActive=true');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -330,7 +330,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should return empty list when no endpoints match filter', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?channel=SMS&isActive=false');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?channel=SMS&isActive=false');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -342,7 +342,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should support pagination with limit', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?limit=2&offset=0');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?limit=2&offset=0');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -354,7 +354,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should support pagination with offset', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints?limit=2&offset=2');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints?limit=2&offset=2');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -366,14 +366,14 @@ describe('Sender Endpoint', () => {
     });
 
     it('should return 404 when sender profile does not exist', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/99999/endpoints');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/99999/endpoints');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_PRF_001' });
     });
 
     it('should return 422 for invalid profile ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/invalid-id/endpoints');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/invalid-id/endpoints');
 
       expect(response.statusCode).toBe(422);
     });
@@ -381,7 +381,7 @@ describe('Sender Endpoint', () => {
 
   describe('GET /v1/sender-profiles/:profileId/endpoints/:endpointId', () => {
     it('should get a sender endpoint by ID', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints/1');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -398,7 +398,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should get sender endpoint for profile 2', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/2/endpoints/5');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/2/endpoints/5');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -415,7 +415,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should get SMS endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/3/endpoints/6');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/3/endpoints/6');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -432,7 +432,7 @@ describe('Sender Endpoint', () => {
     });
 
     it('should get PUSH endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/5/endpoints/8');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/5/endpoints/8');
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -449,27 +449,27 @@ describe('Sender Endpoint', () => {
     });
 
     it('should return 404 for non-existent sender endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints/99999');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_EP_001' });
     });
 
     it('should return 404 when endpoint does not belong to profile', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints/5');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints/5');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_EP_001' });
     });
 
     it('should return 422 for invalid profile ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/invalid-id/endpoints/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/invalid-id/endpoints/1');
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 for invalid endpoint ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });
@@ -483,7 +483,7 @@ describe('Sender Endpoint', () => {
         isActive: false,
       };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toStrictEqual({
@@ -502,7 +502,7 @@ describe('Sender Endpoint', () => {
     it('should partially update only identifier', async () => {
       const updateBody = { identifier: 'new-identifier@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/2/endpoints/5').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/2/endpoints/5').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -516,7 +516,7 @@ describe('Sender Endpoint', () => {
     it('should partially update only weight', async () => {
       const updateBody = { weight: 5 };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/3/endpoints/6').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/3/endpoints/6').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -528,7 +528,7 @@ describe('Sender Endpoint', () => {
     it('should partially update only isActive', async () => {
       const updateBody = { isActive: false };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/4/endpoints/7').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/4/endpoints/7').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -540,7 +540,7 @@ describe('Sender Endpoint', () => {
     it('should return 404 for non-existent sender endpoint', async () => {
       const updateBody = { identifier: 'updated@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/99999').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/99999').body(updateBody);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_EP_001' });
@@ -549,14 +549,14 @@ describe('Sender Endpoint', () => {
     it('should return 404 when endpoint does not belong to profile', async () => {
       const updateBody = { identifier: 'updated@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/5').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/5').body(updateBody);
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_EP_001' });
     });
 
     it('should return 422 for empty update body', async () => {
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/1').body({});
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/1').body({});
 
       expect(response.statusCode).toBe(422);
     });
@@ -564,7 +564,7 @@ describe('Sender Endpoint', () => {
     it('should return 422 for invalid profile ID format', async () => {
       const updateBody = { identifier: 'updated@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/invalid-id/endpoints/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/invalid-id/endpoints/1').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -572,7 +572,7 @@ describe('Sender Endpoint', () => {
     it('should return 422 for invalid endpoint ID format', async () => {
       const updateBody = { identifier: 'updated@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/invalid-id').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/invalid-id').body(updateBody);
 
       expect(response.statusCode).toBe(422);
     });
@@ -580,7 +580,7 @@ describe('Sender Endpoint', () => {
     it('should ignore channel field in update body', async () => {
       const updateBody = { channel: 'SMS', identifier: 'updated-with-channel@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -593,7 +593,7 @@ describe('Sender Endpoint', () => {
     it('should ignore provider field in update body', async () => {
       const updateBody = { provider: 'TWILIO', identifier: 'updated-with-provider@shadow.test' };
 
-      const response = await testEnv.getRouter().mockRequest().patch('/api/v1/sender-profiles/1/endpoints/1').body(updateBody);
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).patch('/api/v1/sender-profiles/1/endpoints/1').body(updateBody);
 
       expect(response.statusCode).toBe(200);
       expect(response.json()).toMatchObject({
@@ -606,54 +606,54 @@ describe('Sender Endpoint', () => {
 
   describe('DELETE /v1/sender-profiles/:profileId/endpoints/:endpointId', () => {
     it('should delete a sender endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/1/endpoints/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/1/endpoints/1');
 
       expect(response.statusCode).toBe(204);
 
-      const getResponse = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/1/endpoints/1');
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/1/endpoints/1');
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should delete SMS endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/3/endpoints/6');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/3/endpoints/6');
 
       expect(response.statusCode).toBe(204);
 
-      const getResponse = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/3/endpoints/6');
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/3/endpoints/6');
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should delete PUSH endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/5/endpoints/8');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/5/endpoints/8');
 
       expect(response.statusCode).toBe(204);
 
-      const getResponse = await testEnv.getRouter().mockRequest().get('/api/v1/sender-profiles/5/endpoints/8');
+      const getResponse = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).get('/api/v1/sender-profiles/5/endpoints/8');
       expect(getResponse.statusCode).toBe(404);
     });
 
     it('should return 404 for non-existent sender endpoint', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/1/endpoints/99999');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/1/endpoints/99999');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_EP_001' });
     });
 
     it('should return 404 when endpoint does not belong to profile', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/1/endpoints/5');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/1/endpoints/5');
 
       expect(response.statusCode).toBe(404);
       expect(response.json()).toMatchObject({ code: 'SND_EP_001' });
     });
 
     it('should return 422 for invalid profile ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/invalid-id/endpoints/1');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/invalid-id/endpoints/1');
 
       expect(response.statusCode).toBe(422);
     });
 
     it('should return 422 for invalid endpoint ID format', async () => {
-      const response = await testEnv.getRouter().mockRequest().delete('/api/v1/sender-profiles/1/endpoints/invalid-id');
+      const response = await testEnv.getRouter().mockRequest().headers(testEnv.authHeaders()).delete('/api/v1/sender-profiles/1/endpoints/invalid-id');
 
       expect(response.statusCode).toBe(422);
     });
