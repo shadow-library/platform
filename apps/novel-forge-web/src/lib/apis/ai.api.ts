@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { type UseQueryOptions, type UseQueryResult, queryOptions, useQuery } from '@tanstack/react-query';
+import { queryOptions, useQuery, type UseQueryOptions, type UseQueryResult } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, ApiError } from './api-request';
+import { ApiError, APIRequest } from './api-request';
 import { type AiModelsResponse } from './api-types.gen';
 
 /**

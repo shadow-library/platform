@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, Tooltip, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useMemo, useState } from 'react';
+import { Button, Dialog, FormField, IconButton, Input, Select, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -17,20 +17,20 @@ import {
   type CreateEntityBody,
   type EntityResponse,
   type EntityType,
+  listEntitiesQueryOptions,
   type UpdateEntityBody,
   useAddEntityImageMutation,
   useAuditBibleMutation,
   useCreateEntityMutation,
-  useDeleteEntityMutation,
   useDeleteEntityImageByIdMutation,
   useDeleteEntityImageMutation,
+  useDeleteEntityMutation,
   useEntityQuery,
-  useUploadEntityImageMutation,
   useListEntitiesQuery,
   useProjectQuery,
   useSeedFromBriefMutation,
   useUpdateEntityMutation,
-  listEntitiesQueryOptions,
+  useUploadEntityImageMutation,
 } from '@/lib/apis';
 import { coverColor, imageUrl } from '@/lib/format';
 
@@ -133,7 +133,7 @@ function TypePicker({ active, counts, onPick }: TypePickerProps): React.JSX.Elem
       </button>
       {open && (
         <>
-          <div className={styles.overlay} onClick={() => setOpen(false)} />
+          <div role="presentation" className={styles.overlay} onClick={() => setOpen(false)} />
           <div role="menu" className={styles.menu}>
             <button type="button" className="nf-menuitem" data-active={active === 'all' || undefined} onClick={() => pick('all')}>
               <span className={styles.iconTile} style={iconTile(28, 7, 'var(--sh-accent-soft)', 'var(--sh-accent)')}>

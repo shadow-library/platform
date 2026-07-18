@@ -1,5 +1,6 @@
 export * from './api-request';
 export * from './api-types.gen';
+export * from './session.api';
 export * from './ai.api';
 export * from './project.api';
 export * from './entity.api';

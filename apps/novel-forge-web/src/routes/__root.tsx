@@ -3,11 +3,11 @@
  */
 import { type QueryClient } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { HeadContent, Outlet, Scripts, createRootRouteWithContext } from '@tanstack/react-router';
+import { createRootRouteWithContext, HeadContent, Outlet, Scripts } from '@tanstack/react-router';
 import { TanStackRouterDevtools } from '@tanstack/react-router-devtools';
+import { type ReactNode } from 'react';
 import { ClientOnly, themeInitScript } from '@shadow-library/ui';
 import { NavProgress } from '@shadow-library/ui/router';
-import { type ReactNode } from 'react';
 
 /**
  *  Importing user defined modules

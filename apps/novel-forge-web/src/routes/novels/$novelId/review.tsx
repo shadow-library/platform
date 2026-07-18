@@ -1,16 +1,24 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, IconButton, Kbd, Textarea, Tooltip, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { Button, Dialog, FormField, IconButton, Kbd, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { WarningIcon } from '@/components/icons';
-import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
-import { type DraftResponse, type FeedbackBody, reviewQueueQueryOptions, useApproveDraftMutation, useDraftFeedbackMutation, useReviewQueueQuery, useReviseDraftMutation } from '@/lib/apis';
+import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import {
+  type DraftResponse,
+  type FeedbackBody,
+  reviewQueueQueryOptions,
+  useApproveDraftMutation,
+  useDraftFeedbackMutation,
+  useReviewQueueQuery,
+  useReviseDraftMutation,
+} from '@/lib/apis';
 
 import styles from './review.module.css';
 
@@ -186,7 +194,8 @@ function ReviewScreen(): React.JSX.Element {
   const [selectedChapter, setSelectedChapter] = useState<number | undefined>();
 
   useEffect(() => {
-    if (selectedChapter == null && drafts.length > 0) setSelectedChapter(drafts[0]!.chapter);
+    const first = drafts[0];
+    if (selectedChapter == null && first) setSelectedChapter(first.chapter);
   }, [drafts, selectedChapter]);
 
   const selected = drafts.find(d => d.chapter === selectedChapter);
@@ -219,9 +228,7 @@ function ReviewScreen(): React.JSX.Element {
           })}
         </div>
       </div>
-      <div className="nf-detail">
-        {selected ? <ReviewDetail novelId={novelId} draft={selected} /> : <div className="nf-pane-empty">Select a chapter to review.</div>}
-      </div>
+      <div className="nf-detail">{selected ? <ReviewDetail novelId={novelId} draft={selected} /> : <div className="nf-pane-empty">Select a chapter to review.</div>}</div>
     </div>
   );
 }

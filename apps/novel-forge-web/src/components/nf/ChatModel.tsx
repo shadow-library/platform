@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { DropdownMenu, toast } from '@shadow-library/ui';
 import { useState } from 'react';
+import { DropdownMenu, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

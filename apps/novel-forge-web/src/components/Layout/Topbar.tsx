@@ -1,16 +1,15 @@
 /**
  * Importing npm packages
  */
-import { Avatar, CommandPalette, type CommandItem, Kbd, Popover, Spinner } from '@shadow-library/ui';
 import { Link, useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type ReactNode, useMemo, useState } from 'react';
+import { Avatar, type CommandItem, CommandPalette, Kbd, Popover, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { useListJobsQuery, useListProjectsQuery, useProjectQuery } from '@/lib/apis';
 import { projectTitle } from '@/lib/format';
-import { type NovelParams, type ProjectRoute } from './routes';
 import {
   BellIcon,
   BookIcon,
@@ -29,6 +28,7 @@ import {
   SourceIcon,
   UploadIcon,
 } from '../icons';
+import { type NovelParams, type ProjectRoute } from './routes';
 import styles from './Topbar.module.css';
 
 /**

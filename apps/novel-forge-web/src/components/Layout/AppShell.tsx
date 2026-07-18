@@ -7,9 +7,9 @@ import { type PropsWithChildren, useEffect, useState } from 'react';
 /**
  * Importing user defined modules
  */
+import styles from './AppShell.module.css';
 import Sidebar from './Sidebar';
 import Topbar from './Topbar';
-import styles from './AppShell.module.css';
 
 /**
  * The application chrome shared by every screen: a mode-aware sidebar, the top

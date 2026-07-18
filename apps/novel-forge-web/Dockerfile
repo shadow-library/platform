@@ -9,18 +9,20 @@ WORKDIR /app
 COPY package.json bun.lock ./
 RUN bun install --frozen-lockfile
 
-# `bun run build` runs `vite build` (emits dist/client + dist/server) then `tsc --noEmit` (type-check).
+# `bun run build` runs `shadow build` (the repo's `vite build` — emits dist/client + dist/server).
 COPY . .
 RUN bun run build
 
 # ── Stage 2: run the TanStack Start SSR server ──────────────────────────────────
-# The app is no longer static files behind nginx — it is a Bun server that renders every request. serve.ts
-# fronts three things on one origin: /api → the backend (API_ORIGIN), hashed client assets from dist/client,
-# and full-document SSR from dist/server. Put a TLS-terminating proxy in front of it if you need HTTPS.
+# serve.ts (shadow web's `serve`) fronts hashed client assets from dist/client and full-document SSR from
+# dist/server on PORT, with a backend-independent /healthz probe on HEALTH_PORT. Backend calls happen
+# server-side through Start server functions against API_ORIGIN — there is no /api proxy here anymore, so
+# the ingress must route /api/auth/* (the interactive login redirect) to novel-forge-server directly.
 FROM oven/bun:1.3.6-slim AS runtime
 WORKDIR /app
 ENV NODE_ENV=production \
     PORT=3000 \
+    HEALTH_PORT=3001 \
     API_ORIGIN=http://novel-forge-server:8080
 
 # The SSR bundle externalises its runtime deps, so ship node_modules from the build stage (identical base
@@ -29,9 +31,9 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/package.json /app/serve.ts ./
 
-EXPOSE 3000
+EXPOSE 3000 3001
 
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD bun -e "fetch('http://127.0.0.1:'+(process.env.PORT||3000)+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
+  CMD bun -e "fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||3001)+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 
 CMD ["bun", "run", "serve.ts"]

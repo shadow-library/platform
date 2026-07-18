@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, Input, SegmentedControl, toast } from '@shadow-library/ui';
 import { useState } from 'react';
+import { Button, Dialog, FormField, Input, SegmentedControl, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

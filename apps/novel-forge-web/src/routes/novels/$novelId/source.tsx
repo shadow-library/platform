@@ -1,19 +1,21 @@
 /**
  * Importing npm packages
  */
-import { Button, IconButton, Spinner, Tooltip, toast } from '@shadow-library/ui';
 import { useQueryClient } from '@tanstack/react-query';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect, useRef } from 'react';
+import { Button, IconButton, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { EditIcon, ResetIcon, SearchIcon, SourceIcon } from '@/components/icons';
-import { PageHeader, QueryState, StatusChip, type ChipIntent } from '@/components/nf';
+import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
 import {
   type ChapterListResponse,
   type GenerationJobItem,
+  listChaptersQueryOptions,
+  projectStatusQueryOptions,
   useConsolidateMutation,
   useExtractMutation,
   useIngestMutation,
@@ -23,8 +25,6 @@ import {
   useProjectStatusQuery,
   useResumeMutation,
   useSkeletonMutation,
-  listChaptersQueryOptions,
-  projectStatusQueryOptions,
 } from '@/lib/apis';
 
 import styles from './source.module.css';

@@ -1,21 +1,24 @@
 /**
  * Importing npm packages
  */
-import { Button, ButtonGroup, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, Tooltip, toast } from '@shadow-library/ui';
-import { createFileRoute } from '@tanstack/react-router';
 import { useQueryClient } from '@tanstack/react-query';
+import { createFileRoute } from '@tanstack/react-router';
 import DOMPurify from 'dompurify';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { Button, ButtonGroup, Dialog, Drawer, DropdownMenu, IconButton, SegmentedControl, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { ChevronDownIcon, ChevronLeftIcon, ChevronRightIcon, EditIcon, PlusIcon, TrashIcon, WarningIcon } from '@/components/icons';
-import { Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
+import { type ChipIntent, Markdown, PaneError, PaneLoader, QueryState, RowAction, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import { ImageGallery } from '@/components/nf/ImageGallery';
 import {
   type DraftResponse,
+  listBriefsQueryOptions,
+  listDraftsQueryOptions,
+  projectStatusQueryOptions,
   useAddChapterImageMutation,
   useApproveDraftMutation,
   useChapterImagesQuery,
@@ -31,9 +34,6 @@ import {
   useListRunsQuery,
   useProjectStatusQuery,
   useUpdateDraftMutation,
-  listBriefsQueryOptions,
-  listDraftsQueryOptions,
-  projectStatusQueryOptions,
 } from '@/lib/apis';
 import { imageUrl } from '@/lib/format';
 
@@ -219,7 +219,13 @@ function ChapterList({ novelId, onOpen, onProgress }: ChapterListProps): React.J
   const planApproved = statusQuery.data?.planApproved ?? false;
 
   // Generation gates mirror the backend (PLN_001 / DRF_003); surface the reason rather than let the call throw.
-  const generateReason = !nextBriefChapter ? 'No brief to generate from — write it yourself' : !planApproved ? 'Approve the volume plan first' : hasContradiction ? 'Resolve the flagged contradiction first' : undefined;
+  const generateReason = !nextBriefChapter
+    ? 'No brief to generate from — write it yourself'
+    : !planApproved
+      ? 'Approve the volume plan first'
+      : hasContradiction
+        ? 'Resolve the flagged contradiction first'
+        : undefined;
   const canGenerate = !generateReason;
 
   const createManual = useUpdateDraftMutation(novelId, nextManualChapter);

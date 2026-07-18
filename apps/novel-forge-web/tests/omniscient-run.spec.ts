@@ -18,7 +18,7 @@
 /// <reference types="node" /> — tsconfig pins types to vite/client; node:fs needs @types/node here.
 import { appendFileSync, readFileSync } from 'node:fs';
 
-import { type APIRequestContext, type Page, expect, test } from '@playwright/test';
+import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 
 declare const process: { env: Record<string, string | undefined> };
 

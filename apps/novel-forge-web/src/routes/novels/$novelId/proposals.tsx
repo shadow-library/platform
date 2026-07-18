@@ -1,15 +1,22 @@
 /**
  * Importing npm packages
  */
-import { Button, Checkbox, SegmentedControl, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Button, Checkbox, SegmentedControl, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
-import { Markdown, PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
-import { type ProposalResponse, listProposalsQueryOptions, useApplyProposalMutation, useDiscardProposalMutation, useListProposalsQuery, useRevertProposalMutation } from '@/lib/apis';
+import { type ChipIntent, Markdown, PaneError, PaneLoader, StatusChip } from '@/components/nf';
+import {
+  listProposalsQueryOptions,
+  type ProposalResponse,
+  useApplyProposalMutation,
+  useDiscardProposalMutation,
+  useListProposalsQuery,
+  useRevertProposalMutation,
+} from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './proposals.module.css';
@@ -47,7 +54,8 @@ function proposalTitle(p: ProposalResponse): string {
 /** A one-line human summary of a change-set op: its type plus the key that identifies the target. */
 export function opLabel(op: Record<string, unknown>): string {
   const type = String(op.op ?? 'unknown');
-  const target = op.volumeKey ?? op.arcKey ?? op.entityKey ?? (op.section !== undefined ? `${op.section}/${op.slug}` : undefined) ?? (op.chapter !== undefined ? `ch ${op.chapter}` : undefined);
+  const target =
+    op.volumeKey ?? op.arcKey ?? op.entityKey ?? (op.section !== undefined ? `${op.section}/${op.slug}` : undefined) ?? (op.chapter !== undefined ? `ch ${op.chapter}` : undefined);
   return target === undefined ? type : `${type} · ${target}`;
 }
 
@@ -277,9 +285,7 @@ function ProposalsScreen(): React.JSX.Element {
           ))}
         </div>
       </div>
-      <div className="nf-detail">
-        {selected ? <ProposalDetail novelId={novelId} proposal={selected} /> : <div className="nf-pane-empty">Select a proposal to review.</div>}
-      </div>
+      <div className="nf-detail">{selected ? <ProposalDetail novelId={novelId} proposal={selected} /> : <div className="nf-pane-empty">Select a proposal to review.</div>}</div>
     </div>
   );
 }

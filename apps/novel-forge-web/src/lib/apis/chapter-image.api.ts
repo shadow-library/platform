@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, ApiError } from './api-request';
+import { ApiError, APIRequest } from './api-request';
 import { type AddChapterImageBody } from './api-types.gen';
 
 /**

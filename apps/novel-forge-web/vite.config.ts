@@ -5,8 +5,9 @@ import viteReact from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
 import { type PluginOption, defineConfig } from 'vite';
 
-// One backend origin drives everything: the dev/preview `/api` proxy (browser-side requests) and the
-// SSR fetch base (see `src/lib/apis/api-request.ts`). Defaults to the local backend on 8080.
+// One backend origin drives everything: the server-function fetch base (`src/lib/apis/server-fetch.ts`)
+// and the dev `/api` proxy — which now only matters for the interactive `/api/auth/*` login redirects,
+// since data calls travel through TanStack Start server functions. Defaults to the local backend on 8080.
 const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:8080';
 
 // Bundle analysis is opt-in (`ANALYZE=1 bun run build`) so ordinary builds — which now run twice, once
@@ -14,7 +15,9 @@ const API_ORIGIN = process.env.API_ORIGIN || 'http://localhost:8080';
 const analyze = process.env.ANALYZE ? [visualizer({ gzipSize: true, brotliSize: true }) as PluginOption] : [];
 
 export default defineConfig({
-  plugins: [tanstackStart(), viteReact(), ...analyze],
+  // The generated route tree lives under `generated/` (the ecosystem's convention for generated
+  // artifacts) so `shadow verify`'s lint/format globs never fight the generator's own output style.
+  plugins: [tanstackStart({ router: { generatedRouteTree: '../generated/routeTree.gen.ts' } }), viteReact(), ...analyze],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

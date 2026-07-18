@@ -5,10 +5,10 @@
  * page header, a query gate, and a couple of tag flavours — kept here so every
  * screen speaks the same visual language.
  */
-import { Alert, EmptyState, Spinner } from '@shadow-library/ui';
+import { type ApiError } from '@/lib/apis';
 import { type CSSProperties, type ReactElement, type ReactNode } from 'react';
 
-import { type ApiError } from '@/lib/apis';
+import { Alert, EmptyState, Spinner } from '@shadow-library/ui';
 import { SparkIcon } from '../icons';
 import styles from './nf.module.css';
 

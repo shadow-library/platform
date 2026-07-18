@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Tabs, Textarea, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { Alert, Button, Dialog, FormField, Input, SegmentedControl, Select, Tabs, Textarea, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -11,6 +11,7 @@ import { useEffect, useState } from 'react';
 import { PageContainer, PageHeader, QueryState, SectionCard } from '@/components/nf';
 import {
   type AiModelOption,
+  aiModelsQueryOptions,
   type ContentMode,
   type ProjectConfig,
   type ProjectModelOverrides,
@@ -18,7 +19,6 @@ import {
   useDeleteProjectMutation,
   useProjectQuery,
   useUpdateProjectMutation,
-  aiModelsQueryOptions,
 } from '@/lib/apis';
 import { decodeModelRef, encodeModelRef, projectTitle } from '@/lib/format';
 

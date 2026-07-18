@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
-import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { Button, Checkbox, Dialog, FormField, Input, SegmentedControl, Select, Spinner, Textarea, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { ArchiveIcon, ProposalsIcon, SendIcon, TrashIcon } from '@/components/icons';
-import { Markdown, PaneError, PaneLoader, RowAction, StatusChip, type ChipIntent } from '@/components/nf';
+import { type ChipIntent, Markdown, PaneError, PaneLoader, RowAction, StatusChip } from '@/components/nf';
 import { ChatModelMenu, MessageModelTag } from '@/components/nf/ChatModel';
 import {
   type ChangeItemResponse,
@@ -422,7 +422,10 @@ function HistoryDialog({ novelId, open, onOpenChange }: HistoryDialogProps): Rea
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <Dialog.Content size="lg">
-          <Dialog.Header title="Change history" description="Everything the chat (and the analysis passes) changed — newest first. Revert one change, or roll the project back to a point." />
+          <Dialog.Header
+            title="Change history"
+            description="Everything the chat (and the analysis passes) changed — newest first. Revert one change, or roll the project back to a point."
+          />
           <Dialog.Body>
             <div className={styles.historyList}>
               {changesQuery.isLoading && <PaneLoader />}

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { EmptyState } from '@shadow-library/ui';
 import { type ErrorComponentProps, useRouter } from '@tanstack/react-router';
+import { EmptyState } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -26,7 +26,12 @@ export function DefaultCatchBoundary({ error, reset }: ErrorComponentProps): Rea
   };
   return (
     <div className={styles.wrap}>
-      <EmptyState size="page" title="Something went wrong" description={error?.message ?? 'An unexpected error occurred. Please try again.'} action={{ label: 'Try again', onClick: retry }} />
+      <EmptyState
+        size="page"
+        title="Something went wrong"
+        description={error?.message ?? 'An unexpected error occurred. Please try again.'}
+        action={{ label: 'Try again', onClick: retry }}
+      />
     </div>
   );
 }

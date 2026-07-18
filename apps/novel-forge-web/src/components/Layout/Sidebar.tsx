@@ -1,16 +1,15 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Badge, IconButton, Popover, Tooltip, useTheme } from '@shadow-library/ui';
 import { Link, useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type ReactNode, useState } from 'react';
+import { Avatar, Badge, IconButton, Popover, Tooltip, useTheme } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { useListProjectsQuery, useListProposalsQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
 import { imageUrl, lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
-import { type NovelParams, type ProjectRoute } from './routes';
 import {
   BookIcon,
   ChatIcon,
@@ -30,6 +29,7 @@ import {
   SunIcon,
   UploadIcon,
 } from '../icons';
+import { type NovelParams, type ProjectRoute } from './routes';
 import styles from './Sidebar.module.css';
 
 /**

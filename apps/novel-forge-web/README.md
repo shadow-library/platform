@@ -8,15 +8,16 @@ Authoring workspace for Shadow Applications. A server-rendered React app built w
 | ---------------- | --------------------------------------------------- |
 | Runtime / PM     | [Bun](https://bun.sh)                               |
 | Framework        | [TanStack Start](https://tanstack.com/start) (full-document SSR) |
-| Build tool       | [Vite 7](https://vite.dev)                          |
+| Build tool       | [Vite 7](https://vite.dev) via the `shadow` CLI (`@shadow-library/scripts`) |
 | UI library       | [React 19](https://react.dev)                       |
 | Routing          | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split) |
 | Server state     | [TanStack Query](https://tanstack.com/query)        |
-| Components        | [Ant Design 6](https://ant.design)                 |
-| Styling          | [Tailwind CSS 4](https://tailwindcss.com) + CSS variables |
-| Types            | [TypeScript 5](https://www.typescriptlang.org) (strict) |
-| Lint / Format    | ESLint + Prettier                                   |
-| Git hooks        | Husky + commitlint (Conventional Commits)           |
+| Components       | `@shadow-library/ui` (CSS Modules + `--sh-*` design tokens) |
+| Transport / SSR  | `@shadow-library/web` (server functions + `createServerFetch`, `createAppRouter`, `serve`) |
+| Auth             | Session-gated via `requireAuth` — every route is private |
+| Types            | [TypeScript 6](https://www.typescriptlang.org) (strict) |
+| Lint / Format    | `shadow verify` (shared ESLint + Prettier ruleset)  |
+| Git hooks        | Husky → `shadow verify` / `shadow commit-msg` (Conventional Commits) |
 | E2E tests        | [Playwright](https://playwright.dev)                |
 
 ## Prerequisites
@@ -30,49 +31,45 @@ bun install
 bun dev
 ```
 
-The dev server runs on [http://localhost:3000](http://localhost:3000). Browser requests to `/api` are proxied to the backend (`API_ORIGIN`, default `http://localhost:8080`); during SSR the route loaders call that same backend directly (an absolute URL on the server, a relative `/api` path in the browser — see `src/lib/apis/api-request.ts`).
+The dev server runs on [http://localhost:3000](http://localhost:3000). Every backend call travels through TanStack Start server functions to `API_ORIGIN` (default `http://localhost:8080`) — see `src/lib/apis/server-fetch.ts`. The dev `/api` proxy remains only for the interactive `/api/auth/*` login redirects. All routes are session-gated: `GET /api/auth/session` must answer 200, else the app redirects to `/api/auth/login?returnTo=…`.
 
 ## Scripts
 
 | Script                       | Description                                            |
 | ---------------------------- | ------------------------------------------------------ |
 | `bun dev`                    | Start the TanStack Start dev server (SSR) on port 3000 |
-| `bun run build`              | Build the client + SSR server to `dist/`, then type-check (`tsc`) |
+| `bun run build`              | `shadow build` — the client + SSR server bundles to `dist/` |
 | `bun run type-check`         | Type-check only (`tsc --noEmit`)                       |
-| `bun run start`              | Run the production SSR server (`serve.ts`): SSR + static assets + `/api` proxy on one origin |
-| `bun lint`                   | Check formatting (Prettier) and lint (ESLint)          |
-| `bun lint --fix`             | Auto-fix formatting and lint issues                    |
+| `bun run start`              | Run the production SSR server (`serve.ts` → `@shadow-library/web/server-entry`) |
+| `bun run verify`             | `shadow verify` — format (Prettier) + lint (ESLint) + type-check |
+| `bunx shadow verify --fix`   | Auto-fix formatting and lint issues                    |
 | `bun run test`               | Run Playwright end-to-end tests                        |
 | `bun run test:setup`         | Install the Chromium browser Playwright needs          |
 | `bun run generate:api-types` | Regenerate API types from the backend OpenAPI spec     |
 
 ## Production
 
-`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` is a small Bun server that fronts everything on one origin: it proxies `/api/*` to `API_ORIGIN`, serves the built client assets, and renders every other request server-side. The `Dockerfile` builds and runs exactly this; set `API_ORIGIN` to the backend and `PORT` to taste (default 3000). A `/healthz` endpoint answers liveness probes without touching the backend or the renderer. Put a TLS-terminating proxy in front if you need HTTPS.
+`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip, streamed SSR, and graceful drain, on `PORT` (default 3000). Liveness lives on its own port — `GET /healthz` on `HEALTH_PORT` (default 3001) — so probes never touch the backend or the renderer. Backend calls happen server-side through Start server functions against `API_ORIGIN`; there is no `/api` proxy in production, so the ingress must route `/api/auth/*` (the interactive login redirect) to novel-forge-server directly. The `Dockerfile` builds and runs exactly this.
 
 ## Project Structure
 
 ```
+generated/               Generated artifacts (routeTree.gen.ts — outside the lint/format globs)
 src/
-├── components/          Shared, cross-feature UI
-│   ├── AppProvider/     Query client + theme context providers
-│   ├── Layout/          Top nav, side nav, footer shell
-│   └── Logo/            Shadow Applications wordmark
-├── constants/           App-wide constants (Ant Design themes)
+├── components/          Shared, cross-feature UI (providers, layout shell, nf primitives)
 ├── features/            Feature modules (UI + hooks + utils per feature)
 ├── lib/                 Non-UI building blocks
-│   ├── apis/            APIRequest HTTP client + generated types
-│   ├── hooks/           Reusable hooks
-│   └── utils.ts         Shared helpers (pagination, …)
+│   ├── apis/            APIRequest facade + server-fetch transport + session + generated types
+│   └── session.ts       requireSession — the requireAuth gate every route group runs
 ├── routes/              File-based routes (TanStack Router)
-├── main.tsx             App entry point
-├── styles.css           Tailwind import + theme CSS variables
+├── router.tsx           createAppRouter wiring (per-request QueryClient + SSR query integration)
+├── styles.css           @shadow-library/ui styles + app CSS variables
 └── types.ts             Shared types
 ```
 
 ### Routing
 
-Routes are files under `src/routes`. TanStack Router's Vite plugin generates `src/routeTree.gen.ts` on dev/build — do not edit it by hand. Adding a file such as `src/routes/library/novels/index.tsx` registers the `/library/novels` route automatically.
+Routes are files under `src/routes`. TanStack Router's Vite plugin generates `generated/routeTree.gen.ts` on dev/build — do not edit it by hand. Adding a file such as `src/routes/library/novels/index.tsx` registers the `/library/novels` route automatically.
 
 ### Features
 
@@ -80,16 +77,11 @@ Each feature lives in `src/features/<name>` and owns its components, `hooks/`, a
 
 ### Theming
 
-The design system is defined once and consumed two ways:
-
-- **Ant Design** components read the `lightTheme` / `darkTheme` token configs in `src/constants/themes.ts`.
-- **Tailwind / custom CSS** read the matching CSS variables in `src/styles.css` (e.g. `var(--color-primary)`), switched via the `data-theme` attribute.
-
-`ThemeProvider` persists the choice in `localStorage` and falls back to the OS preference.
+The design system is `@shadow-library/ui`: components are styled with CSS Modules over `--sh-*` design tokens, switched via the `data-theme` attribute on `<html>`. App CSS in `src/styles.css` composes the same tokens. `ThemeProvider` persists the choice in `localStorage` and falls back to the OS preference (`themeInitScript` runs before paint to avoid a flash).
 
 ### API Layer
 
-`src/lib/apis/api-request.ts` exposes a small fluent `APIRequest` client:
+`src/lib/apis/api-request.ts` exposes the same fluent `APIRequest` builder the screens have always used, now a facade over `@shadow-library/web`: every call is a TanStack Start server function whose handler goes through `createServerFetch` (session-cookie forwarding + CSRF double-submit + `Set-Cookie` relay), and failures surface as the shared `ApiError` (`isApiError`, `fieldErrors`).
 
 ```ts
 import { APIRequest } from '@/lib';
@@ -97,14 +89,14 @@ import { APIRequest } from '@/lib';
 const novels = await APIRequest.get('/novels').query({ limit: 20 }).execute();
 ```
 
-Response and error types come from `src/lib/apis/api-types.gen.ts`, generated from the backend OpenAPI spec. The committed file is a placeholder stub — run `bun run generate:api-types` (configure `OPENAPI_SPEC_URL` in `.env`) to replace it with the real types.
+Response and error types come from `src/lib/apis/api-types.gen.ts`, generated from the backend OpenAPI spec via `bun run generate:api-types` (`shadow gen-api-types`).
 
 ## Code Conventions
 
-- Import blocks are grouped and ordered: npm packages → user-defined packages → user-defined modules, enforced by ESLint `import/order`.
-- Single quotes, trailing commas, 180-char line width (Prettier).
+- Lint, formatting, and commit-message rules are the ecosystem's shared ruleset, driven by `.shadowrc.json` — no per-repo ESLint/Prettier/commitlint config.
+- Single quotes, trailing commas, 180-char line width; imports grouped npm → user-defined and sorted.
 - TypeScript runs in strict mode with `noUncheckedIndexedAccess`; exported functions carry explicit return types.
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org); husky runs lint + tests pre-commit and validates the message.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org); husky runs `shadow verify` pre-commit and `shadow commit-msg` on the message.
 
 ## Testing
 

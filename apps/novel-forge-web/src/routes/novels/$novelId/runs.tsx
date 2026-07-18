@@ -1,24 +1,24 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, Spinner } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { Button, Dialog, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
-import { PaneError, PaneLoader, StatusChip, type ChipIntent } from '@/components/nf';
+import { type ChipIntent, PaneError, PaneLoader, StatusChip } from '@/components/nf';
 import {
+  listRunsQueryOptions,
   type RunContextPackResponse,
   type RunModelCallResponse,
   type RunToolCallResponse,
-  type WorkflowRunDetailResponse,
   useListRunsQuery,
   useRunCallQuery,
   useRunContextQuery,
   useRunQuery,
-  listRunsQueryOptions,
+  type WorkflowRunDetailResponse,
 } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
@@ -368,7 +368,9 @@ function RunDetail({ novelId, runId }: RunDetailProps): React.JSX.Element {
             <>
               <SectionLabel>Model calls</SectionLabel>
               <ModelCallsTable novelId={novelId} runId={runId} calls={calls} />
-              <p className={styles.tableNote}>Click a call to see its raw model output. Input tokens include the assembled context, playbook, and history — not just the trigger below.</p>
+              <p className={styles.tableNote}>
+                Click a call to see its raw model output. Input tokens include the assembled context, playbook, and history — not just the trigger below.
+              </p>
             </>
           )}
           {toolCalls.length > 0 && (
@@ -399,7 +401,8 @@ function RunsScreen(): React.JSX.Element {
   const [selectedId, setSelectedId] = useState<string | undefined>();
 
   useEffect(() => {
-    if (!selectedId && runs.length > 0) setSelectedId(runs[0]!.id);
+    const first = runs[0];
+    if (!selectedId && first) setSelectedId(first.id);
   }, [runs, selectedId]);
 
   return (
@@ -419,9 +422,7 @@ function RunsScreen(): React.JSX.Element {
           ))}
         </div>
       </div>
-      <div className="nf-detail">
-        {selectedId ? <RunDetail novelId={novelId} runId={selectedId} /> : <div className="nf-pane-empty">Select a run to see its detail.</div>}
-      </div>
+      <div className="nf-detail">{selectedId ? <RunDetail novelId={novelId} runId={selectedId} /> : <div className="nf-pane-empty">Select a run to see its detail.</div>}</div>
     </div>
   );
 }

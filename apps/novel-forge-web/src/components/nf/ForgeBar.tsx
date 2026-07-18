@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Button, IconButton, Textarea, toast } from '@shadow-library/ui';
 import { useEffect, useRef, useState } from 'react';
+import { Button, IconButton, Textarea, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

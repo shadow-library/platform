@@ -1,5 +1,5 @@
 {
-  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts"],
+  "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "generated/**/*.ts"],
   "compilerOptions": {
     /** Language and Environment */
     "target": "ES2022",
@@ -24,7 +24,6 @@
     "strictPropertyInitialization": false,
 
     /** Modules */
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": { "@/*": ["./src/*"] },

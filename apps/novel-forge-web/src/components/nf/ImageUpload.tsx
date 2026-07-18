@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Spinner } from '@shadow-library/ui';
 import { type ReactNode, useRef } from 'react';
+import { Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
 import { ImageIcon, TrashIcon } from '@/components/icons';
-import { ACCEPT_ATTR, type UploadMime, readImageFile } from './image-file';
+import { ACCEPT_ATTR, readImageFile, type UploadMime } from './image-file';
 import styles from './ImageUpload.module.css';
 
 /**

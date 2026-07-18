@@ -8,24 +8,30 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './routes/__root'
-import { Route as AppRouteImport } from './routes/_app'
-import { Route as AppIndexRouteImport } from './routes/_app/index'
-import { Route as NovelsNovelIdRouteImport } from './routes/novels/$novelId'
-import { Route as NovelsNovelIdIndexRouteImport } from './routes/novels/$novelId/index'
-import { Route as NovelsNovelIdVolumesRouteImport } from './routes/novels/$novelId/volumes'
-import { Route as NovelsNovelIdStoryBibleRouteImport } from './routes/novels/$novelId/story-bible'
-import { Route as NovelsNovelIdSourceRouteImport } from './routes/novels/$novelId/source'
-import { Route as NovelsNovelIdSettingsRouteImport } from './routes/novels/$novelId/settings'
-import { Route as NovelsNovelIdRunsRouteImport } from './routes/novels/$novelId/runs'
-import { Route as NovelsNovelIdReviewRouteImport } from './routes/novels/$novelId/review'
-import { Route as NovelsNovelIdRebrandRouteImport } from './routes/novels/$novelId/rebrand'
-import { Route as NovelsNovelIdProposalsRouteImport } from './routes/novels/$novelId/proposals'
-import { Route as NovelsNovelIdOverviewRouteImport } from './routes/novels/$novelId/overview'
-import { Route as NovelsNovelIdImportPlanRouteImport } from './routes/novels/$novelId/import-plan'
-import { Route as NovelsNovelIdChatRouteImport } from './routes/novels/$novelId/chat'
-import { Route as NovelsNovelIdChaptersRouteImport } from './routes/novels/$novelId/chapters'
+import { Route as rootRouteImport } from './../src/routes/__root'
+import { Route as LoginRouteImport } from './../src/routes/login'
+import { Route as AppRouteImport } from './../src/routes/_app'
+import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
+import { Route as NovelsNovelIdRouteImport } from './../src/routes/novels/$novelId'
+import { Route as NovelsNovelIdIndexRouteImport } from './../src/routes/novels/$novelId/index'
+import { Route as NovelsNovelIdVolumesRouteImport } from './../src/routes/novels/$novelId/volumes'
+import { Route as NovelsNovelIdStoryBibleRouteImport } from './../src/routes/novels/$novelId/story-bible'
+import { Route as NovelsNovelIdSourceRouteImport } from './../src/routes/novels/$novelId/source'
+import { Route as NovelsNovelIdSettingsRouteImport } from './../src/routes/novels/$novelId/settings'
+import { Route as NovelsNovelIdRunsRouteImport } from './../src/routes/novels/$novelId/runs'
+import { Route as NovelsNovelIdReviewRouteImport } from './../src/routes/novels/$novelId/review'
+import { Route as NovelsNovelIdRebrandRouteImport } from './../src/routes/novels/$novelId/rebrand'
+import { Route as NovelsNovelIdProposalsRouteImport } from './../src/routes/novels/$novelId/proposals'
+import { Route as NovelsNovelIdOverviewRouteImport } from './../src/routes/novels/$novelId/overview'
+import { Route as NovelsNovelIdImportPlanRouteImport } from './../src/routes/novels/$novelId/import-plan'
+import { Route as NovelsNovelIdChatRouteImport } from './../src/routes/novels/$novelId/chat'
+import { Route as NovelsNovelIdChaptersRouteImport } from './../src/routes/novels/$novelId/chapters'
 
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppRoute = AppRouteImport.update({
   id: '/_app',
   getParentRoute: () => rootRouteImport,
@@ -108,6 +114,7 @@ const NovelsNovelIdChaptersRoute = NovelsNovelIdChaptersRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
+  '/login': typeof LoginRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByFullPath {
   '/novels/$novelId/': typeof NovelsNovelIdIndexRoute
 }
 export interface FileRoutesByTo {
+  '/login': typeof LoginRoute
   '/': typeof AppIndexRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -142,6 +150,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
@@ -162,6 +171,7 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/login'
     | '/novels/$novelId'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/novels/$novelId/'
   fileRoutesByTo: FileRoutesByTo
   to:
+    | '/login'
     | '/'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
   id:
     | '__root__'
     | '/_app'
+    | '/login'
     | '/novels/$novelId'
     | '/_app/'
     | '/novels/$novelId/chapters'
@@ -214,11 +226,19 @@ export interface FileRouteTypes {
 }
 export interface RootRouteChildren {
   AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
   NovelsNovelIdRoute: typeof NovelsNovelIdRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app': {
       id: '/_app'
       path: ''
@@ -382,13 +402,14 @@ const NovelsNovelIdRouteWithChildren = NovelsNovelIdRoute._addFileChildren(
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
+  LoginRoute: LoginRoute,
   NovelsNovelIdRoute: NovelsNovelIdRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
 
-import type { getRouter } from './router.tsx'
+import type { getRouter } from '../src/router.tsx'
 import type { createStart } from '@tanstack/react-start'
 declare module '@tanstack/react-start' {
   interface Register {

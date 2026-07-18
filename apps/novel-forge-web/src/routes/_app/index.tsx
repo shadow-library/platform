@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, SegmentedControl } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Button, SegmentedControl } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { BookIcon, PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
-import { type ProjectKind, type ProjectResponse, listProjectsQueryOptions, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
+import { listProjectsQueryOptions, type ProjectKind, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
 import { imageUrl, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './index.module.css';

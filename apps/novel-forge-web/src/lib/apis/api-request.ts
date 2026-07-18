@@ -1,89 +1,66 @@
 /**
  * Importing npm packages
  */
+import { createServerFn } from '@tanstack/react-start';
+import { type ApiResult, call, type JsonValue, type QueryParams } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
  */
-import { type JsonObject, type JsonValue } from '@/types';
-
-import { type components } from './api-types.gen';
+import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
  */
-
-/**
- * The stable error contract returned by the API. The backend's dev docs expose
- * this as `DevErrorResponseDto` (which additionally carries a dev-only `stack`);
- * the client speaks the production shape.
- */
-export interface ErrorResponseDto {
-  code: string;
-  type: string;
-  message: string;
-  fields?: components['schemas']['ErrorFieldDto'][] | null;
-}
-
-export type QueryValue = string | number | boolean;
 
 /** Options for query hooks that poll — e.g. following a job or workflow run to completion. */
 export interface PollingOptions {
   refetchInterval?: number;
 }
 
-interface APIRequestOptions {
+export type QueryValue = string | number | boolean;
+
+type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+
+interface ApiCallSpec {
+  method: HttpMethod;
   path: string;
-  method: string;
-  headers: Record<string, string>;
   query: Record<string, string>;
-  data?: JsonObject;
-}
-
-export class ApiError extends Error {
-  readonly status: number;
-  readonly code: string;
-  readonly type: string;
-  readonly fields: ErrorResponseDto['fields'];
-
-  constructor(status: number, body: ErrorResponseDto) {
-    // Validation errors carry the actual field problems ("body.content: must NOT have more than…");
-    // fold them into the message so toasts explain the rejection instead of the generic sentence.
-    const fieldDetail = body.fields?.length ? ` — ${body.fields.map(f => `${f.field}: ${f.msg}`).join('; ')}` : '';
-    super(`${body.message}${fieldDetail}`);
-    this.name = 'ApiError';
-    this.status = status;
-    this.code = body.code;
-    this.type = body.type;
-    this.fields = body.fields;
-  }
+  body?: JsonValue;
 }
 
 /**
  * Declaring the constants
+ *
+ * The error and transport surface comes from `@shadow-library/web`, so one error contract flows
+ * backend → server function → UI. `ApiError`/`isApiError` are re-exported under the path the app's
+ * `*.api.ts` files already import.
  */
-const BASE_PATH = '/api/v1';
+export { ApiError, isApiError } from '@shadow-library/web';
+export type { ErrorField, ErrorResponse } from '@shadow-library/web';
 
 /**
- * Route loaders are isomorphic: they run on the server for the initial document and in the browser on
- * client navigation. In the browser a relative path is correct (same-origin, proxied to the backend); on
- * the server there is no origin, so the backend's absolute URL is prefixed. `API_ORIGIN` is read only
- * under `import.meta.env.SSR`, which Vite statically resolves to `false` in the client build and drops the
- * branch — so the server-only origin never ships to (or is depended on by) the browser bundle.
+ * The single RPC every versioned-API call goes through. On the client it travels as a server-function
+ * request; during SSR it short-circuits to a direct invocation — either way the handler runs on the Start
+ * server, where `serverFetch` forwards the session cookie and satisfies the CSRF double-submit. The
+ * validator pins the spec to a backend-relative path so the passthrough cannot be aimed elsewhere.
  */
-function resolveUrl(pathWithQuery: string): string {
-  if (import.meta.env.SSR) {
-    const origin = process.env.API_ORIGIN ?? 'http://localhost:8080';
-    return `${origin}${BASE_PATH}${pathWithQuery}`;
-  }
-  return `${BASE_PATH}${pathWithQuery}`;
-}
+const executeApiCall = createServerFn({ method: 'POST' })
+  .validator((spec: ApiCallSpec): ApiCallSpec => {
+    if (!spec.path.startsWith('/') || spec.path.includes('..')) throw new Error(`Invalid API path: ${spec.path}`);
+    return spec;
+  })
+  .handler(({ data }): Promise<ApiResult<JsonValue>> => serverFetch({ method: data.method, path: data.path, query: data.query, body: data.body }));
 
+/**
+ * The app-facing HTTP client: the same chainable, thenable builder the screens have always used, now a
+ * thin facade over the `@shadow-library/web` transport instead of a hand-rolled isomorphic `fetch`.
+ */
 export class APIRequest {
-  private readonly options: APIRequestOptions;
+  private readonly spec: ApiCallSpec;
 
-  private constructor(path: string, method: string) {
-    this.options = { path, method, headers: {}, query: {} };
+  private constructor(path: string, method: HttpMethod) {
+    this.spec = { method, path, query: {} };
   }
 
   static get(path: string): APIRequest {
@@ -106,88 +83,27 @@ export class APIRequest {
     return new APIRequest(path, 'DELETE');
   }
 
-  header(key: string, value: string): this {
-    this.options.headers[key] = value;
-    return this;
-  }
-
   query(key: string, value: QueryValue): this;
-  query(params: Record<string, QueryValue | undefined>): this;
-  query(keyOrParams: string | Record<string, QueryValue | undefined>, value?: QueryValue): this {
-    if (typeof keyOrParams === 'string') this.options.query[keyOrParams] = String(value);
-    else {
-      for (const [k, v] of Object.entries(keyOrParams)) {
-        if (v !== undefined) this.options.query[k] = String(v);
+  query(params: QueryParams): this;
+  query(keyOrParams: string | QueryParams, value?: QueryValue): this {
+    if (typeof keyOrParams === 'string') {
+      if (value !== undefined) this.spec.query[keyOrParams] = String(value);
+    } else {
+      for (const [key, val] of Object.entries(keyOrParams)) {
+        if (val !== undefined) this.spec.query[key] = String(val);
       }
     }
     return this;
   }
 
-  field(key: string, value: JsonValue): this {
-    if (!this.options.data) this.options.data = {};
-
-    const keys = key.split('.');
-    let pointer = this.options.data;
-    for (let index = 0; index < keys.length - 1; index++) {
-      const currentKey = keys[index] as string;
-      if (!pointer[currentKey]) pointer[currentKey] = {};
-      pointer = pointer[currentKey] as JsonObject;
-    }
-    pointer[keys[keys.length - 1] as string] = value;
-
-    return this;
-  }
-
-  // Accepts any request DTO. Generated bodies may carry open-object fields (typed `{ [k]: unknown }`
-  // for freeform blobs like frontmatter or workflow state), which aren't assignable to `JsonValue`;
-  // they're still JSON-serialisable, so the object is stored as-is for `JSON.stringify`.
+  /** Accepts any request DTO — generated bodies may carry freeform blobs; they stay JSON-serialisable as-is. */
   body(data: object): this {
-    this.options.data = data as JsonObject;
+    this.spec.body = data as JsonValue;
     return this;
   }
 
   async execute<T>(): Promise<T> {
-    const { path, method, headers, query, data } = this.options;
-
-    const queryString = Object.keys(query).length > 0 ? `?${new URLSearchParams(query).toString()}` : '';
-    const url = resolveUrl(`${path}${queryString}`);
-
-    const init: RequestInit = { method, headers };
-    if (data) {
-      headers['content-type'] = 'application/json';
-      init.body = JSON.stringify(data);
-    }
-
-    let response: Response;
-    try {
-      response = await fetch(url, init);
-    } catch {
-      throw new ApiError(-1, { code: 'NETWORK_ERROR', type: 'NetworkError', message: 'Unable to reach the server' });
-    }
-
-    if (!response.ok) {
-      let body: ErrorResponseDto;
-      try {
-        body = await response.json();
-      } catch {
-        throw new ApiError(response.status, { code: 'UNKNOWN_ERROR', type: 'UnknownError', message: `Request failed with status ${response.status}` });
-      }
-      throw new ApiError(response.status, body);
-    }
-
-    if (response.status === 204) {
-      return undefined as T;
-    }
-
-    // Some action endpoints (e.g. generate) return an OK with an empty or
-    // non-JSON body — treat that as a successful void result rather than error.
-    const text = await response.text();
-    if (!text) return undefined as T;
-    try {
-      return JSON.parse(text) as T;
-    } catch {
-      return undefined as T;
-    }
+    return call(executeApiCall({ data: this.spec }) as Promise<ApiResult<T>>);
   }
 
   then<T, TResult1 = T, TResult2 = never>(

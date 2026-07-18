@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Spinner, Tooltip, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Alert, Button, Dialog, EmptyState, FormField, IconButton, Input, Select, Spinner, toast, Tooltip } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -12,21 +12,21 @@ import { CheckIcon, CloseIcon, CopyIcon, DownloadIcon, ResetIcon } from '@/compo
 import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
+  aiUsageQueryOptions,
+  projectStatusQueryOptions,
   type ResetBody,
   type RoleUsage,
-  type WorkflowRunDetailResponse,
   useAiUsageQuery,
   useCloneProjectMutation,
+  useDeleteCoverMutation,
   useListRunsQuery,
   useProjectQuery,
   useProjectStatusQuery,
-  useDeleteCoverMutation,
   useResetProjectMutation,
   useUploadCoverMutation,
-  aiUsageQueryOptions,
-  projectStatusQueryOptions,
+  type WorkflowRunDetailResponse,
 } from '@/lib/apis';
-import { LIFECYCLE_PHASES, imageUrl, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
+import { imageUrl, LIFECYCLE_PHASES, lifecyclePhase, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './overview.module.css';
 
@@ -34,10 +34,7 @@ export const Route = createFileRoute('/novels/$novelId/overview')({
   // Status stats and the AI-usage chart are the overview's primary data — prefetch both so they render on
   // the server. Recent runs stay a client query (secondary panel).
   loader: async ({ context, params }) => {
-    await Promise.all([
-      context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)),
-      context.queryClient.prefetchQuery(aiUsageQueryOptions(params.novelId)),
-    ]);
+    await Promise.all([context.queryClient.prefetchQuery(projectStatusQueryOptions(params.novelId)), context.queryClient.prefetchQuery(aiUsageQueryOptions(params.novelId))]);
   },
   component: OverviewScreen,
 });

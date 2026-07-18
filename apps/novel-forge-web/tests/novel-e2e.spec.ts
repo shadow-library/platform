@@ -17,7 +17,7 @@
  * Example:
  *   E2E_FULL=1 E2E_CHAPTERS=3 bunx playwright test tests/novel-e2e.spec.ts
  */
-import { type APIRequestContext, type Page, expect, test } from '@playwright/test';
+import { type APIRequestContext, expect, type Page, test } from '@playwright/test';
 
 // Playwright specs run under Node; the app tsconfig only ships browser globals, so declare what we use.
 declare const process: { env: Record<string, string | undefined> };

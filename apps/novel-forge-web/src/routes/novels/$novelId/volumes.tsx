@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useEffect, useState } from 'react';
+import { Button, Dialog, FormField, Input, Textarea, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -13,7 +13,7 @@ import { PaneError, PaneLoader, QueryState, StatusChip } from '@/components/nf';
 import { ForgeBar } from '@/components/nf/ForgeBar';
 import {
   type ArcResponse,
-  type VolumeResponse,
+  listVolumesQueryOptions,
   useApproveArcsMutation,
   useApproveVolumesMutation,
   useBriefQuery,
@@ -25,7 +25,7 @@ import {
   usePlanMutation,
   useUpdateBriefMutation,
   useVolumeQuery,
-  listVolumesQueryOptions,
+  type VolumeResponse,
 } from '@/lib/apis';
 
 import styles from './volumes.module.css';
@@ -573,9 +573,9 @@ function VolumesScreen(): React.JSX.Element {
       <div className={styles.body}>
         <div className={`nf-scroll ${styles.scrollFill}`}>
           {level === 'volumes' && <VolumesList novelId={novelId} onOpen={volume => goVolume(volume.volumeKey)} />}
-          {level === 'volume' && <VolumeDetail novelId={novelId} volumeKey={volumeKey!} onOpenArc={arc => goArc(arc.arcKey)} />}
-          {level === 'arc' && <ArcDetail novelId={novelId} volumeKey={volumeKey!} arcKey={arcKey!} onOpenBrief={goBrief} />}
-          {level === 'brief' && <BriefDetail novelId={novelId} chapter={chapter!} />}
+          {level === 'volume' && volumeKey != null && <VolumeDetail novelId={novelId} volumeKey={volumeKey} onOpenArc={arc => goArc(arc.arcKey)} />}
+          {level === 'arc' && volumeKey != null && arcKey != null && <ArcDetail novelId={novelId} volumeKey={volumeKey} arcKey={arcKey} onOpenBrief={goBrief} />}
+          {level === 'brief' && chapter != null && <BriefDetail novelId={novelId} chapter={chapter} />}
         </div>
         <ForgeDockArea novelId={novelId} scope={forgeScope} />
       </div>

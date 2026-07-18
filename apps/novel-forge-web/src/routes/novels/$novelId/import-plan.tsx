@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Button, Dialog, FileUpload, Switch, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Alert, Button, Dialog, FileUpload, Switch, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -108,7 +108,8 @@ function ImportPlanScreen(): React.JSX.Element {
     else doImport();
   };
 
-  const fieldErrors = importPlan.error?.fields ?? [];
+  // `ApiError.fieldErrors` folds the backend's field problems into a `{ field: message }` map for inline display.
+  const fieldErrors = Object.entries(importPlan.error?.fieldErrors ?? {});
 
   return (
     <PageContainer>
@@ -180,9 +181,9 @@ function ImportPlanScreen(): React.JSX.Element {
               {fieldErrors.length > 0 && (
                 <Alert intent="danger" title="The bundle failed validation — fix the workspace and re-pack">
                   <ul className={styles.issueList}>
-                    {fieldErrors.map((f, i) => (
-                      <li key={i}>
-                        <code>{f.field}</code> — {f.msg}
+                    {fieldErrors.map(([field, message]) => (
+                      <li key={field}>
+                        <code>{field}</code> — {message}
                       </li>
                     ))}
                   </ul>

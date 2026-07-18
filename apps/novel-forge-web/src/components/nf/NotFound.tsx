@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { EmptyState } from '@shadow-library/ui';
 import { useNavigate } from '@tanstack/react-router';
+import { EmptyState } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
