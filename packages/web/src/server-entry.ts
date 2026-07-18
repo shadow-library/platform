@@ -25,6 +25,8 @@ export interface ServeOptions {
   port?: number;
   /** Port the backend-independent `/healthz` probe listens on. @default 3001 (or `HEALTH_PORT`) */
   healthPort?: number;
+  /** Paths served with service-worker headers (`no-cache` + `Service-Worker-Allowed: /`). @default ['/sw.js'] */
+  serviceWorkerPaths?: string[];
 }
 
 /**
@@ -56,7 +58,7 @@ function withGzip(res: Response, req: Request): Response {
  * Serve a file from the client directory, or return null so the request falls through to SSR. Rejects path
  * traversal and never treats a directory (or a trailing-slash path) as a static hit — SSR owns the HTML.
  */
-async function serveStatic(req: Request, pathname: string, clientDir: string): Promise<Response | null> {
+async function serveStatic(req: Request, pathname: string, clientDir: string, serviceWorkerPaths: readonly string[]): Promise<Response | null> {
   if (pathname.endsWith('/')) return null;
 
   let decoded: string;
@@ -72,8 +74,18 @@ async function serveStatic(req: Request, pathname: string, clientDir: string): P
   const file = Bun.file(path);
   if (!(await file.exists())) return null;
 
-  const cacheControl = pathname.startsWith('/assets/') ? CACHE_IMMUTABLE : CACHE_REVALIDATE;
-  const headers = new Headers({ 'content-type': file.type || 'application/octet-stream', 'cache-control': cacheControl });
+  // A service worker must not be cached long or the browser keeps running the stale one; hashed `/assets/`
+  // are immutable; everything else revalidates.
+  const isServiceWorker = serviceWorkerPaths.includes(pathname);
+  let cacheControl = CACHE_REVALIDATE;
+  if (isServiceWorker) cacheControl = 'no-cache';
+  else if (pathname.startsWith('/assets/')) cacheControl = CACHE_IMMUTABLE;
+
+  // Bun doesn't map `.webmanifest`, and it must be `application/manifest+json` for the install prompt.
+  const contentType = pathname.endsWith('.webmanifest') ? 'application/manifest+json' : file.type || 'application/octet-stream';
+  const headers = new Headers({ 'content-type': contentType, 'cache-control': cacheControl });
+  // Let a worker served from the app root control the whole origin even when its file sits at a nested path.
+  if (isServiceWorker) headers.set('service-worker-allowed', '/');
 
   if (req.method === 'HEAD') {
     headers.set('content-length', String(file.size));
@@ -94,6 +106,7 @@ async function serveStatic(req: Request, pathname: string, clientDir: string): P
 export async function serve(options: ServeOptions): Promise<void> {
   const appPort = options.port ?? Number(process.env.PORT ?? 3000);
   const healthPort = options.healthPort ?? Number(process.env.HEALTH_PORT ?? 3001);
+  const serviceWorkerPaths = options.serviceWorkerPaths ?? ['/sw.js'];
   const entryUrl = typeof options.ssrEntry === 'string' ? pathToFileURL(options.ssrEntry) : options.ssrEntry;
 
   let ssr: SsrEntry;
@@ -113,7 +126,7 @@ export async function serve(options: ServeOptions): Promise<void> {
     idleTimeout: 30,
     async fetch(req) {
       if (req.method === 'GET' || req.method === 'HEAD') {
-        const asset = await serveStatic(req, new URL(req.url).pathname, options.clientDir);
+        const asset = await serveStatic(req, new URL(req.url).pathname, options.clientDir, serviceWorkerPaths);
         if (asset) return asset;
       }
       return withGzip(await ssr.fetch(req), req);
