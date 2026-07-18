@@ -13,6 +13,8 @@ import { Module } from '@shadow-library/app';
 import { ExtractionModule } from '../extraction/extraction.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { PlanningModule } from '../planning/planning.module';
+import { PublishingController } from '../publishing/publishing.controller';
+import { PublishingModule } from '../publishing/publishing.module';
 import { RebrandController } from '../rebrand/rebrand.controller';
 import { RebrandModule } from '../rebrand/rebrand.module';
 import { SourceModule } from '../source/source.module';
@@ -35,7 +37,7 @@ import { PipelineController } from './pipeline.controller';
  * RebrandService in the rebrand job) — so their controllers live here.
  */
 @Module({
-  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule],
-  controllers: [PipelineController, RebrandController],
+  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, PublishingModule],
+  controllers: [PipelineController, RebrandController, PublishingController],
 })
 export class PipelineModule {}

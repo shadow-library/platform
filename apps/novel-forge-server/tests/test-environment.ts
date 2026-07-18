@@ -58,6 +58,10 @@ export class TestEnvironment {
     const databaseName = `${baseConnectionString.split('/').pop()}_${this.databaseSuffix}`;
     TestEnvironment.logger.info(`Setting up test environment with database: '${databaseName}'`);
     Config['cache'].set('database.postgres.url', `${baseConnectionString}_${this.databaseSuffix}`);
+    // DatabaseService never closes its Postgres pool on app stop, so every booted TestEnvironment
+    // leaks one for the rest of the run. Tests are sequential anyway; a small pool per app keeps the
+    // whole suite far below Postgres's max_connections no matter how many suites boot an app.
+    Config['cache'].set('database.postgres.max-connections', '3');
 
     // beforeAll runs before any beforeEach, so the database must exist before the app boots —
     // otherwise a fresh machine (no leftover DB from a prior run) fails the boot-time SELECT 1.
