@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Params, Put, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Params, Put, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -38,7 +38,7 @@ export class BibleDocumentController {
   @RespondFor(200, BibleDocResponse)
   async getBibleDoc(@Params() params: BibleDocParams): Promise<BibleDocResponse> {
     const doc = await this.bibleDocumentService.get(params.projectId, params.section, params.slug);
-    if (!doc) throw new ServerError(AppErrorCode.DOC_001);
+    if (!doc) throw AppErrorCode.DOC_001.create();
     return doc as unknown as BibleDocResponse;
   }
 

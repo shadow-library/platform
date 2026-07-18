@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -54,7 +54,7 @@ export class EntityController {
   @RespondFor(200, EntityResponse)
   async getEntity(@Params() params: EntityKeyParams): Promise<EntityResponse> {
     const entity = await this.entityService.get(params.projectId, params.entityKey);
-    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (!entity) throw AppErrorCode.ENT_001.create();
     return entity as unknown as EntityResponse;
   }
 

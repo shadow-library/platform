@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { eq } from 'drizzle-orm';
 
@@ -83,9 +82,9 @@ export class RefineService {
    */
   async enhancePremise(projectId: bigint, overview?: string): Promise<PremiseEnhanceResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
     const effectiveOverview = overview ?? project.brief ?? project.premise;
-    if (!effectiveOverview) throw new ServerError(AppErrorCode.PRM_001);
+    if (!effectiveOverview) throw AppErrorCode.PRM_001.create();
     this.logger.info('enhancePremise: starting', {
       projectId,
       overviewSource: overview ? 'argument' : project.brief ? 'brief' : 'premise',
@@ -129,7 +128,7 @@ export class RefineService {
    */
   async auditBible(projectId: bigint): Promise<BibleAuditResult> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
     const prompt = PROMPT_REGISTRY['bible-audit'];
     const [pack, docs] = await Promise.all([
@@ -176,13 +175,13 @@ export class RefineService {
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
       this.db.query.volumes.findMany({ where: eq(schema.volumes.projectId, projectId) }),
     ]);
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
     const volume = volumes.find(v => v.volumeKey === volumeKey);
-    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
+    if (!volume) throw AppErrorCode.VOL_001.create();
     // Gate 1 (design §4): the whole plan is approved with laid-out ranges before arcs are planned.
     const planReady = volumes.every(v => v.status !== 'draft') && volume.startChapter !== null && volume.endChapter !== null;
-    if (!planReady) throw new ServerError(AppErrorCode.ARC_003);
+    if (!planReady) throw AppErrorCode.ARC_003.create();
 
     const startChapter = volume.startChapter as number;
     const endChapter = volume.endChapter as number;
@@ -257,11 +256,11 @@ export class RefineService {
       case 'outline':
         return this.contextAssembler.forOutline(projectId, query.chapter ?? 1);
       case 'chat': {
-        if (!query.scopeType) throw new ServerError(AppErrorCode.CHT_003);
+        if (!query.scopeType) throw AppErrorCode.CHT_003.create();
         return this.contextAssembler.forChatTurn(projectId, { scopeType: query.scopeType as Refinement.ChatScope, scopeRef: query.scopeRef ?? null, createdAt: new Date() });
       }
       case 'arc_plan': {
-        if (!query.volumeKey) throw new ServerError(AppErrorCode.VOL_001);
+        if (!query.volumeKey) throw AppErrorCode.VOL_001.create();
         return this.contextAssembler.forArcPlanning(projectId, query.volumeKey);
       }
       case 'premise':

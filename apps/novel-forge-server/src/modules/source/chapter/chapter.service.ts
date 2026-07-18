@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq } from 'drizzle-orm';
 
@@ -68,7 +67,7 @@ export class ChapterService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!result) throw new ServerError(AppErrorCode.CHP_001);
+    if (!result) throw AppErrorCode.CHP_001.create();
     return result;
   }
 
@@ -78,6 +77,6 @@ export class ChapterService {
       .where(and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, number)))
       .returning();
 
-    if (result.length === 0) throw new ServerError(AppErrorCode.CHP_001);
+    if (result.length === 0) throw AppErrorCode.CHP_001.create();
   }
 }

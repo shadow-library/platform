@@ -9,8 +9,7 @@ import { createHash } from 'node:crypto';
 
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
 import { Injectable } from '@shadow-library/app';
-import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
 import { z } from 'zod';
@@ -121,7 +120,7 @@ export class ChatService {
       .insert(schema.chatSessions)
       .values({ projectId, scopeType: input.scopeType, scopeRef, title: input.title, mode: input.mode ?? 'manual' })
       .returning();
-    if (!session) throw new ServerError(AppErrorCode.CHT_001);
+    if (!session) throw AppErrorCode.CHT_001.create();
     this.logger.info('chat session created', { projectId, sessionId: session.id, scopeType: session.scopeType, scopeRef, mode: session.mode });
     return session;
   }
@@ -133,7 +132,7 @@ export class ChatService {
     if (update.mode !== undefined) set['mode'] = update.mode;
     if (update.title !== undefined) set['title'] = update.title;
     const [updated] = await this.db.update(schema.chatSessions).set(set).where(eq(schema.chatSessions.id, session.id)).returning();
-    if (!updated) throw new ServerError(AppErrorCode.CHT_001);
+    if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
   }
 
@@ -156,19 +155,19 @@ export class ChatService {
               eq(schema.bibleDocuments.slug, rest.join('/')),
             ),
           }));
-        if (!doc) throw new ServerError(AppErrorCode.CHT_003);
+        if (!doc) throw AppErrorCode.CHT_003.create();
         return scopeRef as string;
       }
       case 'volume':
       case 'arc_plan': {
         const volume =
           scopeRef?.startsWith('volume:') && (await this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, value)) }));
-        if (!volume) throw new ServerError(AppErrorCode.CHT_003);
+        if (!volume) throw AppErrorCode.CHT_003.create();
         return scopeRef as string;
       }
       case 'arc': {
         const arc = scopeRef?.startsWith('arc:') && (await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, value)) }));
-        if (!arc) throw new ServerError(AppErrorCode.CHT_003);
+        if (!arc) throw AppErrorCode.CHT_003.create();
         return scopeRef as string;
       }
       case 'brief': {
@@ -177,7 +176,7 @@ export class ChatService {
           scopeRef?.startsWith('chapter:') &&
           Number.isInteger(chapter) &&
           (await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) }));
-        if (!brief) throw new ServerError(AppErrorCode.CHT_003);
+        if (!brief) throw AppErrorCode.CHT_003.create();
         return scopeRef as string;
       }
     }
@@ -203,14 +202,14 @@ export class ChatService {
 
   async getSession(projectId: bigint, sessionId: string): Promise<Refinement.ChatSession> {
     const session = await this.db.query.chatSessions.findFirst({ where: and(eq(schema.chatSessions.projectId, projectId), eq(schema.chatSessions.id, sessionId)) });
-    if (!session) throw new ServerError(AppErrorCode.CHT_001);
+    if (!session) throw AppErrorCode.CHT_001.create();
     return session;
   }
 
   async setSessionStatus(projectId: bigint, sessionId: string, status: Refinement.ChatSessionStatus): Promise<Refinement.ChatSession> {
     const session = await this.getSession(projectId, sessionId);
     const [updated] = await this.db.update(schema.chatSessions).set({ status, updatedAt: new Date() }).where(eq(schema.chatSessions.id, session.id)).returning();
-    if (!updated) throw new ServerError(AppErrorCode.CHT_001);
+    if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
   }
 
@@ -229,7 +228,7 @@ export class ChatService {
       .set({ modelProvider: provider, modelId: model, updatedAt: new Date() })
       .where(eq(schema.chatSessions.id, session.id))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.CHT_001);
+    if (!updated) throw AppErrorCode.CHT_001.create();
     return updated;
   }
 
@@ -268,7 +267,7 @@ export class ChatService {
    */
   async turn(projectId: bigint, sessionId: string, content: string): Promise<ChatTurnResult> {
     const session = await this.getSession(projectId, sessionId);
-    if (session.status !== 'active') throw new ServerError(AppErrorCode.CHT_002);
+    if (session.status !== 'active') throw AppErrorCode.CHT_002.create();
     await this.validateScopeRef(projectId, session.scopeType, session.scopeRef);
     this.logger.info('chat turn', { projectId, sessionId, scopeType: session.scopeType, mode: session.mode });
     this.logger.debug('chat turn user message', { projectId, sessionId, content });
@@ -336,7 +335,7 @@ export class ChatService {
       return { proposal: applied.proposal, applied: { applied: applied.applied, staleMarked: applied.staleMarked, opResults: applied.opResults } };
     } catch (err) {
       const fresh = await this.proposalService.get(projectId, proposal.id);
-      const note = err instanceof ServerError ? err.getMessage() : err instanceof Error ? err.message : String(err);
+      const note = AppError.is(err) || err instanceof Error ? err.message : String(err);
       this.logger.warn(`auto-apply of proposal ${proposal.id} failed: ${note}`);
       return { proposal: fresh, applyNote: note };
     }
@@ -420,7 +419,7 @@ export class ChatService {
       .insert(schema.chatMessages)
       .values({ sessionId: session.id, projectId, ordinal: lastOrdinal + 1, role: 'user', content, runId, tokens: countTokens(content) })
       .returning();
-    if (!userMessage) throw new ServerError(AppErrorCode.CHT_001);
+    if (!userMessage) throw AppErrorCode.CHT_001.create();
     return userMessage;
   }
 
@@ -447,7 +446,7 @@ export class ChatService {
         tokens: countTokens(output.reply),
       })
       .returning();
-    if (!assistantMessage) throw new ServerError(AppErrorCode.CHT_001);
+    if (!assistantMessage) throw AppErrorCode.CHT_001.create();
 
     let proposal: Refinement.Proposal | null = null;
     if (output.changeSet && output.changeSet.length > 0) {

@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -37,7 +37,7 @@ export class ChapterController {
   @RespondFor(200, ChapterResponse)
   async getChapter(@Params() params: ChapterParams): Promise<ChapterResponse> {
     const chapter = await this.chapterService.get(params.projectId, params.n);
-    if (!chapter) throw new ServerError(AppErrorCode.CHP_001);
+    if (!chapter) throw AppErrorCode.CHP_001.create();
     return chapter as unknown as ChapterResponse;
   }
 

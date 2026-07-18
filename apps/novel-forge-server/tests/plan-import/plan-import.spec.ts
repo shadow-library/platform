@@ -48,7 +48,7 @@ async function codeOf(promise: Promise<unknown>): Promise<string> {
     await promise;
     return 'NO_ERROR';
   } catch (err) {
-    return err instanceof AppError ? err.getCode() : String(err);
+    return err instanceof AppError ? err.code : String(err);
   }
 }
 

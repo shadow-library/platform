@@ -9,7 +9,6 @@ import { randomUUID } from 'node:crypto';
 
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq } from 'drizzle-orm';
 
@@ -78,7 +77,7 @@ export class EntityService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!entity) throw new ServerError(AppErrorCode.S001);
+    if (!entity) throw AppErrorCode.S001.create();
     return entity;
   }
 
@@ -121,13 +120,13 @@ export class EntityService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!result) throw new ServerError(AppErrorCode.ENT_001);
+    if (!result) throw AppErrorCode.ENT_001.create();
     return result;
   }
 
   async setImage(projectId: bigint, entityKey: string, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Knowledge.Entity> {
     const entity = await this.get(projectId, entityKey);
-    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (!entity) throw AppErrorCode.ENT_001.create();
 
     // Drop the previous file first so a different extension (png → jpg) never leaves an orphan behind.
     if (entity.imagePath) await this.imageStorage.delete(entity.imagePath);
@@ -139,13 +138,13 @@ export class EntityService {
       .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
       .returning();
 
-    if (!updated) throw new ServerError(AppErrorCode.ENT_001);
+    if (!updated) throw AppErrorCode.ENT_001.create();
     return updated;
   }
 
   async clearImage(projectId: bigint, entityKey: string): Promise<Knowledge.Entity> {
     const entity = await this.get(projectId, entityKey);
-    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (!entity) throw AppErrorCode.ENT_001.create();
     if (entity.imagePath) await this.imageStorage.delete(entity.imagePath);
 
     const [updated] = await this.db
@@ -154,13 +153,13 @@ export class EntityService {
       .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
       .returning();
 
-    if (!updated) throw new ServerError(AppErrorCode.ENT_001);
+    if (!updated) throw AppErrorCode.ENT_001.create();
     return updated;
   }
 
   async addImage(projectId: bigint, entityKey: string, image: string, mime: UploadMime, caption?: string): Promise<EntityWithImages> {
     const entity = await this.get(projectId, entityKey);
-    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (!entity) throw AppErrorCode.ENT_001.create();
 
     // Gallery files get a random suffix so multiple images per entity never collide on the storage key.
     const key = `${entityKey}_g_${randomUUID().slice(0, 8)}`;
@@ -174,10 +173,10 @@ export class EntityService {
 
   async deleteImageById(projectId: bigint, entityKey: string, imageId: bigint): Promise<EntityWithImages> {
     const entity = await this.get(projectId, entityKey);
-    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (!entity) throw AppErrorCode.ENT_001.create();
 
     const image = entity.images.find(img => img.id === imageId);
-    if (!image) throw new ServerError(AppErrorCode.ENT_002);
+    if (!image) throw AppErrorCode.ENT_002.create();
 
     await this.imageStorage.delete(image.imagePath);
     await this.db.delete(schema.entityImages).where(and(eq(schema.entityImages.id, imageId), eq(schema.entityImages.projectId, projectId)));
@@ -187,7 +186,7 @@ export class EntityService {
 
   private async getOrThrow(projectId: bigint, entityKey: string): Promise<EntityWithImages> {
     const entity = await this.get(projectId, entityKey);
-    if (!entity) throw new ServerError(AppErrorCode.ENT_001);
+    if (!entity) throw AppErrorCode.ENT_001.create();
     return entity;
   }
 
@@ -197,6 +196,6 @@ export class EntityService {
       .where(and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)))
       .returning();
 
-    if (result.length === 0) throw new ServerError(AppErrorCode.ENT_001);
+    if (result.length === 0) throw AppErrorCode.ENT_001.create();
   }
 }

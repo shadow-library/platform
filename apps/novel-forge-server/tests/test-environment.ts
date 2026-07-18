@@ -7,7 +7,7 @@
  */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
 
-import { Router, ShadowApplication } from '@shadow-library/app';
+import { Dispatcher, ShadowApplication } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
@@ -60,7 +60,7 @@ export class TestEnvironment {
   }
 
   getRouter(): FastifyRouter {
-    return this.app.get(Router);
+    return this.app.get(Dispatcher) as FastifyRouter;
   }
 
   getPostgresClient(): PrimaryDatabase {

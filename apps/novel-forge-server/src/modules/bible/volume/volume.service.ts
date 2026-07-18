@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 
@@ -66,7 +65,7 @@ export class VolumeService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!volume) throw new ServerError(AppErrorCode.S001);
+    if (!volume) throw AppErrorCode.S001.create();
     return volume;
   }
 
@@ -97,7 +96,7 @@ export class VolumeService {
 
   async update(projectId: bigint, volumeKey: string, update: UpdateVolumeBody): Promise<Plan.Volume> {
     const existing = await this.get(projectId, volumeKey);
-    if (!existing) throw new ServerError(AppErrorCode.VOL_001);
+    if (!existing) throw AppErrorCode.VOL_001.create();
 
     const contentHash = volumeContentHash({ ...existing, ...update } as Record<string, unknown>);
     const [result] = await this.db
@@ -107,7 +106,7 @@ export class VolumeService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!result) throw new ServerError(AppErrorCode.VOL_001);
+    if (!result) throw AppErrorCode.VOL_001.create();
     return result;
   }
 
@@ -117,7 +116,7 @@ export class VolumeService {
       .where(and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)))
       .returning();
 
-    if (result.length === 0) throw new ServerError(AppErrorCode.VOL_001);
+    if (result.length === 0) throw AppErrorCode.VOL_001.create();
   }
 
   approve(projectId: bigint): Promise<ApprovePlanResponse> {

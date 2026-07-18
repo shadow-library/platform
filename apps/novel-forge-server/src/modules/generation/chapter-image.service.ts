@@ -9,7 +9,6 @@ import { randomUUID } from 'node:crypto';
 
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, eq, gt, sql } from 'drizzle-orm';
 
@@ -66,7 +65,7 @@ export class ChapterImageService {
       .values({ projectId, chapter, imagePath: ref, caption: caption ?? null, sortOrder: nextOrder })
       .returning();
 
-    if (!created) throw new ServerError(AppErrorCode.DRF_001);
+    if (!created) throw AppErrorCode.DRF_001.create();
     this.logger.info('chapter image added', { projectId, chapter, imageId: created.id, ref });
     return created;
   }
@@ -75,7 +74,7 @@ export class ChapterImageService {
     const image = await this.db.query.chapterImages.findFirst({
       where: and(eq(schema.chapterImages.id, imageId), eq(schema.chapterImages.projectId, projectId), eq(schema.chapterImages.chapter, chapter)),
     });
-    if (!image) throw new ServerError(AppErrorCode.DRF_006);
+    if (!image) throw AppErrorCode.DRF_006.create();
 
     this.logger.info('chapter image removed', { projectId, chapter, imageId, ref: image.imagePath });
     await this.imageStorage.delete(image.imagePath);

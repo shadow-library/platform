@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 
@@ -74,7 +73,7 @@ export class ProposalService {
    */
   async create(projectId: bigint, input: CreateProposalInput): Promise<Refinement.Proposal> {
     const errors = validateChangeSet(input.changeSet, input.allowedOps);
-    if (errors.length > 0) throw new ServerError(AppErrorCode.RFN_004);
+    if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const refs = changeSetRefs(input.changeSet);
     const baseline = await loadArtifactStates(this.db, projectId, refs);
@@ -95,7 +94,7 @@ export class ProposalService {
         runId: input.runId,
       })
       .returning();
-    if (!proposal) throw new ServerError(AppErrorCode.RFN_001);
+    if (!proposal) throw AppErrorCode.RFN_001.create();
 
     if (input.sessionId) await this.supersedeOverlapping(projectId, input.sessionId, proposal.id, refs);
     return proposal;
@@ -180,17 +179,17 @@ export class ProposalService {
     const proposal = await this.db.query.refinementProposals.findFirst({
       where: and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.id, proposalId)),
     });
-    if (!proposal) throw new ServerError(AppErrorCode.RFN_001);
+    if (!proposal) throw AppErrorCode.RFN_001.create();
     return proposal;
   }
 
   /** Hand-edits get no trust: the change-set is re-validated and the baseline re-captured for the new refs. */
   async updateChangeSet(projectId: bigint, proposalId: bigint, changeSet: unknown): Promise<Refinement.Proposal> {
     const existing = await this.get(projectId, proposalId);
-    if (existing.status !== 'pending') throw new ServerError(AppErrorCode.RFN_002);
+    if (existing.status !== 'pending') throw AppErrorCode.RFN_002.create();
 
     const errors = validateChangeSet(changeSet);
-    if (errors.length > 0) throw new ServerError(AppErrorCode.RFN_004);
+    if (errors.length > 0) throw AppErrorCode.RFN_004.create();
 
     const ops = changeSet as ChangeOp[];
     const baseline = await loadArtifactStates(this.db, projectId, changeSetRefs(ops));
@@ -199,20 +198,20 @@ export class ProposalService {
       .set({ changeSet: ops, baseline, updatedAt: new Date() })
       .where(eq(schema.refinementProposals.id, existing.id))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.RFN_001);
+    if (!updated) throw AppErrorCode.RFN_001.create();
     return updated;
   }
 
   async discard(projectId: bigint, proposalId: bigint): Promise<Refinement.Proposal> {
     const existing = await this.get(projectId, proposalId);
-    if (existing.status !== 'pending' && existing.status !== 'conflicted') throw new ServerError(AppErrorCode.RFN_002);
+    if (existing.status !== 'pending' && existing.status !== 'conflicted') throw AppErrorCode.RFN_002.create();
 
     const [updated] = await this.db
       .update(schema.refinementProposals)
       .set({ status: 'discarded', updatedAt: new Date() })
       .where(eq(schema.refinementProposals.id, existing.id))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.RFN_001);
+    if (!updated) throw AppErrorCode.RFN_001.create();
     return updated;
   }
 }

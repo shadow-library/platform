@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Get, HttpController, Params, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Get, HttpController, Params, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -31,7 +31,7 @@ export class JobsController {
   @RespondFor(200, JobResponse)
   async getJob(@Params() params: JobIdParams): Promise<JobResponse> {
     const job = await this.jobService.get(params.jobId);
-    if (!job) throw new ServerError(AppErrorCode.JOB_001);
+    if (!job) throw AppErrorCode.JOB_001.create();
     return job as unknown as JobResponse;
   }
 }

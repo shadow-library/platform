@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -49,7 +49,7 @@ export class VolumeController {
   @RespondFor(200, VolumeResponse)
   async getVolume(@Params() params: VolumeKeyParams): Promise<VolumeResponse> {
     const volume = await this.volumeService.get(params.projectId, params.volumeKey);
-    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
+    if (!volume) throw AppErrorCode.VOL_001.create();
     return volume as unknown as VolumeResponse;
   }
 

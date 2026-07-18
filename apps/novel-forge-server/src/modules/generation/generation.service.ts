@@ -8,7 +8,6 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 
@@ -148,7 +147,7 @@ export class GenerationService {
 
   async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Ai.WorkflowRun[] }> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
     // Fresh (non-source) novels have no skeleton; a blank "Novel skeleton:" line makes weak models
     // treat the task as unanswerable and return an empty plan, so state the fallback explicitly.
@@ -304,8 +303,8 @@ export class GenerationService {
    */
   async outlineArc(projectId: bigint, arcKey: string, body: OutlineArcBody): Promise<{ briefs: Generation.Brief[] }> {
     const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
-    if (!arc) throw new ServerError(AppErrorCode.ARC_001);
-    if (arc.chapterStart === null || arc.chapterEnd === null) throw new ServerError(AppErrorCode.ARC_002);
+    if (!arc) throw AppErrorCode.ARC_001.create();
+    if (arc.chapterStart === null || arc.chapterEnd === null) throw AppErrorCode.ARC_002.create();
 
     const [catalog, volume, siblings, project] = await Promise.all([
       this.contextAssembler.catalog(projectId),
@@ -313,7 +312,7 @@ export class GenerationService {
       this.db.query.arcs.findMany({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.volumeKey, arc.volumeKey)), orderBy: asc(schema.arcs.ordinal) }),
       this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
     ]);
-    if (siblings.some(a => a.status !== 'approved')) throw new ServerError(AppErrorCode.ARC_004);
+    if (siblings.some(a => a.status !== 'approved')) throw AppErrorCode.ARC_004.create();
     this.logger.info('outlineArc: generating briefs for arc', { projectId, arcKey, chapterStart: arc.chapterStart, chapterEnd: arc.chapterEnd });
 
     const nextArc = siblings.find(a => a.ordinal > arc.ordinal);
@@ -380,7 +379,7 @@ export class GenerationService {
 
   async getBrief(projectId: bigint, chapter: number): Promise<Generation.Brief> {
     const brief = await this.db.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, projectId), eq(schema.briefs.chapter, chapter)) });
-    if (!brief) throw new ServerError(AppErrorCode.DRF_001);
+    if (!brief) throw AppErrorCode.DRF_001.create();
     return brief;
   }
 
@@ -394,7 +393,7 @@ export class GenerationService {
         set: { title: body.title, body: body.body, ...(contract !== undefined ? { knowledgeContract: contract } : {}), updatedAt: new Date() },
       })
       .returning();
-    if (!result) throw new ServerError(AppErrorCode.DRF_001);
+    if (!result) throw AppErrorCode.DRF_001.create();
     return result;
   }
 
@@ -405,7 +404,7 @@ export class GenerationService {
 
     // Guard: volumes must be approved before generating.
     const approvedVolumes = await this.db.query.volumes.findMany({ where: and(eq(schema.volumes.projectId, projectId), inArray(schema.volumes.status, ['approved', 'source'])) });
-    if (approvedVolumes.length === 0) throw new ServerError(AppErrorCode.PLN_001);
+    if (approvedVolumes.length === 0) throw AppErrorCode.PLN_001.create();
 
     // Ordering guard: never run two generation streams at once. Overlapping streams both pick "the next
     // chapter" and persist drafts out of order (the cause of chapters landing as 9,10,11 with 1–8 missing).
@@ -420,7 +419,7 @@ export class GenerationService {
 
     // Guard: no unresolved contradiction drafts.
     const contradiction = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.reviewStatus, 'contradiction')) });
-    if (contradiction) throw new ServerError(AppErrorCode.DRF_003);
+    if (contradiction) throw AppErrorCode.DRF_003.create();
 
     // Generate strictly in ascending chapter order: the next chapters that have a brief but no draft yet.
     // Because each chapter is drafted before the next begins, generation only advances once the previous
@@ -443,7 +442,7 @@ export class GenerationService {
       const volumeArcs = arcs.filter(a => a.volumeKey === volume.volumeKey);
       if (volumeArcs.length === 0) continue;
       const covering = volumeArcs.find(a => a.chapterStart !== null && a.chapterEnd !== null && chapter >= a.chapterStart && chapter <= a.chapterEnd);
-      if (!covering || covering.status !== 'approved') throw new ServerError(AppErrorCode.ARC_004);
+      if (!covering || covering.status !== 'approved') throw AppErrorCode.ARC_004.create();
     }
 
     const target = [...chapters].sort((a, b) => a - b).join(',');
@@ -462,7 +461,7 @@ export class GenerationService {
 
   async getDraft(projectId: bigint, chapter: number): Promise<Generation.Draft> {
     const draft = await this.db.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)) });
-    if (!draft) throw new ServerError(AppErrorCode.DRF_001);
+    if (!draft) throw AppErrorCode.DRF_001.create();
     return draft;
   }
 
@@ -494,7 +493,7 @@ export class GenerationService {
         },
       })
       .returning();
-    if (!draft) throw new ServerError(AppErrorCode.DRF_001);
+    if (!draft) throw AppErrorCode.DRF_001.create();
 
     // Upsert a draft_revisions row for this hand edit.
     await this.db
@@ -509,7 +508,7 @@ export class GenerationService {
     this.logger.info('reviseDraft: revising draft', { projectId, chapter });
     this.logger.debug('reviseDraft: feedback note', { projectId, chapter, note: body.note });
     const draft = await this.getDraft(projectId, chapter);
-    if (draft.status === 'final') throw new ServerError(AppErrorCode.DRF_002);
+    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
 
     // Create user_feedback row for this revision request.
     const [feedback] = await this.db
@@ -544,7 +543,7 @@ export class GenerationService {
       })
       .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.DRF_001);
+    if (!updated) throw AppErrorCode.DRF_001.create();
 
     await this.db
       .insert(schema.draftRevisions)
@@ -617,13 +616,13 @@ export class GenerationService {
       .insert(schema.userFeedback)
       .values({ projectId, artifactType: 'draft', artifactRef: String(chapter), disposition: body.disposition ?? 'comment', note: body.note })
       .returning();
-    if (!feedback) throw new ServerError(AppErrorCode.DRF_001);
+    if (!feedback) throw AppErrorCode.DRF_001.create();
     return feedback;
   }
 
   async approveDraft(projectId: bigint, chapter: number, options?: { reviewerId?: string; idempotencyKey?: string }): Promise<Generation.Draft> {
     const draft = await this.getDraft(projectId, chapter);
-    if (draft.status === 'final') throw new ServerError(AppErrorCode.DRF_002);
+    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
 
     // Record the approval and flip the draft's review status in one transaction: a crash can never
     // leave an approval logged without the draft approved, or the draft approved with no audit row.
@@ -656,7 +655,7 @@ export class GenerationService {
       return row;
     });
 
-    if (!updated) throw new ServerError(AppErrorCode.DRF_001);
+    if (!updated) throw AppErrorCode.DRF_001.create();
     this.logger.info('draft approved', { projectId, chapter, reviewerId: options?.reviewerId });
     return updated;
   }
@@ -669,7 +668,7 @@ export class GenerationService {
   async getRevision(projectId: bigint, chapter: number, revision: number): Promise<Ai.DraftRevision> {
     const draft = await this.getDraft(projectId, chapter);
     const rev = await this.db.query.draftRevisions.findFirst({ where: and(eq(schema.draftRevisions.draftId, draft.id), eq(schema.draftRevisions.revision, revision)) });
-    if (!rev) throw new ServerError(AppErrorCode.DRF_001);
+    if (!rev) throw AppErrorCode.DRF_001.create();
     return rev;
   }
 
@@ -691,7 +690,7 @@ export class GenerationService {
         .delete(schema.drafts)
         .where(and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, chapter)))
         .returning({ id: schema.drafts.id });
-      if (deleted.length === 0) throw new ServerError(AppErrorCode.DRF_001);
+      if (deleted.length === 0) throw AppErrorCode.DRF_001.create();
 
       // draft_revisions cascade via FK; the deleted chapter's continuity review is cleared here.
       await tx.delete(schema.continuityProposals).where(and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter)));
@@ -729,7 +728,7 @@ export class GenerationService {
         set: { title: body.title, body: body.prose, summary: body.summary, revision: sql`${schema.drafts.revision} + 1`, reviewStatus: 'needs_review', updatedAt: new Date() },
       })
       .returning();
-    if (!draft) throw new ServerError(AppErrorCode.DRF_001);
+    if (!draft) throw AppErrorCode.DRF_001.create();
 
     await this.db
       .insert(schema.draftRevisions)
@@ -755,9 +754,9 @@ export class GenerationService {
         })) ?? null;
     }
 
-    if (!draft) throw new ServerError(AppErrorCode.DRF_001);
-    if (draft.reviewStatus !== 'approved') throw new ServerError(AppErrorCode.DRF_004);
-    if (draft.status === 'final') throw new ServerError(AppErrorCode.DRF_002);
+    if (!draft) throw AppErrorCode.DRF_001.create();
+    if (draft.reviewStatus !== 'approved') throw AppErrorCode.DRF_004.create();
+    if (draft.status === 'final') throw AppErrorCode.DRF_002.create();
     this.logger.info('finalize: finalizing chapter', { projectId, chapter: draft.chapter, draftId: draft.id, generator: draft.generator });
 
     // Enforce order: all previous chapters must have a final draft.
@@ -765,7 +764,7 @@ export class GenerationService {
       const prevFinal = await this.db.query.drafts.findFirst({
         where: and(eq(schema.drafts.projectId, projectId), eq(schema.drafts.chapter, draft.chapter - 1), eq(schema.drafts.status, 'final')),
       });
-      if (!prevFinal) throw new ServerError(AppErrorCode.FIN_001);
+      if (!prevFinal) throw AppErrorCode.FIN_001.create();
     }
 
     // Enforce bible/chapter consistency: an earlier finalized chapter invalidated by a canon change must
@@ -773,7 +772,7 @@ export class GenerationService {
     const stale = await this.db.query.chapters.findFirst({
       where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.needsRevalidation, true), lt(schema.chapters.number, draft.chapter)),
     });
-    if (stale) throw new ServerError(AppErrorCode.FIN_002);
+    if (stale) throw AppErrorCode.FIN_002.create();
 
     // Block if the most recent novel validation flagged an unresolved error for this very chapter.
     const latestReport = await this.db.query.validationReports.findFirst({
@@ -781,7 +780,7 @@ export class GenerationService {
       orderBy: desc(schema.validationReports.createdAt),
     });
     const reportIssues = (latestReport?.payload as { issues?: { chapter?: number; severity?: string }[] } | undefined)?.issues ?? [];
-    if (reportIssues.some(i => i.severity === 'error' && i.chapter === draft.chapter)) throw new ServerError(AppErrorCode.FIN_003);
+    if (reportIssues.some(i => i.severity === 'error' && i.chapter === draft.chapter)) throw AppErrorCode.FIN_003.create();
 
     return this.workflowRunService.runChapterFinalization({
       projectId,
@@ -846,7 +845,7 @@ export class GenerationService {
         },
       })
       .returning();
-    if (!draft) throw new ServerError(AppErrorCode.DRF_001);
+    if (!draft) throw AppErrorCode.DRF_001.create();
     return draft;
   }
 
@@ -871,7 +870,7 @@ export class GenerationService {
         set: { proposal: proposal as never, status: 'pending', appliedAt: null, updatedAt: new Date() },
       })
       .returning();
-    if (!row) throw new ServerError(AppErrorCode.CNT_001);
+    if (!row) throw AppErrorCode.CNT_001.create();
     return row;
   }
 
@@ -897,7 +896,7 @@ export class GenerationService {
 
     const changeSet = (output.changeSet ?? []) as unknown as ChangeOp[];
     this.logger.debug('extractChapterToBible: derived change-set', { projectId, chapter, ops: changeSet.length });
-    if (changeSet.length === 0) throw new ServerError(AppErrorCode.DRF_005);
+    if (changeSet.length === 0) throw AppErrorCode.DRF_005.create();
 
     return this.proposalService.create(projectId, {
       scopeType: 'brief',
@@ -914,7 +913,7 @@ export class GenerationService {
     const proposal = await this.db.query.continuityProposals.findFirst({
       where: and(eq(schema.continuityProposals.projectId, projectId), eq(schema.continuityProposals.chapter, chapter), eq(schema.continuityProposals.status, 'pending')),
     });
-    if (!proposal) throw new ServerError(AppErrorCode.CNT_001);
+    if (!proposal) throw AppErrorCode.CNT_001.create();
     return proposal;
   }
 
@@ -925,7 +924,7 @@ export class GenerationService {
       .set({ proposal: body.proposal as never, updatedAt: new Date() })
       .where(eq(schema.continuityProposals.id, existing.id))
       .returning();
-    if (!updated) throw new ServerError(AppErrorCode.CNT_001);
+    if (!updated) throw AppErrorCode.CNT_001.create();
     return updated;
   }
 
@@ -1101,7 +1100,7 @@ export class GenerationService {
    */
   async getRun(projectId: bigint, runId: string): Promise<Ai.WorkflowRun & { modelCalls: Ai.ModelCall[]; toolCalls: Ai.ToolCall[]; contextPack?: RunContextPackSummary }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
-    if (!run) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!run) throw AppErrorCode.PRJ_001.create();
     const [modelCalls, toolCalls, contextPack] = await Promise.all([
       this.db.query.modelCalls.findMany({
         where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId)),
@@ -1128,16 +1127,16 @@ export class GenerationService {
     const call = await this.db.query.modelCalls.findFirst({
       where: and(eq(schema.modelCalls.projectId, projectId), eq(schema.modelCalls.runId, runId), eq(schema.modelCalls.id, callId)),
     });
-    if (!call) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!call) throw AppErrorCode.PRJ_001.create();
     return call;
   }
 
   /** The exact rendered context that fed the run's prompt, with the section anatomy alongside. */
   async getRunContext(projectId: bigint, runId: string): Promise<RunContextPackSummary & { rendered: string }> {
     const run = await this.db.query.workflowRuns.findFirst({ where: and(eq(schema.workflowRuns.projectId, projectId), eq(schema.workflowRuns.id, runId)) });
-    if (!run) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!run) throw AppErrorCode.PRJ_001.create();
     const summary = await this.loadPackSummary(run.contextPackId);
-    if (!summary) throw new ServerError(AppErrorCode.CTX_001);
+    if (!summary) throw AppErrorCode.CTX_001.create();
     const pack = await this.db.query.contextPacks.findFirst({ where: eq(schema.contextPacks.id, BigInt(summary.id)) });
     return { ...summary, rendered: pack?.rendered ?? '' };
   }

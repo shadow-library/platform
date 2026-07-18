@@ -6,8 +6,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 
@@ -139,8 +138,8 @@ export class ProposalApplyService {
         .from(schema.refinementProposals)
         .where(and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.id, proposalId)))
         .for('update');
-      if (!proposal) throw new ServerError(AppErrorCode.RFN_001);
-      if (proposal.status !== 'pending') throw new ServerError(AppErrorCode.RFN_002);
+      if (!proposal) throw AppErrorCode.RFN_001.create();
+      if (proposal.status !== 'pending') throw AppErrorCode.RFN_002.create();
 
       const ops = proposal.changeSet as ChangeOp[];
       const selected = this.resolveSelection(ops, options?.opIndexes);
@@ -150,9 +149,9 @@ export class ProposalApplyService {
 
       // Finalize crosses the immutability line — once prose locks, the revert guarantee is gone, so an
       // auto-mode turn may never trigger it; the proposal stays pending for a deliberate manual apply.
-      if (options?.autoApplied && actionOps.some(a => a.op.op === 'action.finalize')) throw new ServerError(AppErrorCode.RFN_009);
+      if (options?.autoApplied && actionOps.some(a => a.op.op === 'action.finalize')) throw AppErrorCode.RFN_009.create();
       for (const action of actionOps) {
-        if (!this.actionRegistry.has(action.op.op)) throw new ServerError(AppErrorCode.RFN_008);
+        if (!this.actionRegistry.has(action.op.op)) throw AppErrorCode.RFN_008.create();
       }
 
       const baseline = proposal.baseline as Record<string, ArtifactState>;
@@ -203,7 +202,7 @@ export class ProposalApplyService {
         })
         .where(eq(schema.refinementProposals.id, proposal.id))
         .returning();
-      if (!applied) throw new ServerError(AppErrorCode.RFN_001);
+      if (!applied) throw AppErrorCode.RFN_001.create();
 
       await tx
         .insert(schema.userFeedback)
@@ -222,7 +221,7 @@ export class ProposalApplyService {
       return { outcome: 'applied', proposal: applied, applied: ctx.applied, staleMarked: [...new Set(ctx.staleMarked)], opResults };
     });
 
-    if (result.outcome === 'conflicted') throw new ServerError(AppErrorCode.RFN_003);
+    if (result.outcome === 'conflicted') throw AppErrorCode.RFN_003.create();
 
     const ops = result.proposal.changeSet as ChangeOp[];
     const pendingActions = result.opResults.filter(r => r.status === 'pending').map(r => ({ index: r.index, op: ops[r.index] as ActionOp }));
@@ -237,7 +236,7 @@ export class ProposalApplyService {
     if (!opIndexes) return ops.map((_, index) => index);
     const unique = [...new Set(opIndexes)].sort((a, b) => a - b);
     const valid = unique.length > 0 && unique.every(index => Number.isInteger(index) && index >= 0 && index < ops.length);
-    if (!valid) throw new ServerError(AppErrorCode.RFN_011);
+    if (!valid) throw AppErrorCode.RFN_011.create();
     return unique;
   }
 
@@ -444,7 +443,7 @@ export class ProposalApplyService {
       default:
         // Actions never reach the content dispatcher — they are filtered out before apply and executed
         // post-commit (chat-hub design §5.3). Reaching here is a programming error, not bad input.
-        throw new ServerError(AppErrorCode.RFN_004);
+        throw AppErrorCode.RFN_004.create();
     }
   }
 
@@ -490,7 +489,7 @@ export class ProposalApplyService {
       .delete(schema.bibleDocuments)
       .where(and(eq(schema.bibleDocuments.projectId, ctx.projectId), eq(schema.bibleDocuments.section, op.section), eq(schema.bibleDocuments.slug, op.slug)))
       .returning();
-    if (deleted.length === 0) throw new ServerError(AppErrorCode.DOC_001);
+    if (deleted.length === 0) throw AppErrorCode.DOC_001.create();
 
     await ctx.tx.update(schema.chapters).set({ needsRevalidation: true, updatedAt: new Date() }).where(eq(schema.chapters.projectId, ctx.projectId));
     ctx.applied.push({ artifactRef: `doc:${op.section}/${op.slug}`, newRevision: null });
@@ -593,14 +592,14 @@ export class ProposalApplyService {
     };
 
     const volume = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
-    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
+    if (!volume) throw AppErrorCode.VOL_001.create();
     const withinVolume =
       volume.startChapter === null ||
       volume.endChapter === null ||
       merged.chapterStart === null ||
       merged.chapterEnd === null ||
       (merged.chapterStart >= volume.startChapter && merged.chapterEnd <= volume.endChapter);
-    if (!withinVolume) throw new ServerError(AppErrorCode.ARC_002);
+    if (!withinVolume) throw AppErrorCode.ARC_002.create();
 
     const contentHash = arcContentHash({ arcKey: op.arcKey, ...merged });
     let revision: number;
@@ -628,8 +627,8 @@ export class ProposalApplyService {
 
   private async applyVolumeRemove(ctx: ApplyContext, op: VolumeRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, ctx.projectId), eq(schema.volumes.volumeKey, op.volumeKey)) });
-    if (!existing) throw new ServerError(AppErrorCode.VOL_001);
-    if (existing.status !== 'draft') throw new ServerError(AppErrorCode.RFN_004);
+    if (!existing) throw AppErrorCode.VOL_001.create();
+    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
 
     await ctx.tx.delete(schema.volumes).where(eq(schema.volumes.id, existing.id));
     ctx.applied.push({ artifactRef: `volume:${op.volumeKey}`, newRevision: null });
@@ -637,8 +636,8 @@ export class ProposalApplyService {
 
   private async applyArcRemove(ctx: ApplyContext, op: ArcRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, ctx.projectId), eq(schema.arcs.arcKey, op.arcKey)) });
-    if (!existing) throw new ServerError(AppErrorCode.ARC_001);
-    if (existing.status !== 'draft') throw new ServerError(AppErrorCode.RFN_004);
+    if (!existing) throw AppErrorCode.ARC_001.create();
+    if (existing.status !== 'draft') throw AppErrorCode.RFN_004.create();
 
     await ctx.tx.delete(schema.arcs).where(eq(schema.arcs.id, existing.id));
     ctx.applied.push({ artifactRef: `arc:${op.arcKey}`, newRevision: null });
@@ -646,14 +645,14 @@ export class ProposalApplyService {
 
   private async applyBriefUpdate(ctx: ApplyContext, op: BriefUpdateOp): Promise<void> {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
-    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw new ServerError(AppErrorCode.RFN_005);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_005.create();
 
     const existing = await ctx.tx.query.briefs.findFirst({ where: and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)) });
 
     // A missing brief is creatable — refinement is a first-class authoring path — but only with a body;
     // without one there is nothing for the chapter author to draft from.
-    if (!existing && op.body === undefined) throw new ServerError(AppErrorCode.RFN_004);
+    if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
 
     const merged = {
       title: op.title ?? existing?.title ?? null,
@@ -681,14 +680,14 @@ export class ProposalApplyService {
 
   private async applyBriefRemove(ctx: ApplyContext, op: BriefRemoveOp): Promise<void> {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
-    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw new ServerError(AppErrorCode.RFN_005);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_005.create();
 
     const deleted = await ctx.tx
       .delete(schema.briefs)
       .where(and(eq(schema.briefs.projectId, ctx.projectId), eq(schema.briefs.chapter, op.chapter)))
       .returning();
-    if (deleted.length === 0) throw new ServerError(AppErrorCode.RFN_004);
+    if (deleted.length === 0) throw AppErrorCode.RFN_004.create();
     ctx.applied.push({ artifactRef: `chapter:${op.chapter}`, newRevision: null });
   }
 
@@ -699,12 +698,12 @@ export class ProposalApplyService {
    */
   private async applyDraftUpdate(ctx: ApplyContext, op: DraftUpdateOp): Promise<void> {
     const project = await ctx.tx.query.projects.findFirst({ where: eq(schema.projects.id, ctx.projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
-    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw new ServerError(AppErrorCode.RFN_010);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (op.chapter <= (project.storyCurrentChapter ?? 0)) throw AppErrorCode.RFN_010.create();
 
     const existing = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
-    if (existing?.status === 'final') throw new ServerError(AppErrorCode.RFN_010);
-    if (!existing && op.body === undefined) throw new ServerError(AppErrorCode.RFN_004);
+    if (existing?.status === 'final') throw AppErrorCode.RFN_010.create();
+    if (!existing && op.body === undefined) throw AppErrorCode.RFN_004.create();
 
     const merged = { title: op.title ?? existing?.title ?? null, body: op.body ?? existing?.body ?? '', summary: op.summary ?? existing?.summary ?? null };
     const revision = (existing?.revision ?? 0) + 1;
@@ -721,7 +720,7 @@ export class ProposalApplyService {
         .insert(schema.drafts)
         .values({ projectId: ctx.projectId, chapter: op.chapter, ...merged, status: 'draft', revision, reviewStatus: 'needs_review', generator: 'standard' })
         .returning();
-      if (!created) throw new ServerError(AppErrorCode.DRF_001);
+      if (!created) throw AppErrorCode.DRF_001.create();
       draftId = created.id;
     }
 
@@ -734,8 +733,8 @@ export class ProposalApplyService {
 
   private async applyDraftRemove(ctx: ApplyContext, op: DraftRemoveOp): Promise<void> {
     const existing = await ctx.tx.query.drafts.findFirst({ where: and(eq(schema.drafts.projectId, ctx.projectId), eq(schema.drafts.chapter, op.chapter)) });
-    if (!existing) throw new ServerError(AppErrorCode.DRF_001);
-    if (existing.status === 'final') throw new ServerError(AppErrorCode.RFN_010);
+    if (!existing) throw AppErrorCode.DRF_001.create();
+    if (existing.status === 'final') throw AppErrorCode.RFN_010.create();
 
     await ctx.tx.delete(schema.drafts).where(eq(schema.drafts.id, existing.id));
     ctx.applied.push({ artifactRef: `draft:${op.chapter}`, newRevision: null });
@@ -743,7 +742,7 @@ export class ProposalApplyService {
 
   private async applyEntityUpsert(ctx: ApplyContext, op: EntityUpsertOp): Promise<void> {
     const existing = await ctx.tx.query.entities.findFirst({ where: and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)) });
-    if (!existing && !op.name) throw new ServerError(AppErrorCode.RFN_004);
+    if (!existing && !op.name) throw AppErrorCode.RFN_004.create();
 
     const merged = {
       type: op.type,
@@ -770,7 +769,7 @@ export class ProposalApplyService {
       .delete(schema.entities)
       .where(and(eq(schema.entities.projectId, ctx.projectId), eq(schema.entities.entityKey, op.entityKey)))
       .returning();
-    if (deleted.length === 0) throw new ServerError(AppErrorCode.RFN_004);
+    if (deleted.length === 0) throw AppErrorCode.RFN_004.create();
     ctx.applied.push({ artifactRef: `entity:${op.entityKey}`, newRevision: null });
   }
 
@@ -789,9 +788,9 @@ export class ProposalApplyService {
         .from(schema.refinementProposals)
         .where(and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.id, proposalId)))
         .for('update');
-      if (!proposal) throw new ServerError(AppErrorCode.RFN_001);
+      if (!proposal) throw AppErrorCode.RFN_001.create();
       const inverseOps = (proposal.inverseOps ?? []) as ContentOp[];
-      if (proposal.status !== 'applied' || inverseOps.length === 0) throw new ServerError(AppErrorCode.RFN_007);
+      if (proposal.status !== 'applied' || inverseOps.length === 0) throw AppErrorCode.RFN_007.create();
 
       // Content identity (exists + contentHash) is the guard — NOT revision: reverting a newer change
       // on the same artifact restores this proposal's content but bumps the revision counter, and a
@@ -816,14 +815,14 @@ export class ProposalApplyService {
         .set({ status: 'reverted', revertedAt: new Date(), updatedAt: new Date() })
         .where(eq(schema.refinementProposals.id, proposal.id))
         .returning();
-      if (!reverted) throw new ServerError(AppErrorCode.RFN_001);
+      if (!reverted) throw AppErrorCode.RFN_001.create();
 
       await tx.insert(schema.userFeedback).values({ projectId, artifactType: 'refinement_proposal', artifactRef: String(proposal.id), disposition: 'rejected', note: 'reverted' });
 
       return { outcome: 'reverted' as const, proposal: reverted, reverted: ctx.applied, staleMarked: [...new Set(ctx.staleMarked)] };
     });
 
-    if (result.outcome === 'conflicted') throw new ServerError(AppErrorCode.RFN_006);
+    if (result.outcome === 'conflicted') throw AppErrorCode.RFN_006.create();
     this.logger.info(`proposal ${proposalId} reverted: ${result.reverted.map(a => a.artifactRef).join(', ')}`);
     return { proposal: result.proposal, reverted: result.reverted, staleMarked: result.staleMarked };
   }
@@ -838,8 +837,8 @@ export class ProposalApplyService {
     const anchor = await this.db.query.refinementProposals.findFirst({
       where: and(eq(schema.refinementProposals.projectId, projectId), eq(schema.refinementProposals.id, afterProposalId)),
     });
-    if (!anchor) throw new ServerError(AppErrorCode.RFN_001);
-    if (!anchor.appliedAt) throw new ServerError(AppErrorCode.RFN_007);
+    if (!anchor) throw AppErrorCode.RFN_001.create();
+    if (!anchor.appliedAt) throw AppErrorCode.RFN_007.create();
 
     // The anchor's appliedAt stays in SQL — round-tripping it through a JS Date shifts timestamps
     // (timezone serialization) and corrupts the comparison. Ties on the same instant break by id.
@@ -869,7 +868,7 @@ export class ProposalApplyService {
         result.reverted.push({ proposalId: proposal.id, artifacts: reverted.reverted });
       } catch (err) {
         result.stoppedAt = proposal.id;
-        if (err instanceof ServerError) result.conflict = { code: err.getCode(), message: err.message };
+        if (AppError.is(err)) result.conflict = { code: err.code, message: err.message };
         else result.conflict = { message: err instanceof Error ? err.message : String(err) };
         break;
       }

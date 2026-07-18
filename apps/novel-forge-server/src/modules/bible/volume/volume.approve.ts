@@ -5,7 +5,6 @@
 /**
  * Importing npm packages
  */
-import { ServerError } from '@shadow-library/fastify';
 import { and, asc, eq, ne } from 'drizzle-orm';
 
 /**
@@ -47,7 +46,7 @@ export async function approveVolumePlan(db: PrimaryDatabase, projectId: bigint):
     if (volume.startChapter !== null && volume.endChapter !== null) return volume.endChapter - volume.startChapter + 1;
     return null;
   });
-  if (counts.some(count => count === null)) throw new ServerError(AppErrorCode.PLN_002);
+  if (counts.some(count => count === null)) throw AppErrorCode.PLN_002.create();
 
   let nextStart = 1;
   for (const [index, volume] of volumes.entries()) {

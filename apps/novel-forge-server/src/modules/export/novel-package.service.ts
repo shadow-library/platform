@@ -7,7 +7,6 @@
  */
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, eq } from 'drizzle-orm';
 import { zipSync } from 'fflate';
@@ -116,10 +115,10 @@ export class NovelPackageService {
 
   async build(projectId: bigint): Promise<NovelPackage> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
     const chapters = await this.loadChapters(projectId);
-    if (chapters.length === 0) throw new ServerError(AppErrorCode.EXP_001);
+    if (chapters.length === 0) throw AppErrorCode.EXP_001.create();
     this.logger.info('export: building novel package', { projectId, chapters: chapters.length });
 
     const files: Record<string, Uint8Array> = {};

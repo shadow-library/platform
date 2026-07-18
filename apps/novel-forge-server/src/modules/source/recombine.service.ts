@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 
@@ -91,8 +90,8 @@ export class RecombineService {
   async recombine(projectId: bigint, options: RecombineOptions = {}): Promise<RecombineResult> {
     this.logger.debug('recombine: starting', { projectId, dryRun: options.dryRun ?? false, useAi: options.useAi ?? false });
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
-    if (project.kind !== 'source') throw new ServerError(AppErrorCode.PRJ_003);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (project.kind !== 'source') throw AppErrorCode.PRJ_003.create();
 
     const chapters = await this.loadChapters(projectId);
     const plan = await this.buildPlan(projectId, chapters, options.useAi ?? false, project);
@@ -102,7 +101,7 @@ export class RecombineService {
       return this.toResult(plan, false);
     }
 
-    if (!project.scrapeComplete) throw new ServerError(AppErrorCode.SRC_002);
+    if (!project.scrapeComplete) throw AppErrorCode.SRC_002.create();
     await this.assertNoDerivedData(projectId);
     if (plan.after === plan.before) {
       this.logger.debug('recombine: no merges to apply (before == after)', { projectId, before: plan.before });
@@ -215,7 +214,7 @@ export class RecombineService {
         conversions: !!conversions,
         drafts: !!drafts,
       });
-      throw new ServerError(AppErrorCode.SRC_003);
+      throw AppErrorCode.SRC_003.create();
     }
   }
 

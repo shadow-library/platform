@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, eq } from 'drizzle-orm';
 
@@ -64,7 +63,7 @@ export class FactService {
       where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)),
       with: LEDGER_RELATION,
     });
-    if (!fact) throw new ServerError(AppErrorCode.FCT_001);
+    if (!fact) throw AppErrorCode.FCT_001.create();
     return this.toFactWithKnowledge(fact as FactRowWithLedger);
   }
 
@@ -100,7 +99,7 @@ export class FactService {
       .delete(schema.canonFacts)
       .where(and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)))
       .returning();
-    if (deleted.length === 0) throw new ServerError(AppErrorCode.FCT_001);
+    if (deleted.length === 0) throw AppErrorCode.FCT_001.create();
   }
 
   /**
@@ -112,8 +111,8 @@ export class FactService {
       this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) }),
       this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, body.entityKey)) }),
     ]);
-    if (!fact) throw new ServerError(AppErrorCode.FCT_001);
-    if (!entity) throw new ServerError(AppErrorCode.FCT_002);
+    if (!fact) throw AppErrorCode.FCT_001.create();
+    if (!entity) throw AppErrorCode.FCT_002.create();
 
     await this.db
       .insert(schema.characterKnowledge)
@@ -132,8 +131,8 @@ export class FactService {
       this.db.query.canonFacts.findFirst({ where: and(eq(schema.canonFacts.projectId, projectId), eq(schema.canonFacts.factKey, factKey)) }),
       this.db.query.entities.findFirst({ where: and(eq(schema.entities.projectId, projectId), eq(schema.entities.entityKey, entityKey)) }),
     ]);
-    if (!fact) throw new ServerError(AppErrorCode.FCT_001);
-    if (!entity) throw new ServerError(AppErrorCode.FCT_002);
+    if (!fact) throw AppErrorCode.FCT_001.create();
+    if (!entity) throw AppErrorCode.FCT_002.create();
 
     await this.db.delete(schema.characterKnowledge).where(and(eq(schema.characterKnowledge.factId, fact.id), eq(schema.characterKnowledge.entityId, entity.id)));
     this.logger.info('fact knowledge retracted', { projectId, factKey, entityKey });

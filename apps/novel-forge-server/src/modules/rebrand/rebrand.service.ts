@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 
@@ -77,8 +76,8 @@ export class RebrandService {
   /** Upsert-on-read: the rebrand row exists from the first touch, so config and status never 404. */
   async getOrCreate(projectId: bigint): Promise<Rebrand.Row> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
-    if (project.kind !== 'source') throw new ServerError(AppErrorCode.RBR_003);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (project.kind !== 'source') throw AppErrorCode.RBR_003.create();
 
     const existing = await this.db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) });
     if (existing) return existing;
@@ -86,7 +85,7 @@ export class RebrandService {
     const [inserted] = await this.db.insert(schema.rebrands).values({ projectId }).onConflictDoNothing().returning();
     if (inserted) return inserted;
     const raced = await this.db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) });
-    if (!raced) throw new ServerError(AppErrorCode.RBR_001);
+    if (!raced) throw AppErrorCode.RBR_001.create();
     return raced;
   }
 
@@ -158,7 +157,7 @@ export class RebrandService {
     const conversion = await this.db.query.chapterConversions.findFirst({
       where: and(eq(schema.chapterConversions.projectId, projectId), eq(schema.chapterConversions.chapter, chapter)),
     });
-    if (!conversion) throw new ServerError(AppErrorCode.RBR_002);
+    if (!conversion) throw AppErrorCode.RBR_002.create();
     return conversion;
   }
 

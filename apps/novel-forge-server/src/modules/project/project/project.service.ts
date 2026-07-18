@@ -7,7 +7,6 @@
  */
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
@@ -62,7 +61,7 @@ export class ProjectService {
   }
 
   async create(body: CreateProjectBody): Promise<Project.Row> {
-    if (body.kind === 'source' && !body.url) throw new ServerError(AppErrorCode.SRC_001);
+    if (body.kind === 'source' && !body.url) throw AppErrorCode.SRC_001.create();
     this.logger.debug('create project', { name: body.name, kind: body.kind, url: body.url, webnovelId: body.webnovelId, contentMode: body.contentMode });
 
     const [project] = await this.db
@@ -80,7 +79,7 @@ export class ProjectService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!project) throw new ServerError(AppErrorCode.S001);
+    if (!project) throw AppErrorCode.S001.create();
     this.logger.info('project created', { projectId: project.id, name: project.name, kind: project.kind });
 
     if (body.kind === 'new_novel') {
@@ -121,24 +120,24 @@ export class ProjectService {
 
   async setCover(id: bigint, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Project.Row> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
     // Drop the previous cover first so a different extension (png → jpg) never leaves an orphan behind.
     if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
     const ref = await this.imageStorage.save(id, 'cover', new Uint8Array(Buffer.from(image, 'base64')), mime);
 
     const [result] = await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
-    if (!result) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!result) throw AppErrorCode.PRJ_001.create();
     return this.present(result);
   }
 
   async clearCover(id: bigint): Promise<Project.Row> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
     if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
 
     const [result] = await this.db.update(schema.projects).set({ coverImagePath: null, updatedAt: new Date() }).where(eq(schema.projects.id, id)).returning();
-    if (!result) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!result) throw AppErrorCode.PRJ_001.create();
     return this.present(result);
   }
 
@@ -158,14 +157,14 @@ export class ProjectService {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!result) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!result) throw AppErrorCode.PRJ_001.create();
     return this.present(result);
   }
 
   async clone(id: bigint, body: CloneProjectBody): Promise<Project.Row> {
     return this.db.transaction(async tx => {
       const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
-      if (!source) throw new ServerError(AppErrorCode.PRJ_001);
+      if (!source) throw AppErrorCode.PRJ_001.create();
 
       if (body.resetDerived === false) {
         this.logger.warn(`clone resetDerived=false for project ${id}: full child-table copy is not yet implemented`);
@@ -188,7 +187,7 @@ export class ProjectService {
         .returning()
         .catch(err => this.databaseService.translateError(err));
 
-      if (!newProject) throw new ServerError(AppErrorCode.S001);
+      if (!newProject) throw AppErrorCode.S001.create();
 
       if (body.resetDerived !== false) {
         if (source.kind === 'new_novel') {
@@ -244,7 +243,7 @@ export class ProjectService {
   async delete(id: bigint): Promise<void> {
     this.logger.info('deleting project (cascades to all child tables)', { projectId: id });
     const result = await this.db.delete(schema.projects).where(eq(schema.projects.id, id)).returning();
-    if (result.length === 0) throw new ServerError(AppErrorCode.PRJ_001);
+    if (result.length === 0) throw AppErrorCode.PRJ_001.create();
   }
 
   async reset(id: bigint, stage: string): Promise<ResetResponse> {
@@ -292,7 +291,7 @@ export class ProjectService {
 
   async status(id: bigint): Promise<ProjectStatusResponse> {
     const project = await this.get(id);
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
 
     // Three single-row aggregate queries with conditional counts, rather than six concurrent `$count`
     // calls: fewer connections under load (drizzle's `$count` intermittently crashed on `res[0].count`

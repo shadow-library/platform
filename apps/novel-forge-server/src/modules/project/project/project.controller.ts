@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -56,7 +56,7 @@ export class ProjectController {
   @RespondFor(200, ProjectResponse)
   async getProject(@Params() params: ProjectParams): Promise<ProjectResponse> {
     const project = await this.projectService.get(params.projectId);
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
+    if (!project) throw AppErrorCode.PRJ_001.create();
     return project as unknown as ProjectResponse;
   }
 

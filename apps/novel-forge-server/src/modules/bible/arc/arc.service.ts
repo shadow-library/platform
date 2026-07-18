@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, eq, inArray } from 'drizzle-orm';
 
@@ -44,14 +43,14 @@ export class ArcService {
 
   async get(projectId: bigint, arcKey: string): Promise<Plan.Arc> {
     const arc = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
-    if (!arc) throw new ServerError(AppErrorCode.ARC_001);
+    if (!arc) throw AppErrorCode.ARC_001.create();
     return arc;
   }
 
   /** Hand-authoring upsert: creates draft arcs, edits existing ones, and always bumps revision/contentHash. */
   async upsert(projectId: bigint, arcKey: string, body: UpsertArcBody): Promise<Plan.Arc> {
     const volume = await this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, body.volumeKey)) });
-    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
+    if (!volume) throw AppErrorCode.VOL_001.create();
 
     const existing = await this.db.query.arcs.findFirst({ where: and(eq(schema.arcs.projectId, projectId), eq(schema.arcs.arcKey, arcKey)) });
     const merged = {
@@ -77,7 +76,7 @@ export class ArcService {
         .where(eq(schema.arcs.id, existing.id))
         .returning()
         .catch(err => this.databaseService.translateError(err));
-      if (!updated) throw new ServerError(AppErrorCode.ARC_001);
+      if (!updated) throw AppErrorCode.ARC_001.create();
       return updated;
     }
 
@@ -86,13 +85,13 @@ export class ArcService {
       .values({ projectId, arcKey, ...merged, contentHash })
       .returning()
       .catch(err => this.databaseService.translateError(err));
-    if (!created) throw new ServerError(AppErrorCode.ARC_001);
+    if (!created) throw AppErrorCode.ARC_001.create();
     return created;
   }
 
   private assertWithinVolume(volume: Plan.Volume, chapterStart: number | null, chapterEnd: number | null): void {
     if (volume.startChapter === null || volume.endChapter === null || chapterStart === null || chapterEnd === null) return;
-    if (chapterStart < volume.startChapter || chapterEnd > volume.endChapter) throw new ServerError(AppErrorCode.ARC_002);
+    if (chapterStart < volume.startChapter || chapterEnd > volume.endChapter) throw AppErrorCode.ARC_002.create();
   }
 
   /**
@@ -102,11 +101,11 @@ export class ArcService {
    */
   async approve(projectId: bigint, volumeKey: string): Promise<ApproveArcsResponse> {
     const volume = await this.db.query.volumes.findFirst({ where: and(eq(schema.volumes.projectId, projectId), eq(schema.volumes.volumeKey, volumeKey)) });
-    if (!volume) throw new ServerError(AppErrorCode.VOL_001);
-    if (volume.status !== 'approved' || volume.startChapter === null || volume.endChapter === null) throw new ServerError(AppErrorCode.ARC_003);
+    if (!volume) throw AppErrorCode.VOL_001.create();
+    if (volume.status !== 'approved' || volume.startChapter === null || volume.endChapter === null) throw AppErrorCode.ARC_003.create();
 
     const arcs = await this.list(projectId, volumeKey);
-    if (!this.coversExactly(arcs, volume.startChapter, volume.endChapter)) throw new ServerError(AppErrorCode.ARC_002);
+    if (!this.coversExactly(arcs, volume.startChapter, volume.endChapter)) throw AppErrorCode.ARC_002.create();
 
     const approved = await this.db
       .update(schema.arcs)

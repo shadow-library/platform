@@ -16,7 +16,6 @@ import { ChatXAI } from '@langchain/xai';
 import { Injectable } from '@shadow-library/app';
 import { type SchemaClass } from '@shadow-library/class-schema';
 import { Config, Logger } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { eq } from 'drizzle-orm';
 
@@ -163,16 +162,16 @@ export class ModelRouterService {
           ...(opts?.format ? { format: opts.format } : {}),
         });
       case 'anthropic-claude-code':
-        if (!Config.get('ai.claude-code.enabled')) throw new ServerError(AppErrorCode.AI_002);
+        if (!Config.get('ai.claude-code.enabled')) throw AppErrorCode.AI_002.create();
         return new ChatClaudeCode(Config.get('ai.claude-code.bin'), resolved.model);
       case 'openai-codex':
-        if (!Config.get('ai.codex.enabled')) throw new ServerError(AppErrorCode.AI_002);
+        if (!Config.get('ai.codex.enabled')) throw AppErrorCode.AI_002.create();
         return new ChatCodex(Config.get('ai.codex.bin'), resolved.model);
       case 'xai-grok-build':
-        if (!Config.get('ai.grok-build.enabled')) throw new ServerError(AppErrorCode.AI_002);
+        if (!Config.get('ai.grok-build.enabled')) throw AppErrorCode.AI_002.create();
         return new ChatGrokBuild(Config.get('ai.grok-build.bin'));
       default:
-        throw new ServerError(AppErrorCode.AI_002);
+        throw AppErrorCode.AI_002.create();
     }
   }
 
@@ -261,7 +260,7 @@ export class ModelRouterService {
     this.logger.error('All parse attempts failed', { role, runId: ctx.runId, rawOutput1: rawOutput1.slice(0, 200) });
     // Full outputs only on debug (dev) — an operator can read the exact prose the model returned.
     this.logger.debug('All parse attempts failed — full raw outputs', { role, runId: ctx.runId, rawOutput1, rawOutput2 });
-    throw new ServerError(AppErrorCode.AI_001);
+    throw AppErrorCode.AI_001.create();
   }
 
   // Normalise the raw parsed value for the module's schema (unwrapping object-wrapped arrays from
@@ -317,7 +316,7 @@ export class ModelRouterService {
       }
     }
     this.logger.error('LLM call failed after retries', { role, err: lastErr });
-    throw new ServerError(AppErrorCode.AI_001);
+    throw AppErrorCode.AI_001.create();
   }
 
   private withTimeout<R>(promise: Promise<R>, ms: number): Promise<R> {

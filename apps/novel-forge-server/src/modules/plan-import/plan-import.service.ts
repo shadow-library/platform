@@ -7,7 +7,6 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 import { and, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 
@@ -52,11 +51,11 @@ export class PlanImportService {
 
   async import(projectId: bigint, body: ImportPlanBody): Promise<ImportPlanResponse> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    if (!project) throw new ServerError(AppErrorCode.PRJ_001);
-    if (project.kind !== 'new_novel') throw new ServerError(AppErrorCode.PRJ_003);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    if (project.kind !== 'new_novel') throw AppErrorCode.PRJ_003.create();
 
     const bundle = body.bundle;
-    if (bundle.format !== BUNDLE_FORMAT || !BUNDLE_VERSIONS.includes(bundle.version)) throw new ServerError(AppErrorCode.IMP_002);
+    if (bundle.format !== BUNDLE_FORMAT || !BUNDLE_VERSIONS.includes(bundle.version)) throw AppErrorCode.IMP_002.create();
 
     const [existingEntities, existingFacts] = await Promise.all([
       this.db.query.entities.findMany({ where: eq(schema.entities.projectId, projectId), columns: { entityKey: true } }),
@@ -118,7 +117,7 @@ export class PlanImportService {
         this.db.$count(schema.drafts, eq(schema.drafts.projectId, projectId)),
         this.db.$count(schema.chapters, eq(schema.chapters.projectId, projectId)),
       ]);
-      if (draftCount > 0 || chapterCount > 0) throw new ServerError(AppErrorCode.IMP_003);
+      if (draftCount > 0 || chapterCount > 0) throw AppErrorCode.IMP_003.create();
       return;
     }
 
@@ -139,7 +138,7 @@ export class PlanImportService {
     ];
     for (const collection of collections) {
       if (collection.carried === 0) continue;
-      if ((await collection.count()) > 0) throw new ServerError(AppErrorCode.IMP_001);
+      if ((await collection.count()) > 0) throw AppErrorCode.IMP_001.create();
     }
   }
 
