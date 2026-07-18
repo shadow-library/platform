@@ -16,6 +16,11 @@ import { defineConfig, devices } from '@playwright/test';
  */
 const isCI = !!process.env.CI;
 
+// Every route sits behind the backend session gate, so live-stack runs need a pre-established
+// `nf-session` cookie. PW_STORAGE_STATE points at a storage-state JSON minted out-of-band (real
+// OIDC login against the running identity + novel-forge-server pair); unset, tests run cookie-less.
+const storageState = process.env.PW_STORAGE_STATE;
+
 export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
@@ -26,6 +31,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://127.0.0.1:3000',
     trace: 'on-first-retry',
+    ...(storageState ? { storageState } : {}),
   },
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
