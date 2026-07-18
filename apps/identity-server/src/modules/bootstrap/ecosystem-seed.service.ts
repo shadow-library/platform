@@ -33,6 +33,7 @@ const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
 const AUTHZ_ROLES_SYNC_SCOPE = 'authz:roles:sync';
 const WEBNOVEL_PUBLISH_SCOPE = 'webnovel:publish';
+const PULSE_NOTIFICATIONS_SEND_SCOPE = 'notifications:send';
 
 const IDENTITY_SERVICE_CLIENT = 'identity-server';
 const OAUTH_CALLBACK_PATH = '/api/auth/callback';
@@ -84,6 +85,11 @@ export class EcosystemSeedService {
     /** Identity's own outbound M2M client — the caller behind its pulse-server notification calls. */
     const identityClientId = await this.ensureServiceClient(IDENTITY_SERVICE_CLIENT, platform.id);
 
+    /** identity-server's notification tokens carry pulse's send scope (FC-1), so the scope and its grant must exist. */
+    const pulse = this.applicationService.getApplicationOrThrow('pulse');
+    const notificationsSendScopeId = await this.oauthClientService.ensureScope(pulse.id, 'pulse-server', PULSE_NOTIFICATIONS_SEND_SCOPE);
+    await this.oauthClientService.grantScope(identityClientId, notificationsSendScopeId);
+
     /** novel-forge-server may request `webnovel:publish` when minting tokens for webnovel-server. */
     const webnovel = this.applicationService.getApplicationOrThrow('webnovel');
     const publishScopeId = await this.oauthClientService.ensureScope(webnovel.id, 'webnovel-server', WEBNOVEL_PUBLISH_SCOPE);
@@ -91,7 +97,6 @@ export class EcosystemSeedService {
     await this.oauthClientService.grantScope(novelForgeServerId, publishScopeId);
 
     /** Deny-by-default M2M allowlist (D-17): without these rules the target service 403s the caller. */
-    const pulse = this.applicationService.getApplicationOrThrow('pulse');
     await this.serviceAccessService.create({ applicationId: pulse.id, callerClientId: identityClientId, method: 'POST', pathPattern: '/api/v1/notifications', createdBy: 'ecosystem-seed' });
     await this.serviceAccessService.create({ applicationId: webnovel.id, callerClientId: novelForgeServerId, method: '*', pathPattern: '/internal/*', createdBy: 'ecosystem-seed' });
   }

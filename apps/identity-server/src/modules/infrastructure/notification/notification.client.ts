@@ -10,6 +10,8 @@ import { APIRequest, AppError, Config, Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { NotificationOutbox } from '@server/modules/infrastructure/datastore';
 
+import { NotificationTokenService } from './notification-token.service';
+
 /**
  * Defining types
  */
@@ -34,10 +36,14 @@ export class NotificationClient {
   private readonly baseUrl = Config.get('notification.base-url').replace(/\/$/, '');
   private readonly serviceName = Config.get('notification.service-name');
 
+  constructor(private readonly tokenService: NotificationTokenService) {}
+
   async send(notification: SendNotification): Promise<void> {
     /** Recipients carry the target email/phone, so this trace is debug-only (dev/local, never prod). */
     this.logger.debug('dispatching notification to pulse-server', { templateKey: notification.templateKey, recipients: notification.recipients });
+    const token = await this.tokenService.getToken();
     const response = await APIRequest.post(`${this.baseUrl}/notifications`)
+      .header('authorization', `Bearer ${token}`)
       .body({ ...notification, service: this.serviceName })
       .suppressErrors()
       .execute()
@@ -46,6 +52,8 @@ export class NotificationClient {
         throw error;
       });
     if (response.statusCode >= 400) {
+      /** An auth rejection can mean the cached token went stale (rotated key, revoked grant); drop it so the outbox retry presents a fresh one. */
+      if (response.statusCode === 401 || response.statusCode === 403) this.tokenService.invalidate();
       this.logger.error('notification dispatch rejected by pulse-server', { templateKey: notification.templateKey, status: response.statusCode, body: response.data });
       throw AppError.internal(`Notification request failed with status ${response.statusCode}`);
     }

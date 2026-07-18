@@ -73,6 +73,16 @@ describe('EcosystemSeedService', () => {
     expect(client?.grantTypes).toEqual(['client_credentials']);
   });
 
+  it('should grant notifications:send to identity-server for its pulse dispatches', async () => {
+    const client = await findClient('shadow-identity', 'identity-server', 'SERVICE');
+    const scopes = await env.getService(OAuthClientService).getGrantedScopeNames(client!.id);
+    expect(scopes).toContain('notifications:send');
+
+    const resources = await env.getService(OAuthClientService).listResources();
+    const pulseResource = resources.find(resource => resource.identifier === 'pulse-server');
+    expect(pulseResource?.scopes.some(scope => scope.name === 'notifications:send')).toBe(true);
+  });
+
   it('should grant webnovel:publish to novel-forge-server', async () => {
     const client = await findClient('novel-forge', 'novel-forge-server', 'SERVICE');
     const scopes = await env.getService(OAuthClientService).getGrantedScopeNames(client!.id);

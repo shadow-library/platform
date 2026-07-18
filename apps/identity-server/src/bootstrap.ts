@@ -34,6 +34,7 @@ declare module '@shadow-library/common' {
     /** Notification service (pulse-server) */
     'notification.base-url': string;
     'notification.service-name': string;
+    'notification.audience': string;
 
     /** Worker configs */
     'worker.poll-interval': number;
@@ -75,6 +76,8 @@ Config.load('auth.webauthn.origin', { defaultValue: 'http://localhost:8080' });
 
 Config.load('notification.base-url', { defaultValue: 'http://localhost:3000/api/v1' });
 Config.load('notification.service-name', { defaultValue: 'shadow-identity' });
+/** `aud` of the outbound service token; must mirror pulse-server's AUTH_AUDIENCE (the identity-seeded `pulse-server` API resource). */
+Config.load('notification.audience', { defaultValue: 'pulse-server' });
 
 Config.load('worker.poll-interval', { defaultValue: '5000', validateType: 'number' });
 

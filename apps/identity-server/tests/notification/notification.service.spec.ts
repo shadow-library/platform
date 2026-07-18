@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it } from 'bun:test';
+import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -22,10 +22,15 @@ const env = new TestEnvironment('notification').init();
 
 let sentCalls: SendNotification[] = [];
 let sendBehaviour: (notification: SendNotification) => Promise<void> = async () => undefined;
+const originalSend = NotificationClient.prototype.send;
 NotificationClient.prototype.send = async function mockedSend(notification: SendNotification): Promise<void> {
   sentCalls.push(notification);
   await sendBehaviour(notification);
 };
+/** Spec files share one module registry, so the real transport is restored for later suites. */
+afterAll(() => {
+  NotificationClient.prototype.send = originalSend;
+});
 
 describe('NotificationService', () => {
   let service: NotificationService;
