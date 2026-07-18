@@ -13,12 +13,34 @@ import { ShadowError } from '@lib/utils';
  * Defining types
  */
 export interface BuildConfig {
-  /** Public subpath → source-relative base (no extension), e.g. `{ ".": "index", "./errors": "errors/index" }`. */
+  /**
+   * Public subpath → source-relative base. An extensionless base (`"errors/index"`) is a JS module and gets
+   * `{ types, default }` conditions plus a `typesVersions` entry; a base with an extension (`"styles.css"`) is a
+   * raw asset emitted by a custom `command` and is exported as-is. E.g. `{ ".": "index", "./styles.css": "styles.css" }`.
+   */
   exports: Record<string, string>;
+  /**
+   * Escape hatch: a bundler invocation (tsup/vite/rollup) that replaces the default `tsc` + `tsc-alias` compile —
+   * for component libraries whose build needs CSS Modules, `'use client'` banners, or asset extraction that `tsc`
+   * can't do. It must emit into `outDir`; shadow still synthesizes `dist/package.json` around its output. A string
+   * is split on whitespace (`"tsup"`, `"vite build"`); an array is passed through verbatim for quoted arguments.
+   */
+  command?: string | string[];
   /** Binary name → source-relative base. Normalized from the `.shadowrc.json` string shorthand or map. */
   bin?: Record<string, string>;
   /** Output directory, relative to the repo root. */
   outDir: string;
+}
+
+/** Which runtime globals the lint config treats as defined — a Node library, a browser library, or both. */
+export type GlobalsEnv = 'node' | 'browser' | 'both';
+
+/** A file-scoped rule override a consuming repo layers onto the shipped flat config (e.g. relax rules for colocated tests). */
+export interface LintOverride {
+  /** Flat-config `files` globs the rules apply to, e.g. story or fixture file patterns. */
+  files: string[];
+  /** ESLint rules applied to the matched files. */
+  rules: Record<string, unknown>;
 }
 
 export interface LintConfig {
@@ -26,6 +48,14 @@ export interface LintConfig {
   rules: Record<string, unknown>;
   /** Extra ignore globs appended to the shipped defaults. */
   ignores: string[];
+  /** File-scoped rule overrides layered after the base config, for cases a flat `rules` map can't express. */
+  overrides: LintOverride[];
+  /** Which runtime globals to treat as defined. Defaults to `node`; a browser/component library uses `browser` or `both`. */
+  globals: GlobalsEnv;
+  /** Enable the React/JSX lint rules on `.tsx`. Left unset means auto-detect from a `react` dependency (resolved by `verify`). */
+  react?: boolean;
+  /** React version handed to `eslint-plugin-react` (its `'detect'` mode throws under ESLint 10). Unset means resolve from the repo's `react` dependency. */
+  reactVersion?: string;
 }
 
 /** Prettier options merged over {@link PRETTIER_BASE}. Kept open — every prettier option is a valid override. */
@@ -43,8 +73,12 @@ export interface VerifyConfig {
   format: FormatConfig;
   /** Commit-message linting config, applied by `shadow commit-msg`. */
   commit: CommitConfig;
-  /** Glob of files lint + format cover, relative to the repo root. */
-  files: string;
+  /** Glob of files lint covers, relative to the repo root. */
+  lintFiles: string;
+  /** Glob of files format covers, relative to the repo root — split from lint so a repo can format a dir it doesn't lint. */
+  formatFiles: string;
+  /** Run the delegated `test` step during `verify`. Set false for a lighter pre-commit that leaves tests to CI. */
+  test: boolean;
 }
 
 export interface ReleaseConfig {
@@ -78,14 +112,17 @@ export interface ShadowConfig {
 export interface RawShadowConfig {
   build?: {
     exports?: Record<string, string>;
+    command?: string | string[];
     bin?: string | Record<string, string>;
     outDir?: string;
   };
   verify?: {
-    lint?: { rules?: Record<string, unknown>; ignores?: string[] };
+    lint?: { rules?: Record<string, unknown>; ignores?: string[]; overrides?: LintOverride[]; globals?: GlobalsEnv; react?: boolean; reactVersion?: string };
     format?: FormatConfig;
     commit?: { extends?: string[]; rules?: Record<string, unknown> };
-    files?: string;
+    /** One glob shared by lint + format, or `{ lint, format }` to cover different file sets. */
+    files?: string | { lint?: string; format?: string };
+    test?: boolean;
   };
   release?: { npm?: boolean; publishDir?: string; changelog?: boolean };
   genApiTypes?: { outputPath?: string };
@@ -108,9 +145,19 @@ export const PRETTIER_BASE: FormatConfig = {
   arrowParens: 'avoid',
 };
 
+/** Default file glob lint + format cover — includes `.tsx` so component libraries are checked out of the box. */
+const DEFAULT_FILES = '{src,tests,scripts}/**/*.{ts,tsx}';
+
 const DEFAULT_CONFIG: ShadowConfig = {
   build: { exports: { '.': 'index' }, outDir: 'dist' },
-  verify: { lint: { rules: {}, ignores: [] }, format: {}, commit: { extends: COMMITLINT_BASE_EXTENDS, rules: {} }, files: '{src,tests,scripts}/**/*.ts' },
+  verify: {
+    lint: { rules: {}, ignores: [], overrides: [], globals: 'node' },
+    format: {},
+    commit: { extends: COMMITLINT_BASE_EXTENDS, rules: {} },
+    lintFiles: DEFAULT_FILES,
+    formatFiles: DEFAULT_FILES,
+    test: true,
+  },
   release: { npm: true, publishDir: 'dist', changelog: true },
   genApiTypes: { outputPath: 'src/lib/apis/api-types.gen.ts' },
   checkMigrations: { dir: 'generated/drizzle' },
@@ -149,9 +196,14 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
   const exportsConfig = raw.build?.exports ?? DEFAULT_CONFIG.build.exports;
   if (!exportsConfig['.']) throw new ShadowError('build.exports must include a "." entry');
 
+  const rawFiles = raw.verify?.files;
+  const lintFiles = typeof rawFiles === 'string' ? rawFiles : (rawFiles?.lint ?? DEFAULT_CONFIG.verify.lintFiles);
+  const formatFiles = typeof rawFiles === 'string' ? rawFiles : (rawFiles?.format ?? DEFAULT_CONFIG.verify.formatFiles);
+
   return {
     build: {
       exports: exportsConfig,
+      command: raw.build?.command,
       bin: normalizeBin(raw.build?.bin, packageName),
       outDir: raw.build?.outDir ?? DEFAULT_CONFIG.build.outDir,
     },
@@ -159,13 +211,19 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
       lint: {
         rules: { ...DEFAULT_CONFIG.verify.lint.rules, ...raw.verify?.lint?.rules },
         ignores: [...DEFAULT_CONFIG.verify.lint.ignores, ...(raw.verify?.lint?.ignores ?? [])],
+        overrides: raw.verify?.lint?.overrides ?? DEFAULT_CONFIG.verify.lint.overrides,
+        globals: raw.verify?.lint?.globals ?? DEFAULT_CONFIG.verify.lint.globals,
+        react: raw.verify?.lint?.react,
+        reactVersion: raw.verify?.lint?.reactVersion,
       },
       format: { ...DEFAULT_CONFIG.verify.format, ...raw.verify?.format },
       commit: {
         extends: raw.verify?.commit?.extends ?? DEFAULT_CONFIG.verify.commit.extends,
         rules: { ...DEFAULT_CONFIG.verify.commit.rules, ...raw.verify?.commit?.rules },
       },
-      files: raw.verify?.files ?? DEFAULT_CONFIG.verify.files,
+      lintFiles,
+      formatFiles,
+      test: raw.verify?.test ?? DEFAULT_CONFIG.verify.test,
     },
     release: {
       npm: raw.release?.npm ?? DEFAULT_CONFIG.release.npm,

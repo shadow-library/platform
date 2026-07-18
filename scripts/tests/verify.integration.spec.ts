@@ -83,6 +83,37 @@ describe('verify (integration)', () => {
     await expect(verify({ cwd: fixtureDir })).resolves.toBe(0);
   });
 
+  it('should lint .tsx files with the base rules', async () => {
+    fixtureDir = createFixtureDir('shadow-verify-tsx-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/tsx' }),
+      'src/index.tsx': 'const unused = 2;\nexport const value = 1;\n',
+    });
+
+    await expect(verify({ cwd: fixtureDir })).resolves.toBe(1);
+  });
+
+  it('should not flag underscore-prefixed unused arguments', async () => {
+    fixtureDir = createFixtureDir('shadow-verify-underscore-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/underscore' }),
+      'src/index.ts': 'export const fn = (_unused: number): number => 1;\n',
+    });
+
+    await expect(verify({ cwd: fixtureDir })).resolves.toBe(0);
+  });
+
+  it('should skip the test step when verify.test is false', async () => {
+    fixtureDir = createFixtureDir('shadow-verify-notest-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/notest', scripts: { test: failScript } }),
+      '.shadowrc.json': JSON.stringify({ verify: { test: false } }),
+      'src/index.ts': CLEAN_SOURCE,
+    });
+
+    await expect(verify({ cwd: fixtureDir })).resolves.toBe(0);
+  });
+
   it('should stop at a failing delegated type-check and return its exit code', async () => {
     fixtureDir = createFixtureDir('shadow-verify-tc-');
     writeFixtureFiles(fixtureDir, {

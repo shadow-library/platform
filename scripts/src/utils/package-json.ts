@@ -17,6 +17,9 @@ export interface PackageJson {
   version?: string;
   type?: string;
   scripts?: Record<string, string>;
+  dependencies?: Record<string, string>;
+  devDependencies?: Record<string, string>;
+  peerDependencies?: Record<string, string>;
   sideEffects?: boolean | string[];
   bin?: string | Record<string, string>;
   [key: string]: unknown;

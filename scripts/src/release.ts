@@ -11,7 +11,7 @@ import { Octokit } from '@octokit/rest';
  */
 import { build } from '@lib/build';
 import { loadConfig, type ReleaseConfig } from '@lib/config';
-import { log, readPackageJson, run, ShadowError } from '@lib/utils';
+import { findScript, log, type PackageJson, readPackageJson, run, ShadowError } from '@lib/utils';
 
 /**
  * Defining types
@@ -266,7 +266,7 @@ export async function release(options: ReleaseOptions, deps: ReleaseDependencies
   }
   const tag = `v${version}`;
 
-  runPreReleaseChecks(targetDir, deps);
+  runPreReleaseChecks(targetDir, packageJson, deps);
 
   packageJson.version = version;
   const updatedContents = `${JSON.stringify(packageJson, null, 2)}\n`;
@@ -299,9 +299,15 @@ export function npmDistTag(version: string): string {
   return /-([a-z]+)\.\d+$/.exec(version)?.[1] ?? 'latest';
 }
 
-/** Runs the pre-release gate — `bun test` — so a broken build never reaches a tag or npm. */
-function runPreReleaseChecks(targetDir: string, deps: ReleaseDependencies): void {
-  const test = deps.run('bun', ['test'], { cwd: targetDir });
+/**
+ * Runs the pre-release test gate so a broken build never reaches a tag or npm. Delegates to the repo's own
+ * `test` script (`bun run test` — Vitest, etc.) so a non-Bun test runner is honored, falling back to `bun test`
+ * only when the repo declares no `test` script.
+ */
+function runPreReleaseChecks(targetDir: string, packageJson: PackageJson, deps: ReleaseDependencies): void {
+  const script = findScript(packageJson.scripts, ['test']);
+  const args = script ? ['run', script.name] : ['test'];
+  const test = deps.run('bun', args, { cwd: targetDir });
   if (test.status !== 0) throw new ShadowError(`Tests failed (exit code ${test.status}) — aborting before any release action`);
 }
 

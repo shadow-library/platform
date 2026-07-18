@@ -46,6 +46,29 @@ describe('build', () => {
       });
     });
 
+    it('should export an asset subpath as-is with no type conditions or typesVersions entry', () => {
+      const result = computeDistPackageJson({ name: 'ui' }, cfg({ '.': 'index', './hooks': 'hooks/index', './styles.css': 'styles.css' }));
+      expect(result.exports).toStrictEqual({
+        '.': { types: './index.d.ts', default: './index.js' },
+        './hooks': { types: './hooks/index.d.ts', default: './hooks/index.js' },
+        './styles.css': './styles.css',
+        './package.json': './package.json',
+      });
+      // only the JS subpath gets a typesVersions entry; the css asset is excluded
+      expect(result.typesVersions).toStrictEqual({ '*': { hooks: ['./hooks/index.d.ts'] } });
+    });
+
+    it('should treat a dotted module base (e.g. *.service) as a JS module, not an asset', () => {
+      // mirrors @shadow-library/common: role-suffixed filenames must still get { types, default } + typesVersions
+      const result = computeDistPackageJson({ name: 'common' }, cfg({ '.': 'index', './config': 'services/config.service', './reflect': 'services/reflector.service' }));
+      const exports = result.exports as Record<string, unknown>;
+      expect(exports['./config']).toStrictEqual({ types: './services/config.service.d.ts', default: './services/config.service.js' });
+      expect(exports['./reflect']).toStrictEqual({ types: './services/reflector.service.d.ts', default: './services/reflector.service.js' });
+      expect(result.typesVersions).toStrictEqual({
+        '*': { config: ['./services/config.service.d.ts'], reflect: ['./services/reflector.service.d.ts'] },
+      });
+    });
+
     it('should rewrite src/-relative sideEffects entries and pass globs through unchanged', () => {
       const result = computeDistPackageJson({ name: 'pkg', sideEffects: ['src/index.ts', 'src/reflector.service.ts', '**/index.js'] }, cfg());
       expect(result.sideEffects).toStrictEqual(['./index.js', './reflector.service.js', '**/index.js']);

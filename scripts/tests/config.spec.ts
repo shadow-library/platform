@@ -32,10 +32,56 @@ describe('config', () => {
     const config = loadConfig(fixtureDir);
     expect(config.build.exports).toStrictEqual({ '.': 'index' });
     expect(config.build.outDir).toBe('dist');
-    expect(config.verify.files).toBe('{src,tests,scripts}/**/*.ts');
+    expect(config.build.command).toBeUndefined();
+    expect(config.verify.lintFiles).toBe('{src,tests,scripts}/**/*.{ts,tsx}');
+    expect(config.verify.formatFiles).toBe('{src,tests,scripts}/**/*.{ts,tsx}');
+    expect(config.verify.test).toBe(true);
+    expect(config.verify.lint).toStrictEqual({ rules: {}, ignores: [], overrides: [], globals: 'node', react: undefined, reactVersion: undefined });
     expect(config.verify.commit).toStrictEqual({ extends: ['@commitlint/config-conventional'], rules: {} });
     expect(config.release).toStrictEqual({ npm: true, publishDir: 'dist', changelog: true });
     expect(config.checkMigrations.dir).toBe('generated/drizzle');
+  });
+
+  it('should read a custom build.command and asset exports from .shadowrc.json', () => {
+    fixtureDir = createFixtureDir('shadow-config-command-');
+    writeFixtureFiles(fixtureDir, {
+      '.shadowrc.json': JSON.stringify({ build: { command: 'tsup', exports: { '.': 'index', './styles.css': 'styles.css' } } }),
+    });
+    const config = loadConfig(fixtureDir);
+    expect(config.build.command).toBe('tsup');
+    expect(config.build.exports).toStrictEqual({ '.': 'index', './styles.css': 'styles.css' });
+  });
+
+  it('should split lint and format file sets when verify.files is an object', () => {
+    fixtureDir = createFixtureDir('shadow-config-files-');
+    writeFixtureFiles(fixtureDir, {
+      '.shadowrc.json': JSON.stringify({ verify: { files: { lint: 'src/**/*.tsx', format: '{src,scripts}/**/*.tsx' } } }),
+    });
+    const config = loadConfig(fixtureDir);
+    expect(config.verify.lintFiles).toBe('src/**/*.tsx');
+    expect(config.verify.formatFiles).toBe('{src,scripts}/**/*.tsx');
+  });
+
+  it('should apply a single verify.files string to both lint and format', () => {
+    fixtureDir = createFixtureDir('shadow-config-files-str-');
+    writeFixtureFiles(fixtureDir, { '.shadowrc.json': JSON.stringify({ verify: { files: 'lib/**/*.ts' } }) });
+    const config = loadConfig(fixtureDir);
+    expect(config.verify.lintFiles).toBe('lib/**/*.ts');
+    expect(config.verify.formatFiles).toBe('lib/**/*.ts');
+  });
+
+  it('should read verify.lint react/globals/overrides and verify.test', () => {
+    fixtureDir = createFixtureDir('shadow-config-lint-');
+    writeFixtureFiles(fixtureDir, {
+      '.shadowrc.json': JSON.stringify({
+        verify: { test: false, lint: { react: true, globals: 'browser', overrides: [{ files: ['**/*.stories.tsx'], rules: { 'no-console': 'off' } }] } },
+      }),
+    });
+    const config = loadConfig(fixtureDir);
+    expect(config.verify.test).toBe(false);
+    expect(config.verify.lint.react).toBe(true);
+    expect(config.verify.lint.globals).toBe('browser');
+    expect(config.verify.lint.overrides).toStrictEqual([{ files: ['**/*.stories.tsx'], rules: { 'no-console': 'off' } }]);
   });
 
   it('should read build config from .shadowrc.json', () => {

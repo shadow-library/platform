@@ -72,7 +72,7 @@ function fakeDeps(overrides: Partial<Record<string, RunResult>> = {}): { deps: R
       if (command === 'git' && args[0] === 'rev-parse') return ok(overrides['__gitRoot']?.stdout ?? '');
       if (command === 'git' && args[0] === 'describe') return fail(); // no prior tag → release from repo root
       if (command === 'git' && args[0] === 'log') return ok('feat: add a thing\x00fix: patch a bug\x00');
-      if (command === 'bun' && args[0] === 'test') return ok();
+      if (command === 'bun' && (args[0] === 'test' || args[0] === 'run')) return ok();
       if (command === 'npm' && args[0] === 'publish') return ((recorder.publishArgs = args), ok());
       throw new Error(`fakeDeps: unexpected command "${command} ${args.join(' ')}"`);
     },
@@ -229,6 +229,17 @@ describe('release (with injected dependencies)', () => {
     expect(recorder.createRefArgs).toStrictEqual([{ ref: 'refs/tags/v1.1.0-alpha.0', sha: 'newsha' }]);
     expect(recorder.createReleaseArgs).toStrictEqual([{ tag_name: 'v1.1.0-alpha.0', prerelease: true }]);
     expect(recorder.publishArgs.slice(-2)).toStrictEqual(['--tag', 'alpha']);
+  });
+
+  it("should run the repo's own test script instead of bun test when one is declared", async () => {
+    fixtureDir = createFixtureDir('shadow-release-testscript-');
+    writeFixtureFiles(fixtureDir, { 'package.json': JSON.stringify({ name: '@fixtures/pkg', version: '1.0.0', scripts: { test: 'vitest run' } }) });
+    const { deps, recorder } = withGitRoot(fixtureDir);
+
+    await release({ release: 'minor', path: fixtureDir }, deps);
+
+    expect(recorder.commands).toContain('bun run');
+    expect(recorder.commands).not.toContain('bun test');
   });
 
   it('should skip npm publish when release.npm is false', async () => {

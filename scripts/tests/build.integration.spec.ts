@@ -90,6 +90,57 @@ describe('build (integration)', () => {
     expect(distPackageJson.scripts).toBeUndefined();
   });
 
+  it('should run a custom build.command bundler and synthesize package.json around its asset output', async () => {
+    fixtureDir = createFixtureDir('shadow-build-cmd-');
+    // a fake bundler that cleans dist first (like tsup clean:true), then emits JS, a d.ts, and a CSS asset
+    const bundler =
+      "const fs=require('fs');fs.rmSync('dist',{recursive:true,force:true});fs.mkdirSync('dist');" +
+      "fs.writeFileSync('dist/index.js','export const x=1;');fs.writeFileSync('dist/index.d.ts','export declare const x: number;');fs.writeFileSync('dist/styles.css','.a{color:red}');";
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/ui', version: '1.0.0', type: 'module', sideEffects: ['**/*.css'] }),
+      '.shadowrc.json': JSON.stringify({ build: { command: ['node', '-e', bundler], exports: { '.': 'index', './styles.css': 'styles.css' } } }),
+    });
+
+    await build({ cwd: fixtureDir });
+
+    const distDir = path.join(fixtureDir, 'dist');
+    expect(fs.existsSync(path.join(distDir, 'index.js'))).toBe(true);
+    expect(fs.existsSync(path.join(distDir, 'styles.css'))).toBe(true);
+
+    // package.json is written AFTER the bundler cleans dist, so the synthesized manifest survives
+    const distPackageJson = JSON.parse(fs.readFileSync(path.join(distDir, 'package.json'), 'utf-8'));
+    expect(distPackageJson.exports['.']).toStrictEqual({ types: './index.d.ts', default: './index.js' });
+    expect(distPackageJson.exports['./styles.css']).toBe('./styles.css');
+    expect(distPackageJson.typesVersions).toBeUndefined();
+    expect(distPackageJson.sideEffects).toStrictEqual(['**/*.css']);
+  });
+
+  it('should resolve a bare build.command to the local node_modules/.bin', async () => {
+    fixtureDir = createFixtureDir('shadow-build-localbin-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/localbin', version: '1.0.0', type: 'module' }),
+      '.shadowrc.json': JSON.stringify({ build: { command: 'mybundler', exports: { '.': 'index' } } }),
+      'node_modules/.bin/mybundler': '#!/bin/sh\nmkdir -p dist\nprintf "export const x=1;" > dist/index.js\nprintf "export declare const x: number;" > dist/index.d.ts\n',
+    });
+    fs.chmodSync(path.join(fixtureDir, 'node_modules/.bin/mybundler'), 0o755);
+
+    await build({ cwd: fixtureDir });
+
+    expect(fs.existsSync(path.join(fixtureDir, 'dist/index.js'))).toBe(true);
+    const distPackageJson = JSON.parse(fs.readFileSync(path.join(fixtureDir, 'dist/package.json'), 'utf-8'));
+    expect(distPackageJson.main).toBe('./index.js');
+  });
+
+  it('should fail with a clear error when a custom build.command exits non-zero', async () => {
+    fixtureDir = createFixtureDir('shadow-build-cmd-fail-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/ui-fail', version: '1.0.0', type: 'module' }),
+      '.shadowrc.json': JSON.stringify({ build: { command: ['node', '-e', 'process.exit(1)'], exports: { '.': 'index' } } }),
+    });
+
+    await expect(build({ cwd: fixtureDir })).rejects.toThrow(/Build failed/);
+  });
+
   it('should fail with a clear error when tsc fails to compile', async () => {
     fixtureDir = createFixtureDir('shadow-build-fail-');
     writeFixtureFiles(fixtureDir, {

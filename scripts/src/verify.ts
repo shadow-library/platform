@@ -43,10 +43,26 @@ export function isRecursiveVerifyCall(command: string): boolean {
   return /(^|[\s&|;])(bunx|npx)?\s*shadow\s+verify\b/.test(command);
 }
 
+/** The repo's declared `react` version spec, if any — preferring the concrete build dep over a broad peer range. */
+function reactSpec(packageJson: PackageJson): string | undefined {
+  return packageJson.dependencies?.react ?? packageJson.devDependencies?.react ?? packageJson.peerDependencies?.react;
+}
+
+/**
+ * Coerces a `react` dependency spec (`^19.2.4`, `18`, `^18.3.0 || ^19.0.0`) to the `major.minor` string
+ * `eslint-plugin-react` needs — its own `'detect'` mode throws under ESLint 10, so `verify` resolves it here.
+ */
+function detectReactVersion(packageJson: PackageJson): string | undefined {
+  const spec = reactSpec(packageJson);
+  const match = spec ? /(\d+)(?:\.(\d+))?/.exec(spec) : null;
+  if (!match) return undefined;
+  return match[2] ? `${match[1]}.${match[2]}` : match[1];
+}
+
 /** Formats the repo's TypeScript with prettier — the base ruleset merged with `verify.format` overrides. */
 async function runFormat(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
   const options = { ...PRETTIER_BASE, ...verifyConfig.format };
-  const files = Array.from(new Bun.Glob(verifyConfig.files).scanSync({ cwd, onlyFiles: true }));
+  const files = Array.from(new Bun.Glob(verifyConfig.formatFiles).scanSync({ cwd, onlyFiles: true }));
 
   if (files.length === 0) {
     log.info('skip   format (no files matched)');
@@ -82,7 +98,7 @@ async function runLint(cwd: string, verifyConfig: VerifyConfig, fix: boolean): P
   const overrideConfig = createLintConfig(verifyConfig.lint) as unknown as Linter.Config[];
   // errorOnUnmatchedPattern is off because the file glob spans src/tests/scripts and not every repo has all three.
   const eslint = new ESLint({ cwd, fix, overrideConfigFile: true, overrideConfig, errorOnUnmatchedPattern: false });
-  const results = await eslint.lintFiles([verifyConfig.files]);
+  const results = await eslint.lintFiles([verifyConfig.lintFiles]);
   if (fix) await ESLint.outputFixes(results);
 
   const output = await (await eslint.loadFormatter('stylish')).format(results);
@@ -127,10 +143,17 @@ export async function verify(options: VerifyOptions): Promise<number> {
   const { data: packageJson } = readPackageJson(options.cwd);
   const config = loadConfig(options.cwd, packageJson.name);
 
-  if (!(await runFormat(options.cwd, config.verify, fix))) return 1;
-  if (!(await runLint(options.cwd, config.verify, fix))) return 1;
+  // React lint is on when explicitly set, otherwise auto-detected from a `react` dependency; its version is
+  // pinned from the repo (or an explicit override) because eslint-plugin-react's `'detect'` throws on ESLint 10.
+  const react = config.verify.lint.react ?? Boolean(reactSpec(packageJson));
+  const reactVersion = config.verify.lint.reactVersion ?? detectReactVersion(packageJson);
+  const verifyConfig: VerifyConfig = { ...config.verify, lint: { ...config.verify.lint, react, reactVersion } };
 
-  for (const step of DELEGATED_STEPS) {
+  if (!(await runFormat(options.cwd, verifyConfig, fix))) return 1;
+  if (!(await runLint(options.cwd, verifyConfig, fix))) return 1;
+
+  const steps = verifyConfig.test ? DELEGATED_STEPS : DELEGATED_STEPS.filter(step => step.label !== 'test');
+  for (const step of steps) {
     const status = runDelegatedStep(step, packageJson, options.cwd);
     if (status !== 0) return status;
   }
