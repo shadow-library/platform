@@ -16,19 +16,14 @@ import { serverAuthFetch } from './server-fetch';
  */
 
 /**
- * ASSUMED CONTRACT — the backend has not migrated yet. The relying-party auth package exposes no HTTP
- * routes of its own (session management is left to the consuming app), so this codes against
- * `GET /api/auth/session` returning the signed-in user and answering 401 when there is no session.
- * Adjust here (and in `server-fetch.ts`) once novel-forge-server lands its real surface.
+ * The BINDING flat session contract of novel-forge-server's first-party session surface:
+ * `GET /api/auth/session` answers 200 with this shape for an established session and 401 otherwise —
+ * never a 200 null.
  */
-export interface SessionUser {
-  id: string;
+export interface SessionResponse {
+  userId: string;
   email?: string;
   name?: string;
-}
-
-export interface SessionResponse {
-  user: SessionUser;
 }
 
 /**

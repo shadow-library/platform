@@ -26,8 +26,5 @@ const API_ORIGIN = process.env.API_ORIGIN ?? 'http://localhost:8080';
 /** The versioned API surface (projects, chapters, runs, …). */
 export const serverFetch = createServerFetch({ baseUrl: `${API_ORIGIN}/api/v1` });
 
-/**
- * The session routes the backend's relying-party auth module exposes outside the versioned API.
- * ASSUMED CONTRACT: `GET /api/auth/session` (401 = no session) — novel-forge-server's migration must expose it.
- */
+/** The first-party session surface novel-forge-server exposes outside the versioned API (`GET /api/auth/session`, 401 = no session). */
 export const serverAuthFetch = createServerFetch({ baseUrl: `${API_ORIGIN}/api/auth` });
