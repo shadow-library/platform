@@ -1,0 +1,68 @@
+{
+  "type": "component",
+  "build": {
+    "exports": {
+      ".": "index",
+      "./router": "router",
+      "./styles.css": "styles.css",
+      "./styles.layer.css": "styles.layer.css"
+    },
+    "alias": {
+      "@/": "src/"
+    },
+    "css": {
+      "layer": "shadow-library",
+      "useClient": [
+        "**/*.tsx",
+        "**/hooks/**",
+        "**/router.{ts,tsx}"
+      ]
+    }
+  },
+  "verify": {
+    "files": "{src,scripts,.storybook}/**/*.{ts,tsx}",
+    "lint": {
+      "globals": "both",
+      "ignores": [
+        "scripts/**"
+      ],
+      "rules": {
+        "jsx-a11y/click-events-have-key-events": "off",
+        "jsx-a11y/interactive-supports-focus": "off",
+        "jsx-a11y/no-static-element-interactions": "off",
+        "jsx-a11y/no-noninteractive-element-interactions": "off",
+        "jsx-a11y/no-noninteractive-tabindex": "off",
+        "jsx-a11y/no-autofocus": "off"
+      },
+      "overrides": [
+        {
+          "files": [
+            "**/*.stories.{ts,tsx}"
+          ],
+          "rules": {
+            "@typescript-eslint/no-empty-function": "off",
+            "@typescript-eslint/explicit-module-boundary-types": "off",
+            "react-hooks/rules-of-hooks": "off"
+          }
+        },
+        {
+          "files": [
+            ".storybook/**/*.{ts,tsx}"
+          ],
+          "rules": {
+            "react-hooks/rules-of-hooks": "off"
+          }
+        },
+        {
+          "files": [
+            "**/*.test.{ts,tsx}"
+          ],
+          "rules": {
+            "jsx-a11y/anchor-has-content": "off",
+            "no-constant-binary-expression": "off"
+          }
+        }
+      ]
+    }
+  }
+}

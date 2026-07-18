@@ -1,27 +1,31 @@
 name: Publish package to NPM
-permissions:
-  id-token: write
-  contents: write
 
 on:
   workflow_dispatch:
     inputs:
-      bump:
+      release:
         type: choice
-        description: 'Bump version'
+        description: 'Release type — stable level (major/minor/patch) or prerelease channel (alpha/beta)'
         default: 'patch'
         options:
-          - 'patch'
-          - 'minor'
           - 'major'
-          - 'premajor'
-          - 'preminor'
-          - 'prepatch'
+          - 'minor'
+          - 'patch'
+          - 'alpha'
+          - 'beta'
+      force:
+        type: boolean
+        description: 'Release the chosen level even if the commits require a higher bump'
+        default: false
 
 jobs:
   publish:
     if: github.actor == 'leanderpaul' && github.triggering_actor == 'leanderpaul' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: write
+      pull-requests: write
 
     steps:
       - name: Checkout repository
@@ -35,14 +39,6 @@ jobs:
           app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
           private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
 
-      - name: Set Git user config
-        run: |
-          git config user.name "$APP_SLUG[bot]"
-          git config user.email "$INSTALLATION_ID+$APP_SLUG[bot]@users.noreply.github.com"
-        env:
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
-          INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}
-
       - name: Set up Node.js version
         uses: actions/setup-node@v4
         with:
@@ -55,18 +51,8 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Bump version
-        run: bunx release-it ${{ github.event.inputs.bump }} ${{ startsWith(github.event.inputs.bump, 'pre') && '--preRelease=beta' || '' }} --ci
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
-
-      - name: Push changes
-        run: |
-          gh api --method PUT /repos/${{ github.repository }}/contents/package.json \
-            --field branch="main" \
-            --field encoding="base64"  \
-            --field content="$(base64 -i package.json)" \
-            --field message="$(git show -s --format=%s)" \
-            --field sha="$(git rev-parse HEAD~1:package.json)"
+      # npm publish authenticates via OIDC trusted publishing (id-token: write) — no NODE_AUTH_TOKEN needed.
+      - name: Release
+        run: bunx shadow release ${{ inputs.release }} ${{ inputs.force && '--force' || '' }}
         env:
           GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}

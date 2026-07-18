@@ -19,14 +19,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint code
-        run: bun lint
+      - name: Verify code (format + lint + type-check + test)
+        run: bun run verify
 
-      - name: Build the code
+      - name: Build the package
         run: bun run build
 
-      - name: Test the code
-        run: bun test:setup && bun run test
-
       - name: Test the stories (interaction + a11y)
-        run: bun run test:stories
+        run: bun test:setup && bun run test:stories

@@ -30,14 +30,14 @@ function newestInputMtime(): number {
     }
   };
   walk(srcDir);
-  for (const file of ['scripts/build.ts', 'package.json']) newest = Math.max(newest, fs.statSync(path.join(rootDir, file)).mtimeMs);
+  for (const file of ['package.json', '.shadowrc.json']) newest = Math.max(newest, fs.statSync(path.join(rootDir, file)).mtimeMs);
   return newest;
 }
 
 function ensureFreshBuild(): void {
   const built = fs.existsSync(distEntry) && fs.statSync(distEntry).mtimeMs >= newestInputMtime();
   if (built) return;
-  execFileSync('bun', ['scripts/build.ts'], { cwd: rootDir, stdio: 'pipe' });
+  execFileSync('bun', ['run', 'build'], { cwd: rootDir, stdio: 'pipe' });
 }
 
 /**
