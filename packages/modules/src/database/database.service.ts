@@ -167,6 +167,18 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     return typeof error === 'object' && error !== null && 'code' in error && (error as Record<string, unknown>).code === 'ERR_POSTGRES_SERVER_ERROR';
   }
 
+  /**
+   * Runs a database operation, rethrowing any failure through `translateError` so constraint
+   * violations surface as the mapped application errors without a try/catch at every call site.
+   */
+  async run<T>(operation: () => Promise<T>): Promise<T> {
+    try {
+      return await operation();
+    } catch (error) {
+      this.translateError(error);
+    }
+  }
+
   translateError(error: unknown): never {
     const cause = error instanceof Error ? error.cause : undefined;
     const pgError = this.isPostgresError(error) ? error : this.isPostgresError(cause) ? cause : undefined;

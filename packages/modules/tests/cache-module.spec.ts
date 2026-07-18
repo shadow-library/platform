@@ -124,6 +124,76 @@ describe('Cache Module', () => {
       await redisCacheService.publish('test-channel', 'test-message');
       expect(redisMock.publish).toHaveBeenCalledWith('test-channel', 'test-message');
     });
+
+    describe('getOrSet', () => {
+      it('should compute and cache the value on a miss', async () => {
+        redisMock.get.mockResolvedValue(null);
+        const factory = mock(() => ({ test: 'data' }));
+
+        const result = await cacheService.getOrSet('miss-key', factory, 60);
+        expect(result).toEqual({ test: 'data' });
+        expect(factory).toHaveBeenCalledTimes(1);
+        expect(redisMock.set).toHaveBeenCalledWith('miss-key', JSON.stringify({ test: 'data' }), 'EX', 60);
+      });
+
+      it('should return the cached value without calling the factory on a hit', async () => {
+        redisMock.get.mockResolvedValue(JSON.stringify({ test: 'data' }));
+        const factory = mock(() => ({ test: 'fresh' }));
+
+        const result = await cacheService.getOrSet('hit-key', factory);
+        expect(result).toEqual({ test: 'data' });
+        expect(factory).not.toHaveBeenCalled();
+      });
+
+      it('should share a single factory invocation between concurrent calls', async () => {
+        redisMock.get.mockResolvedValue(null);
+        const factory = mock(async () => {
+          await new Promise(resolve => setTimeout(resolve, 10));
+          return 'computed';
+        });
+
+        const [first, second] = await Promise.all([cacheService.getOrSet('flight-key', factory), cacheService.getOrSet('flight-key', factory)]);
+        expect(first).toBe('computed');
+        expect(second).toBe('computed');
+        expect(factory).toHaveBeenCalledTimes(1);
+      });
+
+      it('should not cache nullish factory results', async () => {
+        redisMock.get.mockResolvedValue(null);
+        const factory = mock(() => null);
+
+        const result = await cacheService.getOrSet('null-key', factory);
+        expect(result).toBeNull();
+        expect(redisMock.set).not.toHaveBeenCalled();
+      });
+    });
+
+    describe('counters', () => {
+      it('should increment the counter through the L2 store', async () => {
+        redisMock.incrby.mockResolvedValue(5);
+        const result = await cacheService.incr('counter', 5);
+        expect(result).toBe(5);
+        expect(redisMock.incrby).toHaveBeenCalledWith('counter', 5);
+      });
+
+      it('should decrement the counter through the L2 store', async () => {
+        redisMock.decrby.mockResolvedValue(3);
+        const result = await cacheService.decr('counter', 2);
+        expect(result).toBe(3);
+        expect(redisMock.decrby).toHaveBeenCalledWith('counter', 2);
+      });
+
+      it('should drop the stale L1 copy when a counter changes', async () => {
+        await cacheService.set('counter', 1);
+        redisMock.incrby.mockResolvedValue(2);
+        redisMock.get.mockResolvedValue('2');
+
+        await cacheService.incr('counter');
+        const result = await cacheService.get('counter');
+        expect(result).toBe(2);
+        expect(redisMock.get).toHaveBeenCalledWith('counter');
+      });
+    });
   });
 
   describe('Memcached Strategy', () => {

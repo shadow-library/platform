@@ -56,7 +56,7 @@ The `DatabaseModule` provides a unified database access layer for PostgreSQL (vi
 - **Redis**: Full Redis client lifecycle management via `ioredis`.
 - **Memcached**: Full Memcached client lifecycle management.
 - **Connection Testing**: Automatic connection verification on startup for all backends (PostgreSQL runs `SELECT 1`, Redis waits for `ready`, Memcached runs `stats`). PostgreSQL supports **lazy connections** — skip the startup verification by setting `lazyConnection: true` in code or via the `database.postgres.lazy-connection` config key.
-- **Error Translation**: Translates PostgreSQL constraint violations into application-specific errors via a configurable constraint error map.
+- **Error Translation**: `run()` wraps operations and translates PostgreSQL constraint violations into application-specific errors via a configurable constraint error map; `translateError()` does the same inside your own catch block.
 - **Environment Variable Fallbacks**: Connection URLs can be provided in code or fall back to environment variables.
 - **Clear Peer Dependency Errors**: When optional peer dependencies (`ioredis`, `memcached`) are missing, the error message includes the exact install command for your runtime.
 - **Utility Methods**: `attachParent` and `attachMatchingParent` helpers for linking related database records.
@@ -68,6 +68,8 @@ The `CacheModule` offers a multi-level caching strategy (L1: in-memory LRU, L2: 
 - **L1 Cache**: In-memory LRU cache with configurable size and TTL.
 - **L2 Cache**: Automatically uses Redis or Memcached (provided by the `DatabaseModule`) as the L2 backend.
 - **Abstraction**: Unified `CacheService` for consistent caching operations regardless of the backend.
+- **Cache-aside Helper**: `getOrSet` computes and caches a value on miss, with concurrent calls for the same key sharing a single computation (cache-stampede protection).
+- **Counters**: `incr`/`decr` update counters atomically in the L2 store and drop the stale L1 copy.
 - **Direct Access**: `RedisCacheService` and `MemcacheService` are also exported for backend-specific operations.
 
 ## Usage
@@ -320,13 +322,19 @@ declare module '@shadow-library/modules/database' {
 
 **Error translation:**
 
-Use `translateError()` to map PostgreSQL constraint violations to application errors:
+Wrap database operations with `run()` to translate PostgreSQL constraint violations into your application errors without a try/catch at every call site:
+
+```typescript
+// Throws the mapped error from constraintErrorMap, or an internal error for unknown failures
+const user = await this.databaseService.run(() => db.insert(users).values({ email }).returning());
+```
+
+For manual control, `translateError()` performs the same mapping inside your own catch block:
 
 ```typescript
 try {
   await db.insert(users).values({ email: 'duplicate@test.com' });
 } catch (error) {
-  // Throws the mapped error from constraintErrorMap, or InternalError for unknown errors
   this.databaseService.translateError(error);
 }
 ```
@@ -353,6 +361,7 @@ linked[0].getParent(); // returns the matching user
 | `isPostgresEnabled()`                                    | Returns `true` if the Postgres client is initialized                 |
 | `isRedisEnabled()`                                       | Returns `true` if the Redis client is initialized                    |
 | `isMemcacheEnabled()`                                    | Returns `true` if the Memcached client is initialized                |
+| `run(operation)`                                         | Runs an operation, translating failures via the constraint map       |
 | `translateError(error)`                                  | Translates a database error to an app error using the constraint map |
 | `attachParent(target, parent)`                           | Attaches a `getParent()` method to the target object                 |
 | `attachMatchingParent(sources, sourceKey, parents, ...)` | Batch-links sources to parents by key                                |
@@ -405,15 +414,27 @@ export class UserService {
   constructor(private readonly cacheService: CacheService) {}
 
   async getUser(id: string) {
-    const cachedUser = await this.cacheService.get(`user:${id}`);
-    if (cachedUser) return cachedUser;
-
-    const user = { id, name: 'John Doe' };
-    await this.cacheService.set(`user:${id}`, user, 60); // TTL: 60 seconds
-    return user;
+    // Returns the cached user, or loads, caches (TTL: 60s) and returns it.
+    // Concurrent calls for the same key share a single load (no cache stampede).
+    return this.cacheService.getOrSet(`user:${id}`, () => this.loadUser(id), 60);
   }
 }
 ```
+
+The lower-level primitives are available when you need direct control:
+
+```typescript
+await cacheService.get('user:1'); // L1 → L2 lookup, hydrates L1 on an L2 hit
+await cacheService.set('user:1', user, 60); // writes L1 + L2 with an optional TTL
+await cacheService.del('user:1'); // removes from L1 + L2
+
+// Atomic counters — applied in the L2 store, stale L1 copies are dropped
+await cacheService.incr('page:views'); // 1
+await cacheService.incr('page:views', 5); // 6
+await cacheService.decr('page:views', 2); // 4
+```
+
+> `getOrSet` treats `null`/`undefined` factory results as uncacheable: the value is returned to the caller but recomputed on the next call.
 
 You can also inject `RedisCacheService` or `MemcacheService` directly for backend-specific features:
 

@@ -146,6 +146,53 @@ describe('Database Module', () => {
     });
   });
 
+  describe('run', () => {
+    let databaseService: DatabaseService;
+
+    const mappedError = new Error('Email already exists');
+    const pgError = {
+      errno: '23505',
+      detail: 'Key (email)=(test@test.com) already exists.',
+      severity: 'ERROR',
+      schema: 'public',
+      table: 'users',
+      constraint: 'users_email_unique',
+      file: 'nbtinsert.c',
+      routine: '_bt_check_unique',
+      code: 'ERR_POSTGRES_SERVER_ERROR' as const,
+    };
+
+    @Module({
+      imports: [
+        DatabaseModule.forRoot({
+          postgres: {
+            factory: postgresFactory,
+            constraintErrorMap: { users_email_unique: mappedError },
+          },
+        }),
+      ],
+    })
+    class RunAppModule {}
+
+    beforeEach(async () => {
+      const app = await ShadowFactory.create(RunAppModule);
+      databaseService = app.get(DatabaseService);
+    });
+
+    it('should return the operation result on success', async () => {
+      const result = await databaseService.run(async () => 'query-result');
+      expect(result).toBe('query-result');
+    });
+
+    it('should translate a constraint violation to the mapped error', async () => {
+      await expect(databaseService.run(async () => Promise.reject(pgError))).rejects.toThrow(mappedError);
+    });
+
+    it('should translate an unknown failure to an internal error', async () => {
+      await expect(databaseService.run(async () => Promise.reject(new Error('boom')))).rejects.toThrow('Unknown database error occurred');
+    });
+  });
+
   describe('forRootAsync', () => {
     let databaseService: DatabaseService;
 
