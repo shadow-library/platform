@@ -14,7 +14,7 @@
 - A **design-token layer** of CSS custom properties (`--sh-*`) is the single runtime source of truth for all themeable values (colors, type, spacing, radius, elevation, motion, z-index, density). Light and dark are the same tokens with different values; theme flips cascade automatically.
 - Each **component** is a self-contained folder pairing a React `.tsx` with a scoped **CSS Module** (`.module.css`) that consumes tokens. No component depends on a global class — see the one documented exception below.
 - The **package entry** (`src/index.ts`) imports the global stylesheet and re-exports every public component, hook, and type.
-- The **build** (`scripts/build.ts`) bundles ESM with Rollup, extracts all CSS Modules + globals into one `dist/styles.css`, and emits type declarations.
+- The **build** (`shadow build`, repo `type: component`) bundles ESM with Rollup + PostCSS, extracts all CSS Modules into one `dist/styles.css`, emits type declarations, and injects `'use client'` banners — driven entirely by `.shadowrc.json` (`build.css` / `build.alias`).
 
 ---
 
@@ -24,15 +24,15 @@
 | --- | --- |
 | Language | TypeScript 5.9 (strict), React 18.3+/19 |
 | Styling | **CSS Modules** + CSS custom-property design tokens |
-| Build | Bun + Rollup (`rollup-plugin-esbuild`, `rollup-plugin-postcss` with `postcss-import`) |
+| Build | `shadow build` (`@shadow-library/scripts`, `type: component`) — native Rollup (`rollup-plugin-esbuild`) + PostCSS (`rollup-plugin-postcss`, `postcss-import`) CSS-Modules pipeline with `'use client'` banners; shadow synthesizes `dist/package.json` |
 | Types | `tsc` (declaration emit) + `tsc-alias` |
-| Lint / format | Biome |
+| Lint / format | `shadow verify` (`@shadow-library/scripts`) — Prettier + a shipped ESLint flat config (typescript-eslint + perfectionist + react/react-hooks/jsx-a11y) |
 | Tests | Vitest — `unit` project (happy-dom) + `storybook` project (Playwright/Chromium) + Testing Library |
 | Docs / visual QA | Storybook 10 (`@storybook/react-vite`) |
 | Composition | `@radix-ui/react-slot` (the sanctioned `asChild` Slot) |
 | Overlays / behavior | **Radix UI primitives** (`@radix-ui/react-select`, and the sibling packages added per component: dropdown-menu, popover, dialog, tooltip, …). Overlay, menu, and disclosure components wrap the matching Radix primitive 1:1 and skin it with a CSS Module; Radix owns focus management, positioning/flip, and ARIA. Keep the primitive **external** in the build (declare it a dependency), never fork it. |
 | Package manager | Bun (`bun.lock`) |
-| Releases | release-it + conventional-changelog; commitlint + Husky |
+| Releases | `shadow release` (`@shadow-library/scripts`) — computes the bump from Conventional Commits, builds + tests, tags, GitHub release, npm publish; `shadow commit-msg` + Husky enforce the message format |
 
 **Do not introduce Tailwind CSS, CSS-in-JS runtimes, or any other styling system.** Components style exclusively through CSS Modules; the library also ships one hand-authored, token-backed, **unprefixed** global utility layer (`src/styles/utilities.css`) for consumers' own layout markup — see *Styling Guidelines* rule 4.
 
@@ -48,7 +48,7 @@ ui/
 │   ├── preview.tsx           # Imports global CSS, light/dark theme toolbar
 │   └── foundations/          # Token-gallery stories (design docs, not shipped)
 ├── scripts/
-│   └── build.ts              # Rollup + PostCSS build; writes dist/
+│   └── ssr-smoke.mjs         # Standalone SSR import-safety smoke test for the built dist/ (driven by ssr.dist.test.ts)
 ├── src/
 │   ├── components/           # One folder per component (see Component Standards)
 │   ├── hooks/                # Shared, reusable hooks; barrel in index.ts
@@ -60,7 +60,7 @@ ui/
 │   │   └── index.css         # Aggregates tokens.css + reset.css + utilities.css (the global entry)
 │   ├── types.ts              # Shared public types
 │   └── index.ts              # Package entry: imports global CSS, re-exports public API
-├── biome.json                # Lint + format config (2-space, single quote, width 180)
+├── .shadowrc.json            # `@shadow-library/scripts` config: build (component: exports + css + alias) + verify (lint/format/globals/overrides)
 ├── tsconfig.json             # Base TS config (strict; @/* → src/*)
 ├── tsconfig.build.json       # Declaration-emit config for the build
 └── vitest.config.ts          # unit + storybook test projects
@@ -231,8 +231,8 @@ All tokens live in `src/styles/tokens.css` as `--sh-*` custom properties. Semant
 ## Coding Standards
 
 **TypeScript**
-- Strict mode; no `any` (Biome errors). Prefer precise unions and `ComponentPropsWithoutRef<T>`.
-- Inline type imports: `import { type Foo } from 'x'` (Biome `useImportType: inlineType`).
+- Strict mode; avoid `any`. Prefer precise unions and `ComponentPropsWithoutRef<T>`.
+- Inline type imports: `import { type Foo } from 'x'`. Every exported component/function carries an explicit return type (e.g. `: ReactElement`) — the shipped ESLint config's `explicit-module-boundary-types`.
 - Respect `noUncheckedIndexedAccess`; compose possibly-undefined class values through `cn`.
 
 **React patterns**
@@ -283,14 +283,12 @@ When adding a new component:
 Then run the full gate and fix everything before committing:
 
 ```bash
-bun lint          # biome check   (bun format to auto-fix)
-bun type-check    # tsc
-bun run test      # vitest unit project
-bun run build     # rollup + postcss + tsc declarations
+bun run verify    # shadow verify: prettier + eslint + tsc + vitest unit project (add --fix to auto-format/lint)
+bun run build     # shadow build (type: component) → rollup + postcss CSS Modules + tsc declarations + synthesized dist/package.json
 bun run build-storybook   # optional but recommended for new components
 ```
 
-Commit as a **single logical unit** using Conventional Commits (`feat: add button component`). Husky runs Biome + `tsc` pre-commit; commitlint enforces the message format.
+Commit as a **single logical unit** using Conventional Commits (`feat: add button component`). Husky runs `shadow verify` pre-commit; `shadow commit-msg` enforces the message format.
 
 ---
 
