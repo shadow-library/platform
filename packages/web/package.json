@@ -1,6 +1,6 @@
 {
   "name": "@shadow-library/web",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "description": "Frontend application framework for the Shadow Apps ecosystem — the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
   "sideEffects": false,
@@ -34,11 +34,21 @@
     "typescript": "^5.7.0"
   },
   "peerDependenciesMeta": {
-    "@tanstack/react-query": { "optional": true },
-    "@tanstack/react-router": { "optional": true },
-    "@tanstack/react-router-ssr-query": { "optional": true },
-    "@tanstack/react-start": { "optional": true },
-    "typescript": { "optional": true }
+    "@tanstack/react-query": {
+      "optional": true
+    },
+    "@tanstack/react-router": {
+      "optional": true
+    },
+    "@tanstack/react-router-ssr-query": {
+      "optional": true
+    },
+    "@tanstack/react-start": {
+      "optional": true
+    },
+    "typescript": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@shadow-library/scripts": "^0.2.2",
