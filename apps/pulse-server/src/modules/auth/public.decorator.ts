@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -20,4 +20,4 @@ type PublicDecorator = ClassDecorator & MethodDecorator;
 export const PUBLIC_ROUTE_METADATA = 'pulsePublic';
 
 /** Marks a controller route as intentionally unauthenticated, exempting it from the default-deny sentinel */
-export const Public = (): PublicDecorator => Route({ [PUBLIC_ROUTE_METADATA]: true });
+export const Public = (): PublicDecorator => Handler({ [PUBLIC_ROUTE_METADATA]: true });

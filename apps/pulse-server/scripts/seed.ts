@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Logger } from '@shadow-library/common';
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
 import { PgTableWithColumns } from 'drizzle-orm/pg-core';
+import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

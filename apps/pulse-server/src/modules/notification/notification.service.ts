@@ -3,13 +3,12 @@
  */
 import assert from 'node:assert';
 
-import { Injectable } from '@shadow-library/app';
-import { AppError, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
-import { DatabaseService } from '@shadow-library/modules';
 import { and, asc, desc, eq, sql } from 'drizzle-orm';
 import parsePhoneNumber from 'libphonenumber-js';
 import validator from 'validator';
+import { Injectable } from '@shadow-library/app';
+import { AppError, type AppErrorObject, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { DatabaseService } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
@@ -18,7 +17,7 @@ import { SenderEndpointService, SenderRoutingRuleService } from '@modules/config
 import { LinkedTemplateVariant, TemplateSettingsService, TemplateVariantService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { Configuration, Notification, PrimaryDatabase, Template, schema } from '@server/database';
+import { Configuration, Notification, PrimaryDatabase, schema, Template } from '@server/database';
 
 import { NotificationProviderService } from './notification-provider.service';
 import { NotificationOpResult } from './providers';
@@ -62,7 +61,12 @@ export interface ChannelSendResult {
   status: ChannelNotificationStatus;
   locale?: string;
   jobId?: string;
-  error?: ServerError;
+  /**
+   * Already the wire shape (`AppError.toResponse()`): the fastify 2.0 response-transform pipeline
+   * `structuredClone`s the payload, which strips custom properties off `Error` instances, so a live
+   * `AppError` cannot survive to an output transformer.
+   */
+  error?: AppErrorObject;
 }
 
 export interface SendNotificationResult {
@@ -185,7 +189,7 @@ export class NotificationService {
 
       const routingRule = await this.senderRoutingRuleService.resolveSenderRoutingRule(service, region, templateGroup.messageType);
       const senderEndpoints = await this.senderEndpointService.getSenderEndpointsByChannel(routingRule.senderProfileId, notificationJob.channel);
-      if (senderEndpoints.length === 0) throw new ServerError(AppErrorCode.SND_EP_001);
+      if (senderEndpoints.length === 0) throw AppErrorCode.SND_EP_001.create();
       Object.assign(jobLogData, { routingRuleId: routingRule.id, senderProfileId: routingRule.senderProfileId, senderEndpointCount: senderEndpoints.length });
       this.logger.debug(`Resolved sender profile for notification job - ${notificationJob.id}`, jobLogData);
 
@@ -218,7 +222,7 @@ export class NotificationService {
         .set({
           status: 'PERMANENTLY_FAILED',
           attempt: sql`${schema.notificationJobs.attempt} + 1`,
-          lastError: error instanceof AppError ? error.getCode() : 'UNKNOWN_ERROR',
+          lastError: error instanceof AppError ? error.code : 'UNKNOWN_ERROR',
           lastAttemptedAt: new Date(),
         })
         .where(eq(schema.notificationJobs.id, notificationJob.id))
@@ -232,11 +236,11 @@ export class NotificationService {
     const recipient = this.getValidatedRecipient(channel, config.recipients);
     if (!recipient) {
       const errorCode = RECIPIENT_VALIDATION_ERROR_CODES[channel];
-      return { channel, status: ChannelNotificationStatus.FAILED, error: new ServerError(errorCode) };
+      return { channel, status: ChannelNotificationStatus.FAILED, error: errorCode.create().toResponse() };
     }
 
     const templateVariant = await this.resolveTemplateVariant(config.templateKey, channel, config.locale);
-    if (!templateVariant) return { channel, status: ChannelNotificationStatus.FAILED, error: new ServerError(AppErrorCode.TPL_VRT_003) };
+    if (!templateVariant) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_VRT_003.create().toResponse() };
 
     const templateGroup = templateVariant.getParent();
     const [notification] = await this.db

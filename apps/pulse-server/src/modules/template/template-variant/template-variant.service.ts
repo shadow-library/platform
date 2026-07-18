@@ -3,18 +3,17 @@
  */
 import assert from 'node:assert';
 
+import { and, asc, desc, eq, InferInsertModel } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger, OffsetPagination, OffsetPaginationResult, ValidationError, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
+import { Logger, OffsetPagination, OffsetPaginationResult, utils, ValidationError } from '@shadow-library/common';
 import { DatabaseService, LinkedWithParent } from '@shadow-library/modules';
-import { InferInsertModel, and, asc, desc, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { Notification, PrimaryDatabase, Template, schema } from '@server/database';
+import { Notification, PrimaryDatabase, schema, Template } from '@server/database';
 
 /**
  * Defining types
@@ -83,7 +82,7 @@ export class TemplateVariantService {
   async listTemplateVariants(templateGroupId: bigint, filter: ListVariantQuery = {}): Promise<OffsetPaginationResult<Template.Variant>> {
     const page = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
     const templateGroup = await this.db.query.templateGroups.findFirst({ where: eq(schema.templateGroups.id, templateGroupId) });
-    if (!templateGroup) throw new ServerError(AppErrorCode.TPL_GRP_001);
+    if (!templateGroup) throw AppErrorCode.TPL_GRP_001.create();
 
     const sortField = page.sortBy === 'createdAt' ? schema.templateVariants.createdAt : schema.templateVariants.updatedAt;
     const orderBy = page.sortOrder === 'asc' ? asc(sortField) : desc(sortField);
@@ -126,7 +125,7 @@ export class TemplateVariantService {
       .where(and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.id, templateVariantId)))
       .returning()
       .catch(err => this.databaseService.translateError(err));
-    if (!templateVariant) throw new ServerError(AppErrorCode.TPL_VRT_001);
+    if (!templateVariant) throw AppErrorCode.TPL_VRT_001.create();
     this.logger.info('Template variant updated', { channel: templateVariant.channel, locale: templateVariant.locale, templateGroupId });
     return templateVariant;
   }
@@ -137,7 +136,7 @@ export class TemplateVariantService {
       .where(and(eq(schema.templateVariants.templateGroupId, templateGroupId), eq(schema.templateVariants.id, templateVariantId)))
       .returning({ id: schema.templateVariants.id })
       .catch(err => this.databaseService.translateError(err));
-    if (result.length === 0) throw new ServerError(AppErrorCode.TPL_VRT_001);
+    if (result.length === 0) throw AppErrorCode.TPL_VRT_001.create();
     this.logger.info('Template variant deleted', { templateVariantId, templateGroupId, result });
   }
 }

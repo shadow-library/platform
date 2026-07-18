@@ -2,7 +2,8 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
-import { ErrorResponseDto, ServerError, Transform } from '@shadow-library/fastify';
+import { type AppErrorObject } from '@shadow-library/common';
+import { ErrorResponseDto } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
 /**
@@ -65,8 +66,7 @@ export class NotificationChannelResponse {
   jobId?: string;
 
   @Field(() => ErrorResponseDto, { optional: true })
-  @Transform('server-error:toObject')
-  error?: ServerError;
+  error?: AppErrorObject;
 }
 
 @Schema()

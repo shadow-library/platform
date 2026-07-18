@@ -3,10 +3,10 @@
  */
 import assert from 'node:assert';
 
+import { InferInsertModel } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { InferInsertModel } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -18,10 +18,10 @@ import {
   EmailProvider,
   NotificationOpResult,
   PushNotificationProvider,
-  SMSProvider,
   SendEmailConfig,
   SendPushNotificationConfig,
   SendSMSConfig,
+  SMSProvider,
 } from './base-notification.provider';
 
 /**

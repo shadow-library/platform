@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Logger } from '@shadow-library/common';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

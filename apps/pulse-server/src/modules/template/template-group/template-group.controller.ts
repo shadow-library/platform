@@ -1,12 +1,13 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { RequirePermission } from '@shadow-library/auth/module';
+import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
+import { PULSE_PERMISSIONS } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
 import {
@@ -27,7 +28,7 @@ import { TemplateGroupService } from './template-group.service';
  * Declaring the constants
  */
 
-@HttpController('/template-groups')
+@HttpController('/api/v1/template-groups')
 export class TemplateGroupController {
   constructor(private readonly templateGroupService: TemplateGroupService) {}
 
@@ -50,7 +51,7 @@ export class TemplateGroupController {
   @RespondFor(200, TemplateGroupResponse)
   async getTemplateGroup(@Params() params: TemplateGroupParams): Promise<TemplateGroupResponse> {
     const templateGroup = await this.templateGroupService.getTemplateGroup(params.groupId);
-    if (!templateGroup) throw new ServerError(AppErrorCode.TPL_GRP_001);
+    if (!templateGroup) throw AppErrorCode.TPL_GRP_001.create();
     return templateGroup;
   }
 

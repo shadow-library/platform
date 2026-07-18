@@ -3,11 +3,10 @@
  */
 import assert from 'node:assert';
 
+import { and, asc, desc, eq, InferInsertModel } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { InferInsertModel, and, asc, desc, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -46,7 +45,7 @@ export class SenderEndpointService {
 
   async createSenderEndpoint(profileId: bigint, data: Omit<CreateSenderEndpoint, 'senderProfileId'>): Promise<Configuration.SenderEndpoint> {
     const profile = await this.db.query.senderProfiles.findFirst({ where: eq(schema.senderProfiles.id, profileId) });
-    if (!profile) throw new ServerError(AppErrorCode.SND_PRF_001);
+    if (!profile) throw AppErrorCode.SND_PRF_001.create();
 
     const [senderEndpoint] = await this.db
       .insert(schema.senderEndpoints)
@@ -60,7 +59,7 @@ export class SenderEndpointService {
 
   async listSenderEndpoints(profileId: bigint, filter: ListSenderEndpointsQuery = {}): Promise<OffsetPaginationResult<Configuration.SenderEndpoint>> {
     const profile = await this.db.query.senderProfiles.findFirst({ where: eq(schema.senderProfiles.id, profileId) });
-    if (!profile) throw new ServerError(AppErrorCode.SND_PRF_001);
+    if (!profile) throw AppErrorCode.SND_PRF_001.create();
 
     const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' } });
     const sortOrder = query.sortOrder === 'asc' ? asc : desc;
@@ -100,7 +99,7 @@ export class SenderEndpointService {
       .set({ ...update, updatedAt: new Date() })
       .where(and(eq(schema.senderEndpoints.id, endpointId), eq(schema.senderEndpoints.senderProfileId, profileId)))
       .returning();
-    if (!result) throw new ServerError(AppErrorCode.SND_EP_001);
+    if (!result) throw AppErrorCode.SND_EP_001.create();
     return result;
   }
 
@@ -110,7 +109,7 @@ export class SenderEndpointService {
       .where(and(eq(schema.senderEndpoints.id, endpointId), eq(schema.senderEndpoints.senderProfileId, profileId)))
       .returning({ id: schema.senderEndpoints.id })
       .catch(err => this.databaseService.translateError(err));
-    if (result.length === 0) throw new ServerError(AppErrorCode.SND_EP_001);
+    if (result.length === 0) throw AppErrorCode.SND_EP_001.create();
     this.logger.info(`Deleted sender endpoint with id: '${endpointId}' for profile: '${profileId}'`);
   }
 }

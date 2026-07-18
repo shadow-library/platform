@@ -1,16 +1,15 @@
 /**
  * Importing npm packages
  */
-import { Injectable } from '@shadow-library/app';
-import { ServerError } from '@shadow-library/fastify';
-import { DatabaseService, LinkedWithParent } from '@shadow-library/modules';
 import { and, eq } from 'drizzle-orm';
+import { Injectable } from '@shadow-library/app';
+import { DatabaseService, LinkedWithParent } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { Notification, PrimaryDatabase, Template, schema } from '@server/database';
+import { Notification, PrimaryDatabase, schema, Template } from '@server/database';
 
 /**
  * Defining types
@@ -36,7 +35,7 @@ export class TemplateSettingsService {
       with: { channelSettings: { where: eq(schema.templateChannelSettings.isEnabled, true) } },
     });
 
-    if (!templateGroup) throw new ServerError(AppErrorCode.TPL_GRP_001);
+    if (!templateGroup) throw AppErrorCode.TPL_GRP_001.create();
     return templateGroup.channelSettings.map(setting => this.databaseService.attachParent(setting, templateGroup));
   }
 
@@ -45,7 +44,7 @@ export class TemplateSettingsService {
       where: and(eq(schema.templateChannelSettings.templateGroupId, templateGroupId), eq(schema.templateChannelSettings.channel, channel)),
     });
 
-    if (!channelSettings) throw new ServerError(AppErrorCode.TPL_CHN_001);
+    if (!channelSettings) throw AppErrorCode.TPL_CHN_001.create();
     return channelSettings;
   }
 

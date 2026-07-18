@@ -1,12 +1,13 @@
 /**
  * Importing npm packages
  */
+import { RequirePermission } from '@shadow-library/auth/module';
 import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
+import { PULSE_PERMISSIONS } from '@modules/auth';
 
 import { DashboardStats } from './dashboard-stats.dto';
 
@@ -18,7 +19,7 @@ import { DashboardStats } from './dashboard-stats.dto';
  * Declaring the constants
  */
 
-@HttpController('/dashboard')
+@HttpController('/api/v1/dashboard')
 export class DashboardController {
   @Get('/stats')
   @RequirePermission(PULSE_PERMISSIONS.metricsRead)

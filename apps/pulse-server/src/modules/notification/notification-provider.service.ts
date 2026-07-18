@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import mustache from 'mustache';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import mustache from 'mustache';
 
 /**
  * Importing user defined packages

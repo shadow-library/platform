@@ -1,12 +1,13 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { RequirePermission } from '@shadow-library/auth/module';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
+import { PULSE_PERMISSIONS } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
 import {
@@ -23,7 +24,7 @@ import { SenderProfileService } from './sender-profile.service';
  * Declaring the constants
  */
 
-@HttpController('/sender-profiles')
+@HttpController('/api/v1/sender-profiles')
 export class SenderProfileController {
   constructor(private readonly senderProfileService: SenderProfileService) {}
 
@@ -46,7 +47,7 @@ export class SenderProfileController {
   @RespondFor(200, SenderProfileResponse)
   async getSenderProfile(@Params() params: SenderProfileParams): Promise<SenderProfileResponse> {
     const senderProfile = await this.senderProfileService.getSenderProfile(params.profileId);
-    if (!senderProfile) throw new ServerError(AppErrorCode.SND_PRF_001);
+    if (!senderProfile) throw AppErrorCode.SND_PRF_001.create();
     return senderProfile;
   }
 

@@ -3,18 +3,17 @@
  */
 import assert from 'node:assert';
 
+import { and, asc, desc, eq, InferInsertModel, isNull, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { InferInsertModel, and, asc, desc, eq, isNull, or, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { Configuration, PrimaryDatabase, Template, schema } from '@server/database';
+import { Configuration, PrimaryDatabase, schema, Template } from '@server/database';
 
 /**
  * Defining types
@@ -50,8 +49,8 @@ export class SenderRoutingRuleService {
 
   async createRoutingRule(data: CreateRoutingRule): Promise<Configuration.SenderRoutingRule> {
     const profile = await this.db.query.senderProfiles.findFirst({ where: eq(schema.senderProfiles.id, data.senderProfileId) });
-    if (!profile) throw new ServerError(AppErrorCode.SND_PRF_001);
-    if (!profile.isActive) throw new ServerError(AppErrorCode.SND_RTR_003);
+    if (!profile) throw AppErrorCode.SND_PRF_001.create();
+    if (!profile.isActive) throw AppErrorCode.SND_RTR_003.create();
 
     const whereConditions = [];
     if (data.service) whereConditions.push(eq(schema.senderRoutingRules.service, data.service));
@@ -62,7 +61,7 @@ export class SenderRoutingRuleService {
     else whereConditions.push(isNull(schema.senderRoutingRules.region));
 
     const existingRule = await this.db.query.senderRoutingRules.findFirst({ where: and(...whereConditions) });
-    if (existingRule) throw new ServerError(AppErrorCode.SND_RTR_002);
+    if (existingRule) throw AppErrorCode.SND_RTR_002.create();
 
     const [routingRule] = await this.db
       .insert(schema.senderRoutingRules)
@@ -150,34 +149,34 @@ export class SenderRoutingRuleService {
       .orderBy(asc(sql`priority`))
       .limit(1);
 
-    if (!result) throw new ServerError(AppErrorCode.SND_RTR_001);
+    if (!result) throw AppErrorCode.SND_RTR_001.create();
     return { ...result.routingRule, profile: result.profile };
   }
 
   async updateSenderRoutingRule(id: bigint, updatedSenderProfileId: bigint): Promise<Configuration.SenderRoutingRule> {
     const profile = await this.db.query.senderProfiles.findFirst({ where: eq(schema.senderProfiles.id, updatedSenderProfileId) });
-    if (!profile) throw new ServerError(AppErrorCode.SND_PRF_001);
-    if (!profile.isActive) throw new ServerError(AppErrorCode.SND_RTR_003);
+    if (!profile) throw AppErrorCode.SND_PRF_001.create();
+    if (!profile.isActive) throw AppErrorCode.SND_RTR_003.create();
 
     const [result] = await this.db
       .update(schema.senderRoutingRules)
       .set({ senderProfileId: updatedSenderProfileId, updatedAt: new Date() })
       .where(eq(schema.senderRoutingRules.id, id))
       .returning();
-    if (!result) throw new ServerError(AppErrorCode.SND_RTR_001);
+    if (!result) throw AppErrorCode.SND_RTR_001.create();
     return result;
   }
 
   async deleteSenderRoutingRule(id: bigint): Promise<void> {
     const routingRule = await this.getSenderRoutingRule(id);
-    if (routingRule && !routingRule.service && !routingRule.messageType && !routingRule.region) throw new ServerError(AppErrorCode.SND_RTR_004);
+    if (routingRule && !routingRule.service && !routingRule.messageType && !routingRule.region) throw AppErrorCode.SND_RTR_004.create();
 
     const result = await this.db
       .delete(schema.senderRoutingRules)
       .where(eq(schema.senderRoutingRules.id, id))
       .returning()
       .catch(err => this.databaseService.translateError(err));
-    if (result.length === 0) throw new ServerError(AppErrorCode.SND_RTR_001);
+    if (result.length === 0) throw AppErrorCode.SND_RTR_001.create();
     this.logger.info(`Deleted sender routing rule`, { routingRuleId: id, result });
   }
 }

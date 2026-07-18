@@ -3,18 +3,17 @@
  */
 import assert from 'node:assert';
 
+import { and, asc, desc, eq, InferInsertModel, like } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { InferInsertModel, and, asc, desc, eq, like } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { PrimaryDatabase, Template, schema, templateGroups } from '@server/database';
+import { PrimaryDatabase, schema, Template, templateGroups } from '@server/database';
 
 /**
  * Defining types
@@ -83,7 +82,7 @@ export class TemplateGroupService {
       .set({ ...update, updatedAt: new Date() })
       .where(eq(schema.templateGroups.id, id))
       .returning();
-    if (!result) throw new ServerError(AppErrorCode.TPL_GRP_001);
+    if (!result) throw AppErrorCode.TPL_GRP_001.create();
     return result;
   }
 }

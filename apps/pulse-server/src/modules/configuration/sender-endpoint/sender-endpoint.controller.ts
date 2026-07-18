@@ -1,12 +1,13 @@
 /**
  * Importing npm packages
  */
-import { ApiOperation, Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { RequirePermission } from '@shadow-library/auth/module';
+import { ApiOperation, Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
+import { PULSE_PERMISSIONS } from '@modules/auth';
 import { AppErrorCode } from '@server/classes';
 
 import {
@@ -25,7 +26,7 @@ import { SenderEndpointService } from './sender-endpoint.service';
  */
 
 @ApiOperation({ tags: ['Sender Endpoints'] })
-@HttpController('/sender-profiles/:profileId/endpoints')
+@HttpController('/api/v1/sender-profiles/:profileId/endpoints')
 export class SenderEndpointController {
   constructor(private readonly senderEndpointService: SenderEndpointService) {}
 
@@ -48,7 +49,7 @@ export class SenderEndpointController {
   @RespondFor(200, SenderEndpointResponse)
   async getSenderEndpoint(@Params() params: SenderEndpointParams): Promise<SenderEndpointResponse> {
     const senderEndpoint = await this.senderEndpointService.getSenderEndpoint(params.profileId, params.endpointId);
-    if (!senderEndpoint) throw new ServerError(AppErrorCode.SND_EP_001);
+    if (!senderEndpoint) throw AppErrorCode.SND_EP_001.create();
     return senderEndpoint;
   }
 

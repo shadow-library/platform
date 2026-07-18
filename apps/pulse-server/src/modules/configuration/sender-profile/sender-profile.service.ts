@@ -3,11 +3,10 @@
  */
 import assert from 'node:assert';
 
+import { and, asc, desc, eq, InferInsertModel, isNull, like } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
-import { ServerError } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { InferInsertModel, and, asc, desc, eq, isNull, like } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -88,7 +87,7 @@ export class SenderProfileService {
       .set({ ...update, updatedAt: new Date() })
       .where(eq(schema.senderProfiles.id, id))
       .returning();
-    if (!result) throw new ServerError(AppErrorCode.SND_PRF_001);
+    if (!result) throw AppErrorCode.SND_PRF_001.create();
     return result;
   }
 
@@ -98,7 +97,7 @@ export class SenderProfileService {
       .where(eq(schema.senderProfiles.id, id))
       .returning({ id: schema.senderProfiles.id })
       .catch(err => this.databaseService.translateError(err));
-    if (result.length === 0) throw new ServerError(AppErrorCode.SND_PRF_001);
+    if (result.length === 0) throw AppErrorCode.SND_PRF_001.create();
     this.logger.info(`Deleted sender profile with id: '${id}'`);
   }
 }

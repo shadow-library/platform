@@ -33,21 +33,18 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint code
-        run: bun lint
-
-      - name: Build the code
-        run: bun run type-check && bun run build
-
       - name: Prepare test environment
         run: bun run db:create-template
 
-      - name: Test the code
-        run: bun test
+      - name: Verify the code
+        run: bun run verify
         env:
           LOG_LEVEL: http
           DATABASE_POSTGRES_MAX_CONNECTIONS: 1
           DATABASE_POSTGRES_LAZY_CONNECTION: true
+
+      - name: Build the code
+        run: bun run build
 
       - name: Upload test logs
         if: failure()

@@ -2,13 +2,14 @@
  * Importing npm packages
  */
 import { EnableIf } from '@shadow-library/app';
+import { RequirePermission, RequireScope } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { Body, Get, HttpController, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { PULSE_PERMISSIONS, PULSE_SCOPES, RequirePermission, RequireScope } from '@modules/auth';
+import { PULSE_PERMISSIONS, PULSE_SCOPES } from '@modules/auth';
 import { NotificationService } from '@modules/notification';
 
 import { CreateNotificationBody, CreateNotificationResponse, ListNotificationMessagesQuery, ListNotificationMessagesResponse } from './notifications.dto';
@@ -21,7 +22,7 @@ import { CreateNotificationBody, CreateNotificationResponse, ListNotificationMes
  * Declaring the constants
  */
 
-@HttpController('/notifications')
+@HttpController('/api/v1/notifications')
 export class NotificationController {
   constructor(private readonly notificationService: NotificationService) {}
 

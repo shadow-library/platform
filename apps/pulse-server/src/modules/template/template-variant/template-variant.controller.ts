@@ -1,15 +1,17 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor, ServerError } from '@shadow-library/fastify';
+import { RequirePermission } from '@shadow-library/auth/module';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { PULSE_PERMISSIONS, RequirePermission } from '@modules/auth';
+import { PULSE_PERMISSIONS } from '@modules/auth';
 import { TemplateVariantService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 
+import { TemplateGroupParams } from '../template-group/template-group.dto';
 import {
   CreateTemplateVariantBody,
   ListTemplateVariantQuery,
@@ -18,7 +20,6 @@ import {
   TemplateVariantResponse,
   UpdateTemplateVariantBody,
 } from './template-variant.dto';
-import { TemplateGroupParams } from '../template-group/template-group.dto';
 
 /**
  * Defining types
@@ -28,7 +29,7 @@ import { TemplateGroupParams } from '../template-group/template-group.dto';
  * Declaring the constants
  */
 
-@HttpController('/template-groups/:groupId/variants')
+@HttpController('/api/v1/template-groups/:groupId/variants')
 export class TemplateVariantController {
   constructor(private readonly templateVariantService: TemplateVariantService) {}
 
@@ -51,7 +52,7 @@ export class TemplateVariantController {
   @RespondFor(200, TemplateVariantResponse)
   async getTemplateVariant(@Params() params: TemplateVariantParams): Promise<TemplateVariantResponse> {
     const templateVariant = await this.templateVariantService.getTemplateVariantById(params.groupId, params.variantId);
-    if (!templateVariant) throw new ServerError(AppErrorCode.TPL_VRT_001);
+    if (!templateVariant) throw AppErrorCode.TPL_VRT_001.create();
     return templateVariant;
   }
 
