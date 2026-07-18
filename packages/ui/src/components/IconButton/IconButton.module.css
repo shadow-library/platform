@@ -32,6 +32,20 @@
   cursor: wait;
 }
 
+/* ≥44×44 tap target on touch — invisible hit-area extension, coarse pointers only so
+   dense desktop toolbars keep exact hit zones. */
+@media (pointer: coarse) {
+  .root::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, var(--sh-tap-target));
+    height: max(100%, var(--sh-tap-target));
+    transform: translate(-50%, -50%);
+  }
+}
+
 /* ── Sizes (square footprints) ────────────────────────────── */
 .root[data-size='sm'] {
   width: var(--sh-control-height-sm);

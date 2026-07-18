@@ -19,7 +19,9 @@
   display: flex;
   justify-content: center;
   align-items: flex-start;
+  /* dvh tracks mobile browser chrome; the vh line is the no-dvh fallback */
   padding: 15vh 16px 16px;
+  padding: max(15dvh, calc(16px + var(--sh-safe-top))) 16px 16px;
   overflow-y: auto;
 }
 
@@ -29,6 +31,7 @@
   width: 100%;
   max-width: 480px;
   max-height: 70vh;
+  max-height: 70dvh;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-default);
   border-radius: var(--sh-radius-xl);

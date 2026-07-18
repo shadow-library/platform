@@ -59,6 +59,7 @@
 
 /* ── Remove button ───────────────────────────────────────── */
 .remove {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -84,4 +85,17 @@
   display: block;
   width: 10px;
   height: 10px;
+}
+/* Tap target on touch — capped at the tag's own height so tightly stacked tags don't
+   swallow each other's taps; the extension mainly widens the horizontal hit zone. */
+@media (pointer: coarse) {
+  .remove::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 28px);
+    height: max(100%, 28px);
+    transform: translate(-50%, -50%);
+  }
 }

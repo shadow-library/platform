@@ -17,7 +17,9 @@
   z-index: var(--sh-z-modal);
   display: flex;
   flex-direction: column;
-  max-height: calc(100vh - 24px - env(safe-area-inset-top));
+  max-height: calc(100vh - 24px - var(--sh-safe-top));
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  max-height: calc(100dvh - 24px - var(--sh-safe-top));
   border-top-left-radius: var(--sh-radius-2xl);
   border-top-right-radius: var(--sh-radius-2xl);
   background: var(--sh-surface-raised);
@@ -30,15 +32,18 @@
   transition: none;
 }
 
-/* Snap heights */
+/* Snap heights (vh line first as the no-dvh fallback) */
 .surface[data-snap='content'] {
   max-height: 60vh;
+  max-height: 60dvh;
 }
 .surface[data-snap='half'] {
   height: 50vh;
+  height: 50dvh;
 }
 .surface[data-snap='full'] {
-  height: calc(100vh - 24px - env(safe-area-inset-top));
+  height: calc(100vh - 24px - var(--sh-safe-top));
+  height: calc(100dvh - 24px - var(--sh-safe-top));
 }
 
 /* Centered narrow column on larger screens (direct desktop use; breakpoint token 768) */
@@ -117,10 +122,14 @@
   overflow-y: auto;
   padding: 0 16px 16px;
 }
+/* Without a pinned footer the scroll region owns the home-indicator inset. */
+.content:last-child {
+  padding-bottom: calc(16px + var(--sh-safe-bottom));
+}
 
 .footer {
   flex-shrink: 0;
-  padding: 12px 16px calc(12px + env(safe-area-inset-bottom));
+  padding: 12px 16px calc(12px + var(--sh-safe-bottom));
   border-top: var(--sh-border-width) solid var(--sh-border-subtle);
 }
 

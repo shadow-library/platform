@@ -15,36 +15,37 @@
 .viewport > * {
   pointer-events: auto;
 }
+/* Edge offsets clear the device safe areas (notch / home indicator) in standalone PWAs. */
 .viewport[data-placement='top-start'] {
-  left: 16px;
-  top: 16px;
+  left: calc(16px + var(--sh-safe-left));
+  top: calc(16px + var(--sh-safe-top));
   flex-direction: column;
 }
 .viewport[data-placement='top-center'] {
   left: 50%;
-  top: 16px;
+  top: calc(16px + var(--sh-safe-top));
   transform: translateX(-50%);
   flex-direction: column;
 }
 .viewport[data-placement='top-end'] {
-  right: 16px;
-  top: 16px;
+  right: calc(16px + var(--sh-safe-right));
+  top: calc(16px + var(--sh-safe-top));
   flex-direction: column;
 }
 .viewport[data-placement='bottom-start'] {
-  left: 16px;
-  bottom: 16px;
+  left: calc(16px + var(--sh-safe-left));
+  bottom: calc(16px + var(--sh-safe-bottom));
   flex-direction: column-reverse;
 }
 .viewport[data-placement='bottom-center'] {
   left: 50%;
-  bottom: 16px;
+  bottom: calc(16px + var(--sh-safe-bottom));
   transform: translateX(-50%);
   flex-direction: column-reverse;
 }
 .viewport[data-placement='bottom-end'] {
-  right: 16px;
-  bottom: 16px;
+  right: calc(16px + var(--sh-safe-right));
+  bottom: calc(16px + var(--sh-safe-bottom));
   flex-direction: column-reverse;
 }
 
@@ -125,6 +126,7 @@
 
 /* ── Action + dismiss ────────────────────────────────────── */
 .action {
+  position: relative;
   flex-shrink: 0;
   height: 24px;
   padding: 0 8px;
@@ -145,6 +147,7 @@
   outline-offset: 1px;
 }
 .dismiss {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -170,6 +173,20 @@
   display: block;
   width: 14px;
   height: 14px;
+}
+/* ≥44×44 tap targets on touch for the two toast controls (side-by-side, so the extension
+   is capped at 40px wide to keep them from overlapping each other). */
+@media (pointer: coarse) {
+  .action::before,
+  .dismiss::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, 40px);
+    height: max(100%, var(--sh-tap-target));
+    transform: translate(-50%, -50%);
+  }
 }
 
 @keyframes sh-toast-in {

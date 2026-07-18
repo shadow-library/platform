@@ -27,6 +27,7 @@
 }
 
 .circle {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -59,6 +60,20 @@
 }
 .circle:disabled {
   cursor: not-allowed;
+}
+
+/* ≥44×44 tap target on touch — invisible hit-area extension, coarse pointers only so
+   dense desktop layouts keep exact hit zones. */
+@media (pointer: coarse) {
+  .circle::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, var(--sh-tap-target));
+    height: max(100%, var(--sh-tap-target));
+    transform: translate(-50%, -50%);
+  }
 }
 
 /* Radix Indicator only renders when checked — style it as the 6px dot. */

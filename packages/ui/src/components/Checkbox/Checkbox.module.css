@@ -14,6 +14,7 @@
 }
 
 .box {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -60,6 +61,20 @@
   display: block;
   width: 11px;
   height: 11px;
+}
+
+/* ≥44×44 tap target on touch — invisible hit-area extension, coarse pointers only so
+   dense desktop layouts keep exact hit zones. */
+@media (pointer: coarse) {
+  .box::before {
+    content: '';
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    width: max(100%, var(--sh-tap-target));
+    height: max(100%, var(--sh-tap-target));
+    transform: translate(-50%, -50%);
+  }
 }
 
 .text {

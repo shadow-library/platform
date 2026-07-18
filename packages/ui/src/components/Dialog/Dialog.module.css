@@ -32,6 +32,8 @@
   flex-direction: column;
   width: 100%;
   max-height: calc(100vh - 32px);
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  max-height: calc(100dvh - 32px);
   padding: 24px;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-default);
