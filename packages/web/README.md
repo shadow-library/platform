@@ -20,6 +20,9 @@ All heavy peers are **optional** — you only need the ones for the subpaths you
 | `@shadow-library/web/router` | `@tanstack/react-router`, `@tanstack/react-query`, `@tanstack/react-router-ssr-query` |
 | `@shadow-library/web/server` | `@tanstack/react-start` |
 | `@shadow-library/web/server-entry` | Bun runtime |
+| `@shadow-library/web/pwa` | `react` |
+| `@shadow-library/web/offline` | `react` |
+| `@shadow-library/web/service-worker` | none (runs inside the service worker) |
 
 ## Entry points
 
@@ -79,6 +82,88 @@ await serve({
   clientDir: new URL('./dist/client', import.meta.url).pathname,
 });
 ```
+
+### `@shadow-library/web/pwa` — installability, updates, manifest
+
+Client utilities to turn any app into an installable PWA. SSR-safe: every hook and function no-ops on the
+server, so they can be called unconditionally.
+
+- **`buildManifest(input)`** / **`manifestResponse(manifest)`** — build a Web App Manifest over sane defaults
+  (`standalone`, `start_url: '/'`, `short_name` ← `name`) and serve it as `application/manifest+json`.
+- **`pwaHeadLinks(options)`** / **`pwaHeadMeta(options)`** — the `<link>`/`<meta>` descriptors a PWA needs
+  (manifest link, theme color, iOS hints), as plain objects that drop into any head manager.
+- **`registerServiceWorker(options)`** — register the worker and get a controller (`update`, `applyUpdate`,
+  `unregister`, `message`). Update model is **prompt-then-reload**: a new worker waits, `onUpdate` fires, and
+  only `applyUpdate()` activates it (reloading once) — no surprise refresh mid-session.
+- **`useServiceWorker(options)`** — the same, as a hook: `{ isSupported, isRegistered, updateAvailable, applyUpdate }`.
+- **`usePwaInstall()`** — `{ canInstall, isInstalled, promptInstall }` for a custom "Install app" button.
+- **`useOnlineStatus()`** — a tearing-free, SSR-safe `navigator.onLine`.
+
+```tsx
+// wherever you configure <head> (e.g. a TanStack Start root route)
+head: () => ({ links: pwaHeadLinks({ appleTouchIcon: '/icons/apple-touch-icon.png' }), meta: pwaHeadMeta({ themeColor: '#0b0b0f' }) })
+
+// app root
+const { updateAvailable, applyUpdate } = useServiceWorker();
+const { canInstall, promptInstall } = usePwaInstall();
+```
+
+### `@shadow-library/web/service-worker` — the runtime that powers offline
+
+Import this **only** from your worker entry (`src/sw.ts`), which your bundler emits as the registered script.
+Caching is entirely runtime-configured (no build-time asset manifest), so the one worker fits any app.
+
+```ts
+// src/sw.ts
+import { createServiceWorker } from '@shadow-library/web/service-worker';
+
+createServiceWorker({
+  version: 'v1', // bump to drop old caches on deploy
+  precache: ['/', '/offline'], // app shell for offline navigation
+  navigationFallback: '/offline',
+  runtimeCaching: [
+    { pattern: /\/assets\//, strategy: 'cache-first', maxEntries: 200 },
+    { pattern: /\/api\//, strategy: 'network-first', networkTimeoutSeconds: 5, maxAgeSeconds: 300 },
+    { pattern: /\.(?:png|jpg|svg|webp|woff2)$/, strategy: 'stale-while-revalidate' },
+  ],
+});
+```
+
+Strategies: `network-first`, `cache-first`, `stale-while-revalidate`, `network-only`, `cache-only`. On
+activate it cleans up stale versioned caches; on a navigation failure it serves `navigationFallback`; and any
+on-demand downloaded content (below) is served transparently offline. **Emit the worker to `/sw.js`** with
+your bundler — e.g. a Vite `rollupOptions.input`, `vite-plugin-pwa`'s injectManifest entry, or a
+`?worker`/second build — then register it (`registerServiceWorker({ url: '/sw.js' })`).
+
+### `@shadow-library/web/offline` — download content for offline use
+
+An IndexedDB-backed store for content the user chooses to keep offline. It works with **no service worker**
+(the primary path); when a worker is present it can also cache asset URLs so images resolve offline too.
+
+- **`OfflineStore`** — `put`/`get`/`has`/`delete`/`list`/`clear`/`totalSize`/`estimate` over IndexedDB
+  (JSON *and* `Blob`s). Construction is side-effect-free (the DB opens lazily), so it is SSR-safe.
+- **`OfflineContentManager`** + **`useOfflineDownload(manager?)`** — orchestrate a download: fetch the payload,
+  persist it, and (given a `controller` + `assets`) have the worker cache those asset URLs, with progress.
+- **`createIDBPersister(options)`** — an IndexedDB `Persister` for `@tanstack/react-query-persist-client`, to
+  keep the **whole** query cache across reloads and offline (no extra peer dep).
+
+```tsx
+const { controller } = useServiceWorker();
+const { entries, download, remove, isDownloading, progress } = useOfflineDownload();
+
+// "Download for offline"
+await download({
+  key: `novel:${id}`,
+  label: novel.title,
+  loader: () => APIRequest.get(`/novels/${id}`).execute(), // stored in IndexedDB, readable offline
+  assets: [novel.coverUrl], // optional: cached by the service worker for transparent offline serving
+  controller,
+});
+```
+
+The production server (`serve`) already sends the right headers for `/sw.js` (`no-cache` +
+`Service-Worker-Allowed: /`) and `*.webmanifest` (`application/manifest+json`); override the worker path(s)
+with `serve({ ..., serviceWorkerPaths: ['/sw.js'] })`.
 
 ## Relationship to `@shadow-library/ui`
 
