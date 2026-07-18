@@ -167,6 +167,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly IMP_003 = AppErrorCode.badRequest('IMP_003', 'Overwrite is not allowed once drafts or chapters exist — edit the plan in the app instead');
 
   /*!
+   * Publishing Errors
+   */
+  static readonly PUB_001 = AppErrorCode.notFound('PUB_001', 'Publication not found');
+  static readonly PUB_002 = AppErrorCode.badRequest('PUB_002', 'Chapter is not finalized — only reviewed, finalized chapters can be published');
+  static readonly PUB_003 = AppErrorCode.badRequest('PUB_003', 'Chapters must be published contiguously — publish or restore every earlier chapter first');
+  // A user-facing 500: the push failure detail must reach the client, so it stays out of the internal() mask
+  static readonly PUB_004 = new AppErrorCode('PUB_004', 'Reader service push failed — see the publication ledger error', 500);
+
+  /*!
    * Session Errors
    */
   static readonly SES_001 = AppErrorCode.unauthenticated('SES_001', 'No active session');

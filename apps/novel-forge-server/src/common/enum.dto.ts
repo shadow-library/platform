@@ -53,4 +53,6 @@ export const RebrandStatus = EnumType.create('RebrandStatus', schema.rebrandStat
 export const RebrandConversionStatus = EnumType.create('RebrandConversionStatus', schema.rebrandConversionStatus.enumValues);
 export const RebrandGlossaryCategory = EnumType.create('RebrandGlossaryCategory', schema.rebrandGlossaryCategory.enumValues);
 export const RefinementKind = EnumType.create('RefinementKind', schema.refinementKind.enumValues);
+export const PublicationStatus = EnumType.create('PublicationStatus', schema.publicationStatus.enumValues);
+export const ChapterPublicationStatus = EnumType.create('ChapterPublicationStatus', schema.chapterPublicationStatus.enumValues);
 export const RefinementProposalStatus = EnumType.create('RefinementProposalStatus', schema.refinementProposalStatus.enumValues);
