@@ -1,22 +1,60 @@
-# During the @shadow-library 2.0 alpha line the auth SDK is distributed as a vendored tarball
-# (consumers pin `file:vendor/shadow-library-auth-<version>.tgz`), not published to npm. This
-# workflow builds and packs the tarball from the package's built dist and uploads it as an
-# artifact; release-it and npm publishing were retired with the shadow CLI adoption.
-name: Pack auth package tarball
-permissions:
-  contents: read
+# Publishes @shadow-library/auth to npm via `shadow release`, run from packages/auth — the repo's only
+# released unit (the identity server itself is a `backend` shadow repo: deployed, never published).
+# Convention: every `v<version>` git tag and GitHub release in this repository versions the AUTH package.
+#
+# During the 2.0 alpha line the SDK was vendored as a tarball (`file:vendor/shadow-library-auth-<v>.tgz`)
+# because npm publishing was unavailable; this workflow supersedes that flow with a real npm release and
+# still uploads the packed tarball as an artifact for consumers that have not yet switched to the npm alpha.
+name: Publish auth package
 
 on:
   workflow_dispatch:
+    inputs:
+      release:
+        type: choice
+        description: 'Release type — stable level (major/minor/patch) or prerelease channel (alpha/beta)'
+        # alpha: the package tracks the @shadow-library 2.0 alpha line (0.2.0-alpha.x) and its peers are
+        # alpha-pinned, so an accidental default dispatch must cut a prerelease, never a stable version.
+        default: 'alpha'
+        options:
+          - 'major'
+          - 'minor'
+          - 'patch'
+          - 'alpha'
+          - 'beta'
+      force:
+        type: boolean
+        description: 'Release the chosen level even if the commits require a higher bump'
+        default: false
 
 jobs:
-  pack:
+  publish:
     if: github.actor == 'leanderpaul' && github.triggering_actor == 'leanderpaul' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
+    permissions:
+      id-token: write # npm OIDC trusted publishing, once the package exists on the registry
+      contents: write # not used while the App token performs the release; required if GITHUB_TOKEN ever substitutes for it
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # shadow release resolves the previous release with `git describe --tags --match 'v*'`
+
+      # The org-wide release pattern (see the sibling library repos): a GitHub App token so the version-bump
+      # commit, tag, and release are made by the app as Verified. Requires the SHADOW_MANAGER app installed
+      # on this repository plus the org-level SHADOW_MANAGER_APP_ID variable and SHADOW_MANAGER_PRIVATE_KEY secret.
+      - uses: actions/create-github-app-token@v1
+        id: app-token
+        with:
+          app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
+          private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
+
+      - name: Set up Node.js version
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
@@ -24,9 +62,21 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Build and pack the auth package
+      # The first-ever publish must authenticate with a classic npm automation token (secrets.NPM_TOKEN) —
+      # npm trusted publishing can only be configured after the package exists on the registry. Once it does,
+      # add this repo + workflow as the package's trusted publisher on npmjs.com and delete the NPM_TOKEN
+      # secret; OIDC (id-token: write) then takes over, matching the sibling library repos.
+      - name: Release the auth package
         working-directory: packages/auth
-        run: bun run pack
+        run: bunx shadow release ${{ inputs.release }} ${{ inputs.force && '--force' || '' }}
+        env:
+          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      # Transitional: consumers still pinning the vendored tarball can grab the exact published dist here.
+      - name: Pack the tarball for vendored consumers
+        working-directory: packages/auth/dist
+        run: bun pm pack --destination ..
 
       - name: Upload tarball artifact
         uses: actions/upload-artifact@v4
