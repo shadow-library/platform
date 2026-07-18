@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -23,7 +24,8 @@ import { VolumeService } from './volume.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/volumes')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/volumes')
 export class VolumeController {
   constructor(private readonly volumeService: VolumeService) {}
 

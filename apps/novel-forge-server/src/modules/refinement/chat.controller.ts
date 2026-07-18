@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -36,7 +37,8 @@ import { serialiseMessage, serialiseProposal } from './serialise';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/chat/sessions')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/chat/sessions')
 export class ChatController {
   constructor(private readonly chatService: ChatService) {}
 

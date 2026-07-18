@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -34,7 +35,8 @@ import { EntityService } from './entity.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/entities')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/entities')
 export class EntityController {
   constructor(private readonly entityService: EntityService) {}
 

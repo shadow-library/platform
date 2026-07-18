@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Put, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -23,7 +24,8 @@ import { BibleDocumentService } from './bible-document.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/bible')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/bible')
 export class BibleDocumentController {
   constructor(private readonly bibleDocumentService: BibleDocumentService) {}
 

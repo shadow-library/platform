@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -36,7 +37,8 @@ import { ProjectService } from './project.service';
  * Declaring the constants
  */
 
-@HttpController('/projects')
+@Authenticated()
+@HttpController('/api/v1/projects')
 export class ProjectController {
   constructor(private readonly projectService: ProjectService) {}
 

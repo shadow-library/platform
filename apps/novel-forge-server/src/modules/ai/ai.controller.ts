@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
 
@@ -39,7 +40,8 @@ const SUBPROCESS_OPTIONS: { id: string; provider: string; label: string; flag: '
   { id: 'grok-build', provider: 'xai-grok-build', label: 'Grok Build (CLI)', flag: 'ai.grok-build.enabled' },
 ];
 
-@HttpController('/ai')
+@Authenticated()
+@HttpController('/api/v1/ai')
 export class AiController {
   @Get('/models')
   @RespondFor(200, AiModelsResponse)

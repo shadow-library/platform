@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -69,7 +70,8 @@ import { ProposalResponse } from '../refinement/refinement.dto';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId')
 export class GenerationController {
   constructor(private readonly generationService: GenerationService) {}
 

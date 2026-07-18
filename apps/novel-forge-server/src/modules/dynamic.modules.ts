@@ -13,6 +13,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { AiModule } from '@modules/ai';
+import { AppAuthModule } from '@modules/auth';
 import { BibleModule } from '@modules/bible';
 import { ExportModule } from '@modules/export';
 import { ExtractionModule } from '@modules/extraction';
@@ -44,6 +45,7 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 export const HttpRouteModule = FastifyModule.forRoot({
   imports: [
     AppHttpCoreModule,
+    AppAuthModule,
     AiModule,
     ExportModule,
     ExtractionModule,
@@ -61,8 +63,8 @@ export const HttpRouteModule = FastifyModule.forRoot({
   ],
   host: Config.get('server.host'),
   port: Config.get('server.port'),
-  routePrefix: '/api',
-  prefixVersioning: true,
+  // Controllers carry explicit full paths (`/api/v1/*`, `/api/auth/*`) instead of a global prefix,
+  // because the first-party session surface is versionless while the domain API stays under /v1.
   // Cover/portrait uploads arrive as base64 JSON (~1.33x the file size); Fastify's 1MB default
   // rejects any real image with a 413. Lift the ceiling to comfortably fit the client's 8MB cap.
   bodyLimit: 12 * 1024 * 1024,

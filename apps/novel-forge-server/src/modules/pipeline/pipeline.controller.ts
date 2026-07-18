@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -39,7 +40,8 @@ import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId')
 export class PipelineController {
   constructor(
     private readonly jobService: JobService,

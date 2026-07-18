@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -31,7 +32,8 @@ import { IllustrationService } from './illustration.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/entities/:entityKey/illustration')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/entities/:entityKey/illustration')
 export class IllustrationController {
   constructor(private readonly illustrationService: IllustrationService) {}
 

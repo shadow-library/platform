@@ -50,6 +50,17 @@ declare module '@shadow-library/common' {
     /** Storage configs */
     'storage.driver': 'local';
     'storage.local.dir': string;
+
+    /**
+     * Auth configs — `auth.issuer` and `auth.audience` are declared (and augmented into
+     * `ConfigRecords`) by `@shadow-library/auth/module`. The relying-party client deliberately
+     * uses its own keys instead of the package's `auth.client.*`: setting those would make
+     * `AuthModule` phone identity for M2M service-access rules at boot, which this app does not use.
+     */
+    'auth.rp.client.id': string;
+    'auth.rp.client.secret': string | undefined;
+    'auth.session.secret': string;
+    'auth.redirect-uri': string;
   }
 }
 
@@ -80,3 +91,12 @@ Config.load('ai.langsmith.api.key');
 
 Config.load('storage.driver', { defaultValue: 'local', allowedValues: ['local'] });
 Config.load('storage.local.dir', { defaultValue: './images' });
+
+// AUTH_ISSUER and AUTH_AUDIENCE are loaded by the auth package with bare options; loading them here
+// bare too documents them without conflicting (same shared default options object).
+Config.load('auth.issuer');
+Config.load('auth.audience');
+Config.load('auth.rp.client.id', { defaultValue: 'novel-forge-web' });
+Config.load('auth.rp.client.secret');
+Config.load('auth.session.secret', { defaultValue: 'novel-forge-dev-session-secret', isProdRequired: true });
+Config.load('auth.redirect-uri', { defaultValue: 'http://localhost:8080/api/auth/callback' });

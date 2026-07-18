@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -21,7 +22,8 @@ import { AddChapterImageBody, ChapterImageParams, ChapterImageResponse, ChapterP
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/chapters/:n/images')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/chapters/:n/images')
 export class ChapterImageController {
   constructor(private readonly chapterImageService: ChapterImageService) {}
 

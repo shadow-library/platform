@@ -6,6 +6,7 @@
  * Importing npm packages
  */
 import { Inject } from '@shadow-library/app';
+import { Authenticated } from '@shadow-library/auth/module';
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Get, HttpController, Params, Res } from '@shadow-library/fastify';
 import { type FastifyReply } from 'fastify';
@@ -35,7 +36,8 @@ export class ImageParams {
 
 // Serves the bytes written by the storage provider. `getUrl` on the provider points here, so uploaded
 // covers and entity portraits resolve to a real image response.
-@HttpController('/images')
+@Authenticated()
+@HttpController('/api/v1/images')
 export class ImageController {
   constructor(@Inject(IMAGE_STORAGE) private readonly storage: ImageStorageProvider) {}
 

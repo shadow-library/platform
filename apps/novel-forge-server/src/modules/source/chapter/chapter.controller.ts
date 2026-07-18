@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -23,7 +24,8 @@ import { ChapterService } from './chapter.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/source/chapters')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/source/chapters')
 export class ChapterController {
   constructor(private readonly chapterService: ChapterService) {}
 

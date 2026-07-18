@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Get, HttpController, Params, Res } from '@shadow-library/fastify';
 import { type FastifyReply } from 'fastify';
 
@@ -22,7 +23,8 @@ import { NovelPackageService } from './novel-package.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/export')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/export')
 export class ExportController {
   constructor(private readonly novelPackage: NovelPackageService) {}
 

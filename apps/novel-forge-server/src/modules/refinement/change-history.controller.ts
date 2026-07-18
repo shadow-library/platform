@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -22,7 +23,8 @@ import { ListChangesQuery, ListChangesResponse, ProposalProjectParams, RollbackB
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/changes')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/changes')
 export class ChangeHistoryController {
   constructor(
     private readonly proposalService: ProposalService,

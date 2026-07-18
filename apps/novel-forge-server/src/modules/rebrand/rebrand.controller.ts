@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, HttpStatus, Params, Post, Put, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -36,7 +37,8 @@ import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/rebrand')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/rebrand')
 export class RebrandController {
   constructor(
     private readonly rebrandService: RebrandService,

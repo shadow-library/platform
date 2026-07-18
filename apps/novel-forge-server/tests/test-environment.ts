@@ -1,6 +1,11 @@
 /**
  * Importing packages with side effects
+ *
+ * The test IdP must be evaluated (and its issuer seeded into the config cache) before anything
+ * touches the app module graph, so its import lives up here rather than with the other user
+ * imports.
  */
+import './test-idp';
 
 /**
  * Importing npm packages
@@ -17,13 +22,17 @@ import { type AbstractClass, type Class } from 'type-fest';
  * Importing user defined packages
  */
 import { createDatabaseFromTemplate } from '@scripts/create-template-db';
-import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
 
 /**
  * Defining types
  */
+
+export interface GetRouterOptions {
+  /** Pass `false` to get the raw router without the default bearer token — for testing the auth surface itself */
+  authenticated?: boolean;
+}
 
 /**
  * Declaring the constants
@@ -40,7 +49,8 @@ export const TEST_REGEX = {
 
 export class TestEnvironment {
   private static readonly logger = Logger.getLogger(APP_NAME, TestEnvironment.name);
-  private readonly app = new ShadowApplication(AppModule);
+  private app!: ShadowApplication;
+  private accessToken = '';
 
   constructor(private readonly databaseSuffix: string) {}
 
@@ -51,7 +61,13 @@ export class TestEnvironment {
 
     // beforeAll runs before any beforeEach, so the database must exist before the app boots —
     // otherwise a fresh machine (no leftover DB from a prior run) fails the boot-time SELECT 1.
+    // AppModule is imported lazily: the auth modules capture the issuer at import time, and with
+    // the test IdP's top-level await in flight a static sibling import could evaluate them first.
     beforeAll(async () => {
+      const { issueTestToken } = await import('./test-idp');
+      this.accessToken = await issueTestToken();
+      const { AppModule } = await import('@server/app.module');
+      this.app = new ShadowApplication(AppModule);
       await createDatabaseFromTemplate(databaseName);
       await this.app.init();
     });
@@ -59,8 +75,22 @@ export class TestEnvironment {
     afterAll(() => this.app.stop());
   }
 
-  getRouter(): FastifyRouter {
-    return this.app.get(Dispatcher) as FastifyRouter;
+  /**
+   * Every API route requires an authenticated identity user, so the returned router injects the
+   * shared test user's bearer token into each `mockRequest()` chain. A spec that sets its own
+   * `.headers(...)` replaces the default (light-my-request `headers` assigns, not merges).
+   */
+  getRouter(options: GetRouterOptions = {}): FastifyRouter {
+    const router = this.app.get(Dispatcher) as FastifyRouter;
+    if (options.authenticated === false) return router;
+
+    const accessToken = this.accessToken;
+    return new Proxy(router, {
+      get(target, property, receiver) {
+        if (property !== 'mockRequest') return Reflect.get(target, property, receiver) as unknown;
+        return () => target.mockRequest().headers({ authorization: `Bearer ${accessToken}` });
+      },
+    });
   }
 
   getPostgresClient(): PrimaryDatabase {

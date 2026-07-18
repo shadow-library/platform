@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Get, HttpController, Params, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -23,7 +24,8 @@ import { JobIdParams, JobResponse } from './jobs.dto';
  * Declaring the constants
  */
 
-@HttpController('/jobs')
+@Authenticated()
+@HttpController('/api/v1/jobs')
 export class JobsController {
   constructor(private readonly jobService: JobService) {}
 

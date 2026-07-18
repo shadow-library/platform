@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -21,7 +22,8 @@ import { FactService } from './fact.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/facts')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/facts')
 export class FactController {
   constructor(private readonly factService: FactService) {}
 

@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -21,7 +22,8 @@ import { PlanImportService } from './plan-import.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/plan')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/plan')
 export class PlanImportController {
   constructor(private readonly planImportService: PlanImportService) {}
 

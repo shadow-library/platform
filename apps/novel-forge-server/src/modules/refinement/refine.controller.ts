@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -31,7 +32,8 @@ import { RefineService } from './refine.service';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId')
 export class RefineController {
   constructor(private readonly refineService: RefineService) {}
 

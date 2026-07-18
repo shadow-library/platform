@@ -5,6 +5,7 @@
 /**
  * Importing npm packages
  */
+import { Authenticated } from '@shadow-library/auth/module';
 import { Body, Get, HttpController, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -33,7 +34,8 @@ import { serialiseProposal } from './serialise';
  * Declaring the constants
  */
 
-@HttpController('/projects/:projectId/proposals')
+@Authenticated()
+@HttpController('/api/v1/projects/:projectId/proposals')
 export class ProposalController {
   constructor(
     private readonly proposalService: ProposalService,
