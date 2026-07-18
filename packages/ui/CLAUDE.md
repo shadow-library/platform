@@ -219,7 +219,8 @@ All tokens live in `src/styles/tokens.css` as `--sh-*` custom properties. Semant
 | **Transitions / motion** | `--sh-duration-{fast,normal,slow}` (+ `-exit`), `--sh-ease-standard`, `--sh-ease-emphasized` | Enumerate transitioned properties; never `transition: all`. |
 | **Focus** | `--sh-focus-ring`, `--sh-focus-ring-width`, `--sh-focus-ring-offset`, `--sh-focus-field-ring`, `--sh-focus-field-ring-error` | Two treatments: `focus-ring` (non-text controls) and `focus-field` (editable controls). |
 | **Z-index** | `--sh-z-{base,sticky,shell,dropdown,scrim,modal,command-palette,popover,toast,tooltip,dev-overlay}` | Fixed ladder — never invent values. |
-| **Density** | `--sh-control-height-{sm,md,lg}`, `--sh-row-height` | Comfortable default; `[data-density='compact']` shrinks. |
+| **Density** | `--sh-control-height-{sm,md,lg}`, `--sh-row-height` | Comfortable default; `[data-density='compact']` shrinks, `[data-density='touch']` grows to finger-first metrics (md = 44px). |
+| **Touch / safe areas** | `--sh-tap-target`, `--sh-safe-{top,right,bottom,left}` | 44px minimum hit area — sub-44 controls extend an invisible `::before` hit area under `@media (pointer: coarse)`. Safe-area tokens wrap `env(safe-area-inset-*)`; edge-anchored surfaces pad by these, never raw `env()`. Pair `vh` sizes with a `dvh` override line. |
 | **Breakpoints (reference)** | `--sh-breakpoint-{sm,md,lg,xl,2xl}` | CSS vars can't be used in `@media`; use the literal px and cite the token in a comment. |
 
 **Adding a token:** if a component needs a value that doesn't exist, add it to `tokens.css` **first** (with both light and dark values for semantic colors), then consume it. Components never define their own themeable constants.
