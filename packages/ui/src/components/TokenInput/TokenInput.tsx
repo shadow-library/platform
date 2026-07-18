@@ -203,6 +203,9 @@ export const TokenInput = forwardRef<HTMLInputElement, TokenInputProps>(function
         type="text"
         autoComplete="off"
         spellCheck={false}
+        autoCapitalize="none"
+        autoCorrect="off"
+        enterKeyHint="enter"
         value={draft}
         placeholder={tokens.length === 0 ? placeholder : ''}
         disabled={disabled}

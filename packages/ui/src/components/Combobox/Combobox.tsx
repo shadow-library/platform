@@ -217,6 +217,9 @@ export function Combobox({
             role="combobox"
             autoComplete="off"
             spellCheck={false}
+            autoCapitalize="none"
+            autoCorrect="off"
+            enterKeyHint="done"
             placeholder={placeholder}
             value={inputValue}
             disabled={disabled}

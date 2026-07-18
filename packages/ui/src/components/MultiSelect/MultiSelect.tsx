@@ -229,6 +229,11 @@ export function MultiSelect({
                 ref={searchRef}
                 className={styles.searchInput}
                 type="text"
+                autoComplete="off"
+                spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                enterKeyHint="done"
                 placeholder="Search…"
                 value={query}
                 aria-label="Search options"

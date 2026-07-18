@@ -151,6 +151,9 @@ export function CommandPalette({
                 role="combobox"
                 autoComplete="off"
                 spellCheck={false}
+                autoCapitalize="none"
+                autoCorrect="off"
+                enterKeyHint="go"
                 placeholder={placeholder}
                 value={query}
                 aria-expanded
