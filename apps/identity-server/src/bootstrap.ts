@@ -47,6 +47,11 @@ declare module '@shadow-library/common' {
     'auth.workload.audience': string;
     'auth.workload.jwks-uri': string;
 
+    /** Ecosystem seed: comma-separated public origins per app; each origin gets `<origin>/api/auth/callback` registered as an OAuth redirect URI */
+    'ecosystem.pulse.public-urls': string;
+    'ecosystem.novel-forge.public-urls': string;
+    'ecosystem.webnovel.public-urls': string;
+
     /** Web UI */
     'ui.public-dir': string;
   }
@@ -84,6 +89,15 @@ Config.load('oauth.login-url', { defaultValue: 'https://identity.shadow-apps.com
 Config.load('auth.workload.issuer', { defaultValue: '' });
 Config.load('auth.workload.audience', { defaultValue: '' });
 Config.load('auth.workload.jwks-uri', { defaultValue: '' });
+
+/**
+ * Public origins of the first-party ecosystem apps, used by the ecosystem seed to register the
+ * `{origin}/api/auth/callback` redirect URIs of their relying-party OAuth clients. Redirect URIs
+ * converge to these values on every boot, so per-environment overrides are picked up on restart.
+ */
+Config.load('ecosystem.pulse.public-urls', { defaultValue: 'http://pulse.shadow-apps.test,http://localhost:3000' });
+Config.load('ecosystem.novel-forge.public-urls', { defaultValue: 'http://novel-forge.shadow-apps.test,http://localhost:3001' });
+Config.load('ecosystem.webnovel.public-urls', { defaultValue: 'http://webnovel.shadow-apps.test,http://localhost:3002' });
 
 Config.load('rate-limit.enabled', { defaultValue: 'true', validateType: 'boolean' });
 Config.load('rate-limit.ip-allowlist', { defaultValue: '' });

@@ -53,6 +53,43 @@ What to request from the admin:
 
 You'll receive a **client id** and, for secret-based confidential clients, a **secret** (shown once — store it in your secret manager, injected as an env var).
 
+### 2.1 First-party ecosystem apps are pre-seeded
+
+The identity server's boot seed (`EcosystemSeedService`) idempotently provisions the first-party ecosystem on every boot — no admin request needed for these apps:
+
+| Application | RP client (`WEB_CONFIDENTIAL`, code + PKCE) | Service client (`SERVICE`, `client_credentials`) | API resource / audience |
+| :-- | :-- | :-- | :-- |
+| `pulse` | `pulse` | `pulse-server` | `pulse-server` |
+| `novel-forge` | `novel-forge` | `novel-forge-server` | `novel-forge-server` |
+| `webnovel` | `webnovel` | `webnovel-server` | `webnovel-server` |
+| `shadow-identity` (platform) | — | `identity-server` (identity's own outbound calls) | `shadow-identity` |
+
+Also seeded:
+
+- Every `*-server` client is granted `authz:check` and `authz:roles:sync` (so the SDK can load service-access rules, call the PDP, and push a role catalog).
+- `novel-forge-server` is granted the `webnovel:publish` scope (on the `webnovel-server` resource).
+- Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge-server` → webnovel `* /internal/*`.
+- RP redirect URIs: `{origin}/api/auth/callback` for every origin in `ECOSYSTEM_<APP>_PUBLIC_URLS` (comma separated; defaults cover `http://<app>.shadow-apps.test` plus a localhost dev variant). Redirect URIs converge to the environment value on every boot.
+
+**Client ids and secrets.** Client ids are database-generated UUIDs, so they differ per environment. On the boot that first creates a client, its id and secret are logged once (`Registered service client '<name>' …` — same convention as the bootstrap-admin password); afterwards look ids up via `GET /api/v1/admin/clients` and mint a fresh secret with `POST /api/v1/admin/clients/:clientId/rotate-secret` (dual-secret overlap, so running consumers keep working while you re-configure). Secrets are stored hashed; they cannot be read back.
+
+**What each downstream service sets in its environment:**
+
+```sh
+# SDK (AuthModule) — token verification, rules loading, PDP, M2M
+AUTH_ISSUER=<identity base URL>            # e.g. http://localhost:8080 in dev
+AUTH_AUDIENCE=<your API resource>          # e.g. pulse-server
+AUTH_CLIENT_ID=<uuid of your *-server client>
+AUTH_CLIENT_SECRET=<secret>                # or AUTH_CLIENT_ASSERTION_PATH in-cluster
+
+# RP login flow (RelyingPartyModule) — app-defined keys, guide convention:
+APP_PUBLIC_URL=<your public origin>        # callback = {APP_PUBLIC_URL}/api/auth/callback
+APP_CLIENT_ID=<uuid of your RP client>
+APP_CLIENT_SECRET=<secret>
+```
+
+The identity server itself sets `AUTH_CLIENT_ID`/`AUTH_CLIENT_SECRET` to its `identity-server` client when calling pulse's notification API.
+
 ---
 
 ## 3. Install the SDK

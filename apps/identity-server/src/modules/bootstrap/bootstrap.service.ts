@@ -17,6 +17,8 @@ import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
+import { EcosystemSeedService } from './ecosystem-seed.service';
+
 /**
  * Defining types
  */
@@ -58,6 +60,7 @@ export class BootstrapService implements OnModuleInit {
     private readonly oauthClientService: OAuthClientService,
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly organisationService: OrganisationService,
+    private readonly ecosystemSeedService: EcosystemSeedService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -66,6 +69,8 @@ export class BootstrapService implements OnModuleInit {
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
     await this.ensureBootstrapAdmin(organisationId);
+    /** Runs last: the ecosystem records hang off the platform application provisioned above. */
+    await this.ecosystemSeedService.seed();
   }
 
   /**

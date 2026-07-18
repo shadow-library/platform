@@ -9,7 +9,7 @@ import { describe, expect, it } from 'bun:test';
 import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
-import { BootstrapService } from '@server/modules/bootstrap';
+import { BootstrapService, EcosystemSeedService } from '@server/modules/bootstrap';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -67,6 +67,7 @@ describe('BootstrapService', () => {
       env.getService(OAuthClientService),
       env.getService(PolicyDecisionService),
       env.getService(OrganisationService),
+      env.getService(EcosystemSeedService),
     );
     await bootstrap.onModuleInit();
 
