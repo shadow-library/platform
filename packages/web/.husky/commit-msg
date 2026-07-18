@@ -1,1 +1,1 @@
-bun commitlint --edit $1
+shadow commit-msg "$1"

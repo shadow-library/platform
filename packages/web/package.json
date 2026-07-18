@@ -3,13 +3,17 @@
   "version": "0.1.0",
   "type": "module",
   "description": "Frontend application framework for the Shadow Apps ecosystem — the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
+  "sideEffects": false,
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
+    "prepare": "husky",
+    "clean": "rm -rf dist",
+    "verify": "shadow verify",
     "type-check": "tsc",
-    "lint": "biome check",
-    "format": "biome format --write",
-    "prepublishOnly": "bun run build",
-    "prepare": "husky"
+    "test": "bun test",
+    "build": "shadow build"
+  },
+  "engines": {
+    "node": ">=20.0.0"
   },
   "repository": {
     "type": "git",
@@ -21,28 +25,6 @@
     "url": "https://github.com/shadow-library/web/issues"
   },
   "homepage": "https://github.com/shadow-library/web#readme",
-  "files": [
-    "dist"
-  ],
-  "exports": {
-    ".": {
-      "types": "./dist/index.d.ts",
-      "default": "./dist/index.js"
-    },
-    "./router": {
-      "types": "./dist/router/index.d.ts",
-      "default": "./dist/router/index.js"
-    },
-    "./server": {
-      "types": "./dist/server/index.d.ts",
-      "default": "./dist/server/index.js"
-    },
-    "./server-entry": {
-      "types": "./dist/server-entry.d.ts",
-      "default": "./dist/server-entry.js"
-    },
-    "./package.json": "./package.json"
-  },
   "peerDependencies": {
     "@tanstack/react-query": "^5.100.0",
     "@tanstack/react-router": "^1.168.0",
@@ -59,10 +41,7 @@
     "typescript": { "optional": true }
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.4.8",
-    "@commitlint/cli": "^20.5.0",
-    "@commitlint/config-conventional": "^20.5.0",
-    "@release-it/conventional-changelog": "^10.0.6",
+    "@shadow-library/scripts": "^0.2.2",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
     "@tanstack/react-router-ssr-query": "^1.167.1",
@@ -71,8 +50,6 @@
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
     "husky": "^9.1.7",
-    "react": "^19.2.0",
-    "release-it": "^19.2.4",
-    "typescript": "^5.7.2"
+    "react": "^19.2.0"
   }
 }
