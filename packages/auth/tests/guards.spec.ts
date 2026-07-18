@@ -9,12 +9,11 @@ import 'reflect-metadata';
  * Importing user defined packages
  */
 import { type HandlerMetadata } from '@shadow-library/app';
+import { AuthClient } from '@shadow-library/auth';
+import { Authenticated, AuthGuard, AuthModule, extendContextWithAuth, GuardedRequest, RequirePermission, RequireScope } from '@shadow-library/auth/module';
+import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
-
-import { AuthClient } from '@shadow-library/auth';
-import { AuthGuard, AuthModule, Authenticated, GuardedRequest, RequirePermission, RequireScope, extendContextWithAuth } from '@shadow-library/auth/module';
-import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
 
 /**
  * Defining types

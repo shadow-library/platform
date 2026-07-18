@@ -9,10 +9,10 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AuthCacheOptions, AuthClientCredential, FetchLike, JwtPayload } from '../interfaces';
-import { createPkcePair, randomUrlSafeString } from './pkce';
 import { DiscoveryClient } from '../lib/discovery';
 import { RemoteJwks } from '../lib/jwks';
 import { verifyJwt } from '../lib/jwt';
+import { createPkcePair, randomUrlSafeString } from './pkce';
 
 /**
  * Defining types

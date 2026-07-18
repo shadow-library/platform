@@ -9,11 +9,11 @@ import { ContextService, FastifyModule } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { NAMESPACE } from '../constants';
+import { type AuthClientConfig } from '../interfaces';
+import { AuthClient } from '../lib/auth-client';
 import { AuthGuard } from './auth-guard';
 import { AuthModuleOptions, resolveAuthClientConfig } from './config';
 import { extendContextWithAuth } from './context';
-import { type AuthClientConfig } from '../interfaces';
-import { AuthClient } from '../lib/auth-client';
 
 /**
  * Defining types

@@ -6,7 +6,7 @@
  * Importing user defined packages
  */
 import { Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
-import { TestSigner, createTestSigner } from './signer';
+import { createTestSigner, TestSigner } from './signer';
 
 /**
  * Defining types

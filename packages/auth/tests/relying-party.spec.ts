@@ -9,8 +9,8 @@ import { AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { RelyingParty, createPkcePair } from '@shadow-library/auth/rp';
-import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
+import { createPkcePair, RelyingParty } from '@shadow-library/auth/rp';
+import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
  * Defining types

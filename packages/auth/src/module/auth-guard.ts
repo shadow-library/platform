@@ -10,11 +10,11 @@ import { ContextService, Middleware } from '@shadow-library/fastify';
  */
 import { NAMESPACE } from '../constants';
 import { AuthPrincipal } from '../interfaces';
+import { AuthClient } from '../lib/auth-client';
 import { AUTH_ROUTE_METADATA } from './constants';
 import { AUTH_PRINCIPAL } from './context';
 import { AuthRouteMetadata } from './decorators';
 import { AuthGuardErrorCode } from './errors';
-import { AuthClient } from '../lib/auth-client';
 
 /**
  * Defining types
