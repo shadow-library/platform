@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { spawnSync } from 'child_process';
-import fs from 'fs';
-import path from 'path';
+import { spawnSync } from 'node:child_process';
+import fs from 'node:fs';
+import path from 'node:path';
 
 /**
  * Importing user defined packages
@@ -28,9 +28,15 @@ const error = (message: string) => (console.error('\x1b[31m%s\x1b[0m', message),
 if (fs.existsSync(distDir)) fs.rmSync(distDir, { recursive: true });
 fs.mkdirSync(distDir);
 
-/** bundling the library entrypoints, leaving framework peers external */
+/**
+ * Bundling the library entrypoints, leaving framework peers external. `splitting` keeps modules
+ * shared between entrypoints (e.g. AuthClient) as one chunk, so class identity holds across the
+ * `.`/`./module` subpaths — required for DI tokens to resolve. The source package.json must not
+ * declare `sideEffects: false`: Bun 1.3.x tree-shakes an entry barrel's named re-exports away
+ * under it, emitting export lists whose bindings were never declared.
+ */
 const entrypoints = ['index.ts', 'module/index.ts', 'rp/index.ts', 'testing/index.ts'].map(entry => path.join(rootDir, 'src', entry));
-const result = await Bun.build({ entrypoints, root: path.join(rootDir, 'src'), target: 'bun', outdir: distDir, external: ['@shadow-library/*'] });
+const result = await Bun.build({ entrypoints, root: path.join(rootDir, 'src'), target: 'bun', outdir: distDir, splitting: true, external: ['@shadow-library/*'] });
 if (!result.success) error(`Build failed: ${result.logs.join('\n')}`);
 
 /** emitting the type declarations alongside the bundles */
