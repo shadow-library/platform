@@ -6,8 +6,8 @@ import { type ReactElement } from 'react';
 /**
  * Importing user defined packages
  */
-import { type NotificationStatsWithDate } from '@/lib';
 import { formatDay } from '@/features/shared';
+import { type NotificationStatsWithDate } from '@/lib';
 
 import styles from './Dashboard.module.css';
 

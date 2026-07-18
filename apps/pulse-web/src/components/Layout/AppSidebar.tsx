@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Sidebar, useTheme } from '@shadow-library/ui';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type MouseEvent, type ReactElement } from 'react';
+import { Sidebar, useTheme } from '@shadow-library/ui';
 
 /**
  * Importing user defined components
  */
-import { DashboardIcon, LogIcon, MoonIcon, PulseMark, RoutingIcon, SendIcon, SenderIcon, SunIcon, TemplateIcon } from '@/features/shared';
+import { DashboardIcon, LogIcon, MoonIcon, PulseMark, RoutingIcon, SenderIcon, SendIcon, SunIcon, TemplateIcon } from '@/features/shared';
 
 import styles from './Layout.module.css';
 
@@ -18,10 +18,12 @@ export default function AppSidebar(): ReactElement {
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
-  const go = (to: NavTarget) => (event: MouseEvent<HTMLAnchorElement>): void => {
-    event.preventDefault();
-    navigate({ to });
-  };
+  const go =
+    (to: NavTarget) =>
+    (event: MouseEvent<HTMLAnchorElement>): void => {
+      event.preventDefault();
+      navigate({ to });
+    };
   const startsWith = (prefix: string): boolean => pathname === prefix || pathname.startsWith(`${prefix}/`);
 
   return (

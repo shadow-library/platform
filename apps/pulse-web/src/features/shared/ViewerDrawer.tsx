@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Drawer, SegmentedControl } from '@shadow-library/ui';
 import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { Drawer, SegmentedControl } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

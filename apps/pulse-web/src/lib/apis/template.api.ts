@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { type QueryKey, type UseMutationOptions, type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { type QueryKey, useMutation, type UseMutationOptions, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { type ApiError, APIRequest } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, ApiError } from './api-request';
 import {
   type CreateTemplateGroupBody,
   type CreateTemplateVariantBody,
@@ -45,9 +45,10 @@ export function getListTemplateGroupsQueryKey(params?: ListTemplateGroupsQueryPa
 export function useListTemplateGroupsQuery(params?: ListTemplateGroupsQueryParams): UseQueryResult<ListTemplateGroupResponse, ApiError> {
   return useQuery<ListTemplateGroupResponse, ApiError>({
     queryKey: templateGroupKeys.list(params),
-    queryFn: () =>
-      APIRequest.get('/template-groups')
+    queryFn: ({ signal }) =>
+      APIRequest.get('/api/v1/template-groups')
         .query(params ?? {})
+        .signal(signal)
         .execute(),
   });
 }
@@ -55,7 +56,7 @@ export function useListTemplateGroupsQuery(params?: ListTemplateGroupsQueryParam
 export function useCreateTemplateGroupMutation(): UseMutationResult<TemplateGroupResponse, ApiError, CreateTemplateGroupBody> {
   const queryClient = useQueryClient();
   return useMutation<TemplateGroupResponse, ApiError, CreateTemplateGroupBody>({
-    mutationFn: data => APIRequest.post('/template-groups').body(data).execute(),
+    mutationFn: data => APIRequest.post('/api/v1/template-groups').body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templateGroupKeys.lists() });
     },
@@ -65,21 +66,21 @@ export function useCreateTemplateGroupMutation(): UseMutationResult<TemplateGrou
 export function useTemplateGroupQuery(groupId: string): UseQueryResult<TemplateGroupResponse, ApiError> {
   return useQuery<TemplateGroupResponse, ApiError>({
     queryKey: templateGroupKeys.detail(groupId),
-    queryFn: () => APIRequest.get(`/template-groups/${groupId}`).execute(),
+    queryFn: ({ signal }) => APIRequest.get(`/api/v1/template-groups/${groupId}`).signal(signal).execute(),
   });
 }
 
 export function useListTemplateVariantsQuery(groupId: string, params: ListTemplateVariantsQueryParams = {}): UseQueryResult<ListTemplateVariantResponse, ApiError> {
   return useQuery<ListTemplateVariantResponse, ApiError>({
     queryKey: templateGroupKeys.variantList(groupId, params),
-    queryFn: () => APIRequest.get(`/template-groups/${groupId}/variants`).query(params).execute(),
+    queryFn: ({ signal }) => APIRequest.get(`/api/v1/template-groups/${groupId}/variants`).query(params).signal(signal).execute(),
   });
 }
 
 export function useUpdateTemplateGroupMutation(groupId: string): UseMutationResult<TemplateGroupResponse, ApiError, UpdateTemplateGroupBody> {
   const queryClient = useQueryClient();
   return useMutation<TemplateGroupResponse, ApiError, UpdateTemplateGroupBody>({
-    mutationFn: data => APIRequest.patch(`/template-groups/${groupId}`).body(data).execute(),
+    mutationFn: data => APIRequest.patch(`/api/v1/template-groups/${groupId}`).body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templateGroupKeys.detail(groupId) });
       queryClient.invalidateQueries({ queryKey: templateGroupKeys.lists() });
@@ -90,7 +91,7 @@ export function useUpdateTemplateGroupMutation(groupId: string): UseMutationResu
 export function useCreateTemplateVariantMutation(groupId: string): UseMutationResult<TemplateVariantResponse, ApiError, CreateTemplateVariantBody> {
   const queryClient = useQueryClient();
   return useMutation<TemplateVariantResponse, ApiError, CreateTemplateVariantBody>({
-    mutationFn: data => APIRequest.post(`/template-groups/${groupId}/variants`).body(data).execute(),
+    mutationFn: data => APIRequest.post(`/api/v1/template-groups/${groupId}/variants`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateGroupKeys.variants(groupId) }),
   });
 }
@@ -98,14 +99,14 @@ export function useCreateTemplateVariantMutation(groupId: string): UseMutationRe
 export function useTemplateVariantQuery(groupId: string, variantId: string): UseQueryResult<TemplateVariantResponse, ApiError> {
   return useQuery<TemplateVariantResponse, ApiError>({
     queryKey: templateGroupKeys.variant(groupId, variantId),
-    queryFn: () => APIRequest.get(`/template-groups/${groupId}/variants/${variantId}`).execute(),
+    queryFn: ({ signal }) => APIRequest.get(`/api/v1/template-groups/${groupId}/variants/${variantId}`).signal(signal).execute(),
   });
 }
 
 export function useDeleteTemplateVariantMutation(groupId: string, variantId: string): UseMutationResult<void, ApiError, void> {
   const queryClient = useQueryClient();
   const options: UseMutationOptions<void, ApiError, void> = {
-    mutationFn: () => APIRequest.delete(`/template-groups/${groupId}/variants/${variantId}`).execute(),
+    mutationFn: () => APIRequest.delete(`/api/v1/template-groups/${groupId}/variants/${variantId}`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateGroupKeys.variants(groupId) }),
   };
   return useMutation(options);
@@ -114,7 +115,7 @@ export function useDeleteTemplateVariantMutation(groupId: string, variantId: str
 export function useUpdateTemplateVariantMutation(groupId: string, variantId: string): UseMutationResult<TemplateVariantResponse, ApiError, UpdateTemplateVariantBody> {
   const queryClient = useQueryClient();
   return useMutation<TemplateVariantResponse, ApiError, UpdateTemplateVariantBody>({
-    mutationFn: data => APIRequest.patch(`/template-groups/${groupId}/variants/${variantId}`).body(data).execute(),
+    mutationFn: data => APIRequest.patch(`/api/v1/template-groups/${groupId}/variants/${variantId}`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateGroupKeys.variants(groupId) }),
   });
 }

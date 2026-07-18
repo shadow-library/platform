@@ -1,15 +1,16 @@
 /**
  * Importing npm packages
  */
-import { Button, Input, Pagination, Table, type TableColumn } from '@shadow-library/ui';
-import { useSearchParams } from '@shadow-library/ui/router';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
+import { Button, Input, Pagination, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
  */
 import {
+  formatDateTime,
   FormDrawer,
   type FormValues,
   Mono,
@@ -21,17 +22,15 @@ import {
   SearchIcon,
   StatusBadge,
   TextOrDash,
-  formatDateTime,
   trimToUndefined,
   useDebouncedParam,
   useTablePagination,
   useTableSort,
 } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import { type MessageType, type Priority, type TemplateGroupResponse, useCreateTemplateGroupMutation, useListTemplateGroupsQuery, useUpdateTemplateGroupMutation } from '@/lib';
 
 import { groupFormConfig } from './forms';
-
-import controls from '@/features/shared/controls.module.css';
 
 export default function GroupList(): ReactElement {
   const navigate = useNavigate();
@@ -53,7 +52,11 @@ export default function GroupList(): ReactElement {
     const description = trimToUndefined(values.description);
     const isActive = values.isActive !== false;
     if (editing.row) updateMutation.mutate({ messageType: values.messageType as MessageType, description, priority, isActive }, { onSuccess: closeForm });
-    else createMutation.mutate({ templateKey: String(values.templateKey ?? '').trim(), messageType: values.messageType as MessageType, description, priority, isActive }, { onSuccess: closeForm });
+    else
+      createMutation.mutate(
+        { templateKey: String(values.templateKey ?? '').trim(), messageType: values.messageType as MessageType, description, priority, isActive },
+        { onSuccess: closeForm },
+      );
   };
 
   const columns: TableColumn<TemplateGroupResponse>[] = [

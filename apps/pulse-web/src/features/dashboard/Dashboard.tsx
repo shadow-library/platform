@@ -1,19 +1,18 @@
 /**
  * Importing npm packages
  */
-import { Alert, Card, Spinner, Statistic } from '@shadow-library/ui';
-import clsx from 'clsx';
 import { type ReactElement } from 'react';
+import { Alert, Card, cn, Spinner, Statistic } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { type NotificationDeliveryStats, useStatsQuery } from '@/lib';
 import { formatDay, successRate } from '@/features/shared';
+import { type NotificationDeliveryStats, useStatsQuery } from '@/lib';
 
 import ChannelCard from './ChannelCard';
-import VolumeChart from './VolumeChart';
 import styles from './Dashboard.module.css';
+import VolumeChart from './VolumeChart';
 
 export default function Dashboard(): ReactElement {
   const { data, isLoading, error } = useStatsQuery();
@@ -91,7 +90,7 @@ export default function Dashboard(): ReactElement {
 function LegendItem({ dotClass, label }: { dotClass?: string; label: string }): ReactElement {
   return (
     <span className={styles.legendItem}>
-      <span className={clsx(styles.legendDot, dotClass)} />
+      <span className={cn(styles.legendDot, dotClass)} />
       {label}
     </span>
   );

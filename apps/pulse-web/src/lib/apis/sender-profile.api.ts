@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationOptions, type UseMutationResult, type UseQueryResult, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMutation, type UseMutationOptions, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
+import { type ApiError, APIRequest } from '@shadow-library/web';
 
 /**
  * Importing user defined packages/modules
  */
-import { APIRequest, ApiError } from './api-request';
 import {
   type CreateSenderEndpointBody,
   type CreateSenderProfileBody,
@@ -41,21 +41,21 @@ const senderProfileKeys = {
 export function useListSenderProfilesQuery(params: ListSenderProfilesQueryParams = {}): UseQueryResult<ListSenderProfileResponse, ApiError> {
   return useQuery<ListSenderProfileResponse, ApiError>({
     queryKey: senderProfileKeys.list(params),
-    queryFn: () => APIRequest.get('/sender-profiles').query(params).execute(),
+    queryFn: ({ signal }) => APIRequest.get('/api/v1/sender-profiles').query(params).signal(signal).execute(),
   });
 }
 
 export function useSenderProfileQuery(profileId: string): UseQueryResult<SenderProfileResponse, ApiError> {
   return useQuery<SenderProfileResponse, ApiError>({
     queryKey: senderProfileKeys.detail(profileId),
-    queryFn: () => APIRequest.get(`/sender-profiles/${profileId}`).execute(),
+    queryFn: ({ signal }) => APIRequest.get(`/api/v1/sender-profiles/${profileId}`).signal(signal).execute(),
   });
 }
 
 export function useCreateSenderProfileMutation(): UseMutationResult<SenderProfileResponse, ApiError, CreateSenderProfileBody> {
   const queryClient = useQueryClient();
   return useMutation<SenderProfileResponse, ApiError, CreateSenderProfileBody>({
-    mutationFn: data => APIRequest.post('/sender-profiles').body(data).execute(),
+    mutationFn: data => APIRequest.post('/api/v1/sender-profiles').body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: senderProfileKeys.lists() }),
   });
 }
@@ -63,7 +63,7 @@ export function useCreateSenderProfileMutation(): UseMutationResult<SenderProfil
 export function useUpdateSenderProfileMutation(profileId: string): UseMutationResult<SenderProfileResponse, ApiError, UpdateSenderProfileBody> {
   const queryClient = useQueryClient();
   return useMutation<SenderProfileResponse, ApiError, UpdateSenderProfileBody>({
-    mutationFn: data => APIRequest.patch(`/sender-profiles/${profileId}`).body(data).execute(),
+    mutationFn: data => APIRequest.patch(`/api/v1/sender-profiles/${profileId}`).body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: senderProfileKeys.detail(profileId) });
       queryClient.invalidateQueries({ queryKey: senderProfileKeys.lists() });
@@ -74,7 +74,7 @@ export function useUpdateSenderProfileMutation(profileId: string): UseMutationRe
 export function useDeleteSenderProfileMutation(profileId: string): UseMutationResult<void, ApiError, void> {
   const queryClient = useQueryClient();
   const options: UseMutationOptions<void, ApiError, void> = {
-    mutationFn: () => APIRequest.delete(`/sender-profiles/${profileId}`).execute(),
+    mutationFn: () => APIRequest.delete(`/api/v1/sender-profiles/${profileId}`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: senderProfileKeys.lists() }),
   };
   return useMutation(options);
@@ -83,21 +83,21 @@ export function useDeleteSenderProfileMutation(profileId: string): UseMutationRe
 export function useListSenderEndpointsQuery(profileId: string, params: ListSenderEndpointsQueryParams = {}): UseQueryResult<ListSenderEndpointResponse, ApiError> {
   return useQuery<ListSenderEndpointResponse, ApiError>({
     queryKey: senderProfileKeys.endpointList(profileId, params),
-    queryFn: () => APIRequest.get(`/sender-profiles/${profileId}/endpoints`).query(params).execute(),
+    queryFn: ({ signal }) => APIRequest.get(`/api/v1/sender-profiles/${profileId}/endpoints`).query(params).signal(signal).execute(),
   });
 }
 
 export function useSenderEndpointQuery(profileId: string, endpointId: string): UseQueryResult<SenderEndpointResponse, ApiError> {
   return useQuery<SenderEndpointResponse, ApiError>({
     queryKey: senderProfileKeys.endpoint(profileId, endpointId),
-    queryFn: () => APIRequest.get(`/sender-profiles/${profileId}/endpoints/${endpointId}`).execute(),
+    queryFn: ({ signal }) => APIRequest.get(`/api/v1/sender-profiles/${profileId}/endpoints/${endpointId}`).signal(signal).execute(),
   });
 }
 
 export function useCreateSenderEndpointMutation(profileId: string): UseMutationResult<SenderEndpointResponse, ApiError, CreateSenderEndpointBody> {
   const queryClient = useQueryClient();
   return useMutation<SenderEndpointResponse, ApiError, CreateSenderEndpointBody>({
-    mutationFn: data => APIRequest.post(`/sender-profiles/${profileId}/endpoints`).body(data).execute(),
+    mutationFn: data => APIRequest.post(`/api/v1/sender-profiles/${profileId}/endpoints`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: senderProfileKeys.endpoints(profileId) }),
   });
 }
@@ -105,7 +105,7 @@ export function useCreateSenderEndpointMutation(profileId: string): UseMutationR
 export function useUpdateSenderEndpointMutation(profileId: string, endpointId: string): UseMutationResult<SenderEndpointResponse, ApiError, UpdateSenderEndpointBody> {
   const queryClient = useQueryClient();
   return useMutation<SenderEndpointResponse, ApiError, UpdateSenderEndpointBody>({
-    mutationFn: data => APIRequest.patch(`/sender-profiles/${profileId}/endpoints/${endpointId}`).body(data).execute(),
+    mutationFn: data => APIRequest.patch(`/api/v1/sender-profiles/${profileId}/endpoints/${endpointId}`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: senderProfileKeys.endpoints(profileId) }),
   });
 }
@@ -113,7 +113,7 @@ export function useUpdateSenderEndpointMutation(profileId: string, endpointId: s
 export function useDeleteSenderEndpointMutation(profileId: string, endpointId: string): UseMutationResult<void, ApiError, void> {
   const queryClient = useQueryClient();
   const options: UseMutationOptions<void, ApiError, void> = {
-    mutationFn: () => APIRequest.delete(`/sender-profiles/${profileId}/endpoints/${endpointId}`).execute(),
+    mutationFn: () => APIRequest.delete(`/api/v1/sender-profiles/${profileId}/endpoints/${endpointId}`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: senderProfileKeys.endpoints(profileId) }),
   };
   return useMutation(options);

@@ -7,7 +7,13 @@ import { visualizer } from 'rollup-plugin-visualizer';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [devtools(), tanstackRouter({ target: 'react', autoCodeSplitting: true }), viteReact(), visualizer({ gzipSize: true, brotliSize: true })],
+  plugins: [
+    devtools(),
+    /** The route tree lives in `generated/` (outside the lint/format globs) because the generator's own formatting fights prettier. */
+    tanstackRouter({ target: 'react', autoCodeSplitting: true, semicolons: true, generatedRouteTree: './generated/routeTree.gen.ts' }),
+    viteReact(),
+    visualizer({ gzipSize: true, brotliSize: true }),
+  ],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),

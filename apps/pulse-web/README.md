@@ -19,26 +19,26 @@ bun --bun run build
 
 ## Testing
 
-This project uses [Vitest](https://vitest.dev/) for testing. You can run the tests with:
+This project uses [Playwright](https://playwright.dev/) for end-to-end testing. You can run the tests with:
 
 ```bash
-bun --bun run test
+bun run test:setup
+bun run test
 ```
 
 ## Styling
 
-This project uses [Tailwind CSS](https://tailwindcss.com/) for styling.
+This project uses [@shadow-library/ui](https://www.npmjs.com/package/@shadow-library/ui) components, design tokens (`--sh-*`), and utility classes for styling.
 
 
 ## Linting & Formatting
 
-
-This project uses [eslint](https://eslint.org/) and [prettier](https://prettier.io/) for linting and formatting. Eslint is configured using [tanstack/eslint-config](https://tanstack.com/config/latest/docs/eslint). The following scripts are available:
+This project uses the `shadow` CLI ([@shadow-library/scripts](https://www.npmjs.com/package/@shadow-library/scripts)) for formatting, linting, type-checking, and builds, driven by `.shadowrc.json`:
 
 ```bash
-bun --bun run lint
-bun --bun run format
-bun --bun run check
+bun run verify        # prettier + eslint + type-check
+bun run verify --fix  # auto-fix formatting and lint issues
+bun run build         # vite production build
 ```
 
 

@@ -1,0 +1,6 @@
+{
+  "type": "spa",
+  "verify": {
+    "test": false
+  }
+}

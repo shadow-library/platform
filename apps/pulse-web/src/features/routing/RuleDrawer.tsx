@@ -1,18 +1,17 @@
 /**
  * Importing npm packages
  */
-import { Drawer, DescriptionList } from '@shadow-library/ui';
 import { type ReactElement } from 'react';
+import { DescriptionList, Drawer } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { AnyOrValue, Mono, OutlineBadge, StatusBadge, formatDateTime } from '@/features/shared';
+import { AnyOrValue, formatDateTime, Mono, OutlineBadge, StatusBadge } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import { type SenderProfileResponse } from '@/lib';
 
 import { type RoutingRule } from './forms';
-
-import controls from '@/features/shared/controls.module.css';
 import styles from './Routing.module.css';
 
 interface RuleDrawerProps {

@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
@@ -11,6 +11,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import {
   ALL,
   CHANNEL_FILTER_OPTIONS,
+  formatDateTime,
   FormDrawer,
   type FormValues,
   Mono,
@@ -20,12 +21,12 @@ import {
   SectionHeader,
   StatusBadge,
   TextOrDash,
-  type ViewerData,
-  ViewerDrawer,
-  formatDateTime,
   trimToUndefined,
   useConfirm,
+  type ViewerData,
+  ViewerDrawer,
 } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import {
   type MessageType,
   type NotificationChannel,
@@ -40,8 +41,6 @@ import {
 } from '@/lib';
 
 import { groupFormConfig, variantFormConfig } from './forms';
-
-import controls from '@/features/shared/controls.module.css';
 import styles from './Templates.module.css';
 
 export default function GroupDetail({ groupId }: { groupId: string }): ReactElement {
@@ -96,12 +95,21 @@ export default function GroupDetail({ groupId }: { groupId: string }): ReactElem
   const submitForm = (values: FormValues): void => {
     if (formKind === 'group') {
       const priority = values.priority === 'NONE' ? undefined : (values.priority as Priority | undefined);
-      groupUpdate.mutate({ messageType: values.messageType as MessageType, description: trimToUndefined(values.description), priority, isActive: values.isActive !== false }, { onSuccess: closeForm });
+      groupUpdate.mutate(
+        { messageType: values.messageType as MessageType, description: trimToUndefined(values.description), priority, isActive: values.isActive !== false },
+        { onSuccess: closeForm },
+      );
     } else if (variantRow) {
       variantUpdate.mutate({ subject: trimToUndefined(values.subject), body: String(values.body ?? ''), isActive: values.isActive !== false }, { onSuccess: closeForm });
     } else {
       variantCreate.mutate(
-        { channel: values.channel as NotificationChannel, locale: String(values.locale ?? '').trim(), subject: trimToUndefined(values.subject), body: String(values.body ?? ''), isActive: values.isActive !== false },
+        {
+          channel: values.channel as NotificationChannel,
+          locale: String(values.locale ?? '').trim(),
+          subject: trimToUndefined(values.subject),
+          body: String(values.body ?? ''),
+          isActive: values.isActive !== false,
+        },
         { onSuccess: closeForm },
       );
     }

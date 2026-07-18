@@ -1,15 +1,14 @@
 /**
  * Importing npm packages
  */
-import clsx from 'clsx';
 import { type PropsWithChildren, type ReactElement } from 'react';
+import { cn } from '@shadow-library/ui';
 
 /**
  * Importing user defined components
  */
 import AppSidebar from './AppSidebar';
 import Header from './Header';
-
 import styles from './Layout.module.css';
 
 export default function Layout({ children }: PropsWithChildren): ReactElement {
@@ -18,7 +17,7 @@ export default function Layout({ children }: PropsWithChildren): ReactElement {
       <AppSidebar />
       <div className={styles.main}>
         <Header />
-        <main className={clsx('pulse-scroll', styles.content)}>{children}</main>
+        <main className={cn('pulse-scroll', styles.content)}>{children}</main>
       </div>
     </div>
   );

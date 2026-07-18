@@ -9,7 +9,7 @@ import { type ReactElement } from 'react';
  */
 import { GroupDetail } from '@/features/templates';
 
-export const Route = createFileRoute('/templates/$groupId')({
+export const Route = createFileRoute('/_app/templates/$groupId')({
   component: GroupDetailRoute,
 });
 

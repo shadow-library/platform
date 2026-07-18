@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
+import { createContext, type PropsWithChildren, type ReactElement, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
 import { ConfirmDialog } from '@shadow-library/ui';
-import { type PropsWithChildren, type ReactElement, type ReactNode, createContext, useCallback, useContext, useRef, useState } from 'react';
 
 /**
  * Defining types

@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Badge, Card, EmptyState, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
-import { useSearchParams } from '@shadow-library/ui/router';
 import { type ReactElement, useState } from 'react';
+import { Badge, Card, EmptyState, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
@@ -11,22 +11,21 @@ import { type ReactElement, useState } from 'react';
 import {
   ALL,
   CHANNEL_FILTER_OPTIONS,
+  formatDateTime,
   Mono,
   Muted,
   OutlineBadge,
   PAGE_SIZE_OPTIONS,
   PageHeader,
   SearchIcon,
-  type ViewerData,
-  ViewerDrawer,
-  formatDateTime,
   useDebouncedParam,
   useTablePagination,
   useTableSort,
+  type ViewerData,
+  ViewerDrawer,
 } from '@/features/shared';
-import { type NotificationMessageResponse, useListNotificationMessagesQuery } from '@/lib';
-
 import controls from '@/features/shared/controls.module.css';
+import { type NotificationMessageResponse, useListNotificationMessagesQuery } from '@/lib';
 
 export default function MessageLog(): ReactElement {
   const header = (
@@ -94,7 +93,12 @@ function MessageLogTable(): ReactElement {
   return (
     <>
       <div className={controls.toolbar}>
-        <Select className={controls.filter} value={search.channel ?? ALL} onValueChange={value => appendSearch({ channel: value === ALL ? '' : value, offset: 0 })} aria-label="Filter by channel">
+        <Select
+          className={controls.filter}
+          value={search.channel ?? ALL}
+          onValueChange={value => appendSearch({ channel: value === ALL ? '' : value, offset: 0 })}
+          aria-label="Filter by channel"
+        >
           {CHANNEL_FILTER_OPTIONS.map(option => (
             <Select.Item key={option.value} value={option.value}>
               {option.label}
@@ -103,7 +107,17 @@ function MessageLogTable(): ReactElement {
         </Select>
         <Input className={controls.searchNarrow} value={recipientValue} onValueChange={setRecipientValue} placeholder="Filter by recipient" prefix={<SearchIcon />} clearable />
       </div>
-      <Table data={data?.items ?? []} columns={columns} rowKey="id" aria-label="Message log" loading={isLoading} onRowClick={openView} sort={sort} onSortChange={onSortChange} emptyState="No messages match your filters." />
+      <Table
+        data={data?.items ?? []}
+        columns={columns}
+        rowKey="id"
+        aria-label="Message log"
+        loading={isLoading}
+        onRowClick={openView}
+        sort={sort}
+        onSortChange={onSortChange}
+        emptyState="No messages match your filters."
+      />
       <div className={controls.pagination}>
         <Pagination
           page={pagination.page}

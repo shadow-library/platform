@@ -1,15 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Combobox, Drawer, FormField, Input, Select, Switch, Textarea } from '@shadow-library/ui';
 import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
+import { Combobox, Drawer, FormField, Input, Select, Switch, Textarea } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { type Option } from './options';
-
 import styles from './FormDrawer.module.css';
+import { type Option } from './options';
 
 /**
  * Defining types
@@ -105,7 +104,15 @@ function renderControl(field: FormFieldConfig, value: FormValue, onChange: (valu
         </Select>
       );
     case 'combobox':
-      return <Combobox options={field.options ?? []} value={selectValue ?? null} onValueChange={next => onChange(next ?? undefined)} placeholder={field.placeholder} disabled={field.disabled} />;
+      return (
+        <Combobox
+          options={field.options ?? []}
+          value={selectValue ?? null}
+          onValueChange={next => onChange(next ?? undefined)}
+          placeholder={field.placeholder}
+          disabled={field.disabled}
+        />
+      );
     case 'switch':
       return <Switch checked={Boolean(value)} onCheckedChange={onChange} />;
     default:

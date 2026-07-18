@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea } from '@shadow-library/ui';
 import { type ReactElement, useState } from 'react';
+import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
@@ -72,7 +72,12 @@ export default function SendForm(): ReactElement {
       <Card padding="lg">
         <div className={styles.formCol}>
           <FormField label="Template key" required helper="References an existing template group.">
-            <Combobox options={templateOptions} value={form.templateKey || null} onValueChange={value => update({ templateKey: value ?? '' })} placeholder="Search template keys…" />
+            <Combobox
+              options={templateOptions}
+              value={form.templateKey || null}
+              onValueChange={value => update({ templateKey: value ?? '' })}
+              placeholder="Search template keys…"
+            />
           </FormField>
 
           <div>

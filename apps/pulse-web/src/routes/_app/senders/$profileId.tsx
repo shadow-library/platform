@@ -9,7 +9,7 @@ import { type ReactElement } from 'react';
  */
 import { ProfileDetail } from '@/features/senders';
 
-export const Route = createFileRoute('/senders/$profileId')({
+export const Route = createFileRoute('/_app/senders/$profileId')({
   component: ProfileDetailRoute,
 });
 

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
+import { type ReactElement } from 'react';
 import { ThemeProvider } from '@shadow-library/ui';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 /**
  *  Importing user defined modules
@@ -19,15 +19,15 @@ export interface AppProviderProps {
 
 /**
  * Declaring constants
+ *
+ * The QueryClientProvider is installed by `createAppRouter` (via the SSR-query integration's router
+ * `Wrap`), so this provider owns only theming and the confirm dialog.
  */
-export const queryClient = new QueryClient();
 
-export default function AppProvider(props: AppProviderProps) {
+export default function AppProvider(props: AppProviderProps): ReactElement {
   return (
-    <QueryClientProvider client={queryClient}>
-      <ThemeProvider storageKey="theme">
-        <ConfirmProvider>{props.children}</ConfirmProvider>
-      </ThemeProvider>
-    </QueryClientProvider>
+    <ThemeProvider storageKey="theme">
+      <ConfirmProvider>{props.children}</ConfirmProvider>
+    </ThemeProvider>
   );
 }

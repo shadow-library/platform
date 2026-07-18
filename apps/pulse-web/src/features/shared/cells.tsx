@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Badge, type BadgeIntent } from '@shadow-library/ui';
 import { type ReactElement, type ReactNode } from 'react';
+import { Badge, type BadgeIntent } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

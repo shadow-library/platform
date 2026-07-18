@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { type SortDirection, type TableSort, toPositiveInt } from '@shadow-library/ui';
-import { useSearchParams } from '@shadow-library/ui/router';
 import { useEffect, useRef, useState } from 'react';
+import { type SortDirection, type TableSort, toPositiveInt } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/web/router';
 
 /**
  * Defining types

@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { Alert, Breadcrumbs, Button, Card, DescriptionList, Select, Spinner, Table, type TableColumn } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
@@ -12,19 +12,20 @@ import {
   ACTIVE_FILTER_OPTIONS,
   ALL,
   CHANNEL_FILTER_OPTIONS,
+  formatDateTime,
   FormDrawer,
   type FormValue,
   type FormValues,
   Mono,
   OutlineBadge,
-  PROVIDER_FILTER_OPTIONS,
   PageHeader,
+  PROVIDER_FILTER_OPTIONS,
   SectionHeader,
   StatusBadge,
-  formatDateTime,
   trimToUndefined,
   useConfirm,
 } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import {
   type NotificationChannel,
   type NotificationServiceProvider,
@@ -38,8 +39,6 @@ import {
 } from '@/lib';
 
 import { endpointFormConfig, senderFormConfig } from './forms';
-
-import controls from '@/features/shared/controls.module.css';
 
 function toWeight(value: FormValue): number | undefined {
   const text = String(value ?? '').trim();
@@ -59,7 +58,8 @@ export default function ProfileDetail({ profileId }: { profileId: string }): Rea
   const [provider, setProvider] = useState<string>(ALL);
   const [active, setActive] = useState<string>(ALL);
   const filtered = endpoints.filter(
-    endpoint => (channel === ALL || endpoint.channel === channel) && (provider === ALL || endpoint.provider === provider) && (active === ALL || String(endpoint.isActive) === active),
+    endpoint =>
+      (channel === ALL || endpoint.channel === channel) && (provider === ALL || endpoint.provider === provider) && (active === ALL || String(endpoint.isActive) === active),
   );
 
   const [formKind, setFormKind] = useState<'profile' | 'endpoint' | null>(null);

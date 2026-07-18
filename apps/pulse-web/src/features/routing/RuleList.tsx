@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
-import { useSearchParams } from '@shadow-library/ui/router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
+import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
@@ -11,6 +11,7 @@ import { type ReactElement, useEffect, useMemo, useState } from 'react';
 import {
   ALL,
   AnyOrValue,
+  formatDateTime,
   FormDrawer,
   type FormValues,
   MESSAGE_TYPE_FILTER_OPTIONS,
@@ -19,13 +20,13 @@ import {
   OutlineBadge,
   PAGE_SIZE_OPTIONS,
   PageHeader,
-  formatDateTime,
   trimToUndefined,
   useConfirm,
   useDebouncedParam,
   useTablePagination,
   useTableSort,
 } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import {
   type MessageType,
   useCreateSenderRoutingRuleMutation,
@@ -34,12 +35,9 @@ import {
   useListSenderRoutingRulesQuery,
   useUpdateSenderRoutingRuleMutation,
 } from '@/lib';
-
 import { type RoutingRule, ruleFormConfig } from './forms';
-import RuleDrawer from './RuleDrawer';
-
-import controls from '@/features/shared/controls.module.css';
 import styles from './Routing.module.css';
+import RuleDrawer from './RuleDrawer';
 
 const rowKey = (rule: RoutingRule): string => `${rule.senderProfileId}:${rule.messageType ?? ''}:${rule.region ?? ''}:${rule.service ?? ''}:${rule.createdAt}`;
 
@@ -150,7 +148,12 @@ export default function RuleList(): ReactElement {
         }
       />
       <div className={controls.toolbar}>
-        <Select className={controls.filter} value={search.messageType ?? ALL} onValueChange={value => appendSearch({ messageType: value === ALL ? '' : value, offset: 0 })} aria-label="Filter by type">
+        <Select
+          className={controls.filter}
+          value={search.messageType ?? ALL}
+          onValueChange={value => appendSearch({ messageType: value === ALL ? '' : value, offset: 0 })}
+          aria-label="Filter by type"
+        >
           {MESSAGE_TYPE_FILTER_OPTIONS.map(option => (
             <Select.Item key={option.value} value={option.value}>
               {option.label}

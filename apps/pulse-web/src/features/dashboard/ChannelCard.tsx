@@ -1,15 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Card } from '@shadow-library/ui';
-import clsx from 'clsx';
 import { type ReactElement } from 'react';
+import { Card, cn } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { type NotificationDeliveryStats } from '@/lib';
 import { formatNumber, successRate } from '@/features/shared';
+import { type NotificationDeliveryStats } from '@/lib';
 
 import styles from './Dashboard.module.css';
 
@@ -40,7 +39,7 @@ function Metric({ label, value, tone }: { label: string; value: number; tone?: s
   return (
     <div>
       <div className={styles.metricLabel}>{label}</div>
-      <div className={clsx(styles.metricValue, tone)}>{formatNumber(value)}</div>
+      <div className={cn(styles.metricValue, tone)}>{formatNumber(value)}</div>
     </div>
   );
 }

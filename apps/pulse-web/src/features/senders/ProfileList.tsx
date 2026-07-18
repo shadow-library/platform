@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
-import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
-import { useSearchParams } from '@shadow-library/ui/router';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
+import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
@@ -12,6 +12,7 @@ import { type ReactElement, useEffect, useState } from 'react';
 import {
   ACTIVE_FILTER_OPTIONS,
   ALL,
+  formatDateTime,
   FormDrawer,
   type FormValues,
   Mono,
@@ -21,18 +22,16 @@ import {
   SearchIcon,
   StatusBadge,
   TextOrDash,
-  formatDateTime,
   trimToUndefined,
   useConfirm,
   useDebouncedParam,
   useTablePagination,
   useTableSort,
 } from '@/features/shared';
+import controls from '@/features/shared/controls.module.css';
 import { type SenderProfileResponse, useCreateSenderProfileMutation, useDeleteSenderProfileMutation, useListSenderProfilesQuery, useUpdateSenderProfileMutation } from '@/lib';
 
 import { senderFormConfig } from './forms';
-
-import controls from '@/features/shared/controls.module.css';
 
 export default function ProfileList(): ReactElement {
   const navigate = useNavigate();
@@ -118,7 +117,12 @@ export default function ProfileList(): ReactElement {
       />
       <div className={controls.toolbar}>
         <Input className={controls.search} value={searchValue} onValueChange={setSearchValue} placeholder="Search by key" prefix={<SearchIcon />} clearable />
-        <Select className={controls.filter} value={search.isActive ?? ALL} onValueChange={value => appendSearch({ isActive: value === ALL ? '' : value, offset: 0 })} aria-label="Filter by status">
+        <Select
+          className={controls.filter}
+          value={search.isActive ?? ALL}
+          onValueChange={value => appendSearch({ isActive: value === ALL ? '' : value, offset: 0 })}
+          aria-label="Filter by status"
+        >
           {ACTIVE_FILTER_OPTIONS.map(option => (
             <Select.Item key={option.value} value={option.value}>
               {option.label}

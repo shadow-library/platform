@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button } from '@shadow-library/ui';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement } from 'react';
+import { Button } from '@shadow-library/ui';
 
 import styles from './Layout.module.css';
 

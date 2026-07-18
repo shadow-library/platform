@@ -6,8 +6,8 @@ import { createFileRoute } from '@tanstack/react-router';
 /**
  *  Importing user defined modules
  */
-import { GroupList } from '@/features/templates';
+import { RuleList } from '@/features/routing';
 
-export const Route = createFileRoute('/templates/')({
-  component: GroupList,
+export const Route = createFileRoute('/_app/routing/')({
+  component: RuleList,
 });

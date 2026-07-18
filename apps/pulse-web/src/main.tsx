@@ -1,9 +1,10 @@
 /**
  * Importing npm packages
  */
-import { RouterProvider, createRouter } from '@tanstack/react-router';
+import { RouterProvider } from '@tanstack/react-router';
 import { StrictMode } from 'react';
 import ReactDOM from 'react-dom/client';
+import { createAppRouter } from '@shadow-library/web/router';
 
 /**
  * Importing npm design components
@@ -16,10 +17,9 @@ import ReactDOM from 'react-dom/client';
 /**
  *  Importing user defined modules
  */
-import AppProvider, { queryClient } from './components/AppProvider';
+import { routeTree } from '../generated/routeTree.gen';
+import AppProvider from './components/AppProvider';
 import reportWebVitals from './reportWebVitals';
-import { routeTree } from './routeTree.gen';
-
 import './styles.css';
 /**
  * Declaring types
@@ -34,14 +34,7 @@ declare module '@tanstack/react-router' {
 /**
  * Declaring constants and variables
  */
-const router = createRouter({
-  routeTree,
-  context: { queryClient },
-  defaultPreload: 'intent',
-  scrollRestoration: true,
-  defaultStructuralSharing: true,
-  defaultPreloadStaleTime: 0,
-});
+const router = createAppRouter(routeTree);
 
 const rootElement = document.getElementById('app');
 if (rootElement && !rootElement.innerHTML) {

@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { type UseQueryResult, useQuery } from '@tanstack/react-query';
+import { useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { type ApiError, APIRequest } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
  */
-import { APIRequest, ApiError } from './api-request';
 import { type DashboardStats } from './api-types.gen';
 
 /**
@@ -24,6 +24,6 @@ const dashboardKeys = {
 export function useStatsQuery(): UseQueryResult<DashboardStats, ApiError> {
   return useQuery<DashboardStats, ApiError>({
     queryKey: dashboardKeys.stats,
-    queryFn: () => APIRequest.get('/dashboard/stats').execute(),
+    queryFn: ({ signal }) => APIRequest.get('/api/v1/dashboard/stats').signal(signal).execute(),
   });
 }

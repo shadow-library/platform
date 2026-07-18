@@ -6,8 +6,8 @@ import { createFileRoute } from '@tanstack/react-router';
 /**
  *  Importing user defined modules
  */
-import { SendForm } from '@/features/send';
+import { Dashboard } from '@/features/dashboard';
 
-export const Route = createFileRoute('/send/')({
-  component: SendForm,
+export const Route = createFileRoute('/_app/')({
+  component: Dashboard,
 });

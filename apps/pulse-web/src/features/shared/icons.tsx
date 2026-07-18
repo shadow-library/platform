@@ -70,7 +70,17 @@ export function SunIcon(): ReactElement {
 export function PulseSquare({ size = 26, radius = 7 }: { size?: number; radius?: number }): ReactElement {
   return (
     <div className={styles.mark} style={{ width: size, height: size, borderRadius: radius }}>
-      <svg width={size * 0.62} height={size * 0.62} viewBox="0 0 24 24" fill="none" stroke="var(--sh-on-accent)" strokeWidth={2.4} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <svg
+        width={size * 0.62}
+        height={size * 0.62}
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="var(--sh-on-accent)"
+        strokeWidth={2.4}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden
+      >
         <path d="M3 12h4l2 6 4-14 2 8h6" />
       </svg>
     </div>
