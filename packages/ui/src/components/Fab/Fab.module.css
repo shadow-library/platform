@@ -1,0 +1,113 @@
+/*
+ * FAB — the promoted action floating above content. Accent fill + e3 (surface contrast carries it in
+ * dark, where shadows are none). Fixed placements clear the device safe areas; z-sticky keeps it under
+ * every overlay. Extended (label) form is a pill; both forms are ≥48px — tap-target compliant outright.
+ */
+
+.root {
+  position: fixed;
+  z-index: var(--sh-z-sticky);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0;
+  border: var(--sh-border-width) solid transparent;
+  border-radius: var(--sh-radius-full);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  box-shadow: var(--sh-shadow-e3);
+  cursor: pointer;
+  text-decoration: none;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+.root:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+/* ── Placement (safe-area aware; static opts out for consumer layouts) ── */
+.root[data-placement='bottom-end'] {
+  right: calc(16px + var(--sh-safe-right));
+  bottom: calc(16px + var(--sh-safe-bottom));
+}
+.root[data-placement='bottom-start'] {
+  left: calc(16px + var(--sh-safe-left));
+  bottom: calc(16px + var(--sh-safe-bottom));
+}
+.root[data-placement='bottom-center'] {
+  left: 50%;
+  bottom: calc(16px + var(--sh-safe-bottom));
+  transform: translateX(-50%);
+}
+.root[data-placement='static'] {
+  position: static;
+}
+
+/* ── Sizes (square; extended widens into a pill) ─────────── */
+.root[data-size='md'] {
+  width: 48px;
+  height: 48px;
+}
+.root[data-size='lg'] {
+  width: 56px;
+  height: 56px;
+}
+.root[data-extended] {
+  width: auto;
+}
+.root[data-size='md'][data-extended] {
+  padding: 0 20px;
+}
+.root[data-size='lg'][data-extended] {
+  padding: 0 24px;
+}
+
+/* ── Variants ─────────────────────────────────────────────── */
+.root[data-variant='primary'] {
+  background-color: var(--sh-accent);
+  color: var(--sh-on-accent);
+}
+.root[data-variant='primary']:not(:disabled):hover {
+  background-color: var(--sh-accent-hover);
+}
+.root[data-variant='primary']:not(:disabled):active {
+  background-color: var(--sh-accent-active);
+}
+
+.root[data-variant='secondary'] {
+  background-color: var(--sh-surface-card);
+  border-color: var(--sh-border-default);
+  color: var(--sh-text-primary);
+}
+.root[data-variant='secondary']:not(:disabled):hover {
+  background-color: var(--sh-surface-well);
+  border-color: var(--sh-border-strong);
+}
+.root[data-variant='secondary']:not(:disabled):active {
+  background-color: var(--sh-bg-pressed);
+}
+
+/* ── Icon ─────────────────────────────────────────────────── */
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.root[data-size='lg'] .icon svg {
+  width: 24px;
+  height: 24px;
+}
