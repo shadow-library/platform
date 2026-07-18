@@ -4,7 +4,7 @@ ARG BUN_IMAGE=oven/bun:1.3.6-slim
 FROM ${BUN_IMAGE}
 
 # Setting up the environment variables
-ENV PORT=8080
+ENV SERVER_PORT=8080
 ENV NODE_ENV=production
 
 # Setting the working directory and user
