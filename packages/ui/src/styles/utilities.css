@@ -1155,6 +1155,8 @@
 
 .h-screen {
   height: 100vh;
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  height: 100dvh;
 }
 
 .min-h-0 {

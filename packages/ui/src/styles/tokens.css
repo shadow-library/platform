@@ -242,6 +242,17 @@
   --sh-row-height: 40px;
   --sh-disabled-opacity: 0.45;
 
+  /* ── Touch (mobile layer) ─────────────────────────────────── */
+  /* Minimum interactive hit area (WCAG 2.5.5 / platform HIGs). Controls smaller than this
+     extend an invisible hit area on coarse pointers instead of growing visually. */
+  --sh-tap-target: 44px;
+  /* Device safe areas (notch, home indicator) — 0 outside notched/standalone contexts.
+     Edge-anchored surfaces (sheets, bars, toasts, FAB) pad by these, never raw env(). */
+  --sh-safe-top: env(safe-area-inset-top, 0px);
+  --sh-safe-right: env(safe-area-inset-right, 0px);
+  --sh-safe-bottom: env(safe-area-inset-bottom, 0px);
+  --sh-safe-left: env(safe-area-inset-left, 0px);
+
   /*
    * Breakpoints (reference) — matching the Foundations grid (xs–2xl).
    * CSS custom properties cannot be used inside media queries, so these document the
@@ -261,6 +272,15 @@
   --sh-control-height-md: 28px;
   --sh-control-height-lg: 32px;
   --sh-row-height: 32px;
+}
+
+/* Touch density — finger-first metrics for mobile/PWA shells: the default (md) control meets the
+   44px tap target outright. Set app-wide via [data-density='touch']; never mixed within a view. */
+[data-density='touch'] {
+  --sh-control-height-sm: 36px;
+  --sh-control-height-md: 44px;
+  --sh-control-height-lg: 48px;
+  --sh-row-height: 48px;
 }
 
 /*
