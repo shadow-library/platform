@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Button, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
+import { Button, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

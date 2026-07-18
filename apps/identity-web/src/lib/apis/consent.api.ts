@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type UseMutationResult, type UseQueryResult, queryOptions, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
 import { createServerFn } from '@tanstack/react-start';
 
 /**

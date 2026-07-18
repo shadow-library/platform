@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Input, Pagination, Select, Table } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Avatar, Input, Pagination, Select, Table } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

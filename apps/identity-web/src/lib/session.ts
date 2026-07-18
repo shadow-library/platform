@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { requireAuth } from '@shadow-library/web/router';
 import { type QueryClient } from '@tanstack/react-query';
+import { requireAuth } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
  */
-import { type MeResponse, meQueryOptions } from '@/lib/apis';
+import { meQueryOptions, type MeResponse } from '@/lib/apis';
 
 /**
  * Declaring the constants
@@ -23,8 +23,7 @@ import { type MeResponse, meQueryOptions } from '@/lib/apis';
  * a 403 surfaced by the route error boundary, never silent access).
  */
 export function requireSession(queryClient: QueryClient, returnTo: string): Promise<MeResponse> {
-  // `requireAuth` types its query param as the non-generic `EnsureQueryDataOptions<unknown, …>`, which a
-  // strongly-typed `queryOptions<MeResponse>()` is not assignable to (its branded `staleTime` is invariant).
-  // The value is correct at runtime; widen the compiler's view to the parameter's own type.
-  return requireAuth<MeResponse>(queryClient, meQueryOptions() as Parameters<typeof requireAuth>[1], { loginTo: '/login', returnTo });
+  // `requireAuth` (web 0.2) mirrors `ensureQueryData`'s generics, so `meQueryOptions()` flows through
+  // and `MeResponse` is inferred — no widening cast needed anymore.
+  return requireAuth(queryClient, meQueryOptions(), { loginTo: '/login', returnTo });
 }

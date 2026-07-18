@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, DescriptionList, Input, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Button, DescriptionList, Input, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { PlusIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { type DomainStatus, domainsQueryOptions, useDomainsQuery, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';
+import { domainsQueryOptions, type DomainStatus, useDomainsQuery, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './domains.module.css';

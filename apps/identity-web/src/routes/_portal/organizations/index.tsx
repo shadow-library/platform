@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Badge, Button, ConfirmDialog, Dialog, FormField, Input, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Avatar, Badge, Button, ConfirmDialog, Dialog, FormField, Input, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

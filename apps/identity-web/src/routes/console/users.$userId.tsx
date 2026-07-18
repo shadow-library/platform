@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Button, ConfirmDialog, DescriptionList, Spinner, Timeline, type TimelineStatus, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Avatar, Button, ConfirmDialog, DescriptionList, Spinner, Timeline, type TimelineStatus, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

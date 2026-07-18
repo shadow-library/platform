@@ -6,7 +6,7 @@ import { useCallback, useRef, useState } from 'react';
 /**
  * Importing user defined packages
  */
-import { ApiError, type FlowState } from '@/lib/apis';
+import { type FlowState, isApiError } from '@/lib/apis';
 
 /**
  * Defining types
@@ -62,10 +62,12 @@ export function useFlow(): FlowUiState & FlowActions {
       if (previous && previous.status === next.status && next.attemptsLeft !== undefined) setError(REJECTED_MESSAGE(next.attemptsLeft));
       return next;
     } catch (cause) {
-      if (cause instanceof ApiError && (cause.status === 410 || cause.status === 409)) setDead(true);
-      else if (cause instanceof ApiError && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
-      else if (cause instanceof ApiError && cause.fields?.length) setError(cause.fields.map(field => field.msg).join(' '));
-      else if (cause instanceof ApiError) setError(cause.message);
+      // `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client
+      // bundles each carry their own `ApiError` class identity.
+      if (isApiError(cause) && (cause.status === 410 || cause.status === 409)) setDead(true);
+      else if (isApiError(cause) && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
+      else if (isApiError(cause) && cause.fields?.length) setError(cause.fields.map(field => field.msg).join(' '));
+      else if (isApiError(cause)) setError(cause.message);
       else setError('Something went wrong. Please try again.');
       return null;
     } finally {

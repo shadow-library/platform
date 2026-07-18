@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, Dialog, DropdownMenu, FormField, IconButton, Input, Select, Switch, Table, TokenInput, type TokenValue, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Badge, Button, Dialog, DropdownMenu, FormField, IconButton, Input, Select, Switch, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -13,9 +13,9 @@ import { PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import { useStepUpGate } from '@/features/portal';
 import {
-  type ClientKind,
   adminApplicationsQueryOptions,
   adminClientsQueryOptions,
+  type ClientKind,
   useApplicationsQuery,
   useClientsQuery,
   useRegisterClientMutation,

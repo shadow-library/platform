@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog } from '@shadow-library/ui';
 import { type ReactNode } from 'react';
+import { Button, Dialog } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, OtpInput, toast } from '@shadow-library/ui';
 import { type ReactElement, useState } from 'react';
+import { Button, Dialog, FormField, OtpInput, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

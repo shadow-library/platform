@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Avatar, Button } from '@shadow-library/ui';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { type ReactNode } from 'react';
+import { Alert, Avatar, Button } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

@@ -40,20 +40,22 @@ PORT=9091 bun run src/main.ts
 ```bash
 bun install
 bun run dev          # Vite + Start dev server on http://localhost:3000
-bun run build        # production build → dist/client + dist/server
+bun run build        # shadow build (ssr) → dist/client + dist/server
 bun run start        # serve the production build (Bun — main.ts) — set SERVER_URL + PORT
-bun run typecheck    # tsc --noEmit
-bun run lint         # prettier -c + eslint
+bun run verify       # shadow verify: format + lint + type-check (e2e stays a separate step)
+bun run type-check   # tsc
 bun run test         # Playwright e2e (needs the backend up); test:setup installs Chromium
 bun run generate:api-types   # regenerate src/lib/apis/api-types.gen.ts from the OpenAPI spec
 ```
 
+Tooling (lint/format/commitlint rules, build type, husky hooks) is centralized in `@shadow-library/scripts` —
+the `shadow` CLI — configured through `.shadowrc.json`; there are no per-repo ESLint/Prettier/commitlint configs.
+
 ## Environment
 
-| Variable           | Default                                        | Used by                                                     |
-| ------------------ | ---------------------------------------------- | ----------------------------------------------------------- |
-| `SERVER_URL`       | `http://localhost:9091`                        | Server functions (server-side backend base URL) + dev proxy |
-| `OPENAPI_SPEC_URL` | `http://localhost:9091/dev/api-docs/openapi.json` | `generate:api-types`                                     |
+| Variable     | Default                 | Used by                                                     |
+| ------------ | ----------------------- | ----------------------------------------------------------- |
+| `SERVER_URL` | `http://localhost:9091` | Server functions (server-side backend base URL) + dev proxy |
 
 ## Deployment topology
 

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Outlet, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Outlet } from '@tanstack/react-router';
 
 /**
  * The hosted-auth layout group. Each page renders the full split-screen chrome itself (via

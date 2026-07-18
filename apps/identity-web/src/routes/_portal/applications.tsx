@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Avatar } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
+import { Avatar } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

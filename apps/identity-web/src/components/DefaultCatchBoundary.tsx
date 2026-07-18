@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Button } from '@shadow-library/ui';
 import { type ErrorComponentProps, Link, useRouter } from '@tanstack/react-router';
+import { Button } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
 import { ShieldAlertIcon } from '@/components/icons';
-import { ApiError } from '@/lib/apis';
+import { isApiError } from '@/lib/apis';
 
 import styles from './boundary.module.css';
 
@@ -22,8 +22,9 @@ import styles from './boundary.module.css';
  */
 export function DefaultCatchBoundary({ error, reset }: ErrorComponentProps): React.JSX.Element {
   const router = useRouter();
-  const sessionExpired = error instanceof ApiError && error.status === 401;
-  const message = error instanceof ApiError ? error.message : 'Something went wrong on our end. Please try again.';
+  // `isApiError` (web 0.2) instead of `instanceof` — holds across the SSR/client dual-bundle class split.
+  const sessionExpired = isApiError(error) && error.status === 401;
+  const message = isApiError(error) ? error.message : 'Something went wrong on our end. Please try again.';
 
   if (sessionExpired) {
     return (

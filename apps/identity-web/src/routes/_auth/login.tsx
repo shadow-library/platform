@@ -1,17 +1,17 @@
 /**
  * Importing npm packages
  */
-import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef, useState } from 'react';
+import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
 import { ExternalLinkIcon, KeyIcon } from '@/components/icons';
-import { AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaStep, OtpEntry, StepHeader, assertPasskey, useFlow } from '@/features/auth';
+import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { type FlowState, authApi } from '@/lib/apis';
+import { authApi, type FlowState } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
 
 /**

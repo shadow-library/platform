@@ -5,18 +5,18 @@
   "scripts": {
     "prepare": "husky",
     "dev": "vite dev --port 3000",
-    "build": "vite build",
+    "build": "shadow build",
     "start": "bun main.ts",
     "preview": "vite preview --port 3000",
-    "typecheck": "tsc --noEmit",
-    "lint": "bun run scripts/lint.ts",
+    "verify": "shadow verify",
+    "type-check": "tsc",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",
-    "generate:api-types": "bun run scripts/generate-api-types.ts"
+    "generate:api-types": "shadow gen-api-types http://localhost:9091/dev/api-docs/openapi.json"
   },
   "dependencies": {
-    "@shadow-library/ui": "^2.0.1",
-    "@shadow-library/web": "^0.1.0",
+    "@shadow-library/ui": "^3.2.0",
+    "@shadow-library/web": "^0.2.0",
     "@simplewebauthn/browser": "^13.3.0",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-query-devtools": "^5.101.2",
@@ -29,27 +29,15 @@
     "react-dom": "^19.2.0"
   },
   "devDependencies": {
-    "@commitlint/cli": "^20.2.0",
-    "@commitlint/config-conventional": "^20.2.0",
-    "@eslint/js": "^9.39.2",
     "@playwright/test": "^1.57.0",
+    "@shadow-library/scripts": "0.2.3",
     "@types/bun": "^1.3.9",
     "@types/node": "^22.10.2",
     "@types/qrcode": "^1.5.6",
     "@types/react": "^19.2.0",
     "@types/react-dom": "^19.2.0",
-    "@typescript-eslint/parser": "^8.50.1",
     "@vitejs/plugin-react": "^5.0.4",
-    "eslint": "^9.39.2",
-    "eslint-import-resolver-typescript": "^4.4.4",
-    "eslint-plugin-import": "^2.32.0",
-    "eslint-plugin-react": "^7.37.5",
-    "eslint-plugin-react-hooks": "^7.0.1",
-    "globals": "^16.5.0",
-    "husky": "^9.1.7",
-    "openapi-typescript": "^7.13.0",
-    "prettier": "^3.5.3",
-    "typescript": "^5.7.2",
+    "typescript": "^6.0.3",
     "vite": "^7.3.1"
   }
 }

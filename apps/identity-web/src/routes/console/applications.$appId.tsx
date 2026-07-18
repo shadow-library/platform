@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Button, ConfirmDialog, DescriptionList, Dialog, FormField, Input, Spinner, Switch, Textarea, toast } from '@shadow-library/ui';
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Avatar, Button, ConfirmDialog, DescriptionList, Dialog, FormField, Input, Spinner, Switch, Textarea, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -12,9 +12,9 @@ import { ArrowLeftIcon, PlusIcon, ShieldCheckIcon } from '@/components/icons';
 import { StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
-  type UpdateApplicationBody,
   adminApplicationMembersQueryOptions,
   adminApplicationQueryOptions,
+  type UpdateApplicationBody,
   useApplicationMembersQuery,
   useApplicationQuery,
   useCreateRoleMutation,

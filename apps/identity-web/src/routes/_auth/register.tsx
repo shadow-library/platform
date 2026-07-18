@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Alert, Button, FormField, Input, Select } from '@shadow-library/ui';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Alert, Button, FormField, Input, Select } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -11,7 +11,7 @@ import { useState } from 'react';
 import { CheckIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, OtpEntry, StepHeader, StepProgress, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { type FlowState, authApi } from '@/lib/apis';
+import { authApi, type FlowState } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
 
 /**

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Button } from '@shadow-library/ui';
 import { Link } from '@tanstack/react-router';
+import { Button } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

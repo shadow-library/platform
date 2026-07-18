@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, ConfirmDialog, Dialog, FormField, Input, Select, Switch, Textarea, TokenInput, type TokenValue, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Button, ConfirmDialog, Dialog, FormField, Input, Select, Switch, Textarea, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules

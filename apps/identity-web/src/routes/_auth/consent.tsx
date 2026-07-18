@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
-import { Avatar, Button, Spinner } from '@shadow-library/ui';
 import { useMutation, useQuery } from '@tanstack/react-query';
-import { Link, createFileRoute, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
+import { Avatar, Button, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -12,7 +12,7 @@ import { useEffect, useRef } from 'react';
 import { AlertTriangleIcon, BadgeCheckIcon, BuildingIcon, MailIcon, RefreshIcon, UserIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { type ConsentScope, authApi, consentPromptQueryOptions, useMeQuery, useSignoutMutation } from '@/lib/apis';
+import { authApi, consentPromptQueryOptions, type ConsentScope, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 /**

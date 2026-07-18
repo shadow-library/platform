@@ -5,10 +5,10 @@
  * card, and a query gate — so each screen speaks the same visual language. Interactive components
  * (Dialog, Badge, DescriptionList, …) come straight from `@shadow-library/ui`; these only compose them.
  */
-import { Alert, Badge, type BadgeIntent, EmptyState, IconButton, Spinner, copyText, toast } from '@shadow-library/ui';
+import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
-import { type ApiError } from '@/lib/apis';
+import { Alert, Badge, type BadgeIntent, copyText, EmptyState, IconButton, Spinner, toast } from '@shadow-library/ui';
 
 import { CopyIcon } from '../icons';
 import styles from './si.module.css';

@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Avatar, DropdownMenu, Spinner } from '@shadow-library/ui';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
+import { Avatar, DropdownMenu, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

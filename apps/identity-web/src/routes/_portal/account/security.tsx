@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, OtpInput, Spinner, toast } from '@shadow-library/ui';
-import { Link, createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
+import { Badge, Button, OtpInput, Spinner, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -14,8 +14,8 @@ import { CopyButton, PageHeader } from '@/components/si';
 import { registerPasskey } from '@/features/auth';
 import { SecretOncePanel, useStepUpGate } from '@/features/portal';
 import {
-  type TotpEnrollment,
   mfaQueryOptions,
+  type TotpEnrollment,
   useMfaQuery,
   useRegenerateRecoveryCodesMutation,
   useRemovePasskeyMutation,

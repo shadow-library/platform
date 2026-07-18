@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Button, Dialog, FormField, Input, Select, Switch, Tag, Textarea, toast } from '@shadow-library/ui';
 import { createFileRoute } from '@tanstack/react-router';
 import { useState } from 'react';
+import { Button, Dialog, FormField, Input, Select, Switch, Tag, Textarea, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
