@@ -32,7 +32,7 @@ and start it on port **9091**:
 cd ../identity-server
 docker compose -f docker-compose.dev.yml up -d   # postgres + redis
 bun run db:migrate
-PORT=9091 bun run src/main.ts
+SERVER_PORT=9091 bun run src/main.ts
 ```
 
 ## Commands
