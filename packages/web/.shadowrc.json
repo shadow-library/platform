@@ -4,7 +4,10 @@
       ".": "index",
       "./router": "router/index",
       "./server": "server/index",
-      "./server-entry": "server-entry"
+      "./server-entry": "server-entry",
+      "./pwa": "pwa/index",
+      "./service-worker": "service-worker/index",
+      "./offline": "offline/index"
     }
   },
   "verify": {
