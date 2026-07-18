@@ -110,6 +110,7 @@ describe.if(pgAvailable)('authentication', () => {
       expect(url.searchParams.get('client_id')).toBe('novel-forge-web');
       expect(url.searchParams.get('code_challenge_method')).toBe('S256');
       expect(url.searchParams.get('redirect_uri')).toBe('http://localhost:8080/api/auth/callback');
+      expect(url.searchParams.get('resource')).toBe(AUTH_AUDIENCE);
       expect(cookieValue(response, 'nf-oidc')).toBeString();
     });
 

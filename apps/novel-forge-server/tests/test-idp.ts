@@ -25,7 +25,7 @@ import { Config } from '@shadow-library/common';
  * cache entry wins over any later `Config.load`), the same trick the database URL uses.
  */
 
-export const AUTH_AUDIENCE = 'api://novel-forge';
+export const AUTH_AUDIENCE = 'novel-forge-server';
 export const RP_CLIENT = { id: 'novel-forge-web', secret: 'test-rp-secret' };
 export const TEST_USER = { userId: '42', email: 'author@example.com', name: 'Test Author' };
 

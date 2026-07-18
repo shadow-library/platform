@@ -12,6 +12,8 @@ import { Config } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
+import { NOVEL_FORGE_AUDIENCE } from '@server/constants';
+
 import { AuthController } from './auth.controller';
 import { SessionCookieMiddleware } from './session-cookie.middleware';
 import { SessionService } from './session.service';
@@ -29,7 +31,10 @@ import { SessionService } from './session.service';
  * once here and shared through `AppAuthModule`.
  */
 
-const IdentityAuthModule = AuthModule.forRoot();
+// The audience defaults to the ecosystem-standard resource identifier rather than requiring
+// AUTH_AUDIENCE: the AuthClient refuses to construct without one, and identity seeds exactly this
+// resource for novel-forge, so the default keeps dev boots aligned with the seeded ecosystem.
+const IdentityAuthModule = AuthModule.forRoot({ audience: Config.get('auth.audience') ?? NOVEL_FORGE_AUDIENCE });
 
 const IdentityRelyingPartyModule = RelyingPartyModule.forRoot({
   client: { id: Config.get('auth.rp.client.id'), secret: Config.get('auth.rp.client.secret') || undefined },

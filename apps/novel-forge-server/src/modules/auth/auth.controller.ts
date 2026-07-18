@@ -7,12 +7,14 @@
  */
 import { type FastifyReply } from 'fastify';
 import { RelyingParty } from '@shadow-library/auth/rp';
+import { Config } from '@shadow-library/common';
 import { Get, HttpController, type HttpRequest, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { NOVEL_FORGE_AUDIENCE } from '@server/constants';
 
 import { CallbackQuery, LoginQuery, SessionResponse } from './auth.dto';
 import { LOGIN_FLOW_COOKIE, SESSION_COOKIE, SessionService, type SessionUser } from './session.service';
@@ -40,7 +42,8 @@ export class AuthController {
   @Get('/login')
   async login(@Query() query: LoginQuery, @Res() response: FastifyReply): Promise<void> {
     const returnTo = this.sessionService.normalizeReturnTo(query.returnTo);
-    const authorization = await this.relyingParty.createAuthorizationUrl();
+    /** Resolved audience, not the raw config — without `resource` identity mints a `shadow-identity`-audience token this server's own guard rejects */
+    const authorization = await this.relyingParty.createAuthorizationUrl({ resource: Config.get('auth.audience') ?? NOVEL_FORGE_AUDIENCE });
     const flow = this.sessionService.createLoginFlowCookie({ state: authorization.state, nonce: authorization.nonce, codeVerifier: authorization.codeVerifier, returnTo });
     await response.setCookie(LOGIN_FLOW_COOKIE, flow.value, flow.options).redirect(authorization.url, 302);
   }
