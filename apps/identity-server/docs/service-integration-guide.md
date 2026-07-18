@@ -71,7 +71,26 @@ Also seeded:
 - Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge-server` → webnovel `* /internal/*`.
 - RP redirect URIs: `{origin}/api/auth/callback` for every origin in `ECOSYSTEM_<APP>_PUBLIC_URLS` (comma separated; defaults cover `http://<app>.shadow-apps.test` plus a localhost dev variant). Redirect URIs converge to the environment value on every boot.
 
-**Client ids and secrets.** Client ids are database-generated UUIDs, so they differ per environment. On the boot that first creates a client, its id and secret are logged once (`Registered service client '<name>' …` — same convention as the bootstrap-admin password); afterwards look ids up via `GET /api/v1/admin/clients` and mint a fresh secret with `POST /api/v1/admin/clients/:clientId/rotate-secret` (dual-secret overlap, so running consumers keep working while you re-configure). Secrets are stored hashed; they cannot be read back.
+**Client ids and secrets.** By default client ids are database-generated UUIDs, so they differ per environment. On the boot that first creates a client, its id and secret are logged once (`Registered service client '<name>' …` — same convention as the bootstrap-admin password); afterwards look ids up via `GET /api/v1/admin/clients` and mint a fresh secret with `POST /api/v1/admin/clients/:clientId/rotate-secret` (dual-secret overlap, so running consumers keep working while you re-configure). Secrets are stored hashed; they cannot be read back.
+
+**Fixed credentials (optional).** Instead of capturing random credentials from the first-boot log, a cluster can pre-declare them through the identity server's environment — one id/secret pair per seeded client:
+
+| Seeded client | Client id env (must be a UUID) | Secret env |
+| :-- | :-- | :-- |
+| `pulse` (RP) | `ECOSYSTEM_PULSE_RP_CLIENT_ID` | `ECOSYSTEM_PULSE_RP_CLIENT_SECRET` |
+| `pulse-server` | `ECOSYSTEM_PULSE_SERVER_CLIENT_ID` | `ECOSYSTEM_PULSE_SERVER_CLIENT_SECRET` |
+| `novel-forge` (RP) | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_ID` | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_SECRET` |
+| `novel-forge-server` | `ECOSYSTEM_NOVEL_FORGE_SERVER_CLIENT_ID` | `ECOSYSTEM_NOVEL_FORGE_SERVER_CLIENT_SECRET` |
+| `webnovel` (RP) | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_ID` | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_SECRET` |
+| `webnovel-server` | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_ID` | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_SECRET` |
+| `identity-server` | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_ID` | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_SECRET` |
+
+Every variable is optional and each pair's halves are independent; whatever is unset keeps the random behaviour above. Semantics:
+
+- **Ids bind only at creation.** A configured id must be a UUID (boot fails otherwise) and is assigned when the seed first creates the client. If the client already exists under a different id, the seed keeps the existing id and logs a warning — it never re-keys a live client, since consents, grants and tokens reference the id. Use distinct UUIDs per client; a collision with an existing id fails the boot.
+- **Secrets converge on every boot.** When the env secret no longer verifies against the stored hash, the seed revokes the client's active secrets and installs the env value — so rotating the env var rotates the client (no dual-secret overlap: update the consumer and identity together). Env-provided secrets are never written to the logs.
+- **Local clusters:** committing deterministic UUIDs/secrets in dev compose files is fine — every fresh `docker compose up` then yields the credentials your downstream `.env` files already reference.
+- **Production:** leave these unset (capture credentials at first boot, rotate via the admin API) or inject both halves from your secret manager and rotate by changing the env secret.
 
 **What each downstream service sets in its environment:**
 

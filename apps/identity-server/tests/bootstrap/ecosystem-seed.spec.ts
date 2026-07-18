@@ -1,7 +1,10 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it, spyOn } from 'bun:test';
+
+import { eq } from 'drizzle-orm';
+import { Config } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -12,7 +15,7 @@ import { EcosystemSeedService } from '@server/modules/bootstrap';
 import { OAuthClient, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
-import { TestEnvironment } from '../test-environment';
+import { TEST_REGEX, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types
@@ -23,6 +26,17 @@ import { TestEnvironment } from '../test-environment';
  */
 const env = new TestEnvironment('ecosystem_seed').init();
 const ECOSYSTEM_APPS = ['pulse', 'novel-forge', 'webnovel'];
+
+const FIXED_RP_CLIENT_ID = '11111111-2222-4333-8444-555555555555';
+const FIXED_SERVER_CLIENT_ID = '66666666-7777-4888-9999-aaaaaaaaaaaa';
+const FIXED_CONFIG_KEYS = [
+  'ecosystem.pulse.rp-client-id',
+  'ecosystem.pulse.rp-client-secret',
+  'ecosystem.pulse.server-client-id',
+  'ecosystem.pulse.server-client-secret',
+  'ecosystem.novel-forge.server-client-secret',
+  'ecosystem.webnovel.rp-client-id',
+] as const;
 
 async function findClient(applicationName: string, clientName: string, kind: OAuthClient.Kind): Promise<OAuthClient | null> {
   const application = env.getService(ApplicationService).getApplicationOrThrow(applicationName);
@@ -139,5 +153,94 @@ describe('EcosystemSeedService', () => {
 
     const applications = await env.getPostgresClient().select().from(schema.applications);
     expect(applications.filter(application => ECOSYSTEM_APPS.includes(application.name))).toHaveLength(3);
+  });
+
+  describe('fixed credentials from the environment', () => {
+    /** The suite database is cloned per test, but the config cache is process-global — always reset it. */
+    afterEach(() => {
+      for (const key of FIXED_CONFIG_KEYS) Config['cache'].delete(key);
+    });
+
+    async function deleteClient(applicationName: string, clientName: string, kind: OAuthClient.Kind): Promise<string> {
+      const client = await findClient(applicationName, clientName, kind);
+      await env
+        .getPostgresClient()
+        .delete(schema.oauthClients)
+        .where(eq(schema.oauthClients.id, client!.id));
+      return client!.id;
+    }
+
+    function listSecrets(clientId: string): Promise<unknown[]> {
+      return env.getPostgresClient().select().from(schema.oauthClientSecrets).where(eq(schema.oauthClientSecrets.clientId, clientId));
+    }
+
+    it('should create clients with the environment-fixed ids and secrets', async () => {
+      await deleteClient('pulse', 'pulse', 'WEB_CONFIDENTIAL');
+      await deleteClient('pulse', 'pulse-server', 'SERVICE');
+      Config['cache'].set('ecosystem.pulse.rp-client-id', FIXED_RP_CLIENT_ID);
+      Config['cache'].set('ecosystem.pulse.rp-client-secret', 'rp-secret-from-env');
+      Config['cache'].set('ecosystem.pulse.server-client-id', FIXED_SERVER_CLIENT_ID);
+      Config['cache'].set('ecosystem.pulse.server-client-secret', 'server-secret-from-env');
+
+      await env.getService(EcosystemSeedService).seed();
+
+      const relyingParty = await findClient('pulse', 'pulse', 'WEB_CONFIDENTIAL');
+      const service = await findClient('pulse', 'pulse-server', 'SERVICE');
+      expect(relyingParty?.id).toBe(FIXED_RP_CLIENT_ID);
+      expect(service?.id).toBe(FIXED_SERVER_CLIENT_ID);
+
+      const oauthClients = env.getService(OAuthClientService);
+      expect(await oauthClients.verifySecret(FIXED_RP_CLIENT_ID, 'rp-secret-from-env')).toBe(true);
+      expect(await oauthClients.verifySecret(FIXED_SERVER_CLIENT_ID, 'server-secret-from-env')).toBe(true);
+    });
+
+    it('should adopt the environment secret, stay idempotent while it verifies and rotate when it changes', async () => {
+      const seed = env.getService(EcosystemSeedService);
+      const oauthClients = env.getService(OAuthClientService);
+      const client = await findClient('novel-forge', 'novel-forge-server', 'SERVICE');
+
+      Config['cache'].set('ecosystem.novel-forge.server-client-secret', 'env-secret-one');
+      await seed.seed();
+      expect(await oauthClients.verifySecret(client!.id, 'env-secret-one')).toBe(true);
+
+      const secretsAfterAdoption = await listSecrets(client!.id);
+      await seed.seed();
+      expect(await listSecrets(client!.id)).toHaveLength(secretsAfterAdoption.length);
+
+      Config['cache'].set('ecosystem.novel-forge.server-client-secret', 'env-secret-two');
+      await seed.seed();
+      expect(await oauthClients.verifySecret(client!.id, 'env-secret-two')).toBe(true);
+      expect(await oauthClients.verifySecret(client!.id, 'env-secret-one')).toBe(false);
+    });
+
+    it('should keep the existing id and warn instead of re-keying a live client', async () => {
+      const existing = await findClient('webnovel', 'webnovel', 'WEB_CONFIDENTIAL');
+      Config['cache'].set('ecosystem.webnovel.rp-client-id', FIXED_RP_CLIENT_ID);
+
+      const seed = env.getService(EcosystemSeedService);
+      const warn = spyOn(seed['logger'], 'warn');
+      await seed.seed();
+
+      const converged = await findClient('webnovel', 'webnovel', 'WEB_CONFIDENTIAL');
+      expect(converged?.id).toBe(existing!.id);
+      expect(warn.mock.calls.some(call => String(call[0]).includes('refusing to re-key'))).toBe(true);
+      warn.mockRestore();
+    });
+
+    it('should reject a non-UUID fixed client id with a clear error', async () => {
+      Config['cache'].set('ecosystem.pulse.server-client-id', 'not-a-uuid');
+      const promise = env.getService(EcosystemSeedService).seed();
+      await expect(promise).rejects.toThrow("Environment variable 'ECOSYSTEM_PULSE_SERVER_CLIENT_ID' must be a UUID; received 'not-a-uuid'");
+    });
+
+    it('should fall back to a random id and one-time secret when the fixed credentials are unset', async () => {
+      const previousId = await deleteClient('pulse', 'pulse', 'WEB_CONFIDENTIAL');
+      await env.getService(EcosystemSeedService).seed();
+
+      const recreated = await findClient('pulse', 'pulse', 'WEB_CONFIDENTIAL');
+      expect(recreated?.id).toMatch(TEST_REGEX.uuid);
+      expect(recreated?.id).not.toBe(previousId);
+      expect(await listSecrets(recreated!.id)).toHaveLength(1);
+    });
   });
 });

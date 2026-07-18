@@ -53,6 +53,22 @@ declare module '@shadow-library/common' {
     'ecosystem.novel-forge.public-urls': string;
     'ecosystem.webnovel.public-urls': string;
 
+    /** Ecosystem seed: optional fixed client credentials (id must be a UUID); unset keeps the random-per-cluster behaviour */
+    'ecosystem.pulse.rp-client-id': string | undefined;
+    'ecosystem.pulse.rp-client-secret': string | undefined;
+    'ecosystem.pulse.server-client-id': string | undefined;
+    'ecosystem.pulse.server-client-secret': string | undefined;
+    'ecosystem.novel-forge.rp-client-id': string | undefined;
+    'ecosystem.novel-forge.rp-client-secret': string | undefined;
+    'ecosystem.novel-forge.server-client-id': string | undefined;
+    'ecosystem.novel-forge.server-client-secret': string | undefined;
+    'ecosystem.webnovel.rp-client-id': string | undefined;
+    'ecosystem.webnovel.rp-client-secret': string | undefined;
+    'ecosystem.webnovel.server-client-id': string | undefined;
+    'ecosystem.webnovel.server-client-secret': string | undefined;
+    'ecosystem.identity-server.client-id': string | undefined;
+    'ecosystem.identity-server.client-secret': string | undefined;
+
     /** Web UI */
     'ui.public-dir': string;
   }
@@ -101,6 +117,27 @@ Config.load('auth.workload.jwks-uri', { defaultValue: '' });
 Config.load('ecosystem.pulse.public-urls', { defaultValue: 'http://pulse.shadow-apps.test,http://localhost:3000' });
 Config.load('ecosystem.novel-forge.public-urls', { defaultValue: 'http://novel-forge.shadow-apps.test,http://localhost:3001' });
 Config.load('ecosystem.webnovel.public-urls', { defaultValue: 'http://webnovel.shadow-apps.test,http://localhost:3002' });
+
+/**
+ * Optional fixed credentials for the ecosystem-seeded OAuth clients (`ECOSYSTEM_<APP>_RP_CLIENT_ID`
+ * and friends), letting a fresh cluster pre-declare its client ids/secrets instead of capturing
+ * random ones from the first-boot log. Ids must be UUIDs and bind only when the seed first creates
+ * the client; secrets converge on every boot. Unset keeps today's random behaviour.
+ */
+Config.load('ecosystem.pulse.rp-client-id');
+Config.load('ecosystem.pulse.rp-client-secret');
+Config.load('ecosystem.pulse.server-client-id');
+Config.load('ecosystem.pulse.server-client-secret');
+Config.load('ecosystem.novel-forge.rp-client-id');
+Config.load('ecosystem.novel-forge.rp-client-secret');
+Config.load('ecosystem.novel-forge.server-client-id');
+Config.load('ecosystem.novel-forge.server-client-secret');
+Config.load('ecosystem.webnovel.rp-client-id');
+Config.load('ecosystem.webnovel.rp-client-secret');
+Config.load('ecosystem.webnovel.server-client-id');
+Config.load('ecosystem.webnovel.server-client-secret');
+Config.load('ecosystem.identity-server.client-id');
+Config.load('ecosystem.identity-server.client-secret');
 
 Config.load('rate-limit.enabled', { defaultValue: 'true', validateType: 'boolean' });
 Config.load('rate-limit.ip-allowlist', { defaultValue: '' });

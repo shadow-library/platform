@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -26,6 +26,15 @@ interface EcosystemApp {
   publicUrlsKey: 'ecosystem.pulse.public-urls' | 'ecosystem.novel-forge.public-urls' | 'ecosystem.webnovel.public-urls';
 }
 
+type FixedCredentialKey = `ecosystem.${EcosystemApp['name']}.${'rp' | 'server'}-client-${'id' | 'secret'}` | `ecosystem.identity-server.client-${'id' | 'secret'}`;
+
+interface FixedCredentials {
+  /** Client id (UUID) the seed assigns at creation; existing clients always keep their id */
+  id?: string;
+  /** Secret the client converges onto every boot; never logged */
+  secret?: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -37,6 +46,7 @@ const PULSE_NOTIFICATIONS_SEND_SCOPE = 'notifications:send';
 
 const IDENTITY_SERVICE_CLIENT = 'identity-server';
 const OAUTH_CALLBACK_PATH = '/api/auth/callback';
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const RP_GRANT_TYPES = ['authorization_code', 'refresh_token'];
 const SERVICE_GRANT_TYPES = ['client_credentials'];
 
@@ -55,6 +65,11 @@ const ECOSYSTEM_APPS: EcosystemApp[] = [
  * template seeding alike. Client secrets are minted once at registration and logged a single time
  * (mirroring the bootstrap-admin password); thereafter rotation goes through
  * `POST /api/v1/admin/clients/:clientId/rotate-secret`.
+ *
+ * Optionally, `ECOSYSTEM_*_CLIENT_ID` / `ECOSYSTEM_*_CLIENT_SECRET` environment variables fix a
+ * client's credentials so a fresh cluster can pre-declare them: the id (a UUID) binds only when
+ * the seed first creates the client, while the secret converges on every boot — rotating the env
+ * value rotates the client. Env-provided secrets are never logged.
  */
 @Injectable()
 export class EcosystemSeedService {
@@ -76,14 +91,16 @@ export class EcosystemSeedService {
       const application = await this.ensureApplication(app);
       await this.oauthClientService.ensureResource(application.id, this.serviceClientName(app), `${app.displayName} API`);
       await this.ensureRelyingPartyClient(app, application.id);
-      const serviceClientId = await this.ensureServiceClient(this.serviceClientName(app), application.id);
+      const serviceCredentials = this.fixedCredentials(`ecosystem.${app.name}.server-client-id` as const, `ecosystem.${app.name}.server-client-secret` as const);
+      const serviceClientId = await this.ensureServiceClient(this.serviceClientName(app), application.id, serviceCredentials);
       await this.oauthClientService.grantScope(serviceClientId, authzCheckScopeId);
       await this.oauthClientService.grantScope(serviceClientId, rolesSyncScopeId);
       serviceClientIds.set(this.serviceClientName(app), serviceClientId);
     }
 
     /** Identity's own outbound M2M client — the caller behind its pulse-server notification calls. */
-    const identityClientId = await this.ensureServiceClient(IDENTITY_SERVICE_CLIENT, platform.id);
+    const identityCredentials = this.fixedCredentials('ecosystem.identity-server.client-id', 'ecosystem.identity-server.client-secret');
+    const identityClientId = await this.ensureServiceClient(IDENTITY_SERVICE_CLIENT, platform.id, identityCredentials);
 
     /** identity-server's notification tokens carry pulse's send scope (FC-1), so the scope and its grant must exist. */
     const pulse = this.applicationService.getApplicationOrThrow('pulse');
@@ -130,14 +147,19 @@ export class EcosystemSeedService {
   }
 
   private async ensureRelyingPartyClient(app: EcosystemApp, applicationId: number): Promise<void> {
+    const label = `relying-party client '${app.name}'`;
     const redirectUris = this.redirectUris(app);
+    const fixed = this.fixedCredentials(`ecosystem.${app.name}.rp-client-id` as const, `ecosystem.${app.name}.rp-client-secret` as const);
     const existing = await this.findClient(applicationId, app.name, 'WEB_CONFIDENTIAL');
 
     if (!existing) {
-      const registered = await this.oauthClientService.register({ applicationId, name: app.name, kind: 'WEB_CONFIDENTIAL', isFirstParty: true, redirectUris, grantTypes: RP_GRANT_TYPES });
-      this.logger.warn(`Registered relying-party client '${app.name}' — the secret is shown only this once: clientId=${registered.clientId} secret=${registered.secret}`);
+      const registered = await this.oauthClientService.register({ applicationId, id: fixed.id, name: app.name, kind: 'WEB_CONFIDENTIAL', isFirstParty: true, redirectUris, grantTypes: RP_GRANT_TYPES });
+      await this.finalizeRegistration(label, registered, fixed);
       return;
     }
+
+    this.refuseRekey(label, existing.id, fixed.id);
+    await this.convergeFixedSecret(label, existing.id, fixed.secret);
 
     /** Redirect URIs follow the environment, so an env change converges on the next boot. */
     const detail = await this.oauthClientService.getClientDetail(existing.id);
@@ -147,12 +169,61 @@ export class EcosystemSeedService {
     this.logger.info(`Converged redirect URIs of relying-party client '${app.name}'`, { clientId: existing.id, redirectUris });
   }
 
-  private async ensureServiceClient(name: string, applicationId: number): Promise<string> {
+  private async ensureServiceClient(name: string, applicationId: number, fixed: FixedCredentials): Promise<string> {
+    const label = `service client '${name}'`;
     const existing = await this.findClient(applicationId, name, 'SERVICE');
-    if (existing) return existing.id;
+    if (existing) {
+      this.refuseRekey(label, existing.id, fixed.id);
+      await this.convergeFixedSecret(label, existing.id, fixed.secret);
+      return existing.id;
+    }
 
-    const registered = await this.oauthClientService.register({ applicationId, name, kind: 'SERVICE', isFirstParty: true, grantTypes: SERVICE_GRANT_TYPES });
-    this.logger.warn(`Registered service client '${name}' — the secret is shown only this once: clientId=${registered.clientId} secret=${registered.secret}`);
+    const registered = await this.oauthClientService.register({ applicationId, id: fixed.id, name, kind: 'SERVICE', isFirstParty: true, grantTypes: SERVICE_GRANT_TYPES });
+    await this.finalizeRegistration(label, registered, fixed);
     return registered.clientId;
+  }
+
+  /**
+   * Reads a client's optional fixed credentials from the environment, treating empty values as
+   * unset so blank vault entries fall back to the random-per-cluster behaviour.
+   */
+  private fixedCredentials(idKey: FixedCredentialKey, secretKey: FixedCredentialKey): FixedCredentials {
+    const id = Config.get(idKey) || undefined;
+    const secret = Config.get(secretKey) || undefined;
+    if (id && !UUID_REGEX.test(id)) throw AppError.internal(`Environment variable '${idKey.toUpperCase().replace(/[.-]/g, '_')}' must be a UUID; received '${id}'`);
+    return { id, secret };
+  }
+
+  /**
+   * Fixed ids bind only at creation: re-keying a live client would orphan every consent, grant and
+   * token referencing it, so a mismatch keeps the existing id and surfaces loudly instead.
+   */
+  private refuseRekey(label: string, existingId: string, fixedId: string | undefined): void {
+    if (!fixedId || fixedId === existingId) return;
+    this.logger.warn(`${label} already exists as clientId=${existingId}; refusing to re-key it to the configured fixed id — fixed client ids apply only when the seed first creates the client`, {
+      clientId: existingId,
+      configuredClientId: fixedId,
+    });
+  }
+
+  /**
+   * Converges the client onto the env-provided secret: a no-op when unset or already verifying, a
+   * revoke-and-replace otherwise, so rotating the env value rotates the client on the next boot.
+   */
+  private async convergeFixedSecret(label: string, clientId: string, secret: string | undefined): Promise<void> {
+    if (!secret) return;
+    if (await this.oauthClientService.verifySecret(clientId, secret)) return;
+    await this.oauthClientService.setSecret(clientId, secret);
+    this.logger.info(`Converged ${label} onto the environment secret — using provided secret`, { clientId });
+  }
+
+  /** Replaces the registration-minted secret with the env one when fixed; the random secret is logged the one time it exists, env secrets never are. */
+  private async finalizeRegistration(label: string, registered: { clientId: string; secret?: string }, fixed: FixedCredentials): Promise<void> {
+    if (!fixed.secret) {
+      this.logger.warn(`Registered ${label} — the secret is shown only this once: clientId=${registered.clientId} secret=${registered.secret}`);
+      return;
+    }
+    await this.oauthClientService.setSecret(registered.clientId, fixed.secret);
+    this.logger.warn(`Registered ${label} — using provided secret: clientId=${registered.clientId}`);
   }
 }

@@ -18,6 +18,8 @@ import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Sco
  */
 
 export interface RegisterClient {
+  /** Fixed client id (UUID) for seed-provisioned clients; omitted ids are database-generated */
+  id?: string;
   applicationId: number;
   name: string;
   kind: OAuthClient.Kind;
@@ -74,6 +76,7 @@ export class OAuthClientService {
       const client = await tx
         .insert(schema.oauthClients)
         .values({
+          ...(input.id ? { id: input.id } : {}),
           applicationId: input.applicationId,
           name: input.name,
           kind: input.kind,
@@ -151,6 +154,23 @@ export class OAuthClientService {
 
   async rotateSecret(clientId: string): Promise<string> {
     return this.createSecret(clientId);
+  }
+
+  /**
+   * Installs an externally provided secret as the client's only active secret, revoking every other
+   * one. Backs env-driven credential rotation (ecosystem seed): the environment is the source of
+   * truth, so no overlap window applies. The secret value itself is never logged.
+   */
+  async setSecret(clientId: string, secret: string): Promise<void> {
+    const secretHash = await Bun.password.hash(secret, ARGON2_OPTIONS);
+    await this.db.transaction(async tx => {
+      await tx
+        .update(schema.oauthClientSecrets)
+        .set({ revokedAt: new Date() })
+        .where(and(eq(schema.oauthClientSecrets.clientId, clientId), isNull(schema.oauthClientSecrets.revokedAt)));
+      await tx.insert(schema.oauthClientSecrets).values({ clientId, secretHash });
+    });
+    this.logger.info('Installed externally provided client secret', { clientId });
   }
 
   /**
