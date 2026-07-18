@@ -1,13 +1,11 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Route } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
-import { All, Delete, Get, Head, Options, Patch, Post, Put } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -16,11 +14,11 @@ import { All, Delete, Get, Head, Options, Patch, Post, Put } from '@shadow-libra
 /**
  * Declaring the constants
  */
+const app = await import('@shadow-library/app');
 const decorator = jest.fn();
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Route: jest.fn(() => decorator) };
-});
+const Handler = jest.fn(() => decorator);
+mock.module('@shadow-library/app', () => ({ ...app, Handler }));
+const { All, Delete, Get, Head, Options, Patch, Post, Put } = await import('@shadow-library/fastify');
 
 describe('HTTP Methods Decorators', () => {
   beforeEach(() => {
@@ -35,9 +33,9 @@ describe('HTTP Methods Decorators', () => {
         static execute() {}
       }
 
-      expect(Route).toBeCalledTimes(2);
-      expect(Route).toBeCalledWith({ path: '/data', method: Decorator.name.toUpperCase() });
-      expect(Route).toBeCalledWith({ operation: { summary: 'Execute', operationId: 'execute' } }, { arrayStrategy: 'replace' });
+      expect(Handler).toBeCalledTimes(2);
+      expect(Handler).toBeCalledWith({ path: '/data', method: Decorator.name.toUpperCase() });
+      expect(Handler).toBeCalledWith({ operation: { summary: 'Execute', operationId: 'execute' } }, { arrayStrategy: 'replace' });
     });
   });
 
@@ -47,7 +45,7 @@ describe('HTTP Methods Decorators', () => {
       static getUserById() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: { summary: 'Get User By Id', operationId: 'getUserById' } }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: { summary: 'Get User By Id', operationId: 'getUserById' } }, { arrayStrategy: 'replace' });
   });
 
   it('should prepend slash to path if missing', () => {
@@ -56,6 +54,6 @@ describe('HTTP Methods Decorators', () => {
       static noSlash() {}
     }
 
-    expect(Route).toBeCalledWith({ path: '/no-slash', method: 'GET' });
+    expect(Handler).toBeCalledWith({ path: '/no-slash', method: 'GET' });
   });
 });

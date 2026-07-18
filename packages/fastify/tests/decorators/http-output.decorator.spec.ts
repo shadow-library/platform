@@ -1,14 +1,12 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Route } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
  */
-import { Header, HttpStatus, Redirect, Render, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -17,11 +15,11 @@ import { Header, HttpStatus, Redirect, Render, RespondFor } from '@shadow-librar
 /**
  * Declaring the constants
  */
+const app = await import('@shadow-library/app');
 const decorator = jest.fn();
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Route: jest.fn(() => decorator) };
-});
+const Handler = jest.fn(() => decorator);
+mock.module('@shadow-library/app', () => ({ ...app, Handler }));
+const { Header, HttpStatus, Redirect, Render, RespondFor } = await import('@shadow-library/fastify');
 
 describe('HTTP Output Decorators', () => {
   @Schema()
@@ -40,7 +38,7 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toBeCalledWith({ status: 200 });
+    expect(Handler).toBeCalledWith({ status: 200 });
   });
 
   it(`should enhance the method with the headers metadata`, () => {
@@ -51,8 +49,8 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toHaveBeenNthCalledWith(1, { headers: { 'Content-Type': 'application/json' } });
-    expect(Route).toHaveBeenNthCalledWith(2, { headers: { 'Content-Length': getContentLength } });
+    expect(Handler).toHaveBeenNthCalledWith(1, { headers: { 'Content-Type': 'application/json' } });
+    expect(Handler).toHaveBeenNthCalledWith(2, { headers: { 'Content-Length': getContentLength } });
   });
 
   it(`should enhance the method with the redirect metadata`, () => {
@@ -61,7 +59,7 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toBeCalledWith({ redirect: '/redirect', status: 301 });
+    expect(Handler).toBeCalledWith({ redirect: '/redirect', status: 301 });
   });
 
   it(`should enhance the method with the render metadata`, () => {
@@ -70,7 +68,7 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toBeCalledWith({ render: 'view' });
+    expect(Handler).toBeCalledWith({ render: 'view' });
   });
 
   it(`should enhance the method with the render metadata with default data`, () => {
@@ -79,7 +77,7 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toBeCalledWith({ render: true });
+    expect(Handler).toBeCalledWith({ render: true });
   });
 
   it('should enhance the method with response schema metadata', () => {
@@ -88,7 +86,7 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toBeCalledWith({ schemas: { response: { 200: Input } } });
+    expect(Handler).toBeCalledWith({ schemas: { response: { 200: Input } } });
   });
 
   it('should enhance the method with multiple response schema metadata', () => {
@@ -98,7 +96,7 @@ describe('HTTP Output Decorators', () => {
       static single() {}
     }
 
-    expect(Route).toHaveBeenNthCalledWith(2, { schemas: { response: { 201: { type: 'object' } } } });
-    expect(Route).toHaveBeenNthCalledWith(1, { schemas: { response: { 200: Input } } });
+    expect(Handler).toHaveBeenNthCalledWith(2, { schemas: { response: { 201: { type: 'object' } } } });
+    expect(Handler).toHaveBeenNthCalledWith(1, { schemas: { response: { 200: Input } } });
   });
 });

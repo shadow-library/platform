@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it } from '@jest/globals';
+import { describe, expect, it } from 'bun:test';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 
 /**

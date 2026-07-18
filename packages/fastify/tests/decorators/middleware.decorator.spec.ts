@@ -1,14 +1,12 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Controller } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { Middleware } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -17,11 +15,11 @@ import { Middleware } from '@shadow-library/fastify';
 /**
  * Declaring the constants
  */
+const app = await import('@shadow-library/app');
 const decorator = jest.fn();
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Controller: jest.fn(() => decorator) };
-});
+const Controller = jest.fn(() => decorator);
+mock.module('@shadow-library/app', () => ({ ...app, Controller }));
+const { Middleware } = await import('@shadow-library/fastify');
 
 describe('@Middleware', () => {
   beforeEach(() => {

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
+import { beforeEach, describe, expect, it, jest } from 'bun:test';
 import { AppError } from '@shadow-library/common';
 
 /**

@@ -1,11 +1,11 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { ControllerRouteMetadata } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, type Mock } from 'bun:test';
+import { fastify, FastifyInstance } from 'fastify';
+import { DispatchMetadata } from '@shadow-library/app';
 import { ClassSchema, Field, Schema } from '@shadow-library/class-schema';
 import { AppError, Config, Fn, Logger, utils, withThis } from '@shadow-library/common';
-import { FastifyInstance, fastify } from 'fastify';
 
 /**
  * Importing user defined packages
@@ -122,7 +122,7 @@ describe('FastifyRouter', () => {
   });
 
   describe('parseControllers', () => {
-    const parseControllers = (controllers: ControllerRouteMetadata[]) => router['parseControllers'](controllers);
+    const parseControllers = (controllers: DispatchMetadata[]) => router['parseControllers'](controllers);
     class Middleware {
       use = jest.fn();
       generate = jest.fn(withThis((ctx: Middleware) => ctx.use()));
@@ -137,7 +137,7 @@ describe('FastifyRouter', () => {
     it('should parse router controller', () => {
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'router', path: '/api' } as const;
       const parsedControllers = parseControllers([
-        { metadata, metatype: Class, instance: classInstance, routes: [{ metadata: { path: '/single' }, handler, handlerName, paramtypes: [] }] },
+        { metadata, metatype: Class, instance: classInstance, handlers: [{ metadata: { path: '/single' }, handler, handlerName, paramtypes: [] }] },
       ]);
 
       expect(parsedControllers.routes).toHaveLength(1);
@@ -147,7 +147,7 @@ describe('FastifyRouter', () => {
 
     it('should add default path if path is not provided', () => {
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'router' } as const;
-      const parsedControllers = parseControllers([{ metadata, metatype: Class, instance: classInstance, routes: [{ metadata: {}, handler, handlerName, paramtypes: [] }] }]);
+      const parsedControllers = parseControllers([{ metadata, metatype: Class, instance: classInstance, handlers: [{ metadata: {}, handler, handlerName, paramtypes: [] }] }]);
 
       expect(parsedControllers.routes[0]?.metadata).toStrictEqual({ path: '/' });
     });
@@ -156,7 +156,7 @@ describe('FastifyRouter', () => {
       router['config'].prefixVersioning = true;
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'router', path: '/api' } as const;
       const parsedControllers = parseControllers([
-        { metadata, metatype: Class, instance: classInstance, routes: [{ metadata: { path: '/users' }, handler, handlerName, paramtypes: [] }] },
+        { metadata, metatype: Class, instance: classInstance, handlers: [{ metadata: { path: '/users' }, handler, handlerName, paramtypes: [] }] },
       ]);
 
       expect(parsedControllers.routes[0]?.metadata).toStrictEqual({ path: '/v1/api/users' });
@@ -166,7 +166,7 @@ describe('FastifyRouter', () => {
       router['config'].prefixVersioning = true;
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'router', path: '/api' } as const;
       const parsedControllers = parseControllers([
-        { metadata, metatype: Class, instance: classInstance, routes: [{ metadata: { path: '/users', version: 3 }, handler, handlerName, paramtypes: [] }] },
+        { metadata, metatype: Class, instance: classInstance, handlers: [{ metadata: { path: '/users', version: 3 }, handler, handlerName, paramtypes: [] }] },
       ]);
 
       expect(parsedControllers.routes[0]?.metadata).toStrictEqual({ path: '/v3/api/users', version: 3 });
@@ -174,7 +174,7 @@ describe('FastifyRouter', () => {
 
     it('should parse generate middleware controller', () => {
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'middleware', type: 'preHandler', generates: true, weight: 0 } as const;
-      const parsedControllers = parseControllers([{ metadata, metatype: Middleware, instance: middleware, routes: [] }]);
+      const parsedControllers = parseControllers([{ metadata, metatype: Middleware, instance: middleware, handlers: [] }]);
       parsedControllers.middlewares[0]?.handler();
 
       expect(middleware.use).toBeCalled();
@@ -192,7 +192,7 @@ describe('FastifyRouter', () => {
 
     it('should parse use middleware controller', () => {
       const metadata = { [HTTP_CONTROLLER_TYPE]: 'middleware', type: 'preHandler', generates: false, weight: 0 } as const;
-      const parsedControllers = parseControllers([{ metadata, metatype: Middleware, instance: middleware, routes: [] }]);
+      const parsedControllers = parseControllers([{ metadata, metatype: Middleware, instance: middleware, handlers: [] }]);
       parsedControllers.middlewares[0]?.handler();
 
       expect(middleware.generate).not.toBeCalled();
@@ -212,8 +212,8 @@ describe('FastifyRouter', () => {
       const metadata1 = { [HTTP_CONTROLLER_TYPE]: 'middleware', type: 'preHandler', generates: true, weight: 1 } as const;
       const metadata2 = { [HTTP_CONTROLLER_TYPE]: 'middleware', type: 'preHandler', generates: false, weight: 0 } as const;
       const parsedControllers = parseControllers([
-        { metadata: metadata1, metatype: Middleware, instance: middleware, routes: [] },
-        { metadata: metadata2, metatype: Middleware, instance: middleware, routes: [] },
+        { metadata: metadata1, metatype: Middleware, instance: middleware, handlers: [] },
+        { metadata: metadata2, metatype: Middleware, instance: middleware, handlers: [] },
       ]);
 
       expect(parsedControllers.middlewares[0]?.metadata).toStrictEqual(metadata1);
@@ -353,9 +353,9 @@ describe('FastifyRouter', () => {
         url: '/',
         schema: { response: {}, body: schema, params: schema, querystring: schema },
       });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.masks?.body?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.masks?.params?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.masks?.query?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.masks?.body?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.masks?.params?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.masks?.query?.({ password: 'secret' }, mask)).toEqual({ password: '****' });
     });
 
     it('should generate the artifacts for request body transformation', async () => {
@@ -385,7 +385,7 @@ describe('FastifyRouter', () => {
         schema: { response: {}, body: bodySchema },
       });
 
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.body?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.transformers?.body?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
         value: BigInt('12345678901234567890'),
       });
     });
@@ -417,7 +417,7 @@ describe('FastifyRouter', () => {
         schema: { response: {}, querystring: querySchema },
       });
 
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.query?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.transformers?.query?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
         value: BigInt('12345678901234567890'),
       });
     });
@@ -449,7 +449,7 @@ describe('FastifyRouter', () => {
         schema: { response: {}, params: paramsSchema },
       });
 
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.params?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.transformers?.params?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
         value: BigInt('12345678901234567890'),
       });
     });
@@ -481,7 +481,7 @@ describe('FastifyRouter', () => {
         schema: { response: { 200: responseSchema } },
       });
 
-      expect(jest.mocked(instance.route).mock.calls[0]?.[0].config?.artifacts?.transformers?.response?.[200]?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
+      expect((instance.route as any).mock.calls[0]?.[0].config?.artifacts?.transformers?.response?.[200]?.({ value: '12345678901234567890' }, toBigInt)).toStrictEqual({
         value: BigInt('12345678901234567890'),
       });
     });
@@ -489,7 +489,7 @@ describe('FastifyRouter', () => {
     it('should apply the middleware if generator returns a function', async () => {
       handler.mockReturnValue(jest.fn());
       const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance: {} } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware] });
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ preHandler: [expect.any(Function)] }));
     });
@@ -497,14 +497,14 @@ describe('FastifyRouter', () => {
     it('should not apply the middleware if generator returns false', async () => {
       handler.mockReturnValue(false);
       const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance: {} } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware] });
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.not.objectContaining({ preHandler: expect.anything() }));
     });
 
     it('should apply the use middleware', async () => {
       const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: false }, handler } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware] });
       await router.register([]);
       expect(handler).not.toBeCalled();
       expect(instance.route).toBeCalledWith(expect.objectContaining({ preHandler: [expect.any(Function)] }));
@@ -513,7 +513,7 @@ describe('FastifyRouter', () => {
     it('should apply multiple middlewares of the same type', async () => {
       const middleware1 = { metatype: Class, metadata: { type: 'preHandler', generates: false }, handler } as any;
       const middleware2 = { metatype: Class, metadata: { type: 'preHandler', generates: false }, handler } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
       await router.register([]);
       expect(instance.route).toBeCalledWith(expect.objectContaining({ preHandler: [expect.any(Function), expect.any(Function)] }));
     });
@@ -523,7 +523,7 @@ describe('FastifyRouter', () => {
       handler.mockReturnValue(() => {});
       const middleware1 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance } as any;
       const middleware2 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
       await router.register([]);
       expect(handler).toBeCalledTimes(1);
     });
@@ -533,7 +533,7 @@ describe('FastifyRouter', () => {
       const handlerTwo = jest.fn().mockReturnValue(() => {});
       const middleware1 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler: handlerOne, instance: {} } as any;
       const middleware2 = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler: handlerTwo, instance: {} } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware1, middleware2] });
       await router.register([]);
       expect(handlerOne).toBeCalledTimes(1);
       expect(handlerTwo).toBeCalledTimes(1);
@@ -548,7 +548,7 @@ describe('FastifyRouter', () => {
       };
       handler.mockReturnValue(() => {});
       const middleware = { metatype: Class, metadata: { type: 'preHandler', generates: true }, handler, instance } as any;
-      jest.mocked(router['parseControllers']).mockReturnValue({ routes: [route], middlewares: [middleware] });
+      (router['parseControllers'] as Mock<any>).mockReturnValue({ routes: [route], middlewares: [middleware] });
       await router.register([]);
       expect(handler).toBeCalledTimes(1);
     });
@@ -653,7 +653,7 @@ describe('FastifyRouter', () => {
         const addHook = jest.spyOn(instance, 'addHook');
         await router.register([]);
 
-        const onRequestHooks = jest.mocked(addHook).mock.calls.filter(c => c[0] === 'onRequest');
+        const onRequestHooks = (addHook as Mock<any>).mock.calls.filter(c => c[0] === 'onRequest');
         expect(onRequestHooks).toHaveLength(2);
       });
 
@@ -662,7 +662,7 @@ describe('FastifyRouter', () => {
         const addHook = jest.spyOn(instance, 'addHook');
         await router.register([]);
 
-        const onRequestHooks = jest.mocked(addHook).mock.calls.filter(c => c[0] === 'onRequest');
+        const onRequestHooks = (addHook as Mock<any>).mock.calls.filter(c => c[0] === 'onRequest');
         expect(onRequestHooks).toHaveLength(3);
       });
 
@@ -673,7 +673,7 @@ describe('FastifyRouter', () => {
         const setTimeoutSpy = jest.spyOn(global, 'setTimeout');
         await router.register([]);
 
-        const onRequestCalls = jest.mocked(addHook).mock.calls.filter(c => c[0] === 'onRequest');
+        const onRequestCalls = (addHook as Mock<any>).mock.calls.filter(c => c[0] === 'onRequest');
         const delayHook = onRequestCalls[2]?.[1] as Fn;
         const done = jest.fn();
         (delayHook as any)({}, {}, done);

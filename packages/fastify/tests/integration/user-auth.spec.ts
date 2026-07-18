@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
-import { utils } from '@shadow-library/common';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { Dispatcher, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -25,7 +25,7 @@ describe('User Auth', () => {
 
   beforeAll(async () => {
     app = await ShadowFactory.create(AppModule).then(app => app.start());
-    router = app.get(Router);
+    router = app.get(Dispatcher) as FastifyRouter;
   });
 
   afterAll(() => app.stop());

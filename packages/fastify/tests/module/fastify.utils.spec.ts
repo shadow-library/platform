@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { AppError, ValidationError } from '@shadow-library/common';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 import Ajv from 'ajv';
 import { FastifyInstance } from 'fastify';
+import { AppError, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { AjvValidators, compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } from '@lib/module/fastify.utils';
+import { type AjvValidators } from '@lib/module/fastify.utils';
 
 /**
  * Defining types
@@ -18,23 +18,24 @@ import { AjvValidators, compileValidator, createFastifyInstance, formatSchemaErr
 /**
  * Declaring the constants
  */
+const fastifyModule = await import('fastify');
+const instanceStub = {
+  setNotFoundHandler: jest.fn(),
+  setErrorHandler: jest.fn(),
+  setSchemaErrorFormatter: jest.fn(),
+  setValidatorCompiler: jest.fn(),
 
-jest.mock('fastify', () => ({
-  fastify: jest.fn().mockReturnValue({
-    setNotFoundHandler: jest.fn(),
-    setErrorHandler: jest.fn(),
-    setSchemaErrorFormatter: jest.fn(),
-    setValidatorCompiler: jest.fn(),
+  getDefaultJsonParser: jest.fn(),
+  addContentTypeParser: jest.fn(),
+  addHook: jest.fn(),
 
-    getDefaultJsonParser: jest.fn(),
-    addContentTypeParser: jest.fn(),
-    addHook: jest.fn(),
-
-    route: jest.fn(),
-    listen: jest.fn(),
-    close: jest.fn(),
-  }),
-}));
+  route: jest.fn(),
+  listen: jest.fn(),
+  close: jest.fn(),
+};
+const fastify = jest.fn(() => instanceStub);
+mock.module('fastify', () => ({ ...fastifyModule, fastify, default: fastify }));
+const { compileValidator, createFastifyInstance, formatSchemaErrors, notFoundHandler } = await import('@lib/module/fastify.utils');
 
 describe('Create Fastify Instance', () => {
   let instance: FastifyInstance;
@@ -59,7 +60,7 @@ describe('Create Fastify Instance', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
-    instance = await createFastifyInstance({ host: '', port: 3000, errorHandler }, fastifyFactory);
+    instance = (await createFastifyInstance({ host: '', port: 3000, errorHandler }, fastifyFactory)) as unknown as FastifyInstance;
   });
 
   it('should create the object and fastify instance', async () => {
@@ -71,7 +72,7 @@ describe('Create Fastify Instance', () => {
   });
 
   it('should create the object and fastify instance without fastifyFactory', async () => {
-    instance = await createFastifyInstance({ host: '', port: 3000, errorHandler });
+    instance = (await createFastifyInstance({ host: '', port: 3000, errorHandler })) as unknown as FastifyInstance;
     expect(instance).toBeDefined();
     expect(instance.setNotFoundHandler).toHaveBeenCalled();
     expect(instance.setErrorHandler).toHaveBeenCalled();
@@ -125,7 +126,7 @@ describe('Create Fastify Instance', () => {
 
   it('should apply custom ajv options when config.ajv.customOptions is provided', async () => {
     const customOptions = { verbose: true };
-    instance = await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { customOptions } });
+    instance = (await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { customOptions } })) as unknown as FastifyInstance;
     expect(instance).toBeDefined();
     expect(instance.setValidatorCompiler).toHaveBeenCalled();
   });
@@ -133,7 +134,7 @@ describe('Create Fastify Instance', () => {
   it('should apply ajv plugins when config.ajv.plugins is provided', async () => {
     const mockPlugin = jest.fn();
     const pluginOptions = { testOption: true };
-    instance = await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { plugins: [[mockPlugin, pluginOptions], mockPlugin] } });
+    instance = (await createFastifyInstance({ host: '', port: 3000, errorHandler, ajv: { plugins: [[mockPlugin, pluginOptions], mockPlugin] } })) as unknown as FastifyInstance;
     expect(instance).toBeDefined();
     expect(mockPlugin).toHaveBeenNthCalledWith(1, expect.any(Object), pluginOptions);
     expect(mockPlugin).toHaveBeenNthCalledWith(2, expect.any(Object), pluginOptions);

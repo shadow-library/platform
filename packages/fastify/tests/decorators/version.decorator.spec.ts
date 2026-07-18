@@ -1,13 +1,11 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Route } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
-import { Version } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -16,11 +14,11 @@ import { Version } from '@shadow-library/fastify';
 /**
  * Declaring the constants
  */
+const app = await import('@shadow-library/app');
 const decorator = jest.fn();
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Route: jest.fn(() => decorator) };
-});
+const Handler = jest.fn(() => decorator);
+mock.module('@shadow-library/app', () => ({ ...app, Handler }));
+const { Version } = await import('@shadow-library/fastify');
 
 describe('@Version', () => {
   beforeEach(() => {
@@ -33,6 +31,6 @@ describe('@Version', () => {
       testMethod() {}
     }
 
-    expect(Route).toBeCalledWith({ version: 1 });
+    expect(Handler).toBeCalledWith({ version: 1 });
   });
 });

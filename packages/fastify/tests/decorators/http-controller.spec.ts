@@ -1,14 +1,12 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Controller, Route } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
 import { HTTP_CONTROLLER_TYPE } from '@lib/constants';
-import { HttpController } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -17,12 +15,13 @@ import { HttpController } from '@shadow-library/fastify';
 /**
  * Declaring the constants
  */
+const app = await import('@shadow-library/app');
 const controllerDecorator = jest.fn();
 const routeDecorator = jest.fn();
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Controller: jest.fn(() => controllerDecorator), Route: jest.fn(() => routeDecorator) };
-});
+const Controller = jest.fn(() => controllerDecorator);
+const Handler = jest.fn(() => routeDecorator);
+mock.module('@shadow-library/app', () => ({ ...app, Controller, Handler }));
+const { HttpController } = await import('@shadow-library/fastify');
 
 describe('@HttpController', () => {
   beforeEach(() => {
@@ -44,24 +43,24 @@ describe('@HttpController', () => {
   it(`should strip 'Api' suffix and generate tag`, () => {
     @HttpController()
     class UserApi {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['User'] } }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: { tags: ['User'] } }, { arrayStrategy: 'replace' });
   });
 
   it(`should convert camelCase to spaced words in tag`, () => {
     @HttpController()
     class UserAccountController {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['User Account'] } }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: { tags: ['User Account'] } }, { arrayStrategy: 'replace' });
   });
 
   it(`should handle multiple camelCase words and suffix stripping`, () => {
     @HttpController()
     class UserProfileSettingsRoute {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['User Profile Settings'] } }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: { tags: ['User Profile Settings'] } }, { arrayStrategy: 'replace' });
   });
 
   it(`should handle class name without any suffix`, () => {
     @HttpController()
     class Health {}
-    expect(Route).toBeCalledWith({ operation: { tags: ['Health'] } }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: { tags: ['Health'] } }, { arrayStrategy: 'replace' });
   });
 });

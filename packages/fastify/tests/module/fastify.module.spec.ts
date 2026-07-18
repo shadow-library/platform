@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Module, Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, jest } from 'bun:test';
+import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { Field, Schema } from '@shadow-library/class-schema';
 
 /**
@@ -34,8 +34,8 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         controllers: [Controller],
-        providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
-        exports: [Router, ContextService, FASTIFY_INSTANCE],
+        providers: expect.arrayContaining([{ token: Dispatcher, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
+        exports: [Dispatcher, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -47,7 +47,7 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         providers: expect.arrayContaining([Provider]),
-        exports: [Router, ContextService, FASTIFY_INSTANCE],
+        exports: [Dispatcher, ContextService, FASTIFY_INSTANCE],
       });
     });
   });
@@ -63,8 +63,8 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         controllers: [Controller],
-        providers: expect.arrayContaining([{ token: Router, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
-        exports: [Router, ContextService, FASTIFY_INSTANCE],
+        providers: expect.arrayContaining([{ token: Dispatcher, useClass: FastifyRouter }, ContextService, { token: FASTIFY_CONFIG, useFactory: expect.any(Function) }]),
+        exports: [Dispatcher, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -76,7 +76,7 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         providers: expect.arrayContaining([Provider]),
-        exports: [Router, ContextService, FASTIFY_INSTANCE],
+        exports: [Dispatcher, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -89,7 +89,7 @@ describe('FastifyModule', () => {
         module: FastifyModule,
         imports: [Import],
         providers: expect.arrayContaining([]),
-        exports: [Router, ContextService, FASTIFY_INSTANCE],
+        exports: [Dispatcher, ContextService, FASTIFY_INSTANCE],
       });
     });
 
@@ -101,7 +101,7 @@ describe('FastifyModule', () => {
       expect(Module).toStrictEqual({
         module: FastifyModule,
         providers: expect.arrayContaining([]),
-        exports: [Router, ContextService, FASTIFY_INSTANCE, Export],
+        exports: [Dispatcher, ContextService, FASTIFY_INSTANCE, Export],
       });
     });
   });
@@ -138,7 +138,7 @@ describe('FastifyModule', () => {
 
     beforeAll(async () => {
       app = await ShadowFactory.create(TestModule).then(app => app.start());
-      router = app.get(Router);
+      router = app.get(Dispatcher) as FastifyRouter;
     });
 
     afterAll(() => app.stop());

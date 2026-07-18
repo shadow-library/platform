@@ -1,13 +1,12 @@
 /**
  * Importing npm packages
  */
-import { beforeEach, describe, expect, it, jest } from '@jest/globals';
-import { Route } from '@shadow-library/app';
+import { beforeEach, describe, expect, it, jest, mock } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
-import { ApiOperation, ApiOperationMetadata } from '@shadow-library/fastify';
+import { type ApiOperationMetadata } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -16,11 +15,11 @@ import { ApiOperation, ApiOperationMetadata } from '@shadow-library/fastify';
 /**
  * Declaring the constants
  */
+const app = await import('@shadow-library/app');
 const decorator = jest.fn();
-jest.mock('@shadow-library/app', () => {
-  const actual = jest.requireActual('@shadow-library/app') as object;
-  return { ...actual, Route: jest.fn(() => decorator) };
-});
+const Handler = jest.fn(() => decorator);
+mock.module('@shadow-library/app', () => ({ ...app, Handler }));
+const { ApiOperation } = await import('@shadow-library/fastify');
 
 describe('@ApiOperation', () => {
   beforeEach(() => {
@@ -38,7 +37,7 @@ describe('@ApiOperation', () => {
       getUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with all operation metadata fields', () => {
@@ -61,7 +60,7 @@ describe('@ApiOperation', () => {
       createUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with minimal operation metadata', () => {
@@ -74,7 +73,7 @@ describe('@ApiOperation', () => {
       deleteUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with tags metadata', () => {
@@ -88,7 +87,7 @@ describe('@ApiOperation', () => {
       listUsers() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with deprecated flag', () => {
@@ -102,7 +101,7 @@ describe('@ApiOperation', () => {
       oldEndpoint() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with custom metadata properties', () => {
@@ -116,7 +115,7 @@ describe('@ApiOperation', () => {
       customEndpoint() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 
   it('should enhance the method with operationId metadata', () => {
@@ -130,6 +129,6 @@ describe('@ApiOperation', () => {
       getUser() {}
     }
 
-    expect(Route).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
+    expect(Handler).toBeCalledWith({ operation: options }, { arrayStrategy: 'replace' });
   });
 });

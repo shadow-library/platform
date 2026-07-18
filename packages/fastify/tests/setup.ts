@@ -1,7 +1,12 @@
 /**
+ * Importing packages with side effects
+ */
+import 'reflect-metadata';
+
+/**
  * Importing npm packages
  */
-import { jest } from '@jest/globals';
+import { afterEach, jest, mock } from 'bun:test';
 
 /**
  * Importing user defined packages
@@ -15,6 +20,12 @@ import { jest } from '@jest/globals';
  * Declaring the constants
  */
 
-jest.mock('chokidar', () => ({
+/** Config (from @shadow-library/common) watches files via chokidar; stub it so tests don't spawn watchers. */
+mock.module('chokidar', () => ({
   watch: jest.fn(() => ({ on: jest.fn(), close: jest.fn() })),
 }));
+
+/** Restore `spyOn` mocks after each test so spies on shared objects (Config, Reflect, utils) don't bleed between tests in a file. */
+afterEach(() => {
+  jest.restoreAllMocks();
+});

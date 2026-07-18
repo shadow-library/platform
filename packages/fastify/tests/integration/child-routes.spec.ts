@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
+import { Dispatcher, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -24,7 +24,7 @@ describe('Child Routes', () => {
 
   beforeAll(async () => {
     app = await ShadowFactory.create(AppModule).then(app => app.start());
-    router = app.get(Router);
+    router = app.get(Dispatcher) as FastifyRouter;
   });
 
   afterAll(() => app.stop());
