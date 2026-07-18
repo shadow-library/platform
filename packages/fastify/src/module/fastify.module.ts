@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
-import { DynamicModule, InjectionToken, Module, Provider, Router } from '@shadow-library/app';
+import { v4 as uuid } from 'uuid';
+import { Dispatcher, DynamicModule, Module, Provider, ProviderToken } from '@shadow-library/app';
 import { ClassSchema } from '@shadow-library/class-schema';
 import { Config, utils } from '@shadow-library/common';
-import { v4 as uuid } from 'uuid';
 
 /**
  * Importing user defined packages
@@ -71,12 +71,12 @@ export class FastifyModule {
   static forRootAsync(options: FastifyModuleAsyncOptions): DynamicModule {
     const fastifyFactory = (config: FastifyConfig) => createFastifyInstance(config, options.fastifyFactory);
 
-    const providers: Provider[] = [{ token: Router, useClass: FastifyRouter }, ContextService];
+    const providers: Provider[] = [{ token: Dispatcher, useClass: FastifyRouter }, ContextService];
     providers.push({ token: FASTIFY_CONFIG, useFactory: this.createConfigFactory(options.useFactory), inject: options.inject });
     providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
     if (options.providers) providers.push(...options.providers);
 
-    const exports: InjectionToken[] = [Router, ContextService, FASTIFY_INSTANCE];
+    const exports: ProviderToken[] = [Dispatcher, ContextService, FASTIFY_INSTANCE];
     if (options.exports) exports.push(...options.exports);
 
     const Module: DynamicModule = { module: FastifyModule, providers, exports };

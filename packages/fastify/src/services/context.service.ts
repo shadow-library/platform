@@ -3,9 +3,9 @@
  */
 import { AsyncLocalStorage } from 'node:async_hooks';
 
+import { onRequestHookHandler } from 'fastify';
 import { Injectable } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
-import { onRequestHookHandler } from 'fastify';
 
 /**
  * Importing user defined packages

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Inject, Router } from '@shadow-library/app';
+import { Inject, Dispatcher } from '@shadow-library/app';
 import { ContextService, FastifyRouter, Get, HttpController, Query } from '@shadow-library/fastify';
 
 /**
@@ -20,7 +20,7 @@ import { ContextService, FastifyRouter, Get, HttpController, Query } from '@shad
 export class RoutesController {
   constructor(
     private readonly contextService: ContextService,
-    @Inject(Router) private readonly fastifyRouter: FastifyRouter,
+    @Inject(Dispatcher) private readonly fastifyRouter: FastifyRouter,
   ) {}
 
   @Get('/hello')

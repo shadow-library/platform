@@ -2,9 +2,9 @@
  * Importing npm packages
  */
 
-import { Route } from '@shadow-library/app';
-import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 import { JsonObject } from 'type-fest';
+import { Handler } from '@shadow-library/app';
+import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -22,14 +22,14 @@ export interface DynamicRender<T extends JsonObject> {
 /**
  * Declaring the constants
  */
-export const HttpStatus = (status: number): MethodDecorator => Route({ status });
+export const HttpStatus = (status: number): MethodDecorator => Handler({ status });
 
-export const Header = (name: string, value: string | (() => string)): MethodDecorator => Route({ headers: { [name]: value } });
+export const Header = (name: string, value: string | (() => string)): MethodDecorator => Handler({ headers: { [name]: value } });
 
-export const Redirect = (redirect: string, status = 301): MethodDecorator => Route({ redirect, status });
+export const Redirect = (redirect: string, status = 301): MethodDecorator => Handler({ redirect, status });
 
-export const Render = (render?: string): MethodDecorator => Route({ render: render ?? true });
+export const Render = (render?: string): MethodDecorator => Handler({ render: render ?? true });
 
 export function RespondFor(statusCode: number, schema: SchemaClass | JSONSchema): MethodDecorator {
-  return Route({ schemas: { response: { [statusCode]: schema } } });
+  return Handler({ schemas: { response: { [statusCode]: schema } } });
 }

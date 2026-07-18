@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -38,7 +38,7 @@ export function HttpRoute(options: RouteOptions): MethodDecorator {
   return (target, propertyKey, descriptor) => {
     const methodName = propertyKey.toString();
     const summary = methodName.charAt(0).toUpperCase() + methodName.slice(1).replace(/([a-z])([A-Z])|([A-Z]+)([A-Z][a-z])/g, '$1$3 $2$4');
-    Route(options)(target, propertyKey, descriptor);
+    Handler(options)(target, propertyKey, descriptor);
     ApiOperation({ summary, operationId: methodName })(target, propertyKey, descriptor);
   };
 }

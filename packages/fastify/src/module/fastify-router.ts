@@ -3,15 +3,22 @@
  */
 import assert from 'node:assert';
 
-import { ControllerRouteMetadata, Inject, Injectable, RouteMetadata, Router } from '@shadow-library/app';
-import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
-import { AppError, Config, Fn, Logger, MaybeUndefined, utils } from '@shadow-library/common';
-import { all as deepmerge } from 'deepmerge';
-import { type FastifyInstance, RouteOptions, preHandlerAsyncHookHandler, preSerializationAsyncHookHandler } from 'fastify';
+import {
+  type FastifyInstance,
+  type FastifyPluginCallback,
+  type FastifyPluginOptions,
+  type FastifyRegisterOptions,
+  preHandlerAsyncHookHandler,
+  preSerializationAsyncHookHandler,
+  RouteOptions,
+} from 'fastify';
 import findMyWay, { Instance as ChildRouter, HTTPVersion } from 'find-my-way';
 import stringify from 'json-stable-stringify';
 import { Chain as MockRequestChain, InjectOptions as MockRequestOptions, Response as MockResponse } from 'light-my-request';
 import { Class, JsonObject, JsonValue, Promisable } from 'type-fest';
+import { Dispatcher, DispatchMetadata, HandlerMetadata, Inject, Injectable } from '@shadow-library/app';
+import { ClassSchema, JSONSchema, ParsedSchema, SchemaClass, Transformer, TransformerAction, TransformerFactory } from '@shadow-library/class-schema';
+import { AppError, Config, Fn, Logger, MaybeUndefined, utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -38,12 +45,19 @@ declare module 'fastify' {
   }
 }
 
+/** Parsed cookies as provided by `@fastify/cookie`; typed locally so the package stays an optional dependency. */
+export type CookieValues = Record<string, string | undefined>;
+
 export interface RequestContext {
   request: HttpRequest;
   response: HttpResponse;
   params: Record<string, string>;
   query: Record<string, string>;
   body: JsonObject;
+  headers: HttpRequest['headers'];
+  cookies?: CookieValues;
+  rawBody?: Buffer;
+  ctx: ContextService;
 }
 
 interface ParsedController<T> {
@@ -110,7 +124,7 @@ const DEFAULT_ARTIFACTS: RouteArtifacts = { masks: {}, transformers: {} };
 const isClassSchema = (schema: object): schema is SchemaClass => typeof schema === 'function' || (Array.isArray(schema) && typeof schema[0] === 'function');
 
 @Injectable()
-export class FastifyRouter extends Router {
+export class FastifyRouter extends Dispatcher {
   static override readonly name = 'FastifyRouter';
 
   private readonly logger = Logger.getLogger(NAMESPACE, 'FastifyRouter');
@@ -169,6 +183,17 @@ export class FastifyRouter extends Router {
     });
   }
 
+  /** Lazily loads and registers the optional `@fastify/cookie` plugin; only runs when a route uses `@Cookie()`. */
+  private async registerCookies(): Promise<void> {
+    let cookiePlugin: FastifyPluginCallback;
+    try {
+      cookiePlugin = (await import('@fastify/cookie')).default as FastifyPluginCallback;
+    } catch {
+      throw AppError.internal("The '@fastify/cookie' package is required to use the @Cookie() decorator; install it to enable cookie parsing.");
+    }
+    await this.instance.register(cookiePlugin, (this.config.cookie ?? {}) as FastifyRegisterOptions<FastifyPluginOptions>);
+  }
+
   private maskField(value: unknown, schema: JSONSchema): string {
     const type = schema['x-fastify']?.type as MaybeUndefined<SensitiveDataType>;
     const stringified = typeof value === 'string' ? value : typeof value === 'object' ? JSON.stringify(value) : String(value);
@@ -220,13 +245,13 @@ export class FastifyRouter extends Router {
     };
   }
 
-  private parseControllers(controllers: ControllerRouteMetadata[]): ParsedControllers {
+  private parseControllers(controllers: DispatchMetadata[]): ParsedControllers {
     const parsedControllers: ParsedControllers = { middlewares: [], routes: [] };
     for (const controller of controllers) {
       switch (controller.metadata[HTTP_CONTROLLER_TYPE]) {
         case 'router': {
           const { instance, metadata, metatype } = controller;
-          for (const route of controller.routes) {
+          for (const route of controller.handlers) {
             const version = route.metadata.version ?? 1;
             const versionPrefix = this.config.prefixVersioning ? `/v${version}` : '';
             const path = this.joinPaths(this.config.routePrefix, versionPrefix, metadata.path, route.metadata.path);
@@ -270,16 +295,19 @@ export class FastifyRouter extends Router {
     const metadata = route.metadata;
     const statusCode = this.getStatusCode(metadata);
     const argsOrder = (Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, route.instance, route.handlerName) as (keyof RequestContext | undefined)[]) ?? [];
+    const headerEntries = Object.entries(metadata.headers ?? {});
+    const contextService = this.context;
 
     return async (request, response) => {
       const params = request.params as Record<string, string>;
       const query = request.query as Record<string, string>;
       const body = request.body as JsonObject;
-      const context = { request, response, params, query, body };
+      const cookies = (request as { cookies?: CookieValues }).cookies;
+      const context: RequestContext = { request, response, params, query, body, headers: request.headers, cookies, rawBody: request.rawBody, ctx: contextService };
 
       /** Setting the status code and headers */
       response.status(statusCode);
-      for (const [key, value] of Object.entries(metadata.headers ?? {})) {
+      for (const [key, value] of headerEntries) {
         response.header(key, typeof value === 'function' ? value() : value);
       }
 
@@ -304,7 +332,7 @@ export class FastifyRouter extends Router {
     };
   }
 
-  private async getMiddlewareHandler(middleware: ParsedController<MiddlewareMetadata>, metadata: RouteMetadata): Promise<MiddlewareHandler | undefined> {
+  private async getMiddlewareHandler(middleware: ParsedController<MiddlewareMetadata>, metadata: HandlerMetadata): Promise<MiddlewareHandler | undefined> {
     if (!middleware.metadata.generates) return middleware.handler.bind(middleware.instance);
 
     /** The cache is scoped per middleware instance so that two generators on the same route never share a handler */
@@ -342,8 +370,8 @@ export class FastifyRouter extends Router {
 
       if (transformer) {
         this.logger.debug(`transforming response for status code ${statusCode}`);
-        const cloned = deepmerge([{}, payload as object]);
-        const data = transformer(cloned, transform);
+        const cloned = structuredClone(payload);
+        const data = transformer(cloned as object, transform);
         this.logger.debug(`transformed response for status code ${statusCode}`, { data });
         return data;
       }
@@ -379,12 +407,15 @@ export class FastifyRouter extends Router {
     };
   }
 
-  async register(controllers: ControllerRouteMetadata[]): Promise<void> {
+  async register(controllers: DispatchMetadata[]): Promise<void> {
     const { middlewares, routes } = this.parseControllers(controllers);
     const defaultResponseSchemas = this.config.responseSchema ?? {};
 
     const hasRawBody = routes.some(r => r.metadata.rawBody);
     if (hasRawBody) this.registerRawBody();
+
+    const hasCookies = routes.some(r => r.metadata.cookies);
+    if (hasCookies) await this.registerCookies();
 
     this.logger.debug('Registering the global middlewares');
     this.instance.addHook('onRequest', this.context.init());
@@ -403,7 +434,7 @@ export class FastifyRouter extends Router {
       assert(metadata.method, 'Route method is required');
       this.logger.debug(`registering route ${metadata.method} ${metadata.path}`);
 
-      const fastifyRouteOptions = utils.object.omitKeys(metadata, ['path', 'method', 'schemas', 'rawBody', 'status', 'headers', 'redirect', 'render']);
+      const fastifyRouteOptions = utils.object.omitKeys(metadata, ['path', 'method', 'schemas', 'rawBody', 'cookies', 'status', 'headers', 'redirect', 'render']);
       const artifacts: RouteArtifacts = { masks: {}, transformers: {} };
       const routeOptions = { ...fastifyRouteOptions, config: { metadata, artifacts } } as RouteOptions;
       routeOptions.url = metadata.path;

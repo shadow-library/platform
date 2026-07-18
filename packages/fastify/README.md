@@ -139,9 +139,18 @@ bootstrap();
 @Body(schema?: JSONSchema)     // Request body
 @Params(schema?: JSONSchema)   // URL parameters
 @Query(schema?: JSONSchema)    // Query parameters
+@Headers()                     // Request headers
+@Cookie()                      // Parsed request cookies (requires the optional @fastify/cookie package)
+@RawBody()                     // Untouched request body buffer (also flags the route to capture it)
 @Request() / @Req()            // Raw Fastify request
 @Response() / @Res()           // Raw Fastify response
+@Ctx()                         // Request-scoped ContextService
 ```
+
+`@Cookie()` loads `@fastify/cookie` lazily and only when a route uses it — the package is an optional peer
+dependency, so apps that don't use cookies never pull it in. Using `@Cookie()` without it installed throws a
+clear error. Cookie plugin options (e.g. a `secret` for signed cookies) can be passed via the `cookie` field
+of `FastifyModule.forRoot({ ... })`.
 
 #### Response Decorators
 

@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
 import { Integer } from 'type-fest';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -17,5 +17,5 @@ import { Integer } from 'type-fest';
  */
 
 export function Version<T extends number>(version: Integer<T>): ClassDecorator & MethodDecorator {
-  return Route({ version });
+  return Handler({ version });
 }

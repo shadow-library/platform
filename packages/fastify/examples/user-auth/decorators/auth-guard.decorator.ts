@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -12,7 +12,7 @@ import { Route } from '@shadow-library/app';
  */
 
 declare module '@shadow-library/app' {
-  export interface RouteMetadata {
+  export interface HandlerMetadata {
     authGuard?: AuthGuardOptions;
   }
 }
@@ -26,5 +26,5 @@ export interface AuthGuardOptions {
  */
 
 export function AuthGuard(options: AuthGuardOptions) {
-  return Route({ authGuard: options });
+  return Handler({ authGuard: options });
 }

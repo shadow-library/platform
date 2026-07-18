@@ -3,11 +3,11 @@
  */
 import assert from 'node:assert';
 
-import { JSONSchema } from '@shadow-library/class-schema';
-import { ValidationError, utils } from '@shadow-library/common';
 import Ajv, { Options as AjvOptions, SchemaObject, ValidateFunction } from 'ajv';
-import { FastifyInstance, fastify } from 'fastify';
+import { fastify, FastifyInstance } from 'fastify';
 import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationResult, SchemaErrorDataVar } from 'fastify/types/schema';
+import { JSONSchema } from '@shadow-library/class-schema';
+import { utils, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -58,7 +58,7 @@ export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject
       const path = error.instancePath.substring(1);
       const defaultValue = routeSchema.schema.properties?.[path]?.default;
       if (defaultValue !== undefined) data[path] = defaultValue;
-      else delete data[path]; // eslint-disable-line @typescript-eslint/no-dynamic-delete
+      else delete data[path];
     }
 
     return { value: data };

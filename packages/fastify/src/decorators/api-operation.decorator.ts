@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -30,5 +30,5 @@ export interface ApiOperationMetadata {
  */
 
 export function ApiOperation(options: ApiOperationMetadata): ClassDecorator & MethodDecorator {
-  return Route({ operation: options }, { arrayStrategy: 'replace' });
+  return Handler({ operation: options }, { arrayStrategy: 'replace' });
 }

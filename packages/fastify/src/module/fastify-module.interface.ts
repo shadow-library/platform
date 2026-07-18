@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
-import { FactoryProvider, ModuleMetadata } from '@shadow-library/app';
-import { JSONSchema } from '@shadow-library/class-schema';
 import { FastifyInstance, FastifyServerOptions } from 'fastify';
 import { Promisable } from 'type-fest';
+import { FactoryProvider, ModuleMetadata } from '@shadow-library/app';
+import { JSONSchema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -76,6 +76,12 @@ export interface FastifyConfig extends FastifyServerOptions {
    * Object defining custom transformers for request and response data transformation
    */
   transformers?: Record<keyof CustomTransformers, (value: any) => any>;
+
+  /**
+   * Options forwarded to the optional `@fastify/cookie` plugin, registered lazily when a route uses `@Cookie()`.
+   * See https://github.com/fastify/fastify-cookie for available options (e.g. `secret` for signed cookies).
+   */
+  cookie?: Record<string, unknown>;
 }
 
 export interface FastifyModuleOptions extends Partial<FastifyConfig> {

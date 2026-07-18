@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { SyncValue } from '@shadow-library/common';
 import { DoneFuncWithErrOrRes, FastifyReply, FastifyRequest } from 'fastify';
+import { SyncValue } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

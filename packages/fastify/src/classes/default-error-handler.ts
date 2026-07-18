@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { AppError, AppErrorObject, Config, Logger } from '@shadow-library/common';
 import { FastifyError } from 'fastify';
+import { AppError, AppErrorObject, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

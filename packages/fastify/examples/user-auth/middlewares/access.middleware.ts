@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { RouteMetadata } from '@shadow-library/app';
+import { HandlerMetadata } from '@shadow-library/app';
 import { AsyncRouteHandler, ContextService, Middleware, MiddlewareGenerator, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
@@ -21,7 +21,7 @@ import { User } from '../user.service';
 export class AccessMiddleware implements MiddlewareGenerator {
   constructor(private readonly contextService: ContextService) {}
 
-  generate(metadata: RouteMetadata): AsyncRouteHandler | undefined {
+  generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
     if (!metadata.authGuard) return;
 
     return async () => {

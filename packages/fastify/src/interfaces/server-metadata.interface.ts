@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { RouteMetadata } from '@shadow-library/app';
-import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 import { FastifyInstance, RouteShorthandOptions } from 'fastify';
+import { HandlerMetadata } from '@shadow-library/app';
+import { JSONSchema, SchemaClass } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages
@@ -16,7 +16,7 @@ import { ApiOperationMetadata, HttpMethod, RouteInputSchemas } from '../decorato
  */
 
 declare module '@shadow-library/app' {
-  export interface RouteMetadata extends Omit<RouteShorthandOptions, 'config'> {
+  export interface HandlerMetadata extends Omit<RouteShorthandOptions, 'config'> {
     method?: HttpMethod;
     path?: string;
     version?: number;
@@ -24,6 +24,7 @@ declare module '@shadow-library/app' {
     operation?: ApiOperationMetadata;
 
     rawBody?: boolean;
+    cookies?: boolean;
     silentValidation?: boolean;
 
     status?: number;
@@ -38,6 +39,6 @@ declare module '@shadow-library/app' {
   }
 }
 
-export type ServerMetadata = RouteMetadata;
+export type ServerMetadata = HandlerMetadata;
 
 export type ServerInstance = FastifyInstance;
