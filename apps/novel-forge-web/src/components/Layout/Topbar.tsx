@@ -24,6 +24,7 @@ import {
   ReviewIcon,
   RunsIcon,
   SearchIcon,
+  SendIcon,
   SettingsIcon,
   SourceIcon,
   UploadIcon,
@@ -55,6 +56,7 @@ const PROJECT_SCREENS: ScreenDef[] = [
   { segment: 'chat', to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon /> },
   { segment: 'proposals', to: '/novels/$novelId/proposals', label: 'Proposals', icon: <ProposalsIcon /> },
   { segment: 'runs', to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon /> },
+  { segment: 'publish', to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon /> },
   { segment: 'settings', to: '/novels/$novelId/settings', label: 'Project Settings', icon: <SettingsIcon /> },
 ];
 

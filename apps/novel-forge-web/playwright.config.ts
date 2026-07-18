@@ -37,10 +37,16 @@ export default defineConfig({
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
   // TanStack Start serves through a Node SSR server (not `vite preview`); build once, then run it on 3000.
-  webServer: {
-    command: isCI ? 'PORT=3000 bun run start' : 'bun run build && PORT=3000 bun run start',
-    url: 'http://127.0.0.1:3000',
-    reuseExistingServer: !isCI,
-    timeout: 180_000,
-  },
+  // Self-hosting specs (e.g. tests/publish-panel.spec.ts, which runs its own app + mock API on high
+  // ports) don't need it — PW_NO_WEBSERVER=1 skips it so a targeted run never touches port 3000.
+  ...(process.env.PW_NO_WEBSERVER === '1'
+    ? {}
+    : {
+        webServer: {
+          command: isCI ? 'PORT=3000 bun run start' : 'bun run build && PORT=3000 bun run start',
+          url: 'http://127.0.0.1:3000',
+          reuseExistingServer: !isCI,
+          timeout: 180_000,
+        },
+      }),
 });

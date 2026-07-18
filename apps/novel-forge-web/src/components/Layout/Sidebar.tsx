@@ -24,6 +24,7 @@ import {
   ProposalsIcon,
   ReviewIcon,
   RunsIcon,
+  SendIcon,
   SettingsIcon,
   SourceIcon,
   SunIcon,
@@ -111,6 +112,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
     { to: '/novels/$novelId/chat', label: 'Refinement Chat', icon: <ChatIcon /> },
     { to: '/novels/$novelId/proposals', label: 'Proposals', icon: <ProposalsIcon />, badge: proposalCount, warnBadge: true },
     { to: '/novels/$novelId/runs', label: 'Workflow Runs', icon: <RunsIcon /> },
+    { to: '/novels/$novelId/publish', label: 'Publish', icon: <SendIcon /> },
   ];
 
   return (

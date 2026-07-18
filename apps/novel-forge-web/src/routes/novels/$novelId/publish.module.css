@@ -1,0 +1,129 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* Novel metadata form */
+.form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.formActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.metaRow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.metaText {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+  white-space: nowrap;
+}
+
+.chipRow {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.issueList {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* Chapter ledger table */
+.table {
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+}
+
+.headerRow,
+.row {
+  display: grid;
+  grid-template-columns: 44px 68px 1fr 130px 190px auto;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 14px;
+}
+
+.headerRow {
+  font-size: var(--sh-text-caption);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--sh-text-tertiary);
+  background: var(--sh-surface-muted);
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.headerActions {
+  text-align: right;
+}
+
+.row {
+  border-bottom: 1px solid var(--sh-border-subtle);
+  font-size: var(--sh-text-body-sm);
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowNum {
+  font-variant-numeric: tabular-nums;
+  color: var(--sh-text-tertiary);
+}
+
+.rowTitle {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pubCell {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 2px;
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .formGrid {
+    grid-template-columns: 1fr;
+  }
+
+  .headerRow,
+  .row {
+    grid-template-columns: 36px 1fr 150px auto;
+  }
+
+  .headerRow > :nth-child(2),
+  .row > :nth-child(2),
+  .headerRow > :nth-child(4),
+  .row > :nth-child(4) {
+    display: none;
+  }
+}

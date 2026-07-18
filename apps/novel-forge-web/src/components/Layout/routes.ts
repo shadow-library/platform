@@ -18,4 +18,5 @@ export type ProjectRoute =
   | '/novels/$novelId/chat'
   | '/novels/$novelId/proposals'
   | '/novels/$novelId/runs'
+  | '/novels/$novelId/publish'
   | '/novels/$novelId/settings';
