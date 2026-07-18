@@ -3,7 +3,7 @@
  */
 
 import { Inject, Injectable } from '@shadow-library/app';
-import { LRUCache, LRUCacheOptions, Logger, Nullable } from '@shadow-library/common';
+import { Logger, LRUCache, LRUCacheOptions, Nullable } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

@@ -2,10 +2,10 @@
  * Importing npm packages
  */
 import { fastifyCookie } from '@fastify/cookie';
-import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
-import { Config, InternalError, LogData, Logger } from '@shadow-library/common';
-import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
 import { PartialDeep } from 'type-fest';
+import { DynamicModule, Inject, Module, OnModuleInit } from '@shadow-library/app';
+import { Config, LogData, Logger } from '@shadow-library/common';
+import { ContextService, FASTIFY_INSTANCE, FastifyModule, type ServerInstance } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -76,10 +76,14 @@ export class HttpCoreModule implements OnModuleInit {
     private readonly openApiService: OpenApiService,
   ) {}
 
-  private firstDefined(...values: (boolean | undefined)[]): boolean {
-    const value = values.find(v => typeof v === 'boolean');
-    if (value === undefined) throw new InternalError('No defined boolean value found in firstDefined');
-    return value;
+  /** Registers an optional feature when enabled by code config, env config, or the environment default — in that order of precedence */
+  private async setupFeature(feature: 'openapi' | 'helmet' | 'compress', fallback: boolean, setup: () => Promise<void>): Promise<void> {
+    const isConfigEnabled = Config.register(`http-core.${feature}.enabled`, DEFAULT_CONFIGS[`http-core.${feature}.enabled`]);
+    const isEnabled = this.options[feature].enabled ?? isConfigEnabled ?? fallback;
+    if (!isEnabled) return;
+
+    await setup();
+    this.logger.info(`${feature} registered with options`, { options: this.options[feature] });
   }
 
   async onModuleInit(): Promise<void> {
@@ -95,32 +99,22 @@ export class HttpCoreModule implements OnModuleInit {
       return context;
     });
 
-    const isOpenapiConfigEnabled = Config.register('http-core.openapi.enabled', DEFAULT_CONFIGS['http-core.openapi.enabled']);
-    const isOpenapiEnabled = this.firstDefined(this.options.openapi.enabled, isOpenapiConfigEnabled, Config.isDev());
-    if (isOpenapiEnabled) {
+    await this.setupFeature('openapi', Config.isDev(), async () => {
       const fastifySwagger = await import('@fastify/swagger');
       const scalar = await import('@scalar/fastify-api-reference');
-
       await this.fastify.register(fastifySwagger, this.openApiService.getFastifySwaggerOptions());
       await this.fastify.register(scalar.default, this.openApiService.getScalarOptions());
-      this.logger.info('OpenAPI registered with options', { options: this.options.openapi });
-    }
+    });
 
-    const isHelmetConfigEnabled = Config.register('http-core.helmet.enabled', DEFAULT_CONFIGS['http-core.helmet.enabled']);
-    const isHelmetEnabled = this.firstDefined(this.options.helmet.enabled, isHelmetConfigEnabled, Config.isProd());
-    if (isHelmetEnabled) {
+    await this.setupFeature('helmet', Config.isProd(), async () => {
       const helmet = await import('@fastify/helmet');
       await this.fastify.register(helmet, this.options.helmet);
-      this.logger.info('Helmet registered with options', { options: this.options.helmet });
-    }
+    });
 
-    const isCompressConfigEnabled = Config.register('http-core.compress.enabled', DEFAULT_CONFIGS['http-core.compress.enabled']);
-    const isCompressEnabled = this.firstDefined(this.options.compress.enabled, isCompressConfigEnabled, Config.isProd());
-    if (isCompressEnabled) {
+    await this.setupFeature('compress', Config.isProd(), async () => {
       const compress = await import('@fastify/compress');
       await this.fastify.register(compress, this.options.compress);
-      this.logger.info('Compress registered with options', { options: this.options.compress });
-    }
+    });
   }
 
   static forRoot(options: PartialDeep<HttpCoreModuleOptions> = {}): DynamicModule {

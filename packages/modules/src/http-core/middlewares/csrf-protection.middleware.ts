@@ -3,7 +3,7 @@
  */
 import { Inject } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
-import { AsyncRouteHandler, Middleware, MiddlewareGenerator, ServerError, ServerErrorCode } from '@shadow-library/fastify';
+import { AsyncRouteHandler, Middleware, MiddlewareGenerator, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -44,7 +44,7 @@ export class CsrfProtectionMiddleware implements MiddlewareGenerator {
       const result = this.csrfTokenService.validateToken(request);
       const isMutation = request.method !== 'GET' && request.method !== 'HEAD' && request.method !== 'OPTIONS';
 
-      if (isMutation && !result.isValid) throw new ServerError(ServerErrorCode.S010);
+      if (isMutation && !result.isValid) throw ServerErrorCode.S010.create();
       if (!result.isValid || result.shouldRefresh) {
         const token = this.csrfTokenService.generateToken();
         response.setCookie(token.name, token.value, token.options);

@@ -5,10 +5,10 @@ import assert from 'node:assert';
 
 import { FastifyDynamicSwaggerOptions } from '@fastify/swagger';
 import { FastifyApiReferenceOptions } from '@scalar/fastify-api-reference';
+import { OpenAPIV3 } from 'openapi-types';
 import { Inject, Injectable } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
-import { utils } from '@shadow-library/common';
-import { OpenAPIV3 } from 'openapi-types';
+import { AppError, utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -51,7 +51,7 @@ export class OpenApiService {
           normalized = candidate;
           break;
         }
-        if (index === 100) throw new Error(`Unable to normalize schema ID for ${id} after 100 attempts`);
+        if (index === 100) throw AppError.internal(`Unable to normalize schema ID for ${id} after 100 attempts`);
       }
     }
 

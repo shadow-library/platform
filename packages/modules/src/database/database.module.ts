@@ -1,11 +1,12 @@
 /**
  * Importing npm packages
  */
-import { DynamicModule, FactoryProvider, Module, Provider } from '@shadow-library/app';
+import { DynamicModule, Module } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
+import { createDynamicModule } from '../internal.utils';
 import { DATABASE_MODULE_OPTIONS } from './database.constants';
 import { DatabaseService } from './database.service';
 import { type DatabaseModuleAsyncOptions, type DatabaseModuleOptions } from './database.types';
@@ -25,13 +26,6 @@ export class DatabaseModule {
   }
 
   static forRootAsync(options: DatabaseModuleAsyncOptions): DynamicModule {
-    const optionsProvider: FactoryProvider = { token: DATABASE_MODULE_OPTIONS, useFactory: options.useFactory };
-    if (options.inject) optionsProvider.inject = options.inject;
-
-    const providers: Provider[] = [optionsProvider, DatabaseService];
-    const module: DynamicModule = { module: DatabaseModule, providers, exports: [DatabaseService] };
-    if (options.imports) module.imports = options.imports;
-
-    return module;
+    return createDynamicModule(DatabaseModule, DATABASE_MODULE_OPTIONS, options, [DatabaseService]);
   }
 }

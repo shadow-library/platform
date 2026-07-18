@@ -1,7 +1,6 @@
 /**
  * Importing npm packages
  */
-import { FactoryProvider, ModuleMetadata } from '@shadow-library/app';
 import { type DrizzleConfig } from 'drizzle-orm';
 import { type PgDatabase } from 'drizzle-orm/pg-core';
 import { type RedisOptions } from 'ioredis';
@@ -11,6 +10,7 @@ import { Promisable } from 'type-fest';
 /**
  * Importing user defined packages
  */
+import { type AsyncModuleOptions } from '../internal.utils';
 
 /**
  * Defining types
@@ -90,7 +90,4 @@ export interface DatabaseModuleOptions {
   memcache?: boolean | MemcacheConfig;
 }
 
-export interface DatabaseModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'>, Pick<FactoryProvider, 'inject'> {
-  /** Factory function that returns DatabaseModuleOptions or a Promise resolving to it */
-  useFactory: (...args: unknown[]) => Promisable<DatabaseModuleOptions>;
-}
+export type DatabaseModuleAsyncOptions = AsyncModuleOptions<DatabaseModuleOptions>;

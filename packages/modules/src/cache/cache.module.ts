@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import { DynamicModule, FactoryProvider, Module, ModuleMetadata, Provider } from '@shadow-library/app';
-import { Promisable } from 'type-fest';
+import { DynamicModule, Module } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
+import { AsyncModuleOptions, createDynamicModule } from '../internal.utils';
 import { CACHE_MODULE_OPTIONS } from './cache.constants';
 import { CacheService } from './cache.service';
 import { MemcacheService } from './memcache.service';
@@ -24,10 +24,7 @@ export interface CacheModuleOptions {
   lruCacheTTLSeconds?: number;
 }
 
-export interface CacheModuleAsyncOptions extends Pick<ModuleMetadata, 'imports'>, Pick<FactoryProvider, 'inject'> {
-  /** Factory function that returns CacheModuleOptions or a Promise resolving to it */
-  useFactory: (...args: unknown[]) => Promisable<CacheModuleOptions>;
-}
+export type CacheModuleAsyncOptions = AsyncModuleOptions<CacheModuleOptions>;
 
 /**
  * Declaring the constants
@@ -40,11 +37,6 @@ export class CacheModule {
   }
 
   static forRootAsync(options: CacheModuleAsyncOptions): DynamicModule {
-    const optionsProvider: FactoryProvider = { token: CACHE_MODULE_OPTIONS, useFactory: options.useFactory };
-    if (options.inject) optionsProvider.inject = options.inject;
-    const providers: Provider[] = [optionsProvider, CacheService, RedisCacheService, MemcacheService];
-    const Module: DynamicModule = { module: CacheModule, providers, exports: [CacheService, RedisCacheService, MemcacheService] };
-    if (options.imports) Module.imports = options.imports;
-    return Module;
+    return createDynamicModule(CacheModule, CACHE_MODULE_OPTIONS, options, [CacheService, RedisCacheService, MemcacheService]);
   }
 }

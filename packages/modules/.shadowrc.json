@@ -1,0 +1,11 @@
+{
+  "type": "library",
+  "build": {
+    "exports": {
+      ".": "index",
+      "./http-core": "http-core/index",
+      "./database": "database/index",
+      "./cache": "cache/index"
+    }
+  }
+}

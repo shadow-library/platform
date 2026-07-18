@@ -3,8 +3,8 @@
  */
 import assert from 'node:assert';
 
-import { EnumType, Field, Schema } from '@shadow-library/class-schema';
 import { Class } from 'type-fest';
+import { EnumType, Field, Schema } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages

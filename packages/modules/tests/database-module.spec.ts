@@ -12,7 +12,7 @@ import { DatabaseModule, DatabaseService, type PostgresClient } from '@shadow-li
 
 describe('Database Module', () => {
   const postgresMock = { execute: mock() } as unknown as PostgresClient;
-  const postgresFactory = mock((_config: unknown, _connection: unknown): PostgresClient => postgresMock);
+  const postgresFactory = mock((): PostgresClient => postgresMock);
 
   beforeEach(() => {
     mock.clearAllMocks();

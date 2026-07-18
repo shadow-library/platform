@@ -1,11 +1,11 @@
 /**
  * Importing npm packages
  */
-import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
-import { Config, InternalError, Logger, NeverError } from '@shadow-library/common';
 import { type DrizzleConfig } from 'drizzle-orm';
 import type Redis from 'ioredis';
 import type Memcached from 'memcached';
+import { Inject, Injectable, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
+import { AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -40,11 +40,11 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     if (url) return url;
     const resolved = Config.register(configKey, DEFAULT_CONFIGS[configKey]);
     this.logger.debug(`Resolved ${database} connection URL from config key '${configKey}'`);
-    if (!resolved) throw new NeverError(`Connection URL for ${database} is in an impossible state: undefined after resolution`);
+    if (!resolved) throw AppError.internal(`Connection URL for ${database} is in an impossible state: undefined after resolution`);
     return resolved;
   }
 
-  private getImportError(error: unknown, packageName: string, contextLabel: string): InternalError {
+  private getImportError(error: unknown, packageName: string, contextLabel: string): AppError {
     const isModuleNotFound = typeof error === 'object' && error !== null && 'code' in error && error.code === 'ERR_MODULE_NOT_FOUND';
     const original = error instanceof Error ? error.message : String(error);
 
@@ -55,7 +55,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       message += `The package '${packageName}' is not installed. Run '${installCommand}' (or the equivalent for your package manager) and try again.`;
     } else message += `The package '${packageName}' was found but could not be loaded. Original error: ${original}`;
 
-    return new InternalError(message);
+    return AppError.internal(message, error);
   }
 
   async onModuleInit(): Promise<void> {
@@ -74,7 +74,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
 
       /** Initialize client and verify connection */
       this.postgresClient = await postgres.factory(drizzleConfig, connectionConfig);
-      if (!this.postgresClient) throw new NeverError('Postgres client is in an impossible state: undefined after initialization');
+      if (!this.postgresClient) throw AppError.internal('Postgres client is in an impossible state: undefined after initialization');
 
       const isLazyConnection = postgres.lazyConnection ?? Config.register('database.postgres.lazy-connection', DEFAULT_CONFIGS['database.postgres.lazy-connection']);
       if (isLazyConnection) this.logger.info('Postgres client initialized with lazy connection');
@@ -96,7 +96,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       const connectionUrl = this.resolveConnectionUrl('Redis', 'database.redis.url', url);
       this.redisClient = new RedisClient(connectionUrl, options);
       await new Promise<void>((resolve, reject) => {
-        if (!this.redisClient) throw new NeverError('Redis client is in an impossible state: undefined after instantiation');
+        if (!this.redisClient) throw AppError.internal('Redis client is in an impossible state: undefined after instantiation');
         this.redisClient.once('ready', () => resolve());
         this.redisClient.once('error', (err: Error) => reject(err));
       });
@@ -116,7 +116,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
       }
       this.memcacheClient = options ? new MemcachedClient(connectionHosts, options) : new MemcachedClient(connectionHosts);
       await new Promise<void>((resolve, reject) => {
-        if (!this.memcacheClient) throw new NeverError('Memcached client is in an impossible state: undefined after instantiation');
+        if (!this.memcacheClient) throw AppError.internal('Memcached client is in an impossible state: undefined after instantiation');
         this.memcacheClient.stats((err: Error) => (err ? reject(err) : resolve()));
       });
 
@@ -137,17 +137,17 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   getPostgresClient(): PostgresClient {
-    if (!this.postgresClient) throw new InternalError('Postgres client is not initialized. Ensure postgres config is provided in DatabaseModuleOptions');
+    if (!this.postgresClient) throw AppError.internal('Postgres client is not initialized. Ensure postgres config is provided in DatabaseModuleOptions');
     return this.postgresClient;
   }
 
   getRedisClient(): Redis {
-    if (!this.redisClient) throw new InternalError('Redis client is not initialized. Ensure redis config is provided in DatabaseModuleOptions');
+    if (!this.redisClient) throw AppError.internal('Redis client is not initialized. Ensure redis config is provided in DatabaseModuleOptions');
     return this.redisClient;
   }
 
   getMemcacheClient(): Memcached {
-    if (!this.memcacheClient) throw new InternalError('Memcached client is not initialized. Ensure memcache config is provided in DatabaseModuleOptions');
+    if (!this.memcacheClient) throw AppError.internal('Memcached client is not initialized. Ensure memcache config is provided in DatabaseModuleOptions');
     return this.memcacheClient;
   }
 
@@ -168,25 +168,16 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   translateError(error: unknown): never {
-    const constraintErrorMap = this.options.postgres?.constraintErrorMap ?? {};
+    const cause = error instanceof Error ? error.cause : undefined;
+    const pgError = this.isPostgresError(error) ? error : this.isPostgresError(cause) ? cause : undefined;
 
-    if (this.isPostgresError(error)) {
-      const appError = constraintErrorMap[error.constraint];
-      if (appError) throw appError;
-      this.logger.error('Unmapped postgres constraint error', error);
-    }
+    if (pgError) {
+      const mappedError = this.options.postgres?.constraintErrorMap?.[pgError.constraint];
+      if (mappedError) throw mappedError;
+      this.logger.error('Unmapped postgres constraint error', pgError);
+    } else this.logger.error('Unknown database error', error);
 
-    if (error instanceof Error && 'cause' in error && this.isPostgresError(error.cause)) {
-      const cause = error.cause as PostgresError;
-      if (constraintErrorMap) {
-        const appError = constraintErrorMap[cause.constraint];
-        if (appError) throw appError;
-      }
-      this.logger.error('Unmapped postgres constraint error', cause);
-    }
-
-    this.logger.error('Unknown database error', error);
-    throw new InternalError('Unknown database error occurred');
+    throw AppError.internal('Unknown database error occurred', error);
   }
 
   attachParent<T extends object, U>(target: T, parent: U): LinkedWithParent<T, U> {
@@ -226,7 +217,7 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
     for (const source of sources) {
       const key = String(source[sourceKey]);
       const parent = parentMap.get(key) ?? null;
-      if (parent === null && throwErrorIfNotFound) throw new InternalError(`Parent not found for source with key ${key}`);
+      if (parent === null && throwErrorIfNotFound) throw AppError.internal(`Parent not found for source with key ${key}`);
       const linkedSource = this.attachParent(source, parent);
       result.push(linkedSource);
     }

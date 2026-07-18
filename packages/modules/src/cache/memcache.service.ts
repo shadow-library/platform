@@ -1,20 +1,24 @@
 /**
  * Importing npm packages
  */
-import { Injectable } from '@shadow-library/app';
-import { Logger, MaybeNull, NeverError } from '@shadow-library/common';
 import type Memcached from 'memcached';
+import { Injectable } from '@shadow-library/app';
+import { AppError, Logger, MaybeNull } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
+import { DatabaseService } from '../database/database.service';
 import { LOGGER_NAMESPACE } from './cache.constants';
 import { type ICacheStore } from './cache.service';
-import { DatabaseService } from '../database/database.service';
 
 /**
  * Defining types
  */
+
+type MemcachedCallback<T> = (err: unknown, result: T) => void;
+
+type AdjustOperation = 'incr' | 'decr';
 
 /**
  * Declaring the constants
@@ -37,92 +41,64 @@ export class MemcacheService implements ICacheStore {
     return this.memcached !== undefined;
   }
 
+  /** Runs a Memcached operation as a promise, throwing when the client is inactive */
+  private exec<T>(operation: (client: Memcached, done: MemcachedCallback<T>) => void): Promise<T> {
+    const client = this.memcached;
+    if (!client) throw AppError.internal('Memcached client is not initialized. Ensure memcache config is provided in DatabaseModuleOptions');
+    return new Promise<T>((resolve, reject) => operation(client, (err, result) => (err ? reject(err as Error) : resolve(result))));
+  }
+
+  /** Increments or decrements a numeric value, initializing the key when it does not exist */
+  private async adjust(operation: AdjustOperation, key: string, amount: number): Promise<number> {
+    const verb = operation === 'incr' ? 'incremented' : 'decremented';
+    const result = await this.exec<number | boolean>((client, done) => client[operation](key, amount, done));
+
+    if (typeof result === 'number') {
+      this.logger.debug(`cache ${verb} for key: ${key}`, { amount, value: result });
+      return result;
+    }
+
+    if (result === false) {
+      const initialValue = operation === 'incr' ? amount : -amount;
+      this.logger.debug(`Memcached key not found for ${operation}, initializing key: ${key} with value: ${initialValue}`);
+      await this.set(key, initialValue, 0);
+      return initialValue;
+    }
+
+    this.logger.error(`Unexpected value returned from Memcached ${operation} for key: ${key}`, { value: result });
+    throw AppError.internal(`Unexpected value returned from Memcached ${operation} for key '${key}': ${String(result)}`);
+  }
+
   /** Retrieves data exclusively from Memcached */
   async get<T = any>(key: string): Promise<MaybeNull<T>> {
     if (!this.memcached) return null;
-    return new Promise<MaybeNull<T>>((resolve, reject) => {
-      this.memcached?.get(key, (err, data) => {
-        if (err) return reject(err);
-        if (data === undefined) this.logger.debug(`cache miss for key: ${key}`);
-        else this.logger.debug(`cache hit for key: ${key}`, { value: data });
-        resolve(data ?? null);
-      });
-    });
+    const data = await this.exec<T | undefined>((client, done) => client.get(key, done));
+    if (data === undefined) this.logger.debug(`cache miss for key: ${key}`);
+    else this.logger.debug(`cache hit for key: ${key}`, { value: data });
+    return data ?? null;
   }
 
   /** Stores data exclusively in Memcached */
   async set<T = any>(key: string, value: T, ttlSeconds = 0): Promise<void> {
     if (!this.memcached) return;
-    return new Promise<void>((resolve, reject) => {
-      this.memcached?.set(key, value, ttlSeconds, err => {
-        if (err) return reject(err);
-        this.logger.debug(`cache set for key: ${key}`, { value, lifetime: ttlSeconds });
-        resolve();
-      });
-    });
+    await this.exec<boolean>((client, done) => client.set(key, value, ttlSeconds, done));
+    this.logger.debug(`cache set for key: ${key}`, { value, lifetime: ttlSeconds });
   }
 
   /** Deletes data exclusively from Memcached */
   async del(key: string): Promise<void> {
     if (!this.memcached) return;
-    return new Promise<void>((resolve, reject) => {
-      this.memcached?.del(key, err => {
-        if (err) return reject(err);
-        this.logger.debug(`cache deleted for key: ${key}`);
-        resolve();
-      });
-    });
+    await this.exec<boolean>((client, done) => client.del(key, done));
+    this.logger.debug(`cache deleted for key: ${key}`);
   }
 
   /** Increments a numeric value exclusively in Memcached, initializing if not found */
   async incr(key: string, amount = 1): Promise<number> {
-    if (!this.memcached) throw new Error('Memcached client not initialized');
-    return new Promise<number>((resolve, reject) => {
-      this.memcached?.incr(key, amount, (err, result) => {
-        if (err) return reject(err);
-
-        if (typeof result === 'number') {
-          resolve(result);
-          this.logger.debug(`cache incremented for key: ${key}`, { amount, value: result });
-          return;
-        }
-
-        if (result === false) {
-          this.logger.debug(`Memcached key not found for increment, initializing key: ${key} with value: ${amount}`);
-          return this.set(key, amount, 0)
-            .then(() => resolve(amount))
-            .catch(reject);
-        }
-
-        this.logger.error(`Unexpected value returned from Memcached increment for key: ${key}`, { value: result });
-        return reject(new NeverError(`Unexpected value returned from Memcached increment for key '${key}': ${result}`));
-      });
-    });
+    return this.adjust('incr', key, amount);
   }
 
   /** Decrements a numeric value exclusively in Memcached, initializing if not found */
   async decr(key: string, amount = 1): Promise<number> {
-    if (!this.memcached) throw new Error('Memcached client not initialized');
-    return new Promise<number>((resolve, reject) => {
-      this.memcached?.decr(key, amount, (err, result) => {
-        if (err) return reject(err);
-
-        if (typeof result === 'number') {
-          resolve(result);
-          this.logger.debug(`cache decremented for key: ${key}`, { amount, value: result });
-          return;
-        }
-
-        if (result === false) {
-          this.logger.debug(`Memcached key not found for decrement, initializing key: ${key} with value: ${-amount}`);
-          return this.set(key, -amount, 0)
-            .then(() => resolve(-amount))
-            .catch(reject);
-        }
-
-        this.logger.error(`Unexpected value returned from Memcached decrement for key: ${key}`, { value: result });
-        return reject(new NeverError(`Unexpected value returned from Memcached decrement for key '${key}': ${result}`));
-      });
-    });
+    return this.adjust('decr', key, amount);
   }
 }

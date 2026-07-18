@@ -1,16 +1,16 @@
 /**
  * Importing npm packages
  */
+import type Redis from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import type Redis from 'ioredis';
 
 /**
  * Importing user defined packages
  */
+import { DatabaseService } from '../database/database.service';
 import { LOGGER_NAMESPACE } from './cache.constants';
 import { type ICacheStore } from './cache.service';
-import { DatabaseService } from '../database/database.service';
 
 /**
  * Defining types

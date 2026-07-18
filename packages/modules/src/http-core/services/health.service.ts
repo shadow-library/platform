@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Server, createServer } from 'node:http';
+import { createServer, Server } from 'node:http';
 
 import { Injectable, OnApplicationReady, OnApplicationStop } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';

@@ -3,10 +3,10 @@
  */
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'bun:test';
 
-import { Module, Router, ShadowApplication, ShadowFactory } from '@shadow-library/app';
+import { Response } from 'light-my-request';
+import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 import { FastifyModule, FastifyRouter, Get, HttpController, HttpStatus, Post } from '@shadow-library/fastify';
-import { Response } from 'light-my-request';
 
 /**
  * Importing user defined packages
@@ -73,7 +73,7 @@ describe('HttpCore Module', () => {
   describe('Request Initializer Middleware', () => {
     beforeEach(async () => {
       app = await ShadowFactory.create(AppModule);
-      router = app.get(Router);
+      router = app.get(Dispatcher) as FastifyRouter;
     });
 
     it('should set x-correlation-id header if not present', async () => {
@@ -93,7 +93,7 @@ describe('HttpCore Module', () => {
   describe('CSRF Protection Middleware', () => {
     beforeEach(async () => {
       app = await ShadowFactory.create(AppModule);
-      router = app.get(Router);
+      router = app.get(Dispatcher) as FastifyRouter;
     });
 
     it('should skip CSRF protection when no cookies are present', async () => {
@@ -205,7 +205,7 @@ describe('HttpCore Module', () => {
 
       beforeEach(async () => {
         disabledApp = await ShadowFactory.create(DisabledAppModule);
-        disabledRouter = disabledApp.get(Router);
+        disabledRouter = disabledApp.get(Dispatcher) as FastifyRouter;
       });
 
       it('should allow POST request without CSRF token when cookies are present', async () => {
@@ -240,7 +240,7 @@ describe('HttpCore Module', () => {
 
     beforeEach(async () => {
       app = await ShadowFactory.create(AppModule);
-      router = app.get(Router);
+      router = app.get(Dispatcher) as FastifyRouter;
       csrfTokenService = app.get(CSRFTokenService);
     });
 
@@ -273,7 +273,7 @@ describe('HttpCore Module', () => {
     describe('validateToken', () => {
       beforeEach(async () => {
         app = await ShadowFactory.create(AppModule);
-        router = app.get(Router);
+        router = app.get(Dispatcher) as FastifyRouter;
       });
 
       it('should return invalid when header token is missing', () => {
@@ -381,7 +381,7 @@ describe('HttpCore Module', () => {
 
       beforeEach(async () => {
         openapiApp = await ShadowFactory.create(OpenAPIAppModule);
-        openapiRouter = openapiApp.get(Router);
+        openapiRouter = openapiApp.get(Dispatcher) as FastifyRouter;
       });
 
       it('should serve OpenAPI documentation at custom route prefix', async () => {
@@ -412,7 +412,7 @@ describe('HttpCore Module', () => {
 
       beforeEach(async () => {
         disabledApp = await ShadowFactory.create(NoOpenAPIAppModule);
-        disabledRouter = disabledApp.get(Router);
+        disabledRouter = disabledApp.get(Dispatcher) as FastifyRouter;
       });
 
       it('should not serve OpenAPI documentation', async () => {
@@ -435,7 +435,7 @@ describe('HttpCore Module', () => {
 
       beforeEach(async () => {
         normalizedApp = await ShadowFactory.create(NormalizedAppModule);
-        normalizedRouter = normalizedApp.get(Router);
+        normalizedRouter = normalizedApp.get(Dispatcher) as FastifyRouter;
       });
 
       it('should serve OpenAPI with normalized schema IDs', async () => {
@@ -470,7 +470,7 @@ describe('HttpCore Module', () => {
       class HelmetAppModule {}
 
       helmetApp = await ShadowFactory.create(HelmetAppModule);
-      helmetRouter = helmetApp.get(Router);
+      helmetRouter = helmetApp.get(Dispatcher) as FastifyRouter;
     }
 
     it('should set security headers when helmet is enabled', async () => {
@@ -515,7 +515,7 @@ describe('HttpCore Module', () => {
       class CompressAppModule {}
 
       compressApp = await ShadowFactory.create(CompressAppModule);
-      compressRouter = compressApp.get(Router);
+      compressRouter = compressApp.get(Dispatcher) as FastifyRouter;
     }
 
     it('should support compression when enabled', async () => {
