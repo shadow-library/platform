@@ -141,6 +141,70 @@ describe('build (integration)', () => {
     await expect(build({ cwd: fixtureDir })).rejects.toThrow(/Build failed/);
   });
 
+  it('should build a backend repo into a single-file tree-shaken Bun bundle with a trimmed manifest', async () => {
+    fixtureDir = createFixtureDir('shadow-build-backend-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({
+        name: '@fixtures/svc',
+        version: '1.2.3',
+        type: 'module',
+        description: 'a service',
+        author: 'me',
+        license: 'MIT',
+        dependencies: { left: '1' },
+      }),
+      '.shadowrc.json': JSON.stringify({ type: 'backend', build: { entries: ['scripts/migrate.ts'], assets: ['generated/migrations'] } }),
+      'src/main.ts': "import { greet } from './greet';\nconsole.log(greet('world'));\n",
+      'src/greet.ts': 'export const greet = (name: string): string => `hi ${name}`;\nexport const UNUSED = 42;\n',
+      'scripts/migrate.ts': "console.log('migrating');\n",
+      'generated/migrations/0000_init.sql': '-- init\n',
+    });
+
+    await build({ cwd: fixtureDir });
+
+    const distDir = path.join(fixtureDir, 'dist');
+    const mainJs = fs.readFileSync(path.join(distDir, 'main.js'), 'utf-8');
+    expect(fs.existsSync(path.join(distDir, 'migrate.js'))).toBe(true); // extra entrypoint bundled
+    expect(mainJs).not.toContain("from './greet'"); // local module inlined into the single file
+    expect(mainJs).toContain('hi '); // greet's body was bundled in
+    expect(fs.existsSync(path.join(distDir, 'generated/migrations/0000_init.sql'))).toBe(true); // asset copied
+
+    const manifest = JSON.parse(fs.readFileSync(path.join(distDir, 'package.json'), 'utf-8'));
+    expect(manifest.main).toBe('main.js');
+    expect(manifest.name).toBe('@fixtures/svc');
+    expect(manifest.version).toBe('1.2.3');
+    expect(manifest.dependencies).toBeUndefined(); // deps are inlined, not declared
+  });
+
+  it('should orchestrate the repo build command for a web (spa/ssr) type without synthesizing package.json', async () => {
+    fixtureDir = createFixtureDir('shadow-build-web-');
+    const fakeVite = 'const fs=require("fs");fs.mkdirSync("dist",{recursive:true});fs.writeFileSync("dist/index.html","<html></html>");';
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: 'web-app', type: 'module' }),
+      '.shadowrc.json': JSON.stringify({ type: 'spa', build: { command: ['node', '-e', fakeVite] } }),
+    });
+
+    await build({ cwd: fixtureDir });
+
+    expect(fs.existsSync(path.join(fixtureDir, 'dist/index.html'))).toBe(true);
+    expect(fs.existsSync(path.join(fixtureDir, 'dist/package.json'))).toBe(false); // an app, not a package
+  });
+
+  it('should honor a --type override over the .shadowrc.json type', async () => {
+    fixtureDir = createFixtureDir('shadow-build-override-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/ovr', version: '1.0.0', type: 'module' }),
+      '.shadowrc.json': JSON.stringify({ type: 'library', build: { exports: { '.': 'index' } } }),
+      'src/main.ts': "console.log('hi');\n",
+    });
+
+    // config says library, but --type backend wins → Bun bundle, not a tsc dist
+    await build({ cwd: fixtureDir, type: 'backend' });
+
+    expect(fs.existsSync(path.join(fixtureDir, 'dist/main.js'))).toBe(true);
+    expect(JSON.parse(fs.readFileSync(path.join(fixtureDir, 'dist/package.json'), 'utf-8')).main).toBe('main.js');
+  });
+
   it('should fail with a clear error when tsc fails to compile', async () => {
     fixtureDir = createFixtureDir('shadow-build-fail-');
     writeFixtureFiles(fixtureDir, {

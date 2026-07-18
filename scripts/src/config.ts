@@ -12,6 +12,15 @@ import { ShadowError } from '@lib/utils';
 /**
  * Defining types
  */
+/**
+ * What a repo is, which decides how `shadow build` builds it (and whether `shadow release` applies):
+ *  - `library`  — a published package → `tsc` + `tsc-alias` (or a custom bundler) to a flat `dist/` with exports; releasable.
+ *  - `backend`  — a runnable service → a single-file, tree-shaken `Bun.build` bundle (`bun dist/main.js`); not released.
+ *  - `spa`      — a client React app → the repo's `vite build`; not released.
+ *  - `ssr`      — a server-rendered React app → the repo's `vite build` (server + client); not released.
+ */
+export type RepoType = 'library' | 'backend' | 'spa' | 'ssr';
+
 export interface BuildConfig {
   /**
    * Public subpath → source-relative base. An extensionless base (`"errors/index"`) is a JS module and gets
@@ -30,6 +39,18 @@ export interface BuildConfig {
   bin?: Record<string, string>;
   /** Output directory, relative to the repo root. */
   outDir: string;
+
+  // --- `backend` type only (Bun.build) ---
+  /** Main entrypoint for a backend bundle, relative to the repo root. Defaults to `src/main.ts`. */
+  entry?: string;
+  /** Additional backend entrypoints bundled alongside `entry` (e.g. a migration runner). */
+  entries?: string[];
+  /** Extra files/dirs copied verbatim into the output (e.g. `generated/drizzle` migrations). */
+  assets?: string[];
+  /** Minify the backend bundle. Identifier minification is always off (it would break reflect-metadata DI). Defaults to true. */
+  minify?: boolean;
+  /** Bun.build target for a backend bundle. Defaults to `bun`. */
+  target?: 'bun' | 'node';
 }
 
 /** Which runtime globals the lint config treats as defined — a Node library, a browser library, or both. */
@@ -50,8 +71,8 @@ export interface LintConfig {
   ignores: string[];
   /** File-scoped rule overrides layered after the base config, for cases a flat `rules` map can't express. */
   overrides: LintOverride[];
-  /** Which runtime globals to treat as defined. Defaults to `node`; a browser/component library uses `browser` or `both`. */
-  globals: GlobalsEnv;
+  /** Which runtime globals to treat as defined. Unset means `verify` picks a default from the repo type (browser for a web app, both for SSR, else node). */
+  globals?: GlobalsEnv;
   /** Enable the React/JSX lint rules on `.tsx`. Left unset means auto-detect from a `react` dependency (resolved by `verify`). */
   react?: boolean;
   /** React version handed to `eslint-plugin-react` (its `'detect'` mode throws under ESLint 10). Unset means resolve from the repo's `react` dependency. */
@@ -101,6 +122,8 @@ export interface CheckMigrationsConfig {
 }
 
 export interface ShadowConfig {
+  /** What the repo is — drives how `shadow build` builds it and whether `shadow release` applies. */
+  type: RepoType;
   build: BuildConfig;
   verify: VerifyConfig;
   release: ReleaseConfig;
@@ -110,11 +133,17 @@ export interface ShadowConfig {
 
 /** The raw, fully-optional shape a user writes in `.shadowrc.json`. Every field is narrowed and defaulted by {@link loadConfig}. */
 export interface RawShadowConfig {
+  type?: RepoType;
   build?: {
     exports?: Record<string, string>;
     command?: string | string[];
     bin?: string | Record<string, string>;
     outDir?: string;
+    entry?: string;
+    entries?: string[];
+    assets?: string[];
+    minify?: boolean;
+    target?: 'bun' | 'node';
   };
   verify?: {
     lint?: { rules?: Record<string, unknown>; ignores?: string[]; overrides?: LintOverride[]; globals?: GlobalsEnv; react?: boolean; reactVersion?: string };
@@ -134,6 +163,14 @@ export interface RawShadowConfig {
  */
 const CONFIG_FILENAME = '.shadowrc.json';
 
+/** The valid repo types, in the order presented by `shadow init`'s prompt. */
+export const REPO_TYPES: RepoType[] = ['library', 'backend', 'spa', 'ssr'];
+
+/** Narrows an arbitrary string to a {@link RepoType} — used to validate the `--type` flag and the init prompt. */
+export function isRepoType(value: string): value is RepoType {
+  return (REPO_TYPES as string[]).includes(value);
+}
+
 /** Base commitlint config the shipped commit-message linting extends. Overridable via `.shadowrc.json` `verify.commit`. */
 export const COMMITLINT_BASE_EXTENDS = ['@commitlint/config-conventional'];
 
@@ -149,9 +186,10 @@ export const PRETTIER_BASE: FormatConfig = {
 const DEFAULT_FILES = '{src,tests,scripts}/**/*.{ts,tsx}';
 
 const DEFAULT_CONFIG: ShadowConfig = {
+  type: 'library',
   build: { exports: { '.': 'index' }, outDir: 'dist' },
   verify: {
-    lint: { rules: {}, ignores: [], overrides: [], globals: 'node' },
+    lint: { rules: {}, ignores: [], overrides: [] },
     format: {},
     commit: { extends: COMMITLINT_BASE_EXTENDS, rules: {} },
     lintFiles: DEFAULT_FILES,
@@ -194,25 +232,30 @@ export function readRawConfig(cwd: string): RawShadowConfig {
 export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
   const raw = readRawConfig(cwd);
   const exportsConfig = raw.build?.exports ?? DEFAULT_CONFIG.build.exports;
-  if (!exportsConfig['.']) throw new ShadowError('build.exports must include a "." entry');
 
   const rawFiles = raw.verify?.files;
   const lintFiles = typeof rawFiles === 'string' ? rawFiles : (rawFiles?.lint ?? DEFAULT_CONFIG.verify.lintFiles);
   const formatFiles = typeof rawFiles === 'string' ? rawFiles : (rawFiles?.format ?? DEFAULT_CONFIG.verify.formatFiles);
 
   return {
+    type: raw.type ?? DEFAULT_CONFIG.type,
     build: {
       exports: exportsConfig,
       command: raw.build?.command,
       bin: normalizeBin(raw.build?.bin, packageName),
       outDir: raw.build?.outDir ?? DEFAULT_CONFIG.build.outDir,
+      entry: raw.build?.entry,
+      entries: raw.build?.entries,
+      assets: raw.build?.assets,
+      minify: raw.build?.minify,
+      target: raw.build?.target,
     },
     verify: {
       lint: {
         rules: { ...DEFAULT_CONFIG.verify.lint.rules, ...raw.verify?.lint?.rules },
         ignores: [...DEFAULT_CONFIG.verify.lint.ignores, ...(raw.verify?.lint?.ignores ?? [])],
         overrides: raw.verify?.lint?.overrides ?? DEFAULT_CONFIG.verify.lint.overrides,
-        globals: raw.verify?.lint?.globals ?? DEFAULT_CONFIG.verify.lint.globals,
+        globals: raw.verify?.lint?.globals,
         react: raw.verify?.lint?.react,
         reactVersion: raw.verify?.lint?.reactVersion,
       },

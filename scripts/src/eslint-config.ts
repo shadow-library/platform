@@ -36,8 +36,8 @@ const TEST_FILES = ['tests/**/*.{ts,tsx}', '**/*.{test,spec}.{ts,tsx}'];
  */
 const DEFAULT_REACT_VERSION = '19.0';
 
-/** Resolves the requested runtime-globals set — Node, browser, or the union of both — into ESLint's globals map. */
-function resolveGlobals(env: GlobalsEnv): Record<string, boolean> {
+/** Resolves the requested runtime-globals set — Node, browser, or the union of both — into ESLint's globals map. Defaults to Node. */
+function resolveGlobals(env: GlobalsEnv | undefined): Record<string, boolean> {
   if (env === 'browser') return globals.browser;
   if (env === 'both') return { ...globals.node, ...globals.browser };
   return globals.node;

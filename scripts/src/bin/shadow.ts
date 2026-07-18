@@ -8,13 +8,14 @@
 import { build } from '@lib/build';
 import { checkMigrations } from '@lib/check-migrations';
 import { commitMsg } from '@lib/commit-msg';
+import { isRepoType, REPO_TYPES, type RepoType } from '@lib/config';
 import { genApiTypes } from '@lib/gen-api-types';
 import { init } from '@lib/init';
 import { release } from '@lib/release';
 import { log, ShadowError } from '@lib/utils';
 import { verify } from '@lib/verify';
 
-import { parseArgs } from './args';
+import { parseArgs, type ParsedArgs } from './args';
 
 /**
  * Defining types
@@ -26,8 +27,8 @@ import { parseArgs } from './args';
 const HELP_TEXT = `shadow — shared CLI for the Shadow Library ecosystem
 
 Usage:
-  shadow init
-  shadow build
+  shadow init [--type <library|backend|spa|ssr>]
+  shadow build [--type <library|backend|spa|ssr>]
   shadow verify [--fix]
   shadow commit-msg <file>
   shadow gen-api-types <url> [--out <path>]
@@ -35,16 +36,24 @@ Usage:
   shadow check-migrations [--dir <path>]
 
 Commands:
-  init                   Set up husky hooks + a starter .shadowrc.json for this repo
-  build                  Build the current repo per .shadowrc.json (ESM-only, flat dist)
+  init [--type <t>]      Set up husky hooks + a starter .shadowrc.json (prompts for the repo type; --type skips it)
+  build [--type <t>]     Build the current repo per .shadowrc.json by type: library (flat dist), backend (single-file bundle), spa/ssr (vite)
   verify [--fix]         Format + lint the whole repo, then type-check + test
   commit-msg <file>      Lint a commit message (drives the husky commit-msg hook)
   gen-api-types <url>    Fetch an OpenAPI document and generate TypeScript types
-  release <type>         Release major|minor|patch (stable, guarded) or alpha|beta (prerelease); --force overrides
+  release <type>         Release major|minor|patch (stable, guarded) or alpha|beta (prerelease); libraries only; --force overrides
   check-migrations       Fail if "db:generate" leaves uncommitted migration changes
 
 Configuration lives in .shadowrc.json. See https://github.com/shadow-library/scripts#readme.
 `;
+
+/** Validates the optional `--type` flag against the known repo types, so a CI typo fails loudly instead of silently defaulting. */
+function parseTypeFlag(flags: ParsedArgs['flags']): RepoType | undefined {
+  const value = flags.type;
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || !isRepoType(value)) throw new ShadowError(`Invalid --type "${String(value)}" — expected one of: ${REPO_TYPES.join(', ')}`);
+  return value;
+}
 
 /** Parses argv, dispatches to the matching command, and returns the process exit code. No business logic lives here. */
 async function main(): Promise<number> {
@@ -64,11 +73,11 @@ async function main(): Promise<number> {
 
   switch (command) {
     case 'init':
-      await init({ cwd });
+      await init({ cwd, type: parseTypeFlag(flags) });
       return 0;
 
     case 'build':
-      await build({ cwd });
+      await build({ cwd, type: parseTypeFlag(flags) });
       return 0;
 
     case 'verify':

@@ -147,7 +147,9 @@ export async function verify(options: VerifyOptions): Promise<number> {
   // pinned from the repo (or an explicit override) because eslint-plugin-react's `'detect'` throws on ESLint 10.
   const react = config.verify.lint.react ?? Boolean(reactSpec(packageJson));
   const reactVersion = config.verify.lint.reactVersion ?? detectReactVersion(packageJson);
-  const verifyConfig: VerifyConfig = { ...config.verify, lint: { ...config.verify.lint, react, reactVersion } };
+  // Globals default from the repo type: SSR runs in both, a React app in the browser, otherwise node.
+  const globals = config.verify.lint.globals ?? (config.type === 'ssr' ? 'both' : react ? 'browser' : 'node');
+  const verifyConfig: VerifyConfig = { ...config.verify, lint: { ...config.verify.lint, react, reactVersion, globals } };
 
   if (!(await runFormat(options.cwd, verifyConfig, fix))) return 1;
   if (!(await runLint(options.cwd, verifyConfig, fix))) return 1;

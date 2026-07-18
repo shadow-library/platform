@@ -94,6 +94,10 @@ describe('build', () => {
       computeDistPackageJson(input, cfg());
       expect(input.sideEffects).toStrictEqual(['src/index.ts']);
     });
+
+    it('should throw when the exports map has no "." entry', () => {
+      expect(() => computeDistPackageJson({ name: 'pkg' }, cfg({ './errors': 'errors/index' }))).toThrow(/must include a "\."/);
+    });
   });
 
   describe('ensureShebang', () => {

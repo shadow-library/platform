@@ -7,6 +7,7 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
+import { isRepoType, type RepoType } from '@lib/config';
 import { log, readPackageJson, run } from '@lib/utils';
 
 /**
@@ -14,6 +15,8 @@ import { log, readPackageJson, run } from '@lib/utils';
  */
 export interface InitOptions {
   cwd: string;
+  /** Repo type (from `--type`). When omitted, `init` prompts interactively on a TTY, else defaults to `library`. */
+  type?: RepoType;
 }
 
 /**
@@ -21,7 +24,24 @@ export interface InitOptions {
  */
 const PRE_COMMIT_HOOK = 'shadow verify\n';
 const COMMIT_MSG_HOOK = 'shadow commit-msg "$1"\n';
-const STARTER_SHADOWRC = `${JSON.stringify({ build: { exports: { '.': 'index' } } }, null, 2)}\n`;
+
+/** The `.shadowrc.json` a fresh repo of each type starts from — only the fields that type actually uses. */
+const STARTER_CONFIG: Record<RepoType, Record<string, unknown>> = {
+  library: { type: 'library', build: { exports: { '.': 'index' } } },
+  backend: { type: 'backend', build: { entry: 'src/main.ts' } },
+  spa: { type: 'spa' },
+  ssr: { type: 'ssr' },
+};
+
+/** Resolves the repo type: the `--type` flag if valid, otherwise an interactive prompt on a TTY, otherwise `library`. */
+function resolveRepoType(explicit: RepoType | undefined): RepoType {
+  if (explicit) return explicit;
+  if (!process.stdin.isTTY) return 'library';
+  const answer = (prompt('Repo type? (library / backend / spa / ssr)', 'library') ?? 'library').trim();
+  if (isRepoType(answer)) return answer;
+  log.warn(`unknown type "${answer}" — defaulting to "library"`);
+  return 'library';
+}
 
 /** Old/known hook contents that `init` may safely overwrite when re-wiring a repo onto shadow. */
 const REPLACEABLE_HOOKS = new Set([
@@ -65,6 +85,7 @@ function writeHook(huskyDir: string, name: string, content: string): void {
  * hand-written hooks or `commitlint.config.js`. Drops a starter `.shadowrc.json` if absent. Idempotent.
  */
 export async function init(options: InitOptions): Promise<void> {
+  const repoType = resolveRepoType(options.type);
   const { filePath: packageJsonPath, data: packageJson } = readPackageJson(options.cwd);
 
   const scripts = (packageJson.scripts ??= {});
@@ -87,8 +108,8 @@ export async function init(options: InitOptions): Promise<void> {
   if (fs.existsSync(shadowrcPath)) {
     log.info('unchanged  .shadowrc.json (already present)');
   } else {
-    fs.writeFileSync(shadowrcPath, STARTER_SHADOWRC);
-    log.info('created    .shadowrc.json');
+    fs.writeFileSync(shadowrcPath, `${JSON.stringify(STARTER_CONFIG[repoType], null, 2)}\n`);
+    log.info(`created    .shadowrc.json (type: ${repoType})`);
   }
 
   log.success('shadow init complete');

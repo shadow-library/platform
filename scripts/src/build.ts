@@ -7,7 +7,7 @@ import path from 'node:path';
 /**
  * Importing user defined packages
  */
-import { type BuildConfig, loadConfig } from '@lib/config';
+import { type BuildConfig, loadConfig, type RepoType } from '@lib/config';
 import { formatDuration, log, type PackageJson, readPackageJson, run, ShadowError } from '@lib/utils';
 
 /**
@@ -16,6 +16,8 @@ import { formatDuration, log, type PackageJson, readPackageJson, run, ShadowErro
 export interface BuildOptions {
   /** Root directory of the consuming repo (the one containing package.json, tsconfig.build.json, src/). */
   cwd: string;
+  /** Overrides the repo type from `.shadowrc.json` (the `--type` CLI flag) — mainly for CI. */
+  type?: RepoType;
 }
 
 /**
@@ -63,7 +65,8 @@ function isAssetBase(base: string): boolean {
  */
 export function computeDistPackageJson(packageJson: PackageJson, config: BuildConfig): PackageJson {
   const { exports: exportsConfig } = config;
-  const rootBase = exportsConfig['.'] as string;
+  const rootBase = exportsConfig['.'];
+  if (!rootBase) throw new ShadowError('build.exports must include a "." entry');
   const subpaths = Object.keys(exportsConfig).filter(subpath => subpath !== '.');
   const typeSubpaths = subpaths.filter(subpath => !isAssetBase(exportsConfig[subpath] as string));
 
@@ -142,18 +145,24 @@ function compile(rootDir: string, outDir: string, config: BuildConfig): void {
   compileWithTsc(rootDir, outDir);
 }
 
-/**
- * Centralizes the ESM library build (tsc + tsc-alias). Emits a single ESM tree with type declarations and
- * subpath exports, synthesizing `dist/package.json` (`main`/`module`/`types`/`exports`/`typesVersions`,
- * rewritten `sideEffects`, and an optional bin) — routed entirely by `.shadowrc.json`'s `build` block.
- */
-export async function build(options: BuildOptions): Promise<void> {
-  const rootDir = options.cwd;
-  const { data: packageJson } = readPackageJson(rootDir);
-  const config = loadConfig(rootDir, packageJson.name).build;
-  const distDir = path.join(rootDir, config.outDir);
+/** Copies `assets` (files or directories, repo-relative) into `distDir`, skipping any that don't exist. */
+function copyAssets(rootDir: string, distDir: string, assets: string[]): void {
+  for (const asset of assets) {
+    const source = path.join(rootDir, asset);
+    if (!fs.existsSync(source)) continue;
+    const dest = path.join(distDir, asset);
+    fs.mkdirSync(path.dirname(dest), { recursive: true });
+    fs.cpSync(source, dest, { recursive: true });
+  }
+}
 
-  const startTime = process.hrtime();
+/**
+ * The published-library build (tsc + tsc-alias, or a custom `build.command`). Emits a single ESM tree with type
+ * declarations and subpath exports, synthesizing `dist/package.json` (`main`/`module`/`types`/`exports`/
+ * `typesVersions`, rewritten `sideEffects`, and an optional bin) — routed entirely by `.shadowrc.json`'s `build` block.
+ */
+async function buildLibrary(rootDir: string, packageJson: PackageJson, config: BuildConfig): Promise<void> {
+  const distDir = path.join(rootDir, config.outDir);
 
   if (fs.existsSync(distDir)) fs.rmSync(distDir, { recursive: true });
   fs.mkdirSync(distDir, { recursive: true });
@@ -164,11 +173,7 @@ export async function build(options: BuildOptions): Promise<void> {
 
   const distPackageJson = computeDistPackageJson(packageJson, config);
   fs.writeFileSync(path.join(distDir, 'package.json'), `${JSON.stringify(distPackageJson, null, 2)}\n`);
-
-  for (const file of SUPPORTING_FILES) {
-    const source = path.join(rootDir, file);
-    if (fs.existsSync(source)) fs.copyFileSync(source, path.join(distDir, file));
-  }
+  copyAssets(rootDir, distDir, SUPPORTING_FILES);
 
   if (distPackageJson.bin) {
     for (const [name, binPath] of Object.entries(distPackageJson.bin as Record<string, string>)) {
@@ -181,8 +186,86 @@ export async function build(options: BuildOptions): Promise<void> {
 
   const tsbuildinfo = path.join(distDir, 'tsconfig.build.tsbuildinfo');
   if (fs.existsSync(tsbuildinfo)) fs.rmSync(tsbuildinfo);
+}
+
+/** Runtime metadata carried from source `package.json` into a backend bundle's trimmed `dist/package.json`. */
+const BACKEND_MANIFEST_KEYS = ['name', 'type', 'version', 'description', 'author', 'license'] as const;
+
+/** Writes the trimmed `dist/package.json` for a backend bundle: runtime metadata + `main` + the current git commit. */
+function writeBackendManifest(rootDir: string, distDir: string, packageJson: PackageJson, entry: string): void {
+  const manifest: PackageJson = {};
+  for (const key of BACKEND_MANIFEST_KEYS) {
+    const value = packageJson[key];
+    if (value !== undefined) (manifest as Record<string, unknown>)[key] = value;
+  }
+  manifest.main = `${path.basename(entry).replace(/\.[cm]?tsx?$/, '')}.js`;
+
+  const gitCommit = run('git', ['rev-parse', 'HEAD'], { cwd: rootDir, stream: false });
+  if (gitCommit.status === 0) manifest.gitCommit = gitCommit.stdout.trim();
+
+  fs.writeFileSync(path.join(distDir, 'package.json'), `${JSON.stringify(manifest, null, 2)}\n`);
+}
+
+/**
+ * The backend-service build: a single-file, tree-shaken `Bun.build` bundle runnable with `bun dist/main.js`.
+ * Identifier minification stays off so `reflect-metadata`-driven DI keeps working. Bundles any extra `entries`
+ * (e.g. a migration runner) alongside `entry`, copies `assets` (e.g. `generated/drizzle`) + README/LICENSE, and
+ * writes a trimmed `dist/package.json` — no `dependencies`, since every JS dependency is inlined into the bundle.
+ */
+async function buildBackend(rootDir: string, packageJson: PackageJson, config: BuildConfig): Promise<void> {
+  const distDir = path.join(rootDir, config.outDir);
+
+  if (fs.existsSync(distDir)) fs.rmSync(distDir, { recursive: true });
+  fs.mkdirSync(distDir, { recursive: true });
+
+  const entry = config.entry ?? 'src/main.ts';
+  // identifiers must stay unminified — reflect-metadata DI resolves classes/params by name.
+  const minify = config.minify === false ? false : { whitespace: true, syntax: true, identifiers: false };
+
+  // One Bun.build per entrypoint: a single entry flattens to `dist/<name>.js`, whereas bundling entries that
+  // span `src/` and `scripts/` together would mirror their tree into `dist/`. Each output is standalone.
+  for (const relative of [entry, ...(config.entries ?? [])]) {
+    const entrypoint = path.join(rootDir, relative);
+    if (!fs.existsSync(entrypoint)) throw new ShadowError(`Build failed: entrypoint does not exist: ${relative}`);
+    const result = await Bun.build({ entrypoints: [entrypoint], target: config.target ?? 'bun', outdir: distDir, minify });
+    if (!result.success) throw new ShadowError(`Build failed (${relative}):\n${result.logs.map(String).join('\n')}`);
+  }
+
+  writeBackendManifest(rootDir, distDir, packageJson, entry);
+  copyAssets(rootDir, distDir, [...SUPPORTING_FILES, ...(config.assets ?? [])]);
+}
+
+/**
+ * The web-app build (SPA or SSR): orchestrates the repo's own Vite build — Vite, plus any framework plugin such as
+ * TanStack Start for SSR, owns CSS, code-splitting, hashing, tree-shaking, and the SSR server/client output. A
+ * custom `build.command` overrides the default `vite build`. No `dist/package.json` synthesis: this is an app, not a package.
+ */
+function buildWeb(rootDir: string, config: BuildConfig, type: RepoType): void {
+  const command = config.command ?? 'vite build';
+  const [bin, ...args] = Array.isArray(command) ? command : command.split(/\s+/).filter(Boolean);
+  if (!bin) throw new ShadowError('build.command is empty');
+  const result = run(resolveBin(rootDir, bin), args, { cwd: rootDir });
+  if (result.status !== 0) throw new ShadowError(`Build failed (${type}): "${[bin, ...args].join(' ')}" exited with code ${result.status}`);
+}
+
+/**
+ * Builds the current repo per `.shadowrc.json`, dispatching on its `type` (overridable with `options.type` /
+ * the `--type` flag): `library` → tsc/tsc-alias package build, `backend` → single-file Bun.build bundle,
+ * `spa`/`ssr` → the repo's Vite build. Server/library builds synthesize `dist/package.json`; app builds don't.
+ */
+export async function build(options: BuildOptions): Promise<void> {
+  const rootDir = options.cwd;
+  const { data: packageJson } = readPackageJson(rootDir);
+  const config = loadConfig(rootDir, packageJson.name);
+  const type = options.type ?? config.type;
+
+  const startTime = process.hrtime();
+
+  if (type === 'library') await buildLibrary(rootDir, packageJson, config.build);
+  else if (type === 'backend') await buildBackend(rootDir, packageJson, config.build);
+  else buildWeb(rootDir, config.build, type);
 
   const [seconds, nanoseconds] = process.hrtime(startTime);
-  const packageLabel = packageJson.name ?? path.basename(rootDir);
-  log.success(`Built ${packageLabel} successfully in ${formatDuration(seconds * 1e3 + nanoseconds * 1e-6)}`);
+  const label = packageJson.name ?? path.basename(rootDir);
+  log.success(`Built ${label} (${type}) successfully in ${formatDuration(seconds * 1e3 + nanoseconds * 1e-6)}`);
 }

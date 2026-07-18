@@ -48,6 +48,18 @@ describe('init (integration)', () => {
     expect(fs.existsSync(path.join(fixtureDir, '.shadowrc.json'))).toBe(true);
   });
 
+  it('should write a type-specific starter .shadowrc.json from the --type flag', async () => {
+    fixtureDir = createFixtureDir('shadow-init-type-');
+    writeFixtureFiles(fixtureDir, { 'package.json': JSON.stringify({ name: '@fixtures/svc', version: '1.0.0' }) });
+    initGit(fixtureDir);
+
+    await init({ cwd: fixtureDir, type: 'backend' });
+
+    const shadowrc = JSON.parse(read('.shadowrc.json'));
+    expect(shadowrc.type).toBe('backend');
+    expect(shadowrc.build.entry).toBe('src/main.ts');
+  });
+
   it('should not clobber a hook with custom content', async () => {
     fixtureDir = createFixtureDir('shadow-init-custom-');
     writeFixtureFiles(fixtureDir, {

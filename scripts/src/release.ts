@@ -232,7 +232,9 @@ export async function release(options: ReleaseOptions, deps: ReleaseDependencies
   if (!packageJson.name) throw new ShadowError(`package.json at ${targetDir} has no "name" — refusing to release`);
   if (!packageJson.version) throw new ShadowError(`package.json at ${targetDir} has no "version" — refusing to release`);
 
-  const config = loadConfig(targetDir, packageJson.name).release;
+  const shadowConfig = loadConfig(targetDir, packageJson.name);
+  if (shadowConfig.type !== 'library') throw new ShadowError(`shadow release does not apply to a "${shadowConfig.type}" repo — only "library" repos are published`);
+  const config = shadowConfig.release;
   const token = requireEnv('GITHUB_TOKEN');
 
   const remote = deps.run('git', ['remote', 'get-url', 'origin'], { cwd: targetDir, stream: false });

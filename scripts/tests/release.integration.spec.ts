@@ -131,6 +131,15 @@ describe('release (validation)', () => {
     writeFixtureFiles(fixtureDir, { 'package.json': JSON.stringify({ name: '@fixtures/pkg', version: '1.0.0' }) });
     await expect(release({ release: 'patch', path: fixtureDir })).rejects.toThrow(/GITHUB_TOKEN/);
   });
+
+  it('should refuse to release a non-library repo type', async () => {
+    fixtureDir = createFixtureDir('shadow-release-apptype-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/app', version: '1.0.0' }),
+      '.shadowrc.json': JSON.stringify({ type: 'backend' }),
+    });
+    await expect(release({ release: 'patch', path: fixtureDir })).rejects.toThrow(/does not apply to a "backend"/);
+  });
 });
 
 describe('release (with injected dependencies)', () => {
