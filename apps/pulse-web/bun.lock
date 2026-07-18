@@ -5,7 +5,7 @@
     "": {
       "name": "pulse-web",
       "dependencies": {
-        "@shadow-library/ui": "^1.1.1",
+        "@shadow-library/ui": "^2.0.0",
         "@tanstack/react-devtools": "^0.7.0",
         "@tanstack/react-query": "^5.66.5",
         "@tanstack/react-query-devtools": "^5.84.2",
@@ -371,7 +371,7 @@
 
     "@rtsao/scc": ["@rtsao/scc@1.1.0", "", {}, "sha512-zt6OdqaDoOnJ1ZYsCYGt9YmWzDXl4vQdKTyJev62gFhRGKdx7mcT54V9KIjg+d2wi9EXsPvAPKe7i7WjfVWB8g=="],
 
-    "@shadow-library/ui": ["@shadow-library/ui@1.1.1", "", { "dependencies": { "@radix-ui/react-accordion": "^1.2.16", "@radix-ui/react-alert-dialog": "^1.1.19", "@radix-ui/react-avatar": "^1.2.2", "@radix-ui/react-checkbox": "^1.3.7", "@radix-ui/react-context-menu": "^2.3.3", "@radix-ui/react-dialog": "^1.1.19", "@radix-ui/react-dropdown-menu": "^2.1.20", "@radix-ui/react-hover-card": "^1.1.19", "@radix-ui/react-popover": "^1.1.19", "@radix-ui/react-radio-group": "^1.4.3", "@radix-ui/react-select": "^2.3.3", "@radix-ui/react-slider": "^1.4.3", "@radix-ui/react-slot": "^1.3.0", "@radix-ui/react-switch": "^1.3.3", "@radix-ui/react-tabs": "^1.1.17", "@radix-ui/react-tooltip": "^1.2.12", "clsx": "^2.1.1", "openapi-typescript": "^7.13.0" }, "peerDependencies": { "@tanstack/react-router": "^1.168.1", "react": "^18.3.0 || ^19.0.0", "react-dom": "^18.3.0 || ^19.0.0", "typescript": "^5.9.3" }, "optionalPeers": ["@tanstack/react-router", "typescript"] }, "sha512-8YPf9ThaFTHStTFmtSvOMniOiPZE7jd93dBm7HB6eoDBrcfDbnXZSGGin2v/6krvJUPPNV7/1Q6rpz7X05Hvow=="],
+    "@shadow-library/ui": ["@shadow-library/ui@2.0.0", "", { "dependencies": { "@radix-ui/react-accordion": "^1.2.16", "@radix-ui/react-alert-dialog": "^1.1.19", "@radix-ui/react-avatar": "^1.2.2", "@radix-ui/react-checkbox": "^1.3.7", "@radix-ui/react-context-menu": "^2.3.3", "@radix-ui/react-dialog": "^1.1.19", "@radix-ui/react-dropdown-menu": "^2.1.20", "@radix-ui/react-hover-card": "^1.1.19", "@radix-ui/react-popover": "^1.1.19", "@radix-ui/react-radio-group": "^1.4.3", "@radix-ui/react-select": "^2.3.3", "@radix-ui/react-slider": "^1.4.3", "@radix-ui/react-slot": "^1.3.0", "@radix-ui/react-switch": "^1.3.3", "@radix-ui/react-tabs": "^1.1.17", "@radix-ui/react-tooltip": "^1.2.12", "clsx": "^2.1.1" }, "peerDependencies": { "@tanstack/react-router": "^1.168.1", "react": "^18.3.0 || ^19.0.0", "react-dom": "^18.3.0 || ^19.0.0", "typescript": "^5.9.3" }, "optionalPeers": ["@tanstack/react-router", "typescript"] }, "sha512-jcgRWBirpjA+UKE1nzN9LzAkzMdfl/d7bkchLY5xQIsdqhdkTFSc463pzUn0Hw03olFo2Q4lZOUmyxse3h3szw=="],
 
     "@solid-primitives/event-listener": ["@solid-primitives/event-listener@2.4.3", "", { "dependencies": { "@solid-primitives/utils": "^6.3.2" }, "peerDependencies": { "solid-js": "^1.6.12" } }, "sha512-h4VqkYFv6Gf+L7SQj+Y6puigL/5DIi7x5q07VZET7AWcS+9/G3WfIE9WheniHWJs51OEkRB43w6lDys5YeFceg=="],
 

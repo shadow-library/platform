@@ -13,7 +13,7 @@
     "generate:api-types": "bun run scripts/generate-api-types.ts"
   },
   "dependencies": {
-    "@shadow-library/ui": "^1.1.1",
+    "@shadow-library/ui": "^2.0.0",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query": "^5.66.5",
     "@tanstack/react-query-devtools": "^5.84.2",

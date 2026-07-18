@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Badge, Card, EmptyState, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/ui/router';
 import { type ReactElement, useState } from 'react';
 
 /**
@@ -23,7 +24,7 @@ import {
   useTablePagination,
   useTableSort,
 } from '@/features/shared';
-import { type NotificationMessageResponse, useListNotificationMessagesQuery, useSearchParams } from '@/lib';
+import { type NotificationMessageResponse, useListNotificationMessagesQuery } from '@/lib';
 
 import controls from '@/features/shared/controls.module.css';
 

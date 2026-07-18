@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/ui/router';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useEffect, useState } from 'react';
 
@@ -27,7 +28,7 @@ import {
   useTablePagination,
   useTableSort,
 } from '@/features/shared';
-import { type SenderProfileResponse, useCreateSenderProfileMutation, useDeleteSenderProfileMutation, useListSenderProfilesQuery, useSearchParams, useUpdateSenderProfileMutation } from '@/lib';
+import { type SenderProfileResponse, useCreateSenderProfileMutation, useDeleteSenderProfileMutation, useListSenderProfilesQuery, useUpdateSenderProfileMutation } from '@/lib';
 
 import { senderFormConfig } from './forms';
 

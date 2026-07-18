@@ -1,13 +1,9 @@
 /**
  * Importing npm packages
  */
-import { type SortDirection, type TableSort } from '@shadow-library/ui';
+import { type SortDirection, type TableSort, toPositiveInt } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/ui/router';
 import { useEffect, useRef, useState } from 'react';
-
-/**
- * Importing user defined packages
- */
-import { useSearchParams, utils } from '@/lib';
 
 /**
  * Defining types
@@ -27,10 +23,10 @@ export interface TablePagination {
 export function useTablePagination(total: number | undefined, defaultLimit = 20): TablePagination {
   const { search, appendSearch } = useSearchParams();
   const safeTotal = total ?? 0;
-  const limit = utils.toPositiveInt(search.limit) ?? defaultLimit;
+  const limit = toPositiveInt(search.limit) ?? defaultLimit;
   const totalPages = Math.max(1, Math.ceil(safeTotal / limit));
   const maxOffset = Math.max(0, (totalPages - 1) * limit);
-  const offset = Math.min(utils.toPositiveInt(search.offset, true) ?? 0, maxOffset);
+  const offset = Math.min(toPositiveInt(search.offset, true) ?? 0, maxOffset);
 
   return {
     page: Math.floor(offset / limit) + 1,

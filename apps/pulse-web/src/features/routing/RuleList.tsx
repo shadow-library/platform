@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/ui/router';
 import { type ReactElement, useEffect, useMemo, useState } from 'react';
 
 /**
@@ -31,7 +32,6 @@ import {
   useDeleteSenderRoutingRuleMutation,
   useListSenderProfilesQuery,
   useListSenderRoutingRulesQuery,
-  useSearchParams,
   useUpdateSenderRoutingRuleMutation,
 } from '@/lib';
 

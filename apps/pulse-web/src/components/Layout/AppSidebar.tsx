@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Sidebar } from '@shadow-library/ui';
+import { Sidebar, useTheme } from '@shadow-library/ui';
 import { useLocation, useNavigate } from '@tanstack/react-router';
 import { type MouseEvent, type ReactElement } from 'react';
 
@@ -9,8 +9,6 @@ import { type MouseEvent, type ReactElement } from 'react';
  * Importing user defined components
  */
 import { DashboardIcon, LogIcon, MoonIcon, PulseMark, RoutingIcon, SendIcon, SenderIcon, SunIcon, TemplateIcon } from '@/features/shared';
-
-import { useTheme } from '../AppProvider';
 
 import styles from './Layout.module.css';
 

@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Button, Input, Pagination, Table, type TableColumn } from '@shadow-library/ui';
+import { useSearchParams } from '@shadow-library/ui/router';
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
 
@@ -26,7 +27,7 @@ import {
   useTablePagination,
   useTableSort,
 } from '@/features/shared';
-import { type MessageType, type Priority, type TemplateGroupResponse, useCreateTemplateGroupMutation, useListTemplateGroupsQuery, useSearchParams, useUpdateTemplateGroupMutation } from '@/lib';
+import { type MessageType, type Priority, type TemplateGroupResponse, useCreateTemplateGroupMutation, useListTemplateGroupsQuery, useUpdateTemplateGroupMutation } from '@/lib';
 
 import { groupFormConfig } from './forms';
 
