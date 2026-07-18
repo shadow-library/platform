@@ -8,7 +8,7 @@ import 'reflect-metadata';
 /**
  * Importing user defined packages
  */
-import { type RouteMetadata } from '@shadow-library/app';
+import { type HandlerMetadata } from '@shadow-library/app';
 import { AppError } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
 
@@ -28,7 +28,7 @@ type RouteMetadataRecord = Record<string, unknown>;
 const AUDIENCE = 'api://pulse';
 const ORG = '7';
 
-/** Reads back the metadata the decorators wrote through the framework `Route` decorator */
+/** Reads back the metadata the decorators wrote through the framework `Handler` decorator */
 const getRouteMetadata = (target: object): RouteMetadataRecord => {
   for (const key of Reflect.getMetadataKeys(target)) {
     const value = Reflect.getMetadata(key, target) as RouteMetadataRecord | undefined;
@@ -100,7 +100,7 @@ describe('AuthGuard', () => {
     expect((error as AppError).status).toBe(statusCode);
   };
 
-  const generate = (metadata: RouteMetadata): ((request: GuardedRequest) => Promise<void>) => {
+  const generate = (metadata: HandlerMetadata): ((request: GuardedRequest) => Promise<void>) => {
     const handler = guard.generate(metadata);
     if (!handler) throw new Error('expected a handler');
     return handler;
@@ -134,7 +134,7 @@ describe('AuthGuard', () => {
   });
 
   it('should deny service callers until identity-configured access rules allow them', async () => {
-    const metadata: RouteMetadata = { shadowAuth: { authenticated: true }, method: 'POST' as never, path: '/api/v1/index' };
+    const metadata: HandlerMetadata = { shadowAuth: { authenticated: true }, method: 'POST' as never, path: '/api/v1/index' };
     const handler = generate(metadata);
     const serviceRequest = async () => request(await idp.issueToken({ sub: 'svc-indexer', kind: 'service', clientId: 'svc-indexer', audience: AUDIENCE }));
 
