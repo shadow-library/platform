@@ -1,0 +1,88 @@
+/*
+ * Bottom Navigation — surface-card bar with a border-default top edge (the bottom mirror of
+ * TopNavigation's recipe). Items are ≥56px equal-width columns — tap-target compliant outright —
+ * with selection told by accent color on icon + label (weight shift keeps it non-color-only).
+ * Fixed at z-shell and padded past the device safe areas.
+ */
+
+.root {
+  display: flex;
+  align-items: stretch;
+  background: var(--sh-surface-card);
+  border-top: var(--sh-border-width) solid var(--sh-border-default);
+  padding-right: var(--sh-safe-right);
+  padding-bottom: var(--sh-safe-bottom);
+  padding-left: var(--sh-safe-left);
+}
+.root[data-fixed] {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--sh-z-shell);
+}
+
+.item {
+  position: relative;
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 0;
+  min-height: 56px;
+  padding: 8px 4px;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font: inherit;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item:hover {
+  color: var(--sh-text-primary);
+}
+.item:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+  border-radius: var(--sh-radius-sm);
+}
+.item[data-selected] {
+  color: var(--sh-accent);
+}
+
+.iconWrap {
+  position: relative;
+  display: inline-flex;
+}
+.icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.icon svg {
+  display: block;
+  width: 24px;
+  height: 24px;
+}
+
+.badge {
+  position: absolute;
+  top: -4px;
+  left: calc(100% - 8px);
+}
+
+.label {
+  max-width: 100%;
+  overflow: hidden;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.item[data-selected] .label {
+  font-weight: 600;
+}
