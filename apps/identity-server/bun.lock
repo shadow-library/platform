@@ -11,7 +11,7 @@
         "@shadow-library/class-schema": "0.5.0-alpha.0",
         "@shadow-library/common": "2.0.0-alpha.1",
         "@shadow-library/fastify": "2.0.0-alpha.0",
-        "@shadow-library/modules": "file:vendor/shadow-library-modules-0.7.0-alpha.0.tgz",
+        "@shadow-library/modules": "0.7.0-alpha.0",
         "@shadow-library/ui": "^3.2.0",
         "@simplewebauthn/browser": "^13.3.0",
         "@simplewebauthn/server": "^13.3.2",
@@ -459,7 +459,7 @@
 
     "@shadow-library/fastify": ["@shadow-library/fastify@2.0.0-alpha.0", "", { "dependencies": { "@fastify/middie": "^9.0.3", "ajv": "^8.17.1", "fastify": "^5.6.0", "find-my-way": "^9.3.0", "json-stable-stringify": "^1.3.0", "type-fest": "^4.41.0", "uuid": "^11.1.0" }, "peerDependencies": { "@fastify/cookie": "^11.0.0", "@fastify/view": "^10.0.0", "@shadow-library/app": "^2.0.0-alpha.0", "@shadow-library/class-schema": "^0.5.0-alpha.0", "@shadow-library/common": "^2.0.0-alpha.1", "reflect-metadata": "^0.2.2" }, "optionalPeers": ["@fastify/cookie", "@fastify/view"] }, "sha512-nJJsUwA2/gI5979X3IrYuJPNRLqzBH4OdrU17k+u/+VSS9iQmnupyH5NgAUYCpJQsZYZYKvvQ1v290oZlAc80Q=="],
 
-    "@shadow-library/modules": ["@shadow-library/modules@vendor/shadow-library-modules-0.7.0-alpha.0.tgz", { "dependencies": { "@fastify/compress": "^8.1.0", "@fastify/cookie": "^11.0.2", "@fastify/helmet": "^13.0.2", "@fastify/swagger": "^9.5.2", "@scalar/fastify-api-reference": "^1.38.1", "luxon": "^3.7.2", "openapi-types": "^12.1.3" }, "peerDependencies": { "@shadow-library/app": "2.0.0-alpha.0", "@shadow-library/class-schema": "0.5.0-alpha.0", "@shadow-library/common": "2.0.0-alpha.1", "@shadow-library/fastify": "2.0.0-alpha.0", "drizzle-orm": "^0.45.0", "ioredis": "^5.8.2", "memcached": "^2.2.2", "reflect-metadata": "^0.2.2" }, "optionalPeers": ["drizzle-orm", "ioredis", "memcached"] }, "sha512-jIQzkdyzdRajMb3RPR5cQvbpAVu/rXWTImwqZNRv0fFujVNrpbs6jFJT3eRgI+NfNuuMQdew8C/6zkZaXs4/LA=="],
+    "@shadow-library/modules": ["@shadow-library/modules@0.7.0-alpha.0", "", { "dependencies": { "@fastify/compress": "^8.1.0", "@fastify/cookie": "^11.0.2", "@fastify/helmet": "^13.0.2", "@fastify/swagger": "^9.5.2", "@scalar/fastify-api-reference": "^1.38.1", "luxon": "^3.7.2", "openapi-types": "^12.1.3", "type-fest": "^4.41.0" }, "peerDependencies": { "@shadow-library/app": "^2.0.0-alpha.0", "@shadow-library/class-schema": "^0.5.0-alpha.0", "@shadow-library/common": "^2.0.0-alpha.1", "@shadow-library/fastify": "^2.0.0-alpha.0", "drizzle-orm": "^0.45.0", "ioredis": "^5.8.2", "memcached": "^2.2.2", "reflect-metadata": "^0.2.2" }, "optionalPeers": ["drizzle-orm", "ioredis", "memcached"] }, "sha512-pN3IznMr4TaWz74XBLea7sSLsilEFggeCUMvViKaHtAubD/e06DbJvwCXLJZQ4lZTuSZw6TRTeNDDyf9SZ37pw=="],
 
     "@shadow-library/scripts": ["@shadow-library/scripts@0.2.3", "", { "dependencies": { "@commitlint/config-conventional": "^21.2.0", "@commitlint/format": "^21.2.0", "@commitlint/lint": "^21.2.0", "@commitlint/load": "^21.2.0", "@eslint/js": "^10.0.1", "@octokit/rest": "^22.0.1", "eslint": "^10.7.0", "eslint-plugin-jsx-a11y": "^6.10.2", "eslint-plugin-n": "^18.2.2", "eslint-plugin-perfectionist": "^5.10.0", "eslint-plugin-react": "^7.37.5", "eslint-plugin-react-hooks": "^7.1.1", "globals": "^17.7.0", "husky": "^9.1.7", "openapi-typescript": "^7.13.0", "prettier": "^3.9.5", "tsc-alias": "^1.9.1", "typescript": "^6.0.3", "typescript-eslint": "^8.64.0" }, "bin": { "shadow": "bin/shadow.js" } }, "sha512-oSoG4uYPkbLUadcqM4skHypQgGL8nFbXMt2g52JOiRz2vbNQJQMLYOa63/YMGnI1HUXp+H/PnOefxFNSjgpoQQ=="],
 
