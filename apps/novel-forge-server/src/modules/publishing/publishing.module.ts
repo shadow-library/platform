@@ -11,7 +11,9 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { PublishRunner } from './publish-runner';
 import { PublishingService } from './publishing.service';
+import { ReaderPushClient } from './reader-push.client';
 
 /**
  * Defining types
@@ -25,7 +27,7 @@ import { PublishingService } from './publishing.service';
 // publishing controller lives in PipelineModule (the HTTP-wiring seam), keeping the module graph acyclic.
 @Module({
   imports: [DatabaseModule],
-  providers: [PublishingService],
-  exports: [PublishingService],
+  providers: [PublishingService, ReaderPushClient, PublishRunner],
+  exports: [PublishingService, PublishRunner],
 })
 export class PublishingModule {}

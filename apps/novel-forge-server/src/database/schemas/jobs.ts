@@ -31,7 +31,7 @@ export namespace Job {
  * Declaring the constants
  */
 
-export const jobKind = pgEnum('job_kind', ['ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume', 'rebrand']);
+export const jobKind = pgEnum('job_kind', ['ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume', 'rebrand', 'publish']);
 export const jobStatus = pgEnum('job_status', ['pending', 'in_progress', 'done', 'failed']);
 export const validationScope = pgEnum('validation_scope', ['novel', 'chapter']);
 

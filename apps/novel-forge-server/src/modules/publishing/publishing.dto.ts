@@ -140,6 +140,37 @@ export class ChapterPublicationResponse {
 }
 
 @Schema()
+export class ReconcileFailureItem {
+  @Field(() => Integer)
+  ordinal: number;
+
+  @Field()
+  error: string;
+}
+
+@Schema()
+export class ReconcileResponse {
+  @Field(() => String, { enum: ['applied', 'noop'] })
+  novel: 'applied' | 'noop';
+
+  @Field(() => [Integer])
+  pushed: number[];
+
+  @Field(() => [Integer])
+  deleted: number[];
+
+  @Field(() => [Integer])
+  skipped: number[];
+
+  @Field(() => [ReconcileFailureItem])
+  failed: ReconcileFailureItem[];
+
+  // Reader ordinals the ledger cannot account for — reported for the author, never deleted (design §6).
+  @Field(() => [Integer])
+  unknownOrdinals: number[];
+}
+
+@Schema()
 export class PublicationsLedgerResponse {
   // Omitted (not null) while the project has never been published — the UI shows an empty panel.
   @Field(() => PublicationResponse, { optional: true })

@@ -61,6 +61,19 @@ declare module '@shadow-library/common' {
     'auth.rp.client.secret': string | undefined;
     'auth.session.secret': string;
     'auth.redirect-uri': string;
+
+    /**
+     * M2M credentials of the forge's identity service client (`novel-forge-server`), used only by
+     * the reader-push client to mint `webnovel:publish` tokens addressed to `webnovel-server`.
+     * Deliberately NOT the package's `auth.client.*` keys — those would make `AuthModule` phone
+     * identity for service-access rules at boot. Unset, the app boots fine and publishing fails
+     * soft at push time with a clear ledger error. The reader's base URL resolves through the SDK's
+     * service discovery: `SERVICE_URL_WEBNOVEL_SERVER` overrides the in-cluster default
+     * (`http://webnovel-server`, shaped by `SERVICE_DISCOVERY_SCHEME`/`SERVICE_DISCOVERY_SUFFIX`).
+     */
+    'auth.m2m.client.id': string | undefined;
+    'auth.m2m.client.secret': string | undefined;
+    'auth.m2m.client.assertion-path': string | undefined;
   }
 }
 
@@ -100,3 +113,6 @@ Config.load('auth.rp.client.id', { defaultValue: 'novel-forge-web' });
 Config.load('auth.rp.client.secret');
 Config.load('auth.session.secret', { defaultValue: 'novel-forge-dev-session-secret', isProdRequired: true });
 Config.load('auth.redirect-uri', { defaultValue: 'http://localhost:8080/api/auth/callback' });
+Config.load('auth.m2m.client.id');
+Config.load('auth.m2m.client.secret');
+Config.load('auth.m2m.client.assertion-path');

@@ -12,6 +12,7 @@ import { DatabaseModule } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { AiModule } from '../ai/ai.module';
+import { PublishingModule } from '../publishing/publishing.module';
 import { RebrandModule } from '../rebrand/rebrand.module';
 import { SourceModule } from '../source/source.module';
 import { CheckpointJanitor } from './checkpoint.janitor';
@@ -19,6 +20,7 @@ import { ConcurrencyController } from './concurrency.controller';
 import { JobExecutor } from './job.executor';
 import { JobService } from './job.service';
 import { JobsController } from './jobs.controller';
+import { PublicationJanitor } from './publication.janitor';
 
 /**
  * Defining types
@@ -29,9 +31,9 @@ import { JobsController } from './jobs.controller';
  */
 
 @Module({
-  imports: [DatabaseModule, AiModule, SourceModule, RebrandModule],
+  imports: [DatabaseModule, AiModule, SourceModule, RebrandModule, PublishingModule],
   controllers: [JobsController],
-  providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor],
+  providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor, PublicationJanitor],
   exports: [JobService, ConcurrencyController, JobExecutor],
 })
 export class JobsModule {}

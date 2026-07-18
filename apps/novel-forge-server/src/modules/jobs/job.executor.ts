@@ -18,6 +18,7 @@ import { type Job, type PrimaryDatabase, type Rebrand, schema } from '@server/da
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
+import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { AcquireService } from '../source/acquire.service';
 import { RecombineService } from '../source/recombine.service';
@@ -74,6 +75,7 @@ export class JobExecutor {
     private readonly rebrandService: RebrandService,
     private readonly recombineService: RecombineService,
     private readonly webnovelCatalog: WebnovelCatalogService,
+    private readonly publishRunner: PublishRunner,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -145,6 +147,8 @@ export class JobExecutor {
         return this.runIngest(job);
       case 'rebrand':
         return this.runRebrand(job);
+      case 'publish':
+        return this.runPublish(job);
       default:
         throw new Error(`Unsupported job kind: ${job.kind}`);
     }
@@ -291,6 +295,18 @@ export class JobExecutor {
       await this.setRebrandStatus(projectId, 'failed', err instanceof Error ? err.message : String(err));
       throw err;
     }
+  }
+
+  // ─── Publish (reader-publish design §5–6) ─────────────────────────────────────
+  // One convergence pass over the publication ledger: novel metadata, due/drifted chapter PUTs,
+  // ledgered-unpublish DELETEs. Per-row failures land on the ledger rows (the row is the outbox);
+  // the job fails on any of them so the janitor sweep keeps retrying until the reader converges.
+  private async runPublish(job: Job.Row): Promise<void> {
+    await this.jobService.progress(job.id, { done: 0, total: 0, current: 'converging', phase: 'publish' });
+    const result = await this.publishRunner.converge(job.projectId);
+    const total = result.pushed.length + result.deleted.length + result.skipped.length + result.failed.length;
+    await this.jobService.progress(job.id, { done: total - result.failed.length, total, current: 'done', phase: 'publish' });
+    if (result.failed.length > 0) throw new Error(`publish convergence incomplete: ${result.failed.length} chapter push(es) failed — see the publication ledger`);
   }
 
   /** payload.chapters wins; otherwise every source chapter without a converted/attention row (failed rows always retry). */

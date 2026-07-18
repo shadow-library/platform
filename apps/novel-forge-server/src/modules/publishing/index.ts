@@ -19,6 +19,8 @@
  */
 
 export * from './publish-payload';
+export * from './reader-push.client';
+export * from './publish-runner';
 export * from './publishing.dto';
 export * from './publishing.service';
 export * from './publishing.controller';
