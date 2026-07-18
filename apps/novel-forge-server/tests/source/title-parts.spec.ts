@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { type ChapterLike, applyBoundaryMerges, buildGroupingPlan, parseTitleParts } from '@modules/source';
+import { applyBoundaryMerges, buildGroupingPlan, type ChapterLike, parseTitleParts } from '@modules/source';
 
 /**
  * Declaring the constants

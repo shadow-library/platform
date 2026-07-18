@@ -6,8 +6,8 @@
  * Importing npm packages
  */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { Logger } from '@shadow-library/common';
 import { eq, sql } from 'drizzle-orm';
+import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -108,12 +108,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     }
 
     const promptKey = `bible:${STAGE_SLUG_MAP[stageName]}` as
-      | 'bible:foundation'
-      | 'bible:world-power'
-      | 'bible:factions-locations'
-      | 'bible:characters'
-      | 'bible:plot'
-      | 'bible:volumes';
+      'bible:foundation' | 'bible:world-power' | 'bible:factions-locations' | 'bible:characters' | 'bible:plot' | 'bible:volumes';
     const prompt = PROMPT_REGISTRY[promptKey];
     if (!prompt) throw new Error(`[bible-builder] No prompt for stage: ${stageName}`);
 

@@ -5,9 +5,8 @@
 /**
  * Importing npm packages
  */
-import { beforeAll, describe, expect, it } from 'bun:test';
-
 import { SQL } from 'bun';
+import { beforeAll, describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages

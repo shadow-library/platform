@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, eq, isNull } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -16,13 +16,13 @@ import { and, eq, isNull } from 'drizzle-orm';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { ConsolidateService } from './consolidate.service';
-import { KnowledgeRepository } from './knowledge.repository';
 import { ModelRouterService } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { type ExtractionOutput } from '../ai/schemas/extraction.schema';
 import { type TelemetryContext } from '../ai/telemetry.handler';
+import { ConsolidateService } from './consolidate.service';
+import { KnowledgeRepository } from './knowledge.repository';
 
 /**
  * Defining types

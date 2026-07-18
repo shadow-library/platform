@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, gt, gte, inArray, lte, or, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -29,16 +29,16 @@ import {
   type BriefRemoveOp,
   type BriefUpdateOp,
   type ChangeOp,
+  changeSetRefs,
   type ContentOp,
   type DraftRemoveOp,
   type DraftUpdateOp,
   type EntityRemoveOp,
   type EntityUpsertOp,
+  isActionOp,
   type PremiseUpdateOp,
   type VolumeRemoveOp,
   type VolumeUpsertOp,
-  changeSetRefs,
-  isActionOp,
 } from './change-set';
 
 /**

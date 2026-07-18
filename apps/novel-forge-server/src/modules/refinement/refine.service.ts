@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -17,14 +17,14 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { type ChangeOp } from './change-set';
-import { ProposalService } from './proposal.service';
-import { renderManifest } from './required-bible-docs';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY, buildArcPlanPrompt } from '../ai/prompts';
+import { buildArcPlanPrompt, PROMPT_REGISTRY } from '../ai/prompts';
 import { type ArcPlanOutput, type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
+import { type ChangeOp } from './change-set';
+import { ProposalService } from './proposal.service';
+import { renderManifest } from './required-bible-docs';
 
 /**
  * Defining types

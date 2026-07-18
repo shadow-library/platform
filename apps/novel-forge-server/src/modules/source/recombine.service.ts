@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, asc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, eq, isNotNull, lt, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -17,11 +17,11 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Chapter, type PrimaryDatabase, type Project, schema } from '@server/database';
 
-import { type AmbiguousBoundary, type ChapterLike, type RecombinePlan, applyBoundaryMerges, buildGroupingPlan } from './title-parts';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
 import { PROMPT_REGISTRY } from '../ai/prompts';
 import { type RecombineOutput } from '../ai/schemas';
+import { type AmbiguousBoundary, applyBoundaryMerges, buildGroupingPlan, type ChapterLike, type RecombinePlan } from './title-parts';
 
 /**
  * Defining types

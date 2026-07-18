@@ -120,8 +120,7 @@ export class TelemetryHandler extends BaseCallbackHandler {
     // LangChain normalises them onto the message's `usage_metadata`; Ollama reports raw `*_eval_count`
     // on the generation info. Fall through all three so local runs report real token usage too.
     const meta = generation as
-      | { message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number } }; generationInfo?: { prompt_eval_count?: number; eval_count?: number } }
-      | undefined;
+      { message?: { usage_metadata?: { input_tokens?: number; output_tokens?: number } }; generationInfo?: { prompt_eval_count?: number; eval_count?: number } } | undefined;
     // When no layer reports usage (CLI subprocess models), fall back to tokenizer estimates so the
     // run detail and usage dashboards never show blank counts.
     const inputTokens: number =

@@ -6,10 +6,10 @@
  * Importing npm packages
  */
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
+import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -20,15 +20,15 @@ import * as schema from '@server/database/schemas';
 
 import { ContextAssembler } from '../context/context-assembler.service';
 import { ModelRouterService } from '../model-router.service';
-import { TelemetryHandler } from '../telemetry.handler';
-import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-builder.graph';
-import { type FinalizationServices, createChapterFinalizationGraph } from './chapter-finalization.graph';
-import { type GraphServices, createChapterGenerationGraph } from './chapter-generation.graph';
-import { type RebrandGraphServices, createChapterRebrandGraph } from './chapter-rebrand.graph';
-import { type ValidationServices, createNovelValidationGraph } from './novel-validation.graph';
-import { type ExtractionServices, createSourceExtractionGraph } from './source-extraction.graph';
 import { IndexingService } from '../retrieval/indexing.service';
+import { TelemetryHandler } from '../telemetry.handler';
 import { ToolRegistryService } from '../tools/tool-registry.service';
+import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-builder.graph';
+import { createChapterFinalizationGraph, type FinalizationServices } from './chapter-finalization.graph';
+import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
+import { createChapterRebrandGraph, type RebrandGraphServices } from './chapter-rebrand.graph';
+import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
+import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
 
 /**
  * Defining types

@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { type PromptModule } from './types';
 import { renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
 import { type ChapterExtractOutput, ChapterExtractSchema } from '../schemas/chapter-extract.schema';
+import { type PromptModule } from './types';
 
 /**
  * Defining types

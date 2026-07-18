@@ -5,9 +5,9 @@
 /**
  * Importing npm packages
  */
+import { type FastifyReply } from 'fastify';
 import { Authenticated } from '@shadow-library/auth/module';
 import { Get, HttpController, Params, Res } from '@shadow-library/fastify';
-import { type FastifyReply } from 'fastify';
 
 /**
  * Importing user defined packages

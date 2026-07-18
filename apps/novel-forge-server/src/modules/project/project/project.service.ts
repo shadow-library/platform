@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -17,6 +17,8 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Bible, type Chapter, type Knowledge, type Plan, type PrimaryDatabase, type Project, schema } from '@server/database';
 
+import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
+import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
 import {
   type CloneProjectBody,
   type CostResponse,
@@ -26,8 +28,6 @@ import {
   type ResetResponse,
   type UpdateProjectBody,
 } from './project.dto';
-import { DEFAULT_WRITING_INSTRUCTIONS } from '../../ai/prompts/authoring-preamble';
-import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
 
 /**
  * Defining types

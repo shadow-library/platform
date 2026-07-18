@@ -5,11 +5,11 @@
 /**
  * Importing npm packages
  */
+import { type FastifyReply } from 'fastify';
 import { Inject } from '@shadow-library/app';
 import { Authenticated } from '@shadow-library/auth/module';
 import { Field, Schema } from '@shadow-library/class-schema';
 import { Get, HttpController, Params, Res } from '@shadow-library/fastify';
-import { type FastifyReply } from 'fastify';
 
 /**
  * Importing user defined packages

@@ -5,10 +5,9 @@
 /**
  * Importing npm packages
  */
+import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-
-import { SQL } from 'bun';
 import { eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 

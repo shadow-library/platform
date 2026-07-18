@@ -10,13 +10,13 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { PipelineController } from './pipeline.controller';
 import { ExtractionModule } from '../extraction/extraction.module';
 import { JobsModule } from '../jobs/jobs.module';
 import { PlanningModule } from '../planning/planning.module';
 import { RebrandController } from '../rebrand/rebrand.controller';
 import { RebrandModule } from '../rebrand/rebrand.module';
 import { SourceModule } from '../source/source.module';
+import { PipelineController } from './pipeline.controller';
 
 /**
  * Defining types

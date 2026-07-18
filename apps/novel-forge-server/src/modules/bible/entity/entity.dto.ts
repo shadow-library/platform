@@ -13,7 +13,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
  * Importing user defined packages
  */
 import { EntityOrigin, EntitySignificance, EntityType, SortByTime } from '@server/common';
-import { type Knowledge, entitySignificance } from '@server/database';
+import { entitySignificance, type Knowledge } from '@server/database';
 
 /**
  * Defining types

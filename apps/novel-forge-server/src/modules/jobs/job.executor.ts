@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -16,14 +16,14 @@ import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { APP_NAME } from '@server/constants';
 import { type Job, type PrimaryDatabase, type Rebrand, schema } from '@server/database';
 
-import { ConcurrencyController } from './concurrency.controller';
-import { JobService } from './job.service';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { AcquireService } from '../source/acquire.service';
 import { RecombineService } from '../source/recombine.service';
 import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
+import { ConcurrencyController } from './concurrency.controller';
+import { JobService } from './job.service';
 
 /**
  * Defining types
@@ -196,8 +196,8 @@ export class JobExecutor {
     this.logger.info('runIngest: starting', { jobId: job.id, projectId: job.projectId, limit, delayMs, batchSize: INGEST_BATCH });
     await this.jobService.progress(job.id, { done: 0, total: 0, current: 'scraping', phase: 'ingest' });
 
-    let complete = false;
-    let scraped = 0;
+    let complete: boolean;
+    let scraped: number;
     let batch = 0;
     do {
       const result = await this.acquireService.ingest(job.projectId, { limit: limit ?? INGEST_BATCH, delayMs });

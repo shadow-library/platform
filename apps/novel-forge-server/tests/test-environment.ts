@@ -12,11 +12,11 @@ import './test-idp';
  */
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
 
+import { type AbstractClass, type Class } from 'type-fest';
 import { Dispatcher, ShadowApplication } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { type FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { type AbstractClass, type Class } from 'type-fest';
 
 /**
  * Importing user defined packages

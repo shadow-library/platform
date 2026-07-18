@@ -11,10 +11,10 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AiModule } from '../ai/ai.module';
 import { ConsolidateService } from './consolidate.service';
 import { ExtractionService } from './extraction.service';
 import { KnowledgeRepository } from './knowledge.repository';
-import { AiModule } from '../ai/ai.module';
 
 /**
  * Defining types

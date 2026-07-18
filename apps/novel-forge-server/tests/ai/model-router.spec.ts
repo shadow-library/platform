@@ -10,13 +10,12 @@ import { describe, expect, it, mock } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { Config } from '@shadow-library/common';
-
 import { LOCAL_TEST_DEFAULTS, PRODUCTION_DEFAULTS, ROLE_GROUP } from '@modules/ai/defaults';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { MODEL_REGISTRY } from '@modules/ai/models';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { ChatGrokBuild } from '@modules/ai/subprocess-providers';
+import { Config } from '@shadow-library/common';
 
 /**
  * Defining types

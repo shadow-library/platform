@@ -7,10 +7,10 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import { and, asc, desc, eq } from 'drizzle-orm';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -19,8 +19,8 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type Knowledge, type PrimaryDatabase, schema } from '@server/database';
 
-import { type CreateEntityBody, type ListEntitiesQuery, type UpdateEntityBody } from './entity.dto';
 import { IMAGE_STORAGE, type ImageStorageProvider } from '../../storage/image-storage.interface';
+import { type CreateEntityBody, type ListEntitiesQuery, type UpdateEntityBody } from './entity.dto';
 
 /**
  * Defining types

@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type FixOutput, FixSchema } from '../schemas/fix.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type FixOutput, FixSchema } from '../schemas/fix.schema';
 
 /**
  * Defining types

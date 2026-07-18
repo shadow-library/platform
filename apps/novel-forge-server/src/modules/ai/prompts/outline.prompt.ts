@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type OutlineOutput, OutlineSchema } from '../schemas/outline.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type OutlineOutput, OutlineSchema } from '../schemas/outline.schema';
 
 /**
  * Defining types

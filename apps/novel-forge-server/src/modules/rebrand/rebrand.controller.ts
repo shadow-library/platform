@@ -11,6 +11,9 @@ import { Body, Get, HttpController, HttpStatus, Params, Post, Put, Query, Respon
 /**
  * Importing user defined packages
  */
+import { JobExecutor } from '../jobs/job.executor';
+import { JobService } from '../jobs/job.service';
+import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
 import {
   ConversionResponse,
   GlossaryListQuery,
@@ -25,9 +28,6 @@ import {
   RebrandStatusResponse,
 } from './rebrand.dto';
 import { RebrandService } from './rebrand.service';
-import { JobExecutor } from '../jobs/job.executor';
-import { JobService } from '../jobs/job.service';
-import { JobEnqueueResponse } from '../pipeline/pipeline.dto';
 
 /**
  * Defining types

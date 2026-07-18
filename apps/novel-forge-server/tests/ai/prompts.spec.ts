@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { PROMPT_REGISTRY, SCOPE_PLAYBOOKS, buildChatRefinePrompt } from '@modules/ai/prompts';
+import { buildChatRefinePrompt, PROMPT_REGISTRY, SCOPE_PLAYBOOKS } from '@modules/ai/prompts';
 import { AUTHORING_STYLE } from '@modules/ai/prompts/authoring-preamble';
 import {
   ChatRefineSchema,

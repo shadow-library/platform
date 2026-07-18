@@ -5,9 +5,9 @@
 /**
  * Importing npm packages
  */
+import { asc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
-import { asc, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

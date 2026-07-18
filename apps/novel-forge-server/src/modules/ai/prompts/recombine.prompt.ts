@@ -11,8 +11,8 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { type PromptModule } from './types';
 import { type RecombineOutput, RecombineSchema } from '../schemas/recombine.schema';
+import { type PromptModule } from './types';
 
 /**
  * Defining types

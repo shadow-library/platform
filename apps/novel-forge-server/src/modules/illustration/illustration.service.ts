@@ -5,12 +5,12 @@
 /**
  * Importing npm packages
  */
-import { randomUUID } from 'crypto';
+import { randomUUID } from 'node:crypto';
 
+import { eq } from 'drizzle-orm';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

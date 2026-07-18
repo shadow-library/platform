@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type BibleStageOutput, BibleStageSchema } from '../schemas/new-novel.schema';
 import { AUTHORING_STYLE, BIBLE_STAGE_OUTPUT_SHAPE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type BibleStageOutput, BibleStageSchema } from '../schemas/new-novel.schema';
 
 /**
  * Defining types

@@ -10,10 +10,10 @@ import { Module } from '@shadow-library/app';
 /**
  * Importing user defined packages
  */
-import { HubActionRegistrar } from './hub-action.registrar';
 import { BibleModule } from '../bible/bible.module';
 import { GenerationModule } from '../generation/generation.module';
 import { RefinementModule } from '../refinement/refinement.module';
+import { HubActionRegistrar } from './hub-action.registrar';
 
 /**
  * Defining types

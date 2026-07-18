@@ -12,9 +12,9 @@ import { DatabaseModule } from '@shadow-library/modules';
  * Importing user defined packages
  */
 
+import { StorageModule } from '../storage/storage.module';
 import { IllustrationController } from './illustration.controller';
 import { IllustrationService } from './illustration.service';
-import { StorageModule } from '../storage/storage.module';
 
 /**
  * Defining types

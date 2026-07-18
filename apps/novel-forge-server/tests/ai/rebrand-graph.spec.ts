@@ -5,11 +5,10 @@
 /**
  * Importing npm packages
  */
+import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { randomUUID } from 'node:crypto';
-
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-import { SQL } from 'bun';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 

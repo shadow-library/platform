@@ -11,6 +11,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AiModule } from '../ai/ai.module';
 import { AcquireService } from './acquire.service';
 import { AdapterRegistry } from './adapters/adapter.registry';
 import { AssetService } from './asset.service';
@@ -18,7 +19,6 @@ import { ChapterController } from './chapter/chapter.controller';
 import { ChapterService } from './chapter/chapter.service';
 import { RecombineService } from './recombine.service';
 import { WebnovelCatalogService } from './webnovel-catalog.service';
-import { AiModule } from '../ai/ai.module';
 
 /**
  * Defining types

@@ -5,8 +5,8 @@
 /**
  * Importing npm packages
  */
-import { mkdir, readFile, unlink, writeFile } from 'fs/promises';
-import { extname, join } from 'path';
+import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { extname, join } from 'node:path';
 
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';

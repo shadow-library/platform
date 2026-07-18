@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { type Import, Module, forwardRef } from '@shadow-library/app';
+import { forwardRef, type Import, Module } from '@shadow-library/app';
 import { AuthModule, RelyingPartyModule } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
 

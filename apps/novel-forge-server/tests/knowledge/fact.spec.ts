@@ -5,9 +5,8 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it } from 'bun:test';
-
 import { SQL } from 'bun';
+import { describe, expect, it } from 'bun:test';
 import { eq } from 'drizzle-orm';
 
 /**

@@ -10,8 +10,8 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { type PromptModule } from './types';
 import { type ReviewOutput, ReviewSchema } from '../schemas/review.schema';
+import { type PromptModule } from './types';
 
 /**
  * Defining types

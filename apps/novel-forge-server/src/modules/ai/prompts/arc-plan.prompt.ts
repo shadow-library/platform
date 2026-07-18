@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type ArcPlanOutput, ArcPlanSchema, validateArcContiguity, validateArcCoverage } from '../schemas/arc-plan.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type ArcPlanOutput, ArcPlanSchema, validateArcContiguity, validateArcCoverage } from '../schemas/arc-plan.schema';
 
 /**
  * Defining types

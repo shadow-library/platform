@@ -47,9 +47,9 @@ All keys are declared in `src/bootstrap.ts`. Keys marked **required in prod** mu
 ```bash
 # Development
 bun run dev               # Start with watch-mode (src/main.ts)
-bun run build             # Bundle to dist/
+bun run build             # shadow build — bundle to dist/main.js
 bun run type-check        # Run tsc (no emit)
-bun run lint              # Prettier + ESLint (add --fix to auto-fix)
+bun run verify            # shadow verify — format + lint + type-check + test (add --fix to auto-fix)
 
 # Database
 bun run db:migrate        # Run Drizzle migrations

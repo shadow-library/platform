@@ -5,16 +5,15 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
-
 import { SQL } from 'bun';
+import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
 
 /**
  * Importing user defined packages
  */
-import { ActionExecutorRegistry, type ChangeOp, ProposalApplyService, ProposalService, changeSetRefs, loadArtifactStates } from '@modules/refinement';
+import { ActionExecutorRegistry, type ChangeOp, changeSetRefs, loadArtifactStates, ProposalApplyService, ProposalService } from '@modules/refinement';
 import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { computeBibleDocHash } from '@server/common';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';

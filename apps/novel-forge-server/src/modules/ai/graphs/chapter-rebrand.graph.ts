@@ -6,8 +6,8 @@
  * Importing npm packages
  */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
-import { Logger } from '@shadow-library/common';
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
+import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -16,7 +16,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Rebrand } from '@server/database';
 import * as schema from '@server/database/schemas';
 
-import { type GlossaryLike, type ResidueIssue, renderGlossarySlice, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
+import { type GlossaryLike, renderGlossarySlice, type ResidueIssue, scanResidue, selectGlossarySlice } from '../../rebrand/residue-scan';
 import { type ContextAssembler } from '../context/context-assembler.service';
 import { type ModelRouterService, type ProjectConfig } from '../model-router.service';
 import { PROMPT_REGISTRY } from '../prompts';

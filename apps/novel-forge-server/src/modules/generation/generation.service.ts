@@ -6,10 +6,10 @@
  * Importing npm packages
  */
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, gt, inArray, lt, ne, sql, sum } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -19,22 +19,6 @@ import { renderBriefBody } from '@server/common';
 import { APP_NAME } from '@server/constants';
 import { type Ai, type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { ChapterImageService } from './chapter-image.service';
-import {
-  type FeedbackBody,
-  type FinalizeBody,
-  type GenerateBody,
-  type GenerateGrokBody,
-  type ImportDraftBody,
-  type OutlineArcBody,
-  type OutlineBody,
-  type PlanBody,
-  type ReviseDraftBody,
-  type SeedFromBriefBody,
-  type UpdateBriefBody,
-  type UpdateContinuityBody,
-  type UpdateDraftBody,
-} from './generation.dto';
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
 import { type WorkflowRunResult, WorkflowRunService } from '../ai/graphs/workflow-run.service';
@@ -55,6 +39,22 @@ import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { type ChangeOp } from '../refinement/change-set';
 import { ProposalService } from '../refinement/proposal.service';
+import { ChapterImageService } from './chapter-image.service';
+import {
+  type FeedbackBody,
+  type FinalizeBody,
+  type GenerateBody,
+  type GenerateGrokBody,
+  type ImportDraftBody,
+  type OutlineArcBody,
+  type OutlineBody,
+  type PlanBody,
+  type ReviseDraftBody,
+  type SeedFromBriefBody,
+  type UpdateBriefBody,
+  type UpdateContinuityBody,
+  type UpdateDraftBody,
+} from './generation.dto';
 
 /**
  * Defining types

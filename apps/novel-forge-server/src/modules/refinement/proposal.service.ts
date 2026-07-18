@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, inArray, ne } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -18,7 +18,7 @@ import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { loadArtifactStates } from './artifact-state';
-import { type ChangeOp, type OpType, changeSetRefs, validateChangeSet } from './change-set';
+import { type ChangeOp, changeSetRefs, type OpType, validateChangeSet } from './change-set';
 import { type ListChangesQuery, type ListProposalsQuery } from './refinement.dto';
 
 /**
@@ -156,22 +156,20 @@ export class ProposalService {
       }),
     ]);
 
-    const changes = items.map(
-      (proposal): ChangeItem => ({
-        id: proposal.id,
-        sessionId: proposal.sessionId,
-        kind: proposal.kind,
-        scopeType: proposal.scopeType,
-        status: proposal.status,
-        summary: proposal.summary,
-        autoApplied: proposal.autoApplied,
-        refs: changeSetRefs(proposal.changeSet as ChangeOp[]),
-        revertible: proposal.status === 'applied' && ((proposal.inverseOps as ChangeOp[] | null)?.length ?? 0) > 0,
-        opResults: proposal.opResults as Record<string, unknown>[] | null,
-        appliedAt: proposal.appliedAt,
-        revertedAt: proposal.revertedAt,
-      }),
-    );
+    const changes = items.map((proposal): ChangeItem => ({
+      id: proposal.id,
+      sessionId: proposal.sessionId,
+      kind: proposal.kind,
+      scopeType: proposal.scopeType,
+      status: proposal.status,
+      summary: proposal.summary,
+      autoApplied: proposal.autoApplied,
+      refs: changeSetRefs(proposal.changeSet as ChangeOp[]),
+      revertible: proposal.status === 'applied' && ((proposal.inverseOps as ChangeOp[] | null)?.length ?? 0) > 0,
+      opResults: proposal.opResults as Record<string, unknown>[] | null,
+      appliedAt: proposal.appliedAt,
+      revertedAt: proposal.revertedAt,
+    }));
     return utils.pagination.createResult(query, changes, total);
   }
 

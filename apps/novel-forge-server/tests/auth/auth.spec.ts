@@ -5,15 +5,14 @@
 /**
  * Importing npm packages
  */
-import { describe, expect, it } from 'bun:test';
-
 import { SQL } from 'bun';
+import { describe, expect, it } from 'bun:test';
 
 /**
  * Importing user defined packages
  */
 import { TestEnvironment } from '@tests/test-environment';
-import { AUTH_AUDIENCE, TEST_USER, issueTestToken, testIdP } from '@tests/test-idp';
+import { AUTH_AUDIENCE, issueTestToken, TEST_USER, testIdP } from '@tests/test-idp';
 
 /**
  * Defining types

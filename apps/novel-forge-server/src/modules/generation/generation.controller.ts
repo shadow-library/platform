@@ -12,6 +12,7 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Put
  * Importing user defined packages
  */
 
+import { ProposalResponse } from '../refinement/refinement.dto';
 import {
   AiUsageResponse,
   ApproveDraftBody,
@@ -60,7 +61,6 @@ import {
   WorkflowRunResponse,
 } from './generation.dto';
 import { GenerationService } from './generation.service';
-import { ProposalResponse } from '../refinement/refinement.dto';
 
 /**
  * Defining types

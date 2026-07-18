@@ -7,9 +7,9 @@
  */
 import { createHash } from 'node:crypto';
 
+import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -17,12 +17,12 @@ import { and, between, eq, inArray, isNotNull, isNull, lte, or, sql } from 'driz
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
 
-import { CatalogService } from './catalog.service';
-import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection } from './sections';
-import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 import { loadKnowledgeView, parseKnowledgeContract, renderChapterReveals, renderHiddenConstraints, renderKnownFacts } from '../../bible/fact/knowledge-view';
 import { DEFAULT_WRITING_INSTRUCTIONS } from '../prompts/authoring-preamble';
 import { type RetrievalHit, RetrievalService } from '../retrieval';
+import { CatalogService } from './catalog.service';
+import { type AssembledPack, type ContextPurpose, type ContextSection, type ContextSegment, type ContextTier, joinSections, renderSection } from './sections';
+import { applyBudget, countTokens, truncateAtParagraph, truncateAtParagraphTail } from './token-budget';
 
 /**
  * Defining types

@@ -11,14 +11,14 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AiModule } from '../ai/ai.module';
+import { RebrandModule } from '../rebrand/rebrand.module';
+import { SourceModule } from '../source/source.module';
 import { CheckpointJanitor } from './checkpoint.janitor';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobExecutor } from './job.executor';
 import { JobService } from './job.service';
 import { JobsController } from './jobs.controller';
-import { AiModule } from '../ai/ai.module';
-import { RebrandModule } from '../rebrand/rebrand.module';
-import { SourceModule } from '../source/source.module';
 
 /**
  * Defining types

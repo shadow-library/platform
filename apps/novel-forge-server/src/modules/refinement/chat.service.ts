@@ -8,11 +8,11 @@
 import { createHash } from 'node:crypto';
 
 import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messages';
+import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
+import { z } from 'zod';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, desc, eq, gt, lt, sql } from 'drizzle-orm';
-import { z } from 'zod';
 
 /**
  * Importing user defined packages
@@ -21,18 +21,18 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
-import { type ChangeOp } from './change-set';
-import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
-import { ProposalService } from './proposal.service';
 import { CHAT_HISTORY_BUDGET, ContextAssembler } from '../ai/context/context-assembler.service';
 import { countTokens } from '../ai/context/token-budget';
 import { type AiRole, type ResolvedModel } from '../ai/defaults';
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { ModelRouterService, type ProjectConfig } from '../ai/model-router.service';
-import { PROMPT_REGISTRY, buildChatRefinePrompt, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
+import { buildChatRefinePrompt, PROMPT_REGISTRY, renderScopeInstructions, scopeAllowedOps } from '../ai/prompts';
 import { RetrievalService } from '../ai/retrieval';
 import { type ChatCompactOutput, type ChatRefineOutput } from '../ai/schemas';
 import { type ToolContext, ToolRegistryService } from '../ai/tools';
+import { type ChangeOp } from './change-set';
+import { type ApplyResult, ProposalApplyService } from './proposal-apply.service';
+import { ProposalService } from './proposal.service';
 
 /**
  * Defining types

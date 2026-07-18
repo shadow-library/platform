@@ -11,8 +11,8 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { type PromptModule } from './types';
 import { type TitleOutput, TitleSchema } from '../schemas/title.schema';
+import { type PromptModule } from './types';
 
 /**
  * Defining types

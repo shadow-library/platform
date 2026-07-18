@@ -11,9 +11,9 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { StorageModule } from '../storage/storage.module';
 import { ExportController } from './export.controller';
 import { NovelPackageService } from './novel-package.service';
-import { StorageModule } from '../storage/storage.module';
 
 /**
  * Defining types

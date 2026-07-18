@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { eq, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

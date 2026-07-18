@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type RebrandConvertOutput, RebrandConvertSchema } from '../schemas/rebrand.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type RebrandConvertOutput, RebrandConvertSchema } from '../schemas/rebrand.schema';
 
 /**
  * Defining types

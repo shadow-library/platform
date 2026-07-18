@@ -5,16 +5,16 @@
 /**
  * Importing npm packages
  */
+import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, asc, eq, ne, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { type Job, type Knowledge, type PrimaryDatabase, type Story, schema } from '@server/database';
+import { type Job, type Knowledge, type PrimaryDatabase, schema, type Story } from '@server/database';
 
 /**
  * Defining types

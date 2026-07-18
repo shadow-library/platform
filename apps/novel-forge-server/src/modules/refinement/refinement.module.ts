@@ -11,6 +11,7 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AiModule } from '../ai/ai.module';
 import { ActionExecutorRegistry } from './action-registry';
 import { ChangeHistoryController } from './change-history.controller';
 import { ChatController } from './chat.controller';
@@ -20,7 +21,6 @@ import { ProposalController } from './proposal.controller';
 import { ProposalService } from './proposal.service';
 import { RefineController } from './refine.controller';
 import { RefineService } from './refine.service';
-import { AiModule } from '../ai/ai.module';
 
 /**
  * Defining types

@@ -13,11 +13,11 @@ import { AIMessage, type BaseMessage, HumanMessage } from '@langchain/core/messa
 import { ChatOllama } from '@langchain/ollama';
 import { ChatOpenAI } from '@langchain/openai';
 import { ChatXAI } from '@langchain/xai';
+import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { type SchemaClass } from '@shadow-library/class-schema';
 import { Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -26,11 +26,11 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
-import { type AiRole, type ResolvedModel, getProfileDefaults } from './defaults';
+import { type AiRole, getProfileDefaults, type ResolvedModel } from './defaults';
 import { MODEL_MAP } from './models';
 import { applyAnthropicCacheControl } from './prompt-caching';
 import { type PromptModule } from './prompts/types';
-import { type SchemaIssue, type SchemaParseResult, parseSchema, renderSchemaIssues, toJsonSchemaFormat } from './schemas/validate';
+import { parseSchema, renderSchemaIssues, type SchemaIssue, type SchemaParseResult, toJsonSchemaFormat } from './schemas/validate';
 import { ChatClaudeCode, ChatCodex, ChatGrokBuild } from './subprocess-providers';
 import { type TelemetryContext, TelemetryHandler } from './telemetry.handler';
 

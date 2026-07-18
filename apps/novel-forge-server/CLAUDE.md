@@ -27,8 +27,8 @@ Read the doc section referenced by the current task before writing code; do not 
 ```bash
 bun run dev                 # watch-mode server (src/main.ts)
 bun run type-check          # tsc, no emit
-bun run lint                # prettier + eslint (add --fix to autofix)
-bun run build               # bundle to dist/
+bun run verify              # shadow verify: format + lint + type-check + test (add --fix to autofix)
+bun run build               # shadow build: bundle to dist/main.js
 bun test                    # all tests (bunfig.toml enforces 90% coverage)
 bun test tests/foo.spec.ts  # single file
 bun test -t "pattern"       # single test by name
@@ -36,7 +36,8 @@ bun test -t "pattern"       # single test by name
 
 ## Architecture & conventions
 
-- **DI framework:** `@shadow-library/app` modules (`@Module`, `ShadowFactory.create(AppModule)`), NestJS-style controllers/services. HTTP via `FastifyModule.forRoot` in `src/routes/`.
+- **DI framework:** `@shadow-library/app` modules (`@Module`, `ShadowFactory.create(AppModule)`), NestJS-style controllers/services. HTTP via `FastifyModule.forRoot` in `src/modules/dynamic.modules.ts`; controllers carry explicit full paths (`/api/v1/*`, `/api/auth/*`).
+- **Auth:** every HTTP controller is class-level `@Authenticated()` (`@shadow-library/auth`); browsers use the first-party session surface in `src/modules/auth/` (login/callback/session/logout, sealed `nf-session` cookie promoted to a bearer header). Tests get tokens from `tests/test-idp.ts`; `TestEnvironment.getRouter()` injects them automatically.
 - **Config:** every env key is declared in `src/bootstrap.ts` via `Config.load(...)` with a module augmentation of `ConfigRecords`. Note: the scaffold's `db.uri` default is MongoDB — Phase 2 replaces it with PostgreSQL.
 - **Layout:** `src/modules/<feature>/` for domain modules, `src/modules/ai/` per design-doc §1.4, `src/database/schemas/` for Drizzle schemas, `src/routes/` for HTTP wiring.
 - **Errors:** extend `AppErrorCode` (`src/classes/app-error-code.ts`); error code groups per migration-doc §7.6.
@@ -53,7 +54,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 1. Read this checklist; pick the **first unchecked task**.
 2. Read its referenced doc section(s) fully.
 3. Implement only that task. If it's too large for one session, finish a coherent sub-step and note remaining work under the checkbox.
-4. Verify green: `bun run type-check && bun run lint && bun test`.
+4. Verify green: `bun run verify`.
 5. Tick the checkbox here (and remove any progress note if done), then commit everything with a conventional message.
 
 **Checklist** (M = migration doc §10, A = ai-system-design §10, R = interactive-refinement-design):

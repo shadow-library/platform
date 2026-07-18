@@ -5,8 +5,8 @@
 /**
  * Importing npm packages
  */
-import { ClassSchema, type SchemaClass } from '@shadow-library/class-schema';
 import Ajv, { type ValidateFunction } from 'ajv';
+import { ClassSchema, type SchemaClass } from '@shadow-library/class-schema';
 
 /**
  * Importing user defined packages

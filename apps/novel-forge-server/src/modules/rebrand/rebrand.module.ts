@@ -11,8 +11,8 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { RebrandService } from './rebrand.service';
 import { AiModule } from '../ai/ai.module';
+import { RebrandService } from './rebrand.service';
 
 /**
  * Defining types

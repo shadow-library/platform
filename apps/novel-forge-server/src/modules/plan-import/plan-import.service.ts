@@ -5,10 +5,10 @@
 /**
  * Importing npm packages
  */
+import { and, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger, ValidationError } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
-import { and, eq, inArray, isNotNull, notInArray } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -18,9 +18,9 @@ import { arcContentHash, briefContentHash, computeBibleDocHash, renderBriefBody,
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase, schema } from '@server/database';
 
+import { approveVolumePlan } from '../bible/volume/volume.approve';
 import { type CollectionResult, type ImportPlanBody, type ImportPlanResponse, PLAN_BUNDLE_SECTIONS, type PlanBundle, type PlanBundleSectionValue } from './plan-import.dto';
 import { validatePlanBundle } from './plan-import.validator';
-import { approveVolumePlan } from '../bible/volume/volume.approve';
 
 /**
  * Defining types

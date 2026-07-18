@@ -5,9 +5,9 @@
 /**
  * Importing npm packages
  */
+import { Ollama } from 'ollama/browser';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
-import { Ollama } from 'ollama/browser';
 
 /**
  * Importing user defined packages

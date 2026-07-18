@@ -11,9 +11,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type PlanOutput, PlanSchema, validatePlanContiguity } from '../schemas/plan.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type PlanOutput, PlanSchema, validatePlanContiguity } from '../schemas/plan.schema';
 
 /**
  * Defining types

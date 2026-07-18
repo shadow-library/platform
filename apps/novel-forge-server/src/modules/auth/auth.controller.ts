@@ -5,9 +5,9 @@
 /**
  * Importing npm packages
  */
+import { type FastifyReply } from 'fastify';
 import { RelyingParty } from '@shadow-library/auth/rp';
 import { Get, HttpController, type HttpRequest, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
-import { type FastifyReply } from 'fastify';
 
 /**
  * Importing user defined packages

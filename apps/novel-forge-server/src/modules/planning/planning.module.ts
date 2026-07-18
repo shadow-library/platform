@@ -11,8 +11,8 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { SkeletonService } from './skeleton.service';
 import { AiModule } from '../ai/ai.module';
+import { SkeletonService } from './skeleton.service';
 
 /**
  * Defining types

@@ -10,8 +10,8 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { type PromptModule } from './types';
 import { type ExtractionOutput, ExtractionSchema } from '../schemas/extraction.schema';
+import { type PromptModule } from './types';
 
 /**
  * Defining types

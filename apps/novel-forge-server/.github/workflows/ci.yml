@@ -35,15 +35,6 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Type check
-        run: bun run type-check
-
-      - name: Lint
-        run: bun run lint
-
-      - name: Build
-        run: bun run build
-
       - name: Migrate database
         run: bun run db:migrate
         env:
@@ -54,7 +45,11 @@ jobs:
         env:
           DATABASE_POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/novel_forge_test
 
-      - name: Test
-        run: bun test
+      # shadow verify = format + lint + type-check + test; the suite needs the template database.
+      - name: Verify
+        run: bun run verify
         env:
           DATABASE_POSTGRES_URL: postgresql://postgres:postgres@localhost:5432/novel_forge_test
+
+      - name: Build
+        run: bun run build

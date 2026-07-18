@@ -5,12 +5,11 @@
 /**
  * Importing npm packages
  */
-import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
-
-import { AppError } from '@shadow-library/common';
 import { SQL } from 'bun';
+import { afterAll, beforeAll, describe, expect, it, mock } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

@@ -13,11 +13,11 @@ import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts
  */
 import { type Refinement } from '@server/database';
 
+import { type OpType, validateChangeSet } from '../../refinement/change-set';
+import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { scopeAllowedOps } from './scope-playbooks';
 import { type PromptModule } from './types';
-import { type OpType, validateChangeSet } from '../../refinement/change-set';
-import { type ChatRefineOutput, ChatRefineSchema } from '../schemas/chat-refine.schema';
 
 /**
  * Defining types

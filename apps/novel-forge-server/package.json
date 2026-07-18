@@ -6,9 +6,10 @@
   "scripts": {
     "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "lint": "bun run scripts/lint.ts",
+    "verify": "shadow verify",
     "type-check": "tsc -p tsconfig.json",
-    "build": "bun run scripts/build.ts",
+    "test": "bun test",
+    "build": "shadow build",
     "dev": "bun run --watch src/main.ts",
     "db:create-template": "bun run scripts/create-template-db.ts",
     "db:migrate": "bun run scripts/migrate-db.ts",
@@ -32,22 +33,12 @@
   },
   "homepage": "https://github.com/shadow-library/novel-forge-server#readme",
   "devDependencies": {
-    "@commitlint/cli": "^19.8.1",
-    "@commitlint/config-conventional": "^19.8.1",
-    "@eslint/js": "~9.38.0",
+    "@shadow-library/scripts": "0.2.3",
     "@types/bun": "^1.3.1",
-    "@typescript-eslint/parser": "^8.46.2",
     "drizzle-kit": "^0.31.7",
-    "eslint": "~9.38.0",
-    "eslint-import-resolver-typescript": "^3.10.1",
-    "eslint-plugin-import": "^2.32.0",
-    "globals": "^15.15.0",
     "husky": "^9.1.7",
-    "prettier": "^3.6.2",
-    "tsc-alias": "^1.8.16",
     "type-fest": "^4.41.0",
-    "typescript": "^6.0.3",
-    "typescript-eslint": "^8.46.2"
+    "typescript": "^6.0.3"
   },
   "dependencies": {
     "@langchain/anthropic": "^1.5.1",

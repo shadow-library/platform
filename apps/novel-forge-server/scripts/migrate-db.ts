@@ -6,9 +6,9 @@
  * Importing npm packages
  */
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
-import { Logger } from '@shadow-library/common';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/node-postgres/migrator';
+import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

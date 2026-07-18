@@ -10,9 +10,9 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
+import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
 import { AUTHORING_STYLE } from './authoring-preamble';
 import { type PromptModule } from './types';
-import { type GenerationOutput, GenerationSchema } from '../schemas/generation.schema';
 
 /**
  * Defining types

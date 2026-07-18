@@ -11,6 +11,13 @@ import { Body, Get, HttpController, HttpStatus, Params, Post, RespondFor } from 
 /**
  * Importing user defined packages
  */
+import { ConsolidateService } from '../extraction/consolidate.service';
+import { JobExecutor } from '../jobs/job.executor';
+import { JobService } from '../jobs/job.service';
+import { SkeletonService } from '../planning/skeleton.service';
+import { AssetService } from '../source/asset.service';
+import { RecombineService } from '../source/recombine.service';
+import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
 import {
   AssetsResponse,
   ConsolidateResponse,
@@ -24,13 +31,6 @@ import {
   RetitleResponse,
   SkeletonResponse,
 } from './pipeline.dto';
-import { ConsolidateService } from '../extraction/consolidate.service';
-import { JobExecutor } from '../jobs/job.executor';
-import { JobService } from '../jobs/job.service';
-import { SkeletonService } from '../planning/skeleton.service';
-import { AssetService } from '../source/asset.service';
-import { RecombineService } from '../source/recombine.service';
-import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
 
 /**
  * Defining types

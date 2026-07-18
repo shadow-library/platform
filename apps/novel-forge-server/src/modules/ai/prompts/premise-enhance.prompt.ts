@@ -11,10 +11,10 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 /**
  * Importing user defined packages
  */
-import { AUTHORING_STYLE } from './authoring-preamble';
-import { type PromptModule } from './types';
 import { renderOpVocabulary, validateChangeSet } from '../../refinement/change-set';
 import { type PremiseEnhanceOutput, PremiseEnhanceSchema } from '../schemas/premise.schema';
+import { AUTHORING_STYLE } from './authoring-preamble';
+import { type PromptModule } from './types';
 
 /**
  * Defining types
