@@ -2,13 +2,14 @@
  * Importing npm packages
  */
 import { Slot } from '@radix-ui/react-slot';
-import { forwardRef, useContext, useId, useState } from 'react';
+import { forwardRef, type MouseEvent, useContext, useId, useState } from 'react';
 
 /**
  * Importing user defined packages
  */
 import { cn } from '@/lib';
 
+import { ShellMobileNavAreaContext } from '../Shell/Shell.context';
 import { Tooltip, TooltipProvider } from '../Tooltip';
 import { SidebarContext } from './Sidebar.context';
 import styles from './Sidebar.module.css';
@@ -46,17 +47,22 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
  * are the existing components — the Sidebar contributes the state machine. Chrome is surface-app.
  */
 const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
-  { workspace, footer, collapsed = false, onCollapsedChange, className, children, 'aria-label': ariaLabel = 'Main', ...props },
+  { workspace, footer, collapsed: collapsedProp = false, onCollapsedChange, className, children, 'aria-label': ariaLabel = 'Main', ...props },
   ref,
 ) {
+  // Inside the shell's mobile nav drawer the sidebar is always expanded — rail mode and its toggle
+  // are desktop furniture; the drawer's own dismissal replaces them.
+  const mobileNav = useContext(ShellMobileNavAreaContext);
+  const collapsed = mobileNav != null ? false : collapsedProp;
+  const showCollapseToggle = onCollapsedChange != null && mobileNav == null;
   return (
     <TooltipProvider>
       <SidebarContext.Provider value={{ collapsed }}>
         <nav ref={ref} className={cn(styles.root, className)} data-collapsed={collapsed || undefined} aria-label={ariaLabel} {...props}>
-          {workspace != null || onCollapsedChange ? (
+          {workspace != null || showCollapseToggle ? (
             <div className={styles.header}>
               {workspace != null ? <div className={styles.workspace}>{workspace}</div> : <span />}
-              {onCollapsedChange ? (
+              {showCollapseToggle ? (
                 <button
                   type="button"
                   className={styles.collapseToggle}
@@ -90,12 +96,20 @@ const SidebarSection = forwardRef<HTMLDivElement, SidebarSectionProps>(function 
 
 /** A navigation destination — a real link with active state, icon, and optional badge. */
 const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function SidebarItem(
-  { icon, badge, active = false, asChild = false, label, className, children, ...props },
+  { icon, badge, active = false, asChild = false, label, className, onClick, children, ...props },
   ref,
 ) {
   const { collapsed } = useContext(SidebarContext);
+  const mobileNav = useContext(ShellMobileNavAreaContext);
   const Comp = asChild ? Slot : 'a';
   const name = label ?? (typeof children === 'string' ? children : undefined);
+
+  // Choosing a destination inside the shell's mobile nav drawer dismisses the drawer.
+  function handleClick(event: MouseEvent<HTMLAnchorElement>): void {
+    onClick?.(event);
+    if (!event.defaultPrevented) mobileNav?.close();
+  }
+
   const item = (
     <Comp
       ref={ref}
@@ -103,6 +117,7 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
       data-active={active || undefined}
       aria-current={active ? 'page' : undefined}
       aria-label={collapsed ? name : undefined}
+      onClick={handleClick}
       {...props}
     >
       {icon != null ? <span className={styles.icon}>{icon}</span> : null}

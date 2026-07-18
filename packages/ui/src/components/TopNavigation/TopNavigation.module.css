@@ -8,13 +8,30 @@
   display: flex;
   align-items: center;
   gap: 24px;
-  height: 56px;
-  padding: 0 24px;
+  /* The bar extends under the status bar / notch in standalone PWAs: safe-area padding
+     grows the box while the 56px content row stays centered (insets are 0 on desktop). */
+  height: calc(56px + var(--sh-safe-top));
+  padding: var(--sh-safe-top) calc(24px + var(--sh-safe-right)) 0 calc(24px + var(--sh-safe-left));
   background: var(--sh-surface-card);
   border-bottom: var(--sh-border-width) solid var(--sh-border-default);
 }
 [data-density='compact'] .bar {
-  height: 48px;
+  height: calc(48px + var(--sh-safe-top));
+}
+
+/* Hamburger — only below md, where the shell swaps the persistent sidebar for the nav drawer
+   (breakpoint token --sh-breakpoint-md 768). The wrapper owns the media query so the IconButton
+   inside keeps its own display rules. */
+.menuSlot {
+  display: none;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: -8px;
+}
+@media (max-width: 767px) {
+  .menuSlot {
+    display: inline-flex;
+  }
 }
 
 .brand {

@@ -6,6 +6,8 @@
 .shell {
   display: flex;
   min-height: 100vh;
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  min-height: 100dvh;
   background: var(--sh-surface-app);
   color: var(--sh-text-primary);
 }
@@ -15,6 +17,93 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
+}
+
+/* ── Sidebar slot / mobile nav drawer ────────────────────── */
+.sidebarSlot {
+  display: contents;
+}
+/* Below md the persistent sidebar yields to the hamburger-driven nav drawer (breakpoint token --sh-breakpoint-md 768) */
+@media (max-width: 767px) {
+  .sidebarSlot {
+    display: none;
+  }
+}
+
+.navScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sh-z-scrim);
+  background: var(--sh-scrim);
+  animation: sh-shell-scrim-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.navScrim[data-state='closed'] {
+  animation: sh-shell-scrim-out var(--sh-duration-normal-exit) var(--sh-ease-standard);
+}
+
+.navDrawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--sh-z-modal);
+  display: flex;
+  max-width: 85vw;
+  padding-left: var(--sh-safe-left);
+  background: var(--sh-surface-app);
+  box-shadow: var(--sh-shadow-e3);
+  animation: sh-shell-nav-in var(--sh-duration-slow) var(--sh-ease-emphasized);
+  outline: none;
+}
+.navDrawer[data-state='closed'] {
+  animation: sh-shell-nav-out var(--sh-duration-slow-exit) var(--sh-ease-standard);
+}
+/* At and above md the persistent sidebar is back; the drawer never shows there. */
+@media (min-width: 768px) {
+  .navScrim,
+  .navDrawer {
+    display: none;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes sh-shell-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sh-shell-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sh-shell-nav-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes sh-shell-nav-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navScrim,
+  .navDrawer {
+    animation: none;
+  }
 }
 
 .main {

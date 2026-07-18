@@ -8,6 +8,8 @@ import { type Meta, type StoryObj } from '@storybook/react-vite';
  * Importing user defined packages
  */
 import { Button } from '../Button';
+import { Sidebar } from '../Sidebar';
+import { TopNavigation } from '../TopNavigation';
 import { Page, Shell } from './Shell';
 
 /**
@@ -64,6 +66,57 @@ export const Default: Story = {
         <div
           style={{
             height: 400,
+            borderRadius: 8,
+            border: '1px dashed var(--sh-border-default)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--sh-text-tertiary)',
+          }}
+        >
+          Page content
+        </div>
+      </Page>
+    </Shell>
+  ),
+};
+
+/**
+ * Below the md breakpoint (768px) the shell hides the persistent sidebar automatically and
+ * TopNavigation surfaces a hamburger that opens the same sidebar as a modal nav drawer.
+ * Narrow the viewport (or use the viewport toolbar) to see the swap.
+ */
+export const ResponsiveNavigation: Story = {
+  parameters: { viewport: { defaultViewport: 'mobile1' } },
+  render: () => (
+    <Shell
+      sidebar={
+        <Sidebar workspace="acme-prod">
+          <Sidebar.Section label="Platform">
+            <Sidebar.Item href="#services" active>
+              Services
+            </Sidebar.Item>
+            <Sidebar.Item href="#deploys">Deploys</Sidebar.Item>
+            <Sidebar.Item href="#logs">Logs</Sidebar.Item>
+          </Sidebar.Section>
+          <Sidebar.Section label="Admin">
+            <Sidebar.Item href="#members">Members</Sidebar.Item>
+            <Sidebar.Item href="#settings">Settings</Sidebar.Item>
+          </Sidebar.Section>
+        </Sidebar>
+      }
+      topbar={
+        <TopNavigation brand="Acme">
+          <TopNavigation.Item href="#overview" active>
+            Overview
+          </TopNavigation.Item>
+        </TopNavigation>
+      }
+    >
+      <Page title="Services" description="Resize below 768px for the drawer">
+        <div
+          style={{
+            height: 320,
             borderRadius: 8,
             border: '1px dashed var(--sh-border-default)',
             display: 'flex',
