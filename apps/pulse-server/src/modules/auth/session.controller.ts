@@ -18,6 +18,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
 import { Public } from './public.decorator';
+import { PULSE_AUDIENCE } from './rbac.constants';
 import { LoginCallbackQuery, LoginQuery, SessionResponse } from './session.dto';
 
 /**
@@ -88,7 +89,8 @@ export class SessionController {
   @Public()
   async login(@Query() query: LoginQuery, @Res() response: HttpResponse): Promise<void> {
     const returnTo = sanitizeReturnTo(query.returnTo);
-    const request = await this.relyingParty.createAuthorizationUrl({ scopes: RP_SCOPES, resource: Config.get('auth.audience') });
+    /** Resolved audience, not the raw config — the raw value is unset whenever the code default applies, and without `resource` identity mints an unusable `shadow-identity`-audience token */
+    const request = await this.relyingParty.createAuthorizationUrl({ scopes: RP_SCOPES, resource: Config.get('auth.audience') ?? PULSE_AUDIENCE });
     const flow: LoginFlowState = { state: request.state, nonce: request.nonce, codeVerifier: request.codeVerifier, returnTo };
     response.setCookie(FLOW_COOKIE, encodeFlow(flow), { ...this.cookieFlags(), path: FLOW_COOKIE_PATH, maxAge: FLOW_TTL_SECONDS });
     this.logger.debug('Login flow started', { returnTo });

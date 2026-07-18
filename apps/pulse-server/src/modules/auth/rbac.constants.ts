@@ -20,6 +20,9 @@ export type PulseRole = (typeof PULSE_ROLES)[keyof typeof PULSE_ROLES];
  * BootstrapService seeds the matching application permissions and roles — the two must stay in sync.
  */
 
+/** Ecosystem-standard API resource identifier for pulse — the audience of every token this service accepts or requests */
+export const PULSE_AUDIENCE = 'pulse-server';
+
 /** PDP-checked permissions, granted to operators through roles and evaluated in the platform organisation */
 export const PULSE_PERMISSIONS = {
   templatesRead: 'pulse:templates:read',

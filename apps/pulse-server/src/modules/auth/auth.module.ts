@@ -9,6 +9,7 @@ import { AppError, Config, throwError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
+import { PULSE_AUDIENCE } from './rbac.constants';
 import { RouteGuardSentinel } from './route-guard.sentinel';
 import { SessionController } from './session.controller';
 
@@ -45,7 +46,7 @@ const RP_CALLBACK_PATH = '/api/auth/callback';
 /** A wrong trust anchor in production means honouring tokens from the wrong authority, so it must never default there */
 function resolveAuthOptions(): ResolvedAuthOptions {
   const issuer = Config.get('auth.issuer') ?? (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'AUTH_ISSUER' not set`)) : DEV_ISSUER);
-  const audience = Config.get('auth.audience') ?? 'pulse-server';
+  const audience = Config.get('auth.audience') ?? PULSE_AUDIENCE;
   const clientId = Config.get('auth.client.id') ?? (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'AUTH_CLIENT_ID' not set`)) : DEV_CLIENT_ID);
   const assertionPath = Config.get('auth.client.assertion-path') || undefined;
   let secret = Config.get('auth.client.secret') || undefined;
