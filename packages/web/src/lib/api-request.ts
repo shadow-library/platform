@@ -17,6 +17,8 @@ export interface APIRequestOptions {
   headers: Record<string, string>;
   query: Record<string, string>;
   data?: JsonObject;
+  signal?: AbortSignal;
+  timeoutMs?: number;
 }
 
 export interface PreRequestContext {
@@ -131,13 +133,32 @@ export class APIRequest {
     return this;
   }
 
-  body(data: JsonObject): this {
-    this.options.data = data;
+  body(data: object): this {
+    // The internal store stays `JsonObject` so `field()` can walk it; `body()` accepts any request DTO
+    // (generated bodies carry freeform `{ [k]: unknown }` blobs that aren't assignable to `JsonValue`) —
+    // still JSON-serialisable, so it is kept as-is for `JSON.stringify`.
+    this.options.data = data as JsonObject;
+    return this;
+  }
+
+  /**
+   * Bind an `AbortSignal` so the request is cancelled when the signal aborts. Pass the `signal` TanStack
+   * Query hands a `queryFn` (`queryFn: ({ signal }) => APIRequest.get('/x').signal(signal).execute()`) to make
+   * queries cancel on unmount or when superseded — the abort propagates as-is instead of becoming an `ApiError`.
+   */
+  signal(signal: AbortSignal): this {
+    this.options.signal = signal;
+    return this;
+  }
+
+  /** Abort the request if it hasn't settled within `ms`. Composes with `signal()` — either aborting cancels the fetch. */
+  timeout(ms: number): this {
+    this.options.timeoutMs = ms;
     return this;
   }
 
   async execute<T>(): Promise<T> {
-    const { path, method, headers, query, data } = this.options;
+    const { path, method, headers, query, data, signal, timeoutMs } = this.options;
 
     let url: string = path;
     const searchParams = new URLSearchParams(query);
@@ -150,13 +171,22 @@ export class APIRequest {
       init.body = JSON.stringify(data);
     }
 
+    // A caller `signal` (query cancellation) and a `timeout` deadline both abort the same fetch; combine
+    // them when both are present so whichever fires first wins.
+    const timeoutSignal = timeoutMs !== undefined ? AbortSignal.timeout(timeoutMs) : undefined;
+    const requestSignal = signal && timeoutSignal ? AbortSignal.any([signal, timeoutSignal]) : (signal ?? timeoutSignal);
+    if (requestSignal) init.signal = requestSignal;
+
     let response: Response;
     try {
       const options = { ...this.options };
       if (APIRequest.preRequestHook) await APIRequest.preRequestHook({ url, init, options });
       response = await fetch(url, init);
       if (APIRequest.postResponseHook) await APIRequest.postResponseHook({ response, options });
-    } catch {
+    } catch (error) {
+      // A cancelled or timed-out request must propagate as-is so TanStack Query treats it as a
+      // cancellation, not a failed request masquerading as a network error.
+      if (error instanceof DOMException && (error.name === 'AbortError' || error.name === 'TimeoutError')) throw error;
       throw new ApiError(-1, { code: 'NETWORK_ERROR', type: 'NetworkError', message: 'Unable to reach the server' });
     }
 

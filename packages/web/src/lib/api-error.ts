@@ -50,4 +50,32 @@ export class ApiError extends Error {
     this.fields = body.fields;
     this.retryAfterSeconds = retryAfterSeconds;
   }
+
+  /** The field-level problems as a `{ field: message }` map for binding inline form errors; empty when there are none. */
+  get fieldErrors(): Record<string, string> {
+    const result: Record<string, string> = {};
+    for (const { field, msg } of this.fields ?? []) result[field] = msg;
+    return result;
+  }
+
+  /**
+   * Narrows an unknown value to `ApiError`. Prefers `instanceof`, but falls back to a shape check so the guard
+   * still holds when the package is bundled more than once (a common SSR + client split), where `instanceof`
+   * across the two class identities would otherwise miss.
+   */
+  static isApiError(value: unknown): value is ApiError {
+    if (value instanceof ApiError) return true;
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      (value as { name?: unknown }).name === 'ApiError' &&
+      typeof (value as { status?: unknown }).status === 'number' &&
+      typeof (value as { code?: unknown }).code === 'string'
+    );
+  }
+}
+
+/** Type guard narrowing an unknown thrown value (a `catch` binding, a query/mutation error) to `ApiError`. */
+export function isApiError(value: unknown): value is ApiError {
+  return ApiError.isApiError(value);
 }
