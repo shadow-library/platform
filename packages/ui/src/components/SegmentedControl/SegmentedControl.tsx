@@ -21,7 +21,7 @@ import { type SegmentedControlItemProps, type SegmentedControlProps } from './Se
  */
 const SegmentedControlRoot = forwardRef<HTMLDivElement, SegmentedControlProps>(function SegmentedControl({ size = 'md', fullWidth = false, className, ...props }, ref) {
   return (
-    <RadioGroupPrimitive.Root ref={ref} className={cn(styles.track, className)} data-size={size} data-full-width={fullWidth || undefined} orientation='horizontal' {...props} />
+    <RadioGroupPrimitive.Root ref={ref} className={cn(styles.track, className)} data-size={size} data-full-width={fullWidth || undefined} orientation="horizontal" {...props} />
   );
 });
 

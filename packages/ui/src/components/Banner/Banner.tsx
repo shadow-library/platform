@@ -21,33 +21,33 @@ const INTENT_PREFIX: Record<BannerIntent, string> = { info: '', success: '', war
 const INTENT_GLYPH: Record<BannerIntent, ReactElement> = {
   success: (
     <>
-      <circle cx='8' cy='8' r='6.25' />
-      <path d='M5.5 8.2l1.8 1.8 3.2-3.6' />
+      <circle cx="8" cy="8" r="6.25" />
+      <path d="M5.5 8.2l1.8 1.8 3.2-3.6" />
     </>
   ),
   warning: (
     <>
-      <path d='M8 2.2 1.6 13h12.8L8 2.2Z' />
-      <path d='M8 6.5v3M8 11.4v.1' />
+      <path d="M8 2.2 1.6 13h12.8L8 2.2Z" />
+      <path d="M8 6.5v3M8 11.4v.1" />
     </>
   ),
   danger: (
     <>
-      <circle cx='8' cy='8' r='6.25' />
-      <path d='M8 5v3.4M8 10.8v.1' />
+      <circle cx="8" cy="8" r="6.25" />
+      <path d="M8 5v3.4M8 10.8v.1" />
     </>
   ),
   info: (
     <>
-      <circle cx='8' cy='8' r='6.25' />
-      <path d='M8 7.4v3.2M8 5.2v.1' />
+      <circle cx="8" cy="8" r="6.25" />
+      <path d="M8 7.4v3.2M8 5.2v.1" />
     </>
   ),
 };
 
 function IntentIcon({ intent }: { intent: BannerIntent }): ReactElement {
   return (
-    <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth={1.6} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       {INTENT_GLYPH[intent]}
     </svg>
   );
@@ -55,8 +55,8 @@ function IntentIcon({ intent }: { intent: BannerIntent }): ReactElement {
 
 function DismissIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -101,10 +101,10 @@ export const Banner = forwardRef<HTMLDivElement, BannerProps>(function Banner(
           aria-busy={actionSpinner || undefined}
           data-loading={actionSpinner || undefined}
         >
-          {actionSpinner ? <Spinner size='sm' /> : action.label}
+          {actionSpinner ? <Spinner size="sm" /> : action.label}
         </ActionTag>
       ) : null}
-      {dismissable ? <IconButton className={styles.dismiss} size='sm' variant='ghost' icon={<DismissIcon />} aria-label='Dismiss notice' onClick={onDismiss} /> : null}
+      {dismissable ? <IconButton className={styles.dismiss} size="sm" variant="ghost" icon={<DismissIcon />} aria-label="Dismiss notice" onClick={onDismiss} /> : null}
     </div>
   );
 });

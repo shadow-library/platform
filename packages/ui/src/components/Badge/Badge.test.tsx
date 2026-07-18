@@ -24,7 +24,7 @@ describe('Badge', () => {
 
   it('reflects intent and variant on the element', () => {
     render(
-      <Badge intent='success' variant='soft'>
+      <Badge intent="success" variant="soft">
         Active
       </Badge>,
     );
@@ -33,18 +33,18 @@ describe('Badge', () => {
 
   it('renders a leading dot when dot is set or variant is dot', () => {
     const { container, rerender } = render(
-      <Badge intent='success' dot>
+      <Badge intent="success" dot>
         Active
       </Badge>,
     );
     expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
-    rerender(<Badge variant='dot'>Active</Badge>);
+    rerender(<Badge variant="dot">Active</Badge>);
     expect(container.querySelector('[aria-hidden="true"]')).toBeInTheDocument();
   });
 
   it('caps a count at max with a trailing plus', () => {
     render(
-      <Badge variant='count' intent='danger' max={99}>
+      <Badge variant="count" intent="danger" max={99}>
         {128}
       </Badge>,
     );
@@ -53,7 +53,7 @@ describe('Badge', () => {
 
   it('renders a count under the cap unchanged', () => {
     render(
-      <Badge variant='count' max={99}>
+      <Badge variant="count" max={99}>
         {12}
       </Badge>,
     );
@@ -70,7 +70,7 @@ describe('Badge', () => {
 
   it('passes through an accessible label for count badges', () => {
     render(
-      <Badge variant='count' intent='danger' aria-label='12 unread notifications'>
+      <Badge variant="count" intent="danger" aria-label="12 unread notifications">
         {12}
       </Badge>,
     );

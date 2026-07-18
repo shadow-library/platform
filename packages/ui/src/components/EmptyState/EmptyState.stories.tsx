@@ -14,10 +14,10 @@ import { EmptyState } from './EmptyState';
  */
 function RepoArt() {
   return (
-    <svg width='96' height='96' viewBox='0 0 96 96' fill='none' stroke='currentColor' strokeWidth='2' aria-hidden='true'>
-      <rect x='20' y='24' width='56' height='48' rx='6' />
-      <path d='M20 38h56M32 52h20' strokeLinecap='round' />
-      <circle cx='68' cy='30' r='3' fill='var(--sh-accent)' stroke='none' />
+    <svg width="96" height="96" viewBox="0 0 96 96" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <rect x="20" y="24" width="56" height="48" rx="6" />
+      <path d="M20 38h56M32 52h20" strokeLinecap="round" />
+      <circle cx="68" cy="30" r="3" fill="var(--sh-accent)" stroke="none" />
     </svg>
   );
 }

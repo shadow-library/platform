@@ -18,12 +18,12 @@ import { Sidebar, useSidebar } from './Sidebar';
 describe('Sidebar', () => {
   it('renders a Main nav landmark with links and marks the active item', () => {
     render(
-      <Sidebar workspace='acme-prod'>
-        <Sidebar.Section label='Platform'>
-          <Sidebar.Item href='/services' active>
+      <Sidebar workspace="acme-prod">
+        <Sidebar.Section label="Platform">
+          <Sidebar.Item href="/services" active>
             Services
           </Sidebar.Item>
-          <Sidebar.Item href='/deploys'>Deploys</Sidebar.Item>
+          <Sidebar.Item href="/deploys">Deploys</Sidebar.Item>
         </Sidebar.Section>
       </Sidebar>,
     );
@@ -37,15 +37,15 @@ describe('Sidebar', () => {
   it('toggles collapse through the labelled button', async () => {
     const user = userEvent.setup();
     const onCollapsedChange = vi.fn();
-    render(<Sidebar workspace='acme-prod' onCollapsedChange={onCollapsedChange} />);
+    render(<Sidebar workspace="acme-prod" onCollapsedChange={onCollapsedChange} />);
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }));
     expect(onCollapsedChange).toHaveBeenCalledWith(true);
   });
 
   it('points the collapse chevron the right way for each mode', () => {
-    const { rerender } = render(<Sidebar workspace='acme-prod' onCollapsedChange={() => {}} />);
+    const { rerender } = render(<Sidebar workspace="acme-prod" onCollapsedChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'Collapse navigation' })).toHaveAttribute('data-direction', 'left');
-    rerender(<Sidebar workspace='acme-prod' collapsed onCollapsedChange={() => {}} />);
+    rerender(<Sidebar workspace="acme-prod" collapsed onCollapsedChange={() => {}} />);
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toHaveAttribute('data-direction', 'right');
   });
 
@@ -53,8 +53,8 @@ describe('Sidebar', () => {
     const user = userEvent.setup();
     render(
       <Sidebar>
-        <Sidebar.Group label='Settings'>
-          <Sidebar.Item href='/settings/general'>General</Sidebar.Item>
+        <Sidebar.Group label="Settings">
+          <Sidebar.Item href="/settings/general">General</Sidebar.Item>
         </Sidebar.Group>
       </Sidebar>,
     );
@@ -69,7 +69,7 @@ describe('Sidebar', () => {
   it('keeps the header identity mark visible in rail mode', () => {
     function Mark() {
       const { collapsed } = useSidebar();
-      return <span data-testid='mark'>{collapsed ? 'A' : 'acme-prod'}</span>;
+      return <span data-testid="mark">{collapsed ? 'A' : 'acme-prod'}</span>;
     }
     render(<Sidebar collapsed workspace={<Mark />} onCollapsedChange={() => {}} />);
     // The logo mark stays mounted (icon-only) rather than being dropped when minimised.
@@ -80,7 +80,7 @@ describe('Sidebar', () => {
   it('hides labels but keeps accessible names in rail mode', () => {
     render(
       <Sidebar collapsed>
-        <Sidebar.Item href='/services' icon={<svg aria-hidden='true' />}>
+        <Sidebar.Item href="/services" icon={<svg aria-hidden="true" />}>
           Services
         </Sidebar.Item>
       </Sidebar>,

@@ -18,8 +18,8 @@ import { type CheckboxProps } from './Checkbox.types';
  */
 function DashIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M3.5 8h9' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M3.5 8h9" />
     </svg>
   );
 }

@@ -20,7 +20,7 @@ describe('FormField', () => {
   it('links the label to the control so clicking it focuses the field', async () => {
     const user = userEvent.setup();
     render(
-      <FormField label='Display name'>
+      <FormField label="Display name">
         <Input />
       </FormField>,
     );
@@ -30,7 +30,7 @@ describe('FormField', () => {
 
   it('links helper text via aria-describedby', () => {
     render(
-      <FormField label='Display name' helper='Shown in the sidebar'>
+      <FormField label="Display name" helper="Shown in the sidebar">
         <Input />
       </FormField>,
     );
@@ -41,7 +41,7 @@ describe('FormField', () => {
 
   it('replaces helper with an error and makes the control invalid', () => {
     render(
-      <FormField label='Workspace URL' helper='Lowercase only' error='Only lowercase letters, numbers, and hyphens'>
+      <FormField label="Workspace URL" helper="Lowercase only" error="Only lowercase letters, numbers, and hyphens">
         <Input />
       </FormField>,
     );
@@ -55,13 +55,13 @@ describe('FormField', () => {
 
   it('renders the required and optional markers', () => {
     const { rerender } = render(
-      <FormField label='Email' required>
+      <FormField label="Email" required>
         <Input />
       </FormField>,
     );
     expect(screen.getByText('Required')).toBeInTheDocument();
     rerender(
-      <FormField label='Phone' optional>
+      <FormField label="Phone" optional>
         <Input />
       </FormField>,
     );
@@ -70,7 +70,7 @@ describe('FormField', () => {
 
   it('disables the wrapped control', () => {
     render(
-      <FormField label='Email' disabled>
+      <FormField label="Email" disabled>
         <Input />
       </FormField>,
     );
@@ -79,8 +79,8 @@ describe('FormField', () => {
 
   it('respects an id already set on the control', () => {
     render(
-      <FormField label='Email'>
-        <Input id='custom-email' />
+      <FormField label="Email">
+        <Input id="custom-email" />
       </FormField>,
     );
     expect(screen.getByRole('textbox')).toHaveAttribute('id', 'custom-email');
@@ -89,8 +89,8 @@ describe('FormField', () => {
 
   it('merges an existing aria-describedby on the control', () => {
     render(
-      <FormField label='Email' helper='We never share it'>
-        <Input aria-describedby='external-hint' />
+      <FormField label="Email" helper="We never share it">
+        <Input aria-describedby="external-hint" />
       </FormField>,
     );
     const describedBy = screen.getByRole('textbox').getAttribute('aria-describedby');

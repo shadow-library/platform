@@ -23,7 +23,7 @@ function Harness({ onOpenChange, ...rest }: { onOpenChange?: (open: boolean) => 
         setOpen(next);
         onOpenChange?.(next);
       }}
-      title='Filter results'
+      title="Filter results"
       snapPoints={rest.snapPoints ?? ['content']}
       dismissable={rest.dismissable}
     >

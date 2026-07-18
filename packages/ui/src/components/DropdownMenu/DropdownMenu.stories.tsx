@@ -17,35 +17,35 @@ import { DropdownMenu } from './DropdownMenu';
  */
 function PlusIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M8 3v10M3 8h10' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M8 3v10M3 8h10" />
     </svg>
   );
 }
 
 function CopyIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <rect x='5' y='5' width='8' height='8' rx='1.5' />
-      <path d='M11 5V4a1.5 1.5 0 0 0-1.5-1.5h-5A1.5 1.5 0 0 0 3 4v5A1.5 1.5 0 0 0 4.5 10.5H5' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="5" width="8" height="8" rx="1.5" />
+      <path d="M11 5V4a1.5 1.5 0 0 0-1.5-1.5h-5A1.5 1.5 0 0 0 3 4v5A1.5 1.5 0 0 0 4.5 10.5H5" />
     </svg>
   );
 }
 
 function TrashIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.5 8h5l.5-8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.5 8h5l.5-8" />
     </svg>
   );
 }
 
 function MoreIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
-      <circle cx='3' cy='8' r='1.3' />
-      <circle cx='8' cy='8' r='1.3' />
-      <circle cx='13' cy='8' r='1.3' />
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="3" cy="8" r="1.3" />
+      <circle cx="8" cy="8" r="1.3" />
+      <circle cx="13" cy="8" r="1.3" />
     </svg>
   );
 }
@@ -70,10 +70,10 @@ export const Playground: Story = {
           <Button suffix={<ChevronDown />}>Actions</Button>
         </DropdownMenu.Trigger>
         <DropdownMenu.Content>
-          <DropdownMenu.Item icon={<PlusIcon />} shortcut='⌘N'>
+          <DropdownMenu.Item icon={<PlusIcon />} shortcut="⌘N">
             New run
           </DropdownMenu.Item>
-          <DropdownMenu.Item icon={<CopyIcon />} shortcut='⌘D'>
+          <DropdownMenu.Item icon={<CopyIcon />} shortcut="⌘D">
             Duplicate
           </DropdownMenu.Item>
           <DropdownMenu.Item disabled icon={<CopyIcon />}>
@@ -99,7 +99,7 @@ export const IconTrigger: Story = {
   render: () => (
     <DropdownMenu>
       <DropdownMenu.Trigger asChild>
-        <IconButton icon={<MoreIcon />} aria-label='Row actions' />
+        <IconButton icon={<MoreIcon />} aria-label="Row actions" />
       </DropdownMenu.Trigger>
       <DropdownMenu.Content>
         <DropdownMenu.Item icon={<CopyIcon />}>Duplicate</DropdownMenu.Item>
@@ -124,9 +124,9 @@ export const RadioGroup: Story = {
         <DropdownMenu.Content>
           <DropdownMenu.Label>Sort by</DropdownMenu.Label>
           <DropdownMenu.RadioGroup value={sort} onValueChange={setSort}>
-            <DropdownMenu.RadioItem value='name'>Name</DropdownMenu.RadioItem>
-            <DropdownMenu.RadioItem value='date'>Date modified</DropdownMenu.RadioItem>
-            <DropdownMenu.RadioItem value='size'>Size</DropdownMenu.RadioItem>
+            <DropdownMenu.RadioItem value="name">Name</DropdownMenu.RadioItem>
+            <DropdownMenu.RadioItem value="date">Date modified</DropdownMenu.RadioItem>
+            <DropdownMenu.RadioItem value="size">Size</DropdownMenu.RadioItem>
           </DropdownMenu.RadioGroup>
         </DropdownMenu.Content>
       </DropdownMenu>
@@ -157,8 +157,8 @@ export const Submenu: Story = {
 
 function ChevronDown() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true' width={16} height={16}>
-      <path d='M4 6.5L8 10.5L12 6.5' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" width={16} height={16}>
+      <path d="M4 6.5L8 10.5L12 6.5" />
     </svg>
   );
 }

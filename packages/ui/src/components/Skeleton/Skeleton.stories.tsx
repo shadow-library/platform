@@ -26,11 +26,11 @@ type Story = StoryObj<typeof meta>;
 export const Primitives: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: 280 }}>
-      <Skeleton shape='line' width='70%' />
-      <Skeleton shape='line' width='90%' />
-      <Skeleton shape='line' width='50%' />
-      <Skeleton shape='circle' width={40} />
-      <Skeleton shape='rect' width='100%' height={80} />
+      <Skeleton shape="line" width="70%" />
+      <Skeleton shape="line" width="90%" />
+      <Skeleton shape="line" width="50%" />
+      <Skeleton shape="circle" width={40} />
+      <Skeleton shape="rect" width="100%" height={80} />
     </div>
   ),
 };

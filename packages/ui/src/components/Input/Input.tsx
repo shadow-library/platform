@@ -16,26 +16,26 @@ import { type InputProps } from './Input.types';
  */
 function ClearIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
 
 function EyeIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z' />
-      <circle cx='8' cy='8' r='2' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1.5 8S3.9 3.5 8 3.5 14.5 8 14.5 8 12.1 12.5 8 12.5 1.5 8 1.5 8Z" />
+      <circle cx="8" cy="8" r="2" />
     </svg>
   );
 }
 
 function EyeOffIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6.3 6.3a2 2 0 0 0 2.8 2.8M4.2 4.3C2.6 5.3 1.5 8 1.5 8s2.4 4.5 6.5 4.5c1 0 1.9-.2 2.7-.6M9.9 4C9.3 3.7 8.7 3.5 8 3.5 3.9 3.5 1.5 8 1.5 8m13 0s-.6 1.2-1.8 2.4' />
-      <path d='M2 2l12 12' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.3 6.3a2 2 0 0 0 2.8 2.8M4.2 4.3C2.6 5.3 1.5 8 1.5 8s2.4 4.5 6.5 4.5c1 0 1.9-.2 2.7-.6M9.9 4C9.3 3.7 8.7 3.5 8 3.5 3.9 3.5 1.5 8 1.5 8m13 0s-.6 1.2-1.8 2.4" />
+      <path d="M2 2l12 12" />
     </svg>
   );
 }
@@ -108,7 +108,7 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
       data-trail={trail}
     >
       {prefix != null ? (
-        <span className={prefixIsAddon ? styles.addon : styles.adornment} data-side='before'>
+        <span className={prefixIsAddon ? styles.addon : styles.adornment} data-side="before">
           {prefix}
         </span>
       ) : null}
@@ -124,17 +124,17 @@ export const Input = forwardRef<HTMLInputElement, InputProps>(function Input(
         {...props}
       />
       {showClear ? (
-        <button type='button' className={styles.clear} aria-label='Clear' onClick={handleClear}>
+        <button type="button" className={styles.clear} aria-label="Clear" onClick={handleClear}>
           <ClearIcon />
         </button>
       ) : null}
       {showReveal ? (
-        <button type='button' className={styles.reveal} aria-label={revealed ? 'Hide password' : 'Show password'} aria-pressed={revealed} onClick={() => setRevealed(v => !v)}>
+        <button type="button" className={styles.reveal} aria-label={revealed ? 'Hide password' : 'Show password'} aria-pressed={revealed} onClick={() => setRevealed(v => !v)}>
           {revealed ? <EyeOffIcon /> : <EyeIcon />}
         </button>
       ) : null}
       {suffix != null ? (
-        <span className={suffixIsAddon ? styles.addon : styles.adornment} data-side='after'>
+        <span className={suffixIsAddon ? styles.addon : styles.adornment} data-side="after">
           {suffix}
         </span>
       ) : null}

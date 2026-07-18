@@ -47,19 +47,19 @@ async function expectHydrationClean(element: ReactElement): Promise<void> {
 
 describe('SSR hydration', () => {
   it('hydrates Kbd without a platform-driven mismatch', async () => {
-    await expectHydrationClean(<Kbd keys='mod+k' />);
+    await expectHydrationClean(<Kbd keys="mod+k" />);
   });
 
   it('hydrates Kbd with an explicit mac pin', async () => {
-    await expectHydrationClean(<Kbd keys='mod+k' mac />);
+    await expectHydrationClean(<Kbd keys="mod+k" mac />);
   });
 
   it('hydrates Statistic without a locale-driven mismatch', async () => {
-    await expectHydrationClean(<Statistic label='Revenue' value={1234567} delta={0.12} positiveIs='up' comparison='vs last week' format={{ notation: 'compact' }} />);
+    await expectHydrationClean(<Statistic label="Revenue" value={1234567} delta={0.12} positiveIs="up" comparison="vs last week" format={{ notation: 'compact' }} />);
   });
 
   it('hydrates an unselected Calendar without a today-driven mismatch', async () => {
-    await expectHydrationClean(<Calendar aria-label='Calendar' />);
+    await expectHydrationClean(<Calendar aria-label="Calendar" />);
   });
 
   it('hydrates a NotificationList feed without a relative-date mismatch', async () => {

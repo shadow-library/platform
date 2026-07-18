@@ -16,27 +16,27 @@ import { ButtonGroup } from './ButtonGroup';
  */
 function SearchIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <circle cx='7' cy='7' r='4.5' />
-      <path d='M10.5 10.5L14 14' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
     </svg>
   );
 }
 
 function PlusIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M8 3v10M3 8h10' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M8 3v10M3 8h10" />
     </svg>
   );
 }
 
 function MoreIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
-      <circle cx='3' cy='8' r='1.3' />
-      <circle cx='8' cy='8' r='1.3' />
-      <circle cx='13' cy='8' r='1.3' />
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="3" cy="8" r="1.3" />
+      <circle cx="8" cy="8" r="1.3" />
+      <circle cx="13" cy="8" r="1.3" />
     </svg>
   );
 }
@@ -73,7 +73,7 @@ export const Playground: Story = {
 /** Symmetric peer actions fused into one control — Secondary, shared 1px borders. */
 export const Attached: Story = {
   render: () => (
-    <ButtonGroup aria-label='History'>
+    <ButtonGroup aria-label="History">
       <Button>Undo</Button>
       <Button>Redo</Button>
     </ButtonGroup>
@@ -83,15 +83,15 @@ export const Attached: Story = {
 export const Sizes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 16, alignItems: 'center' }}>
-      <ButtonGroup aria-label='Zoom small' size='sm'>
+      <ButtonGroup aria-label="Zoom small" size="sm">
         <Button>Out</Button>
         <Button>In</Button>
       </ButtonGroup>
-      <ButtonGroup aria-label='Zoom medium' size='md'>
+      <ButtonGroup aria-label="Zoom medium" size="md">
         <Button>Out</Button>
         <Button>In</Button>
       </ButtonGroup>
-      <ButtonGroup aria-label='Zoom large' size='lg'>
+      <ButtonGroup aria-label="Zoom large" size="lg">
         <Button>Out</Button>
         <Button>In</Button>
       </ButtonGroup>
@@ -102,7 +102,7 @@ export const Sizes: Story = {
 /** The outer corners follow the axis; inner corners stay square. */
 export const Vertical: Story = {
   render: () => (
-    <ButtonGroup aria-label='Alignment' orientation='vertical'>
+    <ButtonGroup aria-label="Alignment" orientation="vertical">
       <Button>Top</Button>
       <Button>Middle</Button>
       <Button>Bottom</Button>
@@ -113,10 +113,10 @@ export const Vertical: Story = {
 /** Ghost icon buttons at a 4px gap with `role="toolbar"` — one tab stop, arrow keys move within. */
 export const Toolbar: Story = {
   render: () => (
-    <ButtonGroup role='toolbar' aria-label='Row actions' attached={false}>
-      <IconButton icon={<SearchIcon />} aria-label='Search' />
-      <IconButton icon={<PlusIcon />} aria-label='Add' />
-      <IconButton icon={<MoreIcon />} aria-label='More' />
+    <ButtonGroup role="toolbar" aria-label="Row actions" attached={false}>
+      <IconButton icon={<SearchIcon />} aria-label="Search" />
+      <IconButton icon={<PlusIcon />} aria-label="Add" />
+      <IconButton icon={<MoreIcon />} aria-label="More" />
     </ButtonGroup>
   ),
 };
@@ -124,7 +124,7 @@ export const Toolbar: Story = {
 /** The container dims once and the whole subtree becomes inert. */
 export const Disabled: Story = {
   render: () => (
-    <ButtonGroup aria-label='History' disabled>
+    <ButtonGroup aria-label="History" disabled>
       <Button>Undo</Button>
       <Button>Redo</Button>
     </ButtonGroup>

@@ -15,11 +15,11 @@ import { SplitPane } from './SplitPane';
  */
 function Workspace({ collapsible = false }: { collapsible?: boolean }) {
   return (
-    <SplitPane direction='horizontal'>
-      <SplitPane.Pane defaultSize='30%' minSize={100} collapsible={collapsible} collapseLabel='Explorer'>
+    <SplitPane direction="horizontal">
+      <SplitPane.Pane defaultSize="30%" minSize={100} collapsible={collapsible} collapseLabel="Explorer">
         <div>Explorer content</div>
       </SplitPane.Pane>
-      <SplitPane.Handle aria-label='Resize explorer' />
+      <SplitPane.Handle aria-label="Resize explorer" />
       <SplitPane.Pane minSize={200}>
         <div>Editor content</div>
       </SplitPane.Pane>

@@ -9,7 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 /**
  * Importing user defined packages
  */
-import { ThemeProvider, themeInitScript, useTheme } from './ThemeProvider';
+import { themeInitScript, ThemeProvider, useTheme } from './ThemeProvider';
 
 /**
  * Declaring the constants
@@ -32,8 +32,8 @@ function Probe() {
   const { theme, toggleTheme } = useTheme();
   return (
     <div>
-      <span data-testid='theme'>{theme}</span>
-      <button type='button' onClick={toggleTheme}>
+      <span data-testid="theme">{theme}</span>
+      <button type="button" onClick={toggleTheme}>
         toggle
       </button>
     </div>

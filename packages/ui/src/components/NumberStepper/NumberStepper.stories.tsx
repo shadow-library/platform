@@ -30,13 +30,13 @@ type Story = StoryObj<typeof meta>;
 export const Split: Story = {
   render: () => {
     const [value, setValue] = useState<number | null>(3);
-    return <NumberStepper value={value} onValueChange={setValue} min={1} max={12} step={1} itemLabel='replicas' buttons='split' aria-label='Replicas' />;
+    return <NumberStepper value={value} onValueChange={setValue} min={1} max={12} step={1} itemLabel="replicas" buttons="split" aria-label="Replicas" />;
   },
 };
 
 export const Chevrons: Story = {
   render: () => {
     const [value, setValue] = useState<number | null>(30);
-    return <NumberStepper value={value} onValueChange={setValue} min={5} max={300} step={5} unit='sec' itemLabel='timeout' buttons='chevrons' aria-label='Timeout' />;
+    return <NumberStepper value={value} onValueChange={setValue} min={5} max={300} step={5} unit="sec" itemLabel="timeout" buttons="chevrons" aria-label="Timeout" />;
   },
 };

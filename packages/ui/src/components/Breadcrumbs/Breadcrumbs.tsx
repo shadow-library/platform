@@ -18,8 +18,8 @@ import { type BreadcrumbsItemProps, type BreadcrumbsProps } from './Breadcrumbs.
  */
 function SeparatorIcon() {
   return (
-    <svg className={styles.separator} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6 4l4 4-4 4' />
+    <svg className={styles.separator} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4l4 4-4 4" />
     </svg>
   );
 }
@@ -28,7 +28,7 @@ function SeparatorIcon() {
 const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(function BreadcrumbsItem({ current = false, asChild = false, className, children, ...props }, ref) {
   if (current) {
     return (
-      <span className={cn(styles.current, className)} aria-current='page'>
+      <span className={cn(styles.current, className)} aria-current="page">
         {children}
       </span>
     );
@@ -56,7 +56,7 @@ const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Bread
   const visible: (ReactElement<BreadcrumbsItemProps> | 'overflow')[] = collapsed ? [first, 'overflow', ...items.slice(-2)] : items;
 
   return (
-    <nav ref={ref} className={cn(styles.root, className)} aria-label='Breadcrumb' {...props}>
+    <nav ref={ref} className={cn(styles.root, className)} aria-label="Breadcrumb" {...props}>
       <ol className={styles.list}>
         {visible.map((item, index) => (
           <li key={`crumb-${index}`} className={styles.crumb}>
@@ -64,11 +64,11 @@ const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Bread
             {item === 'overflow' ? (
               <Popover>
                 <Popover.Trigger asChild>
-                  <button type='button' className={styles.overflow} aria-label={`Show ${hidden.length} hidden levels`}>
+                  <button type="button" className={styles.overflow} aria-label={`Show ${hidden.length} hidden levels`}>
                     …
                   </button>
                 </Popover.Trigger>
-                <Popover.Content className={styles.overflowMenu} style={{ padding: 4, minWidth: 180 }} align='start' aria-label='Hidden levels'>
+                <Popover.Content className={styles.overflowMenu} style={{ padding: 4, minWidth: 180 }} align="start" aria-label="Hidden levels">
                   {hidden.map((crumb, hiddenIndex) => (
                     <a key={`hidden-${hiddenIndex}`} href={crumb.props.href} className={styles.overflowItem}>
                       {crumb.props.children}

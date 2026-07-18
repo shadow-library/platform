@@ -63,8 +63,8 @@ export const Editable: Story = {
       <DataGrid
         data={data}
         columns={columns}
-        rowKey='id'
-        aria-label='Services'
+        rowKey="id"
+        aria-label="Services"
         onCellEdit={(rowKey, columnId, value) =>
           setData(rows => rows.map(row => (row.id === rowKey ? { ...row, [columnId]: columnId === 'replicas' ? Number(value) : value } : row)))
         }

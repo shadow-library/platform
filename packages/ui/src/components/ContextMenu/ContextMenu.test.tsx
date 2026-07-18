@@ -19,13 +19,13 @@ function Files({ onOpen = () => {} }: { onOpen?: () => void }) {
       <ContextMenu.Trigger>
         <div style={{ width: 200, height: 120 }}>Right-click target</div>
       </ContextMenu.Trigger>
-      <ContextMenu.Content aria-label='File actions'>
-        <ContextMenu.Item shortcut='⌘O' onSelect={onOpen}>
+      <ContextMenu.Content aria-label="File actions">
+        <ContextMenu.Item shortcut="⌘O" onSelect={onOpen}>
           Open
         </ContextMenu.Item>
         <ContextMenu.Item>Copy</ContextMenu.Item>
         <ContextMenu.Separator />
-        <ContextMenu.Item destructive shortcut='⌘⌫'>
+        <ContextMenu.Item destructive shortcut="⌘⌫">
           Delete
         </ContextMenu.Item>
       </ContextMenu.Content>

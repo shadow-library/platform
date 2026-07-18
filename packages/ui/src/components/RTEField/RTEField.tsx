@@ -34,8 +34,8 @@ export function useRTEField(): RTEFieldContextValue {
 
 function FullscreenIcon({ active }: { active: boolean }) {
   return (
-    <svg viewBox='0 0 16 16' width='16' height='16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      {active ? <path d='M6 2.5V6H2.5M10 2.5V6h3.5M6 13.5V10H2.5M10 13.5V10h3.5' /> : <path d='M2.5 6V2.5H6M13.5 6V2.5H10M2.5 10v3.5H6M13.5 10v3.5H10' />}
+    <svg viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {active ? <path d="M6 2.5V6H2.5M10 2.5V6h3.5M6 13.5V10H2.5M10 13.5V10h3.5" /> : <path d="M2.5 6V2.5H6M13.5 6V2.5H10M2.5 10v3.5H6M13.5 10v3.5H10" />}
     </svg>
   );
 }
@@ -110,21 +110,21 @@ const RTEFieldRoot = forwardRef<HTMLDivElement, RTEFieldProps>(function RTEField
 
   return (
     <RTEFieldContext.Provider value={context}>
-      {isFullscreen ? <button type='button' className={styles.scrim} aria-label='Exit fullscreen' onClick={() => setFullscreen(false)} /> : null}
+      {isFullscreen ? <button type="button" className={styles.scrim} aria-label="Exit fullscreen" onClick={() => setFullscreen(false)} /> : null}
       <div ref={ref} className={cn(styles.field, className)} data-fullscreen={isFullscreen || undefined} {...props}>
         {!readOnly ? (
           <div className={styles.labelRow}>
             <span className={styles.label} id={labelId}>
               {label}
               {required ? (
-                <span className={styles.required} aria-hidden='true'>
+                <span className={styles.required} aria-hidden="true">
                   {' '}
                   *
                 </span>
               ) : null}
             </span>
             {showCounter ? (
-              <span className={styles.counter} data-state={counterState} aria-hidden='true'>
+              <span className={styles.counter} data-state={counterState} aria-hidden="true">
                 {length}
                 {countMode === 'words' ? ' words' : ''} / {maxLength}
               </span>
@@ -145,7 +145,7 @@ const RTEFieldRoot = forwardRef<HTMLDivElement, RTEFieldProps>(function RTEField
         <div className={styles.frame} data-readonly={readOnly || undefined} data-disabled={disabled || undefined} aria-invalid={invalid || undefined}>
           {fullscreenEnabled && !readOnly ? (
             <button
-              type='button'
+              type="button"
               className={styles.fullscreenToggle}
               aria-label={isFullscreen ? 'Exit fullscreen' : 'Enter fullscreen'}
               aria-pressed={isFullscreen}
@@ -158,10 +158,10 @@ const RTEFieldRoot = forwardRef<HTMLDivElement, RTEFieldProps>(function RTEField
         </div>
 
         {errorMessage ? (
-          <div className={styles.errorLine} id={errorId} role='alert'>
-            <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={1.5} aria-hidden='true'>
-              <circle cx='8' cy='8' r='6.25' />
-              <path d='M8 5v3.4M8 10.8v.1' strokeLinecap='round' />
+          <div className={styles.errorLine} id={errorId} role="alert">
+            <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+              <circle cx="8" cy="8" r="6.25" />
+              <path d="M8 5v3.4M8 10.8v.1" strokeLinecap="round" />
             </svg>
             {errorMessage}
           </div>
@@ -186,7 +186,7 @@ const RTEFieldToolbar = forwardRef<HTMLDivElement, RTEFieldToolbarProps>(functio
     next?.focus();
   }
 
-  return <div ref={ref} className={cn(styles.toolbar, className)} role='toolbar' aria-label='Formatting' onKeyDown={handleKeyDown} {...props} />;
+  return <div ref={ref} className={cn(styles.toolbar, className)} role="toolbar" aria-label="Formatting" onKeyDown={handleKeyDown} {...props} />;
 });
 
 const RTEFieldToolbarButton = forwardRef<HTMLButtonElement, RTEFieldToolbarButtonProps>(function RTEFieldToolbarButton({ className, pressed, type, ...props }, ref) {
@@ -194,7 +194,7 @@ const RTEFieldToolbarButton = forwardRef<HTMLButtonElement, RTEFieldToolbarButto
 });
 
 const RTEFieldToolbarDivider = forwardRef<HTMLDivElement, { className?: string }>(function RTEFieldToolbarDivider({ className }, ref) {
-  return <div ref={ref} className={cn(styles.toolbarDivider, className)} aria-hidden='true' />;
+  return <div ref={ref} className={cn(styles.toolbarDivider, className)} aria-hidden="true" />;
 });
 
 const RTEFieldContent = forwardRef<HTMLDivElement, RTEFieldContentProps>(function RTEFieldContent({ className, ...props }, ref) {
@@ -206,7 +206,7 @@ const RTEFieldAttachments = forwardRef<HTMLDivElement, RTEFieldAttachmentsProps>
   return (
     <div ref={ref} className={cn(styles.attachments, className)} {...props}>
       {value.map(file => (
-        <Tag key={file.id} size='sm' onRemove={onRemove ? () => onRemove(file.id) : undefined}>
+        <Tag key={file.id} size="sm" onRemove={onRemove ? () => onRemove(file.id) : undefined}>
           {file.label}
         </Tag>
       ))}

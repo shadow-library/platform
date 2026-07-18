@@ -18,11 +18,11 @@ import { TopNavigation } from './TopNavigation';
 describe('TopNavigation', () => {
   it('renders a Main nav landmark with links and marks the active one', () => {
     render(
-      <TopNavigation brand='Shadow'>
-        <TopNavigation.Item href='/overview' active>
+      <TopNavigation brand="Shadow">
+        <TopNavigation.Item href="/overview" active>
           Overview
         </TopNavigation.Item>
-        <TopNavigation.Item href='/services'>Services</TopNavigation.Item>
+        <TopNavigation.Item href="/services">Services</TopNavigation.Item>
       </TopNavigation>,
     );
     expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
@@ -34,10 +34,10 @@ describe('TopNavigation', () => {
     const user = userEvent.setup();
     render(
       <TopNavigation maxVisible={2}>
-        <TopNavigation.Item href='/a'>Alpha</TopNavigation.Item>
-        <TopNavigation.Item href='/b'>Bravo</TopNavigation.Item>
-        <TopNavigation.Item href='/c'>Charlie</TopNavigation.Item>
-        <TopNavigation.Item href='/d'>Delta</TopNavigation.Item>
+        <TopNavigation.Item href="/a">Alpha</TopNavigation.Item>
+        <TopNavigation.Item href="/b">Bravo</TopNavigation.Item>
+        <TopNavigation.Item href="/c">Charlie</TopNavigation.Item>
+        <TopNavigation.Item href="/d">Delta</TopNavigation.Item>
       </TopNavigation>,
     );
     expect(screen.getByRole('link', { name: 'Alpha' })).toBeInTheDocument();
@@ -52,8 +52,8 @@ describe('TopNavigation', () => {
   it('marks the More trigger active when an overflowed link is active', () => {
     render(
       <TopNavigation maxVisible={1}>
-        <TopNavigation.Item href='/a'>Alpha</TopNavigation.Item>
-        <TopNavigation.Item href='/b' active>
+        <TopNavigation.Item href="/a">Alpha</TopNavigation.Item>
+        <TopNavigation.Item href="/b" active>
           Bravo
         </TopNavigation.Item>
       </TopNavigation>,

@@ -38,7 +38,7 @@ export const WithSwatch: Story = {
 export const Clickable: Story = {
   render: () => (
     <Tag asChild>
-      <a href='#topics'>infrastructure</a>
+      <a href="#topics">infrastructure</a>
     </Tag>
   ),
 };
@@ -62,9 +62,9 @@ export const RemovableRow: Story = {
 export const Sizes: Story = {
   render: () => (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-      <Tag size='sm'>small</Tag>
-      <Tag size='md'>medium</Tag>
-      <Tag size='lg'>large</Tag>
+      <Tag size="sm">small</Tag>
+      <Tag size="md">medium</Tag>
+      <Tag size="lg">large</Tag>
     </div>
   ),
 };

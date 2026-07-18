@@ -36,20 +36,20 @@ type Story = StoryObj<typeof meta>;
 export const Playground: Story = {
   render: args => (
     <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-      <Button variant='secondary' onClick={() => toast.success('Environment created')}>
+      <Button variant="secondary" onClick={() => toast.success('Environment created')}>
         Success
       </Button>
-      <Button variant='secondary' onClick={() => toast.danger('Deploy failed', { body: 'Build step 3 exited with code 1.', action: { label: 'View logs', onClick: () => {} } })}>
+      <Button variant="secondary" onClick={() => toast.danger('Deploy failed', { body: 'Build step 3 exited with code 1.', action: { label: 'View logs', onClick: () => {} } })}>
         Error
       </Button>
-      <Button variant='secondary' onClick={() => toast.warning('Imported 98 of 100 rows')}>
+      <Button variant="secondary" onClick={() => toast.warning('Imported 98 of 100 rows')}>
         Warning
       </Button>
-      <Button variant='secondary' onClick={() => toast.success('Workspace deleted', { action: { label: 'Undo', onClick: () => {} } })}>
+      <Button variant="secondary" onClick={() => toast.success('Workspace deleted', { action: { label: 'Undo', onClick: () => {} } })}>
         With action
       </Button>
       <Button
-        variant='secondary'
+        variant="secondary"
         onClick={() => toast.promise(new Promise(resolve => setTimeout(resolve, 1500)), { loading: 'Deploying…', success: 'Deployed', error: 'Deploy failed' })}
       >
         Promise

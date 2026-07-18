@@ -52,11 +52,11 @@ const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function T
         {overflow.length > 0 ? (
           <Popover>
             <Popover.Trigger asChild>
-              <button type='button' className={styles.link} data-active={overflowActive || undefined} aria-label='More links'>
+              <button type="button" className={styles.link} data-active={overflowActive || undefined} aria-label="More links">
                 More
               </button>
             </Popover.Trigger>
-            <Popover.Content className={styles.moreMenu} style={{ padding: 4, minWidth: 180 }} align='end' aria-label='More links'>
+            <Popover.Content className={styles.moreMenu} style={{ padding: 4, minWidth: 180 }} align="end" aria-label="More links">
               {overflow.map(item => (
                 <a
                   key={item.key}

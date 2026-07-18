@@ -18,8 +18,8 @@ const GLYPH: Record<AlertIntent, string> = { info: 'i', success: '✓', warning:
 
 function DismissIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -34,7 +34,7 @@ export const Alert = forwardRef<HTMLDivElement, AlertProps>(function Alert({ int
   const role = intent === 'danger' || intent === 'warning' ? 'alert' : 'status';
   return (
     <div ref={ref} className={cn(styles.root, className)} data-intent={intent} role={role} {...props}>
-      <span className={styles.icon} aria-hidden='true'>
+      <span className={styles.icon} aria-hidden="true">
         {GLYPH[intent]}
       </span>
       <div className={styles.content}>
@@ -42,12 +42,12 @@ export const Alert = forwardRef<HTMLDivElement, AlertProps>(function Alert({ int
         {children != null ? <div className={styles.body}>{children}</div> : null}
       </div>
       {action != null ? (
-        <button type='button' className={styles.action} onClick={action.onClick}>
+        <button type="button" className={styles.action} onClick={action.onClick}>
           {action.label}
         </button>
       ) : null}
       {onDismiss != null ? (
-        <button type='button' className={styles.dismiss} aria-label='Dismiss' onClick={onDismiss}>
+        <button type="button" className={styles.dismiss} aria-label="Dismiss" onClick={onDismiss}>
           <DismissIcon />
         </button>
       ) : null}

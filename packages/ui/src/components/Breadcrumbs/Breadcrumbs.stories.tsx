@@ -25,9 +25,9 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => (
     <Breadcrumbs>
-      <Breadcrumbs.Item href='#workspaces'>Workspaces</Breadcrumbs.Item>
-      <Breadcrumbs.Item href='#acme'>acme-prod</Breadcrumbs.Item>
-      <Breadcrumbs.Item href='#services'>Services</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#workspaces">Workspaces</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#acme">acme-prod</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#services">Services</Breadcrumbs.Item>
       <Breadcrumbs.Item current>checkout-service</Breadcrumbs.Item>
     </Breadcrumbs>
   ),
@@ -37,10 +37,10 @@ export const Default: Story = {
 export const Collapsed: Story = {
   render: () => (
     <Breadcrumbs maxVisible={4}>
-      <Breadcrumbs.Item href='#org'>Organization</Breadcrumbs.Item>
-      <Breadcrumbs.Item href='#workspaces'>Workspaces</Breadcrumbs.Item>
-      <Breadcrumbs.Item href='#acme'>acme-prod</Breadcrumbs.Item>
-      <Breadcrumbs.Item href='#services'>Services</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#org">Organization</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#workspaces">Workspaces</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#acme">acme-prod</Breadcrumbs.Item>
+      <Breadcrumbs.Item href="#services">Services</Breadcrumbs.Item>
       <Breadcrumbs.Item current>checkout-service</Breadcrumbs.Item>
     </Breadcrumbs>
   ),

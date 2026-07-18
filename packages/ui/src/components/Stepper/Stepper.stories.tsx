@@ -36,16 +36,16 @@ export const Horizontal: Story = {
     const [step, setStep] = useState(0);
     return (
       <Stepper current={step} onCurrentChange={setStep}>
-        <Stepper.Step id='account' label='Account' hint='Sign-in details'>
+        <Stepper.Step id="account" label="Account" hint="Sign-in details">
           <Panel>Account</Panel>
         </Stepper.Step>
-        <Stepper.Step id='team' label='Invite team' optional>
+        <Stepper.Step id="team" label="Invite team" optional>
           <Panel>Invite team</Panel>
         </Stepper.Step>
-        <Stepper.Step id='billing' label='Billing'>
+        <Stepper.Step id="billing" label="Billing">
           <Panel>Billing</Panel>
         </Stepper.Step>
-        <Stepper.Step id='review' label='Review'>
+        <Stepper.Step id="review" label="Review">
           <Panel>Review &amp; finish</Panel>
         </Stepper.Step>
       </Stepper>
@@ -57,14 +57,14 @@ export const Vertical: Story = {
   render: () => {
     const [step, setStep] = useState(1);
     return (
-      <Stepper current={step} onCurrentChange={setStep} orientation='vertical'>
-        <Stepper.Step id='source' label='Source'>
+      <Stepper current={step} onCurrentChange={setStep} orientation="vertical">
+        <Stepper.Step id="source" label="Source">
           <Panel>Source</Panel>
         </Stepper.Step>
-        <Stepper.Step id='mapping' label='Field mapping'>
+        <Stepper.Step id="mapping" label="Field mapping">
           <Panel>Field mapping</Panel>
         </Stepper.Step>
-        <Stepper.Step id='confirm' label='Confirm'>
+        <Stepper.Step id="confirm" label="Confirm">
           <Panel>Confirm import</Panel>
         </Stepper.Step>
       </Stepper>
@@ -77,10 +77,10 @@ export const AsyncValidation: Story = {
     const [step, setStep] = useState(0);
     return (
       <Stepper current={step} onCurrentChange={setStep}>
-        <Stepper.Step id='check' label='Availability' validate={() => new Promise<boolean>(resolve => setTimeout(() => resolve(true), 900))}>
+        <Stepper.Step id="check" label="Availability" validate={() => new Promise<boolean>(resolve => setTimeout(() => resolve(true), 900))}>
           <Panel>Continue runs an async check</Panel>
         </Stepper.Step>
-        <Stepper.Step id='done' label='Done'>
+        <Stepper.Step id="done" label="Done">
           <Panel>Done</Panel>
         </Stepper.Step>
       </Stepper>

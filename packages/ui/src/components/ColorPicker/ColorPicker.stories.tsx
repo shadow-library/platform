@@ -26,7 +26,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => {
     const [value, setValue] = useState('#4f46e5');
-    return <ColorPicker value={value} onValueChange={setValue} aria-label='Brand color' />;
+    return <ColorPicker value={value} onValueChange={setValue} aria-label="Brand color" />;
   },
 };
 
@@ -37,7 +37,7 @@ export const CustomPalette: Story = {
       <ColorPicker
         value={value}
         onValueChange={setValue}
-        aria-label='Label color'
+        aria-label="Label color"
         palette={[
           { label: 'Sky', value: '#0ea5e9' },
           { label: 'Team purple', value: '#7c3aed' },
@@ -52,20 +52,20 @@ export const CustomPalette: Story = {
 export const PaletteOnly: Story = {
   render: () => {
     const [value, setValue] = useState('#16a34a');
-    return <ColorPicker value={value} onValueChange={setValue} allowCustom={false} aria-label='Status color' />;
+    return <ColorPicker value={value} onValueChange={setValue} allowCustom={false} aria-label="Status color" />;
   },
 };
 
 export const SpectrumOnly: Story = {
   render: () => {
     const [value, setValue] = useState('#4f46e5');
-    return <ColorPicker value={value} onValueChange={setValue} palette={[]} aria-label='Theme color' />;
+    return <ColorPicker value={value} onValueChange={setValue} palette={[]} aria-label="Theme color" />;
   },
 };
 
 export const WithContrastGuard: Story = {
   render: () => {
     const [value, setValue] = useState('#4f46e5');
-    return <ColorPicker value={value} onValueChange={setValue} onCommit={setValue} contrastAgainst='#ffffff' aria-label='Label background' />;
+    return <ColorPicker value={value} onValueChange={setValue} onCommit={setValue} contrastAgainst="#ffffff" aria-label="Label background" />;
   },
 };

@@ -15,9 +15,9 @@ import { Input } from './Input';
  */
 function SearchIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <circle cx='7' cy='7' r='4.5' />
-      <path d='M10.5 10.5L14 14' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <circle cx="7" cy="7" r="4.5" />
+      <path d="M10.5 10.5L14 14" />
     </svg>
   );
 }
@@ -71,9 +71,9 @@ export const Playground: Story = {};
 export const Sizes: Story = {
   render: args => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-      <Input {...args} size='sm' placeholder='Small' />
-      <Input {...args} size='md' placeholder='Medium' />
-      <Input {...args} size='lg' placeholder='Large' />
+      <Input {...args} size="sm" placeholder="Small" />
+      <Input {...args} size="md" placeholder="Medium" />
+      <Input {...args} size="lg" placeholder="Large" />
     </div>
   ),
 };
@@ -92,7 +92,7 @@ export const TextAddon: Story = {
 export const Clearable: Story = {
   render: args => {
     const [value, setValue] = useState('acme-corp');
-    return <Input {...args} clearable value={value} onValueChange={setValue} prefix={<SearchIcon />} placeholder='Search…' />;
+    return <Input {...args} clearable value={value} onValueChange={setValue} prefix={<SearchIcon />} placeholder="Search…" />;
   },
 };
 

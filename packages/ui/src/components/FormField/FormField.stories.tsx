@@ -20,7 +20,7 @@ const meta = {
   title: 'Components/FormField',
   component: FormField,
   parameters: { layout: 'centered' },
-  args: { label: 'Display name', children: <Input placeholder='Acme Corp' /> },
+  args: { label: 'Display name', children: <Input placeholder="Acme Corp" /> },
   argTypes: {
     required: { control: 'boolean' },
     optional: { control: 'boolean' },
@@ -44,7 +44,7 @@ export const Playground: Story = {
   args: { helper: 'Shown in the sidebar and invoices.' },
   render: args => (
     <FormField {...args}>
-      <Input placeholder='Acme Corp' />
+      <Input placeholder="Acme Corp" />
     </FormField>
   ),
 };
@@ -54,7 +54,7 @@ export const WithError: Story = {
   args: { label: 'Workspace URL', required: true, error: 'Only lowercase letters, numbers, and hyphens.' },
   render: args => (
     <FormField {...args}>
-      <Input prefix='https://' defaultValue='acme corp!' />
+      <Input prefix="https://" defaultValue="acme corp!" />
     </FormField>
   ),
 };
@@ -66,8 +66,8 @@ export const LiveValidation: Story = {
     const [touched, setTouched] = useState(false);
     const error = touched && !/^[a-z0-9-]*$/.test(value) ? 'Only lowercase letters, numbers, and hyphens.' : undefined;
     return (
-      <FormField label='Workspace URL' required error={error} helper='Your workspace address'>
-        <Input value={value} onValueChange={setValue} onBlur={() => setTouched(true)} prefix='https://' />
+      <FormField label="Workspace URL" required error={error} helper="Your workspace address">
+        <Input value={value} onValueChange={setValue} onBlur={() => setTouched(true)} prefix="https://" />
       </FormField>
     );
   },
@@ -77,14 +77,14 @@ export const LiveValidation: Story = {
 export const AnyControl: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-      <FormField label='Region' helper='Where your data is stored'>
-        <Select placeholder='Select region…'>
-          <Select.Item value='us-east-1'>us-east-1</Select.Item>
-          <Select.Item value='eu-central-1'>eu-central-1</Select.Item>
+      <FormField label="Region" helper="Where your data is stored">
+        <Select placeholder="Select region…">
+          <Select.Item value="us-east-1">us-east-1</Select.Item>
+          <Select.Item value="eu-central-1">eu-central-1</Select.Item>
         </Select>
       </FormField>
-      <FormField label='Description' optional helper='A short summary'>
-        <Textarea placeholder='What does this project do?' />
+      <FormField label="Description" optional helper="A short summary">
+        <Textarea placeholder="What does this project do?" />
       </FormField>
     </div>
   ),
@@ -94,7 +94,7 @@ export const Disabled: Story = {
   args: { label: 'Workspace URL', helper: 'Contact an admin to change this', disabled: true },
   render: args => (
     <FormField {...args}>
-      <Input defaultValue='acme' />
+      <Input defaultValue="acme" />
     </FormField>
   ),
 };

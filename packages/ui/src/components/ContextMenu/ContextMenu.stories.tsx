@@ -44,8 +44,8 @@ export const Default: Story = {
       <ContextMenu.Trigger>
         <Target />
       </ContextMenu.Trigger>
-      <ContextMenu.Content aria-label='File actions'>
-        <ContextMenu.Item shortcut='⌘O'>Open</ContextMenu.Item>
+      <ContextMenu.Content aria-label="File actions">
+        <ContextMenu.Item shortcut="⌘O">Open</ContextMenu.Item>
         <ContextMenu.Sub>
           <ContextMenu.SubTrigger>Open with</ContextMenu.SubTrigger>
           <ContextMenu.SubContent>
@@ -55,11 +55,11 @@ export const Default: Story = {
           </ContextMenu.SubContent>
         </ContextMenu.Sub>
         <ContextMenu.Separator />
-        <ContextMenu.Item shortcut='⌘C'>Copy</ContextMenu.Item>
-        <ContextMenu.Item shortcut='⌘V'>Paste</ContextMenu.Item>
-        <ContextMenu.Item shortcut='F2'>Rename</ContextMenu.Item>
+        <ContextMenu.Item shortcut="⌘C">Copy</ContextMenu.Item>
+        <ContextMenu.Item shortcut="⌘V">Paste</ContextMenu.Item>
+        <ContextMenu.Item shortcut="F2">Rename</ContextMenu.Item>
         <ContextMenu.Separator />
-        <ContextMenu.Item destructive shortcut='⌘⌫'>
+        <ContextMenu.Item destructive shortcut="⌘⌫">
           Delete
         </ContextMenu.Item>
       </ContextMenu.Content>

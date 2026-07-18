@@ -33,11 +33,11 @@ export const Playground: Story = {};
 export const Sizes: Story = {
   render: () => (
     <div style={{ display: 'flex', alignItems: 'flex-end', gap: 12 }}>
-      <Avatar name='Maya Kim' size='xs' />
-      <Avatar name='Maya Kim' size='sm' />
-      <Avatar name='Maya Kim' size='md' />
-      <Avatar name='Maya Kim' size='lg' />
-      <Avatar name='Maya Kim' size='xl' />
+      <Avatar name="Maya Kim" size="xs" />
+      <Avatar name="Maya Kim" size="sm" />
+      <Avatar name="Maya Kim" size="md" />
+      <Avatar name="Maya Kim" size="lg" />
+      <Avatar name="Maya Kim" size="xl" />
     </div>
   ),
 };
@@ -46,8 +46,8 @@ export const Sizes: Story = {
 export const Shapes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 12 }}>
-      <Avatar name='Maya Kim' size='lg' />
-      <Avatar name='Acme Corp' size='lg' shape='square' />
+      <Avatar name="Maya Kim" size="lg" />
+      <Avatar name="Acme Corp" size="lg" shape="square" />
     </div>
   ),
 };
@@ -55,10 +55,10 @@ export const Shapes: Story = {
 export const Presence: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 16 }}>
-      <Avatar name='Ana Ng' size='lg' presence='online' />
-      <Avatar name='Ravi Sun' size='lg' presence='away' />
-      <Avatar name='Jo Tan' size='lg' presence='busy' />
-      <Avatar name='Kim Lee' size='lg' presence='offline' />
+      <Avatar name="Ana Ng" size="lg" presence="online" />
+      <Avatar name="Ravi Sun" size="lg" presence="away" />
+      <Avatar name="Jo Tan" size="lg" presence="busy" />
+      <Avatar name="Kim Lee" size="lg" presence="offline" />
     </div>
   ),
 };
@@ -67,12 +67,12 @@ export const Presence: Story = {
 export const Group: Story = {
   render: () => (
     <AvatarGroup max={4}>
-      <Avatar name='Maya Kim' />
-      <Avatar name='Jo Tan' />
-      <Avatar name='Ravi Sun' />
-      <Avatar name='Ana Ng' />
-      <Avatar name='Kim Lee' />
-      <Avatar name='Sam Fox' />
+      <Avatar name="Maya Kim" />
+      <Avatar name="Jo Tan" />
+      <Avatar name="Ravi Sun" />
+      <Avatar name="Ana Ng" />
+      <Avatar name="Kim Lee" />
+      <Avatar name="Sam Fox" />
     </AvatarGroup>
   ),
 };

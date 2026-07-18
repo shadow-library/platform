@@ -37,7 +37,7 @@ describe('Tag', () => {
   });
 
   it('renders a decorative swatch when color is set', () => {
-    const { container } = render(<Tag color='#4F46E5'>design-system</Tag>);
+    const { container } = render(<Tag color="#4F46E5">design-system</Tag>);
     const swatch = container.querySelector('[aria-hidden="true"]');
     expect(swatch).toBeInTheDocument();
     expect(swatch).toHaveStyle({ background: '#4F46E5' });
@@ -46,7 +46,7 @@ describe('Tag', () => {
   it('renders as a link through asChild', () => {
     render(
       <Tag asChild>
-        <a href='/topics/infra'>infrastructure</a>
+        <a href="/topics/infra">infrastructure</a>
       </Tag>,
     );
     const link = screen.getByRole('link', { name: 'infrastructure' });
@@ -55,7 +55,7 @@ describe('Tag', () => {
   });
 
   it('applies the size on the root', () => {
-    render(<Tag size='lg'>backend</Tag>);
+    render(<Tag size="lg">backend</Tag>);
     expect(screen.getByText('backend')).toHaveAttribute('data-size', 'lg');
   });
 });

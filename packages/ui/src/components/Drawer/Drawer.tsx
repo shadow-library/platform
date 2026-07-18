@@ -20,8 +20,8 @@ import { type DrawerBodyProps, type DrawerFooterProps, type DrawerHeaderProps, t
  */
 function CloseIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <path d='M4 4l8 8M12 4l-8 8' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -41,10 +41,10 @@ function DrawerHeader({ title, meta, showClose = true, className, ...props }: Dr
       {showClose ? (
         modal ? (
           <DialogPrimitive.Close asChild>
-            <IconButton className={styles.close} variant='ghost' size='sm' aria-label='Close' icon={<CloseIcon />} />
+            <IconButton className={styles.close} variant="ghost" size="sm" aria-label="Close" icon={<CloseIcon />} />
           </DialogPrimitive.Close>
         ) : (
-          <IconButton className={styles.close} variant='ghost' size='sm' aria-label='Close' icon={<CloseIcon />} onClick={onClose} />
+          <IconButton className={styles.close} variant="ghost" size="sm" aria-label="Close" icon={<CloseIcon />} onClick={onClose} />
         )
       ) : null}
     </div>
@@ -66,16 +66,16 @@ function DrawerFooter({ cancel, action, onAction, loading = false, className, ch
           {cancel != null ? (
             modal ? (
               <DialogPrimitive.Close asChild>
-                <Button variant='ghost'>{cancel}</Button>
+                <Button variant="ghost">{cancel}</Button>
               </DialogPrimitive.Close>
             ) : (
-              <Button variant='ghost' onClick={onClose}>
+              <Button variant="ghost" onClick={onClose}>
                 {cancel}
               </Button>
             )
           ) : null}
           {action != null ? (
-            <Button variant='primary' loading={loading} onClick={onAction}>
+            <Button variant="primary" loading={loading} onClick={onAction}>
               {action}
             </Button>
           ) : null}
@@ -124,7 +124,7 @@ function DrawerRoot({ open, onOpenChange, placement = 'right', size = 'md', moda
 
   return (
     <DrawerContext.Provider value={{ modal: false, titleId, onClose }}>
-      <aside {...panelProps} data-nonmodal='' aria-label={ariaLabel} aria-labelledby={ariaLabel ? undefined : titleId} onKeyDown={handleKeyDown}>
+      <aside {...panelProps} data-nonmodal="" aria-label={ariaLabel} aria-labelledby={ariaLabel ? undefined : titleId} onKeyDown={handleKeyDown}>
         {children}
       </aside>
     </DrawerContext.Provider>

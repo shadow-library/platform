@@ -18,8 +18,8 @@ import { type AccordionItemProps, type AccordionProps } from './Accordion.types'
  */
 function ChevronDown() {
   return (
-    <svg className={styles.chevron} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4 6.5L8 10.5l4-4' />
+    <svg className={styles.chevron} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6.5L8 10.5l4-4" />
     </svg>
   );
 }

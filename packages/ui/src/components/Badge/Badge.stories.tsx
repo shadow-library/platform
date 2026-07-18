@@ -35,19 +35,19 @@ export const Playground: Story = {};
 export const Intents: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-      <Badge intent='neutral' dot>
+      <Badge intent="neutral" dot>
         Archived
       </Badge>
-      <Badge intent='info' dot>
+      <Badge intent="info" dot>
         Deploying
       </Badge>
-      <Badge intent='success' dot>
+      <Badge intent="success" dot>
         Active
       </Badge>
-      <Badge intent='warning' dot>
+      <Badge intent="warning" dot>
         Degraded
       </Badge>
-      <Badge intent='danger' dot>
+      <Badge intent="danger" dot>
         Failed
       </Badge>
     </div>
@@ -58,11 +58,11 @@ export const Intents: Story = {
 export const OutlineAndCount: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <Badge variant='outline'>v2.14</Badge>
-      <Badge variant='count' intent='danger' aria-label='12 unread'>
+      <Badge variant="outline">v2.14</Badge>
+      <Badge variant="count" intent="danger" aria-label="12 unread">
         {12}
       </Badge>
-      <Badge variant='count' intent='neutral' max={99}>
+      <Badge variant="count" intent="neutral" max={99}>
         {128}
       </Badge>
     </div>
@@ -73,10 +73,10 @@ export const OutlineAndCount: Story = {
 export const DotOnly: Story = {
   render: () => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-      <Badge variant='dot' intent='success'>
+      <Badge variant="dot" intent="success">
         checkout-service
       </Badge>
-      <Badge variant='dot' intent='danger'>
+      <Badge variant="dot" intent="danger">
         billing-service
       </Badge>
     </div>

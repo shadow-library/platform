@@ -33,7 +33,7 @@ const columns: GridColumn<Row>[] = [
 
 describe('DataGrid', () => {
   it('renders the ARIA grid with true row/col counts', () => {
-    render(<DataGrid data={rows} columns={columns} rowKey='id' aria-label='Services' />);
+    render(<DataGrid data={rows} columns={columns} rowKey="id" aria-label="Services" />);
     const grid = screen.getByRole('grid', { name: 'Services' });
     expect(grid).toHaveAttribute('aria-rowcount', '3');
     expect(grid).toHaveAttribute('aria-colcount', '2');
@@ -44,7 +44,7 @@ describe('DataGrid', () => {
   it('lays out one col per column so the table can fill its container', () => {
     // The grid fills its wrapper via .grid { width: 100% }; the fixed layout needs a <col> per column.
     // (Pixel width is a CSS concern jsdom can't measure — this guards the column template that fill depends on.)
-    render(<DataGrid data={rows} columns={columns} rowKey='id' aria-label='Services' />);
+    render(<DataGrid data={rows} columns={columns} rowKey="id" aria-label="Services" />);
     const table = screen.getByRole('grid', { name: 'Services' });
     expect(table.querySelectorAll('colgroup > col')).toHaveLength(columns.length);
     expect(screen.getAllByRole('columnheader')).toHaveLength(columns.length);
@@ -52,7 +52,7 @@ describe('DataGrid', () => {
 
   it('navigates cells with arrow keys', async () => {
     const user = userEvent.setup();
-    render(<DataGrid data={rows} columns={columns} rowKey='id' aria-label='Services' />);
+    render(<DataGrid data={rows} columns={columns} rowKey="id" aria-label="Services" />);
     const cells = screen.getAllByRole('cell');
     cells[0]?.focus();
     await user.keyboard('{ArrowRight}');
@@ -64,7 +64,7 @@ describe('DataGrid', () => {
   it('edits an editable cell and commits with Enter', async () => {
     const user = userEvent.setup();
     const onCellEdit = vi.fn();
-    render(<DataGrid data={rows} columns={columns} rowKey='id' onCellEdit={onCellEdit} aria-label='Services' />);
+    render(<DataGrid data={rows} columns={columns} rowKey="id" onCellEdit={onCellEdit} aria-label="Services" />);
     screen.getAllByRole('cell')[0]?.focus();
     await user.keyboard('{Enter}');
     const editor = screen.getByRole('textbox');
@@ -76,7 +76,7 @@ describe('DataGrid', () => {
   it('reverts an edit with Escape', async () => {
     const user = userEvent.setup();
     const onCellEdit = vi.fn();
-    render(<DataGrid data={rows} columns={columns} rowKey='id' onCellEdit={onCellEdit} aria-label='Services' />);
+    render(<DataGrid data={rows} columns={columns} rowKey="id" onCellEdit={onCellEdit} aria-label="Services" />);
     screen.getAllByRole('cell')[0]?.focus();
     await user.keyboard('{Enter}');
     await user.type(screen.getByRole('textbox'), 'zzz');
@@ -88,7 +88,7 @@ describe('DataGrid', () => {
   it('multi-sorts with shift-click and shows ordinals', async () => {
     const user = userEvent.setup();
     const onSortChange = vi.fn();
-    render(<DataGrid data={rows} columns={columns} rowKey='id' onSortChange={onSortChange} aria-label='Services' />);
+    render(<DataGrid data={rows} columns={columns} rowKey="id" onSortChange={onSortChange} aria-label="Services" />);
     await user.click(screen.getByRole('button', { name: /Service/ }));
     expect(onSortChange).toHaveBeenLastCalledWith([{ id: 'name', direction: 'asc' }]);
     expect(screen.getByRole('columnheader', { name: /Service/ })).toHaveAttribute('aria-sort', 'ascending');

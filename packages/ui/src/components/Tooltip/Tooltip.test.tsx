@@ -18,8 +18,8 @@ describe('Tooltip', () => {
   it('renders the trigger and shows content when open', () => {
     render(
       <TooltipProvider>
-        <Tooltip content='Duplicate' defaultOpen>
-          <button type='button'>Copy</button>
+        <Tooltip content="Duplicate" defaultOpen>
+          <button type="button">Copy</button>
         </Tooltip>
       </TooltipProvider>,
     );
@@ -30,8 +30,8 @@ describe('Tooltip', () => {
   it('renders the shortcut hint alongside the label', () => {
     render(
       <TooltipProvider>
-        <Tooltip content='Duplicate' shortcut='⌘D' defaultOpen>
-          <button type='button'>Copy</button>
+        <Tooltip content="Duplicate" shortcut="⌘D" defaultOpen>
+          <button type="button">Copy</button>
         </Tooltip>
       </TooltipProvider>,
     );
@@ -41,8 +41,8 @@ describe('Tooltip', () => {
   it('describes the trigger while open', () => {
     render(
       <TooltipProvider>
-        <Tooltip content='Duplicate' defaultOpen>
-          <button type='button'>Copy</button>
+        <Tooltip content="Duplicate" defaultOpen>
+          <button type="button">Copy</button>
         </Tooltip>
       </TooltipProvider>,
     );
@@ -52,7 +52,7 @@ describe('Tooltip', () => {
   it('renders the trigger alone when there is no content', () => {
     render(
       <Tooltip content={undefined}>
-        <button type='button'>Copy</button>
+        <button type="button">Copy</button>
       </Tooltip>,
     );
     expect(screen.getByRole('button', { name: 'Copy' })).toBeInTheDocument();

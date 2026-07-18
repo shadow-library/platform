@@ -31,13 +31,13 @@ beforeAll(() => {
 
 function Regions(props: React.ComponentProps<typeof Select>) {
   return (
-    <Select aria-label='Region' placeholder='Select region…' {...props}>
-      <Select.Group label='US'>
-        <Select.Item value='us-east-1'>us-east-1</Select.Item>
-        <Select.Item value='us-west-2'>us-west-2</Select.Item>
+    <Select aria-label="Region" placeholder="Select region…" {...props}>
+      <Select.Group label="US">
+        <Select.Item value="us-east-1">us-east-1</Select.Item>
+        <Select.Item value="us-west-2">us-west-2</Select.Item>
       </Select.Group>
       <Select.Separator />
-      <Select.Item value='eu-central-1' disabled>
+      <Select.Item value="eu-central-1" disabled>
         eu-central-1
       </Select.Item>
     </Select>
@@ -53,7 +53,7 @@ describe('Select', () => {
   });
 
   it('reflects size and invalid on the trigger', () => {
-    render(<Regions size='lg' invalid />);
+    render(<Regions size="lg" invalid />);
     const trigger = screen.getByRole('combobox');
     expect(trigger).toHaveAttribute('data-size', 'lg');
     expect(trigger).toHaveAttribute('aria-invalid', 'true');

@@ -24,10 +24,10 @@ beforeAll(() => {
 
 function Plans(props: React.ComponentProps<typeof RadioGroup>) {
   return (
-    <RadioGroup aria-label='Plan' {...props}>
-      <RadioGroup.Item value='starter' label='Starter' description='Up to 5 seats' />
-      <RadioGroup.Item value='pro' label='Pro' description='Unlimited seats' />
-      <RadioGroup.Item value='enterprise' label='Enterprise' disabled />
+    <RadioGroup aria-label="Plan" {...props}>
+      <RadioGroup.Item value="starter" label="Starter" description="Up to 5 seats" />
+      <RadioGroup.Item value="pro" label="Pro" description="Unlimited seats" />
+      <RadioGroup.Item value="enterprise" label="Enterprise" disabled />
     </RadioGroup>
   );
 }
@@ -50,7 +50,7 @@ describe('RadioGroup', () => {
 
   it('is one tab stop with roving arrow-key focus', async () => {
     const user = userEvent.setup();
-    render(<Plans defaultValue='starter' />);
+    render(<Plans defaultValue="starter" />);
     await user.tab();
     expect(screen.getByRole('radio', { name: 'Starter' })).toHaveFocus();
     await user.keyboard('{ArrowDown}');

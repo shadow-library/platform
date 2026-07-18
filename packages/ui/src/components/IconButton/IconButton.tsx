@@ -36,7 +36,7 @@ export const IconButton = forwardRef<HTMLButtonElement, IconButtonProps>(functio
     'data-loading': loading || undefined,
     'data-pressed': pressed ? 'true' : undefined,
   };
-  const content = loading ? <span className={styles.spinner} aria-hidden='true' /> : <span className={styles.icon}>{icon}</span>;
+  const content = loading ? <span className={styles.spinner} aria-hidden="true" /> : <span className={styles.icon}>{icon}</span>;
 
   // asChild renders the consumer's element (e.g. a link) as the button, with the icon injected.
   if (asChild) {

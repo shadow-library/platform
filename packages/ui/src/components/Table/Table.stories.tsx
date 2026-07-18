@@ -68,8 +68,8 @@ export const Default: Story = {
       <Table
         data={services}
         columns={columns}
-        rowKey='id'
-        aria-label='Services'
+        rowKey="id"
+        aria-label="Services"
         selection={selected}
         onSelectionChange={setSelected}
         sort={sort}
@@ -77,10 +77,10 @@ export const Default: Story = {
         onRowClick={() => {}}
         bulkActions={
           <>
-            <Button variant='secondary' size='sm'>
+            <Button variant="secondary" size="sm">
               Export
             </Button>
-            <Button variant='danger' size='sm'>
+            <Button variant="danger" size="sm">
               Archive…
             </Button>
           </>
@@ -91,9 +91,9 @@ export const Default: Story = {
 };
 
 export const Loading: Story = {
-  render: () => <Table data={services} columns={columns} rowKey='id' aria-label='Services' loading />,
+  render: () => <Table data={services} columns={columns} rowKey="id" aria-label="Services" loading />,
 };
 
 export const Empty: Story = {
-  render: () => <Table data={[]} columns={columns} rowKey='id' aria-label='Services' emptyState='No services match your filters.' />,
+  render: () => <Table data={[]} columns={columns} rowKey="id" aria-label="Services" emptyState="No services match your filters." />,
 };

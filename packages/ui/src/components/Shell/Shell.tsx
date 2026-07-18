@@ -20,13 +20,13 @@ import { type PageProps, type ShellProps } from './Shell.types';
 export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell({ sidebar, topbar, theme = 'light', density = 'comfortable', className, children, ...props }, ref) {
   return (
     <div ref={ref} className={cn(styles.shell, theme === 'dark' && 'dark', className)} data-density={density === 'compact' ? 'compact' : undefined} {...props}>
-      <a href='#sh-main-content' className={styles.skipLink}>
+      <a href="#sh-main-content" className={styles.skipLink}>
         Skip to content
       </a>
       {sidebar}
       <div className={styles.body}>
         {topbar}
-        <main id='sh-main-content' className={styles.main}>
+        <main id="sh-main-content" className={styles.main}>
           {children}
         </main>
       </div>

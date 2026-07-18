@@ -26,15 +26,15 @@ type Story = StoryObj<typeof meta>;
 const navLink = { display: 'block', padding: '6px 10px', borderRadius: 6, fontSize: 'var(--sh-text-body-sm)', color: 'var(--sh-text-secondary)', textDecoration: 'none' } as const;
 
 const SidebarDemo = (
-  <nav aria-label='Main' style={{ width: 240, flexShrink: 0, borderRight: '1px solid var(--sh-border-default)', padding: 16 }}>
+  <nav aria-label="Main" style={{ width: 240, flexShrink: 0, borderRight: '1px solid var(--sh-border-default)', padding: 16 }}>
     <div style={{ fontWeight: 600, fontSize: 'var(--sh-text-body-sm)', marginBottom: 16 }}>acme-prod</div>
-    <a href='#services' style={{ ...navLink, background: 'var(--sh-accent-soft)', color: 'var(--sh-accent)' }} aria-current='page'>
+    <a href="#services" style={{ ...navLink, background: 'var(--sh-accent-soft)', color: 'var(--sh-accent)' }} aria-current="page">
       Services
     </a>
-    <a href='#deploys' style={navLink}>
+    <a href="#deploys" style={navLink}>
       Deploys
     </a>
-    <a href='#settings' style={navLink}>
+    <a href="#settings" style={navLink}>
       Settings
     </a>
   </nav>
@@ -60,7 +60,7 @@ const TopBarDemo = (
 export const Default: Story = {
   render: () => (
     <Shell sidebar={SidebarDemo} topbar={TopBarDemo}>
-      <Page title='Services' description='Everything running in acme-prod' actions={<Button>New service</Button>}>
+      <Page title="Services" description="Everything running in acme-prod" actions={<Button>New service</Button>}>
         <div
           style={{
             height: 400,
@@ -81,8 +81,8 @@ export const Default: Story = {
 
 export const Dark: Story = {
   render: () => (
-    <Shell theme='dark' sidebar={SidebarDemo} topbar={TopBarDemo}>
-      <Page title='Services' description='Everything running in acme-prod' actions={<Button>New service</Button>}>
+    <Shell theme="dark" sidebar={SidebarDemo} topbar={TopBarDemo}>
+      <Page title="Services" description="Everything running in acme-prod" actions={<Button>New service</Button>}>
         <div
           style={{
             height: 400,

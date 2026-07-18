@@ -60,7 +60,7 @@ describe('CommandPalette', () => {
 
   it('shows the empty message for no matches', async () => {
     const user = userEvent.setup();
-    render(<CommandPalette open onOpenChange={() => {}} commands={makeCommands()} emptyMessage='Nothing here' />);
+    render(<CommandPalette open onOpenChange={() => {}} commands={makeCommands()} emptyMessage="Nothing here" />);
     await user.type(screen.getByRole('combobox'), 'zzzz');
     expect(screen.getByText(/Nothing here/)).toBeInTheDocument();
   });

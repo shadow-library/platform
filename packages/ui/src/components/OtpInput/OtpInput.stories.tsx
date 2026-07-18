@@ -38,9 +38,9 @@ export const Playground: Story = {};
 export const Sizes: Story = {
   render: args => (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-      <OtpInput {...args} size='sm' />
-      <OtpInput {...args} size='md' />
-      <OtpInput {...args} size='lg' />
+      <OtpInput {...args} size="sm" />
+      <OtpInput {...args} size="md" />
+      <OtpInput {...args} size="lg" />
     </div>
   ),
 };

@@ -19,16 +19,16 @@ type PageSlot = number | 'ellipsis-left' | 'ellipsis-right';
 
 function ChevronLeft() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M10 4L6 8l4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M10 4L6 8l4 4" />
     </svg>
   );
 }
 
 function ChevronRight() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6 4l4 4-4 4' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6 4l4 4-4 4" />
     </svg>
   );
 }
@@ -87,12 +87,12 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
 
   if (cursorMode) {
     return (
-      <nav ref={ref} className={cn(styles.root, className)} aria-label='Pagination' {...props}>
+      <nav ref={ref} className={cn(styles.root, className)} aria-label="Pagination" {...props}>
         <div className={styles.controls}>
-          <button type='button' className={styles.arrow} disabled={!hasPrev} aria-label='Previous page' onClick={onPrev}>
+          <button type="button" className={styles.arrow} disabled={!hasPrev} aria-label="Previous page" onClick={onPrev}>
             <ChevronLeft />
           </button>
-          <button type='button' className={styles.arrow} disabled={!hasNext} aria-label='Next page' onClick={onNext}>
+          <button type="button" className={styles.arrow} disabled={!hasNext} aria-label="Next page" onClick={onNext}>
             <ChevronRight />
           </button>
         </div>
@@ -108,15 +108,15 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
   const slots = getPageSlots(page, totalPages, siblingCount);
 
   return (
-    <nav ref={ref} className={cn(styles.root, className)} aria-label='Pagination' {...props}>
+    <nav ref={ref} className={cn(styles.root, className)} aria-label="Pagination" {...props}>
       {summary ? (
-        <span className={styles.summary} aria-live='polite'>
+        <span className={styles.summary} aria-live="polite">
           Showing {start.toLocaleString(locale)} to {end.toLocaleString(locale)} of {total.toLocaleString(locale)}
         </span>
       ) : null}
 
       <div className={styles.controls}>
-        <button type='button' className={styles.arrow} disabled={page <= 1} aria-label='Previous page' onClick={() => onPageChange?.(page - 1)}>
+        <button type="button" className={styles.arrow} disabled={page <= 1} aria-label="Previous page" onClick={() => onPageChange?.(page - 1)}>
           <ChevronLeft />
         </button>
 
@@ -129,7 +129,7 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
             typeof slot === 'number' ? (
               <button
                 key={slot}
-                type='button'
+                type="button"
                 className={styles.page}
                 data-current={slot === page || undefined}
                 aria-label={`Page ${slot}`}
@@ -139,20 +139,20 @@ export const Pagination = forwardRef<HTMLElement, PaginationProps>(function Pagi
                 {slot}
               </button>
             ) : (
-              <span key={slot} className={styles.ellipsis} aria-hidden='true'>
+              <span key={slot} className={styles.ellipsis} aria-hidden="true">
                 …
               </span>
             ),
           )
         )}
 
-        <button type='button' className={styles.arrow} disabled={page >= totalPages} aria-label='Next page' onClick={() => onPageChange?.(page + 1)}>
+        <button type="button" className={styles.arrow} disabled={page >= totalPages} aria-label="Next page" onClick={() => onPageChange?.(page + 1)}>
           <ChevronRight />
         </button>
       </div>
 
       {onPageSizeChange ? (
-        <Select className={styles.pageSize} value={String(pageSize)} onValueChange={next => onPageSizeChange(Number(next))} size='sm' aria-label='Rows per page'>
+        <Select className={styles.pageSize} value={String(pageSize)} onValueChange={next => onPageSizeChange(Number(next))} size="sm" aria-label="Rows per page">
           {pageSizeOptions.map(option => (
             <Select.Item key={option} value={String(option)}>
               {option} / page

@@ -17,8 +17,8 @@ import { DescriptionList } from './DescriptionList';
 describe('DescriptionList', () => {
   it('renders term/detail pairs as a semantic dl', () => {
     render(
-      <DescriptionList title='Deployment'>
-        <DescriptionList.Item term='Service'>checkout-service</DescriptionList.Item>
+      <DescriptionList title="Deployment">
+        <DescriptionList.Item term="Service">checkout-service</DescriptionList.Item>
       </DescriptionList>,
     );
     expect(screen.getByRole('term')).toHaveTextContent('Service');
@@ -28,7 +28,7 @@ describe('DescriptionList', () => {
   it('renders an em dash for empty children', () => {
     render(
       <DescriptionList>
-        <DescriptionList.Item term='Rolled back' />
+        <DescriptionList.Item term="Rolled back" />
       </DescriptionList>,
     );
     expect(screen.getByRole('definition')).toHaveTextContent('—');
@@ -40,7 +40,7 @@ describe('DescriptionList', () => {
     Object.defineProperty(navigator, 'clipboard', { value: { writeText }, configurable: true });
     render(
       <DescriptionList>
-        <DescriptionList.Item term='Deploy ID' mono copyable>
+        <DescriptionList.Item term="Deploy ID" mono copyable>
           d-8f2c41a9
         </DescriptionList.Item>
       </DescriptionList>,
@@ -53,7 +53,7 @@ describe('DescriptionList', () => {
     const user = userEvent.setup();
     render(
       <DescriptionList>
-        <DescriptionList.Item term='API key' masked>
+        <DescriptionList.Item term="API key" masked>
           sk-live-42
         </DescriptionList.Item>
       </DescriptionList>,

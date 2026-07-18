@@ -17,14 +17,14 @@ import { ColorPicker } from './ColorPicker';
 
 describe('ColorPicker', () => {
   it('renders a trigger showing the committed value', () => {
-    render(<ColorPicker value='#4f46e5' aria-label='Brand color' />);
+    render(<ColorPicker value="#4f46e5" aria-label="Brand color" />);
     expect(screen.getByRole('button', { name: /Brand color: #4f46e5/i })).toBeInTheDocument();
   });
 
   it('opens a labelled palette radiogroup and commits a swatch', async () => {
     const user = userEvent.setup();
     const onCommit = vi.fn();
-    render(<ColorPicker value='#4f46e5' onCommit={onCommit} aria-label='Color' />);
+    render(<ColorPicker value="#4f46e5" onCommit={onCommit} aria-label="Color" />);
     await user.click(screen.getByRole('button', { name: /Color:/i }));
     expect(screen.getByRole('radiogroup', { name: 'Palette' })).toBeInTheDocument();
     expect(screen.getByRole('radio', { name: 'Indigo' })).toHaveAttribute('aria-checked', 'true');
@@ -35,7 +35,7 @@ describe('ColorPicker', () => {
   it('accepts valid hex input live', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<ColorPicker value='#4f46e5' onValueChange={onValueChange} aria-label='Color' />);
+    render(<ColorPicker value="#4f46e5" onValueChange={onValueChange} aria-label="Color" />);
     await user.click(screen.getByRole('button', { name: /Color:/i }));
     const hex = screen.getByRole('textbox', { name: 'Hex color' });
     await user.clear(hex);
@@ -45,7 +45,7 @@ describe('ColorPicker', () => {
 
   it('marks invalid hex without committing', async () => {
     const user = userEvent.setup();
-    render(<ColorPicker value='#4f46e5' aria-label='Color' />);
+    render(<ColorPicker value="#4f46e5" aria-label="Color" />);
     await user.click(screen.getByRole('button', { name: /Color:/i }));
     const hex = screen.getByRole('textbox', { name: 'Hex color' });
     await user.clear(hex);
@@ -56,7 +56,7 @@ describe('ColorPicker', () => {
   it('hides the spectrum behind Custom… and reveals a hue + saturation slider', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<ColorPicker defaultValue='#4f46e5' onValueChange={onValueChange} aria-label='Color' />);
+    render(<ColorPicker defaultValue="#4f46e5" onValueChange={onValueChange} aria-label="Color" />);
     await user.click(screen.getByRole('button', { name: /Color:/i }));
     expect(screen.queryByRole('slider', { name: 'Hue' })).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Custom…' }));
@@ -69,7 +69,7 @@ describe('ColorPicker', () => {
 
   it('makes the spectrum the whole panel when no palette is given', async () => {
     const user = userEvent.setup();
-    render(<ColorPicker defaultValue='#4f46e5' palette={[]} aria-label='Color' />);
+    render(<ColorPicker defaultValue="#4f46e5" palette={[]} aria-label="Color" />);
     await user.click(screen.getByRole('button', { name: /Color:/i }));
     expect(screen.queryByRole('radiogroup')).not.toBeInTheDocument();
     expect(screen.getByRole('slider', { name: 'Saturation and brightness' })).toBeInTheDocument();
@@ -77,7 +77,7 @@ describe('ColorPicker', () => {
 
   it('shows a contrast chip when contrastAgainst is set', async () => {
     const user = userEvent.setup();
-    render(<ColorPicker value='#111214' contrastAgainst='#ffffff' aria-label='Color' />);
+    render(<ColorPicker value="#111214" contrastAgainst="#ffffff" aria-label="Color" />);
     await user.click(screen.getByRole('button', { name: /Color:/i }));
     expect(screen.getByRole('status')).toHaveTextContent(/:1/);
   });

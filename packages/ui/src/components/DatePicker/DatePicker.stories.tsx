@@ -33,20 +33,20 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>('2026-06-30');
-    return <DatePicker value={value} onValueChange={setValue} aria-label='Deploy date' />;
+    return <DatePicker value={value} onValueChange={setValue} aria-label="Deploy date" />;
   },
 };
 
 export const WithMinMax: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>(null);
-    return <DatePicker value={value} onValueChange={setValue} min='2026-06-01' max='2026-06-30' aria-label='In June' />;
+    return <DatePicker value={value} onValueChange={setValue} min="2026-06-01" max="2026-06-30" aria-label="In June" />;
   },
 };
 
 export const Empty: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>(null);
-    return <DatePicker value={value} onValueChange={setValue} aria-label='Pick a date' />;
+    return <DatePicker value={value} onValueChange={setValue} aria-label="Pick a date" />;
   },
 };

@@ -24,7 +24,7 @@ const people: ComboboxOption[] = [
 describe('Combobox', () => {
   it('opens on focus and filters as you type', async () => {
     const user = userEvent.setup();
-    render(<Combobox options={people} aria-label='Owner' />);
+    render(<Combobox options={people} aria-label="Owner" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -35,7 +35,7 @@ describe('Combobox', () => {
 
   it('opens and closes the listbox from the chevron button', async () => {
     const user = userEvent.setup();
-    render(<Combobox options={people} aria-label='Owner' />);
+    render(<Combobox options={people} aria-label="Owner" />);
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Open options' }));
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -48,7 +48,7 @@ describe('Combobox', () => {
 
   it('stays open after clicking within the field', async () => {
     const user = userEvent.setup();
-    render(<Combobox options={people} aria-label='Owner' />);
+    render(<Combobox options={people} aria-label="Owner" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
     expect(screen.getByRole('listbox')).toBeInTheDocument();
@@ -60,7 +60,7 @@ describe('Combobox', () => {
   it('commits the highlighted option with Enter', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<Combobox options={people} onValueChange={onValueChange} aria-label='Owner' />);
+    render(<Combobox options={people} onValueChange={onValueChange} aria-label="Owner" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
     await user.type(input, 'ravi');
@@ -72,7 +72,7 @@ describe('Combobox', () => {
   it('commits an option on click', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<Combobox options={people} onValueChange={onValueChange} aria-label='Owner' />);
+    render(<Combobox options={people} onValueChange={onValueChange} aria-label="Owner" />);
     await user.click(screen.getByRole('combobox'));
     await user.click(screen.getByRole('option', { name: 'Jo Tan' }));
     expect(onValueChange).toHaveBeenCalledWith('2');
@@ -81,7 +81,7 @@ describe('Combobox', () => {
   it('shows the committed label and clears it', async () => {
     const user = userEvent.setup();
     const onValueChange = vi.fn();
-    render(<Combobox options={people} defaultValue='1' onValueChange={onValueChange} aria-label='Owner' />);
+    render(<Combobox options={people} defaultValue="1" onValueChange={onValueChange} aria-label="Owner" />);
     expect(screen.getByRole('combobox')).toHaveValue('Maya Kim');
     await user.click(screen.getByRole('button', { name: 'Clear' }));
     expect(onValueChange).toHaveBeenCalledWith(null);
@@ -90,7 +90,7 @@ describe('Combobox', () => {
 
   it('reverts to the committed label on Escape', async () => {
     const user = userEvent.setup();
-    render(<Combobox options={people} defaultValue='1' aria-label='Owner' />);
+    render(<Combobox options={people} defaultValue="1" aria-label="Owner" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
     await user.type(input, 'xyz');
@@ -101,7 +101,7 @@ describe('Combobox', () => {
   it('offers a create row and fires onCreate', async () => {
     const user = userEvent.setup();
     const onCreate = vi.fn();
-    render(<Combobox options={people} creatable onCreate={onCreate} aria-label='Label' />);
+    render(<Combobox options={people} creatable onCreate={onCreate} aria-label="Label" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
     await user.type(input, 'infra');
@@ -111,7 +111,7 @@ describe('Combobox', () => {
 
   it('shows the empty message when nothing matches', async () => {
     const user = userEvent.setup();
-    render(<Combobox options={people} emptyMessage='No people' aria-label='Owner' />);
+    render(<Combobox options={people} emptyMessage="No people" aria-label="Owner" />);
     const input = screen.getByRole('combobox');
     await user.click(input);
     await user.type(input, 'zzz');

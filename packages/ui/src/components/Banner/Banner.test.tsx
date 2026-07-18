@@ -19,16 +19,16 @@ afterEach(() => bannerStore.reset());
 
 describe('Banner', () => {
   it('uses role=alert for danger and role=status otherwise', () => {
-    const { rerender } = render(<Banner intent='danger' message='Payment failed' />);
+    const { rerender } = render(<Banner intent="danger" message="Payment failed" />);
     expect(screen.getByRole('alert')).toHaveTextContent('Payment failed');
-    rerender(<Banner intent='warning' message='Trial ends soon' />);
+    rerender(<Banner intent="warning" message="Trial ends soon" />);
     expect(screen.getByRole('status')).toHaveTextContent('Trial ends soon');
   });
 
   it('renders the single action and dismiss button', async () => {
     const user = userEvent.setup();
     const onDismiss = vi.fn();
-    render(<Banner intent='warning' message='Invoice overdue' action={{ label: 'Pay now', onClick: vi.fn() }} dismissable onDismiss={onDismiss} />);
+    render(<Banner intent="warning" message="Invoice overdue" action={{ label: 'Pay now', onClick: vi.fn() }} dismissable onDismiss={onDismiss} />);
     expect(screen.getByRole('button', { name: 'Pay now' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Dismiss notice' }));
     expect(onDismiss).toHaveBeenCalledOnce();
@@ -57,11 +57,11 @@ describe('Banner queue', () => {
       useBanner({ id: 'invoice', intent: 'warning', message, dismissable: true });
       return <BannerOutlet />;
     }
-    const { rerender } = render(<Dismissible message='Invoice 14 days overdue' />);
+    const { rerender } = render(<Dismissible message="Invoice 14 days overdue" />);
     await user.click(screen.getByRole('button', { name: 'Dismiss notice' }));
     expect(screen.queryByText('Invoice 14 days overdue')).not.toBeInTheDocument();
 
-    rerender(<Dismissible message='Invoice 30 days overdue — service paused' />);
+    rerender(<Dismissible message="Invoice 30 days overdue — service paused" />);
     expect(screen.getByText('Invoice 30 days overdue — service paused')).toBeInTheDocument();
   });
 });

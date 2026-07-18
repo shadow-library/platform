@@ -26,15 +26,15 @@ const STATUS_LABEL: Record<TimelineStatus, string> = {
 
 function CheckGlyph() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={2.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M3.5 8.5l3 3 6-6.5' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.5 8.5l3 3 6-6.5" />
     </svg>
   );
 }
 function BangGlyph() {
   return (
-    <svg viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
-      <path d='M7 3h2l-.4 5.5H7.4L7 3Zm1 7.5a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z' />
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <path d="M7 3h2l-.4 5.5H7.4L7 3Zm1 7.5a1.1 1.1 0 1 0 0 2.2 1.1 1.1 0 0 0 0-2.2Z" />
     </svg>
   );
 }
@@ -59,7 +59,7 @@ export const TimelineItem = forwardRef<HTMLLIElement, TimelineItemProps>(functio
 
   return (
     <li ref={ref} className={cn(styles.item, className)} data-status={status} {...props}>
-      <div className={styles.marker} aria-hidden='true'>
+      <div className={styles.marker} aria-hidden="true">
         {marker ?? glyph}
       </div>
       <div className={styles.content}>

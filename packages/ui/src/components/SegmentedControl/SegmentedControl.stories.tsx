@@ -28,10 +28,10 @@ export const Default: Story = {
   render: args => {
     const [period, setPeriod] = useState('1w');
     return (
-      <SegmentedControl {...args} value={period} onValueChange={setPeriod} aria-label='Chart period'>
-        <SegmentedControl.Item value='1d'>Day</SegmentedControl.Item>
-        <SegmentedControl.Item value='1w'>Week</SegmentedControl.Item>
-        <SegmentedControl.Item value='1m'>Month</SegmentedControl.Item>
+      <SegmentedControl {...args} value={period} onValueChange={setPeriod} aria-label="Chart period">
+        <SegmentedControl.Item value="1d">Day</SegmentedControl.Item>
+        <SegmentedControl.Item value="1w">Week</SegmentedControl.Item>
+        <SegmentedControl.Item value="1m">Month</SegmentedControl.Item>
       </SegmentedControl>
     );
   },
@@ -42,9 +42,9 @@ export const FullWidth: Story = {
     const [layout, setLayout] = useState('grid');
     return (
       <div style={{ width: 320 }}>
-        <SegmentedControl fullWidth value={layout} onValueChange={setLayout} aria-label='Layout'>
-          <SegmentedControl.Item value='grid'>Grid</SegmentedControl.Item>
-          <SegmentedControl.Item value='list'>List</SegmentedControl.Item>
+        <SegmentedControl fullWidth value={layout} onValueChange={setLayout} aria-label="Layout">
+          <SegmentedControl.Item value="grid">Grid</SegmentedControl.Item>
+          <SegmentedControl.Item value="list">List</SegmentedControl.Item>
         </SegmentedControl>
       </div>
     );

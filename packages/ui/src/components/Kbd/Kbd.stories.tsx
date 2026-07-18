@@ -29,11 +29,11 @@ export const Playground: Story = {};
 export const Combinations: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-      <Kbd keys='mod+K' />
-      <Kbd keys='mod+shift+P' />
-      <Kbd keys='ctrl+alt+delete' />
-      <Kbd keys='esc' />
-      <Kbd keys='up' />
+      <Kbd keys="mod+K" />
+      <Kbd keys="mod+shift+P" />
+      <Kbd keys="ctrl+alt+delete" />
+      <Kbd keys="esc" />
+      <Kbd keys="up" />
     </div>
   ),
 };

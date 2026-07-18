@@ -67,10 +67,10 @@ function SelectRoot({
         aria-labelledby={ariaLabelledby}
       >
         <SelectPrimitive.Value className={styles.value} placeholder={placeholder} />
-        <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden='true' /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
+        <SelectPrimitive.Icon className={styles.chevron}>{loading ? <span className={styles.spinner} aria-hidden="true" /> : <ChevronDownIcon />}</SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
       <SelectPrimitive.Portal>
-        <SelectPrimitive.Content className={cn(styles.content, contentClassName)} position='popper' sideOffset={6}>
+        <SelectPrimitive.Content className={cn(styles.content, contentClassName)} position="popper" sideOffset={6}>
           <SelectPrimitive.ScrollUpButton className={styles.scrollButton}>
             <span className={styles.scrollChevronUp}>
               <ChevronDownIcon />

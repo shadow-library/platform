@@ -27,8 +27,8 @@ import {
  */
 function DotIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
-      <circle cx='8' cy='8' r='3' />
+    <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="8" cy="8" r="3" />
     </svg>
   );
 }
@@ -47,7 +47,7 @@ const DropdownMenuItem = forwardRef<HTMLDivElement, DropdownMenuItemProps>(funct
       {icon != null ? <span className={styles.itemIcon}>{icon}</span> : null}
       <span className={styles.itemLabel}>{children}</span>
       {shortcut != null ? (
-        <span className={styles.shortcut} aria-hidden='true'>
+        <span className={styles.shortcut} aria-hidden="true">
           {shortcut}
         </span>
       ) : null}
@@ -75,7 +75,7 @@ const DropdownMenuCheckboxItem = forwardRef<HTMLDivElement, DropdownMenuCheckbox
       </span>
       <span className={styles.itemLabel}>{children}</span>
       {shortcut != null ? (
-        <span className={styles.shortcut} aria-hidden='true'>
+        <span className={styles.shortcut} aria-hidden="true">
           {shortcut}
         </span>
       ) : null}
@@ -101,7 +101,7 @@ const DropdownMenuRadioItem = forwardRef<HTMLDivElement, DropdownMenuRadioItemPr
       </span>
       <span className={styles.itemLabel}>{children}</span>
       {shortcut != null ? (
-        <span className={styles.shortcut} aria-hidden='true'>
+        <span className={styles.shortcut} aria-hidden="true">
           {shortcut}
         </span>
       ) : null}

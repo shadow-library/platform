@@ -22,7 +22,7 @@ describe('Dialog', () => {
       <Dialog>
         <Dialog.Trigger>New environment</Dialog.Trigger>
         <Dialog.Content>
-          <Dialog.Header title='New environment' description='Environments isolate config.' />
+          <Dialog.Header title="New environment" description="Environments isolate config." />
           <Dialog.Body>body</Dialog.Body>
         </Dialog.Content>
       </Dialog>,
@@ -38,7 +38,7 @@ describe('Dialog', () => {
     render(
       <Dialog defaultOpen onOpenChange={onOpenChange}>
         <Dialog.Content>
-          <Dialog.Header title='Settings' />
+          <Dialog.Header title="Settings" />
         </Dialog.Content>
       </Dialog>,
     );
@@ -52,8 +52,8 @@ describe('Dialog', () => {
     render(
       <Dialog defaultOpen>
         <Dialog.Content>
-          <Dialog.Header title='New environment' showClose={false} />
-          <Dialog.Footer cancel='Cancel' action='Create environment' onAction={onAction} />
+          <Dialog.Header title="New environment" showClose={false} />
+          <Dialog.Footer cancel="Cancel" action="Create environment" onAction={onAction} />
         </Dialog.Content>
       </Dialog>,
     );
@@ -66,7 +66,7 @@ describe('ConfirmDialog', () => {
   it('renders as an alertdialog and confirms', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
-    render(<ConfirmDialog defaultOpen title='Archive project?' confirmLabel='Archive' onConfirm={onConfirm} />);
+    render(<ConfirmDialog defaultOpen title="Archive project?" confirmLabel="Archive" onConfirm={onConfirm} />);
     expect(screen.getByRole('alertdialog', { name: 'Archive project?' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Archive' }));
     expect(onConfirm).toHaveBeenCalledTimes(1);
@@ -75,7 +75,7 @@ describe('ConfirmDialog', () => {
   it('gates the action until the resource name is typed', async () => {
     const user = userEvent.setup();
     const onConfirm = vi.fn();
-    render(<ConfirmDialog defaultOpen intent='danger' title='Delete workspace?' confirmLabel='Delete workspace' typedConfirmation='acme-prod' onConfirm={onConfirm} />);
+    render(<ConfirmDialog defaultOpen intent="danger" title="Delete workspace?" confirmLabel="Delete workspace" typedConfirmation="acme-prod" onConfirm={onConfirm} />);
     const confirm = screen.getByRole('button', { name: 'Delete workspace' });
     expect(confirm).toBeDisabled();
     await user.type(screen.getByRole('textbox', { name: 'Type acme-prod to confirm' }), 'acme-prod');

@@ -25,7 +25,7 @@ export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function E
   return (
     <div ref={ref} className={cn(styles.root, className)} data-size={size} {...props}>
       {size === 'page' && illustration != null ? (
-        <div className={styles.illustration} aria-hidden='true'>
+        <div className={styles.illustration} aria-hidden="true">
           {illustration}
         </div>
       ) : null}
@@ -41,7 +41,7 @@ export const EmptyState = forwardRef<HTMLDivElement, EmptyStateProps>(function E
             </Button>
           ) : null}
           {secondaryAction != null ? (
-            <Button variant='text' size={size === 'inline' ? 'sm' : 'md'} loading={secondaryAction.loading} onClick={secondaryAction.onClick}>
+            <Button variant="text" size={size === 'inline' ? 'sm' : 'md'} loading={secondaryAction.loading} onClick={secondaryAction.onClick}>
               {secondaryAction.label}
             </Button>
           ) : null}

@@ -16,10 +16,10 @@ import { SegmentedControl } from './SegmentedControl';
  */
 function Example(props: { onValueChange?: (value: string) => void }) {
   return (
-    <SegmentedControl defaultValue='1w' aria-label='Chart period' onValueChange={props.onValueChange}>
-      <SegmentedControl.Item value='1d'>Day</SegmentedControl.Item>
-      <SegmentedControl.Item value='1w'>Week</SegmentedControl.Item>
-      <SegmentedControl.Item value='1m'>Month</SegmentedControl.Item>
+    <SegmentedControl defaultValue="1w" aria-label="Chart period" onValueChange={props.onValueChange}>
+      <SegmentedControl.Item value="1d">Day</SegmentedControl.Item>
+      <SegmentedControl.Item value="1w">Week</SegmentedControl.Item>
+      <SegmentedControl.Item value="1m">Month</SegmentedControl.Item>
     </SegmentedControl>
   );
 }

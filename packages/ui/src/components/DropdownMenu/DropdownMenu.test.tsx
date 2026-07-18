@@ -35,7 +35,7 @@ function Menu({ onDuplicate }: { onDuplicate?: () => void } = {}) {
         <Button>Actions</Button>
       </DropdownMenu.Trigger>
       <DropdownMenu.Content>
-        <DropdownMenu.Item shortcut='⌘D' onSelect={onDuplicate}>
+        <DropdownMenu.Item shortcut="⌘D" onSelect={onDuplicate}>
           Duplicate
         </DropdownMenu.Item>
         <DropdownMenu.Item disabled>Rename</DropdownMenu.Item>
@@ -111,8 +111,8 @@ describe('DropdownMenu', () => {
           </DropdownMenu.Trigger>
           <DropdownMenu.Content>
             <DropdownMenu.RadioGroup value={sort} onValueChange={setSort}>
-              <DropdownMenu.RadioItem value='name'>Name</DropdownMenu.RadioItem>
-              <DropdownMenu.RadioItem value='date'>Date</DropdownMenu.RadioItem>
+              <DropdownMenu.RadioItem value="name">Name</DropdownMenu.RadioItem>
+              <DropdownMenu.RadioItem value="date">Date</DropdownMenu.RadioItem>
             </DropdownMenu.RadioGroup>
           </DropdownMenu.Content>
         </DropdownMenu>

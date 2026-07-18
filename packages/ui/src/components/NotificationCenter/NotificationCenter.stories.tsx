@@ -65,14 +65,14 @@ export const Default: Story = {
             list.map(entry => (entry.id === item.id ? { ...entry, actions: undefined, receipt: `${actionId === 'approve' ? 'Approved' : 'Declined'} · just now` } : entry)),
           )
         }
-        viewAllHref='#/inbox'
+        viewAllHref="#/inbox"
       />
     );
   },
 };
 
 export const DotBadge: Story = {
-  render: () => <NotificationCenter items={seed} badge='dot' />,
+  render: () => <NotificationCenter items={seed} badge="dot" />,
 };
 
 export const Empty: Story = {

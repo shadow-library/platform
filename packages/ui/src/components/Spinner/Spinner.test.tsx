@@ -16,14 +16,14 @@ import { Spinner } from './Spinner';
 
 describe('Spinner', () => {
   it('exposes a status role with visually-hidden label text', () => {
-    render(<Spinner label='Loading deployments' />);
+    render(<Spinner label="Loading deployments" />);
     const status = screen.getByRole('status');
     expect(status).toHaveTextContent('Loading deployments');
     expect(status).toHaveAttribute('data-size', 'md');
   });
 
   it('applies the size', () => {
-    render(<Spinner size='lg' />);
+    render(<Spinner size="lg" />);
     expect(screen.getByRole('status')).toHaveAttribute('data-size', 'lg');
   });
 });

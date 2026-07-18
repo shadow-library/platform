@@ -23,7 +23,7 @@ const SkeletonRoot = forwardRef<HTMLSpanElement, SkeletonProps>(function Skeleto
       ref={ref}
       className={cn(styles.skeleton, className)}
       data-shape={shape}
-      aria-hidden='true'
+      aria-hidden="true"
       style={{ width, height: resolvedHeight, borderRadius: radius, ...style }}
       {...props}
     />
@@ -33,11 +33,11 @@ const SkeletonRoot = forwardRef<HTMLSpanElement, SkeletonProps>(function Skeleto
 /** Prebuilt table ghost — a grid of line skeletons in a busy region. */
 function SkeletonTable({ rows = 5, columns = 4, className, ...props }: SkeletonTableProps) {
   return (
-    <div className={cn(styles.table, className)} aria-busy='true' {...props}>
+    <div className={cn(styles.table, className)} aria-busy="true" {...props}>
       {Array.from({ length: rows }, (_, row) => (
         <div key={`row-${row}`} className={styles.tableRow}>
           {Array.from({ length: columns }, (_, col) => (
-            <SkeletonRoot key={`cell-${col}`} shape='line' width={col === 0 ? '45%' : '75%'} />
+            <SkeletonRoot key={`cell-${col}`} shape="line" width={col === 0 ? '45%' : '75%'} />
           ))}
         </div>
       ))}
@@ -48,10 +48,10 @@ function SkeletonTable({ rows = 5, columns = 4, className, ...props }: SkeletonT
 /** Prebuilt card ghost — a media block over two text lines. */
 function SkeletonCard({ className, ...props }: SkeletonCardProps) {
   return (
-    <div className={cn(styles.card, className)} aria-busy='true' {...props}>
-      <SkeletonRoot shape='rect' height={120} radius='var(--sh-radius-md)' />
-      <SkeletonRoot shape='line' width='70%' />
-      <SkeletonRoot shape='line' width='45%' />
+    <div className={cn(styles.card, className)} aria-busy="true" {...props}>
+      <SkeletonRoot shape="rect" height={120} radius="var(--sh-radius-md)" />
+      <SkeletonRoot shape="line" width="70%" />
+      <SkeletonRoot shape="line" width="45%" />
     </div>
   );
 }
@@ -59,13 +59,13 @@ function SkeletonCard({ className, ...props }: SkeletonCardProps) {
 /** Prebuilt list ghost — rows of avatar + two text lines. */
 function SkeletonList({ rows = 3, className, ...props }: SkeletonListProps) {
   return (
-    <div className={cn(styles.list, className)} aria-busy='true' {...props}>
+    <div className={cn(styles.list, className)} aria-busy="true" {...props}>
       {Array.from({ length: rows }, (_, row) => (
         <div key={`row-${row}`} className={styles.listRow}>
-          <SkeletonRoot shape='circle' width={32} />
+          <SkeletonRoot shape="circle" width={32} />
           <div className={styles.listText}>
-            <SkeletonRoot shape='line' width='60%' />
-            <SkeletonRoot shape='line' width='40%' />
+            <SkeletonRoot shape="line" width="60%" />
+            <SkeletonRoot shape="line" width="40%" />
           </div>
         </div>
       ))}

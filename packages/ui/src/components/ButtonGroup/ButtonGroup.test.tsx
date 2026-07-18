@@ -20,7 +20,7 @@ import { ButtonGroup } from './ButtonGroup';
 describe('ButtonGroup', () => {
   it('renders an attached group with the role and label', () => {
     render(
-      <ButtonGroup aria-label='Zoom'>
+      <ButtonGroup aria-label="Zoom">
         <Button>Out</Button>
         <Button>In</Button>
       </ButtonGroup>,
@@ -43,9 +43,9 @@ describe('ButtonGroup', () => {
 
   it('imposes its variant and size on member buttons, overriding their own props', () => {
     render(
-      <ButtonGroup variant='primary' size='lg'>
+      <ButtonGroup variant="primary" size="lg">
         <Button>Inherits</Button>
-        <Button variant='ghost' size='sm'>
+        <Button variant="ghost" size="sm">
           Overridden
         </Button>
       </ButtonGroup>,
@@ -59,8 +59,8 @@ describe('ButtonGroup', () => {
   it('warns in development when a member tries to diverge from the group', () => {
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
     render(
-      <ButtonGroup variant='primary'>
-        <Button variant='danger'>Nope</Button>
+      <ButtonGroup variant="primary">
+        <Button variant="danger">Nope</Button>
       </ButtonGroup>,
     );
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('ButtonGroup'));
@@ -69,7 +69,7 @@ describe('ButtonGroup', () => {
 
   it('disables the whole group by making it inert and dimming once', () => {
     render(
-      <ButtonGroup aria-label='Zoom' disabled>
+      <ButtonGroup aria-label="Zoom" disabled>
         <Button>Out</Button>
         <Button>In</Button>
       </ButtonGroup>,
@@ -82,7 +82,7 @@ describe('ButtonGroup', () => {
   it('forwards the ref to the container element', () => {
     const ref = createRef<HTMLDivElement>();
     render(
-      <ButtonGroup ref={ref} aria-label='Zoom'>
+      <ButtonGroup ref={ref} aria-label="Zoom">
         <Button>Out</Button>
       </ButtonGroup>,
     );
@@ -92,7 +92,7 @@ describe('ButtonGroup', () => {
   describe('toolbar roving tabindex', () => {
     function Toolbar() {
       return (
-        <ButtonGroup role='toolbar' aria-label='Actions' attached={false} variant='ghost'>
+        <ButtonGroup role="toolbar" aria-label="Actions" attached={false} variant="ghost">
           <Button>One</Button>
           <Button>Two</Button>
           <Button>Three</Button>

@@ -16,7 +16,7 @@ import { Skeleton } from './Skeleton';
 
 describe('Skeleton', () => {
   it('renders a decorative ghost with the shape and size', () => {
-    const { container } = render(<Skeleton shape='circle' width={32} data-testid='ghost' />);
+    const { container } = render(<Skeleton shape="circle" width={32} data-testid="ghost" />);
     const ghost = screen.getByTestId('ghost');
     expect(ghost).toHaveAttribute('aria-hidden', 'true');
     expect(ghost).toHaveAttribute('data-shape', 'circle');

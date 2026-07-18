@@ -49,9 +49,9 @@ export const SettingsRows: Story = {
     const [state, setState] = useState({ tfa: true, sso: false, audit: true });
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-        <Switch label='Two-factor authentication' description='Require a code at sign-in' checked={state.tfa} onCheckedChange={v => setState(s => ({ ...s, tfa: v }))} />
-        <Switch label='Enforce SSO' description='Members must sign in with your identity provider' checked={state.sso} onCheckedChange={v => setState(s => ({ ...s, sso: v }))} />
-        <Switch label='Audit log streaming' description='Stream events to your SIEM' checked={state.audit} onCheckedChange={v => setState(s => ({ ...s, audit: v }))} />
+        <Switch label="Two-factor authentication" description="Require a code at sign-in" checked={state.tfa} onCheckedChange={v => setState(s => ({ ...s, tfa: v }))} />
+        <Switch label="Enforce SSO" description="Members must sign in with your identity provider" checked={state.sso} onCheckedChange={v => setState(s => ({ ...s, sso: v }))} />
+        <Switch label="Audit log streaming" description="Stream events to your SIEM" checked={state.audit} onCheckedChange={v => setState(s => ({ ...s, audit: v }))} />
       </div>
     );
   },

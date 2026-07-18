@@ -19,8 +19,8 @@ describe('Accordion', () => {
   it('renders heading buttons that toggle their panel', async () => {
     const user = userEvent.setup();
     render(
-      <Accordion type='single' collapsible>
-        <Accordion.Item value='billing' title='Billing'>
+      <Accordion type="single" collapsible>
+        <Accordion.Item value="billing" title="Billing">
           Billing panel content
         </Accordion.Item>
       </Accordion>,
@@ -35,8 +35,8 @@ describe('Accordion', () => {
 
   it('folds meta into the header accessible name', () => {
     render(
-      <Accordion type='single' collapsible>
-        <Accordion.Item value='billing' title='Billing' meta='2 issues'>
+      <Accordion type="single" collapsible>
+        <Accordion.Item value="billing" title="Billing" meta="2 issues">
           content
         </Accordion.Item>
       </Accordion>,
@@ -47,11 +47,11 @@ describe('Accordion', () => {
   it('single mode closes the previous item when another opens', async () => {
     const user = userEvent.setup();
     render(
-      <Accordion type='single' collapsible defaultValue='a'>
-        <Accordion.Item value='a' title='First'>
+      <Accordion type="single" collapsible defaultValue="a">
+        <Accordion.Item value="a" title="First">
           first
         </Accordion.Item>
-        <Accordion.Item value='b' title='Second'>
+        <Accordion.Item value="b" title="Second">
           second
         </Accordion.Item>
       </Accordion>,
@@ -64,8 +64,8 @@ describe('Accordion', () => {
 
   it('respects a custom heading level', () => {
     render(
-      <Accordion type='multiple' headingLevel={2}>
-        <Accordion.Item value='a' title='Section'>
+      <Accordion type="multiple" headingLevel={2}>
+        <Accordion.Item value="a" title="Section">
           content
         </Accordion.Item>
       </Accordion>,

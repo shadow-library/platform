@@ -16,13 +16,13 @@ import { Stepper } from './Stepper';
 function Wizard({ accountValid = true, onFinish = () => {} }: { accountValid?: boolean; onFinish?: () => void }) {
   return (
     <Stepper>
-      <Stepper.Step id='account' label='Account' validate={() => accountValid}>
+      <Stepper.Step id="account" label="Account" validate={() => accountValid}>
         <h2>Account form</h2>
       </Stepper.Step>
-      <Stepper.Step id='team' label='Invite team' optional>
+      <Stepper.Step id="team" label="Invite team" optional>
         <h2>Team form</h2>
       </Stepper.Step>
-      <Stepper.Step id='review' label='Review' onFinish={onFinish}>
+      <Stepper.Step id="review" label="Review" onFinish={onFinish}>
         <h2>Review</h2>
       </Stepper.Step>
     </Stepper>

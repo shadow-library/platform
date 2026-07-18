@@ -24,7 +24,7 @@ const box = (index: number): HTMLInputElement => {
 
 describe('OtpInput', () => {
   it('renders one box per character with an accessible name per box', () => {
-    render(<OtpInput length={4} aria-label='Code' />);
+    render(<OtpInput length={4} aria-label="Code" />);
     expect(boxes()).toHaveLength(4);
     expect(screen.getByRole('textbox', { name: 'Code, character 1 of 4' })).toBeInTheDocument();
   });
@@ -42,7 +42,7 @@ describe('OtpInput', () => {
 
   it('rejects characters outside the allowed set', async () => {
     const user = userEvent.setup();
-    render(<OtpInput length={4} type='numeric' />);
+    render(<OtpInput length={4} type="numeric" />);
     await user.click(box(0));
     await user.keyboard('a1');
     expect(box(0).value).toBe('1');
@@ -72,7 +72,7 @@ describe('OtpInput', () => {
 
   it('moves back and clears on Backspace from an empty box', async () => {
     const user = userEvent.setup();
-    render(<OtpInput length={4} defaultValue='12' />);
+    render(<OtpInput length={4} defaultValue="12" />);
     await user.click(box(2));
     await user.keyboard('{Backspace}');
     expect(box(1).value).toBe('');
@@ -80,10 +80,10 @@ describe('OtpInput', () => {
   });
 
   it('supports a controlled value', () => {
-    const { rerender } = render(<OtpInput length={4} value='99' onValueChange={() => {}} />);
+    const { rerender } = render(<OtpInput length={4} value="99" onValueChange={() => {}} />);
     expect(box(0).value).toBe('9');
     expect(box(2).value).toBe('');
-    rerender(<OtpInput length={4} value='999' onValueChange={() => {}} />);
+    rerender(<OtpInput length={4} value="999" onValueChange={() => {}} />);
     expect(box(2).value).toBe('9');
   });
 
@@ -94,7 +94,7 @@ describe('OtpInput', () => {
 
   it('forwards the ref to the first box', () => {
     const ref = createRef<HTMLInputElement>();
-    render(<OtpInput length={4} ref={ref} aria-label='Code' />);
+    render(<OtpInput length={4} ref={ref} aria-label="Code" />);
     expect(ref.current).toBe(box(0));
   });
 });

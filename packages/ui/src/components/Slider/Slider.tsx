@@ -84,7 +84,7 @@ export const Slider = forwardRef<HTMLSpanElement, SliderProps>(function Slider(
         <SliderPrimitive.Track className={styles.track}>
           <SliderPrimitive.Range className={styles.range} />
           {markStops.map(stop => (
-            <span key={stop} className={styles.mark} style={{ left: `${((stop - min) / (max - min)) * 100}%` }} aria-hidden='true' />
+            <span key={stop} className={styles.mark} style={{ left: `${((stop - min) / (max - min)) * 100}%` }} aria-hidden="true" />
           ))}
         </SliderPrimitive.Track>
         {arrayValue.map((thumbValue, index) => (

@@ -17,18 +17,18 @@ import { Tabs } from './Tabs';
 function Example(props: { onValueChange?: (value: string) => void; defaultValue?: string }) {
   return (
     <Tabs defaultValue={props.defaultValue ?? 'overview'} onValueChange={props.onValueChange}>
-      <Tabs.List aria-label='Service views'>
-        <Tabs.Tab value='overview'>Overview</Tabs.Tab>
-        <Tabs.Tab value='logs' count={12}>
+      <Tabs.List aria-label="Service views">
+        <Tabs.Tab value="overview">Overview</Tabs.Tab>
+        <Tabs.Tab value="logs" count={12}>
           Logs
         </Tabs.Tab>
-        <Tabs.Tab value='settings' disabled>
+        <Tabs.Tab value="settings" disabled>
           Settings
         </Tabs.Tab>
       </Tabs.List>
-      <Tabs.Panel value='overview'>Overview panel</Tabs.Panel>
-      <Tabs.Panel value='logs'>Logs panel</Tabs.Panel>
-      <Tabs.Panel value='settings'>Settings panel</Tabs.Panel>
+      <Tabs.Panel value="overview">Overview panel</Tabs.Panel>
+      <Tabs.Panel value="logs">Logs panel</Tabs.Panel>
+      <Tabs.Panel value="settings">Settings panel</Tabs.Panel>
     </Tabs>
   );
 }

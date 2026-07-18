@@ -33,14 +33,14 @@ export const Default: Story = {
         <BottomSheet
           open={open}
           onOpenChange={setOpen}
-          title='Filter results'
+          title="Filter results"
           headerAction={
-            <Button variant='text' size='sm'>
+            <Button variant="text" size="sm">
               Reset
             </Button>
           }
           footer={
-            <Button size='lg' fullWidth>
+            <Button size="lg" fullWidth>
               Show 24 results
             </Button>
           }
@@ -48,7 +48,7 @@ export const Default: Story = {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingTop: 8 }}>
             {Array.from({ length: 12 }, (_, i) => (
               <label key={`row-${i}`} style={{ display: 'flex', gap: 8 }}>
-                <input type='checkbox' /> Option {i + 1}
+                <input type="checkbox" /> Option {i + 1}
               </label>
             ))}
           </div>
@@ -64,7 +64,7 @@ export const MultiSnap: Story = {
     return (
       <div style={{ padding: 24 }}>
         <Button onClick={() => setOpen(true)}>Open multi-snap sheet</Button>
-        <BottomSheet open={open} onOpenChange={setOpen} title='Details' snapPoints={['content', 'half', 'full']} defaultSnap='half'>
+        <BottomSheet open={open} onOpenChange={setOpen} title="Details" snapPoints={['content', 'half', 'full']} defaultSnap="half">
           <p style={{ margin: 0 }}>Drag the grabber or click it to cycle content → half → full.</p>
         </BottomSheet>
       </div>
@@ -81,10 +81,10 @@ export const NonDismissable: Story = {
         <BottomSheet
           open={open}
           onOpenChange={setOpen}
-          title='Confirm your plan'
+          title="Confirm your plan"
           dismissable={false}
           footer={
-            <Button size='lg' fullWidth onClick={() => setOpen(false)}>
+            <Button size="lg" fullWidth onClick={() => setOpen(false)}>
               Continue
             </Button>
           }

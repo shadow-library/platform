@@ -39,7 +39,7 @@ export const Emails: Story = {
       { value: 'ana@acme.com', valid: true },
       { value: 'jo@acme.com', valid: true },
     ]);
-    return <TokenInput value={tokens} onValueChange={setTokens} validate={isEmail} placeholder='name@company.com' aria-label='Recipients' />;
+    return <TokenInput value={tokens} onValueChange={setTokens} validate={isEmail} placeholder="name@company.com" aria-label="Recipients" />;
   },
 };
 
@@ -49,6 +49,6 @@ export const WithInvalid: Story = {
       { value: 'ana@acme.com', valid: true },
       { value: 'not-an-email', valid: false },
     ]);
-    return <TokenInput value={tokens} onValueChange={setTokens} validate={isEmail} aria-label='Recipients' />;
+    return <TokenInput value={tokens} onValueChange={setTokens} validate={isEmail} aria-label="Recipients" />;
   },
 };

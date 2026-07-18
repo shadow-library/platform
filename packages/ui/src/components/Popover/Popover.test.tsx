@@ -37,7 +37,7 @@ describe('Popover', () => {
       <Popover defaultOpen>
         <Popover.Trigger>Open</Popover.Trigger>
         <Popover.Content>
-          <Popover.Header title='Notifications' description='Choose what reaches you.' />
+          <Popover.Header title="Notifications" description="Choose what reaches you." />
         </Popover.Content>
       </Popover>,
     );
@@ -66,7 +66,7 @@ describe('Popover', () => {
     render(
       <Popover defaultOpen>
         <Popover.Trigger>Open</Popover.Trigger>
-        <Popover.Content aria-label='Quick filters'>
+        <Popover.Content aria-label="Quick filters">
           <div>content</div>
         </Popover.Content>
       </Popover>,

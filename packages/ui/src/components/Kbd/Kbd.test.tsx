@@ -16,24 +16,24 @@ import { Kbd } from './Kbd';
 
 describe('Kbd', () => {
   it('renders a semantic kbd element', () => {
-    const { container } = render(<Kbd keys='mod+K' mac />);
+    const { container } = render(<Kbd keys="mod+K" mac />);
     expect(container.querySelector('kbd')).toBeInTheDocument();
   });
 
   it('maps mod to ⌘ on macOS and Ctrl elsewhere', () => {
-    const { rerender } = render(<Kbd keys='mod+K' mac data-testid='kbd' />);
+    const { rerender } = render(<Kbd keys="mod+K" mac data-testid="kbd" />);
     expect(screen.getByTestId('kbd')).toHaveTextContent('⌘K');
-    rerender(<Kbd keys='mod+K' mac={false} data-testid='kbd' />);
+    rerender(<Kbd keys="mod+K" mac={false} data-testid="kbd" />);
     expect(screen.getByTestId('kbd')).toHaveTextContent('CtrlK');
   });
 
   it('orders modifiers ⌃ ⌥ ⇧ ⌘ before the key', () => {
-    render(<Kbd keys='mod+shift+P' mac data-testid='kbd' />);
+    render(<Kbd keys="mod+shift+P" mac data-testid="kbd" />);
     expect(screen.getByTestId('kbd')).toHaveTextContent('⇧⌘P');
   });
 
   it('supplies a spoken accessible name', () => {
-    render(<Kbd keys='mod+K' mac />);
+    render(<Kbd keys="mod+K" mac />);
     expect(screen.getByLabelText('Command K')).toBeInTheDocument();
   });
 

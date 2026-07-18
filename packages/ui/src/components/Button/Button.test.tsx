@@ -33,7 +33,7 @@ describe('Button', () => {
 
   it('reflects variant and size as data attributes', () => {
     render(
-      <Button variant='primary' size='lg'>
+      <Button variant="primary" size="lg">
         Create
       </Button>,
     );
@@ -43,13 +43,13 @@ describe('Button', () => {
   });
 
   it('merges a caller className with the component styles', () => {
-    render(<Button className='custom'>Go</Button>);
+    render(<Button className="custom">Go</Button>);
     expect(screen.getByRole('button')).toHaveClass('custom');
   });
 
   it('renders prefix and suffix adornments', () => {
     render(
-      <Button prefix={<span data-testid='prefix' />} suffix={<span data-testid='suffix' />}>
+      <Button prefix={<span data-testid="prefix" />} suffix={<span data-testid="suffix" />}>
         Filter
       </Button>,
     );
@@ -109,7 +109,7 @@ describe('Button', () => {
 
   it('shows the loadingText label beside the spinner and replaces the original label', () => {
     render(
-      <Button loading loadingText='Saving…'>
+      <Button loading loadingText="Saving…">
         Save changes
       </Button>,
     );
@@ -133,8 +133,8 @@ describe('Button', () => {
 
   it('renders the child element when asChild is set, merging styling and data attributes', () => {
     render(
-      <Button asChild variant='primary'>
-        <a href='/dashboard'>Dashboard</a>
+      <Button asChild variant="primary">
+        <a href="/dashboard">Dashboard</a>
       </Button>,
     );
     const link = screen.getByRole('link', { name: 'Dashboard' });

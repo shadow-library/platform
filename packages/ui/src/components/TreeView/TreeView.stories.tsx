@@ -55,13 +55,13 @@ type Story = StoryObj<typeof meta>;
 export const Selection: Story = {
   render: () => {
     const [selected, setSelected] = useState<string[]>(['platform']);
-    return <TreeView nodes={tree} defaultExpanded={['eng', 'platform']} selected={selected} onSelectedChange={setSelected} aria-label='Organization' />;
+    return <TreeView nodes={tree} defaultExpanded={['eng', 'platform']} selected={selected} onSelectedChange={setSelected} aria-label="Organization" />;
   },
 };
 
 export const Checkboxes: Story = {
   render: () => {
     const [selected, setSelected] = useState<string[]>(['checkout']);
-    return <TreeView nodes={tree} checkboxes defaultExpanded={['eng', 'platform']} selected={selected} onSelectedChange={setSelected} aria-label='Scope' />;
+    return <TreeView nodes={tree} checkboxes defaultExpanded={['eng', 'platform']} selected={selected} onSelectedChange={setSelected} aria-label="Scope" />;
   },
 };

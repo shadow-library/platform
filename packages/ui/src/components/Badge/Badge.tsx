@@ -34,7 +34,7 @@ export const Badge = forwardRef<HTMLSpanElement, BadgeProps>(function Badge(
   const showDot = dot || variant === 'dot';
   return (
     <span ref={ref} className={cn(styles.root, className)} data-variant={variant} data-intent={intent} data-size={size} {...props}>
-      {showDot ? <span className={styles.dot} aria-hidden='true' /> : null}
+      {showDot ? <span className={styles.dot} aria-hidden="true" /> : null}
       {variant === 'count' ? formatCount(children, max) : children}
     </span>
   );

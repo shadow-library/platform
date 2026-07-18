@@ -33,13 +33,13 @@ type Story = StoryObj<typeof meta>;
 export const WithPresets: Story = {
   render: () => {
     const [value, setValue] = useState<DateRange>({ start: '2026-06-08', end: '2026-06-14' });
-    return <DateRangePicker value={value} onValueChange={setValue} presets={presets} aria-label='Report period' />;
+    return <DateRangePicker value={value} onValueChange={setValue} presets={presets} aria-label="Report period" />;
   },
 };
 
 export const Confirm: Story = {
   render: () => {
     const [value, setValue] = useState<DateRange>({ start: null, end: null });
-    return <DateRangePicker value={value} onValueChange={setValue} presets={presets} confirm aria-label='Query period' />;
+    return <DateRangePicker value={value} onValueChange={setValue} presets={presets} confirm aria-label="Query period" />;
   },
 };

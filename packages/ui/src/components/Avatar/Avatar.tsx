@@ -26,8 +26,8 @@ function getTint(name: string): 'indigo' | 'neutral' {
 
 function DefaultIcon() {
   return (
-    <svg viewBox='0 0 24 24' fill='currentColor' aria-hidden='true' width='60%' height='60%'>
-      <path d='M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.6 0-8 1.8-8 4.5V20h16v-1.5c0-2.7-4.4-4.5-8-4.5Z' />
+    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" width="60%" height="60%">
+      <path d="M12 12a4 4 0 1 0 0-8 4 4 0 0 0 0 8Zm0 2c-3.6 0-8 1.8-8 4.5V20h16v-1.5c0-2.7-4.4-4.5-8-4.5Z" />
     </svg>
   );
 }
@@ -60,11 +60,11 @@ export const Avatar = forwardRef<HTMLSpanElement, AvatarProps>(function Avatar(
       aria-hidden={accessibleName ? undefined : true}
       {...props}
     >
-      {src ? <AvatarPrimitive.Image className={styles.image} src={src} alt='' /> : null}
-      <AvatarPrimitive.Fallback className={styles.fallback} delayMs={src ? 300 : undefined} aria-hidden='true'>
+      {src ? <AvatarPrimitive.Image className={styles.image} src={src} alt="" /> : null}
+      <AvatarPrimitive.Fallback className={styles.fallback} delayMs={src ? 300 : undefined} aria-hidden="true">
         {initials || icon || <DefaultIcon />}
       </AvatarPrimitive.Fallback>
-      {presence ? <span className={styles.presence} data-presence={presence} aria-hidden='true' /> : null}
+      {presence ? <span className={styles.presence} data-presence={presence} aria-hidden="true" /> : null}
     </AvatarPrimitive.Root>
   );
 });
@@ -83,7 +83,7 @@ export const AvatarGroup = forwardRef<HTMLDivElement, AvatarGroupProps>(function
       <div ref={ref} className={cn(styles.group, className)} {...props}>
         {visible}
         {overflow > 0 ? (
-          <span className={cn(styles.root, styles.overflow)} data-size={size} data-shape='circle' role='img' aria-label={`${overflow} more`}>
+          <span className={cn(styles.root, styles.overflow)} data-size={size} data-shape="circle" role="img" aria-label={`${overflow} more`}>
             +{overflow}
           </span>
         ) : null}

@@ -19,8 +19,8 @@ import { type TableAlign, type TableColumn, type TableProps } from './Table.type
 function SortArrow({ direction }: { direction: 'asc' | 'desc' | undefined }) {
   if (direction == null) return null;
   return (
-    <svg className={styles.sortArrow} viewBox='0 0 12 12' fill='currentColor' aria-hidden='true'>
-      {direction === 'asc' ? <path d='M6 3l3 4H3z' /> : <path d='M6 9L3 5h6z' />}
+    <svg className={styles.sortArrow} viewBox="0 0 12 12" fill="currentColor" aria-hidden="true">
+      {direction === 'asc' ? <path d="M6 3l3 4H3z" /> : <path d="M6 9L3 5h6z" />}
     </svg>
   );
 }
@@ -95,10 +95,10 @@ export function Table<T>({
     <div className={styles.wrapper}>
       {selectable && selectedCount > 0 ? (
         <div className={styles.bulkBar}>
-          <span className={styles.bulkCount} aria-live='polite'>
+          <span className={styles.bulkCount} aria-live="polite">
             {selectedCount} selected
           </span>
-          <Button variant='ghost' size='sm' onClick={() => toggleAll(false)}>
+          <Button variant="ghost" size="sm" onClick={() => toggleAll(false)}>
             Clear
           </Button>
           <div className={styles.bulkActions}>{bulkActions}</div>
@@ -111,8 +111,8 @@ export function Table<T>({
           <thead>
             <tr className={styles.headerRow}>
               {selectable ? (
-                <th className={cn(styles.th, styles.checkboxCell)} scope='col'>
-                  <Checkbox checked={selectAll} onCheckedChange={toggleAll} aria-label='Select all rows on this page' />
+                <th className={cn(styles.th, styles.checkboxCell)} scope="col">
+                  <Checkbox checked={selectAll} onCheckedChange={toggleAll} aria-label="Select all rows on this page" />
                 </th>
               ) : null}
               {columns.map(column => {
@@ -121,13 +121,13 @@ export function Table<T>({
                   <th
                     key={column.id}
                     className={styles.th}
-                    scope='col'
+                    scope="col"
                     data-align={column.align ?? 'start'}
                     aria-sort={column.sortable ? (sorted ? ARIA_SORT[sorted] : 'none') : undefined}
                     style={column.width != null ? { width: column.width } : undefined}
                   >
                     {column.sortable ? (
-                      <button type='button' className={styles.sortButton} onClick={() => cycleSort(column.id)} data-active={sorted ? '' : undefined}>
+                      <button type="button" className={styles.sortButton} onClick={() => cycleSort(column.id)} data-active={sorted ? '' : undefined}>
                         {column.header}
                         <SortArrow direction={sorted} />
                       </button>
@@ -176,7 +176,7 @@ export function Table<T>({
                     tabIndex={onRowClick ? 0 : undefined}
                   >
                     {selectable ? (
-                      <td className={cn(styles.td, styles.checkboxCell)} data-selection-cell=''>
+                      <td className={cn(styles.td, styles.checkboxCell)} data-selection-cell="">
                         <Checkbox checked={selected} onCheckedChange={checked => toggleRow(key, checked === true)} aria-label={`Select ${key}`} />
                       </td>
                     ) : null}

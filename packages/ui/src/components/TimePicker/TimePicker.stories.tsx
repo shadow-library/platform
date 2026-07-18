@@ -27,13 +27,13 @@ type Story = StoryObj<typeof meta>;
 export const TwelveHour: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>('09:30');
-    return <TimePicker value={value} onValueChange={setValue} aria-label='Doors open' />;
+    return <TimePicker value={value} onValueChange={setValue} aria-label="Doors open" />;
   },
 };
 
 export const TwentyFourHour: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>('21:30');
-    return <TimePicker value={value} onValueChange={setValue} hour12={false} step={15} aria-label='Cutoff' />;
+    return <TimePicker value={value} onValueChange={setValue} hour12={false} step={15} aria-label="Cutoff" />;
   },
 };

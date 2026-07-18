@@ -17,9 +17,9 @@ import { Timeline } from './Timeline';
 describe('Timeline', () => {
   it('renders an ordered list of entries', () => {
     render(
-      <Timeline aria-label='Activity'>
-        <Timeline.Item status='completed' title='Order shipped' timestamp='2h ago' />
-        <Timeline.Item status='current' title='In transit' />
+      <Timeline aria-label="Activity">
+        <Timeline.Item status="completed" title="Order shipped" timestamp="2h ago" />
+        <Timeline.Item status="current" title="In transit" />
       </Timeline>,
     );
     expect(screen.getByRole('list', { name: 'Activity' })).toBeInTheDocument();
@@ -31,7 +31,7 @@ describe('Timeline', () => {
   it('joins the status to the entry text as a visually-hidden prefix', () => {
     render(
       <Timeline>
-        <Timeline.Item status='danger' title='Job failed' />
+        <Timeline.Item status="danger" title="Job failed" />
       </Timeline>,
     );
     expect(screen.getByText('Failed:')).toBeInTheDocument();
@@ -41,7 +41,7 @@ describe('Timeline', () => {
   it('does not add a status prefix for default events', () => {
     render(
       <Timeline>
-        <Timeline.Item status='default' title='Comment added' />
+        <Timeline.Item status="default" title="Comment added" />
       </Timeline>,
     );
     expect(screen.queryByText(/:/)).not.toBeInTheDocument();

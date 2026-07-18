@@ -28,7 +28,7 @@ describe('Card', () => {
   it('renders the header title and action', () => {
     render(
       <Card>
-        <Card.Header title='API usage' action={<button type='button'>More</button>} />
+        <Card.Header title="API usage" action={<button type="button">More</button>} />
       </Card>,
     );
     expect(screen.getByText('API usage')).toBeInTheDocument();
@@ -45,7 +45,7 @@ describe('Card', () => {
   it('renders as an anchor through asChild and forwards props', () => {
     render(
       <Card asChild interactive>
-        <a href='/services/checkout'>
+        <a href="/services/checkout">
           <Card.Body>checkout-service</Card.Body>
         </a>
       </Card>,
@@ -57,8 +57,8 @@ describe('Card', () => {
 
   it('propagates the padding scale to sections', () => {
     render(
-      <Card padding='lg'>
-        <Card.Header title='Title' />
+      <Card padding="lg">
+        <Card.Header title="Title" />
         <Card.Body>body</Card.Body>
         <Card.Footer>footer</Card.Footer>
       </Card>,

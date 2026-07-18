@@ -40,7 +40,7 @@ export const WithDescription: Story = {
 export const Indeterminate: Story = {
   render: () => {
     const [checked, setChecked] = useState<boolean | 'indeterminate'>('indeterminate');
-    return <Checkbox label='Select all' checked={checked} onCheckedChange={value => setChecked(value)} />;
+    return <Checkbox label="Select all" checked={checked} onCheckedChange={value => setChecked(value)} />;
   },
 };
 
@@ -51,13 +51,13 @@ export const Group: Story = {
     return (
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
         <Checkbox
-          label='Deployment emails'
-          description='Success and failure notifications'
+          label="Deployment emails"
+          description="Success and failure notifications"
           checked={state.emails}
           onCheckedChange={v => setState(s => ({ ...s, emails: v === true }))}
         />
-        <Checkbox label='Weekly digest' description='Usage summary every Monday' checked={state.digest} onCheckedChange={v => setState(s => ({ ...s, digest: v === true }))} />
-        <Checkbox label='Mention alerts' description='When someone @mentions you' checked={state.mentions} onCheckedChange={v => setState(s => ({ ...s, mentions: v === true }))} />
+        <Checkbox label="Weekly digest" description="Usage summary every Monday" checked={state.digest} onCheckedChange={v => setState(s => ({ ...s, digest: v === true }))} />
+        <Checkbox label="Mention alerts" description="When someone @mentions you" checked={state.mentions} onCheckedChange={v => setState(s => ({ ...s, mentions: v === true }))} />
       </div>
     );
   },

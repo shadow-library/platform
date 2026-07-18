@@ -19,8 +19,8 @@ describe('Breadcrumbs', () => {
   it('renders the WAI-ARIA breadcrumb structure', () => {
     render(
       <Breadcrumbs>
-        <Breadcrumbs.Item href='/workspaces'>Workspaces</Breadcrumbs.Item>
-        <Breadcrumbs.Item href='/workspaces/acme'>acme-prod</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/workspaces">Workspaces</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/workspaces/acme">acme-prod</Breadcrumbs.Item>
         <Breadcrumbs.Item current>checkout-service</Breadcrumbs.Item>
       </Breadcrumbs>,
     );
@@ -35,10 +35,10 @@ describe('Breadcrumbs', () => {
     const user = userEvent.setup();
     render(
       <Breadcrumbs maxVisible={4}>
-        <Breadcrumbs.Item href='/a'>Alpha</Breadcrumbs.Item>
-        <Breadcrumbs.Item href='/b'>Bravo</Breadcrumbs.Item>
-        <Breadcrumbs.Item href='/c'>Charlie</Breadcrumbs.Item>
-        <Breadcrumbs.Item href='/d'>Delta</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/a">Alpha</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/b">Bravo</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/c">Charlie</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/d">Delta</Breadcrumbs.Item>
         <Breadcrumbs.Item current>Echo</Breadcrumbs.Item>
       </Breadcrumbs>,
     );
@@ -56,8 +56,8 @@ describe('Breadcrumbs', () => {
   it('does not collapse at or under maxVisible', () => {
     render(
       <Breadcrumbs maxVisible={4}>
-        <Breadcrumbs.Item href='/a'>Alpha</Breadcrumbs.Item>
-        <Breadcrumbs.Item href='/b'>Bravo</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/a">Alpha</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/b">Bravo</Breadcrumbs.Item>
         <Breadcrumbs.Item current>Charlie</Breadcrumbs.Item>
       </Breadcrumbs>,
     );

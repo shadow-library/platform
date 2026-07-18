@@ -17,9 +17,9 @@ import { type FormFieldProps } from './FormField.types';
  */
 function AlertIcon() {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' aria-hidden='true'>
-      <circle cx='8' cy='8' r='6.5' />
-      <path d='M8 5v3.5M8 11h.01' />
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden="true">
+      <circle cx="8" cy="8" r="6.5" />
+      <path d="M8 5v3.5M8 11h.01" />
     </svg>
   );
 }
@@ -74,7 +74,7 @@ export const FormField = forwardRef<HTMLDivElement, FormFieldProps>(function For
         ) : null}
         {control}
         {isInvalid && error != null && error !== false ? (
-          <p id={messageId} className={styles.error} role='alert'>
+          <p id={messageId} className={styles.error} role="alert">
             <span className={styles.errorIcon}>
               <AlertIcon />
             </span>

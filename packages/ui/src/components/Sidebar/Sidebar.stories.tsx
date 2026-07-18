@@ -16,8 +16,8 @@ import { Sidebar, useSidebar } from './Sidebar';
  */
 function Dot() {
   return (
-    <svg width='16' height='16' viewBox='0 0 16 16' fill='currentColor' aria-hidden='true'>
-      <circle cx='8' cy='8' r='4' />
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="8" cy="8" r="4" />
     </svg>
   );
 }
@@ -69,29 +69,29 @@ export const Default: Story = {
           collapsed={collapsed}
           onCollapsedChange={setCollapsed}
           footer={
-            <Sidebar.Item href='#account' icon={<Dot />}>
+            <Sidebar.Item href="#account" icon={<Dot />}>
               Account
             </Sidebar.Item>
           }
         >
-          <Sidebar.Section label='Platform'>
-            <Sidebar.Item href='#services' icon={<Dot />} active>
+          <Sidebar.Section label="Platform">
+            <Sidebar.Item href="#services" icon={<Dot />} active>
               Services
             </Sidebar.Item>
             <Sidebar.Item
-              href='#deploys'
+              href="#deploys"
               icon={<Dot />}
               badge={
-                <Badge variant='count' intent='neutral'>
+                <Badge variant="count" intent="neutral">
                   3
                 </Badge>
               }
             >
               Deploys
             </Sidebar.Item>
-            <Sidebar.Group label='Settings' icon={<Dot />}>
-              <Sidebar.Item href='#general'>General</Sidebar.Item>
-              <Sidebar.Item href='#members'>Members</Sidebar.Item>
+            <Sidebar.Group label="Settings" icon={<Dot />}>
+              <Sidebar.Item href="#general">General</Sidebar.Item>
+              <Sidebar.Item href="#members">Members</Sidebar.Item>
             </Sidebar.Group>
           </Sidebar.Section>
         </Sidebar>

@@ -34,7 +34,7 @@ export const Progress = forwardRef<HTMLDivElement, ProgressProps>(function Progr
       <div
         className={styles.track}
         data-size={size}
-        role='progressbar'
+        role="progressbar"
         aria-label={labelText}
         aria-valuemin={0}
         aria-valuemax={indeterminate ? undefined : max}

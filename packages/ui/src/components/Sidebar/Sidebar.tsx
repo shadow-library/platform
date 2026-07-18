@@ -24,8 +24,8 @@ export function useSidebar(): { collapsed: boolean } {
 
 function ChevronDown() {
   return (
-    <svg className={styles.chevron} viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M4 6.5L8 10.5l4-4' />
+    <svg className={styles.chevron} viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M4 6.5L8 10.5l4-4" />
     </svg>
   );
 }
@@ -33,8 +33,8 @@ function ChevronDown() {
 /** Chevron for the collapse toggle — points left to collapse, right to expand back out. */
 function CollapseChevron({ collapsed }: { collapsed: boolean }) {
   return (
-    <svg viewBox='0 0 16 16' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      {collapsed ? <path d='M6 4l4 4-4 4' /> : <path d='M10 4L6 8l4 4' />}
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      {collapsed ? <path d="M6 4l4 4-4 4" /> : <path d="M10 4L6 8l4 4" />}
     </svg>
   );
 }
@@ -58,7 +58,7 @@ const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
               {workspace != null ? <div className={styles.workspace}>{workspace}</div> : <span />}
               {onCollapsedChange ? (
                 <button
-                  type='button'
+                  type="button"
                   className={styles.collapseToggle}
                   data-direction={collapsed ? 'right' : 'left'}
                   aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
@@ -111,7 +111,7 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
     </Comp>
   );
   return collapsed && name ? (
-    <Tooltip content={name} side='right'>
+    <Tooltip content={name} side="right">
       {item}
     </Tooltip>
   ) : (
@@ -128,7 +128,7 @@ const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function Side
   return (
     <div ref={ref} className={cn(styles.group, className)} {...props}>
       <button
-        type='button'
+        type="button"
         className={styles.item}
         data-active={active && (collapsed || !open) ? '' : undefined}
         aria-expanded={collapsed ? undefined : open}

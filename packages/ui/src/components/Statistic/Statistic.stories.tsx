@@ -39,9 +39,9 @@ export const Compact: Story = {
 export const Sizes: Story = {
   render: () => (
     <div style={{ display: 'flex', gap: 48, alignItems: 'flex-end' }}>
-      <Statistic label='Small' value={1240} size='sm' delta={0.04} positiveIs='up' comparison='vs last week' />
-      <Statistic label='Medium' value={1240} size='md' delta={0.04} positiveIs='up' comparison='vs last week' />
-      <Statistic label='Large' value={1240} size='lg' delta={0.04} positiveIs='up' comparison='vs last week' />
+      <Statistic label="Small" value={1240} size="sm" delta={0.04} positiveIs="up" comparison="vs last week" />
+      <Statistic label="Medium" value={1240} size="md" delta={0.04} positiveIs="up" comparison="vs last week" />
+      <Statistic label="Large" value={1240} size="lg" delta={0.04} positiveIs="up" comparison="vs last week" />
     </div>
   ),
 };

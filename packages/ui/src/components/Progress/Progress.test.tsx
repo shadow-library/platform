@@ -16,7 +16,7 @@ import { Progress } from './Progress';
 
 describe('Progress', () => {
   it('exposes progressbar semantics with the current value', () => {
-    render(<Progress value={64} max={100} label='Re-indexing' />);
+    render(<Progress value={64} max={100} label="Re-indexing" />);
     const bar = screen.getByRole('progressbar', { name: 'Re-indexing' });
     expect(bar).toHaveAttribute('aria-valuenow', '64');
     expect(bar).toHaveAttribute('aria-valuemin', '0');
@@ -25,14 +25,14 @@ describe('Progress', () => {
   });
 
   it('omits the value and percent when indeterminate', () => {
-    render(<Progress indeterminate label='Working' />);
+    render(<Progress indeterminate label="Working" />);
     const bar = screen.getByRole('progressbar');
     expect(bar).not.toHaveAttribute('aria-valuenow');
     expect(screen.queryByText(/%/)).not.toBeInTheDocument();
   });
 
   it('clamps the percentage to 0–100', () => {
-    render(<Progress value={150} max={100} label='Full' />);
+    render(<Progress value={150} max={100} label="Full" />);
     expect(screen.getByText('100%')).toBeInTheDocument();
   });
 });

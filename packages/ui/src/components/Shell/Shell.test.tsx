@@ -17,7 +17,7 @@ import { Page, Shell } from './Shell';
 describe('Shell', () => {
   it('renders sidebar, topbar, and a main landmark with a skip link first', () => {
     render(
-      <Shell sidebar={<nav aria-label='Main'>nav</nav>} topbar={<header>bar</header>}>
+      <Shell sidebar={<nav aria-label="Main">nav</nav>} topbar={<header>bar</header>}>
         <div>content</div>
       </Shell>,
     );
@@ -29,7 +29,7 @@ describe('Shell', () => {
   });
 
   it('mounts dark theme and compact density on the root', () => {
-    const { container } = render(<Shell theme='dark' density='compact' />);
+    const { container } = render(<Shell theme="dark" density="compact" />);
     const root = container.firstElementChild;
     expect(root).toHaveClass('dark');
     expect(root).toHaveAttribute('data-density', 'compact');
@@ -39,7 +39,7 @@ describe('Shell', () => {
 describe('Page', () => {
   it('renders the header with title, description, and actions', () => {
     render(
-      <Page title='Services' description='Everything running in acme-prod' actions={<button type='button'>New service</button>}>
+      <Page title="Services" description="Everything running in acme-prod" actions={<button type="button">New service</button>}>
         <div>page body</div>
       </Page>,
     );

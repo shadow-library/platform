@@ -18,8 +18,8 @@ describe('HoverCard', () => {
   it('opens a labelled preview on hover and leaves the trigger a plain link', async () => {
     const user = userEvent.setup();
     render(
-      <HoverCard openDelay={0} closeDelay={0} card={<p>Staff Engineer · Platform</p>} aria-label='Mira Kessler preview'>
-        <a href='/people/mira'>@mira</a>
+      <HoverCard openDelay={0} closeDelay={0} card={<p>Staff Engineer · Platform</p>} aria-label="Mira Kessler preview">
+        <a href="/people/mira">@mira</a>
       </HoverCard>,
     );
     const trigger = screen.getByRole('link', { name: '@mira' });
@@ -46,7 +46,7 @@ describe('HoverCard', () => {
         render={data => <span>{data.name}</span>}
         fallback={<span>Loading preview…</span>}
       >
-        <a href='/people/mira'>@mira</a>
+        <a href="/people/mira">@mira</a>
       </HoverCard>,
     );
     await user.hover(screen.getByRole('link', { name: '@mira' }));
@@ -60,7 +60,7 @@ describe('HoverCard', () => {
     const user = userEvent.setup();
     render(
       <HoverCard openDelay={0} closeDelay={0} content={() => Promise.reject(new Error('nope'))} render={() => <span>never</span>}>
-        <a href='/repos/x'>repo</a>
+        <a href="/repos/x">repo</a>
       </HoverCard>,
     );
     await user.hover(screen.getByRole('link', { name: 'repo' }));

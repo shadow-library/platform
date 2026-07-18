@@ -19,27 +19,27 @@ import { type DescriptionListItemProps, type DescriptionListProps } from './Desc
  */
 function CopyIcon() {
   return (
-    <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <rect x='5' y='5' width='8' height='8' rx='1.5' />
-      <path d='M11 5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5.5A1.5 1.5 0 0 0 4 11h1' />
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <rect x="5" y="5" width="8" height="8" rx="1.5" />
+      <path d="M11 5V4a1.5 1.5 0 0 0-1.5-1.5H4A1.5 1.5 0 0 0 2.5 4v5.5A1.5 1.5 0 0 0 4 11h1" />
     </svg>
   );
 }
 
 function EyeIcon() {
   return (
-    <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M1.5 8S3.5 3.5 8 3.5 14.5 8 14.5 8 12.5 12.5 8 12.5 1.5 8 1.5 8Z' />
-      <circle cx='8' cy='8' r='2' />
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M1.5 8S3.5 3.5 8 3.5 14.5 8 14.5 8 12.5 12.5 8 12.5 1.5 8 1.5 8Z" />
+      <circle cx="8" cy="8" r="2" />
     </svg>
   );
 }
 
 function EyeOffIcon() {
   return (
-    <svg viewBox='0 0 16 16' width='14' height='14' fill='none' stroke='currentColor' strokeWidth={1.5} strokeLinecap='round' strokeLinejoin='round' aria-hidden='true'>
-      <path d='M6.5 4A5.7 5.7 0 0 1 8 3.5C12.5 3.5 14.5 8 14.5 8a11 11 0 0 1-1.6 2.3M4 5.2A11 11 0 0 0 1.5 8S3.5 12.5 8 12.5a5.7 5.7 0 0 0 2-.35' />
-      <path d='M2 2l12 12' />
+    <svg viewBox="0 0 16 16" width="14" height="14" fill="none" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.5 4A5.7 5.7 0 0 1 8 3.5C12.5 3.5 14.5 8 14.5 8a11 11 0 0 1-1.6 2.3M4 5.2A11 11 0 0 0 1.5 8S3.5 12.5 8 12.5a5.7 5.7 0 0 0 2-.35" />
+      <path d="M2 2l12 12" />
     </svg>
   );
 }
@@ -82,7 +82,7 @@ function DescriptionListItem({ term, mono = false, copyable = false, masked = fa
           <>
             {showMask ? (
               <span className={styles.masked}>
-                <span aria-hidden='true'>••••••••</span>
+                <span aria-hidden="true">••••••••</span>
                 <span className={styles.srOnly}>hidden</span>
               </span>
             ) : null}
@@ -92,8 +92,8 @@ function DescriptionListItem({ term, mono = false, copyable = false, masked = fa
             {masked ? (
               <IconButton
                 className={styles.action}
-                size='sm'
-                variant='ghost'
+                size="sm"
+                variant="ghost"
                 icon={revealed ? <EyeOffIcon /> : <EyeIcon />}
                 aria-label={revealed ? `Hide ${typeof term === 'string' ? term : 'value'}` : revealLabel}
                 onClick={() => setRevealed(v => !v)}
@@ -102,8 +102,8 @@ function DescriptionListItem({ term, mono = false, copyable = false, masked = fa
             {copyable ? (
               <IconButton
                 className={cn(styles.action, styles.copy)}
-                size='sm'
-                variant='ghost'
+                size="sm"
+                variant="ghost"
                 icon={copied ? <CheckIcon width={14} height={14} /> : <CopyIcon />}
                 aria-label={copyLabel}
                 onClick={copy}

@@ -21,7 +21,7 @@ describe('Drawer', () => {
     const onOpenChange = vi.fn();
     render(
       <Drawer open onOpenChange={onOpenChange} modal>
-        <Drawer.Header title='checkout-service' meta='Deploy 7f3a' />
+        <Drawer.Header title="checkout-service" meta="Deploy 7f3a" />
         <Drawer.Body>body</Drawer.Body>
       </Drawer>,
     );
@@ -33,7 +33,7 @@ describe('Drawer', () => {
   it('non-modal renders a complementary landmark named by its title', () => {
     render(
       <Drawer open modal={false} onOpenChange={() => {}}>
-        <Drawer.Header title='checkout-service' />
+        <Drawer.Header title="checkout-service" />
       </Drawer>,
     );
     expect(screen.getByRole('complementary', { name: 'checkout-service' })).toBeInTheDocument();
@@ -43,7 +43,7 @@ describe('Drawer', () => {
     const onOpenChange = vi.fn();
     render(
       <Drawer open modal={false} onOpenChange={onOpenChange}>
-        <Drawer.Header title='Service' />
+        <Drawer.Header title="Service" />
         <Drawer.Body>b</Drawer.Body>
       </Drawer>,
     );
@@ -56,8 +56,8 @@ describe('Drawer', () => {
     const onAction = vi.fn();
     render(
       <Drawer open modal={false} onOpenChange={() => {}}>
-        <Drawer.Header title='Service' showClose={false} />
-        <Drawer.Footer cancel='Cancel' action='Promote' onAction={onAction} />
+        <Drawer.Header title="Service" showClose={false} />
+        <Drawer.Footer cancel="Cancel" action="Promote" onAction={onAction} />
       </Drawer>,
     );
     await user.click(screen.getByRole('button', { name: 'Promote' }));
@@ -67,7 +67,7 @@ describe('Drawer', () => {
   it('renders nothing when a non-modal drawer is closed', () => {
     const { container } = render(
       <Drawer open={false} modal={false} onOpenChange={() => {}}>
-        <Drawer.Header title='Service' />
+        <Drawer.Header title="Service" />
       </Drawer>,
     );
     expect(container).toBeEmptyDOMElement();

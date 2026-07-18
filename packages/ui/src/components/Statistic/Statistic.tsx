@@ -26,21 +26,21 @@ function sentimentOf(delta: number, positiveIs: StatisticPositiveIs): Sentiment 
 function DeltaArrow({ direction }: { direction: -1 | 0 | 1 }) {
   if (direction === 0)
     return (
-      <svg viewBox='0 0 12 12' width='11' height='11' fill='none' stroke='currentColor' strokeWidth={1.75} strokeLinecap='round' aria-hidden='true'>
-        <path d='M2.5 6h7' />
+      <svg viewBox="0 0 12 12" width="11" height="11" fill="none" stroke="currentColor" strokeWidth={1.75} strokeLinecap="round" aria-hidden="true">
+        <path d="M2.5 6h7" />
       </svg>
     );
   return (
     <svg
-      viewBox='0 0 12 12'
-      width='11'
-      height='11'
-      fill='none'
-      stroke='currentColor'
+      viewBox="0 0 12 12"
+      width="11"
+      height="11"
+      fill="none"
+      stroke="currentColor"
       strokeWidth={1.75}
-      strokeLinecap='round'
-      strokeLinejoin='round'
-      aria-hidden='true'
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
       data-direction={direction}
     >
       <path d={direction > 0 ? 'M6 9.5V2.5M3 5.5 6 2.5l3 3' : 'M6 2.5v7M3 6.5 6 9.5l3-3'} />
@@ -110,13 +110,13 @@ export const Statistic = forwardRef<HTMLDivElement, StatisticProps>(function Sta
       {...wrapperProps}
       {...props}
     >
-      <div className={styles.visual} aria-hidden='true'>
+      <div className={styles.visual} aria-hidden="true">
         <span className={styles.label}>{label}</span>
         <span className={styles.valueRow}>
           {loading ? (
-            <Skeleton className={styles.valueSkeleton} shape='rect' />
+            <Skeleton className={styles.valueSkeleton} shape="rect" />
           ) : error ? (
-            <span className={styles.value} title='Data unavailable'>
+            <span className={styles.value} title="Data unavailable">
               —
             </span>
           ) : (

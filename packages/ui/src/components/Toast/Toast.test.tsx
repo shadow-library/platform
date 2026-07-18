@@ -67,7 +67,7 @@ describe('Toast', () => {
   });
 
   it('anchors the viewport to the configured placement', () => {
-    render(<Toaster placement='top-start' />);
+    render(<Toaster placement="top-start" />);
     act(() => {
       toast.info('Positioned');
     });

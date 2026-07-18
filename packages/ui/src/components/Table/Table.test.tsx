@@ -36,7 +36,7 @@ const columns: TableColumn<Service>[] = [
 
 describe('Table', () => {
   it('renders a semantic table with headers and cells', () => {
-    render(<Table data={services} columns={columns} rowKey='id' aria-label='Services' />);
+    render(<Table data={services} columns={columns} rowKey="id" aria-label="Services" />);
     expect(screen.getByRole('table', { name: 'Services' })).toBeInTheDocument();
     expect(screen.getByRole('columnheader', { name: /Service/ })).toBeInTheDocument();
     expect(screen.getByText('checkout')).toBeInTheDocument();
@@ -46,15 +46,15 @@ describe('Table', () => {
   it('cycles a sortable header asc → desc → none', async () => {
     const user = userEvent.setup();
     const onSortChange = vi.fn();
-    const { rerender } = render(<Table data={services} columns={columns} rowKey='id' sort={null} onSortChange={onSortChange} aria-label='Services' />);
+    const { rerender } = render(<Table data={services} columns={columns} rowKey="id" sort={null} onSortChange={onSortChange} aria-label="Services" />);
     const header = screen.getByRole('button', { name: /Service/ });
     await user.click(header);
     expect(onSortChange).toHaveBeenLastCalledWith({ id: 'name', direction: 'asc' });
-    rerender(<Table data={services} columns={columns} rowKey='id' sort={{ id: 'name', direction: 'asc' }} onSortChange={onSortChange} aria-label='Services' />);
+    rerender(<Table data={services} columns={columns} rowKey="id" sort={{ id: 'name', direction: 'asc' }} onSortChange={onSortChange} aria-label="Services" />);
     expect(screen.getByRole('columnheader', { name: /Service/ })).toHaveAttribute('aria-sort', 'ascending');
     await user.click(header);
     expect(onSortChange).toHaveBeenLastCalledWith({ id: 'name', direction: 'desc' });
-    rerender(<Table data={services} columns={columns} rowKey='id' sort={{ id: 'name', direction: 'desc' }} onSortChange={onSortChange} aria-label='Services' />);
+    rerender(<Table data={services} columns={columns} rowKey="id" sort={{ id: 'name', direction: 'desc' }} onSortChange={onSortChange} aria-label="Services" />);
     await user.click(header);
     expect(onSortChange).toHaveBeenLastCalledWith(null);
   });
@@ -62,7 +62,7 @@ describe('Table', () => {
   it('selects all rows through the header checkbox', async () => {
     const user = userEvent.setup();
     const onSelectionChange = vi.fn();
-    render(<Table data={services} columns={columns} rowKey='id' selection={[]} onSelectionChange={onSelectionChange} aria-label='Services' />);
+    render(<Table data={services} columns={columns} rowKey="id" selection={[]} onSelectionChange={onSelectionChange} aria-label="Services" />);
     await user.click(screen.getByRole('checkbox', { name: 'Select all rows on this page' }));
     expect(onSelectionChange).toHaveBeenCalledWith(['a', 'b', 'c']);
   });
@@ -71,7 +71,7 @@ describe('Table', () => {
     const user = userEvent.setup();
     const onSelectionChange = vi.fn();
     const onRowClick = vi.fn();
-    render(<Table data={services} columns={columns} rowKey='id' selection={[]} onSelectionChange={onSelectionChange} onRowClick={onRowClick} aria-label='Services' />);
+    render(<Table data={services} columns={columns} rowKey="id" selection={[]} onSelectionChange={onSelectionChange} onRowClick={onRowClick} aria-label="Services" />);
     await user.click(screen.getByRole('checkbox', { name: 'Select a' }));
     expect(onSelectionChange).toHaveBeenCalledWith(['a']);
     expect(onRowClick).not.toHaveBeenCalled();
@@ -84,11 +84,11 @@ describe('Table', () => {
       <Table
         data={services}
         columns={columns}
-        rowKey='id'
+        rowKey="id"
         selection={['a', 'b']}
         onSelectionChange={() => {}}
-        bulkActions={<button type='button'>Archive</button>}
-        aria-label='Services'
+        bulkActions={<button type="button">Archive</button>}
+        aria-label="Services"
       />,
     );
     expect(screen.getByText('2 selected')).toBeInTheDocument();
@@ -96,12 +96,12 @@ describe('Table', () => {
   });
 
   it('renders skeleton rows while loading', () => {
-    render(<Table data={services} columns={columns} rowKey='id' loading aria-label='Services' />);
+    render(<Table data={services} columns={columns} rowKey="id" loading aria-label="Services" />);
     expect(screen.queryByText('checkout')).not.toBeInTheDocument();
   });
 
   it('shows the empty state when there are no rows', () => {
-    render(<Table data={[]} columns={columns} rowKey='id' emptyState='No services yet' aria-label='Services' />);
+    render(<Table data={[]} columns={columns} rowKey="id" emptyState="No services yet" aria-label="Services" />);
     expect(screen.getByText('No services yet')).toBeInTheDocument();
   });
 });

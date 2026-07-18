@@ -16,10 +16,10 @@ import { type ComboboxOption } from './Combobox.types';
  * Declaring the constants
  */
 const people: ComboboxOption[] = [
-  { value: '1', label: 'Maya Kim', description: 'Platform', media: <Avatar size='xs' name='Maya Kim' /> },
-  { value: '2', label: 'Jo Tan', description: 'Billing', media: <Avatar size='xs' name='Jo Tan' /> },
-  { value: '3', label: 'Ravi Sun', description: 'Search', media: <Avatar size='xs' name='Ravi Sun' /> },
-  { value: '4', label: 'Ana Ng', description: 'Growth', media: <Avatar size='xs' name='Ana Ng' /> },
+  { value: '1', label: 'Maya Kim', description: 'Platform', media: <Avatar size="xs" name="Maya Kim" /> },
+  { value: '2', label: 'Jo Tan', description: 'Billing', media: <Avatar size="xs" name="Jo Tan" /> },
+  { value: '3', label: 'Ravi Sun', description: 'Search', media: <Avatar size="xs" name="Ravi Sun" /> },
+  { value: '4', label: 'Ana Ng', description: 'Growth', media: <Avatar size="xs" name="Ana Ng" /> },
 ];
 
 const meta = {
@@ -43,7 +43,7 @@ type Story = StoryObj<typeof meta>;
 export const Default: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>(null);
-    return <Combobox options={people} value={value} onValueChange={setValue} placeholder='Search people…' aria-label='Owner' />;
+    return <Combobox options={people} value={value} onValueChange={setValue} placeholder="Search people…" aria-label="Owner" />;
   },
 };
 
@@ -52,7 +52,7 @@ export const Plain: Story = {
   render: () => {
     const [value, setValue] = useState<string | null>('2');
     const options = people.map(({ value: v, label }) => ({ value: v, label }));
-    return <Combobox options={options} value={value} onValueChange={setValue} placeholder='Search…' aria-label='Owner' />;
+    return <Combobox options={options} value={value} onValueChange={setValue} placeholder="Search…" aria-label="Owner" />;
   },
 };
 
@@ -74,8 +74,8 @@ export const Creatable: Story = {
           setOptions(list => [...list, { value: query, label: query }]);
           setValue(query);
         }}
-        placeholder='Add a label…'
-        aria-label='Label'
+        placeholder="Add a label…"
+        aria-label="Label"
       />
     );
   },

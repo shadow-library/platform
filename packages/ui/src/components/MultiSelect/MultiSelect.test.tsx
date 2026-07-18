@@ -37,12 +37,12 @@ const teams: MultiSelectOption[] = [
 
 describe('MultiSelect', () => {
   it('renders the placeholder when empty', () => {
-    render(<MultiSelect aria-label='Teams' options={teams} placeholder='Select teams…' />);
+    render(<MultiSelect aria-label="Teams" options={teams} placeholder="Select teams…" />);
     expect(screen.getByRole('button', { name: 'Teams' })).toHaveTextContent('Select teams…');
   });
 
   it('shows selected values as tags with a +N overflow', () => {
-    render(<MultiSelect aria-label='Teams' options={teams} value={['design', 'platform', 'growth']} maxVisibleTags={2} onValueChange={() => {}} />);
+    render(<MultiSelect aria-label="Teams" options={teams} value={['design', 'platform', 'growth']} maxVisibleTags={2} onValueChange={() => {}} />);
     const trigger = screen.getByRole('button', { name: 'Teams' });
     expect(within(trigger).getByText('Design')).toBeInTheDocument();
     expect(within(trigger).getByText('Platform')).toBeInTheDocument();
@@ -51,7 +51,7 @@ describe('MultiSelect', () => {
 
   it('opens a multi-selectable listbox of options', async () => {
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} />);
+    render(<MultiSelect aria-label="Teams" options={teams} />);
     await user.click(screen.getByRole('button', { name: 'Teams' }));
     const listbox = await screen.findByRole('listbox');
     expect(listbox).toHaveAttribute('aria-multiselectable', 'true');
@@ -61,7 +61,7 @@ describe('MultiSelect', () => {
   it('toggles an option and keeps the list open', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} onValueChange={onValueChange} />);
+    render(<MultiSelect aria-label="Teams" options={teams} onValueChange={onValueChange} />);
     await user.click(screen.getByRole('button', { name: 'Teams' }));
     await user.click(await screen.findByRole('option', { name: 'Design' }));
     expect(onValueChange).toHaveBeenCalledWith(['design']);
@@ -71,7 +71,7 @@ describe('MultiSelect', () => {
   it('does not select a disabled option', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} onValueChange={onValueChange} />);
+    render(<MultiSelect aria-label="Teams" options={teams} onValueChange={onValueChange} />);
     await user.click(screen.getByRole('button', { name: 'Teams' }));
     await user.click(await screen.findByRole('option', { name: 'Security' }));
     expect(onValueChange).not.toHaveBeenCalled();
@@ -80,7 +80,7 @@ describe('MultiSelect', () => {
   it('removes a value from its tag ×', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} value={['design', 'platform']} onValueChange={onValueChange} />);
+    render(<MultiSelect aria-label="Teams" options={teams} value={['design', 'platform']} onValueChange={onValueChange} />);
     await user.click(screen.getByRole('button', { name: 'Remove Design' }));
     expect(onValueChange).toHaveBeenCalledWith(['platform']);
   });
@@ -88,7 +88,7 @@ describe('MultiSelect', () => {
   it('clears everything from the footer', async () => {
     const onValueChange = vi.fn();
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} value={['design', 'platform']} onValueChange={onValueChange} />);
+    render(<MultiSelect aria-label="Teams" options={teams} value={['design', 'platform']} onValueChange={onValueChange} />);
     await user.click(screen.getByRole('button', { name: 'Teams' }));
     await user.click(await screen.findByRole('button', { name: 'Clear all' }));
     expect(onValueChange).toHaveBeenCalledWith([]);
@@ -96,7 +96,7 @@ describe('MultiSelect', () => {
 
   it('filters options when searchable', async () => {
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} searchable />);
+    render(<MultiSelect aria-label="Teams" options={teams} searchable />);
     await user.click(screen.getByRole('button', { name: 'Teams' }));
     await user.type(await screen.findByRole('textbox', { name: 'Search options' }), 'grow');
     const options = screen.getAllByRole('option');
@@ -106,7 +106,7 @@ describe('MultiSelect', () => {
 
   it('disables remaining options once maxSelected is reached', async () => {
     const user = userEvent.setup();
-    render(<MultiSelect aria-label='Teams' options={teams} value={['design']} maxSelected={1} onValueChange={() => {}} />);
+    render(<MultiSelect aria-label="Teams" options={teams} value={['design']} maxSelected={1} onValueChange={() => {}} />);
     await user.click(screen.getByRole('button', { name: 'Teams' }));
     expect(await screen.findByRole('option', { name: 'Platform' })).toHaveAttribute('aria-disabled', 'true');
     expect(screen.getByText('Max 1')).toBeInTheDocument();
@@ -115,7 +115,7 @@ describe('MultiSelect', () => {
   it('supports select-all with an indeterminate partial state', async () => {
     function Controlled() {
       const [value, setValue] = useState<string[]>(['design']);
-      return <MultiSelect aria-label='Teams' options={teams} selectAll value={value} onValueChange={setValue} />;
+      return <MultiSelect aria-label="Teams" options={teams} selectAll value={value} onValueChange={setValue} />;
     }
     const user = userEvent.setup();
     render(<Controlled />);
