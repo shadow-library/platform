@@ -96,7 +96,7 @@ describe('Auth Guard', () => {
   });
 
   describe('Machine-to-machine service access', () => {
-    /** CRITICAL COMPAT: identity calls pulse in-cluster with its own M2M bearer tokens (audience `shadow-pulse`) */
+    /** CRITICAL COMPAT: identity calls pulse in-cluster with its own M2M bearer tokens (audience `pulse-server`) */
     it('should keep accepting identity-issued M2M tokens on the notification send endpoint', async () => {
       const headers = await testEnv.serviceHeaders({ clientId: IDENTITY_CLIENT_ID, scopes: [PULSE_SCOPES.notificationsSend] });
       const response = await testEnv.getRouter().mockRequest().headers(headers).post(SEND_ROUTE).body(SEND_BODY);

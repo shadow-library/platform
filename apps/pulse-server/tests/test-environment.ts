@@ -40,8 +40,8 @@ export interface ServiceTokenOptions {
 Logger.attachTransport('file:json');
 const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
 
-/** Pulse's resource identifier; every test token is minted for this audience so the guard accepts it */
-export const TEST_AUDIENCE = 'shadow-pulse';
+/** Pulse's resource identifier (ecosystem-standard audience); every test token is minted for this audience so the guard accepts it */
+export const TEST_AUDIENCE = 'pulse-server';
 /** The single platform organisation operator permissions are evaluated in (pulse is single-tenant) */
 export const TEST_ORG = '1';
 /** The client id the identity server calls pulse with — the in-cluster M2M compatibility contract */

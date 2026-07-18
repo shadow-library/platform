@@ -49,7 +49,7 @@ Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts
 - Database constraint errors are mapped to custom app error codes in `database.constants.ts`
 - Type alias `PrimaryDatabase` exported from `database.module.ts`
 
-**Configuration:** Uses `@shadow-library/common` Config system. Key env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod), `APP_PUBLIC_URL` (prod-required; the RP callback URL is derived from it); auth (loaded by the SDK): `AUTH_ISSUER`, `AUTH_AUDIENCE` (default `shadow-pulse`), `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET` (or `AUTH_CLIENT_ASSERTION_PATH`), `AUTH_IDENTITY_RESOURCE` (default `shadow-identity`). Dev fallbacks and prod fail-fast checks for the `AUTH_*` keys live in `src/modules/auth/auth.module.ts`.
+**Configuration:** Uses `@shadow-library/common` Config system. Key env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod), `APP_PUBLIC_URL` (prod-required; the RP callback URL is derived from it); auth (loaded by the SDK): `AUTH_ISSUER`, `AUTH_AUDIENCE` (default `pulse-server`), `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET` (or `AUTH_CLIENT_ASSERTION_PATH`), `AUTH_IDENTITY_RESOURCE` (default `shadow-identity`); RP login: `APP_CLIENT_ID`, `APP_CLIENT_SECRET` (the `pulse` WEB_CONFIDENTIAL client; dev falls back to the service client). Dev fallbacks and prod fail-fast checks for the `AUTH_*` keys live in `src/modules/auth/auth.module.ts`.
 
 **Authentication & Authorization** (`src/modules/auth/`):
 

@@ -45,7 +45,7 @@ const RP_CALLBACK_PATH = '/api/auth/callback';
 /** A wrong trust anchor in production means honouring tokens from the wrong authority, so it must never default there */
 function resolveAuthOptions(): ResolvedAuthOptions {
   const issuer = Config.get('auth.issuer') ?? (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'AUTH_ISSUER' not set`)) : DEV_ISSUER);
-  const audience = Config.get('auth.audience') ?? 'shadow-pulse';
+  const audience = Config.get('auth.audience') ?? 'pulse-server';
   const clientId = Config.get('auth.client.id') ?? (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'AUTH_CLIENT_ID' not set`)) : DEV_CLIENT_ID);
   const assertionPath = Config.get('auth.client.assertion-path') || undefined;
   let secret = Config.get('auth.client.secret') || undefined;
@@ -63,13 +63,28 @@ function resolveRedirectUri(): string {
   return `${publicUrl.replace(/\/+$/, '')}${RP_CALLBACK_PATH}`;
 }
 
+/**
+ * The login flow runs as the `pulse` WEB_CONFIDENTIAL relying-party client — the `pulse-server`
+ * SERVICE client only holds the `client_credentials` grant, so identity rejects it on the
+ * authorization-code flow. Development (and the test IdP) may fall back to the service client.
+ */
+function resolveRelyingPartyClient(serviceClient: AuthClientCredential): AuthClientCredential {
+  const id = Config.get('app.client.id');
+  if (!id) return Config.isProd() ? throwError(AppError.internal(`Environment Variable 'APP_CLIENT_ID' not set`)) : serviceClient;
+  const secret = Config.get('app.client.secret') || (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'APP_CLIENT_SECRET' not set`)) : undefined);
+  return { id, secret };
+}
+
 @Module({})
 export class SessionModule {
   static forRoot(): DynamicModule {
     const options = resolveAuthOptions();
     return {
       module: SessionModule,
-      imports: [AuthModule.forRoot(options), RelyingPartyModule.forRoot({ issuer: options.issuer, client: options.client, redirectUri: resolveRedirectUri() })],
+      imports: [
+        AuthModule.forRoot(options),
+        RelyingPartyModule.forRoot({ issuer: options.issuer, client: resolveRelyingPartyClient(options.client), redirectUri: resolveRedirectUri() }),
+      ],
       controllers: [SessionController, RouteGuardSentinel],
     };
   }
