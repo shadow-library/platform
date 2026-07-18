@@ -1,0 +1,214 @@
+/*
+ * Action Sheet — BottomSheet's visual recipe (raised surface, radius-2xl top, rising travel, scrim)
+ * applied to a column of full-width action rows. Rows are ≥44px tap targets; danger rows read
+ * danger-text. The cancel row is a separated surface-card button padded past the home indicator.
+ */
+
+.scrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sh-z-scrim);
+  background: var(--sh-scrim);
+  animation: sh-actionsheet-scrim-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.scrim[data-state='closed'] {
+  animation: sh-actionsheet-scrim-out var(--sh-duration-normal-exit) var(--sh-ease-standard);
+}
+
+.surface {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: var(--sh-z-modal);
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100vh - 24px - var(--sh-safe-top));
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  max-height: calc(100dvh - 24px - var(--sh-safe-top));
+  padding: 8px 8px calc(8px + var(--sh-safe-bottom));
+  border-top-left-radius: var(--sh-radius-2xl);
+  border-top-right-radius: var(--sh-radius-2xl);
+  background: var(--sh-surface-raised);
+  box-shadow: 0 -12px 24px -6px rgb(9 9 11 / 0.12), 0 -4px 8px -4px rgb(9 9 11 / 0.08);
+  outline: none;
+}
+.surface[data-state='open'] {
+  animation: sh-actionsheet-in var(--sh-duration-normal) var(--sh-ease-emphasized);
+}
+.surface[data-state='closed'] {
+  animation: sh-actionsheet-out var(--sh-duration-normal-exit) var(--sh-ease-standard);
+}
+
+/* Centered narrow column on larger screens (direct desktop use; breakpoint token 768) */
+@media (min-width: 768px) {
+  .surface {
+    left: 50%;
+    right: auto;
+    width: 400px;
+    transform: translateX(-50%);
+  }
+}
+
+.header {
+  padding: 8px 16px 12px;
+  text-align: center;
+}
+.title {
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+.description {
+  margin-top: 2px;
+  font-size: var(--sh-text-body-sm);
+  line-height: var(--sh-text-body-sm--line-height);
+  color: var(--sh-text-tertiary);
+}
+
+.actions {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+.item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: var(--sh-tap-target);
+  padding: 0 16px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  color: var(--sh-text-primary);
+  font: inherit;
+  font-size: var(--sh-text-body);
+  text-align: left;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.item:hover {
+  background: var(--sh-bg-hover);
+}
+.item:active {
+  background: var(--sh-bg-pressed);
+}
+.item:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+.item[data-intent='danger'] {
+  color: var(--sh-danger-text);
+}
+.item[data-intent='danger']:hover {
+  background: var(--sh-danger-bg-subtle);
+}
+
+.itemIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.itemIcon svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+.itemLabel {
+  flex: 1;
+  min-width: 0;
+}
+
+.group {
+  display: flex;
+  flex-direction: column;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+.group:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+.groupLabel {
+  padding: 4px 16px;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
+}
+
+.cancel {
+  flex-shrink: 0;
+  margin-top: 8px;
+  min-height: var(--sh-tap-target);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+  color: var(--sh-text-primary);
+  font: inherit;
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.cancel:hover {
+  background: var(--sh-surface-well);
+}
+.cancel:active {
+  background: var(--sh-bg-pressed);
+}
+.cancel:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes sh-actionsheet-in {
+  from {
+    transform: translateY(100%);
+  }
+}
+@keyframes sh-actionsheet-out {
+  to {
+    transform: translateY(100%);
+  }
+}
+@keyframes sh-actionsheet-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sh-actionsheet-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface[data-state='open'],
+  .surface[data-state='closed'] {
+    animation-name: sh-actionsheet-fade;
+  }
+}
+@keyframes sh-actionsheet-fade {
+  from {
+    opacity: 0;
+  }
+}
