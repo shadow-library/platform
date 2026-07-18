@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type RouteMetadata } from '@shadow-library/app';
+import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
@@ -40,11 +40,11 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
    * same route would otherwise collide and share one handler; namespacing the key keeps this
    * middleware's handlers distinct from the http-core CSRF generator's.
    */
-  cacheKey(metadata: RouteMetadata): string {
+  cacheKey(metadata: HandlerMetadata): string {
     return `rate-limit:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
-  generate(metadata: RouteMetadata): AsyncRouteHandler {
+  generate(metadata: HandlerMetadata): AsyncRouteHandler {
     const policy = metadata[RATE_LIMIT_METADATA] as RateLimitPolicy | undefined;
 
     return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {

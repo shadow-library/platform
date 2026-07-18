@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route } from '@shadow-library/app';
+import { Handler } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
@@ -34,4 +34,4 @@ export const RATE_LIMIT_METADATA = 'rateLimit';
  * authentication surface, so a Redis outage fails closed for them; undecorated routes only get the
  * general per-IP limit and fail open.
  */
-export const RateLimit = (policy: RateLimitPolicy): RateLimitDecorator => Route({ [RATE_LIMIT_METADATA]: policy });
+export const RateLimit = (policy: RateLimitPolicy): RateLimitDecorator => Handler({ [RATE_LIMIT_METADATA]: policy });

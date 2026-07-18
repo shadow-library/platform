@@ -6,7 +6,6 @@
     "types": ["bun"],
     "emitDecoratorMetadata": false,
     "experimentalDecorators": false,
-    "baseUrl": "..",
     "paths": {}
   },
   "include": ["./**/*.ts", "./**/*.tsx"]

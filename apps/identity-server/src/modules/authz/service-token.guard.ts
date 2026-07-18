@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Route, type RouteMetadata } from '@shadow-library/app';
+import { Handler, type HandlerMetadata } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
@@ -39,7 +39,7 @@ const SERVICE_TOKEN_METADATA = 'serviceToken';
 const PLATFORM_AUDIENCE = 'shadow-identity';
 
 /** Restricts the route to M2M callers presenting a service token carrying the given scope */
-export const RequireServiceToken = (scope: string): ServiceTokenDecorator => Route({ [SERVICE_TOKEN_METADATA]: { scope } satisfies ServiceTokenPolicy });
+export const RequireServiceToken = (scope: string): ServiceTokenDecorator => Handler({ [SERVICE_TOKEN_METADATA]: { scope } satisfies ServiceTokenPolicy });
 
 /** Returns the verified service-token claims the guard attached; throws 401 when the route ran unguarded */
 export function getServiceTokenClaims(request: ServiceTokenCarrier): JwtClaims {
@@ -54,11 +54,11 @@ export class ServiceTokenGuard implements MiddlewareGenerator {
   constructor(private readonly keyService: KeyService) {}
 
   /** The router caches generated handlers by metadata alone; namespacing avoids colliding with other generating middlewares */
-  cacheKey(metadata: RouteMetadata): string {
+  cacheKey(metadata: HandlerMetadata): string {
     return `service-token:${String(metadata.method)}:${String(metadata.path)}`;
   }
 
-  generate(metadata: RouteMetadata): AsyncRouteHandler | undefined {
+  generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
     const policy = metadata[SERVICE_TOKEN_METADATA] as ServiceTokenPolicy | undefined;
     if (!policy) return undefined;
 
