@@ -1,16 +1,16 @@
 /**
  * Importing npm packages
  */
+import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, PrimaryDatabase, ServiceRouteAccess, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, ServiceRouteAccess } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types

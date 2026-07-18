@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { Config } from '@shadow-library/common';
 import { Delete, Get, HttpController, Params, Patch, Post, Put, Query, Req, Res } from '@shadow-library/fastify';
-import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
  * Importing user defined packages
@@ -12,7 +12,7 @@ import { ScimAuthService } from './scim-auth.service';
 import { ScimGroupService } from './scim-group.service';
 import { ScimUserService } from './scim-user.service';
 import { ScimIdParams, ScimListQuery } from './scim.dto';
-import { LIST_SCHEMA, SCIM_CONTENT_TYPE, ScimError, ScimListResponse, parseFilter, parseGroupInput, parsePage, parsePatchOperations, parseUserInput } from './scim.types';
+import { LIST_SCHEMA, parseFilter, parseGroupInput, parsePage, parsePatchOperations, parseUserInput, SCIM_CONTENT_TYPE, ScimError, ScimListResponse } from './scim.types';
 
 /**
  * Defining types

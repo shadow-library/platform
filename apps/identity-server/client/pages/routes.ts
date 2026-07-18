@@ -5,13 +5,13 @@
 /**
  * Importing user defined packages
  */
+import { type RouteDefinition } from '../lib/router';
 import { AccountPage } from './account-page';
 import { ConsentPage } from './consent-page';
 import { ErrorPage } from './error-page';
 import { LoginPage } from './login-page';
 import { RecoverPage } from './recover-page';
 import { RegisterPage } from './register-page';
-import { type RouteDefinition } from '../lib/router';
 
 /**
  * Defining types

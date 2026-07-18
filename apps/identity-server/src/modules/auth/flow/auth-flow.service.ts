@@ -3,9 +3,9 @@
  */
 import { randomUUID } from 'node:crypto';
 
+import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { Config } from '@shadow-library/common';
-import { Redis } from 'ioredis';
 
 /**
  * Importing user defined packages

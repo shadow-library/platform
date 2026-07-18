@@ -3,9 +3,9 @@
  */
 import { randomBytes } from 'node:crypto';
 
+import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -13,7 +13,7 @@ import { eq } from 'drizzle-orm';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
-import { AuditEvent, DatabaseService, PrimaryDatabase, WebhookSubscription, schema } from '@server/modules/infrastructure/datastore';
+import { AuditEvent, DatabaseService, PrimaryDatabase, schema, WebhookSubscription } from '@server/modules/infrastructure/datastore';
 
 import { WebhookTargetGuard } from './webhook-target.guard';
 import { WEBHOOK_ROTATION_OVERLAP_HOURS, WEBHOOK_SECRET_PREFIX } from './webhook.constants';

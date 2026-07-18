@@ -2,8 +2,8 @@
  * Importing npm packages
  */
 
-import { Body, Get, HttpController, Post, Put, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
+import { Body, Get, HttpController, Post, Put, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -14,7 +14,7 @@ import { CatalogSyncBody, CatalogSyncResponse, CheckRequestBody, CheckResponse, 
 import { CatalogSyncService } from './catalog-sync.service';
 import { PolicyDecisionService } from './policy-decision.service';
 import { ServiceAccessService } from './service-access.service';
-import { RequireServiceToken, type ServiceTokenCarrier, getServiceTokenClaims } from './service-token.guard';
+import { getServiceTokenClaims, RequireServiceToken, type ServiceTokenCarrier } from './service-token.guard';
 
 /**
  * Defining types

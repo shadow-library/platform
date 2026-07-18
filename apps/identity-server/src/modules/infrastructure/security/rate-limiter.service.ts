@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { Redis } from 'ioredis';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
-import { Redis } from 'ioredis';
 
 /**
  * Importing user defined packages

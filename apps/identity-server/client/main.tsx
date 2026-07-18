@@ -13,7 +13,6 @@ import { isLoggedIn } from './lib/context';
 import { Router } from './lib/router';
 import { ErrorPage } from './pages/error-page';
 import { routes } from './pages/routes';
-
 import './styles/theme.css';
 
 /**

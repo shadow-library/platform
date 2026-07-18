@@ -3,9 +3,9 @@
  */
 import { createHash } from 'node:crypto';
 
+import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { Config } from '@shadow-library/common';
 import { Get, Header, HttpController, Query, Req, Res } from '@shadow-library/fastify';
-import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
  * Importing user defined packages

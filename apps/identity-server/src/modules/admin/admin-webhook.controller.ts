@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -14,8 +14,8 @@ import { WebhookDeliveryService, WebhookService } from '@server/modules/infrastr
 import { AdminAccessService, AdminActor } from './admin-access.service';
 import { AdminActionResponse } from './admin-user.dto';
 import {
-  CreateWebhookBody,
   CreatedWebhookResponse,
+  CreateWebhookBody,
   RotatedWebhookSecretResponse,
   UpdateWebhookBody,
   WebhookDeliveriesQuery,

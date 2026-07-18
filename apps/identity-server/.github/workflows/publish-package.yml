@@ -1,53 +1,22 @@
-name: Publish package to NPM
+# During the @shadow-library 2.0 alpha line the auth SDK is distributed as a vendored tarball
+# (consumers pin `file:vendor/shadow-library-auth-<version>.tgz`), not published to npm. This
+# workflow builds and packs the tarball from the package's built dist and uploads it as an
+# artifact; release-it and npm publishing were retired with the shadow CLI adoption.
+name: Pack auth package tarball
 permissions:
-  id-token: write
   contents: read
 
 on:
   workflow_dispatch:
-    inputs:
-      bump:
-        type: choice
-        description: 'Bump version'
-        default: 'patch'
-        options:
-          - 'patch'
-          - 'minor'
-          - 'major'
-          - 'premajor'
-          - 'preminor'
-          - 'prepatch'
 
 jobs:
-  publish:
+  pack:
     if: github.actor == 'leanderpaul' && github.triggering_actor == 'leanderpaul' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - uses: actions/create-github-app-token@v1
-        id: app-token
-        with:
-          app-id: ${{ vars.SHADOW_MANAGER_APP_ID }}
-          private-key: ${{ secrets.SHADOW_MANAGER_PRIVATE_KEY }}
-
-      - name: Set Git user config
-        run: |
-          git config user.name "$APP_SLUG[bot]"
-          git config user.email "$INSTALLATION_ID+$APP_SLUG[bot]@users.noreply.github.com"
-        env:
-          APP_SLUG: ${{ steps.app-token.outputs.app-slug }}
-          INSTALLATION_ID: ${{ steps.app-token.outputs.installation-id }}
-
-      - name: Set up Node.js version
-        uses: actions/setup-node@v4
-        with:
-          node-version: '24'
-          registry-url: 'https://registry.npmjs.org'
 
       - name: Setup bun
         uses: oven-sh/setup-bun@v2
@@ -55,19 +24,12 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Bump version and publish
+      - name: Build and pack the auth package
         working-directory: packages/auth
-        run: bunx release-it ${{ github.event.inputs.bump }} ${{ startsWith(github.event.inputs.bump, 'pre') && '--preRelease=beta' || '' }} --ci
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+        run: bun run pack
 
-      - name: Push changes
-        run: |
-          gh api --method PUT /repos/${{ github.repository }}/contents/packages/auth/package.json \
-            --field branch="main" \
-            --field encoding="base64"  \
-            --field content="$(base64 -i packages/auth/package.json)" \
-            --field message="$(git show -s --format=%s)" \
-            --field sha="$(git rev-parse HEAD~1:packages/auth/package.json)"
-        env:
-          GITHUB_TOKEN: ${{ steps.app-token.outputs.token }}
+      - name: Upload tarball artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: shadow-library-auth-tarball
+          path: packages/auth/*.tgz

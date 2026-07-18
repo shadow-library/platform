@@ -8,8 +8,8 @@ import { AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { AuthErrorCode, ClaimExpectations, JwtPayload, decodeJwt, verifyJwt } from '@shadow-library/auth';
-import { TestSigner, createTestSigner } from '@shadow-library/auth/testing';
+import { AuthErrorCode, ClaimExpectations, decodeJwt, JwtPayload, verifyJwt } from '@shadow-library/auth';
+import { createTestSigner, TestSigner } from '@shadow-library/auth/testing';
 
 /**
  * Defining types

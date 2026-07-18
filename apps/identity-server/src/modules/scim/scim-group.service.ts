@@ -1,18 +1,18 @@
 /**
  * Importing npm packages
  */
+import { and, asc, count, eq, inArray, SQL, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, throwError } from '@shadow-library/common';
-import { SQL, and, asc, count, eq, inArray, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { DatabaseService, PrimaryDatabase, ScimGroup, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, ScimGroup } from '@server/modules/infrastructure/datastore';
 
 import { ScimTenant } from './scim-auth.service';
-import { GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput, ScimGroupResource, ScimListResult, ScimPage, ScimPatchOperation, asRecord, asString } from './scim.types';
+import { asRecord, asString, GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput, ScimGroupResource, ScimListResult, ScimPage, ScimPatchOperation } from './scim.types';
 
 /**
  * Defining types

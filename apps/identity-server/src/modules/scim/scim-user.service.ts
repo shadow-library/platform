@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
+import { and, asc, count, eq, SQL, sql } from 'drizzle-orm';
+import validator from 'validator';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Config, Logger, throwError } from '@shadow-library/common';
-import { SQL, and, asc, count, eq, sql } from 'drizzle-orm';
-import validator from 'validator';
 
 /**
  * Importing user defined packages
@@ -16,10 +16,13 @@ import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/a
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { DatabaseService, PrimaryDatabase, ScimDirectoryEntry, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, ScimDirectoryEntry } from '@server/modules/infrastructure/datastore';
 
 import { ScimTenant } from './scim-auth.service';
 import {
+  asBoolean,
+  asOptionalString,
+  asRecord,
   ScimError,
   ScimFilter,
   ScimListResult,
@@ -30,9 +33,6 @@ import {
   ScimUserInput,
   ScimUserResource,
   USER_SCHEMA,
-  asBoolean,
-  asOptionalString,
-  asRecord,
 } from './scim.types';
 
 /**

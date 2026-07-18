@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Card } from '@shadow-library/ui';
 import { type ReactElement, type ReactNode } from 'react';
+import { Card } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

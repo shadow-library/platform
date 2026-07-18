@@ -14,7 +14,7 @@ import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

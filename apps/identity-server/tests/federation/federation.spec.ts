@@ -15,9 +15,9 @@ import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 import { ApplicationService } from '@server/modules/system/application';
-import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
+import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

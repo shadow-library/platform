@@ -10,7 +10,7 @@ import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/sessio
 import { DnsTxtResolver, OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, Card, ConfirmDialog } from '@shadow-library/ui';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Card, ConfirmDialog } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
+import { api, type SessionItem } from '../../lib/api';
 import { useStepUp } from './step-up';
-import { type SessionItem, api } from '../../lib/api';
 
 /**
  * Defining types

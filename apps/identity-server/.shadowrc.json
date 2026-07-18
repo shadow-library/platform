@@ -1,0 +1,21 @@
+{
+  "type": "backend",
+  "build": {
+    "entry": "src/main.ts",
+    "entries": ["src/worker.ts"],
+    "assets": ["generated/drizzle", "public"]
+  },
+  "verify": {
+    "files": "{src,tests,scripts,client,packages/*/src,packages/*/tests,packages/*/scripts}/**/*.{ts,tsx}",
+    "lint": {
+      "globals": "both",
+      "rules": {
+        "@typescript-eslint/no-namespace": "off"
+      },
+      "overrides": [{ "files": ["client/**/*.tsx"], "rules": { "jsx-a11y/no-autofocus": "off" } }]
+    }
+  },
+  "checkMigrations": {
+    "dir": "generated/drizzle"
+  }
+}

@@ -3,9 +3,9 @@
  */
 import { createHash } from 'node:crypto';
 
+import validator, { StrongPasswordOptions } from 'validator';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger, ValidationError } from '@shadow-library/common';
-import validator, { StrongPasswordOptions } from 'validator';
 
 /**
  * Importing user defined packages

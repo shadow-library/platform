@@ -9,12 +9,12 @@ import { eq } from 'drizzle-orm';
  * Importing user defined packages
  */
 import { AuthFlowService } from '@server/modules/auth/flow';
-import { MfaService, base32Decode, hotp } from '@server/modules/auth/mfa';
+import { base32Decode, hotp, MfaService } from '@server/modules/auth/mfa';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

@@ -1,8 +1,6 @@
 /**
  * Importing npm packages
  */
-import { Field, Schema } from '@shadow-library/class-schema';
-import { Body, Delete, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 import {
   type AuthenticatorAttachment,
   type AuthenticatorTransportFuture,
@@ -10,6 +8,8 @@ import {
   type RegistrationResponseJSON,
 } from '@simplewebauthn/server';
 import { type FastifyRequest } from 'fastify';
+import { Field, Schema } from '@shadow-library/class-schema';
+import { Body, Delete, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages

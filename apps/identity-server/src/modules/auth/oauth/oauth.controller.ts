@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { Config } from '@shadow-library/common';
 import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
-import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
  * Importing user defined packages

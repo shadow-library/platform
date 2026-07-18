@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

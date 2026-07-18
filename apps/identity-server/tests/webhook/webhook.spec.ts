@@ -13,9 +13,9 @@ import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/sessio
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { schema } from '@server/modules/infrastructure/datastore';
-import { WebhookDeliveryService, WebhookService, WebhookTargetGuard, isPrivateAddress } from '@server/modules/infrastructure/webhook';
+import { isPrivateAddress, WebhookDeliveryService, WebhookService, WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

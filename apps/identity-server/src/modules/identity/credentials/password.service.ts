@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { and, desc, eq, notInArray } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
-import { and, desc, eq, notInArray } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

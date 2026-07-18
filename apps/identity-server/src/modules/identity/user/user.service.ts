@@ -3,11 +3,11 @@
  */
 import assert from 'node:assert';
 
-import { Injectable } from '@shadow-library/app';
-import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
-import { SQL, and, eq, inArray, isNotNull } from 'drizzle-orm';
+import { and, eq, inArray, isNotNull, SQL } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import validator from 'validator';
+import { Injectable } from '@shadow-library/app';
+import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -16,7 +16,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
 import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
 import { OrganisationService } from '@server/modules/identity/organisation';
-import { DatabaseService, ID, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, ID, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types

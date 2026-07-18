@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
+import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { and, eq, gte, inArray, sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, PrimaryDatabase, User, UserSession, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, User, UserSession } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types

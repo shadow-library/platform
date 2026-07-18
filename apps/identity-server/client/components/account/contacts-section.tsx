@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, Card, Dialog, FormField, Input, OtpInput } from '@shadow-library/ui';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Card, Dialog, FormField, Input, OtpInput } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { type ContactItem, api } from '../../lib/api';
+import { api, type ContactItem } from '../../lib/api';
 
 /**
  * Defining types

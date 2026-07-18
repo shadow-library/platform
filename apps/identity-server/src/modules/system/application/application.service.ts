@@ -3,9 +3,9 @@
  */
 import assert from 'node:assert';
 
+import { eq, InferInsertModel } from 'drizzle-orm';
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { InferInsertModel, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

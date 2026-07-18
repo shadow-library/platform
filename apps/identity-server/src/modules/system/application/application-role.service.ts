@@ -3,9 +3,9 @@
  */
 import assert from 'node:assert';
 
+import { eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

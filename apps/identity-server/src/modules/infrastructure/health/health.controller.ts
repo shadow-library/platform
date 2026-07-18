@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { sql } from 'drizzle-orm';
 import { Logger } from '@shadow-library/common';
 import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
-import { sql } from 'drizzle-orm';
 
 /**
  * Importing user defined packages

@@ -6,8 +6,8 @@ import { ContextService } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
-import { AuthGuardErrorCode } from './errors';
 import { type AuthPrincipal } from '../interfaces';
+import { AuthGuardErrorCode } from './errors';
 
 /**
  * Defining types

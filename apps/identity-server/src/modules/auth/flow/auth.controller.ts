@@ -2,15 +2,15 @@
  * Importing npm packages
  */
 
-import { Body, Get, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 import { type FastifyReply, type FastifyRequest } from 'fastify';
+import { Body, Get, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { WebauthnChallengeResponse } from '@server/modules/auth/mfa';
-import { SessionAuthService, SessionService, clearSessionCookies } from '@server/modules/auth/session';
+import { clearSessionCookies, SessionAuthService, SessionService } from '@server/modules/auth/session';
 import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { RateLimit } from '@server/modules/infrastructure/security';

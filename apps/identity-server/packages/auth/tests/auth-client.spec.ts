@@ -9,7 +9,7 @@ import { AppError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AuthClient } from '@shadow-library/auth';
-import { TestIdP, createTestIdP } from '@shadow-library/auth/testing';
+import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
  * Defining types

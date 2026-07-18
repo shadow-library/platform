@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { DatabaseModule as CoreDatabaseModule } from '@shadow-library/modules';
 import { BunSQLDatabase, drizzle } from 'drizzle-orm/bun-sql';
+import { DatabaseModule as CoreDatabaseModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages

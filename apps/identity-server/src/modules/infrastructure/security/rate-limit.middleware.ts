@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
+import { type FastifyReply, type FastifyRequest } from 'fastify';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-library/fastify';
-import { type FastifyReply, type FastifyRequest } from 'fastify';
 
 /**
  * Importing user defined packages

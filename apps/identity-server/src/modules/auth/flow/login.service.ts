@@ -3,9 +3,9 @@
  */
 import { createHash, randomBytes } from 'node:crypto';
 
+import { type AuthenticationResponseJSON, type AuthenticatorAttachment, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 import { Injectable } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
-import { type AuthenticationResponseJSON, type AuthenticatorAttachment, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 
 /**
  * Importing user defined packages

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger, ValidationError, utils } from '@shadow-library/common';
+import { Logger, utils, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

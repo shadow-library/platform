@@ -13,7 +13,7 @@ import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/sessio
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

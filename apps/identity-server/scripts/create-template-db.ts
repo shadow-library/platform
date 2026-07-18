@@ -1,11 +1,11 @@
 /**
  * Importing npm packages
  */
-import { ShadowApplication } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
 import { SQL } from 'bun';
 import { drizzle } from 'drizzle-orm/bun-sql';
 import { migrate } from 'drizzle-orm/bun-sql/migrator';
+import { ShadowApplication } from '@shadow-library/app';
+import { Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

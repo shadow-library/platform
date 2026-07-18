@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, Card, Tabs } from '@shadow-library/ui';
 import { type ReactElement, useEffect, useState } from 'react';
+import { Badge, Button, Card, Tabs } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
@@ -12,7 +12,7 @@ import { SecuritySection } from '../components/account/security-section';
 import { SessionsSection } from '../components/account/sessions-section';
 import { StepUpProvider } from '../components/account/step-up';
 import { BrandMark } from '../components/auth-shell';
-import { type Me, api } from '../lib/api';
+import { api, type Me } from '../lib/api';
 import { isLoggedIn } from '../lib/context';
 
 /**

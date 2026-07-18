@@ -3,15 +3,15 @@
  */
 import { createHash, randomInt } from 'node:crypto';
 
+import { and, desc, eq, isNull } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { and, desc, eq, isNull } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { DatabaseService, PrimaryDatabase, VerificationChallenge, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, VerificationChallenge } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 import { RateLimiterService } from '@server/modules/infrastructure/security';
 

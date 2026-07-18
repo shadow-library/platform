@@ -1,8 +1,6 @@
 /**
  * Importing npm packages
  */
-import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
 import {
   type AuthenticationResponseJSON,
   type AuthenticatorTransportFuture,
@@ -13,6 +11,8 @@ import {
 import { generateAuthenticationOptions, generateRegistrationOptions, verifyAuthenticationResponse, verifyRegistrationResponse } from '@simplewebauthn/server';
 import { eq } from 'drizzle-orm';
 import { Redis } from 'ioredis';
+import { Injectable } from '@shadow-library/app';
+import { Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -21,7 +21,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { DatabaseService, PrimaryDatabase, WebauthnCredential, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, WebauthnCredential } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
 /**
@@ -156,8 +156,8 @@ export class WebauthnService {
     const expectedChallenge = await this.redis.getdel(this.authenticationKey(flowKey));
     if (!stored || !expectedChallenge) return null;
 
-    let verified = false;
-    let newCounter = 0;
+    let verified: boolean;
+    let newCounter: number;
     try {
       const verification = await verifyAuthenticationResponse({
         response,

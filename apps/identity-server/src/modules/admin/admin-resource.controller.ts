@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
+import { Body, Get, HttpController, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -12,7 +12,7 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { AdminAccessService } from './admin-access.service';
-import { CreateResourceBody, CreateScopeBody, CreatedResponse, ResourceIdParams, ResourceListResponse } from './admin-client.dto';
+import { CreatedResponse, CreateResourceBody, CreateScopeBody, ResourceIdParams, ResourceListResponse } from './admin-client.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
 
 /**

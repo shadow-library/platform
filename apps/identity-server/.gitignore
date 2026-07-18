@@ -28,3 +28,7 @@ npm-debug.log
 
 # web client build
 public/
+
+# packed package tarballs (distributed via the ecosystem .vendor folder)
+*.tgz
+!vendor/*.tgz

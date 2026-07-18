@@ -2,8 +2,8 @@
  * Importing npm packages
  */
 
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages

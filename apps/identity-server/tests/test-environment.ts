@@ -4,12 +4,12 @@
 import { afterAll, beforeAll, beforeEach } from 'bun:test';
 import { randomBytes } from 'node:crypto';
 
+import { Redis } from 'ioredis';
+import { Class } from 'type-fest';
 import { Dispatcher, ShadowApplication } from '@shadow-library/app';
 import { Config, Logger } from '@shadow-library/common';
 import { FastifyRouter } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { Redis } from 'ioredis';
-import { Class } from 'type-fest';
 
 /**
  * Importing user defined packages

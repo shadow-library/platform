@@ -1,17 +1,17 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, Card, ConfirmDialog, Dialog, EmptyState, FormField, Input, OtpInput } from '@shadow-library/ui';
 import QRCode from 'qrcode';
 import { type ReactElement, useCallback, useEffect, useState } from 'react';
+import { Badge, Button, Card, ConfirmDialog, Dialog, EmptyState, FormField, Input, OtpInput } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
+import { api, type MfaEnrollment } from '../../lib/api';
+import { registerPasskey } from '../../lib/webauthn';
 import { CodeSheetDialog } from './code-sheet';
 import { useStepUp } from './step-up';
-import { type MfaEnrollment, api } from '../../lib/api';
-import { registerPasskey } from '../../lib/webauthn';
 
 /**
  * Defining types
@@ -170,7 +170,7 @@ export function SecuritySection(): ReactElement {
             <div className="stack gap-16 items-center">
               {enrolling ? <img src={enrolling.qr} alt="QR code for authenticator enrollment" width={220} height={220} /> : null}
               <p className="text-tertiary text-body-sm">
-                Can't scan? Enter this key manually: <code className="text-code">{enrolling?.secret}</code>
+                Can&#39;t scan? Enter this key manually: <code className="text-code">{enrolling?.secret}</code>
               </p>
               <FormField label="6-digit code" error={activationError}>
                 <OtpInput length={6} type="numeric" value={activationCode} onValueChange={setActivationCode} onComplete={code => void activateTotp(code)} autoFocus />

@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Patch, Req, RespondFor } from '@shadow-library/fastify';
 import { eq } from 'drizzle-orm';
 import { type FastifyRequest } from 'fastify';
+import { Body, Get, HttpController, Patch, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages

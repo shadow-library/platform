@@ -1,12 +1,12 @@
 /**
  * Importing npm packages
  */
-import fs from 'fs';
-import path from 'path';
+import fs from 'node:fs';
+import path from 'node:path';
 
+import { type FastifyReply } from 'fastify';
 import { Config } from '@shadow-library/common';
 import { Get, Header, HttpController, Res } from '@shadow-library/fastify';
-import { type FastifyReply } from 'fastify';
 
 /**
  * Importing user defined packages

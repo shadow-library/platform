@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Card, EmptyState } from '@shadow-library/ui';
 import { type ReactElement } from 'react';
+import { Card, EmptyState } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages

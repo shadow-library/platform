@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { and, count, desc, eq, ilike, inArray, SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { SQL, and, count, desc, eq, ilike, inArray } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -14,7 +14,7 @@ import { MfaService, WebauthnService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
-import { AuditEvent, DatabaseService, PrimaryDatabase, User, schema } from '@server/modules/infrastructure/datastore';
+import { AuditEvent, DatabaseService, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types

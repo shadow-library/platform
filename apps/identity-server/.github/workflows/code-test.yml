@@ -52,16 +52,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Lint code
-        run: bun lint
-
       - name: Verify migration is up to date
-        run: |
-          bun run db:generate
-          git diff --exit-code generated/drizzle
+        run: bunx shadow check-migrations
 
-      - name: Test the code
-        run: bun test
+      - name: Verify the code
+        run: bun run verify
 
       - name: Build the code
         run: bun run build

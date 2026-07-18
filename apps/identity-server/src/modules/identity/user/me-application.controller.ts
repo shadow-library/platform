@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Get, HttpController, Req, RespondFor } from '@shadow-library/fastify';
 import { type FastifyRequest } from 'fastify';
+import { Get, HttpController, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages

@@ -4,16 +4,16 @@
 import { createPrivateKey, generateKeyPairSync, randomUUID } from 'node:crypto';
 
 import * as x509 from '@peculiar/x509';
+import { and, eq, inArray } from 'drizzle-orm';
 import { Injectable, OnModuleInit } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
-import { and, eq, inArray } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
-import { DatabaseService, PrimaryDatabase, SigningKey, schema } from '@server/modules/infrastructure/datastore';
+import { DatabaseService, PrimaryDatabase, schema, SigningKey } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types

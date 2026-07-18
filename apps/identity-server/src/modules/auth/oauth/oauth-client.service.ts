@@ -3,15 +3,15 @@
  */
 import { randomBytes } from 'node:crypto';
 
+import { and, eq, gt, isNull, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
-import { and, eq, gt, isNull, or } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, Scope, schema } from '@server/modules/infrastructure/datastore';
+import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
 /**
  * Defining types

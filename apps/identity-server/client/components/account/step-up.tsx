@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
+import { createContext, type ReactElement, type ReactNode, useCallback, useContext, useRef, useState } from 'react';
 import { Dialog, FormField, OtpInput } from '@shadow-library/ui';
-import { type ReactElement, type ReactNode, createContext, useCallback, useContext, useRef, useState } from 'react';
 
 /**
  * Importing user defined packages
  */
-import { ApiError, api } from '../../lib/api';
+import { api, ApiError } from '../../lib/api';
 
 /**
  * Defining types

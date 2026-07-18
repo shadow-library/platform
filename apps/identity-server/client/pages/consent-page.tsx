@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Badge, Button, Card, Spinner } from '@shadow-library/ui';
 import { type ReactElement, useEffect, useState } from 'react';
+import { Badge, Button, Card, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
 import { AuthShell } from '../components/auth-shell';
-import { ApiError, type ConsentPrompt, api } from '../lib/api';
+import { api, ApiError, type ConsentPrompt } from '../lib/api';
 import { isLoggedIn, safeReturnTo } from '../lib/context';
 
 /**

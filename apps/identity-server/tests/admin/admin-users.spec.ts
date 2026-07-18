@@ -18,7 +18,7 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
-import { TestEnvironment, csrfPair } from '../test-environment';
+import { csrfPair, TestEnvironment } from '../test-environment';
 
 /**
  * Defining types

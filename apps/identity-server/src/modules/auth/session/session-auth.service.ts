@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
+import { type FastifyRequest } from 'fastify';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
-import { type FastifyRequest } from 'fastify';
 
 /**
  * Importing user defined packages
