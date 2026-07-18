@@ -10,20 +10,20 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "build": "bun run scripts/build.ts",
+    "build": "shadow build",
     "pack": "bun run build && cd dist && bun pm pack --destination .."
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/identity.git",
+    "url": "git+ssh://git@github.com/shadow-library/identity-server.git",
     "directory": "packages/auth"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/identity/issues"
+    "url": "https://github.com/shadow-library/identity-server/issues"
   },
-  "homepage": "https://github.com/shadow-library/identity#readme",
+  "homepage": "https://github.com/shadow-library/identity-server#readme",
   "peerDependencies": {
     "@shadow-library/app": "2.0.0-alpha.0",
     "@shadow-library/common": "2.0.0-alpha.1",
