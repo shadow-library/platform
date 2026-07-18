@@ -1,7 +1,7 @@
 {
   "name": "@shadow-library/auth",
   "type": "module",
-  "version": "0.2.0-alpha.0",
+  "version": "0.3.0",
   "description": "Shadow Apps consumer auth SDK — Bun-native EdDSA token verification, PDP client, M2M tokens, OIDC relying-party helper, and framework guards",
   "exports": {
     ".": "./src/index.ts",
