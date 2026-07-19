@@ -1,3 +1,16 @@
-# Only the prebuilt dist/ is copied into the image; keep the context minimal.
-*
-!dist
+# The image builds from source in a builder stage; keep the context lean and secret-free.
+# .git is intentionally shipped — `shadow build` reads the commit hash into dist/package.json.
+**/node_modules
+dist
+logs
+*.log
+coverage
+.nyc_output
+*.tsbuildinfo
+
+# Never ship local secrets into the build context.
+.env
+.env.*
+!.env.example
+
+.DS_Store

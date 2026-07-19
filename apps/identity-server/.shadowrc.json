@@ -2,7 +2,7 @@
   "type": "backend",
   "build": {
     "entry": "src/main.ts",
-    "entries": ["src/worker.ts"],
+    "entries": ["src/worker.ts", "src/migrate.ts"],
     "assets": ["generated/drizzle", "public"]
   },
   "verify": {
