@@ -17,8 +17,46 @@ import { jsonb } from './jsonb';
  * Defining types
  */
 
+// Per-role model overrides persisted in `projects.config` (jsonb). Mirrors the wire `ProjectConfig`/
+// `ProjectModelOverrides` in project.dto (enumerated, not an index signature, so it round-trips in both
+// directions: read → response, and write ← create/clone input) — keep the two structurally in sync.
+export interface ProjectModelRefData {
+  provider: string;
+  model: string;
+}
+
+export interface ProjectModelOverridesData {
+  extraction?: ProjectModelRefData;
+  generation?: ProjectModelRefData;
+  judge?: ProjectModelRefData;
+  fix?: ProjectModelRefData;
+  outline?: ProjectModelRefData;
+  revision?: ProjectModelRefData;
+  title?: ProjectModelRefData;
+  continuity?: ProjectModelRefData;
+  validation?: ProjectModelRefData;
+  review?: ProjectModelRefData;
+  plan?: ProjectModelRefData;
+  skeleton?: ProjectModelRefData;
+  bible?: ProjectModelRefData;
+  premise?: ProjectModelRefData;
+  audit?: ProjectModelRefData;
+  chat?: ProjectModelRefData;
+  compact?: ProjectModelRefData;
+  arc?: ProjectModelRefData;
+  embedding?: ProjectModelRefData;
+  image?: ProjectModelRefData;
+}
+
+export interface ProjectConfigData {
+  models?: ProjectModelOverridesData;
+}
+
 export namespace Project {
   export type Row = InferSelectModel<typeof projects>;
+  // The row as surfaced by `ProjectService.present`: the stored `config = null` is mapped to an omitted
+  // (`undefined`) field so it satisfies the non-nullable `ProjectConfig` response schema.
+  export type Presented = Omit<Row, 'config'> & { config?: ProjectConfigData };
   export type Kind = InferEnum<typeof projectKind>;
   export type ContentMode = InferEnum<typeof contentMode>;
   export type ContentGenerator = InferEnum<typeof contentGenerator>;
@@ -40,7 +78,7 @@ export const projects = pgTable('projects', {
   title: varchar('title', { length: 500 }),
   coverImagePath: varchar('cover_image_path'),
   contentMode: contentMode('content_mode').notNull().default('standard'),
-  config: jsonb('config'),
+  config: jsonb('config').$type<ProjectConfigData>(),
   brief: text('brief'),
   premise: text('premise'),
   themes: jsonb('themes'),

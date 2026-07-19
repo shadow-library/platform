@@ -125,7 +125,7 @@ export const refinementProposals = pgTable(
     runId: varchar('run_id'),
     appliedAt: timestamp('applied_at'),
     revertedAt: timestamp('reverted_at'),
-    error: jsonb('error'),
+    error: jsonb('error').$type<Record<string, unknown>>(),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
   },

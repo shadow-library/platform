@@ -17,7 +17,7 @@ import { DatabaseService } from '@shadow-library/modules';
 import { AppErrorCode } from '@server/classes';
 import { renderBriefBody } from '@server/common';
 import { APP_NAME } from '@server/constants';
-import { type Ai, type Generation, type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { type Ai, type Generation, type Job, type Plan, type PrimaryDatabase, type Refinement, schema } from '@server/database';
 
 import { ContextAssembler } from '../ai/context/context-assembler.service';
 import { type ContextSection } from '../ai/context/sections';
@@ -145,7 +145,7 @@ export class GenerationService {
     return this.workflowRunService.runBibleBuilder({ projectId, brief: body.brief, force: body.force });
   }
 
-  async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Ai.WorkflowRun[] }> {
+  async plan(projectId: bigint, body: PlanBody): Promise<{ volumes: Plan.Volume[] }> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     if (!project) throw AppErrorCode.PRJ_001.create();
 
@@ -215,7 +215,7 @@ export class GenerationService {
     );
 
     this.logger.info('plan: volumes upserted', { projectId, volumes: upserted.filter(Boolean).length });
-    return { volumes: upserted.filter(Boolean) as never };
+    return { volumes: upserted.filter((v): v is Plan.Volume => v != null) };
   }
 
   approvePlan(projectId: bigint): Promise<{ volumesApproved: number; approved: boolean }> {
@@ -1206,7 +1206,7 @@ export class GenerationService {
 
   // ─── Backfill ────────────────────────────────────────────────────────────────
 
-  async listJobs(projectId: bigint): Promise<unknown[]> {
+  async listJobs(projectId: bigint): Promise<Job.Row[]> {
     return this.jobService.listByProject(projectId);
   }
 

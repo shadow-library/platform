@@ -55,7 +55,7 @@ export const rebrands = pgTable(
     status: rebrandStatus('status').notNull().default('pending'),
     directives: text('directives'),
     worldNotes: text('world_notes'),
-    settings: jsonb('settings'),
+    settings: jsonb('settings').$type<Rebrand.Settings>(),
     lastError: varchar('last_error', { length: 2000 }),
     createdAt: timestamp('created_at').notNull().defaultNow(),
     updatedAt: timestamp('updated_at').notNull().defaultNow(),
@@ -73,7 +73,7 @@ export const rebrandGlossary = pgTable(
       .notNull()
       .references(() => projects.id, { onDelete: 'cascade' }),
     sourceName: varchar('source_name', { length: 300 }).notNull(),
-    variants: jsonb('variants'),
+    variants: jsonb('variants').$type<string[]>(),
     replacement: varchar('replacement', { length: 300 }).notNull(),
     category: rebrandGlossaryCategory('category').notNull(),
     notes: text('notes'),

@@ -24,6 +24,7 @@ import { buildArcPlanPrompt, PROMPT_REGISTRY } from '../ai/prompts';
 import { type ArcPlanOutput, type BibleAuditOutput, type PremiseEnhanceOutput } from '../ai/schemas';
 import { type ChangeOp } from './change-set';
 import { ProposalService } from './proposal.service';
+import { type ContextPreviewResponse } from './refine.dto';
 import { renderManifest } from './required-bible-docs';
 
 /**
@@ -235,7 +236,7 @@ export class RefineService {
   }
 
   /** Dry-run window into exactly what a model call would see — the debugging seam of design §12. */
-  async previewContext(projectId: bigint, query: ContextPreviewInput): Promise<Record<string, unknown>> {
+  async previewContext(projectId: bigint, query: ContextPreviewInput): Promise<ContextPreviewResponse> {
     const pack = await this.assemblePreview(projectId, query);
     return {
       purpose: pack.purpose,

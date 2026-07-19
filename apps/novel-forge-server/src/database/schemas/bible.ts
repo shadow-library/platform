@@ -38,7 +38,7 @@ export const bibleDocuments = pgTable(
       .references(() => projects.id, { onDelete: 'cascade' }),
     section: bibleSection('section').notNull(),
     slug: varchar('slug').notNull(),
-    frontmatter: jsonb('frontmatter'),
+    frontmatter: jsonb('frontmatter').$type<Record<string, unknown>>(),
     body: text('body'),
     // Monotonic revision + content hash so dependents can detect when canon they were validated against changed.
     revision: integer('revision').notNull().default(1),

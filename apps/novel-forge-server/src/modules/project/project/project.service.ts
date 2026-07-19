@@ -55,12 +55,12 @@ export class ProjectService {
   // so map that to `undefined` (an omitted field) before it reaches the serialiser. `instructions` is
   // surfaced as its effective value (stored override or the default) so the settings form always shows
   // the writing instructions the AI will actually use.
-  private present<T extends Project.Row>(project: T): T {
+  private present(project: Project.Row): Project.Presented {
     const instructions = project.instructions?.trim() || DEFAULT_WRITING_INSTRUCTIONS;
-    return { ...project, config: project.config ?? undefined, instructions } as T;
+    return { ...project, config: project.config ?? undefined, instructions };
   }
 
-  async create(body: CreateProjectBody): Promise<Project.Row> {
+  async create(body: CreateProjectBody): Promise<Project.Presented> {
     if (body.kind === 'source' && !body.url) throw AppErrorCode.SRC_001.create();
     this.logger.debug('create project', { name: body.name, kind: body.kind, url: body.url, webnovelId: body.webnovelId, contentMode: body.contentMode });
 
@@ -92,7 +92,7 @@ export class ProjectService {
     return this.present(project);
   }
 
-  async list(filter: ListProjectsQuery): Promise<OffsetPaginationResult<Project.Row>> {
+  async list(filter: ListProjectsQuery): Promise<OffsetPaginationResult<Project.Presented>> {
     const query = utils.pagination.normalise(filter, {
       mode: 'offset',
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
@@ -114,11 +114,17 @@ export class ProjectService {
     );
   }
 
-  get(id: bigint): Promise<Project.Row | null> {
+  get(id: bigint): Promise<Project.Presented | null> {
     return this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) }).then(r => (r ? this.present(r) : null));
   }
 
-  async setCover(id: bigint, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Project.Row> {
+  async getOrThrow(id: bigint): Promise<Project.Presented> {
+    const project = await this.get(id);
+    if (!project) throw AppErrorCode.PRJ_001.create();
+    return project;
+  }
+
+  async setCover(id: bigint, image: string, mime: 'image/png' | 'image/jpeg' | 'image/webp'): Promise<Project.Presented> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
     if (!project) throw AppErrorCode.PRJ_001.create();
 
@@ -131,7 +137,7 @@ export class ProjectService {
     return this.present(result);
   }
 
-  async clearCover(id: bigint): Promise<Project.Row> {
+  async clearCover(id: bigint): Promise<Project.Presented> {
     const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, id) });
     if (!project) throw AppErrorCode.PRJ_001.create();
     if (project.coverImagePath) await this.imageStorage.delete(project.coverImagePath);
@@ -141,7 +147,7 @@ export class ProjectService {
     return this.present(result);
   }
 
-  async update(id: bigint, update: UpdateProjectBody): Promise<Project.Row> {
+  async update(id: bigint, update: UpdateProjectBody): Promise<Project.Presented> {
     const set: Record<string, unknown> = { ...update, updatedAt: new Date() };
     // Normalise the writing instructions: blank — or the default itself — collapses back to null so the
     // column keeps meaning "use the default" and follows future changes to DEFAULT_WRITING_INSTRUCTIONS.
@@ -161,7 +167,7 @@ export class ProjectService {
     return this.present(result);
   }
 
-  async clone(id: bigint, body: CloneProjectBody): Promise<Project.Row> {
+  async clone(id: bigint, body: CloneProjectBody): Promise<Project.Presented> {
     return this.db.transaction(async tx => {
       const source = await tx.query.projects.findFirst({ where: eq(schema.projects.id, id) });
       if (!source) throw AppErrorCode.PRJ_001.create();

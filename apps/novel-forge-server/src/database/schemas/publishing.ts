@@ -47,7 +47,7 @@ export const publications = pgTable('publications', {
   coverPath: varchar('cover_path', { length: 512 }),
   // Reader-facing genre list — carried because the reader's novel upsert accepts it; jsonb like every
   // other string-list column in this schema.
-  genres: jsonb('genres'),
+  genres: jsonb('genres').$type<string[]>(),
   status: publicationStatus('status').notNull().default('draft'),
   revision: integer('revision').notNull().default(1),
   createdAt: timestamp('created_at').notNull().defaultNow(),

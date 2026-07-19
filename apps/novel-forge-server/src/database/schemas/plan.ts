@@ -47,7 +47,7 @@ export const volumes = pgTable(
     endChapter: integer('end_chapter'),
     targetChapterCount: integer('target_chapter_count'),
     status: planStatus('status').notNull().default('draft'),
-    cast: jsonb('cast'),
+    cast: jsonb('cast').$type<string[]>(),
     body: text('body'),
     epitome: text('epitome'),
     revision: integer('revision').notNull().default(1),
@@ -78,7 +78,7 @@ export const arcs = pgTable(
     // because volumeKey is a loose key (same convention as briefs.volumeKey), not a FK with range data.
     chapterStart: integer('chapter_start'),
     chapterEnd: integer('chapter_end'),
-    cast: jsonb('cast'),
+    cast: jsonb('cast').$type<string[]>(),
     status: planStatus('status').notNull().default('draft'),
     body: text('body'),
     revision: integer('revision').notNull().default(1),
