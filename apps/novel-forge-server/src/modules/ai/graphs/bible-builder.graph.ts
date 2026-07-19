@@ -7,7 +7,7 @@
  */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { eq, sql } from 'drizzle-orm';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -94,7 +94,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     const section = STAGE_SECTION_MAP[stageName];
     const slug = STAGE_SLUG_MAP[stageName];
 
-    if (!section || !slug) throw new Error(`[bible-builder] Unknown stage: ${stageName}`);
+    if (!section || !slug) throw AppError.internal(`[bible-builder] Unknown stage: ${stageName}`);
 
     // Skip if already exists and force=false.
     if (!state.force) {
@@ -110,7 +110,7 @@ export function createBibleBuilderGraph(services: BibleBuilderServices) {
     const promptKey = `bible:${STAGE_SLUG_MAP[stageName]}` as
       'bible:foundation' | 'bible:world-power' | 'bible:factions-locations' | 'bible:characters' | 'bible:plot' | 'bible:volumes';
     const prompt = PROMPT_REGISTRY[promptKey];
-    if (!prompt) throw new Error(`[bible-builder] No prompt for stage: ${stageName}`);
+    if (!prompt) throw AppError.internal(`[bible-builder] No prompt for stage: ${stageName}`);
 
     const projectRow = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
     const ctx: TelemetryContext = { projectId, runId: state.runId, node: stageName, promptKey, promptVersion: '1.0.0', role: promptKey };

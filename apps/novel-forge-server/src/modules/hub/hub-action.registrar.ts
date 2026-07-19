@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -50,25 +50,25 @@ export class HubActionRegistrar {
     const registry = this.registry;
 
     registry.register('action.generate_chapters', async (projectId, action) => {
-      if (action.op !== 'action.generate_chapters') throw new Error('executor misrouted');
+      if (action.op !== 'action.generate_chapters') throw AppError.internal('executor misrouted');
       const job = await this.generationService.generate(projectId, { limit: action.count });
       return { summary: `enqueued generation of ${action.count} chapter(s)`, jobId: job.jobId };
     });
 
     registry.register('action.plan_volumes', async (projectId, action) => {
-      if (action.op !== 'action.plan_volumes') throw new Error('executor misrouted');
+      if (action.op !== 'action.plan_volumes') throw AppError.internal('executor misrouted');
       const result = await this.generationService.plan(projectId, { volumeCount: action.volumeCount, chaptersPerVolume: action.chaptersPerVolume });
-      return { summary: `planned ${result.volumes.length} volume(s)`, runId: result.volumes[0]?.id };
+      return { summary: `planned ${result.volumes.length} volume(s)` };
     });
 
     registry.register('action.plan_arcs', async (projectId, action, ctx) => {
-      if (action.op !== 'action.plan_arcs') throw new Error('executor misrouted');
+      if (action.op !== 'action.plan_arcs') throw AppError.internal('executor misrouted');
       const result = await this.refineService.planArcs(projectId, action.volumeKey, { arcCount: action.arcCount });
       return this.settleChainProposal(projectId, result.proposal, result.runId, `planned arcs for ${action.volumeKey}`, ctx);
     });
 
     registry.register('action.outline_arc', async (projectId, action) => {
-      if (action.op !== 'action.outline_arc') throw new Error('executor misrouted');
+      if (action.op !== 'action.outline_arc') throw AppError.internal('executor misrouted');
       const result = await this.generationService.outlineArc(projectId, action.arcKey, {});
       return { summary: `outlined ${result.briefs.length} brief(s) for ${action.arcKey}` };
     });
@@ -80,25 +80,25 @@ export class HubActionRegistrar {
     });
 
     registry.register('action.enhance_premise', async (projectId, action, ctx) => {
-      if (action.op !== 'action.enhance_premise') throw new Error('executor misrouted');
+      if (action.op !== 'action.enhance_premise') throw AppError.internal('executor misrouted');
       const result = await this.refineService.enhancePremise(projectId, action.overview);
       return this.settleChainProposal(projectId, result.proposal, result.runId, 'premise enhancement staged', ctx);
     });
 
     registry.register('action.judge_draft', async (projectId, action) => {
-      if (action.op !== 'action.judge_draft') throw new Error('executor misrouted');
+      if (action.op !== 'action.judge_draft') throw AppError.internal('executor misrouted');
       const result = await this.generationService.judgeDraft(projectId, action.chapter);
       return { summary: `judge verdict on chapter ${action.chapter}: ${result.verdict} (${result.findings.length} finding(s))` };
     });
 
     registry.register('action.revise_draft', async (projectId, action) => {
-      if (action.op !== 'action.revise_draft') throw new Error('executor misrouted');
+      if (action.op !== 'action.revise_draft') throw AppError.internal('executor misrouted');
       const draft = await this.generationService.reviseDraft(projectId, action.chapter, { note: action.note });
       return { summary: `revised chapter ${action.chapter} draft to revision ${draft.revision}` };
     });
 
     registry.register('action.approve_draft', async (projectId, action) => {
-      if (action.op !== 'action.approve_draft') throw new Error('executor misrouted');
+      if (action.op !== 'action.approve_draft') throw AppError.internal('executor misrouted');
       await this.generationService.approveDraft(projectId, action.chapter);
       return { summary: `approved chapter ${action.chapter} draft` };
     });
@@ -109,13 +109,13 @@ export class HubActionRegistrar {
     });
 
     registry.register('action.approve_arcs', async (projectId, action) => {
-      if (action.op !== 'action.approve_arcs') throw new Error('executor misrouted');
+      if (action.op !== 'action.approve_arcs') throw AppError.internal('executor misrouted');
       await this.arcService.approve(projectId, action.volumeKey);
       return { summary: `approved arcs of ${action.volumeKey}` };
     });
 
     registry.register('action.validate', async (projectId, action) => {
-      if (action.op !== 'action.validate') throw new Error('executor misrouted');
+      if (action.op !== 'action.validate') throw AppError.internal('executor misrouted');
       if (action.scope === 'chapter' && action.chapter !== undefined) {
         const review = await this.generationService.reviewChapter(projectId, action.chapter);
         return { summary: `chapter ${action.chapter} review: ${review.disposition}` };
@@ -125,7 +125,7 @@ export class HubActionRegistrar {
     });
 
     registry.register('action.finalize', async (projectId, action) => {
-      if (action.op !== 'action.finalize') throw new Error('executor misrouted');
+      if (action.op !== 'action.finalize') throw AppError.internal('executor misrouted');
       const run = await this.generationService.finalize(projectId, { chapter: action.upTo });
       return { summary: `finalize ${run.status}: ${run.outcome}`, runId: run.runId };
     });

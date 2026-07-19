@@ -7,7 +7,7 @@
  */
 import { and, desc, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -65,7 +65,7 @@ export class JobService {
       where: and(eq(schema.jobs.projectId, projectId), eq(schema.jobs.kind, kind), eq(schema.jobs.target, target)),
       columns: { id: true, status: true },
     });
-    if (!existing) throw new Error(`enqueue: job not found after conflict on (${projectId}, ${kind}, ${target})`);
+    if (!existing) throw AppError.internal(`enqueue: job not found after conflict on (${projectId}, ${kind}, ${target})`);
 
     // Active job: real dedup — return it as-is without disturbing an in-flight run.
     if (existing.status === 'pending' || existing.status === 'in_progress') {

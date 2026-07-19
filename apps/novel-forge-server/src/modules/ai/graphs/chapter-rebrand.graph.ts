@@ -7,7 +7,7 @@
  */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, desc, eq, lt, ne, sql } from 'drizzle-orm';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -108,8 +108,8 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
       }),
     ]);
 
-    if (!chapter) throw new Error(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
-    if (!rebrand?.worldNotes) throw new Error(`[loadChapter] Rebrand glossary is not seeded for project ${state.projectId}`);
+    if (!chapter) throw AppError.internal(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
+    if (!rebrand?.worldNotes) throw AppError.internal(`[loadChapter] Rebrand glossary is not seeded for project ${state.projectId}`);
 
     logger.debug('rebrand loadChapter', {
       runId: state.runId,
@@ -222,7 +222,7 @@ function buildChapterRebrandGraph(services: RebrandGraphServices) {
 
   // ─── persistConversion ───────────────────────────────────────────────────────
   async function persistConversion(state: RebrandState) {
-    if (!state.converted) throw new Error('[persistConversion] No converted output to persist');
+    if (!state.converted) throw AppError.internal('[persistConversion] No converted output to persist');
     const projectId = BigInt(state.projectId);
     const converted = state.converted;
     const issues: ConversionIssue[] = [...state.residueIssues, ...state.auditIssues];

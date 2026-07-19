@@ -7,7 +7,7 @@
  */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -150,7 +150,7 @@ export class JobExecutor {
       case 'publish':
         return this.runPublish(job);
       default:
-        throw new Error(`Unsupported job kind: ${job.kind}`);
+        throw AppError.internal(`Unsupported job kind: ${job.kind}`);
     }
   }
 
@@ -166,7 +166,7 @@ export class JobExecutor {
       this.logger.debug('runGenerate: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
       // The run service swallows its own errors into a `failed` result; surface that as a job failure
       // instead of quietly marking the job done with no draft persisted.
-      if (result.status === 'failed') throw new Error(`chapter ${chapter} generation failed (run ${result.runId})`);
+      if (result.status === 'failed') throw AppError.internal(`chapter ${chapter} generation failed (run ${result.runId})`);
     }
   }
 
@@ -180,7 +180,7 @@ export class JobExecutor {
       this.logger.debug('runExtract: extracting chapter', { jobId: job.id, chapter, index: i, total });
       const result = await this.workflowRunService.runSourceExtraction({ projectId: job.projectId, chapter });
       this.logger.debug('runExtract: chapter finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
-      if (result.status === 'failed') throw new Error(`chapter ${chapter} extraction failed (run ${result.runId})`);
+      if (result.status === 'failed') throw AppError.internal(`chapter ${chapter} extraction failed (run ${result.runId})`);
     }
   }
 
@@ -212,7 +212,7 @@ export class JobExecutor {
       await this.jobService.progress(job.id, { done: scraped, total: 0, current: `chapter ${scraped}`, phase: 'ingest' });
       this.logger.debug('runIngest: batch complete', { jobId: job.id, batch: batch++, ingested: result.ingested, scrapedTotal: scraped, complete });
 
-      if (!complete && result.ingested === 0) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
+      if (!complete && result.ingested === 0) throw AppError.internal('acquisition stalled: 0 pages ingested and the scrape is incomplete');
     } while (!complete && limit === undefined);
 
     // A finished scrape triggers the hygiene passes (recombine design §1, §5): reference titles
@@ -241,16 +241,16 @@ export class JobExecutor {
     try {
       // Phase 1: finish acquisition. Blocking on a stalled scrape is correct — nothing to convert.
       let project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-      if (!project) throw new Error(`project ${projectId} not found`);
+      if (!project) throw AppError.internal(`project ${projectId} not found`);
       this.logger.debug('runRebrand: phase 1 — acquisition', { jobId: job.id, projectId, scrapeComplete: project.scrapeComplete });
       while (!project.scrapeComplete) {
         await this.setRebrandStatus(projectId, 'ingesting');
         await this.jobService.progress(job.id, { done: project.scrapeNextNumber ?? 0, total: 0, current: 'scraping', phase: 'ingest' });
         const result = await this.acquireService.ingest(projectId, {});
         project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-        if (!project) throw new Error(`project ${projectId} not found`);
+        if (!project) throw AppError.internal(`project ${projectId} not found`);
         this.logger.debug('runRebrand: acquisition batch', { jobId: job.id, ingested: result.ingested, scrapeComplete: project.scrapeComplete });
-        if (result.ingested === 0 && !project.scrapeComplete) throw new Error('acquisition stalled: 0 pages ingested and the scrape is incomplete');
+        if (result.ingested === 0 && !project.scrapeComplete) throw AppError.internal('acquisition stalled: 0 pages ingested and the scrape is incomplete');
       }
 
       // Phase 1.5: reference titles from webnovel (when configured), then merge translator-split
@@ -306,7 +306,7 @@ export class JobExecutor {
     const result = await this.publishRunner.converge(job.projectId);
     const total = result.pushed.length + result.deleted.length + result.skipped.length + result.failed.length;
     await this.jobService.progress(job.id, { done: total - result.failed.length, total, current: 'done', phase: 'publish' });
-    if (result.failed.length > 0) throw new Error(`publish convergence incomplete: ${result.failed.length} chapter push(es) failed — see the publication ledger`);
+    if (result.failed.length > 0) throw AppError.internal(`publish convergence incomplete: ${result.failed.length} chapter push(es) failed — see the publication ledger`);
   }
 
   /** payload.chapters wins; otherwise every source chapter without a converted/attention row (failed rows always retry). */

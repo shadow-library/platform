@@ -7,7 +7,7 @@
  */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, ne, sql } from 'drizzle-orm';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -73,11 +73,11 @@ export function createChapterFinalizationGraph(services: FinalizationServices) {
     ]);
 
     if (!draftRow || draftRow.reviewStatus !== 'approved')
-      throw new Error(`[guard] Draft for chapter ${state.chapter} is not approved (status: ${draftRow?.reviewStatus ?? 'missing'})`);
+      throw AppError.internal(`[guard] Draft for chapter ${state.chapter} is not approved (status: ${draftRow?.reviewStatus ?? 'missing'})`);
 
     const currentChapter = projectRow?.storyCurrentChapter ?? 0;
     if (state.chapter !== currentChapter + 1) {
-      throw new Error(`[guard] Chapter ${state.chapter} is not next in sequence (current: ${currentChapter})`);
+      throw AppError.internal(`[guard] Chapter ${state.chapter} is not next in sequence (current: ${currentChapter})`);
     }
 
     logger.debug('finalization guard passed', { runId: state.runId, chapter: state.chapter, currentChapter });

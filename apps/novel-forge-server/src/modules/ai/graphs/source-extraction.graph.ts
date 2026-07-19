@@ -7,7 +7,7 @@
  */
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, sql } from 'drizzle-orm';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -69,7 +69,7 @@ function buildSourceExtractionGraph(services: ExtractionServices) {
     const projectId = BigInt(state.projectId);
     const ch = await db.query.chapters.findFirst({ where: and(eq(schema.chapters.projectId, projectId), eq(schema.chapters.number, state.chapter)) });
 
-    if (!ch) throw new Error(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
+    if (!ch) throw AppError.internal(`[loadChapter] Chapter ${state.chapter} not found for project ${state.projectId}`);
 
     logger.debug('extraction loadChapter', { runId: state.runId, chapter: state.chapter, chapterId: String(ch.id), contentLength: (ch.content ?? '').length });
     return { chapterId: String(ch.id), chapterContent: ch.content ?? '', chapterGenerator: ch.generator };

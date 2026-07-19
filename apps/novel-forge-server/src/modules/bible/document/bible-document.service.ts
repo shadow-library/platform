@@ -7,7 +7,7 @@
  */
 import { and, eq, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -78,7 +78,7 @@ export class BibleDocumentService {
       return row;
     });
 
-    if (!doc) throw new Error('Bible document upsert failed unexpectedly');
+    if (!doc) throw AppError.internal('Bible document upsert failed unexpectedly');
     return doc;
   }
 }

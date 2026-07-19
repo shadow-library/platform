@@ -8,7 +8,7 @@
 import { PostgresSaver } from '@langchain/langgraph-checkpoint-postgres';
 import { and, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -90,6 +90,10 @@ export interface WorkflowRunResult {
  * Declaring the constants
  */
 
+// LangGraph's PostgresSaver opens its own raw connection pool and needs a plain connection string,
+// which the injected DatabaseService does not expose. Read the same canonical env key the
+// DatabaseModule is configured from rather than Config.get (which returns undefined until the module
+// registers the key lazily on first connect — a wrong-DB fallback risk here).
 const DB_URL = process.env['DATABASE_POSTGRES_URL'] ?? 'postgresql://postgres:postgres@localhost/novel_forge';
 
 // jsonb columns serialise via JSON.stringify, which throws on bigint. Every workflow input carries
@@ -152,7 +156,7 @@ export class WorkflowRunService {
       .insert(schema.workflowRuns)
       .values({ projectId, graph, target, status: 'running', input: toJsonSafe(input) as never, jobId: jobId ?? null, nodeTrace: [] })
       .returning({ id: schema.workflowRuns.id });
-    if (!run) throw new Error(`[WorkflowRunService] Failed to create workflow_run row`);
+    if (!run) throw AppError.internal(`[WorkflowRunService] Failed to create workflow_run row`);
     this.logger.info('workflow run created', { runId: run.id, projectId, graph, target, jobId });
     this.logger.debug('workflow run input', { runId: run.id, graph, input });
     return run.id;

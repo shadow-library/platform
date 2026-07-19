@@ -12,6 +12,7 @@ import { join } from 'node:path';
 
 import { SimpleChatModel } from '@langchain/core/language_models/chat_models';
 import { type BaseMessage } from '@langchain/core/messages';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -40,7 +41,7 @@ async function spawnAndCapture(bin: string, args: string[]): Promise<string> {
   const [stdout, exitCode] = await Promise.all([new Response(proc.stdout).text(), proc.exited]);
   if (exitCode !== 0) {
     const stderr = await new Response(proc.stderr).text();
-    throw new Error(`Subprocess exited ${exitCode}: ${stderr.trim()}`);
+    throw AppError.internal(`Subprocess exited ${exitCode}: ${stderr.trim()}`);
   }
   return stdout.trim();
 }

@@ -8,7 +8,7 @@
 import { AIMessage, HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { Annotation, type BaseCheckpointSaver, END, START, StateGraph } from '@langchain/langgraph';
 import { and, eq, sql } from 'drizzle-orm';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -260,7 +260,7 @@ export function createChapterGenerationGraph(services: GraphServices) {
         })
         .returning();
 
-      if (!row) throw new Error('[persistDraft] unexpected null result');
+      if (!row) throw AppError.internal('[persistDraft] unexpected null result');
 
       await tx
         .insert(schema.draftRevisions)

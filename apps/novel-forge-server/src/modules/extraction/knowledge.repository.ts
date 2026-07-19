@@ -7,7 +7,7 @@
  */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -117,7 +117,7 @@ export class KnowledgeRepository {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!entity) throw new Error('[KnowledgeRepository] upsertEntity: unexpected null result');
+    if (!entity) throw AppError.internal('[KnowledgeRepository] upsertEntity: unexpected null result');
     return entity;
   }
 
@@ -179,7 +179,7 @@ export class KnowledgeRepository {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!beat) throw new Error('[KnowledgeRepository] upsertBeat: unexpected null result');
+    if (!beat) throw AppError.internal('[KnowledgeRepository] upsertBeat: unexpected null result');
     return beat;
   }
 
@@ -211,7 +211,7 @@ export class KnowledgeRepository {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!thread) throw new Error('[KnowledgeRepository] upsertPlotThread: unexpected null result');
+    if (!thread) throw AppError.internal('[KnowledgeRepository] upsertPlotThread: unexpected null result');
     return thread;
   }
 
@@ -230,7 +230,7 @@ export class KnowledgeRepository {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!fact) throw new Error('[KnowledgeRepository] upsertWorldFact: unexpected null result');
+    if (!fact) throw AppError.internal('[KnowledgeRepository] upsertWorldFact: unexpected null result');
     return fact;
   }
 
@@ -260,7 +260,7 @@ export class KnowledgeRepository {
       .returning()
       .catch(err => this.databaseService.translateError(err));
 
-    if (!mystery) throw new Error('[KnowledgeRepository] upsertMystery: unexpected null result');
+    if (!mystery) throw AppError.internal('[KnowledgeRepository] upsertMystery: unexpected null result');
     return mystery;
   }
 

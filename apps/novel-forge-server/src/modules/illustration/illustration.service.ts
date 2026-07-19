@@ -9,7 +9,7 @@ import { randomUUID } from 'node:crypto';
 
 import { eq } from 'drizzle-orm';
 import { Inject, Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -81,12 +81,12 @@ export class IllustrationService {
     if (!res.ok) {
       const err = await res.text().catch(() => res.statusText);
       this.logger.error('generateImage: provider returned an error', { projectId, model, status: res.status, err });
-      throw new Error(`Image generation failed: ${err}`);
+      throw AppError.internal(`Image generation failed: ${err}`);
     }
 
     const data = (await res.json()) as { data: { b64_json: string }[] };
     const b64 = data.data[0]?.b64_json;
-    if (!b64) throw new Error('Image generation returned no data');
+    if (!b64) throw AppError.internal('Image generation returned no data');
     const bytes = new Uint8Array(Buffer.from(b64, 'base64'));
     this.logger.debug('generateImage: received image', { projectId, model, bytes: bytes.length, latencyMs: Date.now() - startedAt });
     return bytes;
@@ -108,7 +108,7 @@ export class IllustrationService {
 
   async refine(sessionId: string, instruction: string): Promise<{ previewUrl: string }> {
     const session = this.sessions.get(sessionId);
-    if (!session || session.status !== 'active') throw new Error(`Session ${sessionId} not found or inactive`);
+    if (!session || session.status !== 'active') throw AppError.internal(`Session ${sessionId} not found or inactive`);
 
     this.logger.info('illustration refine', { sessionId, projectId: session.projectId, entityKey: session.entityKey });
     const fullInstruction = `${session.instruction}\n\nRefinement: ${instruction}`;
@@ -122,8 +122,8 @@ export class IllustrationService {
 
   async save(sessionId: string): Promise<{ saved: boolean; imagePath: string }> {
     const session = this.sessions.get(sessionId);
-    if (!session || session.status !== 'active') throw new Error(`Session ${sessionId} not found or inactive`);
-    if (!session.previewBytes) throw new Error('No preview to save');
+    if (!session || session.status !== 'active') throw AppError.internal(`Session ${sessionId} not found or inactive`);
+    if (!session.previewBytes) throw AppError.internal('No preview to save');
 
     const ref = await this.imageStorage.save(session.projectId, session.entityKey, session.previewBytes, 'image/png');
 

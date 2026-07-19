@@ -7,6 +7,7 @@
  */
 import Ajv, { type ValidateFunction } from 'ajv';
 import { ClassSchema, type SchemaClass } from '@shadow-library/class-schema';
+import { AppError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -69,7 +70,7 @@ function compile(Class: SchemaClass): ValidateFunction {
   if (!ajv.getSchema(schema.$id)) ajv.addSchema(root, schema.$id);
 
   const validateFn = ajv.getSchema(schema.$id);
-  if (!validateFn) throw new Error(`[validateSchema] failed to compile schema '${schema.$id}'`);
+  if (!validateFn) throw AppError.internal(`[validateSchema] failed to compile schema '${schema.$id}'`);
   compiledCache.set(schema.$id, validateFn);
   return validateFn;
 }
