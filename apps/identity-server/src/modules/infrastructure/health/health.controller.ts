@@ -9,6 +9,7 @@ import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
+import { Auth } from '@server/modules/access';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
 
 import { DependencyStatus, HealthResponse, ReadinessResponse } from './health.dto';
@@ -28,15 +29,17 @@ export class HealthController {
   constructor(private readonly databaseService: DatabaseService) {}
 
   @Get('/health')
+  @Auth({ public: true })
   @RespondFor(200, HealthResponse)
-  health(): HealthResponse {
+  getHealth(): HealthResponse {
     return { status: 'ok' };
   }
 
   @Get('/health/ready')
+  @Auth({ public: true })
   @RespondFor(200, ReadinessResponse)
   @RespondFor(503, ReadinessResponse)
-  async ready(): Promise<ReadinessResponse> {
+  async getReadiness(): Promise<ReadinessResponse> {
     const [postgres, redis] = await Promise.all([this.checkPostgres(), this.checkRedis()]);
     const status = postgres === 'up' && redis === 'up' ? 'ok' : 'degraded';
     return { status, dependencies: { postgres, redis } };

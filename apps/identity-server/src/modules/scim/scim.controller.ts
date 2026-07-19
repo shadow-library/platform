@@ -25,6 +25,10 @@ import { LIST_SCHEMA, parseFilter, parseGroupInput, parsePage, parsePatchOperati
  * RFC 7644 fixes the wire format, including a distinct error envelope and `application/scim+json`,
  * which must not be reshaped by the platform's error handler. `run` maps `ScimError` to the
  * conformant envelope; anything else falls through to the framework as a genuine server fault.
+ *
+ * Authentication is deliberately not delegated to the central `AccessGuard` (no `@Auth`): SCIM
+ * authenticates inline with its own bearer scheme so an auth failure yields a `scim+json` error
+ * envelope inside `run`, rather than the platform's JSON error shape a guard rejection would emit.
  */
 
 @HttpController('/scim/v2')

@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -17,8 +18,9 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
 export class IdentityProviderParams {
-  @Field()
-  organisationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  organisationId: bigint;
 
   @Field()
   identityProviderId: string;
@@ -26,8 +28,9 @@ export class IdentityProviderParams {
 
 @Schema()
 export class OrganisationIdOnlyParams {
-  @Field()
-  organisationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  organisationId: bigint;
 }
 
 @Schema()

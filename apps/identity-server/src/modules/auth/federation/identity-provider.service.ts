@@ -11,6 +11,8 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, oidcDiscoveryUrl } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
+import { type ValidatedSession } from '@server/modules/auth/session';
+import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, IdentityProvider, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
 
@@ -68,8 +70,40 @@ export class IdentityProviderService {
     databaseService: DatabaseService,
     private readonly keyProvider: KeyProvider,
     private readonly targetGuard: WebhookTargetGuard,
+    private readonly auditService: AuditService,
   ) {
     this.db = databaseService.getPostgresClient();
+  }
+
+  private async audit(session: ValidatedSession, organisationId: bigint, action: string, targetId: string): Promise<void> {
+    await this.auditService.record({
+      action,
+      outcome: 'SUCCESS',
+      actorType: 'USER',
+      actorId: session.userId.toString(),
+      organisationId: organisationId.toString(),
+      targetType: 'identity_provider',
+      targetId,
+    });
+  }
+
+  /* --------------------------- caller-facing orchestration --------------------------- */
+
+  async registerIdentityProvider(session: ValidatedSession, organisationId: bigint, input: CreateIdentityProvider): Promise<IdentityProvider> {
+    const provider = await this.create(organisationId, input);
+    await this.audit(session, organisationId, 'org.idp.configured', provider.id);
+    return provider;
+  }
+
+  async updateIdentityProviderConfig(session: ValidatedSession, organisationId: bigint, id: string, patch: UpdateIdentityProvider): Promise<IdentityProvider> {
+    const provider = await this.update(organisationId, id, patch);
+    await this.audit(session, organisationId, 'org.idp.updated', provider.id);
+    return provider;
+  }
+
+  async removeIdentityProviderConfig(session: ValidatedSession, organisationId: bigint, id: string): Promise<void> {
+    await this.remove(organisationId, id);
+    await this.audit(session, organisationId, 'org.idp.removed', id);
   }
 
   /** Raw fetch, not APIRequest: admin-supplied issuers need a hard timeout, which APIRequest does not expose. */
