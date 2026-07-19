@@ -682,6 +682,44 @@ UserAPI.setOptions({
 const userClient = new UserAPI();
 ```
 
+#### Service Discovery (`svc://` URLs)
+
+A `svc://<service>/<path>` URL is resolved for internal service-to-service calls; every other URL is passed through
+untouched. In Kubernetes a Service is reachable by its own name via cluster DNS, so the service name becomes the host
+and the cluster decides where it resolves.
+
+```ts
+// In-cluster: resolves to the service's cluster DNS name
+await APIRequest.get('svc://pulse-server/api/v1/notifications');
+// → http://pulse-server/api/v1/notifications
+
+// A dotted host targets another namespace
+await APIRequest.get('svc://pulse-server.prod/health');
+// → http://pulse-server.prod/health
+```
+
+Two environment variables tune resolution:
+
+- **`SERVICE_DISCOVERY_SCHEME`** — the scheme applied to the in-cluster host (default `http`); set to `https` for an
+  mTLS mesh.
+- **`SERVICE_URL_<NAME>`** — points a single service at an override host or full URL, for local dev or out-of-cluster
+  targets. `<NAME>` is the service name uppercased with `-` and `.` replaced by `_` (`pulse-server` → `SERVICE_URL_PULSE_SERVER`,
+  `pulse-server.prod` → `SERVICE_URL_PULSE_SERVER_PROD`). An override that **carries its own `scheme://` is used
+  verbatim**; a **schemeless** override gets `SERVICE_DISCOVERY_SCHEME` applied, the same as the in-cluster host. A
+  trailing slash on the override is trimmed before the request path is appended.
+
+```ts
+// SERVICE_URL_PULSE_SERVER=https://localhost:3000/  → used verbatim
+await APIRequest.post('svc://pulse-server/api/v1/notifications');
+// → https://localhost:3000/api/v1/notifications
+
+// SERVICE_URL_PULSE_SERVER=localhost:3000 (no scheme) → discovery scheme applied
+await APIRequest.get('svc://pulse-server/api/v1/notifications');
+// → http://localhost:3000/api/v1/notifications  (https://… when SERVICE_DISCOVERY_SCHEME=https)
+```
+
+An invalid service name, or an override that is not a valid URL, throws `ErrorCode.SERVICE_UNKNOWN`.
+
 #### Error Handling
 
 ```ts
@@ -1413,7 +1451,7 @@ The package uses environment variables for configuration. Below are the key vari
 
 #### APIRequest
 
-- `APIRequest.get(url)` - Create GET request
+- `APIRequest.get(url)` - Create GET request (accepts a `svc://<service>/<path>` URL for service discovery)
 - `APIRequest.post(url)` - Create POST request
 - `APIRequest.put(url)` - Create PUT request
 - `APIRequest.patch(url)` - Create PATCH request

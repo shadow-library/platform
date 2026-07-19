@@ -104,6 +104,19 @@ describe('APIRequest', () => {
       expect(mockRequest).toHaveBeenCalledWith('https://localhost:3000/api/v1/notifications', expect.objectContaining({ method: 'POST' }));
     });
 
+    it('should apply the discovery scheme to a schemeless SERVICE_URL_<NAME> override', async () => {
+      process.env['SERVICE_URL_PULSE_SERVER'] = 'localhost:3000';
+      await APIRequest.get('svc://pulse-server/api/v1/notifications');
+      expect(mockRequest).toHaveBeenCalledWith('http://localhost:3000/api/v1/notifications', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should apply SERVICE_DISCOVERY_SCHEME to a schemeless override', async () => {
+      process.env['SERVICE_DISCOVERY_SCHEME'] = 'https';
+      process.env['SERVICE_URL_PULSE_SERVER'] = 'localhost:3000';
+      await APIRequest.get('svc://pulse-server/health');
+      expect(mockRequest).toHaveBeenCalledWith('https://localhost:3000/health', expect.objectContaining({ method: 'GET' }));
+    });
+
     it('should apply SERVICE_DISCOVERY_SCHEME to the in-cluster default', async () => {
       process.env['SERVICE_DISCOVERY_SCHEME'] = 'https';
       await APIRequest.get('svc://pulse-server/health');
