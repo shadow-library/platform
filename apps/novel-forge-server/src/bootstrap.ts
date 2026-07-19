@@ -36,6 +36,11 @@ declare module '@shadow-library/common' {
     'ai.ollama.host': string;
     'ai.embedding.model': string;
 
+    /** AI resilience configs — per-call timeout budget and transient-error backoff */
+    'ai.llm.timeout-ms': number;
+    'ai.llm.max-retries': number;
+    'ai.llm.backoff-ms': number;
+
     /** Subprocess provider configs */
     'ai.claude-code.enabled': boolean;
     'ai.claude-code.bin': string;
@@ -94,6 +99,9 @@ Config.load('ai.grok.llm.model', { defaultValue: 'grok-3' });
 Config.load('ai.grok.image.model', { defaultValue: 'grok-2-image' });
 Config.load('ai.ollama.host', { defaultValue: 'http://localhost:11434' });
 Config.load('ai.embedding.model', { defaultValue: 'qwen3-embedding:8b' });
+Config.load('ai.llm.timeout-ms', { defaultValue: '300000', validateType: 'number' });
+Config.load('ai.llm.max-retries', { defaultValue: '2', validateType: 'number' });
+Config.load('ai.llm.backoff-ms', { defaultValue: '500', validateType: 'number' });
 Config.load('ai.claude-code.enabled', { defaultValue: 'false', validateType: 'boolean' });
 Config.load('ai.claude-code.bin', { defaultValue: 'claude' });
 Config.load('ai.codex.enabled', { defaultValue: 'false', validateType: 'boolean' });

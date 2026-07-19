@@ -51,12 +51,6 @@ export interface ProjectConfig {
 // results are safe to cache. Creative roles (generation, revision, plan, outline, chat…) are never
 // cached — caching them would make a re-request return byte-identical prose.
 const CACHEABLE_ROLES = new Set<AiRole>(['judge', 'validation', 'continuity', 'extraction', 'review', 'audit', 'compact']);
-// Local models (e.g. qwen3:14b) legitimately spend 60–120s on the heavier authoring stages, so the
-// per-call budget defaults generously; override AI_LLM_TIMEOUT_MS downward for fast hosted providers.
-const LLM_TIMEOUT_MS = Number(process.env['AI_LLM_TIMEOUT_MS'] ?? 300_000);
-const LLM_MAX_RETRIES = Number(process.env['AI_LLM_MAX_RETRIES'] ?? 2);
-const LLM_BACKOFF_MS = Number(process.env['AI_LLM_BACKOFF_MS'] ?? 500);
-
 const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 function extractJsonBlock(text: string): unknown {
@@ -112,6 +106,11 @@ function applyPostValidate<T>(result: SchemaParseResult<T>, postValidate?: (data
 export class ModelRouterService {
   private readonly logger = Logger.getLogger(APP_NAME, ModelRouterService.name);
   private readonly db: PrimaryDatabase;
+  // Local models (e.g. qwen3:14b) legitimately spend 60–120s on the heavier authoring stages, so the
+  // per-call budget defaults generously; tune ai.llm.timeout-ms downward for fast hosted providers.
+  private readonly llmTimeoutMs = Config.get('ai.llm.timeout-ms') ?? 300_000;
+  private readonly llmMaxRetries = Config.get('ai.llm.max-retries') ?? 2;
+  private readonly llmBackoffMs = Config.get('ai.llm.backoff-ms') ?? 500;
 
   constructor(
     private readonly telemetry: TelemetryHandler,
@@ -157,7 +156,7 @@ export class ModelRouterService {
           think: false,
           // Bun's fetch aborts after ~300s without socket activity, and a long-context prompt eval
           // streams no bytes for minutes — so long generations die as DOMException transport errors.
-          // Disable that idle timeout (Bun RequestInit extension); LLM_TIMEOUT_MS still bounds the call.
+          // Disable that idle timeout (Bun RequestInit extension); the per-call timeout budget still bounds the call.
           fetch: ((input, init) => fetch(input, { ...init, ...({ timeout: false } as object) })) as typeof fetch,
           ...(opts?.format ? { format: opts.format } : {}),
         });
@@ -302,14 +301,14 @@ export class ModelRouterService {
   // transport/timeout failures; a returned (parseable-or-not) response is never retried here.
   private async invokeResilient(llm: BaseChatModel, messages: BaseMessage[], config: object, role: string): Promise<string> {
     let lastErr: unknown;
-    for (let attempt = 0; attempt <= LLM_MAX_RETRIES; attempt++) {
+    for (let attempt = 0; attempt <= this.llmMaxRetries; attempt++) {
       try {
-        const result = await this.withTimeout(llm.invoke(messages, config), LLM_TIMEOUT_MS);
+        const result = await this.withTimeout(llm.invoke(messages, config), this.llmTimeoutMs);
         return typeof result.content === 'string' ? result.content : JSON.stringify(result.content);
       } catch (err) {
         lastErr = err;
-        if (attempt < LLM_MAX_RETRIES) {
-          const backoff = LLM_BACKOFF_MS * 2 ** attempt;
+        if (attempt < this.llmMaxRetries) {
+          const backoff = this.llmBackoffMs * 2 ** attempt;
           this.logger.warn('LLM transport error — backing off before retry', { role, attempt, backoff, err });
           await sleep(backoff);
         }
