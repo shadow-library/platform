@@ -7,7 +7,7 @@
 
 /* ---------- brand rail ---------- */
 .brandPanel {
-  flex: 1 1 auto;
+  flex: 1 1 0;
   min-width: 0;
   position: relative;
   overflow: hidden;
@@ -102,19 +102,24 @@
 }
 
 /* ---------- form column ---------- */
+/* Mirrors the brand rail (both flex: 1 1 0 → a 50/50 split); the form content is centered within
+   its half and capped at --form-width so the card breathes instead of stretching the full panel. */
 .formCol {
-  flex: none;
-  width: 474px;
-  max-width: 100%;
+  flex: 1 1 0;
+  min-width: 0;
   box-sizing: border-box;
   background: var(--sh-surface-app);
   min-height: 100vh;
   display: flex;
   flex-direction: column;
+  align-items: center;
   padding: 30px 40px 22px;
+  --form-width: 460px;
 }
 
 .brandMark {
+  width: 100%;
+  max-width: var(--form-width);
   display: flex;
   align-items: center;
   gap: 9px;
@@ -133,6 +138,8 @@
 }
 
 .formMain {
+  width: 100%;
+  max-width: var(--form-width);
   flex: 1 1 auto;
   display: flex;
   flex-direction: column;
@@ -142,6 +149,8 @@
 }
 
 .formFoot {
+  width: 100%;
+  max-width: var(--form-width);
   display: flex;
   flex-direction: column;
   gap: 10px;
@@ -166,7 +175,7 @@
   border: 1px solid var(--sh-border-subtle);
   border-radius: 20px;
   box-shadow: var(--sh-shadow-e1);
-  padding: 26px 22px;
+  padding: 30px 28px;
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -207,9 +216,8 @@
   .brandPanel {
     display: none;
   }
+  /* Brand rail gone → the form column already spans full width; just tighten the gutters. */
   .formCol {
-    width: 100%;
-    margin: 0 auto;
-    max-width: 520px;
+    padding: 28px 24px;
   }
 }
