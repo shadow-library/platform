@@ -39,6 +39,9 @@ function LoginPage(): React.JSX.Element {
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
   const [otp, setOtp] = useState('');
+  const [resetCurrent, setResetCurrent] = useState('');
+  const [resetNew, setResetNew] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
   const [resendIn, setResendIn] = useState(0);
   const resendTimer = useRef<ReturnType<typeof setInterval>>(undefined);
 
@@ -271,21 +274,50 @@ function LoginPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- admin-forced reset ---------- */
+  /* ---------- admin-forced reset (inline current + new password) ---------- */
 
-  if (status === 'PASSWORD_RESET_REQUIRED')
+  if (status === 'AWAITING_PASSWORD_RESET') {
+    const submitPasswordReset = (): void => {
+      if (!resetCurrent) return setError('Enter your current password.');
+      if (resetNew.length < 8) return setError('Choose a longer password.');
+      if (resetNew !== resetConfirm) return setError('New passwords don’t match.');
+      void advance(() => authApi.loginResetPassword(flow.flowId, resetCurrent, resetNew));
+    };
     return (
       <AuthScreen footer={footer}>
         <AuthCard>
-          <StepHeader title="Reset required" description="An administrator asked you to set a new password before signing in." align="center" />
-          <Button variant="primary" fullWidth asChild>
-            <Link to="/recover" search={{ identifier: identifier.trim() || undefined }}>
-              Reset your password
-            </Link>
+          <StepHeader
+            title="Set a new password"
+            description="An administrator requires a new password before you continue. Confirm your current password, then choose a new one."
+          />
+          {error && (
+            <Alert intent="danger" title="Check your password">
+              {error}
+            </Alert>
+          )}
+          <FormField label="Current password">
+            <Input type="password" revealable autoComplete="current-password" value={resetCurrent} onValueChange={setResetCurrent} autoFocus />
+          </FormField>
+          <FormField label="New password">
+            <Input type="password" revealable autoComplete="new-password" value={resetNew} onValueChange={setResetNew} />
+          </FormField>
+          <FormField label="Confirm new password">
+            <Input
+              type="password"
+              revealable
+              autoComplete="new-password"
+              value={resetConfirm}
+              onValueChange={setResetConfirm}
+              onKeyDown={event => event.key === 'Enter' && submitPasswordReset()}
+            />
+          </FormField>
+          <Button variant="primary" fullWidth loading={busy} onClick={submitPasswordReset}>
+            Update password and sign in
           </Button>
         </AuthCard>
       </AuthScreen>
     );
+  }
 
   /* ---------- password (default first factor) ---------- */
 

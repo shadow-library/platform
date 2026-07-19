@@ -101,6 +101,10 @@ const recoverResetFn = createServerFn({ method: 'POST' })
   .validator((body: { flowId: string; newPassword: string }) => body)
   .handler(({ data }) => serverFetch<FlowState>({ method: 'POST', path: '/auth/recover/reset', body: data, modeled: [401] }));
 
+const loginResetPasswordFn = createServerFn({ method: 'POST' })
+  .validator((body: { flowId: string; currentPassword: string; newPassword: string }) => body)
+  .handler(({ data }) => serverFetch<FlowState>({ method: 'POST', path: '/auth/login/reset-password', body: data, modeled: [401] }));
+
 const challengeVerifyFn = createServerFn({ method: 'POST' })
   .validator((body: { flowId: string } & ChallengeProof) => body)
   .handler(({ data }) => serverFetch<FlowState>({ method: 'POST', path: '/auth/challenge/verify', body: data, modeled: [401] }));
@@ -180,6 +184,11 @@ export const authApi = {
 
   recoverReset(flowId: string, newPassword: string): Promise<FlowState> {
     return call(recoverResetFn({ data: { flowId, newPassword } }));
+  },
+
+  /** Rotates an admin-forced credential inline during sign-in — 401 carries the typed retry state. */
+  loginResetPassword(flowId: string, currentPassword: string, newPassword: string): Promise<FlowState> {
+    return call(loginResetPasswordFn({ data: { flowId, currentPassword, newPassword } }));
   },
 
   /** Password, OTP code, recovery code, or WebAuthn assertion — 401 carries the typed retry state. */
