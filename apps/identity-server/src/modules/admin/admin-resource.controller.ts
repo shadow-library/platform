@@ -1,17 +1,16 @@
 /**
  * Importing npm packages
  */
-import { type FastifyRequest } from 'fastify';
-import { Body, Get, HttpController, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { ApplicationService } from '@server/modules/system/application';
 
-import { AdminAccessService } from './admin-access.service';
 import { CreatedResponse, CreateResourceBody, CreateScopeBody, ResourceIdParams, ResourceListResponse } from './admin-client.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
 
@@ -26,16 +25,15 @@ import { ADMIN_PERMISSIONS } from './admin.constants';
 @HttpController('/api/v1/admin/resources')
 export class AdminResourceController {
   constructor(
-    private readonly access: AdminAccessService,
     private readonly clientService: OAuthClientService,
     private readonly applicationService: ApplicationService,
     private readonly auditService: AuditService,
   ) {}
 
   @Get()
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsRead })
   @RespondFor(200, ResourceListResponse)
-  async list(@Req() request: FastifyRequest): Promise<ResourceListResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.clientsRead);
+  async listResources(): Promise<ResourceListResponse> {
     const resources = await this.clientService.listResources();
     return {
       items: resources.map(resource => ({
@@ -49,9 +47,10 @@ export class AdminResourceController {
   }
 
   @Post()
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @RespondFor(201, CreatedResponse)
-  async create(@Body() body: CreateResourceBody, @Req() request: FastifyRequest): Promise<CreatedResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async createResource(@Body() body: CreateResourceBody): Promise<CreatedResponse> {
+    const actor = Context.getActor();
     this.applicationService.getApplicationByIdOrThrow(body.applicationId);
     const resource = await this.clientService.ensureResource(body.applicationId, body.identifier, body.displayName);
     await this.auditService.record({
@@ -66,9 +65,10 @@ export class AdminResourceController {
   }
 
   @Post('/:resourceId/scopes')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @RespondFor(201, CreatedResponse)
-  async createScope(@Params() params: ResourceIdParams, @Body() body: CreateScopeBody, @Req() request: FastifyRequest): Promise<CreatedResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async createResourceScope(@Params() params: ResourceIdParams, @Body() body: CreateScopeBody): Promise<CreatedResponse> {
+    const actor = Context.getActor();
     const scopeId = await this.clientService.createScope(params.resourceId, body.name, body.description, body.isSensitive);
     await this.auditService.record({
       action: 'admin.scope.created',

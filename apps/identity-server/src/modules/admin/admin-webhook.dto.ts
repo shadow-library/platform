@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -20,17 +21,20 @@ type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 @Schema()
 export class WebhookIdParams {
-  @Field({ pattern: '^\\d+$' })
-  webhookId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  webhookId: bigint;
 }
 
 @Schema()
 export class WebhookDeliveryParams {
-  @Field({ pattern: '^\\d+$' })
-  webhookId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  webhookId: bigint;
 
-  @Field({ pattern: '^\\d+$' })
-  deliveryId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  deliveryId: bigint;
 }
 
 @Schema()

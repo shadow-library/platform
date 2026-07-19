@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -23,8 +24,9 @@ const SUBDOMAIN_PATTERN = '^[a-z0-9][a-z0-9-]{0,62}$';
 
 @Schema()
 export class ApplicationIdParams {
-  @Field({ pattern: '^\\d+$' })
-  applicationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('int:parse')
+  applicationId: number;
 }
 
 @Schema()
@@ -149,11 +151,13 @@ export class CreateApplicationResponse {
 
 @Schema()
 export class ApplicationMemberParams {
-  @Field({ pattern: '^\\d+$' })
-  applicationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('int:parse')
+  applicationId: number;
 
-  @Field({ pattern: '^\\d+$' })
-  userId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  userId: bigint;
 }
 
 @Schema()

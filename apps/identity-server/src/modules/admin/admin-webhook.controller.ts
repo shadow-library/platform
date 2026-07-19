@@ -1,17 +1,17 @@
 /**
  * Importing npm packages
  */
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { Auth, Context } from '@server/modules/access';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { WebhookDelivery, WebhookSubscription } from '@server/modules/infrastructure/datastore';
 import { WebhookDeliveryService, WebhookService } from '@server/modules/infrastructure/webhook';
 
-import { AdminAccessService, AdminActor } from './admin-access.service';
+import { AdminActor } from './admin-access.service';
 import { AdminActionResponse } from './admin-user.dto';
 import {
   CreatedWebhookResponse,
@@ -42,7 +42,6 @@ import { ADMIN_PERMISSIONS } from './admin.constants';
 @HttpController('/api/v1/admin/webhooks')
 export class AdminWebhookController {
   constructor(
-    private readonly access: AdminAccessService,
     private readonly webhookService: WebhookService,
     private readonly webhookDeliveryService: WebhookDeliveryService,
     private readonly auditService: AuditService,
@@ -86,73 +85,78 @@ export class AdminWebhookController {
   }
 
   @Get()
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage })
   @RespondFor(200, WebhookListResponse)
-  async list(@Req() request: FastifyRequest): Promise<WebhookListResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.webhooksManage);
+  async listWebhooks(): Promise<WebhookListResponse> {
     const subscriptions = await this.webhookService.list();
     return { items: subscriptions.map(subscription => this.toItem(subscription)) };
   }
 
   @Post()
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage, elevated: true })
   @RespondFor(201, CreatedWebhookResponse)
-  async create(@Body() body: CreateWebhookBody, @Req() request: FastifyRequest): Promise<CreatedWebhookResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.webhooksManage);
+  async createWebhook(@Body() body: CreateWebhookBody): Promise<CreatedWebhookResponse> {
+    const actor = Context.getActor();
     const { subscription, secret } = await this.webhookService.create({ name: body.name, targetUrl: body.targetUrl, eventTypes: body.eventTypes });
     await this.record(actor, 'webhook.created', subscription.id.toString(), { targetUrl: body.targetUrl });
     return { webhook: this.toItem(subscription), secret };
   }
 
   @Get('/:webhookId')
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage })
   @RespondFor(200, WebhookItem)
-  async get(@Params() params: WebhookIdParams, @Req() request: FastifyRequest): Promise<WebhookItem> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.webhooksManage);
-    return this.toItem(await this.webhookService.getById(BigInt(params.webhookId)));
+  async getWebhook(@Params() params: WebhookIdParams): Promise<WebhookItem> {
+    return this.toItem(await this.webhookService.getById(params.webhookId));
   }
 
   @Patch('/:webhookId')
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage, elevated: true })
   @RespondFor(200, WebhookItem)
-  async update(@Params() params: WebhookIdParams, @Body() body: UpdateWebhookBody, @Req() request: FastifyRequest): Promise<WebhookItem> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.webhooksManage);
-    const subscription = await this.webhookService.update(BigInt(params.webhookId), body);
-    await this.record(actor, 'webhook.updated', params.webhookId);
+  async updateWebhook(@Params() params: WebhookIdParams, @Body() body: UpdateWebhookBody): Promise<WebhookItem> {
+    const actor = Context.getActor();
+    const subscription = await this.webhookService.update(params.webhookId, body);
+    await this.record(actor, 'webhook.updated', params.webhookId.toString());
     return this.toItem(subscription);
   }
 
   @Post('/:webhookId/rotate-secret')
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, RotatedWebhookSecretResponse)
-  async rotateSecret(@Params() params: WebhookIdParams, @Req() request: FastifyRequest): Promise<RotatedWebhookSecretResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.webhooksManage);
-    const { secret } = await this.webhookService.rotateSecret(BigInt(params.webhookId));
-    await this.record(actor, 'webhook.secret_rotated', params.webhookId);
+  async rotateWebhookSecret(@Params() params: WebhookIdParams): Promise<RotatedWebhookSecretResponse> {
+    const actor = Context.getActor();
+    const { secret } = await this.webhookService.rotateSecret(params.webhookId);
+    await this.record(actor, 'webhook.secret_rotated', params.webhookId.toString());
     return { secret };
   }
 
   @Delete('/:webhookId')
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async remove(@Params() params: WebhookIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.webhooksManage);
-    await this.webhookService.remove(BigInt(params.webhookId));
-    await this.record(actor, 'webhook.deleted', params.webhookId);
+  async deleteWebhook(@Params() params: WebhookIdParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
+    await this.webhookService.remove(params.webhookId);
+    await this.record(actor, 'webhook.deleted', params.webhookId.toString());
     return { success: true };
   }
 
   @Get('/:webhookId/deliveries')
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage })
   @RespondFor(200, WebhookDeliveriesResponse)
-  async deliveries(@Params() params: WebhookIdParams, @Query() query: WebhookDeliveriesQuery, @Req() request: FastifyRequest): Promise<WebhookDeliveriesResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.webhooksManage);
-    await this.webhookService.getById(BigInt(params.webhookId));
-    const deliveries = await this.webhookDeliveryService.listForSubscription(BigInt(params.webhookId), query.status);
+  async listWebhookDeliveries(@Params() params: WebhookIdParams, @Query() query: WebhookDeliveriesQuery): Promise<WebhookDeliveriesResponse> {
+    await this.webhookService.getById(params.webhookId);
+    const deliveries = await this.webhookDeliveryService.listForSubscription(params.webhookId, query.status);
     return { items: deliveries.map(delivery => this.toDeliveryItem(delivery)) };
   }
 
   @Post('/:webhookId/deliveries/:deliveryId/redeliver')
+  @Auth({ permission: ADMIN_PERMISSIONS.webhooksManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async redeliver(@Params() params: WebhookDeliveryParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.webhooksManage);
-    await this.webhookDeliveryService.redeliver(BigInt(params.webhookId), BigInt(params.deliveryId));
-    await this.record(actor, 'webhook.redelivery_requested', params.webhookId, { deliveryId: params.deliveryId });
+  async redeliverWebhookDelivery(@Params() params: WebhookDeliveryParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
+    await this.webhookDeliveryService.redeliver(params.webhookId, params.deliveryId);
+    await this.record(actor, 'webhook.redelivery_requested', params.webhookId.toString(), { deliveryId: params.deliveryId.toString() });
     return { success: true };
   }
 }

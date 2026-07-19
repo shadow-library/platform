@@ -2,20 +2,20 @@
  * Importing npm packages
  */
 
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, Params, Patch, Post, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Application } from '@server/modules/infrastructure/datastore';
 import { ApplicationDetails, ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
 
-import { AdminAccessService, AdminActor } from './admin-access.service';
+import { AdminActor } from './admin-access.service';
 import {
   ApplicationDetailResponse,
   ApplicationIdParams,
@@ -58,7 +58,6 @@ const OAUTH_CALLBACK_PATH = '/api/auth/callback';
 @HttpController('/api/v1/admin/applications')
 export class AdminApplicationController {
   constructor(
-    private readonly access: AdminAccessService,
     private readonly applicationService: ApplicationService,
     private readonly memberService: ApplicationMemberService,
     private readonly clientService: OAuthClientService,
@@ -101,16 +100,17 @@ export class AdminApplicationController {
   }
 
   @Get()
+  @Auth({ permission: ADMIN_PERMISSIONS.appsRead })
   @RespondFor(200, ApplicationListResponse)
-  async list(@Req() request: FastifyRequest): Promise<ApplicationListResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.appsRead);
+  listApplications(): ApplicationListResponse {
     return { items: this.applicationService.listApplications().map(application => this.toSummary(application)) };
   }
 
   @Post()
+  @Auth({ permission: ADMIN_PERMISSIONS.appsManage, elevated: true })
   @RespondFor(201, CreateApplicationResponse)
-  async create(@Body() body: CreateApplicationBody, @Req() request: FastifyRequest): Promise<CreateApplicationResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
+  async createApplication(@Body() body: CreateApplicationBody): Promise<CreateApplicationResponse> {
+    const actor = Context.getActor();
     /** Fail fast on a name collision; the unique constraint is the race-safe backstop. */
     if (this.applicationService.getApplication(body.name)) throw AppErrorCode.APP_002.create();
     const application = await this.applicationService.createApplication({
@@ -128,18 +128,19 @@ export class AdminApplicationController {
   }
 
   @Get('/:applicationId')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsRead })
   @RespondFor(200, ApplicationDetailResponse)
-  async detail(@Params() params: ApplicationIdParams, @Req() request: FastifyRequest): Promise<ApplicationDetailResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.appsRead);
-    const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
+  getApplicationDetails(@Params() params: ApplicationIdParams): ApplicationDetailResponse {
+    const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     return this.toDetail(application);
   }
 
   @Patch('/:applicationId')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async update(@Params() params: ApplicationIdParams, @Body() body: UpdateApplicationBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
-    const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
+  async updateApplication(@Params() params: ApplicationIdParams, @Body() body: UpdateApplicationBody): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
+    const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     if (application.name === APP_NAME && body.isActive === false) throw AppErrorCode.APP_004.create();
 
     const update: ApplicationUpdate = {};
@@ -177,10 +178,11 @@ export class AdminApplicationController {
   }
 
   @Delete('/:applicationId')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async remove(@Params() params: ApplicationIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
-    const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
+  async deleteApplication(@Params() params: ApplicationIdParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
+    const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     if (application.name === APP_NAME) throw AppErrorCode.APP_004.create();
 
     /** Clients FK-restrict the delete; resources, roles, permissions and keys cascade away with it. */
@@ -193,10 +195,10 @@ export class AdminApplicationController {
   }
 
   @Get('/:applicationId/members')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsRead })
   @RespondFor(200, ApplicationMemberListResponse)
-  async members(@Params() params: ApplicationIdParams, @Req() request: FastifyRequest): Promise<ApplicationMemberListResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.appsRead);
-    const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
+  async listApplicationMembers(@Params() params: ApplicationIdParams): Promise<ApplicationMemberListResponse> {
+    const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     const rows = await this.memberService.listMembers(application.id);
     return {
       items: rows.map(row => ({
@@ -210,13 +212,14 @@ export class AdminApplicationController {
   }
 
   @Delete('/:applicationId/members/:userId')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async removeMember(@Params() params: ApplicationMemberParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.appsManage);
-    const application = this.applicationService.getApplicationByIdOrThrow(Number(params.applicationId));
+  async removeApplicationMember(@Params() params: ApplicationMemberParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
+    const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     /** Idempotent: removing an absent membership is a no-op, so re-runs converge without a 404 race. */
-    await this.memberService.removeMembership(application.id, BigInt(params.userId));
-    await this.record(actor, 'admin.application.member_removed', String(application.id), { userId: params.userId });
+    await this.memberService.removeMembership(application.id, params.userId);
+    await this.record(actor, 'admin.application.member_removed', String(application.id), { userId: params.userId.toString() });
     return { success: true };
   }
 }

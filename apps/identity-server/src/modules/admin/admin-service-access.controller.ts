@@ -2,19 +2,19 @@
  * Importing npm packages
  */
 
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { Auth, Context } from '@server/modules/access';
 import { ServiceAccessService } from '@server/modules/authz';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { ServiceRouteAccess } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
-import { AdminAccessService, AdminActor } from './admin-access.service';
+import { AdminActor } from './admin-access.service';
 import { CreateServiceAccessBody, ServiceAccessListQuery, ServiceAccessListResponse, ServiceAccessRuleItem, ServiceAccessRuleParams } from './admin-service-access.dto';
 import { AdminActionResponse } from './admin-user.dto';
 import { ADMIN_PERMISSIONS } from './admin.constants';
@@ -34,7 +34,6 @@ import { ADMIN_PERMISSIONS } from './admin.constants';
 @HttpController('/api/v1/admin/service-access')
 export class AdminServiceAccessController {
   constructor(
-    private readonly access: AdminAccessService,
     private readonly serviceAccessService: ServiceAccessService,
     private readonly applicationService: ApplicationService,
     private readonly auditService: AuditService,
@@ -64,17 +63,18 @@ export class AdminServiceAccessController {
   }
 
   @Get()
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsRead })
   @RespondFor(200, ServiceAccessListResponse)
-  async list(@Query() query: ServiceAccessListQuery, @Req() request: FastifyRequest): Promise<ServiceAccessListResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.clientsRead);
+  async listServiceAccessRules(@Query() query: ServiceAccessListQuery): Promise<ServiceAccessListResponse> {
     const rules = await this.serviceAccessService.listForApplication(query.applicationId);
     return { items: rules.map(rule => this.toItem(rule)) };
   }
 
   @Post()
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @RespondFor(201, ServiceAccessRuleItem)
-  async create(@Body() body: CreateServiceAccessBody, @Req() request: FastifyRequest): Promise<ServiceAccessRuleItem> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async createServiceAccessRule(@Body() body: CreateServiceAccessBody): Promise<ServiceAccessRuleItem> {
+    const actor = Context.getActor();
     this.applicationService.getApplicationByIdOrThrow(body.applicationId);
 
     const rule = await this.serviceAccessService.create({
@@ -94,10 +94,11 @@ export class AdminServiceAccessController {
   }
 
   @Delete('/:ruleId')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async remove(@Params() params: ServiceAccessRuleParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async deleteServiceAccessRule(@Params() params: ServiceAccessRuleParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
     const deleted = await this.serviceAccessService.delete(params.ruleId);
     if (!deleted) throw AppErrorCode.ADM_003.create();
     await this.record(actor, 'admin.service-access.deleted', params.ruleId);

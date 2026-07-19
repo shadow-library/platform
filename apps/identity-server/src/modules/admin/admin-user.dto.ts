@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { EnumType, Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 import { Paginated, PaginationQuery } from '@shadow-library/modules';
 
 /**
@@ -23,8 +24,9 @@ const USER_SORT_FIELDS = EnumType.create('UserSortBy', ['createdAt'] as const);
 
 @Schema()
 export class UserIdParams {
-  @Field({ pattern: '^\\d+$' })
-  userId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  userId: bigint;
 }
 
 @Schema()

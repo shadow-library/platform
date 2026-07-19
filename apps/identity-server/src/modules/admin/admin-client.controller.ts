@@ -2,19 +2,19 @@
  * Importing npm packages
  */
 
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
-import { AdminAccessService, AdminActor } from './admin-access.service';
+import { AdminActor } from './admin-access.service';
 import {
   ALLOWED_GRANT_TYPES,
   ClientDetailResponse,
@@ -40,9 +40,9 @@ import { ADMIN_PERMISSIONS } from './admin.constants';
  */
 
 @HttpController('/api/v1/admin/clients')
+@Auth({ permission: ADMIN_PERMISSIONS.clientsRead })
 export class AdminClientController {
   constructor(
-    private readonly access: AdminAccessService,
     private readonly clientService: OAuthClientService,
     private readonly applicationService: ApplicationService,
     private readonly auditService: AuditService,
@@ -68,8 +68,7 @@ export class AdminClientController {
 
   @Get()
   @RespondFor(200, ClientListResponse)
-  async list(@Query() query: ClientListQuery, @Req() request: FastifyRequest): Promise<ClientListResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.clientsRead);
+  async listClients(@Query() query: ClientListQuery): Promise<ClientListResponse> {
     const clients = await this.clientService.listClients(query.applicationId);
     return {
       items: clients.map(client => ({
@@ -84,9 +83,10 @@ export class AdminClientController {
   }
 
   @Post()
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @RespondFor(201, RegisterClientResponse)
-  async register(@Body() body: RegisterClientBody, @Req() request: FastifyRequest): Promise<RegisterClientResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async registerClient(@Body() body: RegisterClientBody): Promise<RegisterClientResponse> {
+    const actor = Context.getActor();
     if (body.grantTypes.some(grant => !ALLOWED_GRANT_TYPES.includes(grant as (typeof ALLOWED_GRANT_TYPES)[number]))) throw AppErrorCode.ADM_003.create();
     this.applicationService.getApplicationByIdOrThrow(body.applicationId);
 
@@ -108,8 +108,7 @@ export class AdminClientController {
 
   @Get('/:clientId')
   @RespondFor(200, ClientDetailResponse)
-  async detail(@Params() params: ClientIdParams, @Req() request: FastifyRequest): Promise<ClientDetailResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.clientsRead);
+  async getClientDetails(@Params() params: ClientIdParams): Promise<ClientDetailResponse> {
     const client = await this.clientService.getClientDetail(params.clientId);
     if (!client) throw AppErrorCode.OAU_002.create();
     return {
@@ -130,9 +129,10 @@ export class AdminClientController {
   }
 
   @Patch('/:clientId')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async update(@Params() params: ClientIdParams, @Body() body: UpdateClientBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async updateClient(@Params() params: ClientIdParams, @Body() body: UpdateClientBody): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
     await this.requireClient(params.clientId);
     await this.clientService.updateClient(params.clientId, {
       name: body.name,
@@ -147,10 +147,11 @@ export class AdminClientController {
   }
 
   @Post('/:clientId/rotate-secret')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, RotateSecretResponse)
-  async rotateSecret(@Params() params: ClientIdParams, @Req() request: FastifyRequest): Promise<RotateSecretResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async rotateClientSecret(@Params() params: ClientIdParams): Promise<RotateSecretResponse> {
+    const actor = Context.getActor();
     const client = await this.requireClient(params.clientId);
     if (client.tokenEndpointAuthMethod === 'none') throw AppErrorCode.ADM_003.create();
     const rotated = await this.clientService.rotateSecretWithOverlap(params.clientId);
@@ -159,10 +160,11 @@ export class AdminClientController {
   }
 
   @Post('/:clientId/scopes')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async grantScope(@Params() params: ClientIdParams, @Body() body: GrantScopeBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async grantClientScope(@Params() params: ClientIdParams, @Body() body: GrantScopeBody): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
     await this.requireClient(params.clientId);
     await this.clientService.grantScope(params.clientId, body.scopeId);
     await this.record(actor, 'admin.client.scope_granted', params.clientId, { scopeId: body.scopeId });
@@ -170,9 +172,10 @@ export class AdminClientController {
   }
 
   @Delete('/:clientId/scopes/:scopeId')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async revokeScope(@Params() params: ClientScopeParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.clientsManage);
+  async revokeClientScope(@Params() params: ClientScopeParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
     await this.requireClient(params.clientId);
     await this.clientService.revokeScope(params.clientId, params.scopeId);
     await this.record(actor, 'admin.client.scope_revoked', params.clientId, { scopeId: params.scopeId });

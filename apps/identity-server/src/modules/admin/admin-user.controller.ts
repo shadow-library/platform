@@ -2,15 +2,14 @@
  * Importing npm packages
  */
 
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { Auth, Context } from '@server/modules/access';
 
-import { AdminAccessService, AdminActor } from './admin-access.service';
 import { AdminActionResponse, LockUserBody, UserAuditEventsResponse, UserDetailResponse, UserIdParams, UserSearchQuery, UserSearchResponse } from './admin-user.dto';
 import { AdminActionContext, AdminUserService } from './admin-user.service';
 import { ADMIN_PERMISSIONS } from './admin.constants';
@@ -24,25 +23,18 @@ import { ADMIN_PERMISSIONS } from './admin.constants';
  */
 
 @HttpController('/api/v1/admin/users')
+@Auth({ permission: ADMIN_PERMISSIONS.usersRead })
 export class AdminUserController {
-  constructor(
-    private readonly access: AdminAccessService,
-    private readonly adminUserService: AdminUserService,
-  ) {}
+  constructor(private readonly adminUserService: AdminUserService) {}
 
-  private parseUserId(params: UserIdParams): bigint {
-    if (!/^\d+$/.test(params.userId)) throw AppErrorCode.USR_001.create();
-    return BigInt(params.userId);
-  }
-
-  private contextOf(actor: AdminActor): AdminActionContext {
+  private actionContext(): AdminActionContext {
+    const actor = Context.getActor();
     return { actorId: actor.session.userId.toString(), organisationId: actor.organisationId };
   }
 
   @Get()
   @RespondFor(200, UserSearchResponse)
-  async search(@Query() query: UserSearchQuery, @Req() request: FastifyRequest): Promise<UserSearchResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.usersRead);
+  async searchUsers(@Query() query: UserSearchQuery): Promise<UserSearchResponse> {
     const result = await this.adminUserService.search({ email: query.email, status: query.status, offset: query.offset, limit: query.limit, sortOrder: query.sortOrder });
     return {
       offset: query.offset,
@@ -61,9 +53,8 @@ export class AdminUserController {
 
   @Get('/:userId')
   @RespondFor(200, UserDetailResponse)
-  async detail(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<UserDetailResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.usersRead);
-    const detail = await this.adminUserService.getDetail(this.parseUserId(params));
+  async getUserDetail(@Params() params: UserIdParams): Promise<UserDetailResponse> {
+    const detail = await this.adminUserService.getDetail(params.userId);
     return {
       id: detail.user.id.toString(),
       username: detail.user.username ?? undefined,
@@ -80,74 +71,74 @@ export class AdminUserController {
   }
 
   @Post('/:userId/lock')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async lock(@Params() params: UserIdParams, @Body() body: LockUserBody, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
+  async lockUser(@Params() params: UserIdParams, @Body() body: LockUserBody): Promise<AdminActionResponse> {
     const until = body.until ? new Date(body.until) : null;
     if (until && Number.isNaN(until.getTime())) throw AppErrorCode.ADM_003.create();
-    await this.adminUserService.lock(this.parseUserId(params), body.mode, until, this.contextOf(actor));
+    await this.adminUserService.lock(params.userId, body.mode, until, this.actionContext());
     return { success: true };
   }
 
   @Post('/:userId/unlock')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async unlock(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
-    await this.adminUserService.unlock(this.parseUserId(params), this.contextOf(actor));
+  async unlockUser(@Params() params: UserIdParams): Promise<AdminActionResponse> {
+    await this.adminUserService.unlock(params.userId, this.actionContext());
     return { success: true };
   }
 
   @Post('/:userId/force-password-reset')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async forcePasswordReset(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
-    await this.adminUserService.forcePasswordReset(this.parseUserId(params), this.contextOf(actor));
+  async forceUserPasswordReset(@Params() params: UserIdParams): Promise<AdminActionResponse> {
+    await this.adminUserService.forcePasswordReset(params.userId, this.actionContext());
     return { success: true };
   }
 
   @Post('/:userId/sessions/terminate')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async terminateSessions(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
-    await this.adminUserService.terminateSessions(this.parseUserId(params), this.contextOf(actor));
+  async terminateUserSessions(@Params() params: UserIdParams): Promise<AdminActionResponse> {
+    await this.adminUserService.terminateSessions(params.userId, this.actionContext());
     return { success: true };
   }
 
   @Post('/:userId/deactivate')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async deactivate(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
-    await this.adminUserService.setStatus(this.parseUserId(params), 'DISABLED', this.contextOf(actor));
+  async deactivateUser(@Params() params: UserIdParams): Promise<AdminActionResponse> {
+    await this.adminUserService.setStatus(params.userId, 'DISABLED', this.actionContext());
     return { success: true };
   }
 
   @Post('/:userId/reactivate')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
   @RespondFor(200, AdminActionResponse)
-  async reactivate(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
-    await this.adminUserService.setStatus(this.parseUserId(params), 'ACTIVE', this.contextOf(actor));
+  async reactivateUser(@Params() params: UserIdParams): Promise<AdminActionResponse> {
+    await this.adminUserService.setStatus(params.userId, 'ACTIVE', this.actionContext());
     return { success: true };
   }
 
   @Delete('/:userId')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @RespondFor(200, AdminActionResponse)
-  async softDelete(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<AdminActionResponse> {
-    const actor = await this.access.requireMutation(request, ADMIN_PERMISSIONS.usersManage);
-    await this.adminUserService.softDelete(this.parseUserId(params), this.contextOf(actor));
+  async deleteUser(@Params() params: UserIdParams): Promise<AdminActionResponse> {
+    await this.adminUserService.softDelete(params.userId, this.actionContext());
     return { success: true };
   }
 
   @Get('/:userId/audit')
+  @Auth({ permission: ADMIN_PERMISSIONS.auditRead })
   @RespondFor(200, UserAuditEventsResponse)
-  async auditTrail(@Params() params: UserIdParams, @Req() request: FastifyRequest): Promise<UserAuditEventsResponse> {
-    await this.access.requireRead(request, ADMIN_PERMISSIONS.auditRead);
-    const events = await this.adminUserService.listAuditEvents(this.parseUserId(params));
+  async getUserAuditTrail(@Params() params: UserIdParams): Promise<UserAuditEventsResponse> {
+    const events = await this.adminUserService.listAuditEvents(params.userId);
     return {
       events: events.map(event => ({
         id: event.id,
