@@ -41,6 +41,9 @@ export interface CustomAPIRequest {
 
 export class APIRequest {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');
+  private static readonly SERVICE_SCHEME = 'svc://';
+  /** DNS labels separated by dots, so a service may be a bare name (`pulse-server`) or an already-qualified host (`pulse-server.prod`). */
+  private static readonly SERVICE_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
 
   private constructor(private readonly options: APIRequestOptions = {}) {
     if (typeof options.throwErrorOnFailure === 'undefined') options.throwErrorOnFailure = true;
@@ -64,6 +67,32 @@ export class APIRequest {
 
   static delete(url: string): APIRequest {
     return new this({ path: url, method: 'DELETE' });
+  }
+
+  /**
+   * Resolves a `svc://<service>/<path>` URL for internal service-to-service calls; every other URL
+   * is returned untouched. In Kubernetes a Service is reachable by its own name via cluster DNS, so
+   * the service name is the host and the cluster decides where it resolves — a dotted host such as
+   * `pulse-server.<namespace>` targets another namespace. `SERVICE_URL_<NAME>` points a service at a
+   * full URL for local dev or out-of-cluster targets, and `SERVICE_DISCOVERY_SCHEME` overrides `http`.
+   */
+  private static resolveServiceUrl(url: string): string {
+    if (!url.startsWith(APIRequest.SERVICE_SCHEME)) return url;
+
+    const rest = url.slice(APIRequest.SERVICE_SCHEME.length);
+    const separator = rest.indexOf('/');
+    const service = separator === -1 ? rest : rest.slice(0, separator);
+    const path = separator === -1 ? '' : rest.slice(separator);
+    if (!APIRequest.SERVICE_NAME_PATTERN.test(service)) throw ErrorCode.SERVICE_UNKNOWN.create({ reason: `'${service}' is not a valid service name` });
+
+    const override = process.env[`SERVICE_URL_${service.toUpperCase().replace(/[-.]/g, '_')}`];
+    if (override) {
+      if (!URL.canParse(override)) throw ErrorCode.SERVICE_UNKNOWN.create({ reason: `service url override for '${service}' is not a valid url` });
+      return `${override.replace(/\/+$/, '')}${path}`;
+    }
+
+    const scheme = process.env['SERVICE_DISCOVERY_SCHEME'] ?? 'http';
+    return `${scheme}://${service}${path}`;
   }
 
   child(): CustomAPIRequest {
@@ -123,7 +152,7 @@ export class APIRequest {
     const { baseURL = '', throwErrorOnFailure, data, path, ...requestOptions } = this.options;
 
     const query = this.options.query ? `?${qs.stringify(this.options.query)}` : '';
-    const url = baseURL + path;
+    const url = APIRequest.resolveServiceUrl(baseURL + path);
     const uri = url + query;
     if (data) {
       if (!requestOptions.headers) requestOptions.headers = {};

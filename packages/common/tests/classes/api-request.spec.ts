@@ -85,4 +85,43 @@ describe('APIRequest', () => {
     const childInstance = new Child();
     expect(childInstance).toBeInstanceOf(APIRequest);
   });
+
+  describe('svc:// service resolution', () => {
+    const SERVICE_ENV = ['SERVICE_URL_PULSE_SERVER', 'SERVICE_DISCOVERY_SCHEME'];
+    beforeEach(() => {
+      SERVICE_ENV.forEach(key => delete process.env[key]);
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
+    });
+
+    it('should resolve a svc:// url to in-cluster service DNS by default', async () => {
+      await APIRequest.get('svc://pulse-server/api/v1/notifications');
+      expect(mockRequest).toHaveBeenCalledWith('http://pulse-server/api/v1/notifications', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should honour a SERVICE_URL_<NAME> override and its trailing slash', async () => {
+      process.env['SERVICE_URL_PULSE_SERVER'] = 'https://localhost:3000/';
+      await APIRequest.post('svc://pulse-server/api/v1/notifications');
+      expect(mockRequest).toHaveBeenCalledWith('https://localhost:3000/api/v1/notifications', expect.objectContaining({ method: 'POST' }));
+    });
+
+    it('should apply SERVICE_DISCOVERY_SCHEME to the in-cluster default', async () => {
+      process.env['SERVICE_DISCOVERY_SCHEME'] = 'https';
+      await APIRequest.get('svc://pulse-server/health');
+      expect(mockRequest).toHaveBeenCalledWith('https://pulse-server/health', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should accept a dotted service host for a cross-namespace target', async () => {
+      await APIRequest.get('svc://pulse-server.prod/health');
+      expect(mockRequest).toHaveBeenCalledWith('http://pulse-server.prod/health', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should leave an absolute url untouched', async () => {
+      await APIRequest.get('https://api.pwnedpasswords.com/range/ABCDE');
+      expect(mockRequest).toHaveBeenCalledWith('https://api.pwnedpasswords.com/range/ABCDE', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should reject an invalid service name', async () => {
+      await expect(APIRequest.get('svc://Bad_Name/x').execute()).rejects.toBeInstanceOf(AppError);
+    });
+  });
 });
