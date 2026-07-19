@@ -8,8 +8,22 @@ import { Avatar, DropdownMenu, IconButton, Spinner, useTheme } from '@shadow-lib
 /**
  * Importing user defined packages
  */
-import { BellIcon, BuildingIcon, ChevronDownIcon, GridIcon, LogOutIcon, MailIcon, MonitorIcon, MoonIcon, PlugIcon, ShieldCheckIcon, SunIcon, UserIcon } from '@/components/icons';
-import { type MeResponse, useMeQuery, useSignoutMutation } from '@/lib/apis';
+import {
+  BellIcon,
+  BuildingIcon,
+  ChevronDownIcon,
+  GridIcon,
+  LogOutIcon,
+  MailIcon,
+  MonitorIcon,
+  MoonIcon,
+  PlugIcon,
+  ShieldCheckIcon,
+  SunIcon,
+  TerminalIcon,
+  UserIcon,
+} from '@/components/icons';
+import { type MeResponse, useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 import styles from './portal-shell.module.css';
@@ -38,6 +52,9 @@ const ACCOUNT_NAV: NavItem[] = [
 ];
 
 const ORG_NAV: NavItem[] = [{ to: '/organizations', label: 'My organizations', icon: <BuildingIcon size={18} /> }];
+
+/** Revealed only to platform staff (an admin whose /admin/context grants any permission). */
+const PLATFORM_NAV: NavItem[] = [{ to: '/console', label: 'Admin console', icon: <TerminalIcon size={18} /> }];
 
 /** The account/portal brand glyph. */
 function BrandGlyph(): React.JSX.Element {
@@ -80,6 +97,7 @@ function UserMenu({ me, children }: { me: MeResponse; children: ReactNode }): Re
  */
 export function PortalShell({ children }: { children: ReactNode }): React.JSX.Element {
   const me = useMeQuery();
+  const adminContext = useAdminContextQuery();
   const navigate = useNavigate();
   const { pathname } = useLocation();
 
@@ -95,6 +113,7 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
     );
 
   const user = me.data;
+  const isStaff = (adminContext.data?.permissions.length ?? 0) > 0;
   const elevated = user.aal === 'AAL2' || user.elevated;
   const activeLabel = [...ACCOUNT_NAV, ...ORG_NAV].find(item => (item.exact ? pathname === item.to : pathname.startsWith(item.to)))?.label ?? 'Account';
 
@@ -119,6 +138,12 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
           {ACCOUNT_NAV.map(renderNav)}
           <div className={styles.navLabel}>Organizations</div>
           {ORG_NAV.map(renderNav)}
+          {isStaff && (
+            <>
+              <div className={styles.navLabel}>Platform</div>
+              {PLATFORM_NAV.map(renderNav)}
+            </>
+          )}
         </nav>
         <UserMenu me={user}>
           <button type="button" className={styles.userRow}>
