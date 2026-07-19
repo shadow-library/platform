@@ -34,6 +34,6 @@ export class JobsController {
   async getJob(@Params() params: JobIdParams): Promise<JobResponse> {
     const job = await this.jobService.get(params.jobId);
     if (!job) throw AppErrorCode.JOB_001.create();
-    return job as unknown as JobResponse;
+    return job;
   }
 }

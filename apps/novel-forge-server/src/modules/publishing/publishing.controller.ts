@@ -50,7 +50,7 @@ export class PublishingController {
   async publishNovel(@Params() params: PublishingProjectParams, @Body() body: PublishNovelBody): Promise<PublicationResponse> {
     const publication = await this.publishingService.publishNovel(params.projectId, body);
     await this.enqueuePublish(params.projectId);
-    return publication as unknown as PublicationResponse;
+    return publication;
   }
 
   @Post('/chapters/:chapter/publish')
@@ -61,7 +61,7 @@ export class PublishingController {
     // A future-dated schedule stays with the janitor sweep; an immediate publish pushes right away.
     const due = !row.scheduledAt || row.scheduledAt.getTime() <= Date.now();
     if (due) await this.enqueuePublish(params.projectId);
-    return row as unknown as ChapterPublicationResponse;
+    return row;
   }
 
   @Delete('/chapters/:chapter/publish')
@@ -70,23 +70,23 @@ export class PublishingController {
   async unpublishChapter(@Params() params: PublishingChapterParams): Promise<ChapterPublicationResponse> {
     const row = await this.publishingService.unpublishChapter(params.projectId, params.chapter);
     await this.enqueuePublish(params.projectId);
-    return row as unknown as ChapterPublicationResponse;
+    return row;
   }
 
   @Get('/publications')
   @RespondFor(200, PublicationsLedgerResponse)
   async listPublications(@Params() params: PublishingProjectParams): Promise<PublicationsLedgerResponse> {
     const ledger = await this.publishingService.listPublications(params.projectId);
-    return { publication: (ledger.publication ?? undefined) as unknown as PublicationResponse, chapters: ledger.chapters as unknown as ChapterPublicationResponse[] };
+    return { publication: ledger.publication ?? undefined, chapters: ledger.chapters };
   }
 
   // Synchronous by design: the manifest diff is bounded and the UI's reconcile button wants the
   // outcome, not a job id. A reader outage surfaces as PUB_004 with the per-row errors ledgered.
   @Post('/publications/reconcile')
   @RespondFor(200, ReconcileResponse)
-  async reconcile(@Params() params: PublishingProjectParams): Promise<ReconcileResponse> {
+  async reconcilePublications(@Params() params: PublishingProjectParams): Promise<ReconcileResponse> {
     const result = await this.publishRunner.converge(params.projectId, { reconcile: true });
-    return result as unknown as ReconcileResponse;
+    return result;
   }
 
   // Without M2M credentials every push is a guaranteed failure, so the immediate enqueue is skipped;

@@ -29,7 +29,7 @@ export class PlanImportController {
 
   @Post('/import')
   @RespondFor(200, ImportPlanResponse)
-  import(@Params() params: PlanImportParams, @Body() body: ImportPlanBody): Promise<ImportPlanResponse> {
+  importPlan(@Params() params: PlanImportParams, @Body() body: ImportPlanBody): Promise<ImportPlanResponse> {
     return this.planImportService.import(params.projectId, body);
   }
 }

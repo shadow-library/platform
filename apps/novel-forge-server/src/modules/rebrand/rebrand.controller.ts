@@ -49,7 +49,7 @@ export class RebrandController {
   @Put('/config')
   @RespondFor(200, RebrandResponse)
   updateConfig(@Params() params: RebrandParams, @Body() body: RebrandConfigBody): Promise<RebrandResponse> {
-    return this.rebrandService.updateConfig(params.projectId, body) as unknown as Promise<RebrandResponse>;
+    return this.rebrandService.updateConfig(params.projectId, body);
   }
 
   @Post()
@@ -67,30 +67,30 @@ export class RebrandController {
 
   @Get()
   @RespondFor(200, RebrandStatusResponse)
-  async status(@Params() params: RebrandParams): Promise<RebrandStatusResponse> {
+  async getRebrandStatus(@Params() params: RebrandParams): Promise<RebrandStatusResponse> {
     const [status, jobs] = await Promise.all([this.rebrandService.status(params.projectId), this.jobService.listByProject(params.projectId)]);
     const job = jobs.find(j => j.kind === 'rebrand') ?? null;
-    return { ...status, job } as unknown as RebrandStatusResponse;
+    return { ...status, job };
   }
 
   @Get('/glossary')
   @RespondFor(200, GlossaryListResponse)
-  async glossary(@Params() params: RebrandParams, @Query() query: GlossaryListQuery): Promise<GlossaryListResponse> {
+  async getGlossary(@Params() params: RebrandParams, @Query() query: GlossaryListQuery): Promise<GlossaryListResponse> {
     const items = await this.rebrandService.listGlossary(params.projectId, query);
-    return { items } as unknown as GlossaryListResponse;
+    return { items };
   }
 
   @Get('/chapters')
   @RespondFor(200, ListConversionsResponse)
   async listConversions(@Params() params: RebrandParams): Promise<ListConversionsResponse> {
     const items = await this.rebrandService.listConversions(params.projectId);
-    return { items } as unknown as ListConversionsResponse;
+    return { items };
   }
 
   @Get('/chapters/:chapter')
   @RespondFor(200, ConversionResponse)
   getConversion(@Params() params: RebrandChapterParams): Promise<ConversionResponse> {
-    return this.rebrandService.getConversion(params.projectId, params.chapter) as unknown as Promise<ConversionResponse>;
+    return this.rebrandService.getConversion(params.projectId, params.chapter);
   }
 
   @Post('/chapters/:chapter')
@@ -109,7 +109,7 @@ export class RebrandController {
 
   @Get('/manuscript')
   @RespondFor(200, ManuscriptResponse)
-  async manuscript(@Params() params: RebrandParams): Promise<ManuscriptResponse> {
+  async getRebrandManuscript(@Params() params: RebrandParams): Promise<ManuscriptResponse> {
     const markdown = await this.rebrandService.renderManuscript(params.projectId);
     return { markdown };
   }

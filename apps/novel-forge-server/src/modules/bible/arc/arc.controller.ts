@@ -31,7 +31,7 @@ export class ArcController {
   @RespondFor(200, ListArcResponse)
   async listArcs(@Params() params: VolumeArcsParams): Promise<ListArcResponse> {
     const arcs = await this.arcService.list(params.projectId, params.volumeKey);
-    return { arcs } as unknown as ListArcResponse;
+    return { arcs };
   }
 
   @Post('/volumes/:volumeKey/arcs/approve')
@@ -43,12 +43,12 @@ export class ArcController {
   @Get('/arcs/:arcKey')
   @RespondFor(200, ArcResponse)
   getArc(@Params() params: ArcKeyParams): Promise<ArcResponse> {
-    return this.arcService.get(params.projectId, params.arcKey) as unknown as Promise<ArcResponse>;
+    return this.arcService.get(params.projectId, params.arcKey);
   }
 
   @Put('/arcs/:arcKey')
   @RespondFor(200, ArcResponse)
   upsertArc(@Params() params: ArcKeyParams, @Body() body: UpsertArcBody): Promise<ArcResponse> {
-    return this.arcService.upsert(params.projectId, params.arcKey, body) as unknown as Promise<ArcResponse>;
+    return this.arcService.upsert(params.projectId, params.arcKey, body);
   }
 }

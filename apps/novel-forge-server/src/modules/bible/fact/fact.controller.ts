@@ -31,19 +31,19 @@ export class FactController {
   @RespondFor(200, ListFactsResponse)
   async listFacts(@Params() params: FactProjectParams): Promise<ListFactsResponse> {
     const facts = await this.factService.list(params.projectId);
-    return { facts } as unknown as ListFactsResponse;
+    return { facts };
   }
 
   @Get('/:factKey')
   @RespondFor(200, FactResponse)
   getFact(@Params() params: FactKeyParams): Promise<FactResponse> {
-    return this.factService.get(params.projectId, params.factKey) as unknown as Promise<FactResponse>;
+    return this.factService.get(params.projectId, params.factKey);
   }
 
   @Put('/:factKey')
   @RespondFor(200, FactResponse)
   upsertFact(@Params() params: FactKeyParams, @Body() body: UpsertFactBody): Promise<FactResponse> {
-    return this.factService.upsert(params.projectId, params.factKey, body) as unknown as Promise<FactResponse>;
+    return this.factService.upsert(params.projectId, params.factKey, body);
   }
 
   @Delete('/:factKey')
@@ -55,12 +55,12 @@ export class FactController {
   @Post('/:factKey/reveal')
   @RespondFor(200, FactResponse)
   revealFact(@Params() params: FactKeyParams, @Body() body: RevealFactBody): Promise<FactResponse> {
-    return this.factService.reveal(params.projectId, params.factKey, body) as unknown as Promise<FactResponse>;
+    return this.factService.reveal(params.projectId, params.factKey, body);
   }
 
   @Delete('/:factKey/knowledge/:entityKey')
   @RespondFor(200, FactResponse)
   retractKnowledge(@Params() params: FactKnowledgeParams): Promise<FactResponse> {
-    return this.factService.retract(params.projectId, params.factKey, params.entityKey) as unknown as Promise<FactResponse>;
+    return this.factService.retract(params.projectId, params.factKey, params.entityKey);
   }
 }

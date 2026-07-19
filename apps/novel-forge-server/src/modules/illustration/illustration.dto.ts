@@ -6,6 +6,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -17,8 +18,9 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
 export class IllustrationParams {
-  @Field()
-  projectId: string;
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
 
   @Field()
   entityKey: string;

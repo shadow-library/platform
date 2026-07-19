@@ -58,7 +58,7 @@ export class PipelineController {
   @Post('/ingest')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
-  async ingest(@Params() params: PipelineProjectParams, @Body() body: IngestBody): Promise<JobEnqueueResponse> {
+  async ingestSource(@Params() params: PipelineProjectParams, @Body() body: IngestBody): Promise<JobEnqueueResponse> {
     const { projectId } = params;
     const payload = { limit: body.limit, delayMs: body.delayMs };
     const target = `ingest-${projectId}`;
@@ -72,7 +72,7 @@ export class PipelineController {
   @Post('/extract')
   @HttpStatus(202)
   @RespondFor(202, JobEnqueueResponse)
-  async extract(@Params() params: PipelineProjectParams, @Body() body: ExtractBody): Promise<JobEnqueueResponse> {
+  async extractKnowledge(@Params() params: PipelineProjectParams, @Body() body: ExtractBody): Promise<JobEnqueueResponse> {
     const { projectId } = params;
     const payload = { limit: body.limit };
     const target = `extract-${projectId}`;
@@ -85,7 +85,7 @@ export class PipelineController {
 
   @Post('/retitle')
   @RespondFor(200, RetitleResponse)
-  retitle(@Params() params: PipelineProjectParams): Promise<RetitleResponse> {
+  retitleChapters(@Params() params: PipelineProjectParams): Promise<RetitleResponse> {
     return this.webnovelCatalog.sync(params.projectId);
   }
 
@@ -93,15 +93,15 @@ export class PipelineController {
 
   @Post('/recombine')
   @RespondFor(200, RecombineResponse)
-  recombine(@Params() params: PipelineProjectParams, @Body() body: RecombineBody): Promise<RecombineResponse> {
-    return this.recombineService.recombine(params.projectId, { dryRun: body.dryRun, useAi: body.useAi }) as unknown as Promise<RecombineResponse>;
+  recombineChapters(@Params() params: PipelineProjectParams, @Body() body: RecombineBody): Promise<RecombineResponse> {
+    return this.recombineService.recombine(params.projectId, { dryRun: body.dryRun, useAi: body.useAi });
   }
 
   // ─── Consolidate ─────────────────────────────────────────────────────────────
 
   @Post('/consolidate')
   @RespondFor(200, ConsolidateResponse)
-  consolidate(@Params() params: PipelineProjectParams): Promise<ConsolidateResponse> {
+  consolidateSource(@Params() params: PipelineProjectParams): Promise<ConsolidateResponse> {
     return this.consolidateService.consolidate(params.projectId);
   }
 
@@ -109,7 +109,7 @@ export class PipelineController {
 
   @Get('/assets')
   @RespondFor(200, AssetsResponse)
-  async assets(@Params() params: PipelineProjectParams): Promise<AssetsResponse> {
+  async getAssets(@Params() params: PipelineProjectParams): Promise<AssetsResponse> {
     const markdown = await this.assetService.render(params.projectId);
     return { markdown };
   }
@@ -118,7 +118,7 @@ export class PipelineController {
 
   @Post('/skeleton')
   @RespondFor(200, SkeletonResponse)
-  skeleton(@Params() params: PipelineProjectParams): Promise<SkeletonResponse> {
+  generateSkeleton(@Params() params: PipelineProjectParams): Promise<SkeletonResponse> {
     return this.skeletonService.generateSkeleton(params.projectId) as Promise<SkeletonResponse>;
   }
 
@@ -127,7 +127,7 @@ export class PipelineController {
   @Post('/resume')
   @HttpStatus(202)
   @RespondFor(202, ResumeResponse)
-  async resume(@Params() params: PipelineProjectParams): Promise<ResumeResponse> {
+  async resumeIngest(@Params() params: PipelineProjectParams): Promise<ResumeResponse> {
     const { projectId } = params;
     const target = `ingest-${projectId}`;
     const jobId = await this.jobService.enqueue(projectId, 'ingest', target, {});

@@ -29,21 +29,21 @@ export class ChapterImageController {
 
   @Get()
   @RespondFor(200, ListChapterImageResponse)
-  async list(@Params() params: ChapterParams): Promise<ListChapterImageResponse> {
+  async listChapterImages(@Params() params: ChapterParams): Promise<ListChapterImageResponse> {
     const items = await this.chapterImageService.list(params.projectId, params.n);
-    return { items } as unknown as ListChapterImageResponse;
+    return { items };
   }
 
   @Post()
   @RespondFor(201, ChapterImageResponse)
   @HttpStatus(201)
-  add(@Params() params: ChapterParams, @Body() body: AddChapterImageBody): Promise<ChapterImageResponse> {
-    return this.chapterImageService.add(params.projectId, params.n, body.image, body.mime, body.caption) as unknown as Promise<ChapterImageResponse>;
+  addChapterImage(@Params() params: ChapterParams, @Body() body: AddChapterImageBody): Promise<ChapterImageResponse> {
+    return this.chapterImageService.add(params.projectId, params.n, body.image, body.mime, body.caption);
   }
 
   @Delete('/:imageId')
   @HttpStatus(204)
-  remove(@Params() params: ChapterImageParams): Promise<void> {
+  removeChapterImage(@Params() params: ChapterImageParams): Promise<void> {
     return this.chapterImageService.remove(params.projectId, params.n, params.imageId);
   }
 }

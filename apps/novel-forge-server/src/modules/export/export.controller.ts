@@ -31,7 +31,7 @@ export class ExportController {
   // Streams the `.novel` package as a download. Uses @Res raw-byte delivery (like the image route) since
   // the body is a binary zip, not a JSON DTO; a thrown ServerError still surfaces as the usual error JSON.
   @Get('/novel')
-  async novel(@Params() params: ExportParams, @Res() reply: FastifyReply): Promise<void> {
+  async exportNovel(@Params() params: ExportParams, @Res() reply: FastifyReply): Promise<void> {
     const { filename, bytes } = await this.novelPackage.build(params.projectId);
     reply.header('Content-Type', 'application/zip').header('Content-Disposition', `attachment; filename="${filename}"`).send(Buffer.from(bytes));
   }

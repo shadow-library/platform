@@ -11,8 +11,6 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Que
 /**
  * Importing user defined packages
  */
-import { AppErrorCode } from '@server/classes';
-
 import {
   CloneProjectBody,
   CostResponse,
@@ -45,39 +43,37 @@ export class ProjectController {
   @Post()
   @RespondFor(201, ProjectResponse)
   createProject(@Body() body: CreateProjectBody): Promise<ProjectResponse> {
-    return this.projectService.create(body) as unknown as Promise<ProjectResponse>;
+    return this.projectService.create(body);
   }
 
   @Get()
   @RespondFor(200, ListProjectResponse)
   listProjects(@Query() query: ListProjectsQuery): Promise<ListProjectResponse> {
-    return this.projectService.list(query) as unknown as Promise<ListProjectResponse>;
+    return this.projectService.list(query);
   }
 
   @Get('/:projectId')
   @RespondFor(200, ProjectResponse)
-  async getProject(@Params() params: ProjectParams): Promise<ProjectResponse> {
-    const project = await this.projectService.get(params.projectId);
-    if (!project) throw AppErrorCode.PRJ_001.create();
-    return project as unknown as ProjectResponse;
+  getProject(@Params() params: ProjectParams): Promise<ProjectResponse> {
+    return this.projectService.getOrThrow(params.projectId);
   }
 
   @Get('/:projectId/status')
   @RespondFor(200, ProjectStatusResponse)
   getProjectStatus(@Params() params: ProjectParams): Promise<ProjectStatusResponse> {
-    return this.projectService.status(params.projectId) as unknown as Promise<ProjectStatusResponse>;
+    return this.projectService.status(params.projectId);
   }
 
   @Patch('/:projectId')
   @RespondFor(200, ProjectResponse)
   updateProject(@Params() params: ProjectParams, @Body() body: UpdateProjectBody): Promise<ProjectResponse> {
-    return this.projectService.update(params.projectId, body) as unknown as Promise<ProjectResponse>;
+    return this.projectService.update(params.projectId, body);
   }
 
   @Post('/:projectId/clone')
   @RespondFor(201, ProjectResponse)
   cloneProject(@Params() params: ProjectParams, @Body() body: CloneProjectBody): Promise<ProjectResponse> {
-    return this.projectService.clone(params.projectId, body) as unknown as Promise<ProjectResponse>;
+    return this.projectService.clone(params.projectId, body);
   }
 
   @Delete('/:projectId')
@@ -101,12 +97,12 @@ export class ProjectController {
   @Post('/:projectId/cover')
   @RespondFor(200, ProjectResponse)
   uploadCover(@Params() params: ProjectParams, @Body() body: UploadImageBody): Promise<ProjectResponse> {
-    return this.projectService.setCover(params.projectId, body.image, body.mime) as unknown as Promise<ProjectResponse>;
+    return this.projectService.setCover(params.projectId, body.image, body.mime);
   }
 
   @Delete('/:projectId/cover')
   @RespondFor(200, ProjectResponse)
   deleteCover(@Params() params: ProjectParams): Promise<ProjectResponse> {
-    return this.projectService.clearCover(params.projectId) as unknown as Promise<ProjectResponse>;
+    return this.projectService.clearCover(params.projectId);
   }
 }

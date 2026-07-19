@@ -39,25 +39,25 @@ export class IllustrationController {
 
   @Post('/')
   @RespondFor(200, StartIllustrationResponse)
-  start(@Params() params: IllustrationParams, @Body() body: StartIllustrationBody): Promise<StartIllustrationResponse> {
-    return this.illustrationService.start(BigInt(params.projectId), params.entityKey, body);
+  startIllustration(@Params() params: IllustrationParams, @Body() body: StartIllustrationBody): Promise<StartIllustrationResponse> {
+    return this.illustrationService.start(params.projectId, params.entityKey, body);
   }
 
   @Post('/refine')
   @RespondFor(200, RefineIllustrationResponse)
-  refine(@Body() body: RefineIllustrationBody): Promise<RefineIllustrationResponse> {
+  refineIllustration(@Body() body: RefineIllustrationBody): Promise<RefineIllustrationResponse> {
     return this.illustrationService.refine(body.sessionId, body.instruction);
   }
 
   @Post('/save')
   @RespondFor(200, SaveIllustrationResponse)
-  save(@Body() body: SaveIllustrationBody): Promise<SaveIllustrationResponse> {
+  saveIllustration(@Body() body: SaveIllustrationBody): Promise<SaveIllustrationResponse> {
     return this.illustrationService.save(body.sessionId);
   }
 
   @Post('/cancel')
   @RespondFor(200, CancelIllustrationResponse)
-  cancel(@Body() body: CancelIllustrationBody): Promise<CancelIllustrationResponse> {
+  cancelIllustration(@Body() body: CancelIllustrationBody): Promise<CancelIllustrationResponse> {
     return this.illustrationService.cancel(body.sessionId);
   }
 }

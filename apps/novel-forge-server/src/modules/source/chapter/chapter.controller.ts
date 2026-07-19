@@ -32,7 +32,7 @@ export class ChapterController {
   @Get()
   @RespondFor(200, ListChapterResponse)
   listChapters(@Params() params: ChapterProjectParams, @Query() query: ListChaptersQuery): Promise<ListChapterResponse> {
-    return this.chapterService.list(params.projectId, query) as unknown as Promise<ListChapterResponse>;
+    return this.chapterService.list(params.projectId, query);
   }
 
   @Get('/:n')
@@ -40,13 +40,13 @@ export class ChapterController {
   async getChapter(@Params() params: ChapterParams): Promise<ChapterResponse> {
     const chapter = await this.chapterService.get(params.projectId, params.n);
     if (!chapter) throw AppErrorCode.CHP_001.create();
-    return chapter as unknown as ChapterResponse;
+    return chapter;
   }
 
   @Patch('/:n')
   @RespondFor(200, ChapterResponse)
   updateChapter(@Params() params: ChapterParams, @Body() body: UpdateChapterBody): Promise<ChapterResponse> {
-    return this.chapterService.update(params.projectId, params.n, body) as unknown as Promise<ChapterResponse>;
+    return this.chapterService.update(params.projectId, params.n, body);
   }
 
   @Delete('/:n')

@@ -38,13 +38,13 @@ export class VolumeController {
   @Post()
   @RespondFor(201, VolumeResponse)
   createVolume(@Params() params: VolumeProjectParams, @Body() body: CreateVolumeBody): Promise<VolumeResponse> {
-    return this.volumeService.create(params.projectId, body) as unknown as Promise<VolumeResponse>;
+    return this.volumeService.create(params.projectId, body);
   }
 
   @Get()
   @RespondFor(200, ListVolumeResponse)
   listVolumes(@Params() params: VolumeProjectParams, @Query() query: ListVolumesQuery): Promise<ListVolumeResponse> {
-    return this.volumeService.list(params.projectId, query) as unknown as Promise<ListVolumeResponse>;
+    return this.volumeService.list(params.projectId, query);
   }
 
   @Get('/:volumeKey')
@@ -52,13 +52,13 @@ export class VolumeController {
   async getVolume(@Params() params: VolumeKeyParams): Promise<VolumeResponse> {
     const volume = await this.volumeService.get(params.projectId, params.volumeKey);
     if (!volume) throw AppErrorCode.VOL_001.create();
-    return volume as unknown as VolumeResponse;
+    return volume;
   }
 
   @Patch('/:volumeKey')
   @RespondFor(200, VolumeResponse)
   updateVolume(@Params() params: VolumeKeyParams, @Body() body: UpdateVolumeBody): Promise<VolumeResponse> {
-    return this.volumeService.update(params.projectId, params.volumeKey, body) as unknown as Promise<VolumeResponse>;
+    return this.volumeService.update(params.projectId, params.volumeKey, body);
   }
 
   @Delete('/:volumeKey')
