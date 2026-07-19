@@ -232,6 +232,19 @@ export class RecoverInitBody {
 }
 
 @Schema()
+export class LoginResetPasswordBody {
+  @Field()
+  flowId: string;
+
+  /** Re-proves the credential the password step already accepted before it is rotated. */
+  @Field()
+  currentPassword: string;
+
+  @Field()
+  newPassword: string;
+}
+
+@Schema()
 export class ResetPasswordBody {
   @Field()
   flowId: string;

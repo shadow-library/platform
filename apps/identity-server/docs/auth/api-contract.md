@@ -135,13 +135,30 @@ across flows (the identifier cap suppresses delivery silently — the response s
 
 // 200 — complete:            { "status": "COMPLETED" } + Set-Cookie
 // 200 — MFA required:        { "status": "AWAITING_TOTP", "attemptsLeft": 3 }
+// 200 — reset required:      { "status": "AWAITING_PASSWORD_RESET" } — the password was correct but
+//        an administrator forced a reset; replace it inline via §2.6. Does not burn failure budget.
 // 401 — invalid:             { "code": "INVALID_CREDENTIALS", "attemptsLeft": 2 }
-// 401 — admin-forced reset:  { "status": "PASSWORD_RESET_REQUIRED" } — the password was correct
-//        but an administrator forced a reset; recover via §3. Does not burn failure budget.
 // 410 — flow terminated:     { "code": "FLOW_TERMINATED" }
 ```
 
-### 2.6 OIDC handoff
+### 2.6 `POST /auth/login/reset-password`
+
+Completes an admin-forced reset inline: after `challenge/verify` answers `AWAITING_PASSWORD_RESET`,
+the client collects the current and a new password here. The current password is re-verified (a wrong
+one burns failure budget like any other bad attempt), the credential is rotated, and every other
+session is dropped. MFA-enrolled accounts still receive `{ "status": "AWAITING_TOTP" }` (or another
+enrolled factor) before the session is minted.
+
+```jsonc
+{ "flowId": "…", "currentPassword": "…", "newPassword": "…" }
+// 200 → { "status": "COMPLETED" } + Set-Cookie (fresh session; all other sessions revoked)
+// 200 → { "status": "AWAITING_TOTP", "attemptsLeft": 3 } — MFA-enrolled account, second factor next
+// 401 → { "status": "AWAITING_PASSWORD_RESET", "attemptsLeft": 2 } — wrong current password
+// 410 → { "code": "FLOW_TERMINATED" } — too many failed attempts
+// 422 → { "code": "PASSWORD_POLICY", "reasons": ["HISTORY_MATCH", …] }
+```
+
+### 2.7 OIDC handoff
 
 When a flow was started by a redirect from `/oauth2/authorize`, `COMPLETED` responses additionally include `{ "resumeUrl": "/oauth2/authorize?resume=…" }`; the client navigates there to receive the authorization code on the registered redirect URI.
 

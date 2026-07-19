@@ -5,23 +5,24 @@ import { createHash, randomBytes } from 'node:crypto';
 
 import { type AuthenticationResponseJSON, type AuthenticatorAttachment, type PublicKeyCredentialRequestOptionsJSON } from '@simplewebauthn/server';
 import { Injectable } from '@shadow-library/app';
-import { Config, Logger } from '@shadow-library/common';
+import { Config, Logger, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
 import { ADMIN_PERMISSIONS, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { FederatedIdentityService, IdentityProviderService, UpstreamIdentity, UpstreamOidcService } from '@server/modules/auth/federation';
 import { MfaService, RecoveryCodeService, WebauthnAssertion, WebauthnService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
-import { PasswordService } from '@server/modules/identity/credentials';
+import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
 import { OrganisationService } from '@server/modules/identity/organisation';
-import { UserService } from '@server/modules/identity/user';
+import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { User, UserSession } from '@server/modules/infrastructure/datastore';
+import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { AuthFlowContext, AuthFlowService, DeviceContext, FederatedFlowState } from './auth-flow.service';
 import { ChallengeService } from './challenge.service';
@@ -79,9 +80,11 @@ const AWAITING_MFA_WEBAUTHN = 'AWAITING_MFA_WEBAUTHN';
 const AWAITING_WEBAUTHN = 'AWAITING_WEBAUTHN';
 const AWAITING_FEDERATED = 'AWAITING_FEDERATED';
 const AWAITING_LINK_OTP = 'AWAITING_LINK_OTP';
+const AWAITING_PASSWORD_RESET = 'AWAITING_PASSWORD_RESET';
 const MFA_STATUSES = [AWAITING_TOTP, AWAITING_MFA_WEBAUTHN];
 const OTP_STATUSES = ['AWAITING_EMAIL_OTP', 'AWAITING_SMS_OTP'];
 const LINK_OTP_TEMPLATE = 'auth.login.otp';
+const PASSWORD_CHANGED_TEMPLATE = 'auth.password.changed';
 
 @Injectable()
 export class LoginService {
@@ -92,10 +95,13 @@ export class LoginService {
   constructor(
     private readonly authFlowService: AuthFlowService,
     private readonly userService: UserService,
+    private readonly userEmailService: UserEmailService,
     private readonly passwordService: PasswordService,
+    private readonly passwordPolicyService: PasswordPolicyService,
     private readonly sessionService: SessionService,
     private readonly signInEventService: SignInEventService,
     private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
     private readonly mfaService: MfaService,
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly webauthnService: WebauthnService,
@@ -181,15 +187,49 @@ export class LoginService {
     /** Tier-4 lock: a locked account only accepts OTP methods until the lock expires (§13.2). */
     if (this.isOtpLocked(user)) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
     /**
-     * An admin-forced reset refuses even the correct password until recovery replaces it (T-602).
-     * The caller has just proven the credential, so naming the reason leaks nothing — and it must
-     * not burn failure budget or trip lockouts.
+     * An admin-forced reset must replace the credential before a session is minted (T-602). The
+     * caller just proved the current password, so rather than emailing a recovery code the flow
+     * continues to an inline current+new password step. Continuing (not failing) keeps the failure
+     * budget and lockouts untouched, as the credential was already proven.
      */
     if (user.passwordResetRequired) {
-      await this.auditService.record({ action: 'auth.login.reset_required', outcome: 'FAILURE', actorType: 'USER', actorId: userId.toString(), ipAddress: flow.device.ipAddress });
-      await this.authFlowService.delete(flow.flowId);
-      return { outcome: 'FAILED', flowId: flow.flowId, status: 'PASSWORD_RESET_REQUIRED', attemptsLeft: 0 };
+      const next = await this.authFlowService.update(flow, { status: AWAITING_PASSWORD_RESET });
+      return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
     }
+
+    const factors = await this.mfaService.getFactors(userId);
+    if (factors.totp || factors.webauthn) {
+      const next = await this.authFlowService.update(flow, { status: factors.totp ? AWAITING_TOTP : AWAITING_MFA_WEBAUTHN });
+      return { outcome: 'CONTINUE', flowId: flow.flowId, status: next.status };
+    }
+    return this.complete(flow, userId, {});
+  }
+
+  /**
+   * Completes an admin-forced reset inline (T-602). The flow reaches AWAITING_PASSWORD_RESET only
+   * after the current password was accepted, so we re-prove it, then rotate the credential and drop
+   * every other session. MFA-enrolled accounts still walk their second factor before a session is
+   * minted: a rotated password must not downgrade an MFA account to single-factor takeover.
+   */
+  async resetPassword(flowId: string, currentPassword: string, newPassword: string): Promise<FlowStepResult> {
+    const flow = await this.requireFlow(flowId);
+    if (flow.status !== AWAITING_PASSWORD_RESET) throw AppErrorCode.AUTH_002.create();
+
+    const userId = flow.userId ? BigInt(flow.userId) : null;
+    const valid = await this.passwordService.verifyForUser(userId, currentPassword);
+    if (!valid || !userId) return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+
+    const user = await this.userService.getUser(userId);
+    if (!user || user.status !== 'ACTIVE') return this.handleFailure(flow, userId, 'INVALID_CREDENTIALS');
+
+    await this.passwordPolicyService.assertAcceptable(newPassword);
+    if (await this.passwordService.isReused(userId, newPassword)) throw new ValidationError('password', ERROR_MESSAGES.REUSED_PASSWORD);
+
+    const email = (await this.userEmailService.getPrimaryEmail(userId)) ?? flow.identifier;
+    await this.passwordService.changePassword(userId, newPassword, email);
+    await this.sessionService.terminateAllForUser(userId);
+    await this.auditService.record({ action: 'auth.login.password_reset', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString(), ipAddress: flow.device.ipAddress });
+    await this.notificationService.enqueue({ templateKey: PASSWORD_CHANGED_TEMPLATE, recipients: { email }, payload: { ipAddress: flow.device.ipAddress } });
 
     const factors = await this.mfaService.getFactors(userId);
     if (factors.totp || factors.webauthn) {

@@ -22,6 +22,8 @@ const env = new TestEnvironment('login-flow').init();
 
 const login = (identifier: string) => env.getRouter().mockRequest().post('/api/v1/auth/login/init').body({ identifier });
 const verify = (flowId: string, password: string) => env.getRouter().mockRequest().post('/api/v1/auth/challenge/verify').body({ flowId, password });
+const resetPassword = (flowId: string, currentPassword: string, newPassword: string) =>
+  env.getRouter().mockRequest().post('/api/v1/auth/login/reset-password').body({ flowId, currentPassword, newPassword });
 
 describe('Login flow', () => {
   beforeEach(async () => {
@@ -77,5 +79,39 @@ describe('Login flow', () => {
     const { flowId } = (await login('suspended@example.com')).json() as { flowId: string };
     const response = await verify(flowId, 'Password@123');
     expect(response.statusCode).toBe(401);
+  });
+
+  it('should replace an admin-forced password inline and complete the sign-in', async () => {
+    await env
+      .getService(UserService)
+      .createUserWithPassword({ email: 'reset@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true, passwordResetRequired: true });
+
+    const { flowId } = (await login('reset@example.com')).json() as { flowId: string };
+    const gate = await verify(flowId, 'Password@123');
+    expect(gate.statusCode).toBe(200);
+    expect(gate.json()).toMatchObject({ status: 'AWAITING_PASSWORD_RESET' });
+
+    const reset = await resetPassword(flowId, 'Password@123', 'NewPassword@456');
+    expect(reset.statusCode).toBe(200);
+    expect(reset.json()).toMatchObject({ status: 'COMPLETED' });
+    const setCookie = ([] as string[]).concat(reset.headers['set-cookie'] ?? []);
+    expect(setCookie.some(cookie => cookie.startsWith(`${SESSION_COOKIE_NAME}=`))).toBe(true);
+
+    /** The flag is cleared, so the new password signs in cleanly on the next attempt. */
+    const { flowId: nextFlow } = (await login('reset@example.com')).json() as { flowId: string };
+    const again = await verify(nextFlow, 'NewPassword@456');
+    expect(again.json()).toMatchObject({ status: 'COMPLETED' });
+  });
+
+  it('should reject a wrong current password at the forced-reset step and report remaining attempts', async () => {
+    await env
+      .getService(UserService)
+      .createUserWithPassword({ email: 'reset2@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true, passwordResetRequired: true });
+
+    const { flowId } = (await login('reset2@example.com')).json() as { flowId: string };
+    await verify(flowId, 'Password@123');
+    const reset = await resetPassword(flowId, 'WrongPassword@1', 'NewPassword@456');
+    expect(reset.statusCode).toBe(401);
+    expect(reset.json()).toMatchObject({ status: 'AWAITING_PASSWORD_RESET', attemptsLeft: 2 });
   });
 });

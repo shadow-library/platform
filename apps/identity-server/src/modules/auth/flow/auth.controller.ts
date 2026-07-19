@@ -30,6 +30,7 @@ import {
   FlowStatusResponse,
   LoginInitBody,
   LoginInitResponse,
+  LoginResetPasswordBody,
   ProfileBody,
   RecoverInitBody,
   RegisterInitBody,
@@ -71,6 +72,17 @@ export class AuthController {
   @RespondFor(200, LoginInitResponse)
   loginInit(@Body() body: LoginInitBody): Promise<LoginInitResponse> {
     return this.loginService.init({ identifier: body.identifier, device: this.deviceContext(body.deviceId), returnTo: body.returnTo });
+  }
+
+  /** Completes an admin-forced reset inline: the flow proved the current password, this rotates it. */
+  @Post('/login/reset-password')
+  @Auth({ public: true })
+  @HttpStatus(200)
+  @RespondFor(200, ChallengeVerifyResponse)
+  @RespondFor(401, ChallengeVerifyResponse)
+  async loginResetPassword(@Body() body: LoginResetPasswordBody, @Res() reply: FastifyReply): Promise<ChallengeVerifyResponse> {
+    const result = await this.loginService.resetPassword(body.flowId, body.currentPassword, body.newPassword);
+    return this.respond(result, reply);
   }
 
   @Post('/register/init')

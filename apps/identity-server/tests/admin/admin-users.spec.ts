@@ -11,7 +11,6 @@ import { eq } from 'drizzle-orm';
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
-import { PasswordService } from '@server/modules/identity/credentials';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -116,18 +115,25 @@ describe('Admin user lifecycle APIs', () => {
     expect(after.json()).toMatchObject({ lockMode: 'NONE' });
   });
 
-  it('should force a password reset that blocks even the correct password until recovery', async () => {
+  it('should force a password reset the user replaces inline before the correct password signs in', async () => {
     const forced = await request('post', `/api/v1/admin/users/${targetId}/force-password-reset`);
     expect(forced.statusCode).toBe(200);
 
     const init = await env.getRouter().mockRequest().post('/api/v1/auth/login/init').body({ identifier: 'subject@example.com' });
     const { flowId } = init.json() as { flowId: string };
     const attempt = await env.getRouter().mockRequest().post('/api/v1/auth/challenge/verify').body({ flowId, password: 'Password@123' });
-    expect(attempt.statusCode).toBe(401);
-    expect(attempt.json()).toMatchObject({ status: 'PASSWORD_RESET_REQUIRED' });
+    expect(attempt.statusCode).toBe(200);
+    expect(attempt.json()).toMatchObject({ status: 'AWAITING_PASSWORD_RESET' });
 
-    /** Recovery-style credential replacement clears the flag and restores password login. */
-    await env.getService(PasswordService).changePassword(targetUserId, 'NewPassword@456', 'subject@example.com');
+    /** The inline current+new password step rotates the credential and completes the sign-in — no recovery code. */
+    const reset = await env
+      .getRouter()
+      .mockRequest()
+      .post('/api/v1/auth/login/reset-password')
+      .body({ flowId, currentPassword: 'Password@123', newPassword: 'NewPassword@456' });
+    expect(reset.statusCode).toBe(200);
+    expect(reset.json()).toMatchObject({ status: 'COMPLETED' });
+
     const again = await env.getRouter().mockRequest().post('/api/v1/auth/login/init').body({ identifier: 'subject@example.com' });
     const retry = await env
       .getRouter()
