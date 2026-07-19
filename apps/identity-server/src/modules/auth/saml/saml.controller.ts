@@ -10,6 +10,7 @@ import { Get, Header, HttpController, Query, Req, Res } from '@shadow-library/fa
 /**
  * Importing user defined packages
  */
+import { Auth } from '@server/modules/access';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 
 import { escapeXml } from './saml-xml';
@@ -37,20 +38,24 @@ export class SamlController {
 
   constructor(private readonly samlService: SamlService) {}
 
+  /** The SAML endpoints keep `@Req`/`@Res`: they read the session cookie directly and emit XML metadata, an auto-submit HTML page, or a redirect — none expressible through the DTO serializer. */
   @Get('/saml2/metadata')
+  @Auth({ public: true })
   @Header('cache-control', 'public, max-age=300')
-  metadata(@Res() reply: FastifyReply): void {
+  getSamlMetadata(@Res() reply: FastifyReply): void {
     reply.type('application/xml; charset=utf-8').send(this.samlService.getMetadata());
   }
 
   @Get('/saml2/sso')
-  async sso(@Query() query: SamlSsoQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+  @Auth({ public: true })
+  async handleSamlSso(@Query() query: SamlSsoQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     const result = await this.samlService.handleSsoRequest(query.SAMLRequest, query.RelayState, request.cookies[SESSION_COOKIE_NAME]);
     this.dispatch(result, reply);
   }
 
   @Get('/saml2/sso/resume')
-  async resume(@Query() query: SamlResumeQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
+  @Auth({ public: true })
+  async resumeSamlSso(@Query() query: SamlResumeQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     const result = await this.samlService.resume(query.rid, request.cookies[SESSION_COOKIE_NAME]);
     this.dispatch(result, reply);
   }

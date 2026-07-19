@@ -151,6 +151,12 @@ export class WebauthnAttestationData {
 }
 
 @Schema()
+export class WebauthnRemoveParams {
+  @Field()
+  credentialId: string;
+}
+
+@Schema()
 export class WebauthnRegisterVerifyBody {
   @Field()
   id: string;

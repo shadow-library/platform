@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -44,6 +45,7 @@ export class MfaEnrollmentItem {
   createdAt: string;
 
   @Field(() => String, { optional: true })
+  @Transform('strip:null')
   lastUsedAt?: string;
 
   /** Present on WEBAUTHN entries — the id `DELETE /me/webauthn/{credentialId}` expects. */

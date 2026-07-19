@@ -3,6 +3,7 @@
  */
 import {
   type AuthenticationResponseJSON,
+  type AuthenticatorAttachment,
   type AuthenticatorTransportFuture,
   type PublicKeyCredentialCreationOptionsJSON,
   type PublicKeyCredentialRequestOptionsJSON,
@@ -19,10 +20,14 @@ import { Config, Logger } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema, WebauthnCredential } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
+
+import { MfaService } from './mfa.service';
+import { RecoveryCodeService } from './recovery-code.service';
 
 /**
  * Defining types
@@ -31,6 +36,27 @@ import { NotificationService } from '@server/modules/infrastructure/notification
 export interface WebauthnAuthenticationResult {
   userId: bigint;
   credentialId: string;
+}
+
+export interface WebauthnRegisterInput {
+  id: string;
+  rawId: string;
+  type: 'public-key';
+  response: { clientDataJSON: string; attestationObject: string; transports?: string[] };
+  authenticatorAttachment?: string;
+  label?: string;
+}
+
+export interface WebauthnRegistrationOptions {
+  rp: { name: string; id?: string };
+  user: PublicKeyCredentialCreationOptionsJSON['user'];
+  challenge: string;
+  pubKeyCredParams: { alg: number; type: 'public-key' }[];
+  timeout?: number;
+  excludeCredentials?: { id: string; type: 'public-key'; transports?: AuthenticatorTransportFuture[] }[];
+  authenticatorSelection?: PublicKeyCredentialCreationOptionsJSON['authenticatorSelection'];
+  attestation?: PublicKeyCredentialCreationOptionsJSON['attestation'];
+  extensions?: { credProps?: boolean };
 }
 
 /**
@@ -54,9 +80,64 @@ export class WebauthnService {
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
+    private readonly mfaService: MfaService,
+    private readonly sessionService: SessionService,
+    private readonly recoveryCodeService: RecoveryCodeService,
   ) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
+  }
+
+  /* --------------------------- caller-facing orchestration --------------------------- */
+
+  /** Adding the first factor needs only a session; changing factors once MFA exists needs step-up. */
+  private async authorizeFactorChange(userId: bigint, elevated: boolean): Promise<void> {
+    if ((await this.mfaService.hasMfa(userId)) && !elevated) throw AppErrorCode.AUTH_006.create();
+  }
+
+  async beginRegistration(userId: bigint, elevated: boolean): Promise<WebauthnRegistrationOptions> {
+    await this.authorizeFactorChange(userId, elevated);
+    return this.toRegistrationOptions(await this.startRegistration(userId));
+  }
+
+  /** Completing the first passkey elevates the session and provisions the recovery-code batch (T-403). */
+  async completeRegistration(session: ValidatedSession, elevated: boolean, input: WebauthnRegisterInput): Promise<{ success: true; recoveryCodes?: string[] }> {
+    await this.authorizeFactorChange(session.userId, elevated);
+    const response: RegistrationResponseJSON = {
+      id: input.id,
+      rawId: input.rawId,
+      type: input.type,
+      response: {
+        clientDataJSON: input.response.clientDataJSON,
+        attestationObject: input.response.attestationObject,
+        transports: input.response.transports as AuthenticatorTransportFuture[] | undefined,
+      },
+      clientExtensionResults: {},
+      authenticatorAttachment: input.authenticatorAttachment as AuthenticatorAttachment | undefined,
+    };
+    await this.finishRegistration(session.userId, response, input.label);
+    await this.sessionService.elevate(session.id);
+    const hasCodes = (await this.recoveryCodeService.countRemaining(session.userId)) > 0;
+    const recoveryCodes = hasCodes ? undefined : await this.recoveryCodeService.generate(session.userId);
+    return { success: true, recoveryCodes };
+  }
+
+  async removeCredential(userId: bigint, credentialId: string): Promise<void> {
+    await this.remove(userId, credentialId);
+  }
+
+  private toRegistrationOptions(options: PublicKeyCredentialCreationOptionsJSON): WebauthnRegistrationOptions {
+    return {
+      rp: { name: options.rp.name, id: options.rp.id },
+      user: options.user,
+      challenge: options.challenge,
+      pubKeyCredParams: options.pubKeyCredParams.map(param => ({ alg: param.alg, type: param.type })),
+      timeout: options.timeout,
+      excludeCredentials: options.excludeCredentials?.map(credential => ({ id: credential.id, type: credential.type, transports: credential.transports })),
+      authenticatorSelection: options.authenticatorSelection,
+      attestation: options.attestation,
+      extensions: options.extensions ? { credProps: options.extensions.credProps } : undefined,
+    };
   }
 
   private registrationKey(userId: bigint): string {

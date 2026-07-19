@@ -13,11 +13,13 @@ import { Config, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
+import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, MfaEnrollment, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { NotificationService } from '@server/modules/infrastructure/notification';
 
+import { RecoveryCodeService } from './recovery-code.service';
 import { base32Encode, buildOtpauthUri, verifyTotp } from './totp';
 
 /**
@@ -68,6 +70,8 @@ export class MfaService {
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
+    private readonly sessionService: SessionService,
+    private readonly recoveryCodeService: RecoveryCodeService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -173,6 +177,46 @@ export class MfaService {
     await this.auditService.record({ action: 'auth.mfa.totp_disabled', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString() });
     await this.notify(userId, DISABLED_TEMPLATE, 'TOTP');
     this.logger.info('totp disabled', { userId });
+  }
+
+  /* --------------------------- caller-facing orchestration --------------------------- */
+
+  /** Factors plus remaining recovery-code count for the self-service MFA surface. */
+  async listEnrollmentSummary(userId: bigint): Promise<{ enrollments: EnrollmentSummary[]; recoveryCodesRemaining: number }> {
+    const enrollments = await this.listEnrollments(userId);
+    const recoveryCodesRemaining = await this.recoveryCodeService.countRemaining(userId);
+    return { enrollments, recoveryCodesRemaining };
+  }
+
+  /**
+   * Provisioning the first factor requires only a session (the user cannot step up without any
+   * factor yet); once MFA exists, changing factors demands a fresh second-factor proof.
+   */
+  async beginTotpEnrollment(userId: bigint, elevated: boolean): Promise<TotpProvisioning> {
+    if ((await this.hasMfa(userId)) && !elevated) throw AppErrorCode.AUTH_006.create();
+    return this.enrollTotp(userId);
+  }
+
+  /** Activation of the account's first factor also provisions its recovery-code batch (T-403). */
+  async completeTotpActivation(session: ValidatedSession, code: string): Promise<{ success: true; recoveryCodes?: string[] }> {
+    await this.activateTotp(session.userId, code);
+    await this.sessionService.elevate(session.id);
+    const hasCodes = (await this.recoveryCodeService.countRemaining(session.userId)) > 0;
+    const recoveryCodes = hasCodes ? undefined : await this.recoveryCodeService.generate(session.userId);
+    return { success: true, recoveryCodes };
+  }
+
+  async regenerateRecoveryCodes(userId: bigint): Promise<{ recoveryCodes: string[] }> {
+    return { recoveryCodes: await this.recoveryCodeService.generate(userId) };
+  }
+
+  /** Elevates an existing session to AAL2 for the step-up window by proving a TOTP code. */
+  async stepUp(session: ValidatedSession, code: string): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+    const valid = await this.verifyTotp(session.userId, code);
+    if (!valid) throw AppErrorCode.MFA_002.create();
+    const elevated = await this.sessionService.elevate(session.id);
+    if (!elevated || !elevated.elevatedUntil) throw AppErrorCode.AUTH_005.create();
+    return { aal: elevated.aal, elevatedUntil: new Date(elevated.elevatedUntil) };
   }
 
   private async getTotpEnrollment(userId: bigint, state: 'verified' | 'pending'): Promise<MfaEnrollment | undefined> {

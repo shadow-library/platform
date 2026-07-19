@@ -9,6 +9,7 @@ import { Get, HttpController, Query, Res } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
+import { Auth } from '@server/modules/access';
 import { FederatedCallbackQuery, FederationError, IdentityProviderService, UpstreamOidcService } from '@server/modules/auth/federation';
 
 import { AuthFlowService } from './auth-flow.service';
@@ -39,7 +40,8 @@ export class FederatedController {
   ) {}
 
   @Get('/api/v1/auth/federated/callback')
-  async callback(@Query() query: FederatedCallbackQuery, @Res() reply: FastifyReply): Promise<void> {
+  @Auth({ public: true })
+  async handleFederatedCallback(@Query() query: FederatedCallbackQuery, @Res() reply: FastifyReply): Promise<void> {
     const fail = (reason: string): void => {
       this.logger.warn('federated callback failed', { reason });
       reply.status(302).redirect(`${this.loginUrl}?error=federation_failed`);

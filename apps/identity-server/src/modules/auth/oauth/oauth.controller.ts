@@ -9,6 +9,7 @@ import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, R
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { Auth } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
@@ -48,9 +49,10 @@ export class OAuthController {
   ) {}
 
   @Get('/.well-known/openid-configuration')
+  @Auth({ public: true })
   @Header('cache-control', 'public, max-age=300')
   @RespondFor(200, DiscoveryResponse)
-  discovery(): DiscoveryResponse {
+  getOpenidConfiguration(): DiscoveryResponse {
     return {
       issuer: this.issuer,
       authorization_endpoint: `${this.issuer}/oauth2/authorize`,
@@ -67,7 +69,9 @@ export class OAuthController {
     };
   }
 
+  /** Client/bearer-authenticated OAuth endpoints keep `@Req`/`@Res`: they parse Basic/JWT client credentials, verify bearer tokens, and drive redirects — none of which the session guard or DTO serializer can express. */
   @Get('/oauth2/authorize')
+  @Auth({ public: true })
   async authorize(@Query() query: AuthorizeQuery, @Req() request: FastifyRequest, @Res() reply: FastifyReply): Promise<void> {
     const sessionSecret = request.cookies[SESSION_COOKIE_NAME];
     const result = await this.oauthService.authorize(
@@ -94,8 +98,9 @@ export class OAuthController {
   }
 
   @Post('/oauth2/token')
+  @Auth({ public: true })
   @RespondFor(200, TokenResponse)
-  async token(@Body() body: TokenRequestBody, @Req() request: FastifyRequest): Promise<TokenResponse> {
+  async exchangeToken(@Body() body: TokenRequestBody, @Req() request: FastifyRequest): Promise<TokenResponse> {
     const credential = this.parseClientCredential(request, body);
     const result = await this.oauthService.token(
       {
@@ -120,8 +125,9 @@ export class OAuthController {
   }
 
   @Get('/oauth2/userinfo')
+  @Auth({ public: true })
   @RespondFor(200, UserInfoResponse)
-  async userinfo(@Req() request: FastifyRequest): Promise<UserInfoResponse> {
+  async getUserInfo(@Req() request: FastifyRequest): Promise<UserInfoResponse> {
     const header = request.headers.authorization;
     const token = header?.startsWith('Bearer ') ? header.slice(7) : undefined;
     const claims = token ? this.keyService.verify(token) : null;
@@ -132,17 +138,19 @@ export class OAuthController {
   }
 
   @Post('/oauth2/revoke')
+  @Auth({ public: true })
   @HttpStatus(200)
   @RespondFor(200, RevocationResponse)
-  async revoke(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<RevocationResponse> {
+  async revokeToken(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<RevocationResponse> {
     await this.oauthService.revoke(body.token, this.parseClientCredential(request, body));
     return { revoked: true };
   }
 
   @Post('/oauth2/introspect')
+  @Auth({ public: true })
   @HttpStatus(200)
   @RespondFor(200, IntrospectionResponseDto)
-  async introspect(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<IntrospectionResponseDto> {
+  async introspectToken(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<IntrospectionResponseDto> {
     const result = await this.oauthService.introspect(body.token, this.parseClientCredential(request, body));
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
   }

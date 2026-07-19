@@ -26,6 +26,7 @@ import { ChallengeService } from './challenge.service';
 import { FederatedController } from './federated.controller';
 import { LoginService } from './login.service';
 import { MeSessionsController } from './me-sessions.controller';
+import { MeSessionsService } from './me-sessions.service';
 import { RecoveryService } from './recovery.service';
 import { RegistrationService } from './registration.service';
 import { SignInEventService } from './sign-in-event.service';
@@ -55,7 +56,7 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     OrganisationModule,
   ],
   controllers: [AuthController, MeSessionsController, FederatedController],
-  providers: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
+  providers: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService, MeSessionsService],
   exports: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
 })
 export class AuthFlowModule {}
