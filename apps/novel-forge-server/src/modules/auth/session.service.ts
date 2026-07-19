@@ -65,7 +65,7 @@ const IV_LENGTH = 12;
 @Injectable()
 export class SessionService {
   private readonly logger = Logger.getLogger(APP_NAME, SessionService.name);
-  private readonly key = createHash('sha256').update(Config.get('auth.session.secret')).digest();
+  private readonly key = createHash('sha256').update(Config.get('auth.session.seal-secret')).digest();
 
   constructor(private readonly authClient: AuthClient) {}
 

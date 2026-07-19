@@ -64,7 +64,7 @@ declare module '@shadow-library/common' {
      */
     'auth.rp.client.id': string;
     'auth.rp.client.secret': string | undefined;
-    'auth.session.secret': string;
+    'auth.session.seal-secret': string;
     'auth.redirect-uri': string;
 
     /**
@@ -119,7 +119,7 @@ Config.load('auth.issuer');
 Config.load('auth.audience');
 Config.load('auth.rp.client.id', { defaultValue: 'novel-forge-web' });
 Config.load('auth.rp.client.secret');
-Config.load('auth.session.secret', { defaultValue: 'novel-forge-dev-session-secret', isProdRequired: true });
+Config.load('auth.session.seal-secret', { defaultValue: 'novel-forge-dev-session-secret', isProdRequired: true });
 Config.load('auth.redirect-uri', { defaultValue: 'http://localhost:8080/api/auth/callback' });
 Config.load('auth.m2m.client.id');
 Config.load('auth.m2m.client.secret');
