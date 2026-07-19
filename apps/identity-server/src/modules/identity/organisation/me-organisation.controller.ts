@@ -2,20 +2,16 @@
  * Importing npm packages
  */
 
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { AppErrorCode } from '@server/classes';
-import { SessionAuthService } from '@server/modules/auth/session';
-import { PolicyDecisionService } from '@server/modules/authz';
-import { AuditService } from '@server/modules/infrastructure/audit';
+import { Auth, Context } from '@server/modules/access';
+import { type Organisation } from '@server/modules/infrastructure/datastore';
 
-import { InvitationService } from './invitation.service';
 import { InvitationTokenBody, MyOrganisationsResponse, OrganisationActionResponse, OrganisationIdParams, OrganisationResponse } from './organisation.dto';
-import { OrganisationService } from './organisation.service';
+import { type MyOrganisationListItem, OrganisationService } from './organisation.service';
 
 /**
  * Defining types
@@ -25,108 +21,44 @@ import { OrganisationService } from './organisation.service';
  * Declaring the constants
  *
  * Self-service membership: the signed-in user lists their organisations, resolves invitation
- * tokens from their inbox, and leaves teams. Acceptance requires the invited address to be one of
- * the caller's verified emails, so invitations issued before registration resolve naturally once
- * the user signs up and verifies that address.
+ * tokens from their inbox, and leaves teams. Every route needs only a session, so `@Auth` is
+ * declared once on the controller.
  */
 
 @HttpController('/api/v1/me')
+@Auth({ session: true })
 export class MeOrganisationController {
-  constructor(
-    private readonly sessionAuthService: SessionAuthService,
-    private readonly organisationService: OrganisationService,
-    private readonly invitationService: InvitationService,
-    private readonly policyDecisionService: PolicyDecisionService,
-    private readonly auditService: AuditService,
-  ) {}
+  constructor(private readonly organisationService: OrganisationService) {}
+
+  private caller() {
+    return { session: Context.getSession(), ip: Context.getClientInfo().ip };
+  }
 
   @Get('/organisations')
   @RespondFor(200, MyOrganisationsResponse)
-  async list(@Req() request: FastifyRequest): Promise<MyOrganisationsResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const entries = await this.organisationService.listOrganisationsForUser(session.userId);
-    return {
-      organisations: entries
-        .filter(({ organisation }) => organisation.status !== 'DELETED')
-        .map(({ membership, organisation }) => ({
-          id: organisation.id.toString(),
-          slug: organisation.slug,
-          name: organisation.name,
-          type: organisation.type,
-          status: organisation.status,
-          role: membership.role,
-          isDefault: membership.isDefault,
-          joinedAt: membership.joinedAt.toISOString(),
-        })),
-    };
+  async listMyOrganisations(): Promise<{ organisations: MyOrganisationListItem[] }> {
+    return { organisations: await this.organisationService.listMyOrganisationItems(Context.getSession().userId) };
   }
 
-  /** Leaving is removal of oneself: same last-owner protection, same grant revocation. */
   @Delete('/organisations/:organisationId')
   @RespondFor(200, OrganisationActionResponse)
-  async leave(@Params() params: OrganisationIdParams, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    const membership = await this.organisationService.getMembership(session.userId, organisationId);
-    const organisation = await this.organisationService.getById(organisationId);
-    if (!membership || !organisation) throw AppErrorCode.ORG_001.create();
-    if (organisation.type === 'PERSONAL') throw AppErrorCode.ORG_003.create();
-
-    await this.organisationService.removeMember(organisationId, session.userId);
-    await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: session.userId.toString() }, params.organisationId);
-    await this.auditService.record({
-      action: 'org.member_left',
-      outcome: 'SUCCESS',
-      actorType: 'USER',
-      actorId: session.userId.toString(),
-      organisationId: params.organisationId,
-      ipAddress: request.ip,
-    });
+  async leaveOrganisation(@Params() params: OrganisationIdParams): Promise<OrganisationActionResponse> {
+    await this.organisationService.leaveOrganisation(this.caller(), params.organisationId);
     return { success: true };
   }
 
   @Post('/invitations/accept')
   @HttpStatus(200)
   @RespondFor(200, OrganisationResponse)
-  async accept(@Body() body: InvitationTokenBody, @Req() request: FastifyRequest): Promise<OrganisationResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const { invitation, organisation } = await this.invitationService.accept(session.userId, body.token);
-    await this.auditService.record({
-      action: 'org.invitation_accepted',
-      outcome: 'SUCCESS',
-      actorType: 'USER',
-      actorId: session.userId.toString(),
-      organisationId: organisation.id.toString(),
-      targetType: 'organisation_invitation',
-      targetId: invitation.id.toString(),
-      ipAddress: request.ip,
-    });
-    return {
-      id: organisation.id.toString(),
-      slug: organisation.slug,
-      name: organisation.name,
-      type: organisation.type,
-      status: organisation.status,
-      createdAt: organisation.createdAt.toISOString(),
-    };
+  acceptOrganisationInvitation(@Body() body: InvitationTokenBody): Promise<Organisation> {
+    return this.organisationService.acceptInvitation(this.caller(), body.token);
   }
 
   @Post('/invitations/decline')
   @HttpStatus(200)
   @RespondFor(200, OrganisationActionResponse)
-  async decline(@Body() body: InvitationTokenBody, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const invitation = await this.invitationService.decline(session.userId, body.token);
-    await this.auditService.record({
-      action: 'org.invitation_declined',
-      outcome: 'SUCCESS',
-      actorType: 'USER',
-      actorId: session.userId.toString(),
-      organisationId: invitation.organisationId.toString(),
-      targetType: 'organisation_invitation',
-      targetId: invitation.id.toString(),
-      ipAddress: request.ip,
-    });
+  async declineOrganisationInvitation(@Body() body: InvitationTokenBody): Promise<OrganisationActionResponse> {
+    await this.organisationService.declineInvitation(this.caller(), body.token);
     return { success: true };
   }
 }

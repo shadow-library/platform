@@ -12,7 +12,13 @@ import { AppError, Logger } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { type ValidatedSession } from '@server/modules/auth/session';
+import { PolicyDecisionService } from '@server/modules/authz';
+import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { NotificationService } from '@server/modules/infrastructure/notification';
+
+import { InvitationService } from './invitation.service';
 
 /**
  * Defining types
@@ -23,6 +29,29 @@ type OrgWriter = Pick<PrimaryDatabase, 'insert'>;
 export interface CreateTeamInput {
   name: string;
   slug?: string;
+}
+
+interface CallerContext {
+  session: ValidatedSession;
+  ip: string;
+}
+
+export interface MemberListItem {
+  userId: bigint;
+  role: Organisation.MemberRole;
+  email?: string;
+  joinedAt: Date;
+}
+
+export interface MyOrganisationListItem {
+  id: bigint;
+  slug: string;
+  name: string;
+  type: Organisation.Type;
+  status: Organisation.Status;
+  role: Organisation.MemberRole;
+  isDefault: boolean;
+  joinedAt: Date;
 }
 
 export interface MemberDetail {
@@ -46,13 +75,39 @@ export interface MembershipWithOrganisation {
 const ROLE_RANK: Record<Organisation.MemberRole, number> = { MEMBER: 0, ADMIN: 1, OWNER: 2 };
 const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/;
 
+const ROLE_CHANGED_TEMPLATE = 'organisation-role-changed';
+const MEMBER_REMOVED_TEMPLATE = 'organisation-member-removed';
+
 @Injectable()
 export class OrganisationService {
   private readonly logger = Logger.getLogger(APP_NAME, OrganisationService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(databaseService: DatabaseService) {
+  constructor(
+    databaseService: DatabaseService,
+    private readonly invitationService: InvitationService,
+    private readonly policyDecisionService: PolicyDecisionService,
+    private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
+  ) {
     this.db = databaseService.getPostgresClient();
+  }
+
+  private isElevated(session: ValidatedSession): boolean {
+    return session.elevatedUntil !== null && session.elevatedUntil > Date.now();
+  }
+
+  private async audit(caller: CallerContext, organisationId: bigint, action: string, targetType?: string, targetId?: string): Promise<void> {
+    await this.auditService.record({
+      action,
+      outcome: 'SUCCESS',
+      actorType: 'USER',
+      actorId: caller.session.userId.toString(),
+      organisationId: organisationId.toString(),
+      targetType,
+      targetId,
+      ipAddress: caller.ip,
+    });
   }
 
   /**
@@ -155,6 +210,131 @@ export class OrganisationService {
   async softDelete(organisationId: bigint): Promise<void> {
     await this.db.update(schema.organisations).set({ status: 'DELETED', deletedAt: new Date(), updatedAt: new Date() }).where(eq(schema.organisations.id, organisationId));
     this.logger.info('soft-deleted organisation', { organisationId });
+  }
+
+  /* --------------------------- caller-facing orchestration --------------------------- */
+
+  async createOrganisation(caller: CallerContext, input: CreateTeamInput): Promise<Organisation> {
+    const organisation = await this.createTeam(caller.session.userId, input);
+    await this.audit(caller, organisation.id, 'org.created');
+    return organisation;
+  }
+
+  /** A live organisation for a caller the guard already confirmed as a member. */
+  async getOrganisation(organisationId: bigint): Promise<Organisation> {
+    const organisation = await this.getById(organisationId);
+    if (!organisation || organisation.status === 'DELETED') throw AppErrorCode.ORG_001.create();
+    return organisation;
+  }
+
+  async renameOrganisation(caller: CallerContext, organisation: Organisation, name: string): Promise<Organisation> {
+    await this.rename(organisation.id, name);
+    await this.audit(caller, organisation.id, 'org.renamed');
+    return { ...organisation, name };
+  }
+
+  /** Deletion revokes every product-role grant scoped to the org so no PDP decision survives it. */
+  async deleteOrganisation(caller: CallerContext, organisationId: bigint): Promise<void> {
+    await this.softDelete(organisationId);
+    await this.policyDecisionService.revokeAllForOrganisation(organisationId.toString());
+    await this.audit(caller, organisationId, 'org.deleted');
+  }
+
+  /** Members flattened for the member-management surface, with native id/date the serializer converts. */
+  async listMemberItems(organisationId: bigint): Promise<MemberListItem[]> {
+    const members = await this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.organisationId, organisationId) });
+    return Promise.all(members.map(async member => ({ userId: member.userId, role: member.role, email: (await this.getPrimaryVerifiedEmail(member.userId)) ?? undefined, joinedAt: member.joinedAt })));
+  }
+
+  /**
+   * Changes a member's org role. Promoting to OWNER is owner-only and step-up-gated; an owner target
+   * is owner-only and AAL2-gated; otherwise a caller only administers members ranked strictly below
+   * them. Last-owner protection rides on `updateMemberRole`.
+   */
+  async changeMemberRole(caller: CallerContext, callerMembership: Organisation.Member, organisationId: bigint, targetUserId: bigint, role: Organisation.MemberRole): Promise<void> {
+    if (role === 'OWNER') {
+      if (!this.isElevated(caller.session)) throw AppErrorCode.AUTH_006.create();
+      if (callerMembership.role !== 'OWNER') throw AppErrorCode.ORG_007.create();
+    }
+    const target = await this.getMembership(targetUserId, organisationId);
+    if (!target) throw AppErrorCode.USR_001.create();
+    if (target.role === 'OWNER' && callerMembership.role !== 'OWNER') throw AppErrorCode.ORG_007.create();
+    if (target.role === 'OWNER' && caller.session.aal !== 'AAL2') throw AppErrorCode.AUTH_006.create();
+    if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
+
+    await this.updateMemberRole(organisationId, targetUserId, role);
+    await this.audit(caller, organisationId, 'org.member_role_changed', 'user', targetUserId.toString());
+    const email = await this.getPrimaryVerifiedEmail(targetUserId);
+    if (email) await this.notificationService.enqueue({ templateKey: ROLE_CHANGED_TEMPLATE, recipients: { email }, payload: { role } });
+  }
+
+  async removeOrganisationMember(caller: CallerContext, callerMembership: Organisation.Member, organisationId: bigint, targetUserId: bigint): Promise<void> {
+    const target = await this.getMembership(targetUserId, organisationId);
+    if (!target) throw AppErrorCode.USR_001.create();
+    if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
+    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || caller.session.aal !== 'AAL2')) throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
+    if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
+
+    await this.removeMember(organisationId, targetUserId);
+    await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: targetUserId.toString() }, organisationId.toString());
+    await this.audit(caller, organisationId, 'org.member_removed', 'user', targetUserId.toString());
+    const email = await this.getPrimaryVerifiedEmail(targetUserId);
+    if (email) await this.notificationService.enqueue({ templateKey: MEMBER_REMOVED_TEMPLATE, recipients: { email }, payload: {} });
+  }
+
+  async listPendingInvitations(organisationId: bigint): Promise<Organisation.Invitation[]> {
+    return this.invitationService.listPending(organisationId);
+  }
+
+  async inviteMember(caller: CallerContext, organisation: Organisation, email: string, role: Exclude<Organisation.MemberRole, 'OWNER'>): Promise<void> {
+    const invitation = await this.invitationService.invite({ organisation, email, role, invitedBy: caller.session.userId });
+    await this.audit(caller, organisation.id, 'org.invitation_sent', 'organisation_invitation', invitation.id.toString());
+  }
+
+  async revokeInvitation(caller: CallerContext, organisationId: bigint, invitationId: bigint): Promise<void> {
+    const invitation = await this.invitationService.revoke(organisationId, invitationId);
+    await this.audit(caller, organisationId, 'org.invitation_revoked', 'organisation_invitation', invitation.id.toString());
+  }
+
+  /* --------------------------- self-service membership --------------------------- */
+
+  /** The caller's live organisations flattened with their role, for the self-service list. */
+  async listMyOrganisationItems(userId: bigint): Promise<MyOrganisationListItem[]> {
+    const entries = await this.listOrganisationsForUser(userId);
+    return entries
+      .filter(entry => entry.organisation.status !== 'DELETED')
+      .map(({ membership, organisation }) => ({
+        id: organisation.id,
+        slug: organisation.slug,
+        name: organisation.name,
+        type: organisation.type,
+        status: organisation.status,
+        role: membership.role,
+        isDefault: membership.isDefault,
+        joinedAt: membership.joinedAt,
+      }));
+  }
+
+  /** Leaving is removal of oneself: same last-owner protection, same grant revocation. */
+  async leaveOrganisation(caller: CallerContext, organisationId: bigint): Promise<void> {
+    const membership = await this.getMembership(caller.session.userId, organisationId);
+    const organisation = await this.getById(organisationId);
+    if (!membership || !organisation) throw AppErrorCode.ORG_001.create();
+    if (organisation.type === 'PERSONAL') throw AppErrorCode.ORG_003.create();
+    await this.removeMember(organisationId, caller.session.userId);
+    await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: caller.session.userId.toString() }, organisationId.toString());
+    await this.audit(caller, organisationId, 'org.member_left');
+  }
+
+  async acceptInvitation(caller: CallerContext, token: string): Promise<Organisation> {
+    const { invitation, organisation } = await this.invitationService.accept(caller.session.userId, token);
+    await this.audit(caller, organisation.id, 'org.invitation_accepted', 'organisation_invitation', invitation.id.toString());
+    return organisation;
+  }
+
+  async declineInvitation(caller: CallerContext, token: string): Promise<void> {
+    const invitation = await this.invitationService.decline(caller.session.userId, token);
+    await this.audit(caller, invitation.organisationId, 'org.invitation_declined', 'organisation_invitation', invitation.id.toString());
   }
 
   /** Changes a member's org role; refuses to demote the last remaining owner. */

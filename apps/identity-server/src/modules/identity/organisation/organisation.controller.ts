@@ -2,20 +2,14 @@
  * Importing npm packages
  */
 
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
-import { AppErrorCode } from '@server/classes';
-import { SessionAuthService, ValidatedSession } from '@server/modules/auth/session';
-import { PolicyDecisionService } from '@server/modules/authz';
-import { AuditService } from '@server/modules/infrastructure/audit';
-import { Organisation } from '@server/modules/infrastructure/datastore';
-import { NotificationService } from '@server/modules/infrastructure/notification';
+import { Auth, Context } from '@server/modules/access';
+import { type Organisation } from '@server/modules/infrastructure/datastore';
 
-import { InvitationService } from './invitation.service';
 import {
   CreateOrganisationBody,
   InvitationParams,
@@ -29,7 +23,7 @@ import {
   RenameOrganisationBody,
   UpdateMemberRoleBody,
 } from './organisation.dto';
-import { OrganisationService } from './organisation.service';
+import { type MemberListItem, OrganisationService } from './organisation.service';
 
 /**
  * Defining types
@@ -37,196 +31,90 @@ import { OrganisationService } from './organisation.service';
 
 /**
  * Declaring the constants
- *
- * Team administration authorization split (T-705): routine operations (rename, invite, member
- * changes below owner level) need an org ADMIN with an ordinary session; operations that can hand
- * over or destroy the organisation (owner changes, deletion) demand an OWNER with AAL2 step-up.
- * Rank rule: a caller only administers members ranked strictly below them — except owners, who may
- * also administer fellow owners (last-owner protected).
  */
-const ROLE_RANK: Record<Organisation.MemberRole, number> = { MEMBER: 0, ADMIN: 1, OWNER: 2 };
-
-const ROLE_CHANGED_TEMPLATE = 'organisation-role-changed';
-const MEMBER_REMOVED_TEMPLATE = 'organisation-member-removed';
 
 @HttpController('/api/v1/organisations')
 export class OrganisationController {
-  constructor(
-    private readonly sessionAuthService: SessionAuthService,
-    private readonly organisationService: OrganisationService,
-    private readonly invitationService: InvitationService,
-    private readonly policyDecisionService: PolicyDecisionService,
-    private readonly auditService: AuditService,
-    private readonly notificationService: NotificationService,
-  ) {}
+  constructor(private readonly organisationService: OrganisationService) {}
 
-  private toResponse(organisation: Organisation): OrganisationResponse {
-    return {
-      id: organisation.id.toString(),
-      slug: organisation.slug,
-      name: organisation.name,
-      type: organisation.type,
-      status: organisation.status,
-      createdAt: organisation.createdAt.toISOString(),
-    };
-  }
-
-  private async audit(request: FastifyRequest, session: ValidatedSession, organisationId: bigint, action: string, targetType?: string, targetId?: string): Promise<void> {
-    await this.auditService.record({
-      action,
-      outcome: 'SUCCESS',
-      actorType: 'USER',
-      actorId: session.userId.toString(),
-      organisationId: organisationId.toString(),
-      targetType,
-      targetId,
-      ipAddress: request.ip,
-    });
+  private caller() {
+    return { session: Context.getSession(), ip: Context.getClientInfo().ip };
   }
 
   @Post()
+  @Auth({ session: true })
+  @HttpStatus(201)
   @RespondFor(201, OrganisationResponse)
-  async create(@Body() body: CreateOrganisationBody, @Req() request: FastifyRequest): Promise<OrganisationResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisation = await this.organisationService.createTeam(session.userId, { name: body.name, slug: body.slug });
-    await this.audit(request, session, organisation.id, 'org.created');
-    return this.toResponse(organisation);
+  createOrganisation(@Body() body: CreateOrganisationBody): Promise<Organisation> {
+    return this.organisationService.createOrganisation(this.caller(), { name: body.name, slug: body.slug });
   }
 
   @Get('/:organisationId')
+  @Auth({ orgMember: true })
   @RespondFor(200, OrganisationResponse)
-  async get(@Params() params: OrganisationIdParams, @Req() request: FastifyRequest): Promise<OrganisationResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    await this.organisationService.assertMember(session.userId, organisationId);
-    const organisation = await this.organisationService.getById(organisationId);
-    if (!organisation || organisation.status === 'DELETED') throw AppErrorCode.ORG_001.create();
-    return this.toResponse(organisation);
+  getOrganisationDetails(@Params() params: OrganisationIdParams): Promise<Organisation> {
+    return this.organisationService.getOrganisation(params.organisationId);
   }
 
   @Patch('/:organisationId')
+  @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationResponse)
-  async rename(@Params() params: OrganisationIdParams, @Body() body: RenameOrganisationBody, @Req() request: FastifyRequest): Promise<OrganisationResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    const { organisation } = await this.organisationService.requireRole(session.userId, organisationId, 'ADMIN');
-    await this.organisationService.rename(organisationId, body.name);
-    await this.audit(request, session, organisationId, 'org.renamed');
-    return this.toResponse({ ...organisation, name: body.name });
+  renameOrganisation(@Params() params: OrganisationIdParams, @Body() body: RenameOrganisationBody): Promise<Organisation> {
+    return this.organisationService.renameOrganisation(this.caller(), Context.getOrganisation(), body.name);
   }
 
-  /** Deletion revokes every product-role grant scoped to the org so no PDP decision survives it. */
   @Delete('/:organisationId')
+  @Auth({ orgRole: 'OWNER', elevated: true })
   @RespondFor(200, OrganisationActionResponse)
-  async remove(@Params() params: OrganisationIdParams, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const session = await this.sessionAuthService.authenticateElevated(request);
-    const organisationId = BigInt(params.organisationId);
-    await this.organisationService.requireRole(session.userId, organisationId, 'OWNER');
-    await this.organisationService.softDelete(organisationId);
-    await this.policyDecisionService.revokeAllForOrganisation(params.organisationId);
-    await this.audit(request, session, organisationId, 'org.deleted');
+  async deleteOrganisation(@Params() params: OrganisationIdParams): Promise<OrganisationActionResponse> {
+    await this.organisationService.deleteOrganisation(this.caller(), params.organisationId);
     return { success: true };
   }
 
   @Get('/:organisationId/members')
+  @Auth({ orgMember: true })
   @RespondFor(200, MembersResponse)
-  async listMembers(@Params() params: OrganisationIdParams, @Req() request: FastifyRequest): Promise<MembersResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    await this.organisationService.assertMember(session.userId, organisationId);
-    const members = await this.organisationService.listMembersDetailed(organisationId);
-    return {
-      members: members.map(({ member, email }) => ({
-        userId: member.userId.toString(),
-        role: member.role,
-        email: email ?? undefined,
-        joinedAt: member.joinedAt.toISOString(),
-      })),
-    };
+  async listOrganisationMembers(@Params() params: OrganisationIdParams): Promise<{ members: MemberListItem[] }> {
+    return { members: await this.organisationService.listMemberItems(params.organisationId) };
   }
 
   @Patch('/:organisationId/members/:userId')
+  @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationActionResponse)
-  async changeMemberRole(@Params() params: MemberParams, @Body() body: UpdateMemberRoleBody, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const organisationId = BigInt(params.organisationId);
-    const targetUserId = BigInt(params.userId);
-    const ownerLevel = body.role === 'OWNER';
-
-    const session = ownerLevel ? await this.sessionAuthService.authenticateElevated(request) : await this.sessionAuthService.authenticate(request);
-    const { membership: caller } = await this.organisationService.requireRole(session.userId, organisationId, ownerLevel ? 'OWNER' : 'ADMIN');
-    const target = await this.organisationService.getMembership(targetUserId, organisationId);
-    if (!target) throw AppErrorCode.USR_001.create();
-    if (target.role === 'OWNER' && caller.role !== 'OWNER') throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && session.aal !== 'AAL2') throw AppErrorCode.AUTH_006.create();
-    if (caller.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[caller.role]) throw AppErrorCode.ORG_007.create();
-
-    await this.organisationService.updateMemberRole(organisationId, targetUserId, body.role);
-    await this.audit(request, session, organisationId, 'org.member_role_changed', 'user', params.userId);
-    const email = await this.organisationService.getPrimaryVerifiedEmail(targetUserId);
-    if (email) await this.notificationService.enqueue({ templateKey: ROLE_CHANGED_TEMPLATE, recipients: { email }, payload: { role: body.role } });
+  async changeOrganisationMemberRole(@Params() params: MemberParams, @Body() body: UpdateMemberRoleBody): Promise<OrganisationActionResponse> {
+    await this.organisationService.changeMemberRole(this.caller(), Context.getMembership(), params.organisationId, params.userId, body.role);
     return { success: true };
   }
 
   @Delete('/:organisationId/members/:userId')
+  @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationActionResponse)
-  async removeMember(@Params() params: MemberParams, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const organisationId = BigInt(params.organisationId);
-    const targetUserId = BigInt(params.userId);
-
-    const session = await this.sessionAuthService.authenticate(request);
-    const { membership: caller } = await this.organisationService.requireRole(session.userId, organisationId, 'ADMIN');
-    const target = await this.organisationService.getMembership(targetUserId, organisationId);
-    if (!target) throw AppErrorCode.USR_001.create();
-    if (target.userId === session.userId) throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && (caller.role !== 'OWNER' || session.aal !== 'AAL2')) throw (caller.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
-    if (caller.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[caller.role]) throw AppErrorCode.ORG_007.create();
-
-    await this.organisationService.removeMember(organisationId, targetUserId);
-    await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: params.userId }, params.organisationId);
-    await this.audit(request, session, organisationId, 'org.member_removed', 'user', params.userId);
-    const email = await this.organisationService.getPrimaryVerifiedEmail(targetUserId);
-    if (email) await this.notificationService.enqueue({ templateKey: MEMBER_REMOVED_TEMPLATE, recipients: { email }, payload: {} });
+  async removeOrganisationMember(@Params() params: MemberParams): Promise<OrganisationActionResponse> {
+    await this.organisationService.removeOrganisationMember(this.caller(), Context.getMembership(), params.organisationId, params.userId);
     return { success: true };
   }
 
   @Get('/:organisationId/invitations')
+  @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, InvitationsResponse)
-  async listInvitations(@Params() params: OrganisationIdParams, @Req() request: FastifyRequest): Promise<InvitationsResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    await this.organisationService.requireRole(session.userId, organisationId, 'ADMIN');
-    const invitations = await this.invitationService.listPending(organisationId);
-    return {
-      invitations: invitations.map(invitation => ({
-        id: invitation.id.toString(),
-        email: invitation.email,
-        role: invitation.role,
-        expiresAt: invitation.expiresAt.toISOString(),
-        createdAt: invitation.createdAt.toISOString(),
-      })),
-    };
+  async listOrganisationInvitations(@Params() params: OrganisationIdParams): Promise<{ invitations: Organisation.Invitation[] }> {
+    return { invitations: await this.organisationService.listPendingInvitations(params.organisationId) };
   }
 
   @Post('/:organisationId/invitations')
+  @Auth({ orgRole: 'ADMIN' })
   @HttpStatus(200)
   @RespondFor(200, OrganisationActionResponse)
-  async invite(@Params() params: OrganisationIdParams, @Body() body: InviteMemberBody, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    const { organisation } = await this.organisationService.requireRole(session.userId, organisationId, 'ADMIN');
-    const invitation = await this.invitationService.invite({ organisation, email: body.email, role: body.role, invitedBy: session.userId });
-    await this.audit(request, session, organisationId, 'org.invitation_sent', 'organisation_invitation', invitation.id.toString());
+  async inviteOrganisationMember(@Params() params: OrganisationIdParams, @Body() body: InviteMemberBody): Promise<OrganisationActionResponse> {
+    await this.organisationService.inviteMember(this.caller(), Context.getOrganisation(), body.email, body.role);
     return { success: true };
   }
 
   @Delete('/:organisationId/invitations/:invitationId')
+  @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationActionResponse)
-  async revokeInvitation(@Params() params: InvitationParams, @Req() request: FastifyRequest): Promise<OrganisationActionResponse> {
-    const session = await this.sessionAuthService.authenticate(request);
-    const organisationId = BigInt(params.organisationId);
-    await this.organisationService.requireRole(session.userId, organisationId, 'ADMIN');
-    const invitation = await this.invitationService.revoke(organisationId, BigInt(params.invitationId));
-    await this.audit(request, session, organisationId, 'org.invitation_revoked', 'organisation_invitation', invitation.id.toString());
+  async revokeOrganisationInvitation(@Params() params: InvitationParams): Promise<OrganisationActionResponse> {
+    await this.organisationService.revokeInvitation(this.caller(), params.organisationId, params.invitationId);
     return { success: true };
   }
 }

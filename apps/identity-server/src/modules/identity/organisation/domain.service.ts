@@ -12,6 +12,8 @@ import { AppError, Logger } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { type ValidatedSession } from '@server/modules/auth/session';
+import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
 import { DnsTxtResolver } from './dns-txt.resolver';
@@ -24,6 +26,23 @@ export interface DomainChallenge {
   domain: Organisation.Domain;
   txtRecordName: string;
   txtRecordValue: string;
+}
+
+/** Wire shape of a domain: native id/date the response serializer converts. */
+export interface DomainDetail {
+  id: bigint;
+  domain: string;
+  status: Organisation.DomainStatus;
+  txtRecordName: string;
+  txtRecordValue: string;
+  verifiedAt?: Date;
+  lastCheckedAt?: Date;
+  lastCheckError?: string;
+}
+
+interface CallerContext {
+  session: ValidatedSession;
+  ip: string;
 }
 
 /**
@@ -46,12 +65,66 @@ export class DomainService {
   constructor(
     databaseService: DatabaseService,
     private readonly dnsTxtResolver: DnsTxtResolver,
+    private readonly auditService: AuditService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
 
   challengeOf(domain: Organisation.Domain): DomainChallenge {
     return { domain, txtRecordName: `${TXT_PREFIX}.${domain.domain}`, txtRecordValue: `${TXT_VALUE_PREFIX}${domain.verificationToken}` };
+  }
+
+  /** Flattens a challenge to the wire shape; native id/date are converted by the response serializer. */
+  private toDomainItem(challenge: DomainChallenge): DomainDetail {
+    const { domain } = challenge;
+    return {
+      id: domain.id,
+      domain: domain.domain,
+      status: domain.status,
+      txtRecordName: challenge.txtRecordName,
+      txtRecordValue: challenge.txtRecordValue,
+      verifiedAt: domain.verifiedAt ?? undefined,
+      lastCheckedAt: domain.lastCheckedAt ?? undefined,
+      lastCheckError: domain.lastCheckError ?? undefined,
+    };
+  }
+
+  private async audit(caller: CallerContext, organisationId: bigint, action: string, domain: Organisation.Domain): Promise<void> {
+    await this.auditService.record({
+      action,
+      outcome: 'SUCCESS',
+      actorType: 'USER',
+      actorId: caller.session.userId.toString(),
+      organisationId: organisationId.toString(),
+      targetType: 'organisation_domain',
+      targetId: domain.id.toString(),
+      detail: { domain: domain.domain },
+      ipAddress: caller.ip,
+    });
+  }
+
+  /* --------------------------- caller-facing orchestration --------------------------- */
+
+  async listDomainItems(organisationId: bigint): Promise<DomainDetail[]> {
+    const domains = await this.list(organisationId);
+    return domains.map(domain => this.toDomainItem(this.challengeOf(domain)));
+  }
+
+  async registerDomain(caller: CallerContext, organisationId: bigint, rawDomain: string): Promise<DomainDetail> {
+    const challenge = await this.register(organisationId, rawDomain);
+    await this.audit(caller, organisationId, 'org.domain_registered', challenge.domain);
+    return this.toDomainItem(challenge);
+  }
+
+  async verifyDomain(caller: CallerContext, organisationId: bigint, domainId: bigint): Promise<DomainDetail> {
+    const domain = await this.verify(organisationId, domainId);
+    await this.audit(caller, organisationId, domain.status === 'VERIFIED' ? 'org.domain_verified' : 'org.domain_verification_failed', domain);
+    return this.toDomainItem(this.challengeOf(domain));
+  }
+
+  async removeDomain(caller: CallerContext, organisationId: bigint, domainId: bigint): Promise<void> {
+    const domain = await this.remove(organisationId, domainId);
+    await this.audit(caller, organisationId, 'org.domain_removed', domain);
   }
 
   async register(organisationId: bigint, rawDomain: string): Promise<DomainChallenge> {

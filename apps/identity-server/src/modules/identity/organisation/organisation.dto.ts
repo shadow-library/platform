@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -27,26 +28,31 @@ type InvitableRole = (typeof INVITABLE_ROLES)[number];
 
 @Schema()
 export class OrganisationIdParams {
-  @Field({ pattern: '^\\d+$' })
-  organisationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  organisationId: bigint;
 }
 
 @Schema()
 export class MemberParams {
-  @Field({ pattern: '^\\d+$' })
-  organisationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  organisationId: bigint;
 
-  @Field({ pattern: '^\\d+$' })
-  userId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  userId: bigint;
 }
 
 @Schema()
 export class InvitationParams {
-  @Field({ pattern: '^\\d+$' })
-  organisationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  organisationId: bigint;
 
-  @Field({ pattern: '^\\d+$' })
-  invitationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  invitationId: bigint;
 }
 
 @Schema()
@@ -66,8 +72,8 @@ export class RenameOrganisationBody {
 
 @Schema()
 export class OrganisationResponse {
-  @Field()
-  id: string;
+  @Field(() => String)
+  id: bigint;
 
   @Field()
   slug: string;
@@ -87,8 +93,8 @@ export class OrganisationResponse {
 
 @Schema()
 export class MemberItem {
-  @Field()
-  userId: string;
+  @Field(() => String)
+  userId: bigint;
 
   @Field(() => String, { enum: [...MEMBER_ROLES] })
   role: MemberRole;
@@ -123,8 +129,8 @@ export class InviteMemberBody {
 
 @Schema()
 export class InvitationItem {
-  @Field()
-  id: string;
+  @Field(() => String)
+  id: bigint;
 
   @Field()
   email: string;
@@ -159,8 +165,8 @@ export class OrganisationActionResponse {
 
 @Schema()
 export class MyOrganisationItem {
-  @Field()
-  id: string;
+  @Field(() => String)
+  id: bigint;
 
   @Field()
   slug: string;
@@ -192,11 +198,13 @@ export class MyOrganisationsResponse {
 
 @Schema()
 export class DomainParams {
-  @Field({ pattern: '^\\d+$' })
-  organisationId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  organisationId: bigint;
 
-  @Field({ pattern: '^\\d+$' })
-  domainId: string;
+  @Field(() => String, { pattern: '^\\d+$' })
+  @Transform('bigint:parse')
+  domainId: bigint;
 }
 
 @Schema()
@@ -207,8 +215,8 @@ export class RegisterDomainBody {
 
 @Schema()
 export class DomainItem {
-  @Field()
-  id: string;
+  @Field(() => String)
+  id: bigint;
 
   @Field()
   domain: string;
