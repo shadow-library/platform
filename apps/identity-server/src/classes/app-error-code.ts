@@ -102,6 +102,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ADM_002 = new AppErrorCode('ADM_002', 'Platform administration is not provisioned');
   /** A malformed administrative request value (for example an unparseable timestamp) */
   static readonly ADM_003 = AppErrorCode.validation('ADM_003', 'Invalid administrative request value', 400);
+  /** The application already holds the maximum number of OAuth clients permitted */
+  static readonly ADM_004 = AppErrorCode.validation('ADM_004', 'Application has reached its maximum number of OAuth clients', 409);
+  /** A workload-identity client requires a workload subject binding but none was provided */
+  static readonly ADM_005 = AppErrorCode.validation('ADM_005', 'A workload subject is required for Kubernetes workload identity authentication', 400);
 
   /*!
    * Authorization (RBAC) Error Codes

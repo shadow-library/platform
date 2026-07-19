@@ -218,6 +218,20 @@
       "when": 1784173780376,
       "tag": "0030_workload-identity-service-access",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1784434647178,
+      "tag": "0031_add_private_key_jwt_auth_method",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1784440791439,
+      "tag": "0032_application_public_urls",
+      "breakpoints": true
     }
   ]
 }

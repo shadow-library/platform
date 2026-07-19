@@ -32,8 +32,6 @@ declare module '@shadow-library/common' {
     'webhooks.allow-insecure-targets': boolean;
 
     /** Notification service (pulse-server) */
-    'notification.base-url': string;
-    'notification.service-name': string;
     'notification.audience': string;
 
     /** Worker configs */
@@ -47,11 +45,6 @@ declare module '@shadow-library/common' {
     'auth.workload.issuer': string;
     'auth.workload.audience': string;
     'auth.workload.jwks-uri': string;
-
-    /** Ecosystem seed: comma-separated public origins per app; each origin gets `<origin>/api/auth/callback` registered as an OAuth redirect URI */
-    'ecosystem.pulse.public-urls': string;
-    'ecosystem.novel-forge.public-urls': string;
-    'ecosystem.webnovel.public-urls': string;
 
     /** Ecosystem seed: optional fixed client credentials (id must be a UUID); unset keeps the random-per-cluster behaviour */
     'ecosystem.pulse.rp-client-id': string | undefined;
@@ -69,8 +62,6 @@ declare module '@shadow-library/common' {
     'ecosystem.identity-server.client-id': string | undefined;
     'ecosystem.identity-server.client-secret': string | undefined;
 
-    /** Web UI */
-    'ui.public-dir': string;
   }
 }
 
@@ -90,8 +81,6 @@ Config.load('auth.password.breach-check-enabled', { defaultValue: 'false', valid
 Config.load('auth.webauthn.rp-id', { defaultValue: 'localhost' });
 Config.load('auth.webauthn.origin', { defaultValue: 'http://localhost:8080' });
 
-Config.load('notification.base-url', { defaultValue: 'http://localhost:3000/api/v1' });
-Config.load('notification.service-name', { defaultValue: 'shadow-identity' });
 /** `aud` of the outbound service token; must mirror pulse-server's AUTH_AUDIENCE (the identity-seeded `pulse-server` API resource). */
 Config.load('notification.audience', { defaultValue: 'pulse-server' });
 
@@ -108,15 +97,6 @@ Config.load('oauth.login-url', { defaultValue: 'https://identity.shadow-apps.com
 Config.load('auth.workload.issuer', { defaultValue: '' });
 Config.load('auth.workload.audience', { defaultValue: '' });
 Config.load('auth.workload.jwks-uri', { defaultValue: '' });
-
-/**
- * Public origins of the first-party ecosystem apps, used by the ecosystem seed to register the
- * `{origin}/api/auth/callback` redirect URIs of their relying-party OAuth clients. Redirect URIs
- * converge to these values on every boot, so per-environment overrides are picked up on restart.
- */
-Config.load('ecosystem.pulse.public-urls', { defaultValue: 'http://pulse.shadow-apps.test,http://localhost:3000' });
-Config.load('ecosystem.novel-forge.public-urls', { defaultValue: 'http://novel-forge.shadow-apps.test,http://localhost:3001' });
-Config.load('ecosystem.webnovel.public-urls', { defaultValue: 'http://webnovel.shadow-apps.test,http://localhost:3002' });
 
 /**
  * Optional fixed credentials for the ecosystem-seeded OAuth clients (`ECOSYSTEM_<APP>_RP_CLIENT_ID`
@@ -144,8 +124,6 @@ Config.load('rate-limit.ip-allowlist', { defaultValue: '' });
 
 /** Relaxes the webhook SSRF guard (https-only, public addresses) for local development and tests. */
 Config.load('webhooks.allow-insecure-targets', { defaultValue: 'false', validateType: 'boolean' });
-
-Config.load('ui.public-dir', { defaultValue: `${process.cwd()}/public` });
 
 /**
  * The master encryption key wraps signing/encryption keys at rest. It must never fall back to a

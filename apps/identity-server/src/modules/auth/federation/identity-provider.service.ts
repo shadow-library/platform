@@ -9,7 +9,7 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, oidcDiscoveryUrl } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
 import { DatabaseService, IdentityProvider, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { WebhookTargetGuard } from '@server/modules/infrastructure/webhook';
@@ -75,7 +75,7 @@ export class IdentityProviderService {
   /** Raw fetch, not APIRequest: admin-supplied issuers need a hard timeout, which APIRequest does not expose. */
   private async discover(issuer: string): Promise<DiscoveredEndpoints> {
     this.targetGuard.assertAcceptableUrl(issuer);
-    const url = `${issuer.replace(/\/$/, '')}/.well-known/openid-configuration`;
+    const url = oidcDiscoveryUrl(issuer);
     let document: DiscoveryDocument;
     try {
       const response = await fetch(url, { signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS) });

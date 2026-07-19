@@ -41,6 +41,7 @@ interface ApplicationUpdate {
   homePageUrl?: string;
   logoUrl?: string;
   isActive?: boolean;
+  publicUrls?: string[];
 }
 
 /**
@@ -51,6 +52,8 @@ interface ApplicationUpdate {
  * resource cannot exist without an `applicationId`). The platform application (`shadow-identity`)
  * is protected: it may never be deactivated or deleted, since the whole IdP hangs off it.
  */
+
+const OAUTH_CALLBACK_PATH = '/api/auth/callback';
 
 @HttpController('/api/v1/admin/applications')
 export class AdminApplicationController {
@@ -92,6 +95,7 @@ export class AdminApplicationController {
       homePageUrl: application.homePageUrl ?? undefined,
       logoUrl: application.logoUrl ?? undefined,
       roles: application.roles.map(role => ({ id: role.id, roleName: role.roleName, description: role.description ?? undefined })),
+      publicUrls: application.publicUrls,
       updatedAt: application.updatedAt.toISOString(),
     };
   }
@@ -117,6 +121,7 @@ export class AdminApplicationController {
       homePageUrl: body.homePageUrl,
       logoUrl: body.logoUrl,
       isActive: body.isActive,
+      publicUrls: body.publicUrls ? this.normaliseOrigins(body.publicUrls) : undefined,
     });
     await this.record(actor, 'admin.application.created', String(application.id), { name: application.name });
     return { id: application.id };
@@ -144,11 +149,31 @@ export class AdminApplicationController {
     if (body.homePageUrl !== undefined) update.homePageUrl = body.homePageUrl;
     if (body.logoUrl !== undefined) update.logoUrl = body.logoUrl;
     if (body.isActive !== undefined) update.isActive = body.isActive;
+    if (body.publicUrls !== undefined) update.publicUrls = this.normaliseOrigins(body.publicUrls);
 
     const fields = Object.keys(update);
     if (fields.length) await this.applicationService.updateApplication(application.name, update);
+    if (update.publicUrls !== undefined) await this.regenerateRelyingPartyRedirectUris(application.id, update.publicUrls);
     await this.record(actor, 'admin.application.updated', String(application.id), { fields });
     return { success: true };
+  }
+
+  /** Trims trailing slashes and de-duplicates origins so distinct spellings can't collide into duplicate redirect URIs. */
+  private normaliseOrigins(origins: string[]): string[] {
+    return [...new Set(origins.map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean))];
+  }
+
+  /**
+   * Public origins are the authoritative input; the relying-party clients' redirect URIs are the
+   * derived enforcement artifact. Changing the origins rewrites the `/api/auth/callback` redirect
+   * URI set of every confidential (server-rendered) client the application owns.
+   */
+  private async regenerateRelyingPartyRedirectUris(applicationId: number, publicUrls: string[]): Promise<void> {
+    const redirectUris = publicUrls.map(origin => `${origin}${OAUTH_CALLBACK_PATH}`);
+    const clients = await this.clientService.listClients(applicationId);
+    for (const client of clients) {
+      if (client.kind === 'WEB_CONFIDENTIAL') await this.clientService.updateClient(client.id, { redirectUris });
+    }
   }
 
   @Delete('/:applicationId')

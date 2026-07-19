@@ -109,11 +109,9 @@ A **modular monolith** (D-13) with two deployable processes built from the same 
 
 Both are stateless; all state lives in PostgreSQL (durable) and Redis (ephemeral: flows, rate limits, caches, revocation marks). Horizontal scaling of the API process MUST be assumed in all designs — **no in-process state may be authoritative** (this retires the current `ApplicationService` in-memory `Map`).
 
-### 5.1 Hosted web client (T-603)
+### 5.1 Web client (separate app)
 
-The interactive UI (login, registration, recovery, consent, account management) is a React SPA in `client/`, built on `@shadow-library/ui` and **served by the API process itself** — `oauth.login-url` points back at this service, so the IdP owns its own front door and no separate frontend deployment exists. Placement rationale: the pages are pure consumers of the same-origin `/api/v1` surface (cookies + CSRF double-submit), so co-locating them removes CORS, token hand-off, and deployment-skew concerns entirely.
-
-Build wiring: `scripts/build-client.ts` bundles `client/main.tsx` with `Bun.build` into `public/` (fonts ship as files — Bun's CSS bundler would otherwise inline them as data URLs); `scripts/build.ts` embeds `public/` into `dist/` so one image serves both. Serving: `UiController` answers the SPA shell with `cache-control: no-store` on the page routes; `@fastify/static` (registered through `FastifyModule`'s `fastifyFactory`) serves `/assets/*` long-cached. CSP stays `script-src 'self'` (the shell carries no inline script); `style-src` allows inline because the Radix primitives inside `@shadow-library/ui` position overlays with style attributes; `img-src` allows `data:` for the locally rendered TOTP QR code.
+The interactive UI (login, registration, recovery, consent, account management, and the operator console) is a **separate front-end application, [`identity-web`](../../identity-web)** — it is not part of this repository. This service is API-only: it exposes the JSON `/api/v1` surface and the OAuth/OIDC endpoints, and `oauth.login-url` points at wherever `identity-web` is deployed. The UI is a pure consumer of the same-origin `/api/v1` surface (cookies + CSRF double-submit); keeping it in its own repo/deployment is the only cross-origin concern, handled by same-site cookies and the registered redirect/login URLs.
 
 ## 6. Module map
 
@@ -134,7 +132,7 @@ Modules live under `src/modules/`. A module may only touch another module's tabl
 | Audit                | `infrastructure/audit`          | AuditEvent, SignInEvent writer                                                           | New                                         |
 | Jobs                 | `infrastructure/jobs`           | queue tables, worker runtime                                                             | New                                         |
 | Datastore            | `infrastructure/datastore`      | replaced by `DatabaseModule` (D-14); keeps Drizzle schemas                               | Refactor                                    |
-| Web client           | `infrastructure/ui` + `client/` | SPA shell serving, static assets (§5.1)                                                  | New (M6, T-603)                             |
+| Web client           | separate app (`identity-web`)   | browser UI; consumes this service's `/api/v1` + OAuth endpoints (§5.1)                    | External repo                               |
 
 ## 7. Identity and tenancy model
 
@@ -367,7 +365,6 @@ Shipped in M7: team organisations with invitations, DNS-verified domains (`organ
 | L1+L2 cache                              | `CacheModule`                                                | `@shadow-library/modules`      |
 | DB/Redis clients + lifecycle             | `DatabaseModule` (≥ 0.5)                                     | `@shadow-library/modules`      |
 | Health, OpenAPI docs, CSRF, helmet       | `HttpCoreModule`                                             | `@shadow-library/modules`      |
-| Login/account UI components              | React components                                             | `@shadow-library/ui`           |
 | Consumer-side auth                       | **`@shadow-library/auth` (new)**                             | `docs/sdk.md`                  |
 
 ## 17. Sequence diagrams

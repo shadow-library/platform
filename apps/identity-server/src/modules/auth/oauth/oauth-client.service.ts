@@ -10,6 +10,7 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
@@ -32,7 +33,15 @@ export interface RegisterClient {
   backchannelLogoutUri?: string;
   /** k8s SA subject allowed to authenticate this client with a projected token (D-16) */
   workloadSubject?: string;
+  /**
+   * Confidential-client authentication method. `client_secret` mints a rotatable secret;
+   * `workload_identity` binds a k8s SA subject and mints no secret (D-16). Ignored for public
+   * clients, which always use PKCE (`none`). Defaults to `client_secret`.
+   */
+  authMethod?: ClientAuthMethod;
 }
+
+export type ClientAuthMethod = 'client_secret' | 'workload_identity';
 
 export interface RegisteredClient {
   clientId: string;
@@ -57,6 +66,8 @@ export interface RotatedSecret {
  */
 const ARGON2_OPTIONS = { algorithm: 'argon2id', memoryCost: 65536, timeCost: 3 } as const;
 const PUBLIC_KINDS: OAuthClient.Kind[] = ['SPA_PUBLIC', 'NATIVE_PUBLIC'];
+/** An application may not hold more than this many OAuth clients (first-party clients included). */
+const MAX_CLIENTS_PER_APPLICATION = 10;
 const DUMMY_SECRET_HASH = '$argon2id$v=19$m=65536,t=3,p=1$NCJqmYBSCaQHCbd96KVjeycfea/Op9Qf6OqrtzsUMkw$YNaWD8v4qxMkTfyuv7T0n+3PYqGqYo+6ixhN31TqX6E';
 
 @Injectable()
@@ -70,9 +81,21 @@ export class OAuthClientService {
 
   async register(input: RegisterClient): Promise<RegisteredClient> {
     const isPublic = PUBLIC_KINDS.includes(input.kind);
-    const authMethod: OAuthClient.AuthMethod = isPublic ? 'none' : 'client_secret_basic';
+    /**
+     * Auth method is exclusive: a workload-identity client authenticates only with its projected
+     * SA-token assertion (`private_key_jwt`) and holds no secret; a secret client uses
+     * `client_secret_basic`; public clients use PKCE (`none`). A caller signals workload identity
+     * explicitly via `authMethod`, or implicitly by supplying a `workloadSubject` with no method —
+     * the long-standing seed/admin shape (D-16).
+     */
+    const isWorkload = !isPublic && (input.authMethod === 'workload_identity' || (input.authMethod === undefined && input.workloadSubject != null));
+    if (isWorkload && !input.workloadSubject) throw AppErrorCode.ADM_005.create();
+    const authMethod: OAuthClient.AuthMethod = isPublic ? 'none' : isWorkload ? 'private_key_jwt' : 'client_secret_basic';
 
     const clientId = await this.db.transaction(async tx => {
+      const existing = await tx.$count(schema.oauthClients, eq(schema.oauthClients.applicationId, input.applicationId));
+      if (existing >= MAX_CLIENTS_PER_APPLICATION) throw AppErrorCode.ADM_004.create();
+
       const client = await tx
         .insert(schema.oauthClients)
         .values({
@@ -87,7 +110,7 @@ export class OAuthClientService {
           accessTokenTtl: input.accessTokenTtl ?? 3600,
           organisationId: input.organisationId ?? null,
           backchannelLogoutUri: input.backchannelLogoutUri ?? null,
-          workloadSubject: input.workloadSubject ?? null,
+          workloadSubject: isWorkload ? input.workloadSubject : null,
         })
         .returning({ id: schema.oauthClients.id })
         .then(([row]) => row ?? throwError(AppError.internal('Failed to create OAuth client')));
@@ -97,9 +120,9 @@ export class OAuthClientService {
       return client.id;
     });
 
-    let secret: string | undefined;
-    if (!isPublic) secret = await this.createSecret(clientId);
-    this.logger.info('Registered OAuth client', { clientId, kind: input.kind });
+    /** Only secret clients receive a secret; workload and public clients never hold one. */
+    const secret = authMethod === 'client_secret_basic' ? await this.createSecret(clientId) : undefined;
+    this.logger.info('Registered OAuth client', { clientId, kind: input.kind, authMethod });
     return { clientId, secret };
   }
 
@@ -191,8 +214,17 @@ export class OAuthClientService {
     await this.db.delete(schema.oauthClientScopeGrants).where(and(eq(schema.oauthClientScopeGrants.clientId, clientId), eq(schema.oauthClientScopeGrants.scopeId, scopeId)));
   }
 
-  async listClients(): Promise<OAuthClient[]> {
-    return this.db.query.oauthClients.findMany();
+  async listClients(applicationId?: number): Promise<OAuthClient[]> {
+    return this.db.query.oauthClients.findMany({
+      ...(applicationId !== undefined ? { where: eq(schema.oauthClients.applicationId, applicationId) } : {}),
+    });
+  }
+
+  /** Maps the stored token-endpoint auth method to the public auth-method the console renders. */
+  static toAuthMethod(method: OAuthClient.AuthMethod): 'none' | 'client_secret' | 'workload_identity' {
+    if (method === 'none') return 'none';
+    if (method === 'private_key_jwt') return 'workload_identity';
+    return 'client_secret';
   }
 
   async getClientDetail(clientId: string): Promise<(OAuthClient & { redirectUris: string[]; scopes: string[] }) | null> {

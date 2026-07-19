@@ -10,7 +10,7 @@ import { Config, Logger, ValidationError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
+import { APP_NAME, ERROR_MESSAGES, hibpRangeUrl } from '@server/constants';
 
 /**
  * Defining types
@@ -20,7 +20,6 @@ import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
  * Declaring the constants
  */
 const STRENGTH_OPTIONS: StrongPasswordOptions = { minLength: 8, minLowercase: 1, minUppercase: 1, minNumbers: 1, minSymbols: 1 };
-const HIBP_RANGE_URL = 'https://api.pwnedpasswords.com/range';
 
 /**
  * Enforces password strength and, when enabled, checks candidates against the Have I Been Pwned
@@ -43,7 +42,7 @@ export class PasswordPolicyService {
       const sha1 = createHash('sha1').update(password).digest('hex').toUpperCase();
       const prefix = sha1.slice(0, 5);
       const suffix = sha1.slice(5);
-      const response = await fetch(`${HIBP_RANGE_URL}/${prefix}`, { headers: { 'add-padding': 'true' } });
+      const response = await fetch(hibpRangeUrl(prefix), { headers: { 'add-padding': 'true' } });
       if (!response.ok) return false;
       const body = await response.text();
       return body.split('\n').some(line => line.split(':')[0]?.trim() === suffix);

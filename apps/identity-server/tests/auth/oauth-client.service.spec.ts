@@ -82,4 +82,34 @@ describe('OAuthClientService', () => {
     expect(await service.verifySecret('00000000-0000-0000-0000-000000000000', 'whatever')).toBe(false);
     expect(await service.verifySecret('not-a-uuid', 'whatever')).toBe(false);
   });
+
+  it('should register a workload-identity client with no secret and the private_key_jwt method', async () => {
+    const { clientId, secret } = await service.register({
+      applicationId,
+      name: 'Cluster Worker',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+      authMethod: 'workload_identity',
+      workloadSubject: 'system:serviceaccount:prod:cluster-worker',
+    });
+
+    expect(secret).toBeUndefined();
+    const client = await service.getClient(clientId);
+    expect(client?.tokenEndpointAuthMethod).toBe('private_key_jwt');
+    expect(client?.workloadSubject).toBe('system:serviceaccount:prod:cluster-worker');
+  });
+
+  it('should refuse a workload-identity client without a workload subject', async () => {
+    const promise = service.register({ applicationId, name: 'No Subject', kind: 'SERVICE', grantTypes: ['client_credentials'], authMethod: 'workload_identity' });
+    await expect(promise).rejects.toMatchObject({ code: 'ADM_005' });
+  });
+
+  it('should cap an application at ten OAuth clients', async () => {
+    const app = await env.getService(ApplicationService).createApplication({ name: `capped-${Date.now()}`, subDomain: `capped-${Date.now()}` });
+    for (let index = 0; index < 10; index += 1) {
+      await service.register({ applicationId: app.id, name: `client-${index}`, kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    }
+    const eleventh = service.register({ applicationId: app.id, name: 'client-11', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    await expect(eleventh).rejects.toMatchObject({ code: 'ADM_004' });
+  });
 });

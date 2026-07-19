@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { AppError, Logger, throwError } from '@shadow-library/common';
+import { APIRequest, type APIResponse, AppError, Logger, throwError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -25,7 +25,6 @@ import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
 import { type ClaimExpectations, verifyJwt } from './jwt';
 import { PdpClient } from './pdp-client';
-import { ServiceDiscovery } from './service-discovery';
 import { ServiceTokenManager } from './token-manager';
 
 /**
@@ -73,7 +72,6 @@ export class AuthClient {
   private readonly tokens: ServiceTokenManager;
   private readonly pdp: PdpClient;
   private readonly discovery: DiscoveryClient;
-  private readonly services: ServiceDiscovery;
   private serviceAccess: ServiceAccessRule[] | null = null;
 
   constructor(private readonly config: AuthClientConfig) {
@@ -86,7 +84,6 @@ export class AuthClient {
     this.transport = config.fetch ?? ((url, init) => fetch(url, init));
     this.clockSkewSeconds = config.clockSkewSeconds ?? DEFAULT_CLOCK_SKEW_SECONDS;
     this.discovery = new DiscoveryClient(this.issuer, this.transport);
-    this.services = new ServiceDiscovery();
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
     this.tokens = new ServiceTokenManager({ discovery: this.discovery, fetchFn: this.transport, client: config.client });
     this.pdp = new PdpClient({
@@ -134,14 +131,40 @@ export class AuthClient {
     return this.transport(url, this.withBearer(init, fresh));
   }
 
-  /** Resolves a service name to its base URL (in-cluster svc DNS by default, env-overridable) */
-  resolveService(service: string): string {
-    return this.services.resolve(service);
-  }
+  /**
+   * Calls a named ecosystem service over the `svc://` scheme, which APIRequest resolves through
+   * cluster DNS (or a `SERVICE_URL_<NAME>` override). A service token addressed to the service is
+   * attached and a stale-token 401 triggers a single retry with a fresh token.
+   */
+  async fetchService<T = unknown>(service: string, path: string, init: RequestInit = {}, options: ServiceTokenOptions = {}): Promise<APIResponse<T>> {
+    const resource = options.resource ?? service;
+    const url = `svc://${service}${path.startsWith('/') ? path : `/${path}`}`;
+    const method = String(init.method ?? 'GET').toUpperCase();
+    this.logger.debug('calling service endpoint', { service, path, method, resource });
 
-  /** `fetch` against a named service: svc-DNS resolution plus a service token addressed to it */
-  fetchService(service: string, path: string, init: RequestInit = {}, options: ServiceTokenOptions = {}): Promise<Response> {
-    return this.fetch(this.services.url(service, path), init, { ...options, resource: options.resource ?? service });
+    const dispatch = (bearer: string): Promise<APIResponse<T>> => {
+      const request =
+        method === 'POST'
+          ? APIRequest.post(url)
+          : method === 'PUT'
+            ? APIRequest.put(url)
+            : method === 'PATCH'
+              ? APIRequest.patch(url)
+              : method === 'DELETE'
+                ? APIRequest.delete(url)
+                : APIRequest.get(url);
+      request.header('authorization', `Bearer ${bearer}`).suppressErrors();
+      new Headers(init.headers).forEach((value, key) => key !== 'authorization' && request.header(key, value));
+      if (init.body != null) request.body(typeof init.body === 'string' ? (JSON.parse(init.body) as object) : (init.body as object));
+      return request.execute<T>();
+    };
+
+    const response = await dispatch(await this.tokens.getToken({ ...options, resource }));
+    if (response.statusCode !== 401) return response;
+
+    this.logger.warn('service call rejected with 401; retrying with a fresh token', { service, path });
+    this.tokens.invalidate({ ...options, resource });
+    return dispatch(await this.tokens.getToken({ ...options, resource }));
   }
 
   /** Declaratively replaces this application's role catalog in identity; requires service-account credentials */

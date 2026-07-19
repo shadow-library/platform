@@ -3,7 +3,7 @@
  */
 
 import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Query, Req, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -19,6 +19,7 @@ import {
   ALLOWED_GRANT_TYPES,
   ClientDetailResponse,
   ClientIdParams,
+  ClientListQuery,
   ClientListResponse,
   ClientScopeParams,
   GrantScopeBody,
@@ -67,9 +68,9 @@ export class AdminClientController {
 
   @Get()
   @RespondFor(200, ClientListResponse)
-  async list(@Req() request: FastifyRequest): Promise<ClientListResponse> {
+  async list(@Query() query: ClientListQuery, @Req() request: FastifyRequest): Promise<ClientListResponse> {
     await this.access.requireRead(request, ADMIN_PERMISSIONS.clientsRead);
-    const clients = await this.clientService.listClients();
+    const clients = await this.clientService.listClients(query.applicationId);
     return {
       items: clients.map(client => ({
         id: client.id,
@@ -99,6 +100,7 @@ export class AdminClientController {
       accessTokenTtl: body.accessTokenTtl,
       backchannelLogoutUri: body.backchannelLogoutUri,
       workloadSubject: body.workloadSubject,
+      authMethod: body.authMethod,
     });
     await this.record(actor, 'admin.client.registered', registered.clientId, { name: body.name, kind: body.kind });
     return { clientId: registered.clientId, secret: registered.secret };
@@ -121,6 +123,8 @@ export class AdminClientController {
       scopes: client.scopes,
       grantTypes: client.grantTypes,
       accessTokenTtl: client.accessTokenTtl,
+      authMethod: OAuthClientService.toAuthMethod(client.tokenEndpointAuthMethod),
+      workloadSubject: client.workloadSubject ?? undefined,
       createdAt: client.createdAt.toISOString(),
     };
   }

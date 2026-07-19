@@ -69,7 +69,7 @@ Also seeded:
 - Every `*-server` client is granted `authz:check` and `authz:roles:sync` (so the SDK can load service-access rules, call the PDP, and push a role catalog).
 - `novel-forge-server` is granted the `webnovel:publish` scope (on the `webnovel-server` resource).
 - Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge-server` → webnovel `* /internal/*`.
-- RP redirect URIs: `{origin}/api/auth/callback` for every origin in `ECOSYSTEM_<APP>_PUBLIC_URLS` (comma separated; defaults cover `http://<app>.shadow-apps.test` plus a localhost dev variant). Redirect URIs converge to the environment value on every boot.
+- RP redirect URIs: `{origin}/api/auth/callback` for every public origin on the application. Origins are stored on the application (`applications.public_urls`) — seeded with defaults (`http://<app>.shadow-apps.test` plus a localhost dev variant) the first time the app is created, then managed through the admin console's application page. Editing an app's public URLs regenerates its relying-party clients' redirect URIs; the seed no longer overwrites them on boot.
 
 **Client ids and secrets.** By default client ids are database-generated UUIDs, so they differ per environment. On the boot that first creates a client, its id and secret are logged once (`Registered service client '<name>' …` — same convention as the bootstrap-admin password); afterwards look ids up via `GET /api/v1/admin/clients` and mint a fresh secret with `POST /api/v1/admin/clients/:clientId/rotate-secret` (dual-secret overlap, so running consumers keep working while you re-configure). Secrets are stored hashed; they cannot be read back.
 

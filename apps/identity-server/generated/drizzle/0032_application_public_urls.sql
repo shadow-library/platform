@@ -1,0 +1,1 @@
+ALTER TABLE "applications" ADD COLUMN "public_urls" text[] DEFAULT '{}' NOT NULL;

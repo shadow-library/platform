@@ -28,10 +28,10 @@ const auth = new AuthClient({
 const principal = await auth.verify(bearerToken); // → AuthPrincipal, throws AppError with an AuthErrorCode key
 const allowed = await auth.check({ action: 'posts:write', organisationId: principal.org, principal }); // → boolean, deny-by-default
 const token = await auth.getServiceToken({ resource: 'api://novel-forge', scopes: ['books:read'] }); // cached + singleflight
-const response = await auth.fetchService('novel-forge', '/api/v1/books', {}, { resource: 'api://novel-forge' }); // svc-DNS discovery + token, one retry on 401
+const response = await auth.fetchService('novel-forge', '/api/v1/books', {}, { resource: 'api://novel-forge' }); // → APIResponse; svc:// resolution + token, one retry on 401
 ```
 
-Service discovery resolves a name to `http://<name>` (the in-cluster svc domain) by default; override per service with `SERVICE_URL_<NAME>` env variables.
+`fetchService` calls the service over the `svc://<name>/<path>` scheme, which APIRequest resolves to `http://<name>` (the in-cluster svc domain) by default; override per service with a `SERVICE_URL_<NAME>` env variable, or point a `svc://<name>.<namespace>/…` host at another namespace.
 
 ## Framework guards
 

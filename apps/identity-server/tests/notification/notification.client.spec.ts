@@ -27,9 +27,9 @@ interface CapturedRequest {
 /**
  * Declaring the constants
  *
- * A fake pulse-server is stood up before the app boots and `notification.base-url` is pointed at
- * it, so dispatches run through the real client/transport and every Authorization header is
- * captured for claim assertions.
+ * A fake pulse-server is stood up before the app boots and the `pulse-server` service is pointed at
+ * it via `SERVICE_URL_PULSE_SERVER`, so dispatches run through the real client/transport (including
+ * the `svc://` resolution) and every Authorization header is captured for claim assertions.
  */
 let responseStatus = 202;
 const captured: CapturedRequest[] = [];
@@ -40,7 +40,7 @@ const fakePulse = Bun.serve({
     return Response.json({ id: 'ntf-test' }, { status: responseStatus });
   },
 });
-Config['cache'].set('notification.base-url', `http://localhost:${fakePulse.port}/api/v1`);
+process.env['SERVICE_URL_PULSE_SERVER'] = `http://localhost:${fakePulse.port}`;
 
 const env = new TestEnvironment('notification_client').init();
 afterAll(() => fakePulse.stop(true));
@@ -67,6 +67,8 @@ describe('NotificationClient', () => {
 
     expect(captured).toHaveLength(1);
     expect(captured[0]?.authorization).toStartWith('Bearer ');
+    /** The caller identifies itself by the identity application's name (no separate service-name config). */
+    expect(captured[0]?.body.service).toBe('shadow-identity');
     const token = lastToken();
     const claims = decodeClaims(token);
     expect(claims.iss).toBe(Config.get('oauth.issuer'));

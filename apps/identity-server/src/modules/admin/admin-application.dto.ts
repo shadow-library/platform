@@ -49,6 +49,10 @@ export class CreateApplicationBody {
 
   @Field(() => Boolean, { optional: true })
   isActive?: boolean;
+
+  /** Public browser origins for the app's relying-party clients; each becomes an `/api/auth/callback` redirect URI. */
+  @Field(() => [String], { optional: true })
+  publicUrls?: string[];
 }
 
 @Schema()
@@ -70,6 +74,10 @@ export class UpdateApplicationBody {
 
   @Field(() => Boolean, { optional: true })
   isActive?: boolean;
+
+  /** Public browser origins for the app's relying-party clients; each becomes an `/api/auth/callback` redirect URI. */
+  @Field(() => [String], { optional: true })
+  publicUrls?: string[];
 }
 
 @Schema()
@@ -124,6 +132,10 @@ export class ApplicationDetailResponse extends ApplicationSummaryItem {
 
   @Field(() => [ApplicationRoleItem])
   roles: ApplicationRoleItem[];
+
+  /** Public browser origins; each yields an `/api/auth/callback` redirect URI on the app's relying-party clients. */
+  @Field(() => [String])
+  publicUrls: string[];
 
   @Field()
   updatedAt: string;

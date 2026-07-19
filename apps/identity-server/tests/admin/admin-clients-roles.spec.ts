@@ -158,4 +158,37 @@ describe('Admin client, resource and role APIs', () => {
     const after = await request('get', `/api/v1/admin/role-assignments?principalType=USER&principalId=${user.id}`);
     expect((after.json() as { items: unknown[] }).items).toHaveLength(0);
   });
+
+  it('should report the caller’s admin permissions for console gating', async () => {
+    const response = await request('get', '/api/v1/admin/context');
+    expect(response.statusCode).toBe(200);
+    const body = response.json() as { permissions: string[] };
+    expect(body.permissions).toContain('iam:clients:manage');
+  });
+
+  it('should return no permissions for a non-staff session', async () => {
+    const user = await env.getService(UserService).createUserWithPassword({ email: 'not-staff@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
+    const { secret } = await env.getService(SessionService).create({ userId: user.id, aal: 'AAL2' });
+    const response = await request('get', '/api/v1/admin/context', secret);
+    expect(response.statusCode).toBe(200);
+    expect((response.json() as { permissions: string[] }).permissions).toHaveLength(0);
+  });
+
+  it('should register a workload-identity client over HTTP without returning a secret', async () => {
+    const response = await request('post', '/api/v1/admin/clients').body({
+      applicationId: platformAppId,
+      name: 'Cluster Job',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+      authMethod: 'workload_identity',
+      workloadSubject: 'system:serviceaccount:prod:cluster-job',
+    });
+    expect(response.statusCode).toBe(201);
+    const body = response.json() as { clientId: string; secret?: string };
+    expect(body.secret).toBeUndefined();
+
+    const detail = await request('get', `/api/v1/admin/clients/${body.clientId}`);
+    expect((detail.json() as { authMethod: string; workloadSubject?: string }).authMethod).toBe('workload_identity');
+    expect((detail.json() as { workloadSubject?: string }).workloadSubject).toBe('system:serviceaccount:prod:cluster-job');
+  });
 });

@@ -10,7 +10,7 @@ import { AppError, Config, Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { ServiceAccessService } from '@server/modules/authz';
-import { OAuthClient } from '@server/modules/infrastructure/datastore';
+import { type Application, OAuthClient } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
 /**
@@ -22,8 +22,12 @@ interface EcosystemApp {
   name: 'pulse' | 'novel-forge' | 'webnovel';
   subDomain: string;
   displayName: string;
-  /** Config key holding the comma-separated public origins that receive `/api/auth/callback` redirect URIs */
-  publicUrlsKey: 'ecosystem.pulse.public-urls' | 'ecosystem.novel-forge.public-urls' | 'ecosystem.webnovel.public-urls';
+  /**
+   * Public browser origins seeded onto the application the first time it is created. Thereafter the
+   * stored `public_urls` are authoritative and edited through the admin console — these are only the
+   * bootstrap defaults, so a fresh cluster or CI run has working redirect URIs out of the box.
+   */
+  defaultPublicUrls: string[];
 }
 
 type FixedCredentialKey = `ecosystem.${EcosystemApp['name']}.${'rp' | 'server'}-client-${'id' | 'secret'}` | `ecosystem.identity-server.client-${'id' | 'secret'}`;
@@ -51,9 +55,9 @@ const RP_GRANT_TYPES = ['authorization_code', 'refresh_token'];
 const SERVICE_GRANT_TYPES = ['client_credentials'];
 
 const ECOSYSTEM_APPS: EcosystemApp[] = [
-  { name: 'pulse', subDomain: 'pulse', displayName: 'Shadow Pulse', publicUrlsKey: 'ecosystem.pulse.public-urls' },
-  { name: 'novel-forge', subDomain: 'novel-forge', displayName: 'Novel Forge', publicUrlsKey: 'ecosystem.novel-forge.public-urls' },
-  { name: 'webnovel', subDomain: 'webnovel', displayName: 'Webnovel', publicUrlsKey: 'ecosystem.webnovel.public-urls' },
+  { name: 'pulse', subDomain: 'pulse', displayName: 'Shadow Pulse', defaultPublicUrls: ['http://pulse.shadow-apps.test', 'http://localhost:3000'] },
+  { name: 'novel-forge', subDomain: 'novel-forge', displayName: 'Novel Forge', defaultPublicUrls: ['http://novel-forge.shadow-apps.test', 'http://localhost:3001'] },
+  { name: 'webnovel', subDomain: 'webnovel', displayName: 'Webnovel', defaultPublicUrls: ['http://webnovel.shadow-apps.test', 'http://localhost:3002'] },
 ];
 
 /**
@@ -90,7 +94,7 @@ export class EcosystemSeedService {
     for (const app of ECOSYSTEM_APPS) {
       const application = await this.ensureApplication(app);
       await this.oauthClientService.ensureResource(application.id, this.serviceClientName(app), `${app.displayName} API`);
-      await this.ensureRelyingPartyClient(app, application.id);
+      await this.ensureRelyingPartyClient(app, application);
       const serviceCredentials = this.fixedCredentials(`ecosystem.${app.name}.server-client-id` as const, `ecosystem.${app.name}.server-client-secret` as const);
       const serviceClientId = await this.ensureServiceClient(this.serviceClientName(app), application.id, serviceCredentials);
       await this.oauthClientService.grantScope(serviceClientId, authzCheckScopeId);
@@ -122,18 +126,19 @@ export class EcosystemSeedService {
     return `${app.name}-server`;
   }
 
-  private redirectUris(app: EcosystemApp): string[] {
-    return Config.get(app.publicUrlsKey)
-      .split(',')
-      .map(origin => origin.trim().replace(/\/$/, ''))
-      .filter(Boolean)
-      .map(origin => `${origin}${OAUTH_CALLBACK_PATH}`);
+  /** Derives a relying party's callback redirect URIs from an application's stored public origins. */
+  private redirectUris(publicUrls: string[]): string[] {
+    return publicUrls.map(origin => origin.trim().replace(/\/$/, '')).filter(Boolean).map(origin => `${origin}${OAUTH_CALLBACK_PATH}`);
   }
 
-  private async ensureApplication(app: EcosystemApp): Promise<{ id: number }> {
+  private async ensureApplication(app: EcosystemApp): Promise<Application> {
     const existing = this.applicationService.getApplication(app.name);
-    if (existing) return existing;
-    return this.applicationService.createApplication({ name: app.name, subDomain: app.subDomain, displayName: app.displayName });
+    if (existing) {
+      if (existing.publicUrls.length > 0) return existing;
+      /** Upgrade path: an application created before `public_urls` existed adopts the bootstrap defaults once. */
+      return this.applicationService.updateApplication(app.name, { publicUrls: app.defaultPublicUrls });
+    }
+    return this.applicationService.createApplication({ name: app.name, subDomain: app.subDomain, displayName: app.displayName, publicUrls: app.defaultPublicUrls });
   }
 
   /**
@@ -146,14 +151,14 @@ export class EcosystemSeedService {
     return clients.find(client => client.applicationId === applicationId && client.name === name && client.kind === kind) ?? null;
   }
 
-  private async ensureRelyingPartyClient(app: EcosystemApp, applicationId: number): Promise<void> {
+  private async ensureRelyingPartyClient(app: EcosystemApp, application: Application): Promise<void> {
     const label = `relying-party client '${app.name}'`;
-    const redirectUris = this.redirectUris(app);
+    const redirectUris = this.redirectUris(application.publicUrls);
     const fixed = this.fixedCredentials(`ecosystem.${app.name}.rp-client-id` as const, `ecosystem.${app.name}.rp-client-secret` as const);
-    const existing = await this.findClient(applicationId, app.name, 'WEB_CONFIDENTIAL');
+    const existing = await this.findClient(application.id, app.name, 'WEB_CONFIDENTIAL');
 
     if (!existing) {
-      const registered = await this.oauthClientService.register({ applicationId, id: fixed.id, name: app.name, kind: 'WEB_CONFIDENTIAL', isFirstParty: true, redirectUris, grantTypes: RP_GRANT_TYPES });
+      const registered = await this.oauthClientService.register({ applicationId: application.id, id: fixed.id, name: app.name, kind: 'WEB_CONFIDENTIAL', isFirstParty: true, redirectUris, grantTypes: RP_GRANT_TYPES });
       await this.finalizeRegistration(label, registered, fixed);
       return;
     }
@@ -161,12 +166,16 @@ export class EcosystemSeedService {
     this.refuseRekey(label, existing.id, fixed.id);
     await this.convergeFixedSecret(label, existing.id, fixed.secret);
 
-    /** Redirect URIs follow the environment, so an env change converges on the next boot. */
+    /**
+     * Redirect URIs are now owned by the DB (edited through the console), so the seed no longer
+     * overwrites them on every boot — it only backfills a client that has none, e.g. the first boot
+     * after `public_urls` was introduced.
+     */
     const detail = await this.oauthClientService.getClientDetail(existing.id);
-    const current = [...(detail?.redirectUris ?? [])].sort();
-    if (current.join('\n') === [...redirectUris].sort().join('\n')) return;
-    await this.oauthClientService.updateClient(existing.id, { redirectUris });
-    this.logger.info(`Converged redirect URIs of relying-party client '${app.name}'`, { clientId: existing.id, redirectUris });
+    if ((detail?.redirectUris ?? []).length === 0 && redirectUris.length > 0) {
+      await this.oauthClientService.updateClient(existing.id, { redirectUris });
+      this.logger.info(`Backfilled redirect URIs of relying-party client '${app.name}'`, { clientId: existing.id, redirectUris });
+    }
   }
 
   private async ensureServiceClient(name: string, applicationId: number, fixed: FixedCredentials): Promise<string> {

@@ -65,6 +65,20 @@ export class RegisterClientBody {
   /** k8s SA subject (`system:serviceaccount:<ns>:<name>`) allowed to authenticate this client with a projected token (D-16). */
   @Field({ optional: true, maxLength: 512 })
   workloadSubject?: string;
+
+  /**
+   * Confidential-client authentication method. `workload_identity` binds the k8s SA subject and
+   * mints no secret; `client_secret` mints a rotatable secret. Ignored for public clients.
+   */
+  @Field(() => String, { optional: true, enum: ['client_secret', 'workload_identity'] })
+  authMethod?: 'client_secret' | 'workload_identity';
+}
+
+@Schema()
+export class ClientListQuery {
+  /** Restrict the listing to a single application's clients (used by the Applications console). */
+  @Field(() => Number, { optional: true })
+  applicationId?: number;
 }
 
 @Schema()
@@ -117,6 +131,14 @@ export class ClientDetailResponse extends ClientSummaryItem {
 
   @Field(() => Number)
   accessTokenTtl: number;
+
+  /** How the client authenticates: `none` (public/PKCE), `client_secret`, or `workload_identity` (k8s). */
+  @Field(() => String, { enum: ['none', 'client_secret', 'workload_identity'] })
+  authMethod: 'none' | 'client_secret' | 'workload_identity';
+
+  /** The bound k8s SA subject, present only for `workload_identity` clients (D-16). */
+  @Field(() => String, { optional: true })
+  workloadSubject?: string;
 
   @Field()
   createdAt: string;

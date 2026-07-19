@@ -79,6 +79,18 @@ export class AdminAccessService {
     return this.authorize(session, permission);
   }
 
+  /**
+   * Lists which admin permissions the caller's session holds in the platform organisation. The
+   * console uses it to decide whether to render at all and which nav entries to show; an empty
+   * result means the user is not staff. Authorization on each endpoint remains server-side.
+   */
+  async listGrantedPermissions(request: FastifyRequest): Promise<AdminPermission[]> {
+    const session = await this.sessionAuthService.authenticate(request);
+    const organisationId = await this.getPlatformOrganisationId();
+    const held = await this.policyDecisionService.listPermissions(this.principalOf(session), organisationId);
+    return Object.values(ADMIN_PERMISSIONS).filter(permission => held.has(permission));
+  }
+
   async requireMutation(request: FastifyRequest, permission: AdminPermission): Promise<AdminActor> {
     const session = await this.sessionAuthService.authenticateElevated(request);
     return this.authorize(session, permission);

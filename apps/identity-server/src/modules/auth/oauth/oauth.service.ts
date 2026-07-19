@@ -319,6 +319,15 @@ export class OAuthService {
 
     const client = await this.requireClient(credential.clientId);
     if (client.tokenEndpointAuthMethod === 'none') return client;
+    /**
+     * A workload-identity client (`private_key_jwt`) must present its projected SA-token assertion
+     * (handled above); it holds no secret, so a secretless call must be rejected outright rather
+     * than fall through to the secret path (D-16).
+     */
+    if (client.tokenEndpointAuthMethod === 'private_key_jwt') {
+      this.logger.warn('client authentication failed: workload client presented no assertion', { securityEvent: 'oauth.client_auth_failed', clientId: client.id });
+      throw AppErrorCode.OAU_002.create();
+    }
     if (!credential.clientSecret || !(await this.clientService.verifySecret(client.id, credential.clientSecret))) {
       this.logger.warn('client authentication failed: invalid client secret', { securityEvent: 'oauth.client_auth_failed', clientId: client.id });
       throw AppErrorCode.OAU_002.create();

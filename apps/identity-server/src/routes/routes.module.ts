@@ -1,10 +1,6 @@
 /**
  * Importing npm packages
  */
-import fs from 'node:fs';
-import path from 'node:path';
-
-import fastifyStatic from '@fastify/static';
 import { Config } from '@shadow-library/common';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
@@ -28,7 +24,6 @@ import { AuditModule } from '@server/modules/infrastructure/audit';
 import { HealthModule } from '@server/modules/infrastructure/health';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { SecurityModule } from '@server/modules/infrastructure/security';
-import { UiModule } from '@server/modules/infrastructure/ui';
 import { ScimModule } from '@server/modules/scim';
 
 /**
@@ -45,17 +40,14 @@ import { ScimModule } from '@server/modules/scim';
 
 export const AppHttpCoreModule = HttpCoreModule.forRoot({
   helmet: {
-    /**
-     * Scripts stay 'self' (the client ships no inline script); styles allow inline because the
-     * Radix primitives inside @shadow-library/ui position overlays with style attributes.
-     */
+    /** The browser UI is a separate app; this service serves only JSON, so nothing inline is needed. */
     contentSecurityPolicy: {
       directives: {
         defaultSrc: ["'self'"],
         baseUri: ["'self'"],
         scriptSrc: ["'self'"],
-        styleSrc: ["'self'", "'unsafe-inline'"],
-        imgSrc: ["'self'", 'data:'],
+        styleSrc: ["'self'"],
+        imgSrc: ["'self'"],
         objectSrc: ["'none'"],
         formAction: ["'self'"],
         upgradeInsecureRequests: [],
@@ -91,13 +83,10 @@ export const HttpRouteModule = FastifyModule.forRoot({
     NotificationModule,
     AdminModule,
     ScimModule,
-    UiModule,
   ],
 
-  /** Immutable, fingerprint-friendly delivery for the built client; pages are served no-store by UiController. */
+  /** The browser UI is a separate app (identity-web); this service exposes only the JSON/OAuth API. */
   fastifyFactory: async instance => {
-    const assetsDir = path.join(Config.get('ui.public-dir'), 'assets');
-    if (fs.existsSync(assetsDir)) await instance.register(fastifyStatic, { root: assetsDir, prefix: '/assets/', index: false, maxAge: '1d', etag: true });
     /** SCIM clients send RFC 7644's dedicated media type; the payload is ordinary JSON. */
     instance.addContentTypeParser('application/scim+json', { parseAs: 'string' }, (_request, body, done) => {
       try {

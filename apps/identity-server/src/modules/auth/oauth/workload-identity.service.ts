@@ -7,7 +7,7 @@ import { APIRequest, AppError, Config, Logger } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, oidcDiscoveryUrl } from '@server/constants';
 
 /**
  * Defining types
@@ -158,7 +158,7 @@ export class WorkloadIdentityService {
   }
 
   private async discoverJwksUri(): Promise<string> {
-    const response = await APIRequest.get(`${this.issuer.replace(/\/+$/, '')}/.well-known/openid-configuration`)
+    const response = await APIRequest.get(oidcDiscoveryUrl(this.issuer))
       .suppressErrors()
       .execute<{ jwks_uri?: string }>();
     if (response.statusCode >= 400) throw AppError.internal(`cluster oidc discovery returned http ${response.statusCode}`);

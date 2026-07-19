@@ -94,6 +94,11 @@ export class PolicyDecisionService {
     return decision;
   }
 
+  /** Returns every permission the principal holds in the organisation — lets admin surfaces gate on the full set without one check per candidate action. */
+  async listPermissions(principal: Principal, organisationId: string): Promise<Set<string>> {
+    return this.resolvePermissions(principal, organisationId);
+  }
+
   /**
    * Like `check`, but only permissions owned by the given application count. Permission names are
    * unique per application, not globally, so an application-scoped admin permission (for example

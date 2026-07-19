@@ -65,6 +65,10 @@ describe('EcosystemSeedService', () => {
       const detail = await env.getService(OAuthClientService).getClientDetail(client!.id);
       expect(detail?.redirectUris).toContain(`http://${name}.shadow-apps.test/api/auth/callback`);
       expect(detail?.redirectUris?.some(uri => uri.startsWith('http://localhost:') && uri.endsWith('/api/auth/callback'))).toBe(true);
+
+      /** The public origins are stored on the application itself — the callback URIs are derived from them. */
+      const application = env.getService(ApplicationService).getApplicationOrThrow(name);
+      expect(application.publicUrls).toContain(`http://${name}.shadow-apps.test`);
     }
   });
 

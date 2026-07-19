@@ -68,8 +68,6 @@ export class AuthErrorCode extends ErrorCode {
   static readonly ROLE_SYNC_FAILED = AuthErrorCode.unavailable('ROLE_SYNC_FAILED', 'Role catalog sync failed: {reason}');
   /** The service-access rules could not be loaded at startup */
   static readonly SERVICE_ACCESS_FAILED = AuthErrorCode.unavailable('SERVICE_ACCESS_FAILED', 'Service access rules could not be loaded: {reason}');
-  /** The service name is invalid or cannot be resolved */
-  static readonly SERVICE_UNKNOWN = AuthErrorCode.notFound('SERVICE_UNKNOWN', 'Unknown service: {reason}');
   /** The client-credentials token request failed */
   static readonly TOKEN_REQUEST_FAILED = AuthErrorCode.unavailable('TOKEN_REQUEST_FAILED', 'Token request failed: {reason}');
 }

@@ -31,6 +31,8 @@ export const applications = pgTable('applications', {
   description: text('description'),
   isActive: boolean('is_active').notNull().default(true),
   subDomain: varchar('sub_domain', { length: 255 }).notNull(),
+  /** Public browser origins for this app's relying-party clients; each yields an `/api/auth/callback` redirect URI. */
+  publicUrls: text('public_urls').array().notNull().default([]),
   homePageUrl: text('home_page_url'),
   logoUrl: text('logo_url'),
   createdAt: timestamp('created_at').notNull().defaultNow(),

@@ -8,6 +8,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
  */
 import { APP_NAME } from '@server/constants';
 import { IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
@@ -161,5 +162,21 @@ describe('Admin application API', () => {
 
     const denied = await request('get', '/api/v1/admin/applications', secret);
     expect(denied.statusCode).toBe(403);
+  });
+
+  it('should store public URLs on the application and regenerate its relying-party redirect URIs', async () => {
+    const pulse = env.getService(ApplicationService).getApplicationOrThrow('pulse');
+
+    /** Two spellings of the same origin must collapse to one, not collide into a duplicate redirect URI. */
+    const updated = await request('patch', `/api/v1/admin/applications/${pulse.id}`).body({ publicUrls: ['https://pulse.example.com', 'https://pulse.example.com/'] });
+    expect(updated.statusCode).toBe(200);
+
+    const detail = await request('get', `/api/v1/admin/applications/${pulse.id}`);
+    expect((detail.json() as { publicUrls: string[] }).publicUrls).toEqual(['https://pulse.example.com']);
+
+    const clients = await env.getService(OAuthClientService).listClients(pulse.id);
+    const rp = clients.find(client => client.kind === 'WEB_CONFIDENTIAL');
+    const rpDetail = await env.getService(OAuthClientService).getClientDetail(rp!.id);
+    expect(rpDetail?.redirectUris).toEqual(['https://pulse.example.com/api/auth/callback']);
   });
 });

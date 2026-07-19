@@ -2,12 +2,12 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { APIRequest, AppError, Config, Logger } from '@shadow-library/common';
+import { APIRequest, AppError, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, PULSE_NOTIFICATION_URL } from '@server/constants';
 import { NotificationOutbox } from '@server/modules/infrastructure/datastore';
 
 import { NotificationTokenService } from './notification-token.service';
@@ -33,8 +33,6 @@ export interface SendNotification {
 @Injectable()
 export class NotificationClient {
   private readonly logger = Logger.getLogger(APP_NAME, NotificationClient.name);
-  private readonly baseUrl = Config.get('notification.base-url').replace(/\/$/, '');
-  private readonly serviceName = Config.get('notification.service-name');
 
   constructor(private readonly tokenService: NotificationTokenService) {}
 
@@ -42,13 +40,13 @@ export class NotificationClient {
     /** Recipients carry the target email/phone, so this trace is debug-only (dev/local, never prod). */
     this.logger.debug('dispatching notification to pulse-server', { templateKey: notification.templateKey, recipients: notification.recipients });
     const token = await this.tokenService.getToken();
-    const response = await APIRequest.post(`${this.baseUrl}/notifications`)
+    const response = await APIRequest.post(PULSE_NOTIFICATION_URL)
       .header('authorization', `Bearer ${token}`)
-      .body({ ...notification, service: this.serviceName })
+      .body({ ...notification, service: APP_NAME })
       .suppressErrors()
       .execute()
       .catch((error: unknown) => {
-        this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, baseUrl: this.baseUrl, error });
+        this.logger.error('notification transport error reaching pulse-server', { templateKey: notification.templateKey, error });
         throw error;
       });
     if (response.statusCode >= 400) {
