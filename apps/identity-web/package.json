@@ -12,7 +12,7 @@
     "type-check": "tsc",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",
-    "generate:api-types": "shadow gen-api-types http://localhost:9091/dev/api-docs/openapi.json"
+    "generate:api-types": "shadow gen-api-types http://localhost:8080/dev/api-docs/openapi.json"
   },
   "dependencies": {
     "@shadow-library/ui": "^3.2.0",
