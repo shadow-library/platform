@@ -26,6 +26,7 @@
   },
   "homepage": "https://github.com/shadow-library/web#readme",
   "peerDependencies": {
+    "@shadow-library/common": "^2.0.0-alpha.1",
     "@tanstack/react-query": "^5.100.0",
     "@tanstack/react-router": "^1.168.0",
     "@tanstack/react-router-ssr-query": "^1.167.0",
@@ -34,6 +35,9 @@
     "typescript": "^5.7.0"
   },
   "peerDependenciesMeta": {
+    "@shadow-library/common": {
+      "optional": true
+    },
     "@tanstack/react-query": {
       "optional": true
     },
@@ -51,6 +55,7 @@
     }
   },
   "devDependencies": {
+    "@shadow-library/common": "2.0.0-alpha.3",
     "@shadow-library/scripts": "^0.2.2",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",

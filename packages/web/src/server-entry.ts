@@ -8,6 +8,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 /**
  * Importing user defined packages
  */
+import { Logger } from '@shadow-library/common';
 
 /**
  * Defining types
@@ -31,7 +32,11 @@ export interface ServeOptions {
 
 /**
  * Declaring the constants
+ *
+ * The consuming app owns logger init (`Logger.attachTransport(...)` in its server entry); with no transport
+ * attached this logger is a no-op, so nothing here forces a logging config on the app.
  */
+const logger = Logger.getLogger('@shadow-library/web/server-entry', 'Server');
 const CACHE_IMMUTABLE = 'public, max-age=31536000, immutable';
 const CACHE_REVALIDATE = 'public, max-age=3600, must-revalidate';
 const COMPRESSIBLE = /^(?:text\/|application\/(?:javascript|json|xml|manifest\+json)|image\/svg\+xml)/;
@@ -114,8 +119,8 @@ export async function serve(options: ServeOptions): Promise<void> {
     ({ default: ssr } = (await import(entryUrl.href)) as { default: SsrEntry });
   } catch (error) {
     const path = fileURLToPath(entryUrl);
-    if (!(await Bun.file(path).exists())) console.error(`[web] SSR build not found at ${path} — run \`bun run build\` before starting.`);
-    else console.error(`[web] failed to load the SSR build at ${path}:`, error);
+    if (!(await Bun.file(path).exists())) logger.error('SSR build not found — run `bun run build` before starting', { path });
+    else logger.error(`failed to load the SSR build at ${path}`, error);
     process.exit(1);
   }
 
@@ -125,14 +130,25 @@ export async function serve(options: ServeOptions): Promise<void> {
     /* Keep under a fronting load balancer's idle timeout so Bun, not the LB, closes stale sockets. */
     idleTimeout: 30,
     async fetch(req) {
-      if (req.method === 'GET' || req.method === 'HEAD') {
-        const asset = await serveStatic(req, new URL(req.url).pathname, options.clientDir, serviceWorkerPaths);
-        if (asset) return asset;
+      const start = performance.now();
+      const { pathname } = new URL(req.url);
+      try {
+        let res: Response | null = null;
+        if (req.method === 'GET' || req.method === 'HEAD') res = await serveStatic(req, pathname, options.clientDir, serviceWorkerPaths);
+        res ??= withGzip(await ssr.fetch(req), req);
+        const timeTaken = Math.round(performance.now() - start);
+        // `http` level so ops can dial request logs in/out via `log.level` without touching app logs.
+        logger.http(`${req.method} ${pathname} -> ${res.status} (${timeTaken}ms)`, { method: req.method, url: pathname, statusCode: res.status, timeTaken });
+        return res;
+      } catch (error) {
+        const timeTaken = Math.round(performance.now() - start);
+        logger.error(`${req.method} ${pathname} -> 500 (${timeTaken}ms)`, error);
+        return new Response('Internal Server Error', { status: 500 });
       }
-      return withGzip(await ssr.fetch(req), req);
     },
+    /* Last-resort net for anything that escapes the per-request try/catch (e.g. a throw before fetch runs). */
     error(error) {
-      console.error('[web] unhandled request error', error);
+      logger.error('unhandled request error', error);
       return new Response('Internal Server Error', { status: 500 });
     },
   });
@@ -149,10 +165,11 @@ export async function serve(options: ServeOptions): Promise<void> {
   /* Drain in-flight requests on shutdown so rolling deploys don't sever active responses. */
   for (const signal of ['SIGTERM', 'SIGINT'] as const)
     process.on(signal, () => {
+      logger.info(`received ${signal}, draining in-flight requests and shutting down`);
       app.stop();
       health.stop();
     });
 
-  console.info(`[web] app    listening on ${app.url} — static from ${options.clientDir}`);
-  console.info(`[web] health listening on ${health.url}healthz`);
+  logger.info(`app server started at ${app.url} (serving static assets from ${options.clientDir})`);
+  logger.info(`health server started at ${health.url}healthz`);
 }
