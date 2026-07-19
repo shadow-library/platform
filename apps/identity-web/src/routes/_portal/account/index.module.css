@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 24px;
   max-width: 1040px;
+  margin-inline: auto;
 }
 
 .profile {

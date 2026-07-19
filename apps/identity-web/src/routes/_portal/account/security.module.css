@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 20px;
   max-width: 760px;
+  margin-inline: auto;
 }
 
 .loading {

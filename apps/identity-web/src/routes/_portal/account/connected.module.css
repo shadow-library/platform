@@ -3,6 +3,7 @@
   flex-direction: column;
   gap: 18px;
   max-width: 760px;
+  margin-inline: auto;
 }
 
 .list {
