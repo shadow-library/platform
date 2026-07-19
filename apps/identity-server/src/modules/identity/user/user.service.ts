@@ -14,9 +14,12 @@ import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
+import { type ValidatedSession } from '@server/modules/auth/session';
 import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { DatabaseService, ID, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
+
+import { UserEmailService } from './user-email.service';
 
 /**
  * Defining types
@@ -25,6 +28,16 @@ import { DatabaseService, ID, PrimaryDatabase, schema, User } from '@server/modu
 export interface ProfileUpdate {
   firstName?: string;
   lastName?: string;
+}
+
+export interface CurrentUserSummary {
+  userId: bigint;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  aal: 'AAL1' | 'AAL2';
+  elevated: boolean;
+  elevatedUntil?: Date;
 }
 
 export interface CreateUser {
@@ -74,6 +87,7 @@ export class UserService {
     private readonly passwordService: PasswordService,
     private readonly passwordPolicyService: PasswordPolicyService,
     private readonly organisationService: OrganisationService,
+    private readonly userEmailService: UserEmailService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -201,6 +215,21 @@ export class UserService {
   }
 
   /** Updates the signed-in user's own profile fields; a no-op when nothing changed. */
+  /** Identity summary for first-party surfaces: profile basics plus session assurance. */
+  async getCurrentUserSummary(session: ValidatedSession, elevated: boolean): Promise<CurrentUserSummary> {
+    const profile = await this.databaseService.getPostgresClient().query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, session.userId) });
+    const email = await this.userEmailService.getPrimaryEmail(session.userId);
+    return {
+      userId: session.userId,
+      firstName: profile?.firstName ?? undefined,
+      lastName: profile?.lastName ?? undefined,
+      email: email ?? undefined,
+      aal: session.aal,
+      elevated,
+      elevatedUntil: session.elevatedUntil ? new Date(session.elevatedUntil) : undefined,
+    };
+  }
+
   async updateProfile(userId: bigint, data: ProfileUpdate): Promise<void> {
     const update: ProfileUpdate = {};
     if (data.firstName !== undefined) update.firstName = data.firstName;

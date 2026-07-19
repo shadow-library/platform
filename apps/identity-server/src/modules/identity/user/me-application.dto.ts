@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { Field, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -24,6 +25,7 @@ export class MyApplicationItem {
   name: string;
 
   @Field(() => String, { optional: true })
+  @Transform('strip:null')
   displayName?: string;
 
   @Field()

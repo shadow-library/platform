@@ -17,8 +17,8 @@ import { Field, Schema } from '@shadow-library/class-schema';
 
 @Schema()
 export class MeResponse {
-  @Field()
-  userId: string;
+  @Field(() => String)
+  userId: bigint;
 
   @Field({ optional: true })
   firstName?: string;
