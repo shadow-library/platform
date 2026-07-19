@@ -8,7 +8,7 @@ import { Avatar, Button, ConfirmDialog, DescriptionList, Dialog, FormField, Inpu
 /**
  * Importing user defined modules
  */
-import { ArrowLeftIcon, PlusIcon, ShieldCheckIcon } from '@/components/icons';
+import { ArrowLeftIcon, ShieldCheckIcon } from '@/components/icons';
 import { StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
@@ -17,7 +17,6 @@ import {
   type UpdateApplicationBody,
   useApplicationMembersQuery,
   useApplicationQuery,
-  useCreateRoleMutation,
   useDeleteApplicationMutation,
   useRemoveApplicationMemberMutation,
   useUpdateApplicationMutation,
@@ -44,15 +43,12 @@ function ApplicationDetailPage(): React.JSX.Element {
   const members = useApplicationMembersQuery(appId);
   const update = useUpdateApplicationMutation();
   const del = useDeleteApplicationMutation();
-  const createRole = useCreateRoleMutation();
   const removeMember = useRemoveApplicationMemberMutation();
   const { require, dialog } = useStepUpGate();
 
   const [tab, setTab] = useState<Tab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
-  const [roleOpen, setRoleOpen] = useState(false);
-  const [roleName, setRoleName] = useState('');
   const [form, setForm] = useState<UpdateApplicationBody>({});
 
   const data = app.data;
@@ -88,21 +84,6 @@ function ApplicationDetailPage(): React.JSX.Element {
         onError: error => toast.danger(error.message),
       },
     );
-
-  const addRole = (): void => {
-    if (!roleName.trim()) return;
-    createRole.mutate(
-      { applicationId: Number(appId), roleName: roleName.trim() },
-      {
-        onSuccess: () => {
-          toast.success('Role created');
-          setRoleOpen(false);
-          setRoleName('');
-        },
-        onError: error => toast.danger(error.message),
-      },
-    );
-  };
 
   return (
     <div className={styles.page} style={{ maxWidth: 920 }}>
@@ -166,12 +147,9 @@ function ApplicationDetailPage(): React.JSX.Element {
         <div className={styles.detailCard}>
           <div className={styles.sectionHead}>
             <div className={styles.detailCardTitle}>Roles</div>
-            <Button variant="secondary" size="sm" prefix={<PlusIcon size={14} />} onClick={() => require(() => setRoleOpen(true))}>
-              New role
-            </Button>
           </div>
           {data.roles.length === 0 ? (
-            <div className={styles.empty}>No roles defined for this application.</div>
+            <div className={styles.empty}>This application has not published any roles through the platform catalog.</div>
           ) : (
             data.roles.map(role => (
               <div key={role.id} className={styles.accessRow}>
@@ -248,25 +226,6 @@ function ApplicationDetailPage(): React.JSX.Element {
             </Dialog.Close>
             <Button variant="primary" loading={update.isPending} onClick={saveEdit}>
               Save changes
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog>
-
-      <Dialog open={roleOpen} onOpenChange={setRoleOpen}>
-        <Dialog.Content size="sm">
-          <Dialog.Header title="New role" />
-          <Dialog.Body>
-            <FormField label="Role name" required>
-              <Input value={roleName} onValueChange={setRoleName} placeholder="editor" autoFocus />
-            </FormField>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.Close asChild>
-              <Button variant="ghost">Cancel</Button>
-            </Dialog.Close>
-            <Button variant="primary" loading={createRole.isPending} onClick={addRole}>
-              Create role
             </Button>
           </Dialog.Footer>
         </Dialog.Content>

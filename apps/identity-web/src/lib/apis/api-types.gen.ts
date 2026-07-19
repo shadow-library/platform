@@ -6,7 +6,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Health */
+    /** Get Health */
     get: operations['get_health'];
     put?: never;
     post?: never;
@@ -23,7 +23,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Ready */
+    /** Get Readiness */
     get: operations['get_health_ready'];
     put?: never;
     post?: never;
@@ -40,7 +40,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Jwks */
+    /** Get Jwks */
     get: operations['get_well_known_jwks_json'];
     put?: never;
     post?: never;
@@ -57,7 +57,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Discovery */
+    /** Get Openid Configuration */
     get: operations['get_well_known_openid_configuration'];
     put?: never;
     post?: never;
@@ -93,7 +93,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Token */
+    /** Exchange Token */
     post: operations['post_oauth2_token'];
     delete?: never;
     options?: never;
@@ -108,7 +108,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Userinfo */
+    /** Get User Info */
     get: operations['get_oauth2_userinfo'];
     put?: never;
     post?: never;
@@ -127,7 +127,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Revoke */
+    /** Revoke Token */
     post: operations['post_oauth2_revoke'];
     delete?: never;
     options?: never;
@@ -144,7 +144,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Introspect */
+    /** Introspect Token */
     post: operations['post_oauth2_introspect'];
     delete?: never;
     options?: never;
@@ -159,10 +159,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Prompt */
+    /** Get Consent Prompt */
     get: operations['get_api_v1_auth_consent'];
     put?: never;
-    /** Decide */
+    /** Submit Consent Decision */
     post: operations['post_api_v1_auth_consent'];
     delete?: never;
     options?: never;
@@ -177,7 +177,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List My Consents */
     get: operations['get_api_v1_me_consents'];
     put?: never;
     post?: never;
@@ -197,7 +197,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Revoke */
+    /** Revoke My Consent */
     delete: operations['delete_api_v1_me_consents_clientId'];
     options?: never;
     head?: never;
@@ -211,7 +211,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Me */
+    /** Get Current User */
     get: operations['get_api_v1_me'];
     put?: never;
     post?: never;
@@ -234,7 +234,7 @@ export interface paths {
     delete?: never;
     options?: never;
     head?: never;
-    /** Update Profile */
+    /** Update Current User Profile */
     patch: operations['patch_api_v1_me_profile'];
     trace?: never;
   };
@@ -245,7 +245,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List My Applications */
     get: operations['get_api_v1_me_applications'];
     put?: never;
     post?: never;
@@ -264,7 +264,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Create */
+    /** Create Organisation */
     post: operations['post_api_v1_organisations'];
     delete?: never;
     options?: never;
@@ -279,15 +279,15 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get */
+    /** Get Organisation Details */
     get: operations['get_api_v1_organisations_organisationId'];
     put?: never;
     post?: never;
-    /** Remove */
+    /** Delete Organisation */
     delete: operations['delete_api_v1_organisations_organisationId'];
     options?: never;
     head?: never;
-    /** Rename */
+    /** Rename Organisation */
     patch: operations['patch_api_v1_organisations_organisationId'];
     trace?: never;
   };
@@ -298,7 +298,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Members */
+    /** List Organisation Members */
     get: operations['get_api_v1_organisations_organisationId_members'];
     put?: never;
     post?: never;
@@ -318,11 +318,11 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Remove Member */
+    /** Remove Organisation Member */
     delete: operations['delete_api_v1_organisations_organisationId_members_userId'];
     options?: never;
     head?: never;
-    /** Change Member Role */
+    /** Change Organisation Member Role */
     patch: operations['patch_api_v1_organisations_organisationId_members_userId'];
     trace?: never;
   };
@@ -333,10 +333,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Invitations */
+    /** List Organisation Invitations */
     get: operations['get_api_v1_organisations_organisationId_invitations'];
     put?: never;
-    /** Invite */
+    /** Invite Organisation Member */
     post: operations['post_api_v1_organisations_organisationId_invitations'];
     delete?: never;
     options?: never;
@@ -354,7 +354,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Revoke Invitation */
+    /** Revoke Organisation Invitation */
     delete: operations['delete_api_v1_organisations_organisationId_invitations_invitationId'];
     options?: never;
     head?: never;
@@ -368,7 +368,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List My Organisations */
     get: operations['get_api_v1_me_organisations'];
     put?: never;
     post?: never;
@@ -388,7 +388,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Leave */
+    /** Leave Organisation */
     delete: operations['delete_api_v1_me_organisations_organisationId'];
     options?: never;
     head?: never;
@@ -404,7 +404,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Accept */
+    /** Accept Organisation Invitation */
     post: operations['post_api_v1_me_invitations_accept'];
     delete?: never;
     options?: never;
@@ -421,7 +421,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Decline */
+    /** Decline Organisation Invitation */
     post: operations['post_api_v1_me_invitations_decline'];
     delete?: never;
     options?: never;
@@ -436,10 +436,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Domains */
     get: operations['get_api_v1_organisations_organisationId_domains'];
     put?: never;
-    /** Register */
+    /** Register Domain */
     post: operations['post_api_v1_organisations_organisationId_domains'];
     delete?: never;
     options?: never;
@@ -456,7 +456,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Verify */
+    /** Verify Domain */
     post: operations['post_api_v1_organisations_organisationId_domains_domainId_verify'];
     delete?: never;
     options?: never;
@@ -474,7 +474,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Remove */
+    /** Remove Domain */
     delete: operations['delete_api_v1_organisations_organisationId_domains_domainId'];
     options?: never;
     head?: never;
@@ -490,8 +490,42 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Check */
+    /** Check Access */
     post: operations['post_api_v1_authz_check'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/authz/catalog': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Sync Catalog */
+    put: operations['put_api_v1_authz_catalog'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/authz/service-access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Service Access */
+    get: operations['get_api_v1_authz_service_access'];
+    put?: never;
+    post?: never;
     delete?: never;
     options?: never;
     head?: never;
@@ -505,7 +539,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Metadata */
+    /** Get Saml Metadata */
     get: operations['get_saml2_metadata'];
     put?: never;
     post?: never;
@@ -522,7 +556,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Sso */
+    /** Handle Saml Sso */
     get: operations['get_saml2_sso'];
     put?: never;
     post?: never;
@@ -539,7 +573,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Resume */
+    /** Resume Saml Sso */
     get: operations['get_saml2_sso_resume'];
     put?: never;
     post?: never;
@@ -745,7 +779,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Cancel */
+    /** Cancel Flow */
     post: operations['post_api_v1_auth_cancel'];
     delete?: never;
     options?: never;
@@ -794,11 +828,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List My Sessions */
     get: operations['get_api_v1_me_sessions'];
     put?: never;
     post?: never;
-    /** Revoke Others */
+    /** Revoke My Other Sessions */
     delete: operations['delete_api_v1_me_sessions'];
     options?: never;
     head?: never;
@@ -815,7 +849,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Revoke One */
+    /** Revoke My Session */
     delete: operations['delete_api_v1_me_sessions_sessionId'];
     options?: never;
     head?: never;
@@ -829,7 +863,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Callback */
+    /** Handle Federated Callback */
     get: operations['get_api_v1_auth_federated_callback'];
     put?: never;
     post?: never;
@@ -846,7 +880,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Mfa Enrollments */
     get: operations['get_api_v1_me_mfa'];
     put?: never;
     post?: never;
@@ -950,7 +984,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Register Options */
+    /** Get Webauthn Registration Options */
     post: operations['post_api_v1_me_webauthn_register_options'];
     delete?: never;
     options?: never;
@@ -967,7 +1001,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Register Verify */
+    /** Verify Webauthn Registration */
     post: operations['post_api_v1_me_webauthn_register_verify'];
     delete?: never;
     options?: never;
@@ -985,7 +1019,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Remove */
+    /** Remove Webauthn Credential */
     delete: operations['delete_api_v1_me_webauthn_credentialId'];
     options?: never;
     head?: never;
@@ -999,10 +1033,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Identity Providers */
     get: operations['get_api_v1_organisations_organisationId_identity_providers'];
     put?: never;
-    /** Create */
+    /** Create Identity Provider */
     post: operations['post_api_v1_organisations_organisationId_identity_providers'];
     delete?: never;
     options?: never;
@@ -1020,11 +1054,11 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Remove */
+    /** Remove Identity Provider */
     delete: operations['delete_api_v1_organisations_organisationId_identity_providers_identityProviderId'];
     options?: never;
     head?: never;
-    /** Update */
+    /** Update Identity Provider */
     patch: operations['patch_api_v1_organisations_organisationId_identity_providers_identityProviderId'];
     trace?: never;
   };
@@ -1134,6 +1168,23 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/context': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Admin Context */
+    get: operations['get_api_v1_admin_context'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/users': {
     parameters: {
       query?: never;
@@ -1141,7 +1192,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Search */
+    /** Search Users */
     get: operations['get_api_v1_admin_users'];
     put?: never;
     post?: never;
@@ -1158,11 +1209,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Detail */
+    /** Get User Detail */
     get: operations['get_api_v1_admin_users_userId'];
     put?: never;
     post?: never;
-    /** Soft Delete */
+    /** Delete User */
     delete: operations['delete_api_v1_admin_users_userId'];
     options?: never;
     head?: never;
@@ -1178,7 +1229,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Lock */
+    /** Lock User */
     post: operations['post_api_v1_admin_users_userId_lock'];
     delete?: never;
     options?: never;
@@ -1195,7 +1246,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Unlock */
+    /** Unlock User */
     post: operations['post_api_v1_admin_users_userId_unlock'];
     delete?: never;
     options?: never;
@@ -1212,7 +1263,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Force Password Reset */
+    /** Force User Password Reset */
     post: operations['post_api_v1_admin_users_userId_force_password_reset'];
     delete?: never;
     options?: never;
@@ -1229,7 +1280,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Terminate Sessions */
+    /** Terminate User Sessions */
     post: operations['post_api_v1_admin_users_userId_sessions_terminate'];
     delete?: never;
     options?: never;
@@ -1246,7 +1297,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Deactivate */
+    /** Deactivate User */
     post: operations['post_api_v1_admin_users_userId_deactivate'];
     delete?: never;
     options?: never;
@@ -1263,7 +1314,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Reactivate */
+    /** Reactivate User */
     post: operations['post_api_v1_admin_users_userId_reactivate'];
     delete?: never;
     options?: never;
@@ -1278,7 +1329,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Audit Trail */
+    /** Get User Audit Trail */
     get: operations['get_api_v1_admin_users_userId_audit'];
     put?: never;
     post?: never;
@@ -1295,10 +1346,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Applications */
     get: operations['get_api_v1_admin_applications'];
     put?: never;
-    /** Create */
+    /** Create Application */
     post: operations['post_api_v1_admin_applications'];
     delete?: never;
     options?: never;
@@ -1313,15 +1364,15 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Detail */
+    /** Get Application Details */
     get: operations['get_api_v1_admin_applications_applicationId'];
     put?: never;
     post?: never;
-    /** Remove */
+    /** Delete Application */
     delete: operations['delete_api_v1_admin_applications_applicationId'];
     options?: never;
     head?: never;
-    /** Update */
+    /** Update Application */
     patch: operations['patch_api_v1_admin_applications_applicationId'];
     trace?: never;
   };
@@ -1332,7 +1383,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Members */
+    /** List Application Members */
     get: operations['get_api_v1_admin_applications_applicationId_members'];
     put?: never;
     post?: never;
@@ -1352,7 +1403,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Remove Member */
+    /** Remove Application Member */
     delete: operations['delete_api_v1_admin_applications_applicationId_members_userId'];
     options?: never;
     head?: never;
@@ -1366,10 +1417,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Clients */
     get: operations['get_api_v1_admin_clients'];
     put?: never;
-    /** Register */
+    /** Register Client */
     post: operations['post_api_v1_admin_clients'];
     delete?: never;
     options?: never;
@@ -1384,14 +1435,14 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Detail */
+    /** Get Client Details */
     get: operations['get_api_v1_admin_clients_clientId'];
     put?: never;
     post?: never;
     delete?: never;
     options?: never;
     head?: never;
-    /** Update */
+    /** Update Client */
     patch: operations['patch_api_v1_admin_clients_clientId'];
     trace?: never;
   };
@@ -1404,7 +1455,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Rotate Secret */
+    /** Rotate Client Secret */
     post: operations['post_api_v1_admin_clients_clientId_rotate_secret'];
     delete?: never;
     options?: never;
@@ -1421,7 +1472,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Grant Scope */
+    /** Grant Client Scope */
     post: operations['post_api_v1_admin_clients_clientId_scopes'];
     delete?: never;
     options?: never;
@@ -1439,7 +1490,7 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Revoke Scope */
+    /** Revoke Client Scope */
     delete: operations['delete_api_v1_admin_clients_clientId_scopes_scopeId'];
     options?: never;
     head?: never;
@@ -1453,10 +1504,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Resources */
     get: operations['get_api_v1_admin_resources'];
     put?: never;
-    /** Create */
+    /** Create Resource */
     post: operations['post_api_v1_admin_resources'];
     delete?: never;
     options?: never;
@@ -1473,25 +1524,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Create Scope */
+    /** Create Resource Scope */
     post: operations['post_api_v1_admin_resources_resourceId_scopes'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/roles': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Create Role */
-    post: operations['post_api_v1_admin_roles'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1505,46 +1539,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Permissions */
+    /** List Application Permissions */
     get: operations['get_api_v1_admin_permissions'];
     put?: never;
-    /** Create Permission */
-    post: operations['post_api_v1_admin_permissions'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/roles/{roleId}/permissions': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Grant Permission */
-    post: operations['post_api_v1_admin_roles_roleId_permissions'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/admin/roles/{roleId}/permissions/{permissionId}': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
     post?: never;
-    /** Revoke Permission */
-    delete: operations['delete_api_v1_admin_roles_roleId_permissions_permissionId'];
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -1557,10 +1556,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List Assignments */
+    /** List Role Assignments */
     get: operations['get_api_v1_admin_role_assignments'];
     put?: never;
-    /** Assign */
+    /** Assign Role */
     post: operations['post_api_v1_admin_role_assignments'];
     delete?: never;
     options?: never;
@@ -1577,7 +1576,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Revoke */
+    /** Revoke Role Assignment */
     post: operations['post_api_v1_admin_role_assignments_revoke'];
     delete?: never;
     options?: never;
@@ -1592,10 +1591,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Saml Service Providers */
     get: operations['get_api_v1_admin_saml_service_providers'];
     put?: never;
-    /** Create */
+    /** Create Saml Service Provider */
     post: operations['post_api_v1_admin_saml_service_providers'];
     delete?: never;
     options?: never;
@@ -1610,16 +1609,51 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get */
+    /** Get Saml Service Provider */
     get: operations['get_api_v1_admin_saml_service_providers_serviceProviderId'];
     put?: never;
     post?: never;
-    /** Remove */
+    /** Delete Saml Service Provider */
     delete: operations['delete_api_v1_admin_saml_service_providers_serviceProviderId'];
     options?: never;
     head?: never;
-    /** Update */
+    /** Update Saml Service Provider */
     patch: operations['patch_api_v1_admin_saml_service_providers_serviceProviderId'];
+    trace?: never;
+  };
+  '/api/v1/admin/service-access': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Service Access Rules */
+    get: operations['get_api_v1_admin_service_access'];
+    put?: never;
+    /** Create Service Access Rule */
+    post: operations['post_api_v1_admin_service_access'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/service-access/{ruleId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Service Access Rule */
+    delete: operations['delete_api_v1_admin_service_access_ruleId'];
+    options?: never;
+    head?: never;
+    patch?: never;
     trace?: never;
   };
   '/api/v1/admin/webhooks': {
@@ -1629,10 +1663,10 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
+    /** List Webhooks */
     get: operations['get_api_v1_admin_webhooks'];
     put?: never;
-    /** Create */
+    /** Create Webhook */
     post: operations['post_api_v1_admin_webhooks'];
     delete?: never;
     options?: never;
@@ -1647,15 +1681,15 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Get */
+    /** Get Webhook */
     get: operations['get_api_v1_admin_webhooks_webhookId'];
     put?: never;
     post?: never;
-    /** Remove */
+    /** Delete Webhook */
     delete: operations['delete_api_v1_admin_webhooks_webhookId'];
     options?: never;
     head?: never;
-    /** Update */
+    /** Update Webhook */
     patch: operations['patch_api_v1_admin_webhooks_webhookId'];
     trace?: never;
   };
@@ -1668,7 +1702,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Rotate Secret */
+    /** Rotate Webhook Secret */
     post: operations['post_api_v1_admin_webhooks_webhookId_rotate_secret'];
     delete?: never;
     options?: never;
@@ -1683,7 +1717,7 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Deliveries */
+    /** List Webhook Deliveries */
     get: operations['get_api_v1_admin_webhooks_webhookId_deliveries'];
     put?: never;
     post?: never;
@@ -1702,7 +1736,7 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Redeliver */
+    /** Redeliver Webhook Delivery */
     post: operations['post_api_v1_admin_webhooks_webhookId_deliveries_deliveryId_redeliver'];
     delete?: never;
     options?: never;
@@ -1837,125 +1871,6 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
-  '/login': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Login */
-    get: operations['get_login'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/register': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Register */
-    get: operations['get_register'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/recover': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Recover */
-    get: operations['get_recover'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/consent': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Consent */
-    get: operations['get_consent'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/account': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Account */
-    get: operations['get_account'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/error': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Error */
-    get: operations['get_error'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    /** Root */
-    get: operations['get_'];
-    put?: never;
-    post?: never;
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1966,7 +1881,6 @@ export interface components {
     };
     DevErrorResponseDto: {
       code: string;
-      type: string;
       message: string;
       fields?: components['schemas']['ErrorFieldDto'][];
       stack?: string;
@@ -2021,6 +1935,8 @@ export interface components {
       resource?: string;
       client_id?: string;
       client_secret?: string;
+      client_assertion_type?: string;
+      client_assertion?: string;
     };
     TokenResponse: {
       access_token: string;
@@ -2214,6 +2130,34 @@ export interface components {
       decision: 'PERMIT' | 'DENY';
       reasons: string[];
       authzVersion: number;
+    };
+    CatalogSyncBody: {
+      permissions: components['schemas']['CatalogPermission'][];
+      roles: components['schemas']['CatalogRole'][];
+    };
+    CatalogPermission: {
+      name: string;
+      description?: string;
+    };
+    CatalogRole: {
+      name: string;
+      description?: string;
+      permissions: string[];
+    };
+    CatalogSyncResponse: {
+      permissionsUpserted: number;
+      permissionsDeleted: number;
+      rolesUpserted: number;
+      rolesDeleted: number;
+      principalsInvalidated: number;
+    };
+    ServiceAccessResponse: {
+      rules: components['schemas']['ServiceAccessRuleDto'][];
+    };
+    ServiceAccessRuleDto: {
+      callerClientId: string;
+      method: string;
+      path: string;
     };
     LoginInitBody: {
       identifier: string;
@@ -2503,11 +2447,18 @@ export interface components {
     RemovePhoneBody: {
       phone: string;
     };
+    AdminContextResponse: {
+      permissions: string[];
+    };
+    /** @enum {string} */
+    SortOrder: 'asc' | 'desc';
+    /** @enum {string} */
+    UserSortBy: 'createdAt';
     UserSearchResponse: {
-      items: components['schemas']['UserSummaryItem'][];
       total: number;
-      offset: number;
       limit: number;
+      offset: number;
+      items: components['schemas']['UserSummaryItem'][];
     };
     UserSummaryItem: {
       id: string;
@@ -2583,6 +2534,7 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       isActive?: boolean;
+      publicUrls?: string[];
     };
     CreateApplicationResponse: {
       id: number;
@@ -2598,6 +2550,7 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       roles: components['schemas']['ApplicationRoleItem'][];
+      publicUrls: string[];
       updatedAt: string;
     };
     ApplicationRoleItem: {
@@ -2612,6 +2565,7 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       isActive?: boolean;
+      publicUrls?: string[];
     };
     ApplicationMemberListResponse: {
       items: components['schemas']['ApplicationMemberItem'][];
@@ -2645,6 +2599,9 @@ export interface components {
       grantTypes: string[];
       accessTokenTtl?: number;
       backchannelLogoutUri?: string;
+      workloadSubject?: string;
+      /** @enum {string} */
+      authMethod?: 'client_secret' | 'workload_identity';
     };
     RegisterClientResponse: {
       clientId: string;
@@ -2662,6 +2619,9 @@ export interface components {
       scopes: string[];
       grantTypes: string[];
       accessTokenTtl: number;
+      /** @enum {string} */
+      authMethod: 'none' | 'client_secret' | 'workload_identity';
+      workloadSubject?: string;
       createdAt: string;
     };
     UpdateClientBody: {
@@ -2669,6 +2629,7 @@ export interface components {
       isActive?: boolean;
       redirectUris?: string[];
       backchannelLogoutUri?: string;
+      workloadSubject?: string;
     };
     RotateSecretResponse: {
       secret: string;
@@ -2706,16 +2667,6 @@ export interface components {
       description?: string;
       isSensitive?: boolean;
     };
-    CreateRoleBody: {
-      applicationId: number;
-      roleName: string;
-      description?: string;
-    };
-    CreatePermissionBody: {
-      applicationId: number;
-      name: string;
-      description?: string;
-    };
     PermissionListResponse: {
       items: components['schemas']['PermissionItem'][];
     };
@@ -2723,9 +2674,6 @@ export interface components {
       id: string;
       name: string;
       description?: string;
-    };
-    GrantRolePermissionBody: {
-      permissionId: string;
     };
     RoleAssignmentBody: {
       /** @enum {string} */
@@ -2777,6 +2725,23 @@ export interface components {
       nameIdFormat?: 'EMAIL' | 'PERSISTENT';
       releasedAttributes?: string[];
       isActive?: boolean;
+    };
+    ServiceAccessListResponse: {
+      items: components['schemas']['ServiceAccessRuleItem'][];
+    };
+    ServiceAccessRuleItem: {
+      id: string;
+      applicationId: number;
+      callerClientId: string;
+      method: string;
+      pathPattern: string;
+      createdAt: string;
+    };
+    CreateServiceAccessBody: {
+      applicationId: number;
+      callerClientId: string;
+      method: string;
+      pathPattern: string;
     };
     WebhookListResponse: {
       items: components['schemas']['WebhookItem'][];
@@ -4239,6 +4204,86 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['CheckResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_authz_catalog: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CatalogSyncBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['CatalogSyncResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_authz_service_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceAccessResponse'];
         };
       };
       /** @description Default Response */
@@ -6013,15 +6058,53 @@ export interface operations {
       };
     };
   };
+  get_api_v1_admin_context: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminContextResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_admin_users: {
     parameters: {
       query?: {
+        limit?: number | string;
+        offset?: number | string;
+        sortOrder?: components['schemas']['SortOrder'];
+        sortBy?: components['schemas']['UserSortBy'];
         email?: string;
         status?: 'ACTIVE' | 'INACTIVE' | 'DISABLED' | 'BLOCKED' | 'SUSPENDED' | 'CLOSED';
-        offset?: number | string;
-        limit?: number | string;
-        sortBy?: 'createdAt';
-        sortOrder?: 'asc' | 'desc';
       };
       header?: never;
       path?: never;
@@ -6709,7 +6792,9 @@ export interface operations {
   };
   get_api_v1_admin_clients: {
     parameters: {
-      query?: never;
+      query?: {
+        applicationId?: number | string;
+      };
       header?: never;
       path?: never;
       cookie?: never;
@@ -7120,48 +7205,6 @@ export interface operations {
       };
     };
   };
-  post_api_v1_admin_roles: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['CreateRoleBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CreatedResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
   get_api_v1_admin_permissions: {
     parameters: {
       query: {
@@ -7180,133 +7223,6 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['PermissionListResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_admin_permissions: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['CreatePermissionBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      201: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['CreatedResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  post_api_v1_admin_roles_roleId_permissions: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        roleId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
-      content: {
-        'application/json': components['schemas']['GrantRolePermissionBody'];
-      };
-    };
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AdminActionResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  delete_api_v1_admin_roles_roleId_permissions_permissionId: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        roleId: string;
-        permissionId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['AdminActionResponse'];
         };
       };
       /** @description Default Response */
@@ -7638,6 +7554,128 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ServiceProviderItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_service_access: {
+    parameters: {
+      query: {
+        applicationId: number | string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceAccessListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_service_access: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CreateServiceAccessBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ServiceAccessRuleItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_admin_service_access_ruleId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        ruleId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
         };
       };
       /** @description Default Response */
@@ -8446,209 +8484,6 @@ export interface operations {
       };
     };
   };
-  get_login: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_register: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_recover: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_consent: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_account: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_error: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  get_: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
 }
 export type HealthResponse = components['schemas']['HealthResponse'];
 export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
@@ -8693,6 +8528,12 @@ export type DomainItem = components['schemas']['DomainItem'];
 export type RegisterDomainBody = components['schemas']['RegisterDomainBody'];
 export type CheckRequestBody = components['schemas']['CheckRequestBody'];
 export type CheckResponse = components['schemas']['CheckResponse'];
+export type CatalogSyncBody = components['schemas']['CatalogSyncBody'];
+export type CatalogPermission = components['schemas']['CatalogPermission'];
+export type CatalogRole = components['schemas']['CatalogRole'];
+export type CatalogSyncResponse = components['schemas']['CatalogSyncResponse'];
+export type ServiceAccessResponse = components['schemas']['ServiceAccessResponse'];
+export type ServiceAccessRuleDto = components['schemas']['ServiceAccessRuleDto'];
 export type LoginInitBody = components['schemas']['LoginInitBody'];
 export type LoginInitResponse = components['schemas']['LoginInitResponse'];
 export type FederatedLoginOptionDto = components['schemas']['FederatedLoginOptionDto'];
@@ -8751,6 +8592,9 @@ export type ContactOperationResponse = components['schemas']['ContactOperationRe
 export type RemoveEmailBody = components['schemas']['RemoveEmailBody'];
 export type AddPhoneBody = components['schemas']['AddPhoneBody'];
 export type RemovePhoneBody = components['schemas']['RemovePhoneBody'];
+export type AdminContextResponse = components['schemas']['AdminContextResponse'];
+export type SortOrder = components['schemas']['SortOrder'];
+export type UserSortBy = components['schemas']['UserSortBy'];
 export type UserSearchResponse = components['schemas']['UserSearchResponse'];
 export type UserSummaryItem = components['schemas']['UserSummaryItem'];
 export type UserDetailResponse = components['schemas']['UserDetailResponse'];
@@ -8783,11 +8627,8 @@ export type ScopeItem = components['schemas']['ScopeItem'];
 export type CreateResourceBody = components['schemas']['CreateResourceBody'];
 export type CreatedResponse = components['schemas']['CreatedResponse'];
 export type CreateScopeBody = components['schemas']['CreateScopeBody'];
-export type CreateRoleBody = components['schemas']['CreateRoleBody'];
-export type CreatePermissionBody = components['schemas']['CreatePermissionBody'];
 export type PermissionListResponse = components['schemas']['PermissionListResponse'];
 export type PermissionItem = components['schemas']['PermissionItem'];
-export type GrantRolePermissionBody = components['schemas']['GrantRolePermissionBody'];
 export type RoleAssignmentBody = components['schemas']['RoleAssignmentBody'];
 export type AssignmentListResponse = components['schemas']['AssignmentListResponse'];
 export type RoleAssignmentItem = components['schemas']['RoleAssignmentItem'];
@@ -8795,6 +8636,9 @@ export type ServiceProviderListResponse = components['schemas']['ServiceProvider
 export type ServiceProviderItem = components['schemas']['ServiceProviderItem'];
 export type CreateServiceProviderBody = components['schemas']['CreateServiceProviderBody'];
 export type UpdateServiceProviderBody = components['schemas']['UpdateServiceProviderBody'];
+export type ServiceAccessListResponse = components['schemas']['ServiceAccessListResponse'];
+export type ServiceAccessRuleItem = components['schemas']['ServiceAccessRuleItem'];
+export type CreateServiceAccessBody = components['schemas']['CreateServiceAccessBody'];
 export type WebhookListResponse = components['schemas']['WebhookListResponse'];
 export type WebhookItem = components['schemas']['WebhookItem'];
 export type CreateWebhookBody = components['schemas']['CreateWebhookBody'];
@@ -8803,3 +8647,32 @@ export type UpdateWebhookBody = components['schemas']['UpdateWebhookBody'];
 export type RotatedWebhookSecretResponse = components['schemas']['RotatedWebhookSecretResponse'];
 export type WebhookDeliveriesResponse = components['schemas']['WebhookDeliveriesResponse'];
 export type WebhookDeliveryItem = components['schemas']['WebhookDeliveryItem'];
+export type AuthorizeQueryParams = Exclude<paths['/oauth2/authorize']['get']['parameters']['query'], undefined>;
+export type GetConsentPromptQueryParams = Exclude<paths['/api/v1/auth/consent']['get']['parameters']['query'], undefined>;
+export type GetOrganisationDetailsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}']['get']['parameters']['path'], undefined>;
+export type ListOrganisationMembersPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/members']['get']['parameters']['path'], undefined>;
+export type ListOrganisationInvitationsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/invitations']['get']['parameters']['path'], undefined>;
+export type ListDomainsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/domains']['get']['parameters']['path'], undefined>;
+export type HandleSamlSsoQueryParams = Exclude<paths['/saml2/sso']['get']['parameters']['query'], undefined>;
+export type ResumeSamlSsoQueryParams = Exclude<paths['/saml2/sso/resume']['get']['parameters']['query'], undefined>;
+export type ChallengeMethodsQueryParams = Exclude<paths['/api/v1/auth/challenge/methods']['get']['parameters']['query'], undefined>;
+export type HandleFederatedCallbackQueryParams = Exclude<paths['/api/v1/auth/federated/callback']['get']['parameters']['query'], undefined>;
+export type ListIdentityProvidersPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/identity-providers']['get']['parameters']['path'], undefined>;
+export type SearchUsersQueryParams = Exclude<paths['/api/v1/admin/users']['get']['parameters']['query'], undefined>;
+export type GetUserDetailPathParams = Exclude<paths['/api/v1/admin/users/{userId}']['get']['parameters']['path'], undefined>;
+export type GetUserAuditTrailPathParams = Exclude<paths['/api/v1/admin/users/{userId}/audit']['get']['parameters']['path'], undefined>;
+export type GetApplicationDetailsPathParams = Exclude<paths['/api/v1/admin/applications/{applicationId}']['get']['parameters']['path'], undefined>;
+export type ListApplicationMembersPathParams = Exclude<paths['/api/v1/admin/applications/{applicationId}/members']['get']['parameters']['path'], undefined>;
+export type ListClientsQueryParams = Exclude<paths['/api/v1/admin/clients']['get']['parameters']['query'], undefined>;
+export type GetClientDetailsPathParams = Exclude<paths['/api/v1/admin/clients/{clientId}']['get']['parameters']['path'], undefined>;
+export type ListApplicationPermissionsQueryParams = Exclude<paths['/api/v1/admin/permissions']['get']['parameters']['query'], undefined>;
+export type ListRoleAssignmentsQueryParams = Exclude<paths['/api/v1/admin/role-assignments']['get']['parameters']['query'], undefined>;
+export type GetSamlServiceProviderPathParams = Exclude<paths['/api/v1/admin/saml/service-providers/{serviceProviderId}']['get']['parameters']['path'], undefined>;
+export type ListServiceAccessRulesQueryParams = Exclude<paths['/api/v1/admin/service-access']['get']['parameters']['query'], undefined>;
+export type GetWebhookPathParams = Exclude<paths['/api/v1/admin/webhooks/{webhookId}']['get']['parameters']['path'], undefined>;
+export type ListWebhookDeliveriesQueryParams = Exclude<paths['/api/v1/admin/webhooks/{webhookId}/deliveries']['get']['parameters']['query'], undefined>;
+export type ListWebhookDeliveriesPathParams = Exclude<paths['/api/v1/admin/webhooks/{webhookId}/deliveries']['get']['parameters']['path'], undefined>;
+export type ListUsersQueryParams = Exclude<paths['/scim/v2/Users']['get']['parameters']['query'], undefined>;
+export type GetUserPathParams = Exclude<paths['/scim/v2/Users/{id}']['get']['parameters']['path'], undefined>;
+export type ListGroupsQueryParams = Exclude<paths['/scim/v2/Groups']['get']['parameters']['query'], undefined>;
+export type GetGroupPathParams = Exclude<paths['/scim/v2/Groups/{id}']['get']['parameters']['path'], undefined>;
