@@ -181,3 +181,10 @@
   overflow: auto;
   padding: 30px 34px;
 }
+
+/* One standard content width for every portal page (pages no longer set their own), centered so the
+   column stays put as you move between sections instead of resizing per page. */
+.content > * {
+  max-width: 1040px;
+  margin-inline: auto;
+}
