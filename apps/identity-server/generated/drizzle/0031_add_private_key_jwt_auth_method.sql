@@ -1,1 +1,0 @@
-ALTER TYPE "public"."token_endpoint_auth_method" ADD VALUE 'private_key_jwt';

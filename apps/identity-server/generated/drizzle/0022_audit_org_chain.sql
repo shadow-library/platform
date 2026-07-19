@@ -1,1 +1,0 @@
-ALTER TABLE "audit_events" ALTER COLUMN "organisation_id" SET DATA TYPE varchar(64) USING "organisation_id"::text;
