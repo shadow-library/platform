@@ -8,6 +8,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { AccessModule } from '@server/modules/access/access.module';
 import { AdminModule } from '@server/modules/admin';
 import { AuthFlowModule } from '@server/modules/auth/flow';
 import { KeyModule } from '@server/modules/auth/keys';
@@ -83,6 +84,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     NotificationModule,
     AdminModule,
     ScimModule,
+    AccessModule,
   ],
 
   /** The browser UI is a separate app (identity-web); this service exposes only the JSON/OAuth API. */

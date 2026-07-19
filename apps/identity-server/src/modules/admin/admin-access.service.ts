@@ -1,7 +1,6 @@
 /**
  * Importing npm packages
  */
-import { type FastifyRequest } from 'fastify';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -10,7 +9,7 @@ import { Logger } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { SessionAuthService, ValidatedSession } from '@server/modules/auth/session';
+import { ValidatedSession } from '@server/modules/auth/session';
 import { PolicyDecisionService, Principal } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 
@@ -41,7 +40,6 @@ export class AdminAccessService {
   private platformOrganisationId: string | null = null;
 
   constructor(
-    private readonly sessionAuthService: SessionAuthService,
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly organisationService: OrganisationService,
   ) {}
@@ -61,7 +59,8 @@ export class AdminAccessService {
     return { type: 'USER', id: session.userId.toString() };
   }
 
-  private async authorize(session: ValidatedSession, permission: AdminPermission): Promise<AdminActor> {
+  /** Confirms the resolved session holds the permission in the platform organisation; the AccessGuard's permission check. */
+  async authorize(session: ValidatedSession, permission: AdminPermission): Promise<AdminActor> {
     const organisationId = await this.getPlatformOrganisationId();
     const userId = session.userId.toString();
     const decision = await this.policyDecisionService.check({ principal: this.principalOf(session), organisationId, action: permission });
@@ -74,35 +73,24 @@ export class AdminAccessService {
     return { session, organisationId };
   }
 
-  async requireRead(request: FastifyRequest, permission: AdminPermission): Promise<AdminActor> {
-    const session = await this.sessionAuthService.authenticate(request);
-    return this.authorize(session, permission);
-  }
-
   /**
    * Lists which admin permissions the caller's session holds in the platform organisation. The
    * console uses it to decide whether to render at all and which nav entries to show; an empty
    * result means the user is not staff. Authorization on each endpoint remains server-side.
    */
-  async listGrantedPermissions(request: FastifyRequest): Promise<AdminPermission[]> {
-    const session = await this.sessionAuthService.authenticate(request);
+  async listGrantedPermissions(session: ValidatedSession): Promise<AdminPermission[]> {
     const organisationId = await this.getPlatformOrganisationId();
     const held = await this.policyDecisionService.listPermissions(this.principalOf(session), organisationId);
     return Object.values(ADMIN_PERMISSIONS).filter(permission => held.has(permission));
   }
 
-  async requireMutation(request: FastifyRequest, permission: AdminPermission): Promise<AdminActor> {
-    const session = await this.sessionAuthService.authenticateElevated(request);
-    return this.authorize(session, permission);
-  }
-
   /**
    * Role administration accepts two tiers: `iam:roles:manage` works platform-wide, while
    * `app:roles:manage` only counts when the permission is owned by the application whose roles
-   * are being touched — so an application admin can never reach across applications.
+   * are being touched — so an application admin can never reach across applications. The caller's
+   * session (with its required step-up) is resolved by the AccessGuard.
    */
-  async requireRoleAdmin(request: FastifyRequest, applicationId: number): Promise<AdminActor> {
-    const session = await this.sessionAuthService.authenticateElevated(request);
+  async requireRoleAdmin(session: ValidatedSession, applicationId: number): Promise<AdminActor> {
     const organisationId = await this.getPlatformOrganisationId();
     const principal = this.principalOf(session);
     const userId = session.userId.toString();

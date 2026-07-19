@@ -3,13 +3,11 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
-import { type FastifyRequest } from 'fastify';
-
 /**
  * Importing user defined packages
  */
 import { ADMIN_PERMISSIONS, AdminAccessService, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin';
-import { SESSION_COOKIE_NAME, SessionAuthService, SessionService } from '@server/modules/auth/session';
+import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -23,6 +21,10 @@ import { TestEnvironment } from '../test-environment';
 
 /**
  * Declaring the constants
+ *
+ * The AccessGuard now owns session resolution and AAL step-up gating (covered end-to-end in the
+ * guard and admin HTTP specs); what remains here is AdminAccessService's authorization surface,
+ * which the guard delegates to against an already-resolved session.
  */
 const env = new TestEnvironment('admin-access').init();
 const ADMIN_EMAIL = 'admin@shadow-apps.com';
@@ -38,29 +40,23 @@ describe('AdminAccessService', () => {
   let pdp: PolicyDecisionService;
   let sessions: SessionService;
   let platformOrgId: string;
-  let iamAdminRoleId: number;
 
-  const requestWith = (secret: string): FastifyRequest => ({ cookies: { [SESSION_COOKIE_NAME]: secret } }) as unknown as FastifyRequest;
-
-  const createUserSession = async (email: string, aal: 'AAL1' | 'AAL2') => {
+  const sessionFor = async (email: string): Promise<{ userId: bigint; session: ValidatedSession }> => {
     const user = await env.getService(UserService).createUserWithPassword({ email, password: 'Password@123', status: 'ACTIVE', emailVerified: true });
-    const { secret } = await sessions.create({ userId: user.id, aal });
-    return { user, secret };
+    const { secret } = await sessions.create({ userId: user.id, aal: 'AAL2' });
+    const session = await sessions.validate(secret);
+    expect(session).not.toBeNull();
+    return { userId: user.id, session: session as ValidatedSession };
   };
 
   beforeEach(async () => {
     pdp = env.getService(PolicyDecisionService);
     sessions = env.getService(SessionService);
-    access = new AdminAccessService(env.getService(SessionAuthService), pdp, env.getService(OrganisationService));
+    access = new AdminAccessService(pdp, env.getService(OrganisationService));
 
     const organisation = await env.getService(OrganisationService).findTeamByName(PLATFORM_ORG_NAME);
     expect(organisation).not.toBeNull();
     platformOrgId = String(organisation?.id);
-
-    const application = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity');
-    const role = application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE);
-    expect(role).toBeDefined();
-    iamAdminRoleId = role?.id ?? 0;
   });
 
   it('should grant the bootstrap admin the full permission taxonomy', async () => {
@@ -74,32 +70,20 @@ describe('AdminAccessService', () => {
   });
 
   it('should reject a session without administrative assignments', async () => {
-    const { secret } = await createUserSession('mortal@example.com', 'AAL2');
-    const denied = await rejection(access.requireRead(requestWith(secret), ADMIN_PERMISSIONS.usersRead));
+    const { session } = await sessionFor('mortal@example.com');
+    const denied = await rejection(access.authorize(session, ADMIN_PERMISSIONS.usersRead));
     expect(denied.code).toBe('ADM_001');
   });
 
-  it('should reject requests without a session entirely', async () => {
-    const denied = await rejection(access.requireRead(requestWith('not-a-session'), ADMIN_PERMISSIONS.usersRead));
-    expect(denied.code).toBe('AUTH_005');
-  });
+  it('should authorize an administrator holding the permission in the platform organisation', async () => {
+    const { userId, session } = await sessionFor('operator@example.com');
+    const application = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity');
+    const role = application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE);
+    await pdp.assignRole({ type: 'USER', id: userId.toString() }, role?.id ?? 0, platformOrgId);
 
-  it('should permit reads at aal1 but demand step-up for mutations', async () => {
-    const { user, secret } = await createUserSession('operator@example.com', 'AAL1');
-    await pdp.assignRole({ type: 'USER', id: user.id.toString() }, iamAdminRoleId, platformOrgId);
-
-    const actor = await access.requireRead(requestWith(secret), ADMIN_PERMISSIONS.usersRead);
+    const actor = await access.authorize(session, ADMIN_PERMISSIONS.usersManage);
     expect(actor.organisationId).toBe(platformOrgId);
-
-    const denied = await rejection(access.requireMutation(requestWith(secret), ADMIN_PERMISSIONS.usersManage));
-    expect(denied.code).toBe('AUTH_006');
-  });
-
-  it('should permit mutations for an elevated administrator', async () => {
-    const { user, secret } = await createUserSession('elevated@example.com', 'AAL2');
-    await pdp.assignRole({ type: 'USER', id: user.id.toString() }, iamAdminRoleId, platformOrgId);
-    const actor = await access.requireMutation(requestWith(secret), ADMIN_PERMISSIONS.usersManage);
-    expect(actor.session.userId).toBe(user.id);
+    expect(actor.session.userId).toBe(userId);
   });
 
   it('should scope app-level role administration to the owning application', async () => {
@@ -110,13 +94,13 @@ describe('AdminAccessService', () => {
     const permissionId = await pdp.ensurePermission(appB.id, ADMIN_PERMISSIONS.appRolesManage);
     await pdp.grantPermissionToRole(roleB.id, permissionId);
 
-    const { user, secret } = await createUserSession('app-admin@example.com', 'AAL2');
-    await pdp.assignRole({ type: 'USER', id: user.id.toString() }, roleB.id, platformOrgId);
+    const { userId, session } = await sessionFor('app-admin@example.com');
+    await pdp.assignRole({ type: 'USER', id: userId.toString() }, roleB.id, platformOrgId);
 
-    const permitted = await access.requireRoleAdmin(requestWith(secret), appB.id);
-    expect(permitted.session.userId).toBe(user.id);
+    const permitted = await access.requireRoleAdmin(session, appB.id);
+    expect(permitted.session.userId).toBe(userId);
 
-    const denied = await rejection(access.requireRoleAdmin(requestWith(secret), platformApp.id));
+    const denied = await rejection(access.requireRoleAdmin(session, platformApp.id));
     expect(denied.code).toBe('ADM_001');
   });
 });

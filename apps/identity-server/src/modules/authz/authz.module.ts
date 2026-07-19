@@ -15,7 +15,6 @@ import { AuthzController } from './authz.controller';
 import { CatalogSyncService } from './catalog-sync.service';
 import { PolicyDecisionService } from './policy-decision.service';
 import { ServiceAccessService } from './service-access.service';
-import { ServiceTokenGuard } from './service-token.guard';
 
 /**
  * Defining types
@@ -27,7 +26,7 @@ import { ServiceTokenGuard } from './service-token.guard';
 
 @Module({
   imports: [DatabaseModule, KeyModule, AuditModule, ApplicationModule],
-  controllers: [AuthzController, ServiceTokenGuard],
+  controllers: [AuthzController],
   providers: [PolicyDecisionService, CatalogSyncService, ServiceAccessService],
   exports: [PolicyDecisionService, CatalogSyncService, ServiceAccessService],
 })
