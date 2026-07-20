@@ -174,7 +174,7 @@ describe('Admin client, resource and role APIs', () => {
       expect(await db.select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, family?.id ?? ''))).toHaveLength(0);
     });
 
-    it('should refuse to delete a first-party client', async () => {
+    it('should delete a first-party client too (deletion is name-confirmed, not carved out)', async () => {
       const created = await request('post', '/api/v1/admin/clients').body({
         applicationId: platformAppId,
         name: 'Platform',
@@ -184,11 +184,10 @@ describe('Admin client, resource and role APIs', () => {
       });
       const { clientId } = created.json() as { clientId: string };
       const deleted = await request('delete', `/api/v1/admin/clients/${clientId}`);
-      expect(deleted.statusCode).toBe(409);
+      expect(deleted.statusCode).toBe(200);
 
-      /** The client must survive the refused delete. */
       const detail = await request('get', `/api/v1/admin/clients/${clientId}`);
-      expect(detail.statusCode).toBe(200);
+      expect(detail.statusCode).toBe(401);
     });
 
     it('should require a stepped-up session to delete a client', async () => {

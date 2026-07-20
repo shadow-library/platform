@@ -153,8 +153,6 @@ export class AdminClientController {
   async deleteClient(@Params() params: ClientIdParams): Promise<AdminActionResponse> {
     const actor = Context.getActor();
     const client = await this.requireClient(params.clientId);
-    /** First-party clients are platform-managed (the console's own client among them); deleting one could lock the platform out. */
-    if (client.isFirstParty) throw AppErrorCode.ADM_006.create();
     await this.clientService.deleteClient(params.clientId);
     await this.record(actor, 'admin.client.deleted', params.clientId, { name: client.name, kind: client.kind });
     return { success: true };
