@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { createFileRoute, Link } from '@tanstack/react-router';
 import { useMemo, useState } from 'react';
 import {
   Alert,
@@ -53,6 +53,11 @@ import styles from './console.module.css';
  * Declaring the constants
  */
 export const Route = createFileRoute('/console/applications/$appId')({
+  /** The open tab lives in the URL (`?tab=`) so it survives refresh and is deep-linkable; absent means overview. */
+  validateSearch: (search: Record<string, unknown>): { tab?: Tab } => {
+    const tab = search.tab;
+    return { tab: tab === 'overview' || tab === 'clients' || tab === 'resources' || tab === 'roles' || tab === 'members' ? tab : undefined };
+  },
   loader: ({ context, params }) =>
     Promise.all([
       context.queryClient.ensureQueryData(adminApplicationQueryOptions(params.appId)),
@@ -92,7 +97,8 @@ function memberSub(member: ApplicationMemberItem): string | undefined {
 
 function ApplicationDetailPage(): React.JSX.Element {
   const { appId } = Route.useParams();
-  const navigate = useNavigate();
+  const { tab = 'overview' } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const app = useApplicationQuery(appId);
   const members = useApplicationMembersQuery(appId);
   const clientsQuery = useClientsQuery();
@@ -102,7 +108,6 @@ function ApplicationDetailPage(): React.JSX.Element {
   const removeMember = useRemoveApplicationMemberMutation();
   const { require, dialog } = useStepUpGate();
 
-  const [tab, setTab] = useState<Tab>('overview');
   const [editOpen, setEditOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [form, setForm] = useState<UpdateApplicationBody>({});
@@ -203,7 +208,12 @@ function ApplicationDetailPage(): React.JSX.Element {
 
       <div className={styles.appTabs}>
         {TABS.map(item => (
-          <button key={item.key} className={styles.appTab} data-active={tab === item.key || undefined} onClick={() => setTab(item.key)}>
+          <button
+            key={item.key}
+            className={styles.appTab}
+            data-active={tab === item.key || undefined}
+            onClick={() => navigate({ search: prev => ({ ...prev, tab: item.key }), replace: true })}
+          >
             {item.label}
             {counts[item.key] != null && <span className={styles.tabCountPill}>{counts[item.key]}</span>}
           </button>

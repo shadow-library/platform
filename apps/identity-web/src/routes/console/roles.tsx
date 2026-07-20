@@ -31,6 +31,12 @@ import styles from './console.module.css';
  * Declaring the constants
  */
 export const Route = createFileRoute('/console/roles')({
+  /** The chosen application and role live in the URL (`?app=&role=`) so they survive refresh and are deep-linkable. */
+  validateSearch: (search: Record<string, unknown>): { app?: string; role?: number } => {
+    const roleRaw = search.role;
+    const role = typeof roleRaw === 'number' ? roleRaw : typeof roleRaw === 'string' && /^\d+$/.test(roleRaw) ? Number(roleRaw) : undefined;
+    return { app: typeof search.app === 'string' ? search.app : undefined, role };
+  },
   // The application list feeds the picker; permissions and assignments load once an application/role is chosen.
   loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
   component: RolesPage,
@@ -184,11 +190,11 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
 
 function RolesPage(): React.JSX.Element {
   const apps = useApplicationsQuery();
-  const [appId, setAppId] = useState('');
-  const [selectedRoleId, setSelectedRoleId] = useState<number | null>(null);
+  const navigate = Route.useNavigate();
+  const { app: appParam, role: selectedRoleId } = Route.useSearch();
   const firstAppId = apps.data?.items[0]?.id;
   // Default to the first application until the operator picks another — derived, so no effect is needed.
-  const effectiveAppId = appId || (firstAppId === undefined ? '' : String(firstAppId));
+  const effectiveAppId = appParam || (firstAppId === undefined ? '' : String(firstAppId));
 
   const app = useApplicationQuery(effectiveAppId, Boolean(effectiveAppId));
   const permissions = usePermissionsQuery(Number(effectiveAppId), Boolean(effectiveAppId));
@@ -206,14 +212,7 @@ function RolesPage(): React.JSX.Element {
       />
 
       <div className={styles.toolbar}>
-        <Select
-          placeholder="Select an application"
-          value={effectiveAppId}
-          onValueChange={value => {
-            setAppId(value);
-            setSelectedRoleId(null);
-          }}
-        >
+        <Select placeholder="Select an application" value={effectiveAppId} onValueChange={value => navigate({ search: { app: value }, replace: true })}>
           {(apps.data?.items ?? []).map(item => (
             <Select.Item key={item.id} value={String(item.id)}>
               {item.displayName ?? item.name}
@@ -241,7 +240,7 @@ function RolesPage(): React.JSX.Element {
                     key={role.id}
                     type="button"
                     className={styles.accessRow}
-                    onClick={() => setSelectedRoleId(role.id)}
+                    onClick={() => navigate({ search: prev => ({ ...prev, role: role.id }), replace: true })}
                     style={{
                       width: '100%',
                       textAlign: 'left',
