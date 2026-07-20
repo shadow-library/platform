@@ -3,20 +3,21 @@
  */
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Avatar, Button, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
-import { AlertTriangleIcon, BadgeCheckIcon, BuildingIcon, MailIcon, RefreshIcon, UserIcon } from '@/components/icons';
+import { AlertTriangleIcon, BadgeCheckIcon, BuildingIcon, LockIcon, MailIcon, RefreshIcon, UserIcon, XCircleIcon } from '@/components/icons';
 import { AuthCard, AuthMedallion, AuthScreen, StepHeader } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
-import { authApi, consentPromptQueryOptions, type ConsentScope, useMeQuery, useSignoutMutation } from '@/lib/apis';
+import { StepUpFields } from '@/features/portal';
+import { authApi, consentPromptQueryOptions, type ConsentScope, useMeQuery, useSignoutMutation, useStepUpMethodsQuery } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 /**
- * Declaring the constants
+ * Defining types
  */
 interface ConsentSearch {
   clientId?: string;
@@ -24,6 +25,19 @@ interface ConsentSearch {
   redirectUri?: string;
   state?: string;
 }
+
+/**
+ * The interactive step of the consent card once the prompt has loaded. Loading/invalid/first-party are
+ * derived from the query, so only the states the user drives live here — never as parallel booleans.
+ */
+type ConsentPhase = { step: 'review' } | { step: 'stepup' } | { step: 'denied'; redirectTo?: string };
+
+/**
+ * Declaring the constants
+ */
+
+/** How long the denied confirmation lingers before handing control back — long enough to read, short enough not to stall. */
+const DENIED_REDIRECT_DELAY_MS = 1400;
 
 export const Route = createFileRoute('/_auth/consent')({
   validateSearch: (search: Record<string, unknown>): ConsentSearch => ({
@@ -54,6 +68,8 @@ function ConsentPage(): React.JSX.Element {
   const me = useMeQuery();
   const signout = useSignoutMutation();
   const autoApproved = useRef(false);
+  const [phase, setPhase] = useState<ConsentPhase>({ step: 'review' });
+  const stepUpMethods = useStepUpMethodsQuery(phase.step === 'stepup');
 
   const prompt = useQuery(consentPromptQueryOptions(clientId ?? '', scope ?? ''));
 
@@ -61,19 +77,33 @@ function ConsentPage(): React.JSX.Element {
     mutationFn: (decision: 'APPROVE' | 'DENY') =>
       authApi.consentDecide({ clientId: clientId ?? '', scopeNames: prompt.data?.scopes.map(item => item.name) ?? [], decision, redirectUri, state }),
     onSuccess: result => {
+      // Denials pause on a confirmation screen; the effect below fires the validated access_denied redirect.
+      if (result.decision === 'DENY') return setPhase({ step: 'denied', redirectTo: result.redirectTo });
       if (result.redirectTo) window.location.assign(result.redirectTo);
       else navigate({ to: '/account' });
     },
   });
 
-  // First-party apps (and already-granted scopes) skip the prompt: approve silently and hand back.
   const data = prompt.data;
+
+  // First-party apps (and already-granted scopes) skip the prompt: approve silently and hand back.
   useEffect(() => {
     if (data && (data.isFirstParty || data.alreadyGranted) && !autoApproved.current) {
       autoApproved.current = true;
       decide.mutate('APPROVE');
     }
   }, [data, decide]);
+
+  // Hand control back to the client (or home) once the denied confirmation has had its beat on screen.
+  useEffect(() => {
+    if (phase.step !== 'denied') return;
+    const redirectTo = phase.redirectTo;
+    const timer = window.setTimeout(() => {
+      if (redirectTo) window.location.assign(redirectTo);
+      else navigate({ to: '/account' });
+    }, DENIED_REDIRECT_DELAY_MS);
+    return () => window.clearTimeout(timer);
+  }, [phase, navigate]);
 
   if (!clientId || !scope) return <InvalidRequest />;
 
@@ -103,6 +133,50 @@ function ConsentPage(): React.JSX.Element {
         </AuthCard>
       </AuthScreen>
     );
+
+  if (phase.step === 'denied')
+    return (
+      <AuthScreen>
+        <AuthCard>
+          <AuthMedallion intent="neutral">
+            <XCircleIcon size={26} />
+          </AuthMedallion>
+          <StepHeader title="Access denied" description={`You chose not to share access. Returning you to ${data.clientName}.`} align="center" />
+          <div className={parts.otpNote} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+            <Spinner size="sm" />
+            <span>
+              Redirecting with <code style={{ fontFamily: 'var(--sh-font-mono)' }}>error=access_denied</code>
+            </span>
+          </div>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  // Sensitive scopes must be re-authenticated to AAL2 before the grant is recorded; an already-elevated session skips it.
+  const requiresStepUp = data.scopes.some(item => item.isSensitive) && !me.data?.elevated;
+
+  if (phase.step === 'stepup')
+    return (
+      <AuthScreen>
+        <AuthCard>
+          <AuthMedallion intent="warning">
+            <LockIcon size={26} />
+          </AuthMedallion>
+          <StepHeader title="Confirm it’s you" description={`${data.clientName} requests sensitive access. Confirm it’s you to keep granting access.`} align="center" />
+          <StepUpFields methods={stepUpMethods.data?.methods} loading={stepUpMethods.isLoading} onElevated={() => decide.mutate('APPROVE')} />
+          <div className={parts.btnStack}>
+            <Button variant="ghost" fullWidth disabled={decide.isPending} onClick={() => setPhase({ step: 'review' })}>
+              Back
+            </Button>
+          </div>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  const onAllow = (): void => {
+    if (requiresStepUp) return setPhase({ step: 'stepup' });
+    decide.mutate('APPROVE');
+  };
 
   return (
     <AuthScreen>
@@ -161,7 +235,7 @@ function ConsentPage(): React.JSX.Element {
         </div>
 
         <div className={parts.btnStack}>
-          <Button variant="primary" fullWidth loading={decide.isPending && decide.variables === 'APPROVE'} onClick={() => decide.mutate('APPROVE')}>
+          <Button variant="primary" fullWidth loading={decide.isPending && decide.variables === 'APPROVE'} onClick={onAllow}>
             Allow access
           </Button>
           <Button variant="secondary" fullWidth loading={decide.isPending && decide.variables === 'DENY'} onClick={() => decide.mutate('DENY')}>

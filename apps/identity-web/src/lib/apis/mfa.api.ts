@@ -25,6 +25,17 @@ export type TotpActivation = TotpActivateResponse;
 export type StepUpState = StepUpResponse;
 export type { MfaEnrollmentsResponse };
 
+/** How a session may be elevated. `PASSWORD` is offered only to accounts with no second factor; an
+ * empty list means the account must enrol a factor before it can perform sensitive actions. */
+export type StepUpMethod = 'TOTP' | 'WEBAUTHN' | 'PASSWORD';
+export interface StepUpMethodsResponse {
+  methods: StepUpMethod[];
+}
+export interface StepUpProof {
+  code?: string;
+  password?: string;
+}
+
 /** The W3C credential-creation / assertion option blobs and the browser's attestation are opaque JSON — typed as
  * `JsonObject` (not `Record<string, unknown>`) so they satisfy the server-function serializability constraint. */
 export type WebauthnOptions = JsonObject;
@@ -48,9 +59,16 @@ const totpActivate = createServerFn({ method: 'POST' })
   .validator((code: string) => code)
   .handler(({ data }) => serverFetch<TotpActivation>({ method: 'POST', path: '/me/mfa/totp/activate', body: { code: data } }));
 const removeTotp = createServerFn({ method: 'POST' }).handler(() => serverFetch<undefined>({ method: 'DELETE', path: '/me/mfa/totp' }));
+const fetchStepUpMethods = createServerFn({ method: 'GET' }).handler(() => serverFetch<StepUpMethodsResponse>({ method: 'GET', path: '/me/mfa/step-up/methods' }));
 const stepUp = createServerFn({ method: 'POST' })
-  .validator((code: string) => code)
-  .handler(({ data }) => serverFetch<StepUpState>({ method: 'POST', path: '/me/mfa/step-up', body: { code: data } }));
+  .validator((proof: StepUpProof) => proof)
+  .handler(({ data }) => serverFetch<StepUpState>({ method: 'POST', path: '/me/mfa/step-up', body: data }));
+const stepUpPasskeyOptions = createServerFn({ method: 'POST' }).handler(() =>
+  serverFetch<{ options: WebauthnOptions }>({ method: 'POST', path: '/me/webauthn/step-up/options', body: {} }),
+);
+const stepUpPasskeyVerify = createServerFn({ method: 'POST' })
+  .validator((assertion: WebauthnAttestation) => assertion)
+  .handler(({ data }) => serverFetch<StepUpState>({ method: 'POST', path: '/me/webauthn/step-up', body: data }));
 const regenerateRecoveryCodes = createServerFn({ method: 'POST' }).handler(() =>
   serverFetch<{ recoveryCodes: string[] }>({ method: 'POST', path: '/me/mfa/recovery-codes', body: {} }),
 );
@@ -99,13 +117,34 @@ export function useRemoveTotpMutation(): UseMutationResult<undefined, ApiError, 
   });
 }
 
-/** Elevate the current session to AAL2 with a TOTP code (the step-up ceremony). */
-export function useStepUpMutation(): UseMutationResult<StepUpState, ApiError, string> {
+/** The methods the current account may use to elevate, so the UI never prompts for a factor it lacks. */
+export function useStepUpMethodsQuery(enabled = true): UseQueryResult<StepUpMethodsResponse, ApiError> {
+  return useQuery(
+    queryOptions<StepUpMethodsResponse, ApiError>({
+      queryKey: [...mfaKeys.all, 'step-up-methods'],
+      queryFn: () => call(fetchStepUpMethods()),
+      enabled,
+    }),
+  );
+}
+
+/** Elevate the current session to AAL2 with a TOTP code or — for accounts with no second factor — a password. */
+export function useStepUpMutation(): UseMutationResult<StepUpState, ApiError, StepUpProof> {
   const queryClient = useQueryClient();
-  return useMutation<StepUpState, ApiError, string>({
-    mutationFn: code => call(stepUp({ data: code })),
+  return useMutation<StepUpState, ApiError, StepUpProof>({
+    mutationFn: proof => call(stepUp({ data: proof })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: meKeys.all }),
   });
+}
+
+/** Options for the passkey step-up ceremony; the browser runs the assertion between this and verify. */
+export function requestPasskeyStepUpOptions(): Promise<WebauthnOptions> {
+  return call(stepUpPasskeyOptions()).then(result => result.options);
+}
+
+/** Completes a passkey step-up with the browser's assertion, elevating the session to AAL2. */
+export function verifyPasskeyStepUp(assertion: WebauthnAttestation): Promise<StepUpState> {
+  return call(stepUpPasskeyVerify({ data: assertion }));
 }
 
 /** Regenerate the recovery-code batch (step-up required); the previous batch is retired atomically. */
