@@ -41,6 +41,10 @@ const GRANT_PRESETS: Record<string, string[]> = {
   client_credentials: ['client_credentials'],
 };
 
+/** `system:serviceaccount:<namespace>:<name>` — the subject of a projected Kubernetes SA token. */
+const WORKLOAD_SUBJECT_PATTERN = /^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+type AuthMethod = 'client_secret' | 'workload_identity';
+
 function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpenChange: (open: boolean) => void; onSecret: (secret: string) => void }): React.JSX.Element {
   const apps = useApplicationsQuery();
   const register = useRegisterClientMutation();
@@ -50,10 +54,26 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
   const [grant, setGrant] = useState('auth_code');
   const [redirectUris, setRedirectUris] = useState<TokenValue[]>([]);
   const [firstParty, setFirstParty] = useState(false);
+  const [authMethod, setAuthMethod] = useState<AuthMethod>('client_secret');
+  const [workloadSubject, setWorkloadSubject] = useState('');
+
+  const isService = kind === 'SERVICE';
+  const isWorkload = isService && authMethod === 'workload_identity';
+
+  /** Service clients only ever use the client-credentials grant; switching kind keeps the form coherent. */
+  const changeKind = (value: ClientKind): void => {
+    setKind(value);
+    setGrant(value === 'SERVICE' ? 'client_credentials' : 'auth_code');
+    if (value !== 'SERVICE') setAuthMethod('client_secret');
+  };
 
   const submit = (): void => {
     if (!applicationId || !name.trim()) {
       toast.danger('Choose an application and a name.');
+      return;
+    }
+    if (isWorkload && !WORKLOAD_SUBJECT_PATTERN.test(workloadSubject.trim())) {
+      toast.danger('Enter a workload subject like system:serviceaccount:namespace:service-account.');
       return;
     }
     register.mutate(
@@ -62,8 +82,10 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
         name: name.trim(),
         kind,
         isFirstParty: firstParty,
-        grantTypes: GRANT_PRESETS[grant] ?? ['authorization_code', 'refresh_token'],
+        grantTypes: isService ? ['client_credentials'] : (GRANT_PRESETS[grant] ?? ['authorization_code', 'refresh_token']),
         redirectUris: redirectUris.filter(token => token.valid).map(token => token.value),
+        ...(isService ? { authMethod } : {}),
+        ...(isWorkload ? { workloadSubject: workloadSubject.trim() } : {}),
       },
       {
         onSuccess: result => {
@@ -95,7 +117,7 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
               <Input value={name} onValueChange={setName} placeholder="Production web app" />
             </FormField>
             <FormField label="Client type">
-              <Select value={kind} onValueChange={value => setKind(value as ClientKind)}>
+              <Select value={kind} onValueChange={value => changeKind(value as ClientKind)}>
                 {KINDS.map(item => (
                   <Select.Item key={item.value} value={item.value}>
                     {item.label}
@@ -103,13 +125,20 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
                 ))}
               </Select>
             </FormField>
-            <FormField label="Grant types">
-              <Select value={grant} onValueChange={setGrant}>
-                <Select.Item value="auth_code">Authorization code + refresh</Select.Item>
-                <Select.Item value="client_credentials">Client credentials</Select.Item>
-              </Select>
-            </FormField>
-            {grant === 'auth_code' && (
+            {isService && (
+              <FormField label="Authentication method" helper="How this machine client proves its identity when requesting tokens.">
+                <Select value={authMethod} onValueChange={value => setAuthMethod(value as AuthMethod)}>
+                  <Select.Item value="client_secret">Client secret</Select.Item>
+                  <Select.Item value="workload_identity">Workload identity (Kubernetes service account)</Select.Item>
+                </Select>
+              </FormField>
+            )}
+            {isWorkload && (
+              <FormField label="Workload subject" required helper="The pod service account presented as an RFC 7523 assertion — no secret is issued.">
+                <Input value={workloadSubject} onValueChange={setWorkloadSubject} placeholder="system:serviceaccount:novel-forge:novel-forge-server" />
+              </FormField>
+            )}
+            {!isService && (
               <FormField label="Redirect URIs" helper="Where the server may return the authorization code.">
                 <TokenInput
                   value={redirectUris}

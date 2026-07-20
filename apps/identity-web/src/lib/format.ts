@@ -3,6 +3,14 @@
  * small derived bits (initials, country flags) the screens render from lean API models.
  */
 
+/**
+ * Date/time formatting is pinned to a single locale. `toLocale*(undefined, …)` resolves to the
+ * host's locale, which differs between the SSR runtime and the browser (e.g. `Jul 19, 2026` vs
+ * `19 Jul 2026`) and triggers a React hydration mismatch. A fixed locale renders identically on
+ * both sides.
+ */
+const DATE_LOCALE = 'en-US';
+
 /** A compact relative time ("4m ago", "yesterday") from an ISO timestamp. */
 export function relativeTime(iso?: string | null): string {
   if (!iso) return '';
@@ -17,7 +25,7 @@ export function relativeTime(iso?: string | null): string {
   const days = Math.round(hours / 24);
   if (days === 1) return 'yesterday';
   if (days < 7) return `${days}d ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  return new Date(iso).toLocaleDateString(DATE_LOCALE, { month: 'short', day: 'numeric' });
 }
 
 /** An absolute, human timestamp ("12 Jul 2026, 14:05"). */
@@ -25,7 +33,7 @@ export function formatDateTime(iso?: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleString(undefined, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  return date.toLocaleString(DATE_LOCALE, { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 }
 
 /** A date without the clock time ("12 Jul 2026"). */
@@ -33,7 +41,7 @@ export function formatDate(iso?: string | null): string {
   if (!iso) return '';
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return '';
-  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+  return date.toLocaleDateString(DATE_LOCALE, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
 /** Up to two initials from a display name, for avatar fallbacks and monograms. */
