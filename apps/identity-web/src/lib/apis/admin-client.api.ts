@@ -57,6 +57,9 @@ const grantClientScope = createServerFn({ method: 'POST' })
 const revokeClientScope = createServerFn({ method: 'POST' })
   .validator((input: { clientId: string; scopeId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/clients/${data.clientId}/scopes/${data.scopeId}` }));
+const deleteClient = createServerFn({ method: 'POST' })
+  .validator((clientId: string) => clientId)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/clients/${data}` }));
 
 /* ---------- queries ---------- */
 
@@ -115,5 +118,13 @@ export function useRevokeClientScopeMutation(): UseMutationResult<undefined, Api
   return useMutation<undefined, ApiError, { clientId: string; scopeId: string }>({
     mutationFn: input => call(revokeClientScope({ data: input })),
     onSuccess: (_data, { clientId }) => queryClient.invalidateQueries({ queryKey: adminClientKeys.detail(clientId) }),
+  });
+}
+
+export function useDeleteClientMutation(): UseMutationResult<undefined, ApiError, string> {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, ApiError, string>({
+    mutationFn: clientId => call(deleteClient({ data: clientId })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminClientKeys.list() }),
   });
 }

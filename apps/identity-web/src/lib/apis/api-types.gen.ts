@@ -2622,6 +2622,7 @@ export interface components {
       /** @enum {string} */
       authMethod: 'none' | 'client_secret' | 'workload_identity';
       workloadSubject?: string;
+      backchannelLogoutUri?: string;
       createdAt: string;
     };
     UpdateClientBody: {

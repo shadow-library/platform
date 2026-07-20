@@ -36,6 +36,7 @@ import {
   type UpdateClientBody,
   useApplicationsQuery,
   useClientQuery,
+  useDeleteClientMutation,
   useGrantClientScopeMutation,
   useResourcesQuery,
   useRevokeClientScopeMutation,
@@ -87,10 +88,12 @@ function ClientDetailPage(): React.JSX.Element {
   const rotate = useRotateClientSecretMutation();
   const grant = useGrantClientScopeMutation();
   const revoke = useRevokeClientScopeMutation();
+  const del = useDeleteClientMutation();
   const { require, dialog } = useStepUpGate();
 
   const [editOpen, setEditOpen] = useState(false);
   const [deactivateOpen, setDeactivateOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
   const [form, setForm] = useState<UpdateClientBody>({});
   const [redirectTokens, setRedirectTokens] = useState<TokenValue[]>([]);
@@ -128,14 +131,18 @@ function ClientDetailPage(): React.JSX.Element {
 
   const openEdit = (): void =>
     require(() => {
-      setForm({ name: data.name, ...(isWorkload ? { workloadSubject: data.workloadSubject ?? '' } : {}) });
+      setForm({ name: data.name, backchannelLogoutUri: data.backchannelLogoutUri ?? '', ...(isWorkload ? { workloadSubject: data.workloadSubject ?? '' } : {}) });
       setRedirectTokens(data.redirectUris.map(uri => ({ value: uri, valid: true })));
       setEditOpen(true);
     });
 
   const saveEdit = (): void => {
     const body: UpdateClientBody = { name: form.name?.trim() || data.name };
-    if (usesRedirects) body.redirectUris = redirectTokens.filter(token => token.valid).map(token => token.value);
+    if (usesRedirects) {
+      body.redirectUris = redirectTokens.filter(token => token.valid).map(token => token.value);
+      /** An empty value clears the back-channel logout URI; the server treats '' as an explicit clear. */
+      body.backchannelLogoutUri = (form.backchannelLogoutUri ?? '').trim();
+    }
     /** An empty subject unbinds the workload identity; the server treats '' as an explicit clear. */
     if (isWorkload) body.workloadSubject = (form.workloadSubject ?? '').trim();
     update.mutate(
@@ -162,6 +169,18 @@ function ClientDetailPage(): React.JSX.Element {
           onError: error => toast.danger(error.message),
         },
       ),
+    );
+
+  const removeClient = (): void =>
+    require(() =>
+      del.mutate(clientId, {
+        onSuccess: () => {
+          toast.success('Client deleted');
+          setDeleteOpen(false);
+          navigate({ to: '/console/clients' });
+        },
+        onError: error => toast.danger(error.message),
+      }),
     );
 
   const grantScope = (scopeId: string): void => {
@@ -234,6 +253,12 @@ function ClientDetailPage(): React.JSX.Element {
         ) : (
           <Button variant="secondary" size="sm" loading={update.isPending} onClick={() => setActive(true)}>
             Activate client
+          </Button>
+        )}
+        {/* First-party clients are platform-managed and cannot be deleted (the server refuses). */}
+        {!data.isFirstParty && (
+          <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
+            Delete client…
           </Button>
         )}
       </div>
@@ -326,6 +351,15 @@ function ClientDetailPage(): React.JSX.Element {
                   />
                 </FormField>
               )}
+              {usesRedirects && (
+                <FormField label="Back-channel logout URI" helper="Optional OIDC endpoint that receives logout tokens. Clear it to disable.">
+                  <Input
+                    value={form.backchannelLogoutUri ?? ''}
+                    onValueChange={value => setForm(prev => ({ ...prev, backchannelLogoutUri: value }))}
+                    placeholder="https://app.example.com/oidc/backchannel-logout"
+                  />
+                </FormField>
+              )}
               {isWorkload && (
                 <FormField label="Workload subject" helper="The bound Kubernetes service account. Clear it to unbind.">
                   <Input value={form.workloadSubject ?? ''} onValueChange={value => setForm(prev => ({ ...prev, workloadSubject: value }))} />
@@ -353,6 +387,18 @@ function ClientDetailPage(): React.JSX.Element {
         confirmLabel="Deactivate client"
         loading={update.isPending}
         onConfirm={() => setActive(false)}
+      />
+
+      <ConfirmDialog
+        open={deleteOpen}
+        onOpenChange={setDeleteOpen}
+        intent="danger"
+        title={`Delete ${data.name}?`}
+        description="This permanently removes the client and its secrets, redirect URIs, scope grants, and stored consents. Anything authenticating as this client will stop working. Already-issued access tokens remain valid until they expire. This cannot be undone."
+        confirmLabel="Delete client"
+        typedConfirmation={data.name}
+        loading={del.isPending}
+        onConfirm={removeClient}
       />
 
       <SecretDialog
