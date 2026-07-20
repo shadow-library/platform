@@ -255,12 +255,9 @@ function ClientDetailPage(): React.JSX.Element {
             Activate client
           </Button>
         )}
-        {/* First-party clients are platform-managed and cannot be deleted (the server refuses). */}
-        {!data.isFirstParty && (
-          <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
-            Delete client…
-          </Button>
-        )}
+        <Button variant="danger" size="sm" onClick={() => setDeleteOpen(true)}>
+          Delete client…
+        </Button>
       </div>
 
       <div className={styles.detailGrid}>

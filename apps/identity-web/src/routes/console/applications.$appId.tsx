@@ -292,6 +292,7 @@ function ApplicationDetailPage(): React.JSX.Element {
               rowKey="id"
               loading={clientsQuery.isLoading}
               aria-label="OAuth clients"
+              onRowClick={client => navigate({ to: '/console/clients/$clientId', params: { clientId: client.id } })}
               emptyState={
                 <EmptyState
                   size="inline"
