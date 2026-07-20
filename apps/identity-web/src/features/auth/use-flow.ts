@@ -12,6 +12,9 @@ import { type FlowState, isApiError } from '@/lib/apis';
  * Defining types
  */
 
+/** Why a flow became unrecoverable: `expired` (timed out / not found) vs `locked` (terminated after too many failures). */
+export type DeadReason = 'expired' | 'locked';
+
 export interface FlowUiState {
   flow: FlowState | null;
   busy: boolean;
@@ -19,6 +22,8 @@ export interface FlowUiState {
   error: string | null;
   /** Set when the flow is unrecoverable (expired/terminated) — the page offers a restart. */
   dead: boolean;
+  /** Distinguishes the death cause so the page can show a lock-out card instead of the generic expiry one. */
+  deadReason: DeadReason | null;
 }
 
 export interface FlowActions {
@@ -48,6 +53,7 @@ export function useFlow(): FlowUiState & FlowActions {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [dead, setDead] = useState(false);
+  const [deadReason, setDeadReason] = useState<DeadReason | null>(null);
   const previousFlow = useRef<FlowState | null>(null);
 
   const run = useCallback(async (action: () => Promise<FlowState>): Promise<FlowState | null> => {
@@ -64,8 +70,11 @@ export function useFlow(): FlowUiState & FlowActions {
     } catch (cause) {
       // `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client
       // bundles each carry their own `ApiError` class identity.
-      if (isApiError(cause) && (cause.status === 410 || cause.status === 409)) setDead(true);
-      else if (isApiError(cause) && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
+      // AUTH_004 is a flow terminated after too many failures (a lock-out); any other 410/409 is an expiry.
+      if (isApiError(cause) && (cause.status === 410 || cause.status === 409)) {
+        setDead(true);
+        setDeadReason(cause.code === 'AUTH_004' ? 'locked' : 'expired');
+      } else if (isApiError(cause) && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
       else if (isApiError(cause) && cause.fields?.length) setError(cause.fields.map(field => field.msg).join(' '));
       else if (isApiError(cause)) setError(cause.message);
       else setError('Something went wrong. Please try again.');
@@ -80,6 +89,7 @@ export function useFlow(): FlowUiState & FlowActions {
     setFlow(null);
     setError(null);
     setDead(false);
+    setDeadReason(null);
   }, []);
 
   const hydrate = useCallback((state: FlowState) => {
@@ -87,5 +97,5 @@ export function useFlow(): FlowUiState & FlowActions {
     setFlow(state);
   }, []);
 
-  return { flow, busy, error, dead, run, reset, setError, hydrate };
+  return { flow, busy, error, dead, deadReason, run, reset, setError, hydrate };
 }

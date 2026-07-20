@@ -87,6 +87,12 @@
 }
 
 /* method rows */
+.methodList {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+}
+
 .methodRow {
   display: flex;
   align-items: center;
@@ -192,10 +198,8 @@
   text-align: center;
 }
 
-.mfaAlts {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+.otpError {
+  color: var(--sh-danger-text);
 }
 
 /* login-specific helpers */

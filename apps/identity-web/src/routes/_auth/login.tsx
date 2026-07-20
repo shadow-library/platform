@@ -9,7 +9,7 @@ import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
  * Importing user defined modules
  */
 import { ExternalLinkIcon, KeyIcon } from '@/components/icons';
-import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
+import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaLockedCard, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
 import parts from '@/features/auth/auth-parts.module.css';
 import { authApi, type FlowState } from '@/lib/apis';
 import { useDeviceId } from '@/lib/hooks';
@@ -34,7 +34,7 @@ function LoginPage(): React.JSX.Element {
   const search = Route.useSearch();
   const navigate = useNavigate();
   const deviceId = useDeviceId();
-  const { flow, busy, error, dead, run, reset, setError } = useFlow();
+  const { flow, busy, error, dead, deadReason, run, reset, setError } = useFlow();
 
   const [identifier, setIdentifier] = useState('');
   const [password, setPassword] = useState('');
@@ -109,6 +109,14 @@ function LoginPage(): React.JSX.Element {
   );
 
   /* ---------- terminal + transient states ---------- */
+
+  // A flow terminated after too many failed second-factor attempts surfaces as a lock-out, not a plain expiry.
+  if (dead && deadReason === 'locked')
+    return (
+      <AuthScreen footer={footer}>
+        <MfaLockedCard onRestart={reset} />
+      </AuthScreen>
+    );
 
   if (dead)
     return (
@@ -250,9 +258,9 @@ function LoginPage(): React.JSX.Element {
     );
   }
 
-  /* ---------- second factor ---------- */
+  /* ---------- second factor (authenticator, passkey, or recovery) ---------- */
 
-  if (status === 'AWAITING_TOTP')
+  if (status === 'AWAITING_TOTP' || status === 'AWAITING_MFA_WEBAUTHN')
     return (
       <AuthScreen
         footer={
