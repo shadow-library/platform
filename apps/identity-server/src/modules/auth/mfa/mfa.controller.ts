@@ -9,7 +9,17 @@ import { Body, Delete, Get, HttpController, HttpStatus, Post, RespondFor } from 
  */
 import { Auth, Context } from '@server/modules/access';
 
-import { MfaEnrollmentsResponse, OperationSuccessResponse, RecoveryCodesResponse, StepUpResponse, TotpActivateResponse, TotpCodeBody, TotpEnrollResponse } from './mfa.dto';
+import {
+  MfaEnrollmentsResponse,
+  OperationSuccessResponse,
+  RecoveryCodesResponse,
+  StepUpBody,
+  StepUpMethodsResponse,
+  StepUpResponse,
+  TotpActivateResponse,
+  TotpCodeBody,
+  TotpEnrollResponse,
+} from './mfa.dto';
 import { MfaService } from './mfa.service';
 
 /**
@@ -61,10 +71,17 @@ export class MfaController {
     return { success: true };
   }
 
+  /** The methods this account may use to elevate, so the client never prompts for an unavailable factor. */
+  @Get('/step-up/methods')
+  @RespondFor(200, StepUpMethodsResponse)
+  async stepUpMethods(): Promise<StepUpMethodsResponse> {
+    return { methods: await this.mfaService.getStepUpMethods(Context.getSession().userId) };
+  }
+
   @Post('/step-up')
   @HttpStatus(200)
   @RespondFor(200, StepUpResponse)
-  stepUp(@Body() body: TotpCodeBody): ReturnType<MfaService['stepUp']> {
-    return this.mfaService.stepUp(Context.getSession(), body.code);
+  stepUp(@Body() body: StepUpBody): ReturnType<MfaService['stepUp']> {
+    return this.mfaService.stepUp(Context.getSession(), { code: body.code, password: body.password });
   }
 }

@@ -73,6 +73,24 @@ export class StepUpResponse {
 }
 
 @Schema()
+export class StepUpBody {
+  /** A 6-digit TOTP code — required to elevate when the account holds a second factor. */
+  @Field({ optional: true, pattern: '^\\d{6}$' })
+  code?: string;
+
+  /** The account password — accepted only when the account has no second factor enrolled. */
+  @Field({ optional: true, minLength: 1 })
+  password?: string;
+}
+
+@Schema()
+export class StepUpMethodsResponse {
+  /** Methods the account may use to elevate; empty means it must enrol a factor first. */
+  @Field(() => [String])
+  methods: ('TOTP' | 'WEBAUTHN' | 'PASSWORD')[];
+}
+
+@Schema()
 export class OperationSuccessResponse {
   @Field()
   success: boolean;

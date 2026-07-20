@@ -192,4 +192,51 @@ describe('MFA', () => {
       expect((list.json() as { enrollments: unknown[] }).enrollments).toHaveLength(0);
     });
   });
+
+  describe('step-up methods and password fallback', () => {
+    const methodsFor = async (cookie = sessionSecret): Promise<string[]> => {
+      const response = await request('get', '/api/v1/me/mfa/step-up/methods', cookie);
+      expect(response.statusCode).toBe(200);
+      return (response.json() as { methods: string[] }).methods;
+    };
+
+    it('should offer password step-up to an account with no second factor', async () => {
+      expect(await methodsFor()).toEqual(['PASSWORD']);
+    });
+
+    it('should elevate an account with no second factor by re-proving its password', async () => {
+      const stepUp = await request('post', '/api/v1/me/mfa/step-up').body({ password: 'Password@123' });
+      expect(stepUp.statusCode).toBe(200);
+      expect(stepUp.json()).toMatchObject({ aal: 'AAL2' });
+    });
+
+    it('should reject password step-up with the wrong password', async () => {
+      const stepUp = await request('post', '/api/v1/me/mfa/step-up').body({ password: 'WrongPassword@123' });
+      expect(stepUp.statusCode).toBe(401);
+    });
+
+    it('should offer only totp once an authenticator is enrolled', async () => {
+      await setupTotp();
+      expect(await methodsFor()).toEqual(['TOTP']);
+    });
+
+    it('should never let a password elevate over an enrolled second factor', async () => {
+      const secret = await setupTotp();
+      const aal1 = (await env.getService(SessionService).create({ userId })).secret;
+
+      // A TOTP account must present its code; a password must not be accepted as a step-up here.
+      const viaPassword = await request('post', '/api/v1/me/mfa/step-up', aal1).body({ password: 'Password@123' });
+      expect(viaPassword.statusCode).toBe(401);
+
+      const viaCode = await request('post', '/api/v1/me/mfa/step-up', aal1).body({ code: codeAt(secret, currentStep() + 1) });
+      expect(viaCode.statusCode).toBe(200);
+      expect(viaCode.json()).toMatchObject({ aal: 'AAL2' });
+    });
+
+    it('should offer no step-up method to a passwordless account with no factor (forces enrolment)', async () => {
+      const federated = await env.getService(UserService).createProvisionedUser({ email: 'federated@example.com', emailVerified: true, status: 'ACTIVE' });
+      const cookie = (await env.getService(SessionService).create({ userId: federated.id })).secret;
+      expect(await methodsFor(cookie)).toEqual([]);
+    });
+  });
 });

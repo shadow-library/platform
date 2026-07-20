@@ -160,6 +160,44 @@ describe('WebAuthn passkeys', () => {
     });
   });
 
+  describe('step-up', () => {
+    it('should elevate a session to aal2 with a passkey assertion', async () => {
+      await registerPasskey();
+      const aal1 = (await env.getService(SessionService).create({ userId })).secret;
+
+      const options = await request('post', '/api/v1/me/webauthn/step-up/options', aal1);
+      expect(options.statusCode).toBe(200);
+      const challenge = (options.json() as { options: { challenge: string } }).options.challenge;
+
+      const assertion = await emulator.authenticate({ challenge });
+      const done = await request('post', '/api/v1/me/webauthn/step-up', aal1).body(assertion);
+      expect(done.statusCode).toBe(200);
+      expect(done.json()).toMatchObject({ aal: 'AAL2' });
+
+      const audits = await env.getPostgresClient().select().from(schema.auditEvents).where(eq(schema.auditEvents.action, 'auth.mfa.step_up'));
+      expect(audits.length).toBe(1);
+    });
+
+    it('should refuse a passkey step-up for an account with no passkey', async () => {
+      const options = await request('post', '/api/v1/me/webauthn/step-up/options');
+      expect(options.statusCode).toBe(404);
+    });
+
+    it("should reject another user's passkey for step-up", async () => {
+      await registerPasskey();
+      const other = await env.getService(UserService).createUserWithPassword({ email: 'other-stepup@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
+      const otherSession = (await env.getService(SessionService).create({ userId: other.id })).secret;
+      const otherEmulator = await new WebauthnEmulator(RP_ID, ORIGIN).init();
+      await registerPasskey(otherSession, otherEmulator);
+
+      const options = await request('post', '/api/v1/me/webauthn/step-up/options');
+      const challenge = (options.json() as { options: { challenge: string } }).options.challenge;
+      const assertion = await otherEmulator.authenticate({ challenge });
+      const rejected = await request('post', '/api/v1/me/webauthn/step-up').body(assertion);
+      expect(rejected.statusCode).toBe(401);
+    });
+  });
+
   describe('management', () => {
     it('should require elevation to remove a passkey', async () => {
       await registerPasskey();

@@ -14,6 +14,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
+import { PasswordService } from '@server/modules/identity/credentials';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, MfaEnrollment, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -45,6 +46,13 @@ export interface MfaFactors {
   webauthn: boolean;
 }
 
+/**
+ * How a session may be elevated to AAL2 for the step-up window. A strong second factor (TOTP or a
+ * passkey) is preferred; `PASSWORD` re-entry is offered only to accounts that hold no second factor,
+ * and never elevates over one. An empty method set means the account must first enrol a factor.
+ */
+export type StepUpMethod = 'TOTP' | 'WEBAUTHN' | 'PASSWORD';
+
 interface SerializedSecret {
   ciphertext: string;
   iv: string;
@@ -72,6 +80,7 @@ export class MfaService {
     private readonly notificationService: NotificationService,
     private readonly sessionService: SessionService,
     private readonly recoveryCodeService: RecoveryCodeService,
+    private readonly passwordService: PasswordService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -90,6 +99,21 @@ export class MfaService {
     });
     const credential = await this.db.query.webauthnCredentials.findFirst({ where: eq(schema.webauthnCredentials.userId, userId), columns: { id: true } });
     return { totp: enrollment !== undefined, webauthn: credential !== undefined };
+  }
+
+  /**
+   * The step-up methods this account may use to elevate, so a client never prompts for a factor the
+   * user cannot satisfy. `PASSWORD` appears only when no second factor exists (re-proving the password
+   * is a recency check, not a second factor); a passwordless account with no factor gets an empty set,
+   * signalling the caller to route the user through first-factor enrolment instead.
+   */
+  async getStepUpMethods(userId: bigint): Promise<StepUpMethod[]> {
+    const factors = await this.getFactors(userId);
+    const methods: StepUpMethod[] = [];
+    if (factors.totp) methods.push('TOTP');
+    if (factors.webauthn) methods.push('WEBAUTHN');
+    if (!factors.totp && !factors.webauthn && (await this.passwordService.hasPassword(userId))) methods.push('PASSWORD');
+    return methods;
   }
 
   async listEnrollments(userId: bigint): Promise<EnrollmentSummary[]> {
@@ -210,12 +234,30 @@ export class MfaService {
     return { recoveryCodes: await this.recoveryCodeService.generate(userId) };
   }
 
-  /** Elevates an existing session to AAL2 for the step-up window by proving a TOTP code. */
-  async stepUp(session: ValidatedSession, code: string): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
-    const valid = await this.verifyTotp(session.userId, code);
-    if (!valid) throw AppErrorCode.MFA_002.create();
+  /**
+   * Elevates an existing session to AAL2 for the step-up window. A TOTP code is required when the
+   * account holds a second factor; an account with none may instead re-prove its password.
+   *
+   * The security invariant: a password must never elevate over an enrolled second factor — otherwise
+   * a hijacked session could downgrade an AAL2 account to a single password. The accepted proof is
+   * therefore derived from the account's own enrolled factors, not from what the caller supplies.
+   * Passkey-only accounts elevate through the WebAuthn step-up ceremony, not this method.
+   */
+  async stepUp(session: ValidatedSession, proof: { code?: string; password?: string }): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+    const factors = await this.getFactors(session.userId);
+    let method: StepUpMethod;
+    if (factors.totp || factors.webauthn) {
+      if (!factors.totp) throw AppErrorCode.MFA_001.create();
+      if (!proof.code || !(await this.verifyTotp(session.userId, proof.code))) throw AppErrorCode.MFA_002.create();
+      method = 'TOTP';
+    } else {
+      if (!proof.password || !(await this.passwordService.verifyForUser(session.userId, proof.password))) throw AppErrorCode.AUTH_003.create();
+      method = 'PASSWORD';
+    }
+
     const elevated = await this.sessionService.elevate(session.id);
     if (!elevated || !elevated.elevatedUntil) throw AppErrorCode.AUTH_005.create();
+    await this.auditService.record({ action: 'auth.mfa.step_up', outcome: 'SUCCESS', actorType: 'USER', actorId: session.userId.toString(), detail: { method } });
     return { aal: elevated.aal, elevatedUntil: new Date(elevated.elevatedUntil) };
   }
 

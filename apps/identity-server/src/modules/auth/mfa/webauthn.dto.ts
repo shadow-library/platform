@@ -139,6 +139,13 @@ export class WebauthnChallengeResponse {
 }
 
 @Schema()
+export class WebauthnStepUpOptionsResponse {
+  /** Assertion options for the session-scoped passkey step-up ceremony; no flow id is exposed. */
+  @Field(() => WebauthnAuthenticationOptions)
+  options: WebauthnAuthenticationOptions;
+}
+
+@Schema()
 export class WebauthnAttestationData {
   @Field()
   clientDataJSON: string;

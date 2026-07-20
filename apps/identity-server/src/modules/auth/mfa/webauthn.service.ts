@@ -28,6 +28,7 @@ import { NotificationService } from '@server/modules/infrastructure/notification
 
 import { MfaService } from './mfa.service';
 import { RecoveryCodeService } from './recovery-code.service';
+import { WebauthnAssertion } from './webauthn.dto';
 
 /**
  * Defining types
@@ -126,6 +127,25 @@ export class WebauthnService {
     await this.remove(userId, credentialId);
   }
 
+  /**
+   * Begins a passkey step-up ceremony bound to the current session. Unlike login, there is no auth
+   * flow: the challenge is keyed by the session id. A user with no passkey cannot step up this way.
+   */
+  async beginStepUp(session: ValidatedSession): Promise<PublicKeyCredentialRequestOptionsJSON> {
+    if (!(await this.hasCredential(session.userId))) throw AppErrorCode.MFA_001.create();
+    return this.startAuthentication(this.stepUpKey(session.id), session.userId, true);
+  }
+
+  /** Completes a passkey step-up: a user-verified assertion by the session's own user elevates it to AAL2. */
+  async completeStepUp(session: ValidatedSession, assertion: WebauthnAssertion): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+    const result = await this.finishAuthentication(this.stepUpKey(session.id), this.toAuthenticationResponse(assertion), true);
+    if (!result || result.userId !== session.userId) throw AppErrorCode.MFA_002.create();
+    const elevated = await this.sessionService.elevate(session.id);
+    if (!elevated || !elevated.elevatedUntil) throw AppErrorCode.AUTH_005.create();
+    await this.auditService.record({ action: 'auth.mfa.step_up', outcome: 'SUCCESS', actorType: 'USER', actorId: session.userId.toString(), detail: { method: 'WEBAUTHN' } });
+    return { aal: elevated.aal, elevatedUntil: new Date(elevated.elevatedUntil) };
+  }
+
   private toRegistrationOptions(options: PublicKeyCredentialCreationOptionsJSON): WebauthnRegistrationOptions {
     return {
       rp: { name: options.rp.name, id: options.rp.id },
@@ -146,6 +166,26 @@ export class WebauthnService {
 
   private authenticationKey(flowKey: string): string {
     return `webauthn:auth:${flowKey}`;
+  }
+
+  private stepUpKey(sessionId: bigint): string {
+    return `stepup:${sessionId}`;
+  }
+
+  private toAuthenticationResponse(assertion: WebauthnAssertion): AuthenticationResponseJSON {
+    return {
+      id: assertion.id,
+      rawId: assertion.rawId,
+      type: assertion.type,
+      response: {
+        clientDataJSON: assertion.response.clientDataJSON,
+        authenticatorData: assertion.response.authenticatorData,
+        signature: assertion.response.signature,
+        userHandle: assertion.response.userHandle,
+      },
+      clientExtensionResults: {},
+      authenticatorAttachment: assertion.authenticatorAttachment as AuthenticatorAttachment | undefined,
+    };
   }
 
   private parseTransports(credential: WebauthnCredential): AuthenticatorTransportFuture[] | undefined {

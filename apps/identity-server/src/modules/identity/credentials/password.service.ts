@@ -90,6 +90,15 @@ export class PasswordService {
     return result.valid;
   }
 
+  /** Whether the user holds a password credential — false for federated-only (passwordless) accounts. */
+  async hasPassword(userId: bigint): Promise<boolean> {
+    const identity = await this.db.query.userAuthIdentities.findFirst({
+      where: and(eq(schema.userAuthIdentities.userId, userId), eq(schema.userAuthIdentities.provider, 'PASSWORD')),
+      columns: { id: true },
+    });
+    return identity !== undefined;
+  }
+
   /**
    * Sets (or creates) a user's password credential and records it in history. Used by recovery and
    * password change; callers should reject reused passwords via isReused beforehand.

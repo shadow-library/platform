@@ -8,8 +8,15 @@ import { Body, Delete, HttpController, HttpStatus, Params, Post, RespondFor } fr
  */
 import { Auth, Context } from '@server/modules/access';
 
-import { OperationSuccessResponse } from './mfa.dto';
-import { WebauthnRegisterResponse, WebauthnRegisterVerifyBody, WebauthnRegistrationOptionsResponse, WebauthnRemoveParams } from './webauthn.dto';
+import { OperationSuccessResponse, StepUpResponse } from './mfa.dto';
+import {
+  WebauthnAssertion,
+  WebauthnRegisterResponse,
+  WebauthnRegisterVerifyBody,
+  WebauthnRegistrationOptionsResponse,
+  WebauthnRemoveParams,
+  WebauthnStepUpOptionsResponse,
+} from './webauthn.dto';
 import { WebauthnService } from './webauthn.service';
 
 /**
@@ -37,6 +44,20 @@ export class WebauthnController {
   @RespondFor(200, WebauthnRegisterResponse)
   verifyWebauthnRegistration(@Body() body: WebauthnRegisterVerifyBody): ReturnType<WebauthnService['completeRegistration']> {
     return this.webauthnService.completeRegistration(Context.getSession(), Context.getAuth().elevated ?? false, body);
+  }
+
+  @Post('/step-up/options')
+  @HttpStatus(200)
+  @RespondFor(200, WebauthnStepUpOptionsResponse)
+  async stepUpOptions(): Promise<WebauthnStepUpOptionsResponse> {
+    return { options: await this.webauthnService.beginStepUp(Context.getSession()) };
+  }
+
+  @Post('/step-up')
+  @HttpStatus(200)
+  @RespondFor(200, StepUpResponse)
+  stepUp(@Body() body: WebauthnAssertion): ReturnType<WebauthnService['completeStepUp']> {
+    return this.webauthnService.completeStepUp(Context.getSession(), body);
   }
 
   @Delete('/:credentialId')
