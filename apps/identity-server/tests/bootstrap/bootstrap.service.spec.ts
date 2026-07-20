@@ -9,7 +9,7 @@ import { describe, expect, it } from 'bun:test';
 import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
-import { BootstrapService, EcosystemSeedService } from '@server/modules/bootstrap';
+import { BootstrapService } from '@server/modules/bootstrap';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -67,7 +67,6 @@ describe('BootstrapService', () => {
       env.getService(OAuthClientService),
       env.getService(PolicyDecisionService),
       env.getService(OrganisationService),
-      env.getService(EcosystemSeedService),
     );
     await bootstrap.onModuleInit();
 
@@ -79,5 +78,17 @@ describe('BootstrapService', () => {
 
     const organisations = (await env.getPostgresClient().select().from(schema.organisations)).filter(org => org.name === PLATFORM_ORG_NAME);
     expect(organisations).toHaveLength(1);
+  });
+
+  it('should not auto-provision any first-party consumer application or client (clean deployment)', async () => {
+    const applications = await env.getPostgresClient().select().from(schema.applications);
+    /** Only the identity platform itself may exist after a clean bootstrap — no pulse/novel-forge/webnovel. */
+    expect(applications.map(app => app.name)).toEqual(['shadow-identity']);
+
+    const clients = await env.getPostgresClient().select().from(schema.oauthClients);
+    expect(clients).toHaveLength(0);
+
+    const accessRules = await env.getPostgresClient().select().from(schema.serviceRouteAccess);
+    expect(accessRules).toHaveLength(0);
   });
 });

@@ -1,8 +1,10 @@
 /**
  * Importing npm packages
  */
+import { existsSync, readFileSync } from 'node:fs';
+
 import { Injectable } from '@shadow-library/app';
-import { APIRequest, AppError, Config, Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -67,6 +69,7 @@ export class WorkloadIdentityService {
   private readonly issuer = Config.get('auth.workload.issuer');
   private readonly audience = Config.get('auth.workload.audience') || Config.get('oauth.issuer');
   private readonly jwksUriOverride = Config.get('auth.workload.jwks-uri');
+  private readonly saTokenPath = Config.get('auth.workload.sa-token-path');
 
   private keys = new Map<string, CryptoKey>();
   private fetchedAt = 0;
@@ -131,11 +134,35 @@ export class WorkloadIdentityService {
     return this.inflight;
   }
 
+  /**
+   * Fetches a discovery/JWKS document. The apiserver's discovery endpoints require the caller to be
+   * an authenticated service account (the default `system:service-account-issuer-discovery` binding),
+   * so identity presents its own projected SA token — re-read each fetch because the kubelet rotates
+   * it — rather than relying on anonymous access. A missing token file (non-Kubernetes) → an
+   * unauthenticated request. The body is parsed directly rather than via content-type-gated helpers:
+   * the apiserver serves JWKS as `application/jwk-set+json`, which those helpers skip.
+   */
+  private async discoveryFetch<T>(url: string): Promise<{ status: number; data: T | null }> {
+    const headers: Record<string, string> = {};
+    if (this.saTokenPath && existsSync(this.saTokenPath)) {
+      const token = readFileSync(this.saTokenPath, 'utf8').trim();
+      if (token) headers.authorization = `Bearer ${token}`;
+    }
+    const response = await fetch(url, { headers });
+    const text = await response.text();
+    let data: T | null;
+    try {
+      data = text ? (JSON.parse(text) as T) : null;
+    } catch {
+      data = null;
+    }
+    return { status: response.status, data };
+  }
+
   private async load(): Promise<void> {
     const jwksUri = this.jwksUriOverride || (await this.discoverJwksUri());
-    const response = await APIRequest.get(jwksUri).suppressErrors().execute<{ keys?: WorkloadJwk[] }>();
-    if (response.statusCode >= 400) throw AppError.internal(`cluster jwks endpoint returned http ${response.statusCode}`);
-    /** APIRequest only parses `application/json` bodies — a JWKS served under another content type fails closed here. */
+    const response = await this.discoveryFetch<{ keys?: WorkloadJwk[] }>(jwksUri);
+    if (response.status >= 400) throw AppError.internal(`cluster jwks endpoint returned http ${response.status}`);
     if (!response.data) throw AppError.internal('cluster jwks endpoint returned no json body');
 
     const keys = new Map<string, CryptoKey>();
@@ -158,10 +185,8 @@ export class WorkloadIdentityService {
   }
 
   private async discoverJwksUri(): Promise<string> {
-    const response = await APIRequest.get(oidcDiscoveryUrl(this.issuer))
-      .suppressErrors()
-      .execute<{ jwks_uri?: string }>();
-    if (response.statusCode >= 400) throw AppError.internal(`cluster oidc discovery returned http ${response.statusCode}`);
+    const response = await this.discoveryFetch<{ jwks_uri?: string }>(oidcDiscoveryUrl(this.issuer));
+    if (response.status >= 400) throw AppError.internal(`cluster oidc discovery returned http ${response.status}`);
     if (!response.data?.jwks_uri) throw AppError.internal('cluster oidc discovery has no jwks_uri');
     return response.data.jwks_uri;
   }

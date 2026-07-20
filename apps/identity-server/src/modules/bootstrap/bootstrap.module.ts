@@ -13,7 +13,6 @@ import { UserModule } from '@server/modules/identity/user';
 import { ApplicationModule } from '@server/modules/system/application';
 
 import { BootstrapService } from './bootstrap.service';
-import { EcosystemSeedService } from './ecosystem-seed.service';
 
 /**
  * Defining types
@@ -25,7 +24,6 @@ import { EcosystemSeedService } from './ecosystem-seed.service';
 
 @Module({
   imports: [ApplicationModule, UserModule, OAuthModule, AuthzModule, OrganisationModule],
-  providers: [BootstrapService, EcosystemSeedService],
-  exports: [EcosystemSeedService],
+  providers: [BootstrapService],
 })
 export class BootstrapModule {}

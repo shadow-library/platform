@@ -10,8 +10,10 @@ import { Config } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { KeyService } from '@server/modules/auth/keys';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { schema } from '@server/modules/infrastructure/datastore';
 import { NotificationClient, NotificationTokenService, SendNotification } from '@server/modules/infrastructure/notification';
+import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
@@ -52,7 +54,21 @@ describe('NotificationClient', () => {
   let client: NotificationClient;
   let tokenService: NotificationTokenService;
 
-  beforeEach(() => {
+  /**
+   * Identity's own outbound notification client is no longer auto-seeded (consumer integrations are
+   * configured by an administrator), so the suite provisions it against the freshly cloned database:
+   * the `identity-server` service client plus the `notifications:send` grant the token service needs.
+   */
+  const provisionNotificationClient = async (): Promise<void> => {
+    const application = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity');
+    const oauthClientService = env.getService(OAuthClientService);
+    const scopeId = await oauthClientService.ensureScope(application.id, 'pulse-server', 'notifications:send');
+    const { clientId } = await oauthClientService.register({ applicationId: application.id, name: 'identity-server', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    await oauthClientService.grantScope(clientId, scopeId);
+  };
+
+  beforeEach(async () => {
+    await provisionNotificationClient();
     client = env.getService(NotificationClient);
     tokenService = env.getService(NotificationTokenService);
     tokenService.invalidate();
@@ -81,7 +97,7 @@ describe('NotificationClient', () => {
     expect(env.getService(KeyService).verify(token)).not.toBeNull();
   });
 
-  it('should mint the token as the seeded identity-server service client', async () => {
+  it('should mint the token as the identity-server service client', async () => {
     await client.send(notification);
 
     const claims = decodeClaims(lastToken());

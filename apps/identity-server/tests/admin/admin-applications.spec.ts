@@ -165,16 +165,20 @@ describe('Admin application API', () => {
   });
 
   it('should store public URLs on the application and regenerate its relying-party redirect URIs', async () => {
-    const pulse = env.getService(ApplicationService).getApplicationOrThrow('pulse');
+    /** Consumer apps are no longer seeded, so the test registers its own application and RP client. */
+    const created = await request('post', '/api/v1/admin/applications').body({ name: uniqueName('pulse'), subDomain: 'pulse', displayName: 'Pulse' });
+    expect(created.statusCode).toBe(201);
+    const { id } = created.json() as { id: number };
+    await env.getService(OAuthClientService).register({ applicationId: id, name: 'pulse-rp', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code', 'refresh_token'], redirectUris: [] });
 
     /** Two spellings of the same origin must collapse to one, not collide into a duplicate redirect URI. */
-    const updated = await request('patch', `/api/v1/admin/applications/${pulse.id}`).body({ publicUrls: ['https://pulse.example.com', 'https://pulse.example.com/'] });
+    const updated = await request('patch', `/api/v1/admin/applications/${id}`).body({ publicUrls: ['https://pulse.example.com', 'https://pulse.example.com/'] });
     expect(updated.statusCode).toBe(200);
 
-    const detail = await request('get', `/api/v1/admin/applications/${pulse.id}`);
+    const detail = await request('get', `/api/v1/admin/applications/${id}`);
     expect((detail.json() as { publicUrls: string[] }).publicUrls).toEqual(['https://pulse.example.com']);
 
-    const clients = await env.getService(OAuthClientService).listClients(pulse.id);
+    const clients = await env.getService(OAuthClientService).listClients(id);
     const rp = clients.find(client => client.kind === 'WEB_CONFIDENTIAL');
     const rpDetail = await env.getService(OAuthClientService).getClientDetail(rp!.id);
     expect(rpDetail?.redirectUris).toEqual(['https://pulse.example.com/api/auth/callback']);
