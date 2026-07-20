@@ -2,19 +2,21 @@
  * Importing npm packages
  */
 import { createFileRoute } from '@tanstack/react-router';
-import { useState } from 'react';
-import { Avatar, Button, DescriptionList, Dialog, FormField, Input, toast } from '@shadow-library/ui';
+import { useEffect, useState } from 'react';
+import { Avatar, Button, DescriptionList, FormField, Input, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
-import { EditIcon } from '@/components/icons';
 import { PageHeader, QueryState } from '@/components/si';
 import { useMeQuery, useUpdateProfileMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
 import styles from './profile.module.css';
 
+/**
+ * Declaring the constants
+ */
 export const Route = createFileRoute('/_portal/account/profile')({
   component: ProfilePage,
 });
@@ -24,25 +26,34 @@ function ProfilePage(): React.JSX.Element {
   const update = useUpdateProfileMutation();
   const user = me.data;
 
-  const [editing, setEditing] = useState(false);
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [seeded, setSeeded] = useState(false);
 
-  const openEdit = (): void => {
+  // Seed the inline form once the warm session lands; the form then owns its state until save/cancel.
+  useEffect(() => {
+    if (!user || seeded) return;
+    setFirstName(user.firstName ?? '');
+    setLastName(user.lastName ?? '');
+    setSeeded(true);
+  }, [user, seeded]);
+
+  const dirty = Boolean(user) && (firstName !== (user?.firstName ?? '') || lastName !== (user?.lastName ?? ''));
+
+  const reset = (): void => {
     setFirstName(user?.firstName ?? '');
     setLastName(user?.lastName ?? '');
-    setEditing(true);
   };
 
   const submit = (): void => {
-    if (!firstName.trim()) return;
+    if (!firstName.trim()) {
+      toast.danger('First name is required.');
+      return;
+    }
     update.mutate(
       { firstName: firstName.trim(), lastName: lastName.trim() || undefined },
       {
-        onSuccess: () => {
-          toast.success('Profile updated');
-          setEditing(false);
-        },
+        onSuccess: () => toast.success('Profile saved'),
         onError: error => toast.danger(error.message),
       },
     );
@@ -50,17 +61,7 @@ function ProfilePage(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      <PageHeader
-        title="Profile"
-        subtitle="Your name and account identifiers. This is how you appear across Shadow apps."
-        actions={
-          user && (
-            <Button variant="secondary" prefix={<EditIcon size={15} />} onClick={openEdit}>
-              Edit profile
-            </Button>
-          )
-        }
-      />
+      <PageHeader title="Profile" subtitle="This information is shown to apps you connect and to your organizations." />
 
       <QueryState isLoading={me.isLoading} error={me.error}>
         <div className={styles.wrap}>
@@ -72,10 +73,30 @@ function ProfilePage(): React.JSX.Element {
             </div>
           </div>
 
+          <div className={styles.formCard}>
+            <div className={styles.grid}>
+              <FormField label="First name" required>
+                <Input value={firstName} onValueChange={setFirstName} placeholder="Ada" />
+              </FormField>
+              <FormField label="Last name">
+                <Input value={lastName} onValueChange={setLastName} placeholder="Lovelace" />
+              </FormField>
+            </div>
+            <div className={styles.actions} style={{ marginTop: 18 }}>
+              <Button variant="ghost" disabled={!dirty || update.isPending} onClick={reset}>
+                Cancel
+              </Button>
+              <Button variant="primary" disabled={!dirty} loading={update.isPending} onClick={submit}>
+                Save changes
+              </Button>
+            </div>
+          </div>
+
           <div className={styles.card}>
+            <div style={{ paddingTop: 14 }}>
+              <div className={styles.sectionLabel}>Account</div>
+            </div>
             <DescriptionList layout="row" termWidth={160}>
-              <DescriptionList.Item term="First name">{user?.firstName || '—'}</DescriptionList.Item>
-              <DescriptionList.Item term="Last name">{user?.lastName || '—'}</DescriptionList.Item>
               <DescriptionList.Item term="Primary email">{user?.email || '—'}</DescriptionList.Item>
               <DescriptionList.Item term="Two-factor">{user?.aal === 'AAL2' || user?.elevated ? 'Enabled · AAL2' : 'Not enabled · AAL1'}</DescriptionList.Item>
               <DescriptionList.Item term="User ID" mono copyable>
@@ -87,30 +108,6 @@ function ProfilePage(): React.JSX.Element {
           <p className={styles.note}>To change your email or phone, use Emails &amp; phones.</p>
         </div>
       </QueryState>
-
-      <Dialog open={editing} onOpenChange={setEditing}>
-        <Dialog.Content size="sm">
-          <Dialog.Header title="Edit profile" description="Update the name shown across Shadow apps." />
-          <Dialog.Body>
-            <div className={styles.form}>
-              <FormField label="First name" required>
-                <Input value={firstName} onValueChange={setFirstName} placeholder="Ada" autoFocus />
-              </FormField>
-              <FormField label="Last name">
-                <Input value={lastName} onValueChange={setLastName} placeholder="Lovelace" />
-              </FormField>
-            </div>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Dialog.Close asChild>
-              <Button variant="ghost">Cancel</Button>
-            </Dialog.Close>
-            <Button variant="primary" loading={update.isPending} onClick={submit}>
-              Save changes
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog>
     </div>
   );
 }

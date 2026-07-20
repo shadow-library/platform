@@ -51,3 +51,37 @@
   flex-direction: column;
   gap: 16px;
 }
+
+/* inline profile form */
+.formCard {
+  padding: 22px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-2xl);
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+@media (max-width: 620px) {
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.sectionLabel {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 10px;
+}
