@@ -124,6 +124,7 @@ export class AdminClientController {
       accessTokenTtl: client.accessTokenTtl,
       authMethod: OAuthClientService.toAuthMethod(client.tokenEndpointAuthMethod),
       workloadSubject: client.workloadSubject ?? undefined,
+      backchannelLogoutUri: client.backchannelLogoutUri ?? undefined,
       createdAt: client.createdAt.toISOString(),
     };
   }
@@ -138,11 +139,24 @@ export class AdminClientController {
       name: body.name,
       isActive: body.isActive,
       redirectUris: body.redirectUris,
-      backchannelLogoutUri: body.backchannelLogoutUri,
-      /** An empty string unbinds the workload subject; undefined leaves it untouched */
+      /** An empty string clears the back-channel logout URI / unbinds the workload subject; undefined leaves each untouched. */
+      backchannelLogoutUri: body.backchannelLogoutUri === '' ? null : body.backchannelLogoutUri,
       workloadSubject: body.workloadSubject === '' ? null : body.workloadSubject,
     });
     await this.record(actor, 'admin.client.updated', params.clientId, { fields: Object.keys(body) });
+    return { success: true };
+  }
+
+  @Delete('/:clientId')
+  @Auth({ permission: ADMIN_PERMISSIONS.clientsManage, elevated: true })
+  @RespondFor(200, AdminActionResponse)
+  async deleteClient(@Params() params: ClientIdParams): Promise<AdminActionResponse> {
+    const actor = Context.getActor();
+    const client = await this.requireClient(params.clientId);
+    /** First-party clients are platform-managed (the console's own client among them); deleting one could lock the platform out. */
+    if (client.isFirstParty) throw AppErrorCode.ADM_006.create();
+    await this.clientService.deleteClient(params.clientId);
+    await this.record(actor, 'admin.client.deleted', params.clientId, { name: client.name, kind: client.kind });
     return { success: true };
   }
 

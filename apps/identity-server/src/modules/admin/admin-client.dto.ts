@@ -140,6 +140,10 @@ export class ClientDetailResponse extends ClientSummaryItem {
   @Field(() => String, { optional: true })
   workloadSubject?: string;
 
+  /** OIDC back-channel logout endpoint; logout tokens POST here on session termination. */
+  @Field(() => String, { optional: true })
+  backchannelLogoutUri?: string;
+
   @Field()
   createdAt: string;
 }

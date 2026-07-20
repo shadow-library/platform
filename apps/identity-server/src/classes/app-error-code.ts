@@ -106,6 +106,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ADM_004 = AppErrorCode.validation('ADM_004', 'Application has reached its maximum number of OAuth clients', 409);
   /** A workload-identity client requires a workload subject binding but none was provided */
   static readonly ADM_005 = AppErrorCode.validation('ADM_005', 'A workload subject is required for Kubernetes workload identity authentication', 400);
+  /** A first-party (platform-managed) client cannot be deleted through the admin console */
+  static readonly ADM_006 = AppErrorCode.validation('ADM_006', 'A first-party client cannot be deleted', 409);
 
   /*!
    * Authorization (RBAC) Error Codes

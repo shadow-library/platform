@@ -80,6 +80,7 @@ export class OAuthClientService {
   }
 
   async register(input: RegisterClient): Promise<RegisteredClient> {
+    if (input.redirectUris) this.assertValidRedirectUris(input.redirectUris);
     const isPublic = PUBLIC_KINDS.includes(input.kind);
     /**
      * Auth method is exclusive: a workload-identity client authenticates only with its projected
@@ -237,6 +238,7 @@ export class OAuthClientService {
 
   /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
   async updateClient(clientId: string, update: UpdateClient): Promise<void> {
+    if (update.redirectUris) this.assertValidRedirectUris(update.redirectUris);
     await this.db.transaction(async tx => {
       if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined || update.workloadSubject !== undefined) {
         await tx
@@ -255,6 +257,38 @@ export class OAuthClientService {
         for (const uri of update.redirectUris) await tx.insert(schema.oauthClientRedirectUris).values({ clientId, uri });
       }
     });
+  }
+
+  /**
+   * Permanently removes a client. FK-cascade children (secrets, redirect URIs, scope grants, logout
+   * deliveries, and the M2M route allowlist) are dropped by the database; consents and refresh-token
+   * families reference the client by a plain id with no cascade, so they are cleared explicitly to
+   * avoid dangling rows. Already-issued stateless access tokens are not stored and survive until they
+   * expire (bounded by the client's short access-token TTL).
+   */
+  async deleteClient(clientId: string): Promise<void> {
+    await this.db.transaction(async tx => {
+      await tx.delete(schema.consents).where(eq(schema.consents.clientId, clientId));
+      await tx.delete(schema.refreshTokenFamilies).where(eq(schema.refreshTokenFamilies.clientId, clientId));
+      await tx.delete(schema.oauthClients).where(eq(schema.oauthClients.id, clientId));
+    });
+    this.logger.info('Deleted OAuth client', { clientId });
+  }
+
+  /**
+   * Rejects redirect URIs that are not absolute URLs or that carry a fragment. A registered target
+   * must be an exact absolute URI (C-5); RFC 6749 §3.1.2 forbids a fragment component.
+   */
+  private assertValidRedirectUris(uris: string[]): void {
+    for (const uri of uris) {
+      let parsed: URL;
+      try {
+        parsed = new URL(uri);
+      } catch {
+        throw AppErrorCode.ADM_003.create();
+      }
+      if (parsed.hash) throw AppErrorCode.ADM_003.create();
+    }
   }
 
   async listResources(): Promise<(ApiResource & { scopes: Scope[] })[]> {

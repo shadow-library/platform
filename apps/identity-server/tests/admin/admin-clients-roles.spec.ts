@@ -3,6 +3,8 @@
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
 
+import { eq } from 'drizzle-orm';
+
 /**
  * Importing user defined packages
  */
@@ -12,6 +14,7 @@ import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/sessio
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
+import { schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
@@ -27,6 +30,7 @@ const env = new TestEnvironment('admin-clients').init();
 
 describe('Admin client, resource and role APIs', () => {
   let adminSecret: string;
+  let adminUserId: bigint;
   let platformOrgId: string;
   let platformAppId: number;
 
@@ -43,6 +47,7 @@ describe('Admin client, resource and role APIs', () => {
     platformAppId = application.id;
 
     const admin = await env.getService(UserService).createUserWithPassword({ email: 'client-admin@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
+    adminUserId = admin.id;
     const role = application.roles.find(candidate => candidate.roleName === IAM_ADMIN_ROLE);
     await env.getService(PolicyDecisionService).assignRole({ type: 'USER', id: admin.id.toString() }, role?.id ?? 0, platformOrgId);
     const { secret } = await env.getService(SessionService).create({ userId: admin.id, aal: 'AAL2' });
@@ -105,6 +110,95 @@ describe('Admin client, resource and role APIs', () => {
 
     const detail = await request('get', `/api/v1/admin/clients/${clientId}`);
     expect(detail.json()).toMatchObject({ redirectUris: ['https://b.example.com/cb'] });
+  });
+
+  it('should update the client name and active state', async () => {
+    const created = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'Before', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const { clientId } = created.json() as { clientId: string };
+
+    const updated = await request('patch', `/api/v1/admin/clients/${clientId}`).body({ name: 'After', isActive: false });
+    expect(updated.statusCode).toBe(200);
+
+    const detail = await request('get', `/api/v1/admin/clients/${clientId}`);
+    expect(detail.json()).toMatchObject({ name: 'After', isActive: false });
+  });
+
+  it('should reject a malformed redirect uri on register and on update', async () => {
+    const relative = await request('post', '/api/v1/admin/clients').body({
+      applicationId: platformAppId,
+      name: 'Bad',
+      kind: 'SPA_PUBLIC',
+      redirectUris: ['not-a-url'],
+      grantTypes: ['authorization_code'],
+    });
+    expect(relative.statusCode).toBe(400);
+
+    const created = await request('post', '/api/v1/admin/clients').body({
+      applicationId: platformAppId,
+      name: 'Fragmented',
+      kind: 'SPA_PUBLIC',
+      redirectUris: ['https://a.example.com/cb'],
+      grantTypes: ['authorization_code'],
+    });
+    const { clientId } = created.json() as { clientId: string };
+    const fragment = await request('patch', `/api/v1/admin/clients/${clientId}`).body({ redirectUris: ['https://a.example.com/cb#frag'] });
+    expect(fragment.statusCode).toBe(400);
+  });
+
+  describe('deletion', () => {
+    it('should delete a client and clear its dependents, including non-cascade rows', async () => {
+      const created = await request('post', '/api/v1/admin/clients').body({
+        applicationId: platformAppId,
+        name: 'Disposable',
+        kind: 'WEB_CONFIDENTIAL',
+        redirectUris: ['https://d.example.com/cb'],
+        grantTypes: ['authorization_code', 'refresh_token'],
+      });
+      const { clientId } = created.json() as { clientId: string };
+
+      /** Seed the two dependents that carry no FK cascade and would otherwise be orphaned by a naive delete. */
+      const db = env.getPostgresClient();
+      const user = await env.getService(UserService).createUserWithPassword({ email: `consenter-${Date.now()}@example.com`, password: 'Password@123', status: 'ACTIVE' });
+      await db.insert(schema.consents).values({ userId: user.id, clientId, scopeNames: ['openid'], source: 'USER' });
+      const [family] = await db.insert(schema.refreshTokenFamilies).values({ userId: user.id, clientId }).returning({ id: schema.refreshTokenFamilies.id });
+      await db.insert(schema.refreshTokens).values({ familyId: family?.id ?? '', tokenHash: `hash-${Date.now()}`, expiresAt: new Date(Date.now() + 86_400_000) });
+
+      const deleted = await request('delete', `/api/v1/admin/clients/${clientId}`);
+      expect(deleted.statusCode).toBe(200);
+
+      const detail = await request('get', `/api/v1/admin/clients/${clientId}`);
+      expect(detail.statusCode).toBe(401);
+
+      expect(await db.select().from(schema.consents).where(eq(schema.consents.clientId, clientId))).toHaveLength(0);
+      expect(await db.select().from(schema.refreshTokenFamilies).where(eq(schema.refreshTokenFamilies.clientId, clientId))).toHaveLength(0);
+      expect(await db.select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, family?.id ?? ''))).toHaveLength(0);
+    });
+
+    it('should refuse to delete a first-party client', async () => {
+      const created = await request('post', '/api/v1/admin/clients').body({
+        applicationId: platformAppId,
+        name: 'Platform',
+        kind: 'WEB_CONFIDENTIAL',
+        isFirstParty: true,
+        grantTypes: ['authorization_code'],
+      });
+      const { clientId } = created.json() as { clientId: string };
+      const deleted = await request('delete', `/api/v1/admin/clients/${clientId}`);
+      expect(deleted.statusCode).toBe(409);
+
+      /** The client must survive the refused delete. */
+      const detail = await request('get', `/api/v1/admin/clients/${clientId}`);
+      expect(detail.statusCode).toBe(200);
+    });
+
+    it('should require a stepped-up session to delete a client', async () => {
+      const created = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'Guarded', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+      const { clientId } = created.json() as { clientId: string };
+
+      const aal1 = (await env.getService(SessionService).create({ userId: adminUserId })).secret;
+      const denied = await request('delete', `/api/v1/admin/clients/${clientId}`, aal1);
+      expect(denied.statusCode).toBe(403);
+    });
   });
 
   it('should create resources and scopes, then grant and revoke them on a client', async () => {
