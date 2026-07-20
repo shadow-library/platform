@@ -97,13 +97,28 @@
   gap: 16px;
 }
 
+.detailHeadMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.detailEyebrow {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 3px;
+}
+
 .detailName {
   display: flex;
   align-items: center;
   gap: 9px;
-  font-size: 20px;
+  flex-wrap: wrap;
+  font-size: 22px;
   font-weight: 680;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.02em;
   color: var(--sh-text-primary);
 }
 
@@ -111,6 +126,75 @@
   font-size: 13px;
   color: var(--sh-text-secondary);
   margin-top: 2px;
+}
+
+.detailMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.detailMetaId {
+  font-family: var(--sh-font-mono);
+}
+
+.homeLink {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--sh-accent);
+  text-decoration: none;
+  white-space: nowrap;
+}
+.homeLink:hover {
+  text-decoration: underline;
+}
+
+/* application overview */
+.overview {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  max-width: 940px;
+}
+
+.overviewGrid {
+  display: grid;
+  grid-template-columns: 1.15fr 0.85fr;
+  gap: 20px;
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .overviewGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glanceCard {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-xl);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.glanceTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.glanceRow {
+  display: flex;
+  gap: 24px;
 }
 
 .actionBar {
@@ -313,10 +397,14 @@
   display: flex;
   gap: 2px;
   border-bottom: 1px solid var(--sh-border-default);
-  margin: 4px 0 20px;
+  margin: 4px 0 24px;
+  overflow-x: auto;
 }
 
 .appTab {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
   padding: 9px 14px;
   font-size: 13.5px;
   font-weight: 500;
@@ -325,10 +413,109 @@
   border-bottom: 2px solid transparent;
   margin-bottom: -1px;
   color: var(--sh-text-secondary);
+  white-space: nowrap;
   cursor: pointer;
+  font-family: inherit;
 }
 .appTab[data-active='true'] {
   color: var(--sh-accent);
   border-bottom-color: var(--sh-accent);
   font-weight: 600;
+}
+
+.tabCountPill {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sh-text-tertiary);
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 999px;
+  padding: 1px 7px;
+  line-height: 1.5;
+}
+
+/* per-tab section headers (clients / resources / roles / members) */
+.tabHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.tabHeadMain {
+  max-width: 560px;
+}
+
+.tabTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.tabTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 650;
+  color: var(--sh-text-primary);
+}
+
+.tabTitleCount {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.tabDesc {
+  margin: 3px 0 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+.memberSub {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+/* client detail */
+.clientDetailPage {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  max-width: 940px;
+}
+
+.cardStack {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.cardSectionTitle {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  margin-bottom: 8px;
+}
+
+.uriList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.uriItem {
+  font-family: var(--sh-font-mono);
+  font-size: 12.5px;
+  color: var(--sh-text-secondary);
+  background: var(--sh-surface-well);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 8px 10px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.scopeGrant {
+  max-width: 280px;
 }

@@ -1,30 +1,22 @@
 /**
  * Importing npm packages
  */
-import { createFileRoute } from '@tanstack/react-router';
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Badge, Button, Dialog, DropdownMenu, FormField, IconButton, Input, Select, Switch, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
+import { Badge, Button, Dialog, FormField, Input, Select, Switch, Table, toast, TokenInput, type TokenValue } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
-import { MoreIcon, PlusIcon } from '@/components/icons';
-import { PageHeader, StatusChip } from '@/components/si';
+import { PlusIcon } from '@/components/icons';
+import { Mono, PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import { useStepUpGate } from '@/features/portal';
-import {
-  adminApplicationsQueryOptions,
-  adminClientsQueryOptions,
-  type ClientKind,
-  useApplicationsQuery,
-  useClientsQuery,
-  useRegisterClientMutation,
-  useRotateClientSecretMutation,
-} from '@/lib/apis';
+import { adminApplicationsQueryOptions, adminClientsQueryOptions, type ClientKind, useApplicationsQuery, useClientsQuery, useRegisterClientMutation } from '@/lib/apis';
 
 import styles from './console.module.css';
 
-export const Route = createFileRoute('/console/clients')({
+export const Route = createFileRoute('/console/clients/')({
   loader: ({ context }) => Promise.all([context.queryClient.ensureQueryData(adminApplicationsQueryOptions()), context.queryClient.ensureQueryData(adminClientsQueryOptions())]),
   component: ClientsPage,
 });
@@ -35,6 +27,13 @@ const KINDS: { value: ClientKind; label: string }[] = [
   { value: 'NATIVE_PUBLIC', label: 'Native (public)' },
   { value: 'SERVICE', label: 'Service (machine-to-machine)' },
 ];
+
+const CLIENT_KIND: Record<ClientKind, { label: string; intent: 'info' | 'neutral' }> = {
+  WEB_CONFIDENTIAL: { label: 'Server', intent: 'neutral' },
+  SPA_PUBLIC: { label: 'Browser', intent: 'info' },
+  NATIVE_PUBLIC: { label: 'Native', intent: 'info' },
+  SERVICE: { label: 'Service', intent: 'neutral' },
+};
 
 const GRANT_PRESETS: Record<string, string[]> = {
   auth_code: ['authorization_code', 'refresh_token'],
@@ -170,8 +169,8 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
 }
 
 function ClientsPage(): React.JSX.Element {
+  const navigate = useNavigate();
   const clients = useClientsQuery();
-  const rotate = useRotateClientSecretMutation();
   const { require, dialog } = useStepUpGate();
   const [registerOpen, setRegisterOpen] = useState(false);
   const [secret, setSecret] = useState<string | null>(null);
@@ -196,15 +195,21 @@ function ClientsPage(): React.JSX.Element {
           rowKey="id"
           loading={clients.isLoading}
           aria-label="OAuth clients"
+          onRowClick={client => navigate({ to: '/console/clients/$clientId', params: { clientId: client.id } })}
           emptyState={<div style={{ padding: 32, textAlign: 'center', color: 'var(--sh-text-tertiary)' }}>No clients registered yet.</div>}
           columns={[
-            { id: 'name', header: 'Client', cell: client => <span className={styles.cellName}>{client.name}</span> },
-            { id: 'kind', header: 'Type', cell: client => <Badge variant="outline">{client.kind.replace('_', ' ').toLowerCase()}</Badge> },
             {
-              id: 'party',
-              header: 'Party',
-              cell: client => (client.isFirstParty ? <StatusChip intent="accent">First-party</StatusChip> : <StatusChip intent="neutral">Third-party</StatusChip>),
+              id: 'name',
+              header: 'Name',
+              cell: client => (
+                <div className={styles.cell}>
+                  <span className={styles.cellName}>{client.name}</span>
+                  {client.isFirstParty && <StatusChip intent="accent">First-party</StatusChip>}
+                </div>
+              ),
             },
+            { id: 'kind', header: 'Type', cell: client => <Badge intent={CLIENT_KIND[client.kind].intent}>{CLIENT_KIND[client.kind].label}</Badge> },
+            { id: 'id', header: 'Client ID', cell: client => <Mono>{client.id}</Mono> },
             {
               id: 'status',
               header: 'Status',
@@ -212,26 +217,6 @@ function ClientsPage(): React.JSX.Element {
                 <StatusChip intent={client.isActive ? 'success' : 'neutral'} dot>
                   {client.isActive ? 'Active' : 'Inactive'}
                 </StatusChip>
-              ),
-            },
-            {
-              id: 'actions',
-              header: '',
-              align: 'end',
-              width: 56,
-              cell: client => (
-                <DropdownMenu>
-                  <DropdownMenu.Trigger asChild>
-                    <IconButton variant="ghost" size="sm" aria-label="Client actions" icon={<MoreIcon size={16} />} />
-                  </DropdownMenu.Trigger>
-                  <DropdownMenu.Content align="end">
-                    <DropdownMenu.Item
-                      onSelect={() => require(() => rotate.mutate(client.id, { onSuccess: result => setSecret(result.secret), onError: error => toast.danger(error.message) }))}
-                    >
-                      Rotate secret
-                    </DropdownMenu.Item>
-                  </DropdownMenu.Content>
-                </DropdownMenu>
               ),
             },
           ]}

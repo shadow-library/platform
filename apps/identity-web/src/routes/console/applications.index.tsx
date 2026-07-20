@@ -16,7 +16,7 @@ import { formatDate } from '@/lib/format';
 
 import styles from './console.module.css';
 
-export const Route = createFileRoute('/console/applications')({
+export const Route = createFileRoute('/console/applications/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
   component: ApplicationsPage,
 });

@@ -15,7 +15,7 @@ import { formatDate } from '@/lib/format';
 
 import styles from './console.module.css';
 
-export const Route = createFileRoute('/console/users')({
+export const Route = createFileRoute('/console/users/')({
   component: UsersPage,
 });
 

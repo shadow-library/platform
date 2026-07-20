@@ -26,7 +26,7 @@ import {
 import { relativeTime } from '@/lib/format';
 
 import styles from './console.module.css';
-import { userStatusChip } from './users';
+import { userStatusChip } from './users.index';
 
 export const Route = createFileRoute('/console/users/$userId')({
   loader: ({ context, params }) =>
