@@ -1,5 +1,5 @@
 {
-  "id": "39b77b2f-11bb-4332-92c0-b5f918a8f975",
+  "id": "5b365623-036d-403b-950c-a241c3e92773",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -788,7 +788,7 @@
         },
         "caller_client_id": {
           "name": "caller_client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1013,7 +1013,7 @@
         },
         "client_id": {
           "name": "client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1949,7 +1949,7 @@
       "columns": {
         "client_id": {
           "name": "client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -1996,7 +1996,7 @@
       "columns": {
         "client_id": {
           "name": "client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -2063,7 +2063,7 @@
         },
         "client_id": {
           "name": "client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -2137,10 +2137,9 @@
       "columns": {
         "id": {
           "name": "id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": true,
-          "notNull": true,
-          "default": "gen_random_uuid()"
+          "notNull": true
         },
         "application_id": {
           "name": "application_id",
@@ -2188,9 +2187,9 @@
           "notNull": true,
           "default": true
         },
-        "workload_subject": {
-          "name": "workload_subject",
-          "type": "varchar(512)",
+        "workload_subjects": {
+          "name": "workload_subjects",
+          "type": "text[]",
           "primaryKey": false,
           "notNull": false
         },
@@ -2258,15 +2257,7 @@
         }
       },
       "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "oauth_clients_workload_subject_unique": {
-          "name": "oauth_clients_workload_subject_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "workload_subject"
-          ]
-        }
-      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -2284,7 +2275,7 @@
         },
         "client_id": {
           "name": "client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": true
         },
@@ -2427,6 +2418,14 @@
           "primaryKey": false,
           "notNull": true,
           "default": false
+        },
+        "principal_type": {
+          "name": "principal_type",
+          "type": "scope_principal_type",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'BOTH'"
         }
       },
       "indexes": {},
@@ -2485,7 +2484,7 @@
         },
         "client_id": {
           "name": "client_id",
-          "type": "uuid",
+          "type": "varchar(64)",
           "primaryKey": false,
           "notNull": false
         },
@@ -4849,6 +4848,15 @@
         "SPA_PUBLIC",
         "NATIVE_PUBLIC",
         "SERVICE"
+      ]
+    },
+    "public.scope_principal_type": {
+      "name": "scope_principal_type",
+      "schema": "public",
+      "values": [
+        "USER",
+        "SERVICE",
+        "BOTH"
       ]
     },
     "public.token_endpoint_auth_method": {

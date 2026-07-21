@@ -13,6 +13,7 @@ CREATE TYPE "public"."signing_key_status" AS ENUM('PENDING', 'ACTIVE', 'RETIRING
 CREATE TYPE "public"."notification_status" AS ENUM('PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD');--> statement-breakpoint
 CREATE TYPE "public"."logout_delivery_status" AS ENUM('PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD');--> statement-breakpoint
 CREATE TYPE "public"."oauth_client_kind" AS ENUM('WEB_CONFIDENTIAL', 'SPA_PUBLIC', 'NATIVE_PUBLIC', 'SERVICE');--> statement-breakpoint
+CREATE TYPE "public"."scope_principal_type" AS ENUM('USER', 'SERVICE', 'BOTH');--> statement-breakpoint
 CREATE TYPE "public"."token_endpoint_auth_method" AS ENUM('client_secret_basic', 'none', 'private_key_jwt');--> statement-breakpoint
 CREATE TYPE "public"."refresh_family_status" AS ENUM('ACTIVE', 'REVOKED');--> statement-breakpoint
 CREATE TYPE "public"."refresh_revoke_reason" AS ENUM('ROTATION_REUSE', 'LOGOUT', 'ADMIN', 'EXPIRY');--> statement-breakpoint
@@ -118,7 +119,7 @@ CREATE TABLE "role_permissions" (
 CREATE TABLE "service_route_access" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"application_id" integer NOT NULL,
-	"caller_client_id" uuid NOT NULL,
+	"caller_client_id" varchar(64) NOT NULL,
 	"method" varchar(10) NOT NULL,
 	"path_pattern" varchar(512) NOT NULL,
 	"created_by" varchar(64),
@@ -142,7 +143,7 @@ CREATE TABLE "verification_challenges" (
 CREATE TABLE "consents" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" bigint NOT NULL,
-	"client_id" uuid NOT NULL,
+	"client_id" varchar(64) NOT NULL,
 	"scope_names" text[] NOT NULL,
 	"source" "consent_source" NOT NULL,
 	"policy_version" integer DEFAULT 1 NOT NULL,
@@ -260,20 +261,20 @@ CREATE TABLE "api_resources" (
 );
 --> statement-breakpoint
 CREATE TABLE "oauth_client_redirect_uris" (
-	"client_id" uuid NOT NULL,
+	"client_id" varchar(64) NOT NULL,
 	"uri" text NOT NULL,
 	CONSTRAINT "oauth_client_redirect_uris_client_id_uri_pk" PRIMARY KEY("client_id","uri")
 );
 --> statement-breakpoint
 CREATE TABLE "oauth_client_scope_grants" (
-	"client_id" uuid NOT NULL,
+	"client_id" varchar(64) NOT NULL,
 	"scope_id" uuid NOT NULL,
 	CONSTRAINT "oauth_client_scope_grants_client_id_scope_id_pk" PRIMARY KEY("client_id","scope_id")
 );
 --> statement-breakpoint
 CREATE TABLE "oauth_client_secrets" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"client_id" uuid NOT NULL,
+	"client_id" varchar(64) NOT NULL,
 	"secret_hash" text NOT NULL,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"expires_at" timestamp with time zone,
@@ -281,7 +282,7 @@ CREATE TABLE "oauth_client_secrets" (
 );
 --> statement-breakpoint
 CREATE TABLE "oauth_clients" (
-	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"id" varchar(64) PRIMARY KEY NOT NULL,
 	"application_id" integer NOT NULL,
 	"name" varchar(255) NOT NULL,
 	"kind" "oauth_client_kind" NOT NULL,
@@ -289,20 +290,19 @@ CREATE TABLE "oauth_clients" (
 	"token_endpoint_auth_method" "token_endpoint_auth_method" NOT NULL,
 	"grant_types" text[] NOT NULL,
 	"require_pkce" boolean DEFAULT true NOT NULL,
-	"workload_subject" varchar(512),
+	"workload_subjects" text[],
 	"access_token_ttl" integer DEFAULT 600 NOT NULL,
 	"refresh_token_ttl" integer,
 	"organisation_id" bigint,
 	"is_active" boolean DEFAULT true NOT NULL,
 	"backchannel_logout_uri" text,
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
-	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
-	CONSTRAINT "oauth_clients_workload_subject_unique" UNIQUE("workload_subject")
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
 CREATE TABLE "oidc_logout_deliveries" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
-	"client_id" uuid NOT NULL,
+	"client_id" varchar(64) NOT NULL,
 	"logout_uri" text NOT NULL,
 	"subject" varchar(64) NOT NULL,
 	"sid" varchar(64) NOT NULL,
@@ -320,6 +320,7 @@ CREATE TABLE "scopes" (
 	"name" varchar(128) NOT NULL,
 	"description" text,
 	"is_sensitive" boolean DEFAULT false NOT NULL,
+	"principal_type" "scope_principal_type" DEFAULT 'BOTH' NOT NULL,
 	CONSTRAINT "scopes_resource_name_unique" UNIQUE("api_resource_id","name")
 );
 --> statement-breakpoint
@@ -327,7 +328,7 @@ CREATE TABLE "refresh_token_families" (
 	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
 	"user_id" bigint NOT NULL,
 	"session_id" bigint,
-	"client_id" uuid,
+	"client_id" varchar(64),
 	"scope" text,
 	"audience" varchar(255),
 	"organisation_id" bigint,

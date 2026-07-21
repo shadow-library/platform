@@ -5,29 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1784478634604,
-      "tag": "0000_medical_radioactive_man",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1784602976182,
-      "tag": "0001_pretty_earthquake",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1784643244957,
-      "tag": "0002_workload_bindings_and_slug_ids",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1784643341838,
-      "tag": "0003_drop_legacy_workload_subject",
+      "when": 1784648983788,
+      "tag": "0000_dazzling_ma_gnuci",
       "breakpoints": true
     }
   ]
