@@ -40,21 +40,24 @@ const GRANT_PRESETS: Record<string, string[]> = {
   client_credentials: ['client_credentials'],
 };
 
-/** `system:serviceaccount:<namespace>:<name>` — the subject of a projected Kubernetes SA token. */
-const WORKLOAD_SUBJECT_PATTERN = /^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9]([-a-z0-9]*[a-z0-9])?$/;
+/** An exact SA subject `system:serviceaccount:<ns>:<name>` or a namespace-scoped pattern `…:<ns>:*` (the `*` wildcard lives in the name segment only). */
+const WORKLOAD_BINDING_PATTERN = /^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9*]([-a-z0-9*]*[a-z0-9*])?$/;
+/** Client id slug: lowercase letters, digits and internal hyphens, 3–64 chars. */
+const CLIENT_ID_PATTERN = /^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/;
 type AuthMethod = 'client_secret' | 'workload_identity';
 
 function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpenChange: (open: boolean) => void; onSecret: (secret: string) => void }): React.JSX.Element {
   const apps = useApplicationsQuery();
   const register = useRegisterClientMutation();
   const [applicationId, setApplicationId] = useState('');
+  const [clientId, setClientId] = useState('');
   const [name, setName] = useState('');
   const [kind, setKind] = useState<ClientKind>('WEB_CONFIDENTIAL');
   const [grant, setGrant] = useState('auth_code');
   const [redirectUris, setRedirectUris] = useState<TokenValue[]>([]);
   const [firstParty, setFirstParty] = useState(false);
   const [authMethod, setAuthMethod] = useState<AuthMethod>('client_secret');
-  const [workloadSubject, setWorkloadSubject] = useState('');
+  const [workloadSubjects, setWorkloadSubjects] = useState<TokenValue[]>([]);
 
   const isService = kind === 'SERVICE';
   const isWorkload = isService && authMethod === 'workload_identity';
@@ -71,12 +74,18 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
       toast.danger('Choose an application and a name.');
       return;
     }
-    if (isWorkload && !WORKLOAD_SUBJECT_PATTERN.test(workloadSubject.trim())) {
-      toast.danger('Enter a workload subject like system:serviceaccount:namespace:service-account.');
+    if (!CLIENT_ID_PATTERN.test(clientId.trim())) {
+      toast.danger('Client ID must be lowercase letters, digits and hyphens (3–64 chars).');
+      return;
+    }
+    const subjects = workloadSubjects.filter(token => token.valid).map(token => token.value);
+    if (isWorkload && subjects.length === 0) {
+      toast.danger('Add at least one workload subject like system:serviceaccount:namespace:service-account.');
       return;
     }
     register.mutate(
       {
+        clientId: clientId.trim(),
         applicationId: Number(applicationId),
         name: name.trim(),
         kind,
@@ -84,7 +93,7 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
         grantTypes: isService ? ['client_credentials'] : (GRANT_PRESETS[grant] ?? ['authorization_code', 'refresh_token']),
         redirectUris: redirectUris.filter(token => token.valid).map(token => token.value),
         ...(isService ? { authMethod } : {}),
-        ...(isWorkload ? { workloadSubject: workloadSubject.trim() } : {}),
+        ...(isWorkload ? { workloadSubjects: subjects } : {}),
       },
       {
         onSuccess: result => {
@@ -115,6 +124,9 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
             <FormField label="Client name" required>
               <Input value={name} onValueChange={setName} placeholder="Production web app" />
             </FormField>
+            <FormField label="Client ID" required helper="Permanent identifier used in tokens and deployment configs. Lowercase letters, digits and hyphens.">
+              <Input value={clientId} onValueChange={setClientId} placeholder="novel-forge-server" />
+            </FormField>
             <FormField label="Client type">
               <Select value={kind} onValueChange={value => changeKind(value as ClientKind)}>
                 {KINDS.map(item => (
@@ -133,8 +145,17 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
               </FormField>
             )}
             {isWorkload && (
-              <FormField label="Workload subject" required helper="The pod service account presented as an RFC 7523 assertion — no secret is issued.">
-                <Input value={workloadSubject} onValueChange={setWorkloadSubject} placeholder="system:serviceaccount:novel-forge:novel-forge-server" />
+              <FormField
+                label="Workload subjects"
+                required
+                helper="Pod service accounts allowed to authenticate — no secret is issued. List each SA, or use a namespace pattern like system:serviceaccount:novel-forge:*."
+              >
+                <TokenInput
+                  value={workloadSubjects}
+                  onValueChange={setWorkloadSubjects}
+                  placeholder="system:serviceaccount:novel-forge:novel-forge-server"
+                  validate={value => WORKLOAD_BINDING_PATTERN.test(value) || 'Must be system:serviceaccount:namespace:name (name may be *)'}
+                />
               </FormField>
             )}
             {!isService && (

@@ -78,6 +78,9 @@ const AUTH_METHOD_LABEL: Record<ClientAuthMethod, string> = {
   workload_identity: 'Workload identity (Kubernetes)',
 };
 
+/** An exact SA subject `system:serviceaccount:<ns>:<name>` or a namespace-scoped pattern `…:<ns>:*`. */
+const WORKLOAD_BINDING_PATTERN = /^system:serviceaccount:[a-z0-9]([-a-z0-9]*[a-z0-9])?:[a-z0-9*]([-a-z0-9*]*[a-z0-9*])?$/;
+
 function ClientDetailPage(): React.JSX.Element {
   const { clientId } = Route.useParams();
   const navigate = useNavigate();
@@ -97,6 +100,7 @@ function ClientDetailPage(): React.JSX.Element {
   const [secret, setSecret] = useState<string | null>(null);
   const [form, setForm] = useState<UpdateClientBody>({});
   const [redirectTokens, setRedirectTokens] = useState<TokenValue[]>([]);
+  const [workloadTokens, setWorkloadTokens] = useState<TokenValue[]>([]);
   const [grantScopeId, setGrantScopeId] = useState('');
 
   const data = client.data;
@@ -131,8 +135,9 @@ function ClientDetailPage(): React.JSX.Element {
 
   const openEdit = (): void =>
     require(() => {
-      setForm({ name: data.name, backchannelLogoutUri: data.backchannelLogoutUri ?? '', ...(isWorkload ? { workloadSubject: data.workloadSubject ?? '' } : {}) });
+      setForm({ name: data.name, backchannelLogoutUri: data.backchannelLogoutUri ?? '' });
       setRedirectTokens(data.redirectUris.map(uri => ({ value: uri, valid: true })));
+      setWorkloadTokens((data.workloadSubjects ?? []).map(subject => ({ value: subject, valid: true })));
       setEditOpen(true);
     });
 
@@ -143,8 +148,8 @@ function ClientDetailPage(): React.JSX.Element {
       /** An empty value clears the back-channel logout URI; the server treats '' as an explicit clear. */
       body.backchannelLogoutUri = (form.backchannelLogoutUri ?? '').trim();
     }
-    /** An empty subject unbinds the workload identity; the server treats '' as an explicit clear. */
-    if (isWorkload) body.workloadSubject = (form.workloadSubject ?? '').trim();
+    /** An empty array unbinds workload identity; the server replaces the full binding set. */
+    if (isWorkload) body.workloadSubjects = workloadTokens.filter(token => token.valid).map(token => token.value);
     update.mutate(
       { clientId, body },
       {
@@ -273,9 +278,9 @@ function ClientDetailPage(): React.JSX.Element {
             <DescriptionList.Item term="Application">{appName}</DescriptionList.Item>
             <DescriptionList.Item term="Grant types">{data.grantTypes.join(', ') || '—'}</DescriptionList.Item>
             <DescriptionList.Item term="Created">{formatDate(data.createdAt)}</DescriptionList.Item>
-            {isWorkload && data.workloadSubject && (
-              <DescriptionList.Item term="Workload subject" mono>
-                {data.workloadSubject}
+            {isWorkload && (data.workloadSubjects?.length ?? 0) > 0 && (
+              <DescriptionList.Item term="Workload subjects" mono>
+                {(data.workloadSubjects ?? []).join('\n')}
               </DescriptionList.Item>
             )}
           </DescriptionList>
@@ -358,8 +363,16 @@ function ClientDetailPage(): React.JSX.Element {
                 </FormField>
               )}
               {isWorkload && (
-                <FormField label="Workload subject" helper="The bound Kubernetes service account. Clear it to unbind.">
-                  <Input value={form.workloadSubject ?? ''} onValueChange={value => setForm(prev => ({ ...prev, workloadSubject: value }))} />
+                <FormField
+                  label="Workload subjects"
+                  helper="Kubernetes service accounts allowed to authenticate. Use a namespace pattern like system:serviceaccount:novel-forge:* to cover many. Remove all to unbind."
+                >
+                  <TokenInput
+                    value={workloadTokens}
+                    onValueChange={setWorkloadTokens}
+                    placeholder="system:serviceaccount:novel-forge:novel-forge-server"
+                    validate={value => WORKLOAD_BINDING_PATTERN.test(value) || 'Must be system:serviceaccount:namespace:name (name may be *)'}
+                  />
                 </FormField>
               )}
             </div>

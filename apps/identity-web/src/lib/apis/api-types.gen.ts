@@ -2590,6 +2590,7 @@ export interface components {
       applicationId: number;
     };
     RegisterClientBody: {
+      clientId: string;
       applicationId: number;
       name: string;
       /** @enum {string} */
@@ -2599,7 +2600,7 @@ export interface components {
       grantTypes: string[];
       accessTokenTtl?: number;
       backchannelLogoutUri?: string;
-      workloadSubject?: string;
+      workloadSubjects?: string[];
       /** @enum {string} */
       authMethod?: 'client_secret' | 'workload_identity';
     };
@@ -2621,7 +2622,7 @@ export interface components {
       accessTokenTtl: number;
       /** @enum {string} */
       authMethod: 'none' | 'client_secret' | 'workload_identity';
-      workloadSubject?: string;
+      workloadSubjects?: string[];
       backchannelLogoutUri?: string;
       createdAt: string;
     };
@@ -2630,7 +2631,7 @@ export interface components {
       isActive?: boolean;
       redirectUris?: string[];
       backchannelLogoutUri?: string;
-      workloadSubject?: string;
+      workloadSubjects?: string[];
     };
     RotateSecretResponse: {
       secret: string;
