@@ -9,7 +9,7 @@ import { Avatar } from '@shadow-library/ui';
  */
 import { ExternalLinkIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/si';
-import { type MyApplication, myApplicationsQueryOptions, useMyApplicationsQuery } from '@/lib/apis';
+import { type MyApplication, myApplicationsQueryOptions, useMyApplicationsQuery, useRootDomain } from '@/lib/apis';
 import { relativeTime } from '@/lib/format';
 
 import styles from './applications.module.css';
@@ -19,12 +19,13 @@ export const Route = createFileRoute('/_portal/applications')({
   component: ApplicationsPage,
 });
 
-function appUrl(app: MyApplication): string {
-  return `https://${app.subDomain}.shadow-apps.com`;
+function appUrl(app: MyApplication, rootDomain: string): string {
+  return `https://${app.subDomain}.${rootDomain}`;
 }
 
 function ApplicationsPage(): React.JSX.Element {
   const apps = useMyApplicationsQuery();
+  const rootDomain = useRootDomain();
   const list = apps.data?.applications ?? [];
 
   return (
@@ -40,13 +41,15 @@ function ApplicationsPage(): React.JSX.Element {
       >
         <div className={styles.grid}>
           {list.map(app => (
-            <a key={app.id} href={appUrl(app)} target="_blank" rel="noreferrer" className={`si-cardhover ${styles.card}`}>
+            <a key={app.id} href={appUrl(app, rootDomain)} target="_blank" rel="noreferrer" className={`si-cardhover ${styles.card}`}>
               <div className={styles.cardTop}>
                 <Avatar name={app.displayName ?? app.name} shape="square" size="lg" />
                 <ExternalLinkIcon size={16} className={styles.extIcon} />
               </div>
               <div className={styles.cardName}>{app.displayName ?? app.name}</div>
-              <div className={styles.cardDomain}>{app.subDomain}.shadow-apps.com</div>
+              <div className={styles.cardDomain}>
+                {app.subDomain}.{rootDomain}
+              </div>
               <div className={styles.cardFoot}>
                 {app.isActive ? (
                   <StatusChip intent="success" dot>

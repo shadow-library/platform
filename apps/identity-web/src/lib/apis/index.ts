@@ -1,4 +1,5 @@
 export * from './api-request';
+export * from './runtime-config.api';
 export * from './auth.api';
 export * from './me.api';
 export * from './admin-context.api';

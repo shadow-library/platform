@@ -43,6 +43,7 @@ import {
   useDeleteApplicationMutation,
   useRemoveApplicationMemberMutation,
   useResourcesQuery,
+  useRootDomain,
   useUpdateApplicationMutation,
 } from '@/lib/apis';
 import { formatDate, relativeTime } from '@/lib/format';
@@ -106,6 +107,7 @@ function ApplicationDetailPage(): React.JSX.Element {
   const update = useUpdateApplicationMutation();
   const del = useDeleteApplicationMutation();
   const removeMember = useRemoveApplicationMemberMutation();
+  const rootDomain = useRootDomain();
   const { require, dialog } = useStepUpGate();
 
   const [editOpen, setEditOpen] = useState(false);
@@ -139,8 +141,8 @@ function ApplicationDetailPage(): React.JSX.Element {
     roles: data.roles.length,
     members: allMembers.length,
   };
-  const homeLabel = data.homePageUrl ? data.homePageUrl.replace(/^https?:\/\//, '') : `${data.subDomain}.shadow-apps.com`;
-  const homeUrl = data.homePageUrl || `https://${data.subDomain}.shadow-apps.com`;
+  const homeLabel = data.homePageUrl ? data.homePageUrl.replace(/^https?:\/\//, '') : `${data.subDomain}.${rootDomain}`;
+  const homeUrl = data.homePageUrl || `https://${data.subDomain}.${rootDomain}`;
 
   const openEdit = (): void =>
     require(() => {

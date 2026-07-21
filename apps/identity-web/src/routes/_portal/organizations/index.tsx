@@ -10,7 +10,7 @@ import { Avatar, Badge, Button, ConfirmDialog, Dialog, FormField, Input, toast }
  */
 import { PlusIcon } from '@/components/icons';
 import { PageHeader, QueryState } from '@/components/si';
-import { type MyOrganisation, myOrganisationsQueryOptions, useCreateOrganisationMutation, useLeaveOrganisationMutation, useMyOrganisationsQuery } from '@/lib/apis';
+import { type MyOrganisation, myOrganisationsQueryOptions, useCreateOrganisationMutation, useLeaveOrganisationMutation, useMyOrganisationsQuery, useRootDomain } from '@/lib/apis';
 
 import styles from './index.module.css';
 
@@ -22,6 +22,7 @@ export const Route = createFileRoute('/_portal/organizations/')({
 function CreateOrgDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }): React.JSX.Element {
   const navigate = useNavigate();
   const create = useCreateOrganisationMutation();
+  const rootDomain = useRootDomain();
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
 
@@ -52,7 +53,7 @@ function CreateOrgDialog({ open, onOpenChange }: { open: boolean; onOpenChange: 
               <Input placeholder="Acme Corp" value={name} onValueChange={setName} autoFocus />
             </FormField>
             <FormField label="Slug" helper="Used in URLs and your SSO home realm. Auto-generated if left blank.">
-              <Input prefix="shadow-apps.com/" placeholder="acme-corp" value={slug} onValueChange={setSlug} />
+              <Input prefix={`${rootDomain}/`} placeholder="acme-corp" value={slug} onValueChange={setSlug} />
             </FormField>
           </div>
         </Dialog.Body>

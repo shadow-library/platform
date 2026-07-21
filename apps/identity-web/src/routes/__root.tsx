@@ -15,6 +15,7 @@ import { NavProgress } from '@shadow-library/ui/router';
 import AppProvider from '@/components/AppProvider';
 import { DefaultCatchBoundary } from '@/components/DefaultCatchBoundary';
 import { NotFound } from '@/components/NotFound';
+import { getPublicRuntimeConfig } from '@/lib/apis';
 import '@/styles.css';
 
 /**
@@ -30,6 +31,8 @@ interface RouterContext {
  */
 
 export const Route = createRootRouteWithContext<RouterContext>()({
+  /** Resolves deploy-time public config (root domain) once on the server; hydrates to every route. */
+  loader: () => getPublicRuntimeConfig(),
   head: () => ({
     meta: [
       { charSet: 'utf-8' },
