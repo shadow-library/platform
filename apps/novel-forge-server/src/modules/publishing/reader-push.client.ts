@@ -7,7 +7,7 @@
  */
 import { Injectable } from '@shadow-library/app';
 import { AuthClient } from '@shadow-library/auth';
-import { Config, Logger } from '@shadow-library/common';
+import { type APIResponse, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -108,25 +108,25 @@ export class ReaderPushClient {
   /** Idempotent on the reader — deleting an absent chapter still answers 204 */
   async deleteChapter(slug: string, ordinal: number): Promise<void> {
     const response = await this.send('DELETE', `/internal/novels/${slug}/chapters/${ordinal}`);
-    if (response.status !== 204) throw new ReaderPushError(`reader unpublish answered http ${response.status}`, response.status);
+    if (response.statusCode !== 204) throw new ReaderPushError(`reader unpublish answered http ${response.statusCode}`, response.statusCode);
   }
 
   /** The reconciliation primitive — an unknown novel reads as an empty shelf, since the next novel push creates it */
   async getManifest(slug: string): Promise<ManifestItem[]> {
-    const response = await this.send('GET', `/internal/novels/${slug}/manifest`);
-    if (response.status === 404) return [];
-    if (!response.ok) throw new ReaderPushError(`reader manifest answered http ${response.status}`, response.status);
-    return (await response.json()) as ManifestItem[];
+    const response = await this.send<ManifestItem[]>('GET', `/internal/novels/${slug}/manifest`);
+    if (response.statusCode === 404) return [];
+    if (response.statusCode >= 400) throw new ReaderPushError(`reader manifest answered http ${response.statusCode}`, response.statusCode);
+    return response.data ?? [];
   }
 
-  private async send(method: string, path: string, body?: unknown): Promise<Response> {
+  private async send<T = unknown>(method: string, path: string, body?: unknown): Promise<APIResponse<T>> {
     const init: RequestInit = { method, signal: AbortSignal.timeout(PUSH_TIMEOUT_MS) };
     if (body !== undefined) {
       init.headers = { 'content-type': 'application/json' };
       init.body = JSON.stringify(body);
     }
     try {
-      return await this.getAuthClient().fetchService(READER_SERVICE, path, init, { scopes: [READER_PUBLISH_SCOPE] });
+      return await this.getAuthClient().fetchService<T>(READER_SERVICE, path, init, { scopes: [READER_PUBLISH_SCOPE] });
     } catch (err) {
       if (err instanceof ReaderPushError) throw err;
       const message = err instanceof Error ? err.message : String(err);
@@ -135,11 +135,11 @@ export class ReaderPushClient {
     }
   }
 
-  private toUpsertResult(response: Response, revision: number): PushResult {
-    if (response.status === 200) return { outcome: 'applied' };
-    if (response.status === 204) return { outcome: 'noop' };
-    if (response.status === 409) throw new StaleRevisionError(revision);
-    throw new ReaderPushError(`reader push answered http ${response.status}`, response.status);
+  private toUpsertResult(response: APIResponse<unknown>, revision: number): PushResult {
+    if (response.statusCode === 200) return { outcome: 'applied' };
+    if (response.statusCode === 204) return { outcome: 'noop' };
+    if (response.statusCode === 409) throw new StaleRevisionError(revision);
+    throw new ReaderPushError(`reader push answered http ${response.statusCode}`, response.statusCode);
   }
 
   // Lazily constructed so the app boots (and every non-publishing feature works) with no M2M
