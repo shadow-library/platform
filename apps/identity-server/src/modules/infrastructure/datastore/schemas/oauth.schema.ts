@@ -96,6 +96,9 @@ export const apiResources = pgTable('api_resources', {
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
 });
 
+/** Which principal kind may hold a scope: end users, services (M2M), or both. Enforced at token mint and consent. */
+export const scopePrincipalType = pgEnum('scope_principal_type', ['USER', 'SERVICE', 'BOTH']);
+
 export const scopes = pgTable(
   'scopes',
   {
@@ -106,6 +109,8 @@ export const scopes = pgTable(
     name: varchar('name', { length: 128 }).notNull(),
     description: text('description'),
     isSensitive: boolean('is_sensitive').notNull().default(false),
+    /** A `SERVICE` scope is never minted into a user token nor shown at consent; a `USER` scope is never minted into a service token. */
+    principalType: scopePrincipalType('principal_type').notNull().default('BOTH'),
   },
   t => [unique('scopes_resource_name_unique').on(t.apiResourceId, t.name)],
 );

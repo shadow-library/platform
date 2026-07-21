@@ -41,7 +41,13 @@ export class AdminResourceController {
         identifier: resource.identifier,
         displayName: resource.displayName ?? undefined,
         applicationId: resource.applicationId,
-        scopes: resource.scopes.map(scope => ({ id: scope.id, name: scope.name, description: scope.description ?? undefined, isSensitive: scope.isSensitive })),
+        scopes: resource.scopes.map(scope => ({
+          id: scope.id,
+          name: scope.name,
+          description: scope.description ?? undefined,
+          isSensitive: scope.isSensitive,
+          principalType: scope.principalType,
+        })),
       })),
     };
   }
@@ -69,7 +75,7 @@ export class AdminResourceController {
   @RespondFor(201, CreatedResponse)
   async createResourceScope(@Params() params: ResourceIdParams, @Body() body: CreateScopeBody): Promise<CreatedResponse> {
     const actor = Context.getActor();
-    const scopeId = await this.clientService.createScope(params.resourceId, body.name, body.description, body.isSensitive);
+    const scopeId = await this.clientService.createScope(params.resourceId, body.name, body.description, body.isSensitive, body.principalType);
     await this.auditService.record({
       action: 'admin.scope.created',
       outcome: 'SUCCESS',
@@ -77,7 +83,7 @@ export class AdminResourceController {
       actorId: actor.session.userId.toString(),
       targetType: 'scope',
       targetId: scopeId,
-      detail: { name: body.name, isSensitive: body.isSensitive ?? false },
+      detail: { name: body.name, isSensitive: body.isSensitive ?? false, principalType: body.principalType ?? 'BOTH' },
     });
     return { id: scopeId };
   }

@@ -149,7 +149,10 @@ export class OAuthService {
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) return { kind: 'login' };
 
-    const scopes = params.scope.split(' ').filter(Boolean);
+    /** Service-only scopes never ride a user token: drop them before consent and code issuance. */
+    const requested = params.scope.split(' ').filter(Boolean);
+    const scopes = await this.clientService.filterScopesForPrincipal(requested, 'user');
+    const scope = scopes.join(' ');
     if (client.isFirstParty) {
       await this.consentService.record(session.userId, client.id, scopes, 'FIRST_PARTY_POLICY');
     } else if (!(await this.consentService.getActive(session.userId, client.id))) {
@@ -161,7 +164,7 @@ export class OAuthService {
       redirectUri: params.redirectUri,
       codeChallenge: params.codeChallenge ?? '',
       codeChallengeMethod: params.codeChallengeMethod ?? 'S256',
-      scope: params.scope,
+      scope,
       nonce: params.nonce,
       resource: params.resource,
       userId: session.userId.toString(),
@@ -299,18 +302,20 @@ export class OAuthService {
       this.logger.warn('client_credentials request rejected: scope not granted to client', { clientId: client.id, disallowed });
       throw AppErrorCode.OAU_004.create();
     }
+    /** User-only scopes never ride a service token, even if somehow granted to the client. */
+    const scope = (await this.clientService.filterScopesForPrincipal(requested, 'service')).join(' ');
 
     const audience = params.resource ?? DEFAULT_AUDIENCE;
     const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
       subject: client.id,
       audience,
-      scope: requested.join(' '),
+      scope,
       clientId: client.id,
       ttlSeconds: client.accessTokenTtl,
       actorType: 'service',
     });
-    this.logger.debug('issued token via client_credentials grant', { clientId: client.id, scope: requested.join(' ') });
-    return { accessToken, tokenType: 'Bearer', expiresIn, scope: requested.join(' ') };
+    this.logger.debug('issued token via client_credentials grant', { clientId: client.id, scope });
+    return { accessToken, tokenType: 'Bearer', expiresIn, scope };
   }
 
   private async authenticateClient(credential: ClientCredential): Promise<OAuthClient> {

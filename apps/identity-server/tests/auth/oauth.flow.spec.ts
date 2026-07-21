@@ -282,4 +282,57 @@ describe('OAuth authorization-code flow', () => {
       .body({ grant_type: 'client_credentials', scope: 'reports:admin', resource: 'api://reports' });
     expect(ungranted.statusCode).toBe(400);
   });
+
+  describe('typed scopes (user vs m2m)', () => {
+    it('should keep BOTH scopes, drop the wrong-principal ones, and pass unknown protocol scopes through', async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const db = env.getPostgresClient();
+      const [resource] = await db.insert(schema.apiResources).values({ applicationId, identifier: 'api://typed' }).returning();
+      await db.insert(schema.scopes).values([
+        { apiResourceId: resource?.id ?? '', name: 'reports:read', principalType: 'BOTH' },
+        { apiResourceId: resource?.id ?? '', name: 'reports:ingest', principalType: 'SERVICE' },
+        { apiResourceId: resource?.id ?? '', name: 'reports:me', principalType: 'USER' },
+      ]);
+      const clients = env.getService(OAuthClientService);
+      const requested = ['openid', 'reports:read', 'reports:ingest', 'reports:me'];
+
+      expect(await clients.filterScopesForPrincipal(requested, 'user')).toEqual(['openid', 'reports:read', 'reports:me']);
+      expect(await clients.filterScopesForPrincipal(requested, 'service')).toEqual(['openid', 'reports:read', 'reports:ingest']);
+    });
+
+    it('should never mint a user-only scope into a service (client-credentials) token', async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const db = env.getPostgresClient();
+      const [resource] = await db.insert(schema.apiResources).values({ applicationId, identifier: 'api://svc' }).returning();
+      const [shared] = await db.insert(schema.scopes).values({ apiResourceId: resource?.id ?? '', name: 'jobs:run', principalType: 'BOTH' }).returning();
+      const [userOnly] = await db.insert(schema.scopes).values({ apiResourceId: resource?.id ?? '', name: 'jobs:profile', principalType: 'USER' }).returning();
+      const service = await env
+        .getService(OAuthClientService)
+        .register({ applicationId, name: 'Worker', kind: 'SERVICE', grantTypes: ['client_credentials'], scopeIds: [shared?.id ?? '', userOnly?.id ?? ''] });
+
+      const granted = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(service.clientId, service.secret ?? '') })
+        .body({ grant_type: 'client_credentials', scope: 'jobs:run jobs:profile', resource: 'api://svc' });
+      expect(granted.statusCode).toBe(200);
+      const claims = env.getService(KeyService).verify((granted.json() as { access_token: string }).access_token);
+      expect(claims?.scope).toBe('jobs:run');
+    });
+
+    it('should not surface a service-only scope on a user consent prompt', async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const db = env.getPostgresClient();
+      const [resource] = await db.insert(schema.apiResources).values({ applicationId, identifier: 'api://consent' }).returning();
+      await db.insert(schema.scopes).values([
+        { apiResourceId: resource?.id ?? '', name: 'docs:read', principalType: 'BOTH' },
+        { apiResourceId: resource?.id ?? '', name: 'docs:sync', principalType: 'SERVICE' },
+      ]);
+      const prompt = await env.getService(ConsentService).buildPrompt(userId, clientId, 'openid docs:read docs:sync');
+      const names = prompt.scopes.map(scope => scope.name);
+      expect(names).toContain('docs:read');
+      expect(names).not.toContain('docs:sync');
+    });
+  });
 });

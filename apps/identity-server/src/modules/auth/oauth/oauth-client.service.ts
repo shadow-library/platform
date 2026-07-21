@@ -3,7 +3,7 @@
  */
 import { randomBytes } from 'node:crypto';
 
-import { and, eq, gt, isNull, or } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
@@ -167,6 +167,19 @@ export class OAuthClientService {
     await this.db.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId }).onConflictDoNothing();
   }
 
+  /**
+   * Removes scopes the given principal kind may not hold: a user flow drops `SERVICE`-only scopes, a
+   * service flow drops `USER`-only scopes. Names absent from the catalog (OIDC protocol scopes such as
+   * `openid`/`profile`/`email`) pass through untouched, so a user token still carries them.
+   */
+  async filterScopesForPrincipal(scopeNames: string[], kind: 'user' | 'service'): Promise<string[]> {
+    if (scopeNames.length === 0) return scopeNames;
+    const rows = await this.db.query.scopes.findMany({ where: inArray(schema.scopes.name, scopeNames), columns: { name: true, principalType: true } });
+    const disallowed = kind === 'user' ? 'SERVICE' : 'USER';
+    const disallowedNames = new Set(rows.filter(row => row.principalType === disallowed).map(row => row.name));
+    return scopeNames.filter(name => !disallowedNames.has(name));
+  }
+
   async getGrantedScopeNames(clientId: string): Promise<string[]> {
     const grants = await this.db
       .select({ name: schema.scopes.name })
@@ -296,10 +309,10 @@ export class OAuthClientService {
     return resources;
   }
 
-  async createScope(apiResourceId: string, name: string, description?: string, isSensitive?: boolean): Promise<string> {
+  async createScope(apiResourceId: string, name: string, description?: string, isSensitive?: boolean, principalType?: 'USER' | 'SERVICE' | 'BOTH'): Promise<string> {
     await this.db
       .insert(schema.scopes)
-      .values({ apiResourceId, name, description, isSensitive: isSensitive ?? false })
+      .values({ apiResourceId, name, description, isSensitive: isSensitive ?? false, principalType: principalType ?? 'BOTH' })
       .onConflictDoNothing();
     const scope =
       (await this.db.query.scopes.findFirst({ where: and(eq(schema.scopes.apiResourceId, apiResourceId), eq(schema.scopes.name, name)) })) ??

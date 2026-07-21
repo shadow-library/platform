@@ -96,7 +96,8 @@ export class ConsentService {
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_001.create();
 
-    const requested = scope.split(' ').filter(Boolean);
+    /** Only user-holdable scopes reach a consent screen; service-only scopes are dropped. */
+    const requested = await this.clientService.filterScopesForPrincipal(scope.split(' ').filter(Boolean), 'user');
     const active = await this.getActive(userId, client.id);
     const alreadyGranted = active !== null && requested.every(name => active.scopeNames.includes(name));
 

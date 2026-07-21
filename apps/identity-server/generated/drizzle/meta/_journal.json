@@ -8,6 +8,13 @@
       "when": 1784478634604,
       "tag": "0000_medical_radioactive_man",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784602976182,
+      "tag": "0001_pretty_earthquake",
+      "breakpoints": true
     }
   ]
 }

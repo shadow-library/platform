@@ -211,6 +211,10 @@ export class CreateScopeBody {
 
   @Field(() => Boolean, { optional: true })
   isSensitive?: boolean;
+
+  /** Which principal kind may hold this scope: `USER`, `SERVICE` (M2M), or `BOTH` (default). */
+  @Field(() => String, { optional: true, enum: ['USER', 'SERVICE', 'BOTH'] })
+  principalType?: 'USER' | 'SERVICE' | 'BOTH';
 }
 
 @Schema()
@@ -226,6 +230,10 @@ export class ScopeItem {
 
   @Field(() => Boolean)
   isSensitive: boolean;
+
+  /** Which principal kind may hold this scope: `USER`, `SERVICE` (M2M), or `BOTH`. */
+  @Field(() => String, { enum: ['USER', 'SERVICE', 'BOTH'] })
+  principalType: 'USER' | 'SERVICE' | 'BOTH';
 }
 
 @Schema()
