@@ -27,7 +27,12 @@ interface LoginSearch {
  * navigations land on a real route and escape the SPA cleanly.
  */
 export const Route = createFileRoute('/login')({
-  validateSearch: (search: Record<string, unknown>): LoginSearch => ({ returnTo: typeof search.returnTo === 'string' ? search.returnTo : '/' }),
+  /** Constrain returnTo to a same-origin path (reject `//host` and `/\host`) before it reaches the redirect. */
+  validateSearch: (search: Record<string, unknown>): LoginSearch => {
+    const raw = typeof search.returnTo === 'string' ? search.returnTo : '/';
+    const safe = raw.startsWith('/') && !raw.startsWith('//') && !raw.includes('\\') ? raw : '/';
+    return { returnTo: safe };
+  },
   head: () => ({ meta: [{ title: 'Signing in · Novel Forge' }] }),
   component: LoginRedirect,
 });
