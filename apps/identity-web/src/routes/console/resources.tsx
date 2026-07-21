@@ -87,11 +87,12 @@ function AddScopeDialog({ resourceId, open, onOpenChange }: { resourceId: string
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [sensitive, setSensitive] = useState(false);
+  const [principalType, setPrincipalType] = useState<'USER' | 'SERVICE' | 'BOTH'>('BOTH');
 
   const submit = (): void => {
     if (!resourceId || !name.trim()) return;
     create.mutate(
-      { resourceId, body: { name: name.trim(), description: description.trim() || undefined, isSensitive: sensitive } },
+      { resourceId, body: { name: name.trim(), description: description.trim() || undefined, isSensitive: sensitive, principalType } },
       {
         onSuccess: () => {
           toast.success('Scope added');
@@ -99,6 +100,7 @@ function AddScopeDialog({ resourceId, open, onOpenChange }: { resourceId: string
           setName('');
           setDescription('');
           setSensitive(false);
+          setPrincipalType('BOTH');
         },
         onError: error => toast.danger(error.message),
       },
@@ -116,6 +118,13 @@ function AddScopeDialog({ resourceId, open, onOpenChange }: { resourceId: string
             </FormField>
             <FormField label="Description">
               <Textarea value={description} onValueChange={setDescription} minRows={2} placeholder="Read a customer’s orders" />
+            </FormField>
+            <FormField label="Who may hold it" helper="Service scopes never reach a user token or the consent screen; user scopes never reach a service token.">
+              <Select value={principalType} onValueChange={value => setPrincipalType(value as 'USER' | 'SERVICE' | 'BOTH')}>
+                <Select.Item value="BOTH">Users and services</Select.Item>
+                <Select.Item value="USER">Users only</Select.Item>
+                <Select.Item value="SERVICE">Services only (M2M)</Select.Item>
+              </Select>
             </FormField>
             <Switch label="Sensitive" description="Shown prominently on the consent screen." checked={sensitive} onCheckedChange={value => setSensitive(value === true)} />
           </div>
@@ -179,6 +188,7 @@ function ResourcesPage(): React.JSX.Element {
                   resource.scopes.map(scope => (
                     <span key={scope.id} className={styles.scopeTag}>
                       <Tag>{scope.name}</Tag>
+                      {scope.principalType !== 'BOTH' && <StatusChip intent="neutral">{scope.principalType === 'SERVICE' ? 'M2M' : 'user'}</StatusChip>}
                       {scope.isSensitive && <StatusChip intent="warning">sensitive</StatusChip>}
                     </span>
                   ))

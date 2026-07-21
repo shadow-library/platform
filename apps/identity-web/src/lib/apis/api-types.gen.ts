@@ -2654,6 +2654,8 @@ export interface components {
       name: string;
       description?: string;
       isSensitive: boolean;
+      /** @enum {string} */
+      principalType: 'USER' | 'SERVICE' | 'BOTH';
     };
     CreateResourceBody: {
       applicationId: number;
@@ -2667,6 +2669,8 @@ export interface components {
       name: string;
       description?: string;
       isSensitive?: boolean;
+      /** @enum {string} */
+      principalType?: 'USER' | 'SERVICE' | 'BOTH';
     };
     PermissionListResponse: {
       items: components['schemas']['PermissionItem'][];
