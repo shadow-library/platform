@@ -49,6 +49,8 @@ export interface RefreshTokenResult {
 export interface RotationContext {
   ipAddress?: string;
   ipCountry?: string;
+  /** When set, the token's owning client must match before any state is mutated (prevents a forced-logout by a mismatched caller). */
+  expectedClientId?: string;
 }
 
 export interface RefreshTokenDescription {
@@ -65,6 +67,14 @@ export class RefreshTokenReuseError extends Error {
   constructor() {
     super('Refresh token reuse detected');
     this.name = 'RefreshTokenReuseError';
+  }
+}
+
+/** Raised when a refresh token is presented by a client that does not own it — before any mutation. */
+export class RefreshTokenClientMismatchError extends Error {
+  constructor() {
+    super('Refresh token does not belong to the presenting client');
+    this.name = 'RefreshTokenClientMismatchError';
   }
 }
 
@@ -160,9 +170,21 @@ export class RefreshTokenService {
       throw new RefreshTokenReuseError();
     }
 
+    /** Verify ownership BEFORE consuming the token, so a mismatched caller cannot burn the victim's token (forced logout). */
+    if (context.expectedClientId !== undefined && family.clientId !== context.expectedClientId) {
+      this.logger.warn('refresh token rotation rejected: client mismatch', { familyId: family.id, tokenClientId: family.clientId });
+      throw new RefreshTokenClientMismatchError();
+    }
+
     const { secret: nextSecret, tokenHash } = this.mint();
     const tokenId = await this.db.transaction(async tx => {
-      await tx.update(schema.refreshTokens).set({ status: 'ROTATED', rotatedAt: new Date() }).where(eq(schema.refreshTokens.id, presented.id));
+      /** Atomic single-use consumption: only an ACTIVE row rotates. Zero rows means a concurrent rotation already consumed it → reuse. */
+      const consumed = await tx
+        .update(schema.refreshTokens)
+        .set({ status: 'ROTATED', rotatedAt: new Date() })
+        .where(and(eq(schema.refreshTokens.id, presented.id), eq(schema.refreshTokens.status, 'ACTIVE')))
+        .returning({ id: schema.refreshTokens.id });
+      if (consumed.length === 0) throw new RefreshTokenReuseError();
       const token = await tx
         .insert(schema.refreshTokens)
         .values({

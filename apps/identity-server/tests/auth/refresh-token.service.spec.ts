@@ -9,7 +9,7 @@ import { eq } from 'drizzle-orm';
  * Importing user defined packages
  */
 import { SessionService } from '@server/modules/auth/session';
-import { RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
+import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
 
@@ -83,6 +83,32 @@ describe('RefreshTokenService', () => {
     expect(await env.getService(SessionService).validate(session.secret)).toBeNull();
     const audit = await env.getPostgresClient().select().from(schema.auditEvents);
     expect(audit.some(event => event.action === 'security.token_reuse')).toBe(true);
+  });
+
+  it('should reject a mismatched client before consuming the token, leaving it usable (M2)', async () => {
+    const first = await service.issue({ userId, clientId: 'client-a' });
+    const error = await rejection(service.rotate(first.secret, { expectedClientId: 'client-b' }));
+    expect(error).toBeInstanceOf(RefreshTokenClientMismatchError);
+
+    /** The victim's token must survive a mismatched caller — a legitimate rotation by its own client still works. */
+    const rotated = await service.rotate(first.secret, { expectedClientId: 'client-a' });
+    expect(rotated.secret).not.toBe(first.secret);
+
+    const [family] = await env.getPostgresClient().select().from(schema.refreshTokenFamilies).where(eq(schema.refreshTokenFamilies.id, first.familyId));
+    expect(family?.status).toBe('ACTIVE');
+  });
+
+  it('should let only one of two concurrent rotations of the same token succeed (M1)', async () => {
+    const first = await service.issue({ userId });
+    const results = await Promise.allSettled([service.rotate(first.secret), service.rotate(first.secret)]);
+    const fulfilled = results.filter(result => result.status === 'fulfilled');
+    const rejected = results.filter(result => result.status === 'rejected');
+    expect(fulfilled).toHaveLength(1);
+    expect(rejected).toHaveLength(1);
+
+    /** Exactly one ACTIVE successor exists — the reuse-detection invariant (one live token per family) holds under the race. */
+    const active = (await env.getPostgresClient().select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, first.familyId))).filter(token => token.status === 'ACTIVE');
+    expect(active).toHaveLength(1);
   });
 
   it('should revoke every family for a session on demand', async () => {

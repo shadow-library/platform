@@ -87,7 +87,7 @@ describe('BootstrapService', () => {
 
   it('should seed the pulse application, its clients and the notification access rule', async () => {
     const applications = await env.getPostgresClient().select().from(schema.applications);
-    expect(applications.map(app => app.name).sort()).toEqual(['pulse', 'shadow-identity']);
+    expect(applications.map(app => app.name).sort()).toEqual(['novel-forge', 'pulse', 'shadow-identity', 'webnovel']);
 
     const pulse = env.getService(ApplicationService).getApplication('pulse');
     expect(pulse?.roles.map(role => role.roleName).sort()).toEqual(['PulseAdmin', 'PulseOperator', 'PulseViewer']);
@@ -104,5 +104,14 @@ describe('BootstrapService', () => {
     const accessRules = await env.getPostgresClient().select().from(schema.serviceRouteAccess);
     const notificationRule = accessRules.find(rule => rule.callerClientId === 'identity-server' && rule.pathPattern === '/api/v1/notifications');
     expect(notificationRule?.method).toBe('POST');
+  });
+
+  it('should register first-party API resources and the service-only publish scope', async () => {
+    /** Resources are seeded declaratively so audience/scope validation has something to validate against; consumer clients stay console-registered. */
+    const resources = await env.getPostgresClient().select().from(schema.apiResources);
+    expect(resources.map(resource => resource.identifier).sort()).toEqual(['novel-forge-server', 'pulse-server', 'shadow-identity', 'webnovel-server']);
+
+    const publishScope = (await env.getPostgresClient().select().from(schema.scopes)).find(scope => scope.name === 'webnovel:publish');
+    expect(publishScope?.principalType).toBe('SERVICE');
   });
 });

@@ -201,6 +201,12 @@ export class OAuthClientService {
     return scopeNames.filter(name => !disallowedNames.has(name));
   }
 
+  /** Whether an RFC 8707 `resource` value is a registered API resource identifier; the audience derives from this. */
+  async isRegisteredResource(identifier: string): Promise<boolean> {
+    const resource = await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, identifier), columns: { id: true } });
+    return resource !== undefined;
+  }
+
   async getGrantedScopeNames(clientId: string): Promise<string[]> {
     const grants = await this.db
       .select({ name: schema.scopes.name })

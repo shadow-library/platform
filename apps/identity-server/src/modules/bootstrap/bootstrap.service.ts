@@ -73,8 +73,39 @@ export class BootstrapService implements OnModuleInit {
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
     await this.ensureBootstrapAdmin(organisationId);
+    await this.ensureFirstPartyRegistrations();
     /** Runs last: the ecosystem seed provisions pulse and identity's outbound client on top of the platform records above. */
     await this.ecosystemSeedService.seed();
+  }
+
+  /**
+   * Registers the first-party ecosystem's API resources and cross-service scopes so audience/scope
+   * validation (RFC 8707 + the scope-grant ceiling) has something to validate against — previously
+   * these lived only in a manually-populated database, so a fresh deployment could not issue a
+   * correctly-audienced token. Idempotent: safe on every boot. Clients themselves (with their
+   * secrets/redirect URIs) are still registered through the console; only resources, the
+   * service-only publish scope, and its grant to the existing publisher client are seeded here.
+   * The pulse application (with its clients) is provisioned separately by {@link EcosystemSeedService}.
+   */
+  private async ensureFirstPartyRegistrations(): Promise<void> {
+    const novelForge = await this.ensureApplication('novel-forge');
+    await this.oauthClientService.ensureResource(novelForge.id, 'novel-forge-server', 'Novel Forge API');
+
+    const webnovel = await this.ensureApplication('webnovel');
+    const webnovelResource = await this.oauthClientService.ensureResource(webnovel.id, 'webnovel-server', 'Webnovel Reader API');
+    /** `webnovel:publish` is service-only: a user token can never carry it, and only the granted M2M client can request it. */
+    const publishScopeId = await this.oauthClientService.createScope(webnovelResource.id, 'webnovel:publish', 'Publish rendered novels to the reader', false, 'SERVICE');
+
+    const publisher = await this.oauthClientService.getClient('novel-forge-service');
+    if (publisher) {
+      await this.oauthClientService.grantScope(publisher.id, publishScopeId);
+      this.logger.info("Granted 'webnovel:publish' to the novel-forge service client");
+    }
+  }
+
+  /** Ensures a first-party application exists (idempotent); consumer clients are still console-registered. */
+  private async ensureApplication(name: string): Promise<{ id: number }> {
+    return this.applicationService.getApplication(name) ?? (await this.applicationService.createApplication({ name, subDomain: name }));
   }
 
   /**

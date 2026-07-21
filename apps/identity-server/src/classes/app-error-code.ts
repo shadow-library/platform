@@ -194,4 +194,6 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly OAU_003 = AppErrorCode.badRequest('invalid_grant', 'The authorization grant is invalid, expired, or revoked');
   /** unsupported_grant_type / invalid_scope */
   static readonly OAU_004 = AppErrorCode.badRequest('invalid_scope', 'The requested scope or grant is invalid');
+  /** invalid_target (RFC 8707) — the requested resource is not a registered API resource */
+  static readonly OAU_005 = AppErrorCode.badRequest('invalid_target', 'The requested resource is unknown or not permitted');
 }

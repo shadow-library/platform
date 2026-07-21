@@ -11,7 +11,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyService } from '@server/modules/auth/keys';
 import { SessionService } from '@server/modules/auth/session';
-import { RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
+import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenService } from '@server/modules/auth/token';
 import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
@@ -83,6 +83,13 @@ export interface IntrospectionResult {
  */
 const DEFAULT_AUDIENCE = 'shadow-identity';
 
+/**
+ * OIDC protocol scopes are never resource-server capabilities: they are always honoured for any
+ * client without an explicit grant. Every other requested scope must be registered AND granted to
+ * the client, so a client can never mint a token carrying a scope it was not authorised for.
+ */
+const STANDARD_OIDC_SCOPES = new Set(['openid', 'profile', 'email', 'offline_access', 'address', 'phone']);
+
 @Injectable()
 export class OAuthService {
   private readonly logger = Logger.getLogger(APP_NAME, OAuthService.name);
@@ -145,13 +152,13 @@ export class OAuthService {
     if (params.responseType !== 'code') throw AppErrorCode.OAU_001.create();
     if (!client.grantTypes.includes('authorization_code')) throw AppErrorCode.OAU_001.create();
     if (client.requirePkce && (!params.codeChallenge || params.codeChallengeMethod !== 'S256')) throw AppErrorCode.OAU_001.create();
+    /** RFC 8707: a requested resource must be a registered API resource, else the token's audience would be attacker-chosen. */
+    if (params.resource && !(await this.clientService.isRegisteredResource(params.resource))) throw AppErrorCode.OAU_005.create();
 
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) return { kind: 'login' };
 
-    /** Service-only scopes never ride a user token: drop them before consent and code issuance. */
-    const requested = params.scope.split(' ').filter(Boolean);
-    const scopes = await this.clientService.filterScopesForPrincipal(requested, 'user');
+    const scopes = await this.ceilingUserScopes(client, params.scope);
     const scope = scopes.join(' ');
     if (client.isFirstParty) {
       await this.consentService.record(session.userId, client.id, scopes, 'FIRST_PARTY_POLICY');
@@ -184,6 +191,22 @@ export class OAuthService {
     });
     this.logger.debug('authorization code granted', { clientId: client.id, userId: session.userId.toString(), scope });
     return { kind: 'redirect', url: url.toString() };
+  }
+
+  /**
+   * Computes the scopes a user token may carry: OIDC protocol scopes always pass; every other scope
+   * must be registered and granted to the client. Service-only scopes are dropped even if granted.
+   * This is the ceiling that stops a client obtaining a scope it was never authorised for (SCOPE-01).
+   */
+  private async ceilingUserScopes(client: OAuthClient, requestedScope: string): Promise<string[]> {
+    const requested = requestedScope.split(' ').filter(Boolean);
+    if (requested.length === 0) return requested;
+    const principalScoped = await this.clientService.filterScopesForPrincipal(requested, 'user');
+    const granted = new Set(await this.clientService.getGrantedScopeNames(client.id));
+    const allowed = principalScoped.filter(name => STANDARD_OIDC_SCOPES.has(name) || granted.has(name));
+    const dropped = principalScoped.filter(name => !STANDARD_OIDC_SCOPES.has(name) && !granted.has(name));
+    if (dropped.length > 0) this.logger.warn('dropped un-granted scopes from user token', { clientId: client.id, dropped });
+    return allowed;
   }
 
   async token(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
@@ -264,17 +287,18 @@ export class OAuthService {
     const client = await this.authenticateClient(credential);
     if (!params.refreshToken) throw AppErrorCode.OAU_001.create();
 
-    const rotated = await this.refreshTokenService.rotate(params.refreshToken).catch(error => {
+    /** The client binding is verified INSIDE rotate() before the token is consumed, so a mismatched caller cannot burn the victim's token. */
+    const rotated = await this.refreshTokenService.rotate(params.refreshToken, { expectedClientId: client.id }).catch(error => {
       if (error instanceof RefreshTokenReuseError) {
         this.logger.warn('refresh token reuse detected, token family revoked', { securityEvent: 'oauth.refresh_token_reuse', clientId: client.id });
         throw AppErrorCode.OAU_003.create();
       }
+      if (error instanceof RefreshTokenClientMismatchError) {
+        this.logger.warn('refresh token rejected: client mismatch', { clientId: client.id });
+        throw AppErrorCode.OAU_003.create();
+      }
       throw error;
     });
-    if (rotated.context.clientId !== client.id) {
-      this.logger.warn('refresh token rejected: client mismatch', { clientId: client.id, tokenClientId: rotated.context.clientId });
-      throw AppErrorCode.OAU_003.create();
-    }
 
     const scope = rotated.context.scope ?? '';
     const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
@@ -294,6 +318,8 @@ export class OAuthService {
   private async clientCredentials(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
     const client = await this.authenticateClient(credential);
     if (!client.grantTypes.includes('client_credentials')) throw AppErrorCode.OAU_004.create();
+    /** RFC 8707: reject an unregistered target so a service token cannot be minted for an arbitrary audience. */
+    if (params.resource && !(await this.clientService.isRegisteredResource(params.resource))) throw AppErrorCode.OAU_005.create();
 
     const granted = await this.clientService.getGrantedScopeNames(client.id);
     const requested = (params.scope ?? '').split(' ').filter(Boolean);
