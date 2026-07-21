@@ -38,6 +38,8 @@ interface WorkloadJwk {
 export interface VerifiedWorkload {
   /** The service-account subject, e.g. `system:serviceaccount:prod:pulse` */
   subject: string;
+  /** The trusted cluster OIDC issuer that signed the assertion (validated equal to the configured issuer). */
+  issuer: string;
 }
 
 /**
@@ -99,7 +101,7 @@ export class WorkloadIdentityService {
     if (!isValid) throw new WorkloadAssertionError('assertion signature verification failed');
 
     this.validateClaims(payload);
-    return { subject: payload.sub as string };
+    return { subject: payload.sub as string, issuer: payload.iss as string };
   }
 
   private validateClaims(payload: WorkloadJwtPayload): void {

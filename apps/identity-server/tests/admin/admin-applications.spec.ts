@@ -118,7 +118,7 @@ describe('Admin application API', () => {
     const created = await request('post', '/api/v1/admin/applications').body({ name, subDomain: 'withclient' });
     const { id } = created.json() as { id: number };
 
-    const client = await request('post', '/api/v1/admin/clients').body({ applicationId: id, name: 'svc', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const client = await request('post', '/api/v1/admin/clients').body({ clientId: 'app-svc', applicationId: id, name: 'svc', kind: 'SERVICE', grantTypes: ['client_credentials'] });
     expect(client.statusCode).toBe(201);
 
     const removed = await request('delete', `/api/v1/admin/applications/${id}`);

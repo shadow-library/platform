@@ -68,7 +68,7 @@ describe('workload identity client authentication', () => {
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
     const registered = await env
       .getService(OAuthClientService)
-      .register({ applicationId, name: 'Pulse Workload', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubject: SUBJECT });
+      .register({ applicationId, name: 'Pulse Workload', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [SUBJECT] });
     clientId = registered.clientId;
   });
   afterAll(() => jwksServer.stop(true));
@@ -133,7 +133,7 @@ describe('workload identity client authentication', () => {
   it('should not let one workload impersonate another (per-subject binding)', async () => {
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
     const otherSubject = 'system:serviceaccount:prod:novel-forge-server';
-    const other = await env.getService(OAuthClientService).register({ applicationId, name: 'Forge Workload', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubject: otherSubject });
+    const other = await env.getService(OAuthClientService).register({ applicationId, name: 'Forge Workload', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [otherSubject] });
 
     /** pulse's SA token resolves to pulse's client only... */
     const asPulse = await requestToken(await signSaToken(saClaims()));
@@ -147,6 +147,37 @@ describe('workload identity client authentication', () => {
     const asForge = await requestToken(await signSaToken(saClaims({ sub: otherSubject })));
     expect(asForge.statusCode).toBe(200);
     expect((env.getService(KeyService).verify((asForge.json() as { access_token: string }).access_token) as { client_id: string }).client_id).toBe(other.clientId);
+  });
+
+  /** The `-web` and `-server` variants of one product share a single client, listing both SA subjects. */
+  it('should mint under one shared client for either exact subject bound to it', async () => {
+    const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+    const web = 'system:serviceaccount:nf:nf-web';
+    const server = 'system:serviceaccount:nf:nf-server';
+    const shared = await env
+      .getService(OAuthClientService)
+      .register({ id: 'novel-forge', applicationId, name: 'Novel Forge', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [web, server] });
+
+    for (const sub of [web, server]) {
+      const response = await requestToken(await signSaToken(saClaims({ sub })));
+      expect(response.statusCode).toBe(200);
+      expect((env.getService(KeyService).verify((response.json() as { access_token: string }).access_token) as { client_id: string }).client_id).toBe(shared.clientId);
+    }
+    expect(shared.clientId).toBe('novel-forge');
+  });
+
+  /** A namespace pattern matches only with an explicit client_id; subject-only resolution stays exact. */
+  it('should honour a namespace pattern with an explicit client_id but not by subject alone', async () => {
+    const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+    const pattern = await env
+      .getService(OAuthClientService)
+      .register({ id: 'staging-fleet', applicationId, name: 'Staging Fleet', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: ['system:serviceaccount:staging:*'] });
+    const token = await signSaToken(saClaims({ sub: 'system:serviceaccount:staging:api' }));
+
+    /** Named client + covered subject → minted. */
+    expect((await requestToken(token, { client_id: pattern.clientId })).statusCode).toBe(200);
+    /** Same subject with no client_id → a pattern is never reachable on the exact-resolution path. */
+    expect((await requestToken(token)).statusCode).toBe(401);
   });
 
   /** A caller cannot fabricate a service identity by naming a workload client without presenting its SA token. */

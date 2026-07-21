@@ -15,6 +15,20 @@
       "when": 1784602976182,
       "tag": "0001_pretty_earthquake",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1784643244957,
+      "tag": "0002_workload_bindings_and_slug_ids",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784643341838,
+      "tag": "0003_drop_legacy_workload_subject",
+      "breakpoints": true
     }
   ]
 }

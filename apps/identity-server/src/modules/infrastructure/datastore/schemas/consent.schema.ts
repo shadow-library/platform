@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, sql } from 'drizzle-orm';
-import { bigint, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core';
+import { bigint, integer, pgEnum, pgTable, text, timestamp, uniqueIndex, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -37,7 +37,7 @@ export const consents = pgTable(
     userId: bigint('user_id', { mode: 'bigint' })
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
-    clientId: uuid('client_id').notNull(),
+    clientId: varchar('client_id', { length: 64 }).notNull(),
     scopeNames: text('scope_names').array().notNull(),
     source: consentSource('source').notNull(),
     policyVersion: integer('policy_version').notNull().default(1),

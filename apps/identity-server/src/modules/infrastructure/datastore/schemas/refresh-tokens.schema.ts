@@ -43,7 +43,7 @@ export const refreshTokenFamilies = pgTable(
       .notNull()
       .references(() => users.id, { onDelete: 'cascade' }),
     sessionId: bigint('session_id', { mode: 'bigint' }).references(() => userSessions.id, { onDelete: 'set null' }),
-    clientId: uuid('client_id'),
+    clientId: varchar('client_id', { length: 64 }),
     scope: text('scope'),
     audience: varchar('audience', { length: 255 }),
     organisationId: bigint('organisation_id', { mode: 'bigint' }),

@@ -10,3 +10,4 @@ export * from './oauth.module';
 export * from './oauth.service';
 export * from './pkce';
 export * from './workload-identity.service';
+export * from './workload-subject.util';

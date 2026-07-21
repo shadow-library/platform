@@ -56,6 +56,7 @@ describe('Admin client, resource and role APIs', () => {
 
   it('should register a confidential client returning the secret exactly once', async () => {
     const response = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'ops-console',
       applicationId: platformAppId,
       name: 'Ops Console',
       kind: 'WEB_CONFIDENTIAL',
@@ -74,15 +75,15 @@ describe('Admin client, resource and role APIs', () => {
   });
 
   it('should reject unknown grant types and unknown applications', async () => {
-    const badGrant = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'X', kind: 'SERVICE', grantTypes: ['implicit'] });
+    const badGrant = await request('post', '/api/v1/admin/clients').body({ clientId: 'bad-grant', applicationId: platformAppId, name: 'X', kind: 'SERVICE', grantTypes: ['implicit'] });
     expect(badGrant.statusCode).toBe(400);
 
-    const badApp = await request('post', '/api/v1/admin/clients').body({ applicationId: 999999, name: 'X', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const badApp = await request('post', '/api/v1/admin/clients').body({ clientId: 'bad-app', applicationId: 999999, name: 'X', kind: 'SERVICE', grantTypes: ['client_credentials'] });
     expect(badApp.statusCode).toBe(404);
   });
 
   it('should rotate a secret with an overlap window where both secrets verify', async () => {
-    const created = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'Rotator', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'rotator', applicationId: platformAppId, name: 'Rotator', kind: 'SERVICE', grantTypes: ['client_credentials'] });
     const { clientId, secret: oldSecret } = created.json() as { clientId: string; secret: string };
 
     const rotated = await request('post', `/api/v1/admin/clients/${clientId}/rotate-secret`);
@@ -97,6 +98,7 @@ describe('Admin client, resource and role APIs', () => {
 
   it('should update redirect uris as a full replacement', async () => {
     const created = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'updatable',
       applicationId: platformAppId,
       name: 'Updatable',
       kind: 'SPA_PUBLIC',
@@ -113,7 +115,7 @@ describe('Admin client, resource and role APIs', () => {
   });
 
   it('should update the client name and active state', async () => {
-    const created = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'Before', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'before-after', applicationId: platformAppId, name: 'Before', kind: 'SERVICE', grantTypes: ['client_credentials'] });
     const { clientId } = created.json() as { clientId: string };
 
     const updated = await request('patch', `/api/v1/admin/clients/${clientId}`).body({ name: 'After', isActive: false });
@@ -125,6 +127,7 @@ describe('Admin client, resource and role APIs', () => {
 
   it('should reject a malformed redirect uri on register and on update', async () => {
     const relative = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'bad-redirect',
       applicationId: platformAppId,
       name: 'Bad',
       kind: 'SPA_PUBLIC',
@@ -134,6 +137,7 @@ describe('Admin client, resource and role APIs', () => {
     expect(relative.statusCode).toBe(400);
 
     const created = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'fragmented',
       applicationId: platformAppId,
       name: 'Fragmented',
       kind: 'SPA_PUBLIC',
@@ -148,6 +152,7 @@ describe('Admin client, resource and role APIs', () => {
   describe('deletion', () => {
     it('should delete a client and clear its dependents, including non-cascade rows', async () => {
       const created = await request('post', '/api/v1/admin/clients').body({
+        clientId: 'disposable',
         applicationId: platformAppId,
         name: 'Disposable',
         kind: 'WEB_CONFIDENTIAL',
@@ -176,6 +181,7 @@ describe('Admin client, resource and role APIs', () => {
 
     it('should delete a first-party client too (deletion is name-confirmed, not carved out)', async () => {
       const created = await request('post', '/api/v1/admin/clients').body({
+        clientId: 'platform-fp',
         applicationId: platformAppId,
         name: 'Platform',
         kind: 'WEB_CONFIDENTIAL',
@@ -191,7 +197,7 @@ describe('Admin client, resource and role APIs', () => {
     });
 
     it('should require a stepped-up session to delete a client', async () => {
-      const created = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'Guarded', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+      const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'guarded', applicationId: platformAppId, name: 'Guarded', kind: 'SERVICE', grantTypes: ['client_credentials'] });
       const { clientId } = created.json() as { clientId: string };
 
       const aal1 = (await env.getService(SessionService).create({ userId: adminUserId })).secret;
@@ -209,7 +215,7 @@ describe('Admin client, resource and role APIs', () => {
     expect(scope.statusCode).toBe(201);
     const { id: scopeId } = scope.json() as { id: string };
 
-    const created = await request('post', '/api/v1/admin/clients').body({ applicationId: platformAppId, name: 'Scoped', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'scoped', applicationId: platformAppId, name: 'Scoped', kind: 'SERVICE', grantTypes: ['client_credentials'] });
     const { clientId } = created.json() as { clientId: string };
 
     const granted = await request('post', `/api/v1/admin/clients/${clientId}/scopes`).body({ scopeId });
@@ -269,19 +275,21 @@ describe('Admin client, resource and role APIs', () => {
 
   it('should register a workload-identity client over HTTP without returning a secret', async () => {
     const response = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'cluster-job',
       applicationId: platformAppId,
       name: 'Cluster Job',
       kind: 'SERVICE',
       grantTypes: ['client_credentials'],
       authMethod: 'workload_identity',
-      workloadSubject: 'system:serviceaccount:prod:cluster-job',
+      workloadSubjects: ['system:serviceaccount:prod:cluster-job'],
     });
     expect(response.statusCode).toBe(201);
     const body = response.json() as { clientId: string; secret?: string };
     expect(body.secret).toBeUndefined();
+    expect(body.clientId).toBe('cluster-job');
 
     const detail = await request('get', `/api/v1/admin/clients/${body.clientId}`);
-    expect((detail.json() as { authMethod: string; workloadSubject?: string }).authMethod).toBe('workload_identity');
-    expect((detail.json() as { workloadSubject?: string }).workloadSubject).toBe('system:serviceaccount:prod:cluster-job');
+    expect((detail.json() as { authMethod: string; workloadSubjects?: string[] }).authMethod).toBe('workload_identity');
+    expect((detail.json() as { workloadSubjects?: string[] }).workloadSubjects).toEqual(['system:serviceaccount:prod:cluster-job']);
   });
 });

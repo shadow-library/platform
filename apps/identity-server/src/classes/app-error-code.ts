@@ -106,6 +106,10 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ADM_004 = AppErrorCode.validation('ADM_004', 'Application has reached its maximum number of OAuth clients', 409);
   /** A workload-identity client requires a workload subject binding but none was provided */
   static readonly ADM_005 = AppErrorCode.validation('ADM_005', 'A workload subject is required for Kubernetes workload identity authentication', 400);
+  /** The client id is malformed (must be lowercase letters, digits and hyphens) or is reserved */
+  static readonly ADM_006 = AppErrorCode.validation('ADM_006', 'Invalid or reserved OAuth client id', 400);
+  /** A workload subject binding is malformed, or a cluster-wide namespace wildcard was rejected */
+  static readonly ADM_007 = AppErrorCode.validation('ADM_007', 'Invalid workload subject binding', 400);
 
   /*!
    * Authorization (RBAC) Error Codes

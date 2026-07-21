@@ -182,7 +182,7 @@ export class OAuthService {
       targetType: 'oauth_client',
       targetId: client.id,
     });
-    this.logger.debug('authorization code granted', { clientId: client.id, userId: session.userId.toString(), scope: params.scope });
+    this.logger.debug('authorization code granted', { clientId: client.id, userId: session.userId.toString(), scope });
     return { kind: 'redirect', url: url.toString() };
   }
 
@@ -351,8 +351,14 @@ export class OAuthService {
       throw AppErrorCode.OAU_002.create();
     });
 
-    const client = await this.clientService.getClientByWorkloadSubject(workload.subject);
-    if (!client || !client.isActive || (credential.clientId && credential.clientId !== client.id)) {
+    /**
+     * With an explicit `client_id` the client is named and only its own bindings are tested, so
+     * overlapping patterns across clients stay harmless. Without one, the client is resolved from the
+     * exact subject alone — pattern bindings are unreachable on this path (D-16).
+     */
+    const client = credential.clientId ? await this.clientService.getClient(credential.clientId) : await this.clientService.resolveClientBySubject(workload.subject);
+    const matches = client !== null && (!credential.clientId || this.clientService.subjectMatchesClient(client, workload.subject));
+    if (!client || !client.isActive || !matches) {
       this.logger.warn('client authentication failed: workload subject not bound to an active client', {
         securityEvent: 'oauth.client_auth_failed',
         workloadSubject: workload.subject,
@@ -360,6 +366,13 @@ export class OAuthService {
       });
       throw AppErrorCode.OAU_002.create();
     }
+    /** Attribution: the concrete SA subject is logged as the acting caller, alongside the resolved client id. */
+    this.logger.info('workload identity authenticated', {
+      securityEvent: 'oauth.workload_authenticated',
+      clientId: workload.subject,
+      resolvedClientId: client.id,
+      issuer: workload.issuer,
+    });
     return client;
   }
 

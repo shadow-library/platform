@@ -88,7 +88,7 @@ export const serviceRouteAccess = pgTable(
     applicationId: integer('application_id')
       .notNull()
       .references(() => applications.id, { onDelete: 'cascade' }),
-    callerClientId: uuid('caller_client_id')
+    callerClientId: varchar('caller_client_id', { length: 64 })
       .notNull()
       .references(() => oauthClients.id, { onDelete: 'cascade' }),
     /** HTTP method the rule covers, or `*` for all methods */

@@ -1,9 +1,9 @@
 /**
  * Importing npm packages
  */
-import { randomBytes } from 'node:crypto';
+import { randomBytes, randomUUID } from 'node:crypto';
 
-import { and, eq, gt, inArray, isNull, or } from 'drizzle-orm';
+import { and, arrayContains, eq, gt, inArray, isNull, ne, or } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { AppError, Logger, throwError } from '@shadow-library/common';
 
@@ -14,12 +14,14 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
+import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from './workload-subject.util';
+
 /**
  * Defining types
  */
 
 export interface RegisterClient {
-  /** Fixed client id (UUID) for seed-provisioned clients; omitted ids are database-generated */
+  /** Client id slug; a UUID string is generated when omitted (seed/programmatic callers) */
   id?: string;
   applicationId: number;
   name: string;
@@ -31,8 +33,8 @@ export interface RegisterClient {
   organisationId?: bigint | null;
   accessTokenTtl?: number;
   backchannelLogoutUri?: string;
-  /** k8s SA subject allowed to authenticate this client with a projected token (D-16) */
-  workloadSubject?: string;
+  /** k8s SA subjects and/or namespace-scoped patterns allowed to authenticate this client with a projected token (D-16) */
+  workloadSubjects?: string[];
   /**
    * Confidential-client authentication method. `client_secret` mints a rotatable secret;
    * `workload_identity` binds a k8s SA subject and mints no secret (D-16). Ignored for public
@@ -53,13 +55,17 @@ export interface UpdateClient {
   isActive?: boolean;
   redirectUris?: string[];
   backchannelLogoutUri?: string | null;
-  workloadSubject?: string | null;
+  /** Replaces the full set of workload bindings; an empty array unbinds workload identity (D-16). */
+  workloadSubjects?: string[] | null;
 }
 
 export interface RotatedSecret {
   secret: string;
   previousSecretsExpireAt: Date;
 }
+
+/** The transaction handle drizzle passes to a `db.transaction` callback — a narrower type than the pooled db. */
+type PrimaryTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
 
 /**
  * Declaring the constants
@@ -68,6 +74,10 @@ const ARGON2_OPTIONS = { algorithm: 'argon2id', memoryCost: 65536, timeCost: 3 }
 const PUBLIC_KINDS: OAuthClient.Kind[] = ['SPA_PUBLIC', 'NATIVE_PUBLIC'];
 /** An application may not hold more than this many OAuth clients (first-party clients included). */
 const MAX_CLIENTS_PER_APPLICATION = 10;
+/** Client id slug: lowercase letters, digits and internal hyphens, 3–64 chars. Accepts existing UUID ids. */
+const CLIENT_ID_PATTERN = /^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])?$/;
+/** Reserved ids that would collide with system identifiers such as the default access-token audience. */
+const RESERVED_CLIENT_IDS = new Set(['shadow-identity']);
 const DUMMY_SECRET_HASH = '$argon2id$v=19$m=65536,t=3,p=1$NCJqmYBSCaQHCbd96KVjeycfea/Op9Qf6OqrtzsUMkw$YNaWD8v4qxMkTfyuv7T0n+3PYqGqYo+6ixhN31TqX6E';
 
 @Injectable()
@@ -81,44 +91,45 @@ export class OAuthClientService {
 
   async register(input: RegisterClient): Promise<RegisteredClient> {
     if (input.redirectUris) this.assertValidRedirectUris(input.redirectUris);
+    if (input.id !== undefined) this.assertValidClientId(input.id);
     const isPublic = PUBLIC_KINDS.includes(input.kind);
+    const workloadSubjects = input.workloadSubjects ?? [];
     /**
      * Auth method is exclusive: a workload-identity client authenticates only with its projected
      * SA-token assertion (`private_key_jwt`) and holds no secret; a secret client uses
      * `client_secret_basic`; public clients use PKCE (`none`). A caller signals workload identity
-     * explicitly via `authMethod`, or implicitly by supplying a `workloadSubject` with no method —
+     * explicitly via `authMethod`, or implicitly by supplying workload subjects with no method —
      * the long-standing seed/admin shape (D-16).
      */
-    const isWorkload = !isPublic && (input.authMethod === 'workload_identity' || (input.authMethod === undefined && input.workloadSubject != null));
-    if (isWorkload && !input.workloadSubject) throw AppErrorCode.ADM_005.create();
+    const isWorkload = !isPublic && (input.authMethod === 'workload_identity' || (input.authMethod === undefined && workloadSubjects.length > 0));
+    if (isWorkload && workloadSubjects.length === 0) throw AppErrorCode.ADM_005.create();
+    for (const subject of workloadSubjects) assertValidWorkloadBinding(subject);
     const authMethod: OAuthClient.AuthMethod = isPublic ? 'none' : isWorkload ? 'private_key_jwt' : 'client_secret_basic';
+    /** The admin supplies a meaningful slug; a UUID string is minted for seed/programmatic callers. */
+    const clientId = input.id ?? randomUUID();
 
-    const clientId = await this.db.transaction(async tx => {
+    await this.db.transaction(async tx => {
       const existing = await tx.$count(schema.oauthClients, eq(schema.oauthClients.applicationId, input.applicationId));
       if (existing >= MAX_CLIENTS_PER_APPLICATION) throw AppErrorCode.ADM_004.create();
+      if (isWorkload) await this.assertExactSubjectsUnclaimed(tx, clientId, workloadSubjects);
 
-      const client = await tx
-        .insert(schema.oauthClients)
-        .values({
-          ...(input.id ? { id: input.id } : {}),
-          applicationId: input.applicationId,
-          name: input.name,
-          kind: input.kind,
-          isFirstParty: input.isFirstParty ?? false,
-          tokenEndpointAuthMethod: authMethod,
-          grantTypes: input.grantTypes,
-          requirePkce: true,
-          accessTokenTtl: input.accessTokenTtl ?? 3600,
-          organisationId: input.organisationId ?? null,
-          backchannelLogoutUri: input.backchannelLogoutUri ?? null,
-          workloadSubject: isWorkload ? input.workloadSubject : null,
-        })
-        .returning({ id: schema.oauthClients.id })
-        .then(([row]) => row ?? throwError(AppError.internal('Failed to create OAuth client')));
+      await tx.insert(schema.oauthClients).values({
+        id: clientId,
+        applicationId: input.applicationId,
+        name: input.name,
+        kind: input.kind,
+        isFirstParty: input.isFirstParty ?? false,
+        tokenEndpointAuthMethod: authMethod,
+        grantTypes: input.grantTypes,
+        requirePkce: true,
+        accessTokenTtl: input.accessTokenTtl ?? 3600,
+        organisationId: input.organisationId ?? null,
+        backchannelLogoutUri: input.backchannelLogoutUri ?? null,
+        workloadSubjects: isWorkload ? workloadSubjects : null,
+      });
 
-      for (const uri of input.redirectUris ?? []) await tx.insert(schema.oauthClientRedirectUris).values({ clientId: client.id, uri });
-      for (const scopeId of input.scopeIds ?? []) await tx.insert(schema.oauthClientScopeGrants).values({ clientId: client.id, scopeId });
-      return client.id;
+      for (const uri of input.redirectUris ?? []) await tx.insert(schema.oauthClientRedirectUris).values({ clientId, uri });
+      for (const scopeId of input.scopeIds ?? []) await tx.insert(schema.oauthClientScopeGrants).values({ clientId, scopeId });
     });
 
     /** Only secret clients receive a secret; workload and public clients never hold one. */
@@ -128,20 +139,30 @@ export class OAuthClientService {
   }
 
   async getClient(clientId: string): Promise<OAuthClient | null> {
-    if (!this.isUuid(clientId)) return null;
+    if (!this.isValidClientId(clientId)) return null;
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId) });
     return client ?? null;
   }
 
-  /** Resolves the client bound to a verified k8s workload subject (D-16) */
-  async getClientByWorkloadSubject(subject: string): Promise<OAuthClient | null> {
-    const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.workloadSubject, subject) });
+  /**
+   * Resolves the client that holds a verified subject as an *exact* binding, used when the assertion
+   * carries no `client_id` (D-16). Pattern bindings never match here — a literal `*` pattern string
+   * cannot equal a concrete subject — so wildcards are reachable only with an explicit `client_id`.
+   * The exact-subject uniqueness invariant (enforced on write) keeps this resolution deterministic.
+   */
+  async resolveClientBySubject(subject: string): Promise<OAuthClient | null> {
+    const client = await this.db.query.oauthClients.findFirst({ where: arrayContains(schema.oauthClients.workloadSubjects, [subject]) });
     return client ?? null;
+  }
+
+  /** Whether a verified subject is covered by any of a resolved client's bindings (exact or pattern). */
+  subjectMatchesClient(client: OAuthClient, subject: string): boolean {
+    return (client.workloadSubjects ?? []).some(binding => matchesWorkloadBinding(binding, subject));
   }
 
   /** Exact-string redirect-URI match — no wildcards or substring logic (C-5). */
   async isRedirectUriAllowed(clientId: string, uri: string): Promise<boolean> {
-    if (!this.isUuid(clientId)) return false;
+    if (!this.isValidClientId(clientId)) return false;
     const match = await this.db.query.oauthClientRedirectUris.findFirst({
       where: and(eq(schema.oauthClientRedirectUris.clientId, clientId), eq(schema.oauthClientRedirectUris.uri, uri)),
     });
@@ -252,15 +273,19 @@ export class OAuthClientService {
   /** Replaces the redirect-URI set atomically; partial updates would risk a dangling old URI. */
   async updateClient(clientId: string, update: UpdateClient): Promise<void> {
     if (update.redirectUris) this.assertValidRedirectUris(update.redirectUris);
+    /** A null/empty array unbinds workload identity; a populated array replaces the full binding set. */
+    const workloadSubjects = update.workloadSubjects === undefined ? undefined : (update.workloadSubjects ?? []);
+    if (workloadSubjects) for (const subject of workloadSubjects) assertValidWorkloadBinding(subject);
     await this.db.transaction(async tx => {
-      if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined || update.workloadSubject !== undefined) {
+      if (workloadSubjects) await this.assertExactSubjectsUnclaimed(tx, clientId, workloadSubjects);
+      if (update.name !== undefined || update.isActive !== undefined || update.backchannelLogoutUri !== undefined || workloadSubjects !== undefined) {
         await tx
           .update(schema.oauthClients)
           .set({
             ...(update.name !== undefined ? { name: update.name } : {}),
             ...(update.isActive !== undefined ? { isActive: update.isActive } : {}),
             ...(update.backchannelLogoutUri !== undefined ? { backchannelLogoutUri: update.backchannelLogoutUri } : {}),
-            ...(update.workloadSubject !== undefined ? { workloadSubject: update.workloadSubject } : {}),
+            ...(workloadSubjects !== undefined ? { workloadSubjects: workloadSubjects.length > 0 ? workloadSubjects : null } : {}),
             updatedAt: new Date(),
           })
           .where(eq(schema.oauthClients.id, clientId));
@@ -330,7 +355,7 @@ export class OAuthClientService {
 
   /** Verifies a client secret against its active (unexpired, unrevoked) secrets, in constant work. */
   async verifySecret(clientId: string, secret: string): Promise<boolean> {
-    const active = this.isUuid(clientId)
+    const active = this.isValidClientId(clientId)
       ? await this.db
           .select({ secretHash: schema.oauthClientSecrets.secretHash })
           .from(schema.oauthClientSecrets)
@@ -359,7 +384,28 @@ export class OAuthClientService {
     return secret;
   }
 
-  private isUuid(value: string): boolean {
-    return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  /** Whether a value is shaped like a client id (slug or legacy UUID) — gates lookups against obvious garbage. */
+  private isValidClientId(value: string): boolean {
+    return CLIENT_ID_PATTERN.test(value);
+  }
+
+  /** Rejects a malformed or reserved admin-supplied client id (D-16 slug ids). */
+  private assertValidClientId(id: string): void {
+    if (!CLIENT_ID_PATTERN.test(id) || RESERVED_CLIENT_IDS.has(id)) throw AppErrorCode.ADM_006.create();
+  }
+
+  /**
+   * Enforces the exact-subject uniqueness invariant: no exact binding may be claimed by more than one
+   * client, so subject-only resolution stays unambiguous. Pattern bindings are exempt — overlapping
+   * patterns are harmless because they only ever match with an explicit `client_id` (D-16).
+   */
+  private async assertExactSubjectsUnclaimed(tx: PrimaryTransaction, clientId: string, subjects: string[]): Promise<void> {
+    for (const subject of subjects.filter(value => !isWorkloadPattern(value))) {
+      const conflict = await tx.query.oauthClients.findFirst({
+        where: and(arrayContains(schema.oauthClients.workloadSubjects, [subject]), ne(schema.oauthClients.id, clientId)),
+        columns: { id: true },
+      });
+      if (conflict) throw AppErrorCode.ADM_007.create();
+    }
   }
 }

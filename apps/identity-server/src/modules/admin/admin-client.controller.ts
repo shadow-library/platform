@@ -91,6 +91,7 @@ export class AdminClientController {
     this.applicationService.getApplicationByIdOrThrow(body.applicationId);
 
     const registered = await this.clientService.register({
+      id: body.clientId,
       applicationId: body.applicationId,
       name: body.name,
       kind: body.kind,
@@ -99,7 +100,7 @@ export class AdminClientController {
       grantTypes: body.grantTypes,
       accessTokenTtl: body.accessTokenTtl,
       backchannelLogoutUri: body.backchannelLogoutUri,
-      workloadSubject: body.workloadSubject,
+      workloadSubjects: body.workloadSubjects,
       authMethod: body.authMethod,
     });
     await this.record(actor, 'admin.client.registered', registered.clientId, { name: body.name, kind: body.kind });
@@ -123,7 +124,7 @@ export class AdminClientController {
       grantTypes: client.grantTypes,
       accessTokenTtl: client.accessTokenTtl,
       authMethod: OAuthClientService.toAuthMethod(client.tokenEndpointAuthMethod),
-      workloadSubject: client.workloadSubject ?? undefined,
+      workloadSubjects: client.workloadSubjects ?? undefined,
       backchannelLogoutUri: client.backchannelLogoutUri ?? undefined,
       createdAt: client.createdAt.toISOString(),
     };
@@ -139,9 +140,9 @@ export class AdminClientController {
       name: body.name,
       isActive: body.isActive,
       redirectUris: body.redirectUris,
-      /** An empty string clears the back-channel logout URI / unbinds the workload subject; undefined leaves each untouched. */
+      /** An empty string clears the back-channel logout URI; an empty array unbinds workload identity; undefined leaves each untouched. */
       backchannelLogoutUri: body.backchannelLogoutUri === '' ? null : body.backchannelLogoutUri,
-      workloadSubject: body.workloadSubject === '' ? null : body.workloadSubject,
+      workloadSubjects: body.workloadSubjects,
     });
     await this.record(actor, 'admin.client.updated', params.clientId, { fields: Object.keys(body) });
     return { success: true };

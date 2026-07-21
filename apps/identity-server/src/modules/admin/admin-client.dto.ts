@@ -20,15 +20,18 @@ type ClientKind = (typeof CLIENT_KINDS)[number];
 
 export const ALLOWED_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_credentials'] as const;
 
+/** Client id slug (lowercase letters, digits, hyphens, 3–64 chars); also matches legacy UUID ids. */
+const CLIENT_ID_PATTERN = '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$';
+
 @Schema()
 export class ClientIdParams {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  @Field({ pattern: CLIENT_ID_PATTERN })
   clientId: string;
 }
 
 @Schema()
 export class ClientScopeParams {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  @Field({ pattern: CLIENT_ID_PATTERN })
   clientId: string;
 
   @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
@@ -37,6 +40,10 @@ export class ClientScopeParams {
 
 @Schema()
 export class RegisterClientBody {
+  /** Admin-chosen, immutable client id slug — lowercase letters, digits and hyphens. Embedded in tokens and configs. */
+  @Field({ pattern: CLIENT_ID_PATTERN })
+  clientId: string;
+
   @Field(() => Number)
   applicationId: number;
 
@@ -62,12 +69,12 @@ export class RegisterClientBody {
   @Field({ optional: true })
   backchannelLogoutUri?: string;
 
-  /** k8s SA subject (`system:serviceaccount:<ns>:<name>`) allowed to authenticate this client with a projected token (D-16). */
-  @Field({ optional: true, maxLength: 512 })
-  workloadSubject?: string;
+  /** k8s SA subjects and/or namespace-scoped patterns (`system:serviceaccount:<ns>:<name>`, `…:<ns>:*`) allowed to authenticate this client (D-16). */
+  @Field(() => [String], { optional: true })
+  workloadSubjects?: string[];
 
   /**
-   * Confidential-client authentication method. `workload_identity` binds the k8s SA subject and
+   * Confidential-client authentication method. `workload_identity` binds k8s SA subjects and
    * mints no secret; `client_secret` mints a rotatable secret. Ignored for public clients.
    */
   @Field(() => String, { optional: true, enum: ['client_secret', 'workload_identity'] })
@@ -136,9 +143,9 @@ export class ClientDetailResponse extends ClientSummaryItem {
   @Field(() => String, { enum: ['none', 'client_secret', 'workload_identity'] })
   authMethod: 'none' | 'client_secret' | 'workload_identity';
 
-  /** The bound k8s SA subject, present only for `workload_identity` clients (D-16). */
-  @Field(() => String, { optional: true })
-  workloadSubject?: string;
+  /** The bound k8s SA subjects/patterns, present only for `workload_identity` clients (D-16). */
+  @Field(() => [String], { optional: true })
+  workloadSubjects?: string[];
 
   /** OIDC back-channel logout endpoint; logout tokens POST here on session termination. */
   @Field(() => String, { optional: true })
@@ -162,9 +169,9 @@ export class UpdateClientBody {
   @Field({ optional: true })
   backchannelLogoutUri?: string;
 
-  /** k8s SA subject bound to this client; pass an empty string to unbind (D-16). */
-  @Field({ optional: true, maxLength: 512 })
-  workloadSubject?: string;
+  /** Replaces the full set of k8s SA subjects/patterns bound to this client; pass an empty array to unbind (D-16). */
+  @Field(() => [String], { optional: true })
+  workloadSubjects?: string[];
 }
 
 @Schema()

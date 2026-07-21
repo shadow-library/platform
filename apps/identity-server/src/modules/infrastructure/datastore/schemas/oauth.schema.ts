@@ -37,7 +37,8 @@ export const oauthClientKind = pgEnum('oauth_client_kind', ['WEB_CONFIDENTIAL', 
 export const tokenEndpointAuthMethod = pgEnum('token_endpoint_auth_method', ['client_secret_basic', 'none', 'private_key_jwt']);
 
 export const oauthClients = pgTable('oauth_clients', {
-  id: uuid('id').defaultRandom().primaryKey(),
+  /** Admin-chosen, immutable slug (lowercase letters, digits, hyphens). Public by design; embedded in tokens and configs. */
+  id: varchar('id', { length: 64 }).primaryKey(),
   applicationId: integer('application_id')
     .notNull()
     .references(() => applications.id, { onDelete: 'restrict' }),
@@ -47,8 +48,8 @@ export const oauthClients = pgTable('oauth_clients', {
   tokenEndpointAuthMethod: tokenEndpointAuthMethod('token_endpoint_auth_method').notNull(),
   grantTypes: text('grant_types').array().notNull(),
   requirePkce: boolean('require_pkce').notNull().default(true),
-  /** Kubernetes workload identity (D-16): the SA subject (`system:serviceaccount:<ns>:<name>`) allowed to authenticate this client with a projected token instead of a secret. */
-  workloadSubject: varchar('workload_subject', { length: 512 }).unique(),
+  /** Kubernetes workload identity (D-16): the exact SA subjects and/or namespace-scoped patterns allowed to authenticate this client with a projected token instead of a secret. */
+  workloadSubjects: text('workload_subjects').array(),
   accessTokenTtl: integer('access_token_ttl').notNull().default(600),
   refreshTokenTtl: integer('refresh_token_ttl'),
   organisationId: bigint('organisation_id', { mode: 'bigint' }),
@@ -63,7 +64,7 @@ export const oauthClientSecrets = pgTable(
   'oauth_client_secrets',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id')
+    clientId: varchar('client_id', { length: 64 })
       .notNull()
       .references(() => oauthClients.id, { onDelete: 'cascade' }),
     secretHash: text('secret_hash').notNull(),
@@ -77,7 +78,7 @@ export const oauthClientSecrets = pgTable(
 export const oauthClientRedirectUris = pgTable(
   'oauth_client_redirect_uris',
   {
-    clientId: uuid('client_id')
+    clientId: varchar('client_id', { length: 64 })
       .notNull()
       .references(() => oauthClients.id, { onDelete: 'cascade' }),
     uri: text('uri').notNull(),
@@ -118,7 +119,7 @@ export const scopes = pgTable(
 export const oauthClientScopeGrants = pgTable(
   'oauth_client_scope_grants',
   {
-    clientId: uuid('client_id')
+    clientId: varchar('client_id', { length: 64 })
       .notNull()
       .references(() => oauthClients.id, { onDelete: 'cascade' }),
     scopeId: uuid('scope_id')
@@ -139,7 +140,7 @@ export const oidcLogoutDeliveries = pgTable(
   'oidc_logout_deliveries',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    clientId: uuid('client_id')
+    clientId: varchar('client_id', { length: 64 })
       .notNull()
       .references(() => oauthClients.id, { onDelete: 'cascade' }),
     logoutUri: text('logout_uri').notNull(),

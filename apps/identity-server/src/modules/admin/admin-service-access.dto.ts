@@ -27,8 +27,8 @@ export class CreateServiceAccessBody {
   @Field(() => Number)
   applicationId: number;
 
-  /** The SERVICE client allowed to call */
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  /** The SERVICE client allowed to call (client id slug or legacy UUID) */
+  @Field({ pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$' })
   callerClientId: string;
 
   /** HTTP method the rule covers, or `*` for all methods */
