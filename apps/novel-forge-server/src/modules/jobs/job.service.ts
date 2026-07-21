@@ -123,6 +123,19 @@ export class JobService {
     return this.db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
   }
 
+  // The owner-scoped read behind `GET /api/v1/jobs/:jobId` (NF-BOLA-02): a job is only visible to the
+  // owner of its project. Resolving projectId → owner_id via an inner join returns nothing when the job
+  // is missing or owned by someone else, and a null owner_id never matches — so it fails closed.
+  async getForOwner(jobId: string, ownerId: bigint): Promise<Job.Row | undefined> {
+    const [row] = await this.db
+      .select({ job: schema.jobs })
+      .from(schema.jobs)
+      .innerJoin(schema.projects, eq(schema.jobs.projectId, schema.projects.id))
+      .where(and(eq(schema.jobs.id, jobId), eq(schema.projects.ownerId, ownerId)))
+      .limit(1);
+    return row?.job;
+  }
+
   async listByProject(projectId: bigint): Promise<Job.Row[]> {
     return this.db.query.jobs.findMany({ where: eq(schema.jobs.projectId, projectId), orderBy: desc(schema.jobs.createdAt) });
   }

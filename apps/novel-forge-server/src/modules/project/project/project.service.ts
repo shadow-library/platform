@@ -8,6 +8,7 @@
 import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -46,9 +47,16 @@ export class ProjectService {
 
   constructor(
     private readonly databaseService: DatabaseService,
+    private readonly context: ContextService,
     @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
+  }
+
+  // The single owner of anything created in this request: the authenticated principal's identity user id.
+  // Project ownership is enforced everywhere else by `ProjectOwnershipGuard`; here it is stamped on write.
+  private ownerId(): bigint {
+    return BigInt(this.context.getAuthPrincipal().sub);
   }
 
   // The `ProjectResponse.config` schema is a non-nullable object; a fresh project stores `config = null`,
@@ -67,6 +75,7 @@ export class ProjectService {
     const [project] = await this.db
       .insert(schema.projects)
       .values({
+        ownerId: this.ownerId(),
         name: body.name,
         kind: body.kind,
         sourceUrl: body.url,
@@ -98,7 +107,9 @@ export class ProjectService {
       defaults: { limit: 20, offset: 0, sortBy: 'updatedAt', sortOrder: 'desc' },
     });
 
-    const where = filter.kind ? eq(schema.projects.kind, filter.kind) : undefined;
+    // A caller only ever sees the projects they own (NF-BOLA-01); an optional kind filter narrows within that.
+    const owner = eq(schema.projects.ownerId, this.ownerId());
+    const where = filter.kind ? and(owner, eq(schema.projects.kind, filter.kind)) : owner;
     const column = query.sortBy === 'createdAt' ? schema.projects.createdAt : schema.projects.updatedAt;
     const order = query.sortOrder === 'asc' ? asc(column) : desc(column);
 
@@ -179,6 +190,7 @@ export class ProjectService {
       const [newProject] = await tx
         .insert(schema.projects)
         .values({
+          ownerId: this.ownerId(),
           name: body.name,
           kind: source.kind,
           title: source.title,

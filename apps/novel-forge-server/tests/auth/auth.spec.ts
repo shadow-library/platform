@@ -119,6 +119,13 @@ describe.if(pgAvailable)('authentication', () => {
       expect(response.statusCode).toBe(400);
       expect(response.json().code).toBe('SES_003');
     });
+
+    it('should reject a backslash returnTo that browsers resolve off-origin with SES_003', async () => {
+      // `/\evil.com` starts with a slash but a browser treats the backslash as `//`, redirecting off-origin.
+      const response = await testEnv.getRouter({ authenticated: false }).mockRequest().get('/api/auth/login?returnTo=%2F%5Cevil.com');
+      expect(response.statusCode).toBe(400);
+      expect(response.json().code).toBe('SES_003');
+    });
   });
 
   describe('GET /api/auth/callback', () => {

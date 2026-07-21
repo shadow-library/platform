@@ -6,12 +6,14 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
+import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
 /**
  * Importing user defined packages
  */
 import { StorageModule } from '../storage/storage.module';
+import { ProjectOwnershipGuard } from './project-ownership.middleware';
 import { ProjectController } from './project/project.controller';
 import { ProjectService } from './project/project.service';
 
@@ -24,8 +26,8 @@ import { ProjectService } from './project/project.service';
  */
 
 @Module({
-  imports: [DatabaseModule, StorageModule],
-  controllers: [ProjectController],
+  imports: [DatabaseModule, StorageModule, FastifyModule],
+  controllers: [ProjectController, ProjectOwnershipGuard],
   providers: [ProjectService],
   exports: [ProjectService],
 })

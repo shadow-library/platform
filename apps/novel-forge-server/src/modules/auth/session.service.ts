@@ -117,7 +117,9 @@ export class SessionService {
   /** Only same-origin relative paths may round-trip through the login flow — never absolute URLs */
   normalizeReturnTo(returnTo: string | undefined): string {
     if (returnTo === undefined) return '/';
-    if (!returnTo.startsWith('/') || returnTo.startsWith('//')) throw AppErrorCode.SES_003.create();
+    // A backslash is a path separator to browsers, so `/\evil.com` and `/\/evil.com` resolve to another
+    // origin exactly like `//evil.com`; reject any backslash alongside the protocol-relative guard.
+    if (!returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('\\')) throw AppErrorCode.SES_003.create();
     return returnTo;
   }
 

@@ -6,6 +6,7 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
+import { FastifyModule } from '@shadow-library/fastify';
 import { DatabaseModule } from '@shadow-library/modules';
 
 /**
@@ -31,7 +32,7 @@ import { PublicationJanitor } from './publication.janitor';
  */
 
 @Module({
-  imports: [DatabaseModule, AiModule, SourceModule, RebrandModule, PublishingModule],
+  imports: [DatabaseModule, AiModule, SourceModule, RebrandModule, PublishingModule, FastifyModule],
   controllers: [JobsController],
   providers: [JobService, ConcurrencyController, JobExecutor, CheckpointJanitor, PublicationJanitor],
   exports: [JobService, ConcurrencyController, JobExecutor],
