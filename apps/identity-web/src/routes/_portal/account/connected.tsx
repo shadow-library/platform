@@ -32,7 +32,7 @@ function ConnectedPage(): React.JSX.Element {
 
   const onRevoke = (record: ConsentRecord): void =>
     revoke.mutate(record.clientId, {
-      onSuccess: () => toast.success(`Revoked access for ${record.clientName}`),
+      onSuccess: () => toast.success(`Revoked access for ${record.applicationName}`),
       onError: error => toast.danger(error.message),
     });
 
@@ -52,10 +52,10 @@ function ConnectedPage(): React.JSX.Element {
             const sourceLabel = SOURCE_LABEL[record.source];
             return (
               <div key={record.clientId} className={styles.row}>
-                <Avatar name={record.clientName} shape="square" size="md" />
+                <Avatar name={record.applicationName} shape="square" size="md" />
                 <div className={styles.meta}>
                   <div className={styles.name}>
-                    {record.clientName}
+                    {record.applicationName}
                     {sourceLabel && <StatusChip intent="neutral">{sourceLabel}</StatusChip>}
                   </div>
                   <div className={styles.sub}>Granted {relativeTime(record.grantedAt)}</div>

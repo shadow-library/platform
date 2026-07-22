@@ -1998,6 +1998,8 @@ export interface components {
     ConsentRecordDto: {
       clientId: string;
       clientName: string;
+      /** User-facing name of the application the client belongs to — what the connected-apps surface shows. */
+      applicationName: string;
       scopeNames: string[];
       /** @enum {string} */
       source: 'USER' | 'FIRST_PARTY_POLICY' | 'ADMIN';
