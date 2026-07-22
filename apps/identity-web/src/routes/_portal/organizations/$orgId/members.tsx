@@ -16,10 +16,13 @@ import {
   type MemberItem,
   type MemberRole,
   membersQueryOptions,
+  myOrganisationsQueryOptions,
+  orgAccessOf,
   useInvitationsQuery,
   useInviteMemberMutation,
   useMembersQuery,
   useMeQuery,
+  useOrgAccess,
   useRemoveMemberMutation,
   useRevokeInvitationMutation,
   useUpdateMemberRoleMutation,
@@ -28,9 +31,15 @@ import { formatDate, relativeTime } from '@/lib/format';
 
 import styles from './members.module.css';
 
+/** Invitations are an org-admin surface (403 for members, rejected outright for personal workspaces), so only managers prefetch them. */
 export const Route = createFileRoute('/_portal/organizations/$orgId/members')({
-  loader: ({ context, params }) =>
-    Promise.all([context.queryClient.ensureQueryData(membersQueryOptions(params.orgId)), context.queryClient.ensureQueryData(invitationsQueryOptions(params.orgId))]),
+  loader: async ({ context, params }) => {
+    const mine = await context.queryClient.ensureQueryData(myOrganisationsQueryOptions());
+    const { canManage } = orgAccessOf(mine, params.orgId);
+    const queries: Promise<unknown>[] = [context.queryClient.ensureQueryData(membersQueryOptions(params.orgId))];
+    if (canManage) queries.push(context.queryClient.ensureQueryData(invitationsQueryOptions(params.orgId)));
+    await Promise.all(queries);
+  },
   component: MembersPage,
 });
 
@@ -96,8 +105,9 @@ function InviteDialog({ orgId, open, onOpenChange }: { orgId: string; open: bool
 function MembersPage(): React.JSX.Element {
   const { orgId } = Route.useParams();
   const me = useMeQuery();
+  const { canManage } = useOrgAccess(orgId);
   const members = useMembersQuery(orgId);
-  const invitations = useInvitationsQuery(orgId);
+  const invitations = useInvitationsQuery(orgId, canManage);
   const updateRole = useUpdateMemberRoleMutation(orgId);
   const removeMember = useRemoveMemberMutation(orgId);
   const invite = useInviteMemberMutation(orgId);
@@ -133,9 +143,11 @@ function MembersPage(): React.JSX.Element {
           <Select.Item value="MEMBER">Member</Select.Item>
         </Select>
         <div className={styles.spacer} />
-        <Button variant="primary" size="sm" prefix={<PlusIcon size={15} />} onClick={() => setInviteOpen(true)}>
-          Invite members
-        </Button>
+        {canManage && (
+          <Button variant="primary" size="sm" prefix={<PlusIcon size={15} />} onClick={() => setInviteOpen(true)}>
+            Invite members
+          </Button>
+        )}
       </div>
 
       <QueryState isLoading={members.isLoading} error={members.error} isEmpty={rows.length === 0} emptyTitle="No members match">
@@ -167,7 +179,7 @@ function MembersPage(): React.JSX.Element {
               align: 'end',
               width: 56,
               cell: member =>
-                member.userId === me.data?.userId ? null : (
+                !canManage || member.userId === me.data?.userId ? null : (
                   <DropdownMenu>
                     <DropdownMenu.Trigger asChild>
                       <IconButton variant="ghost" size="sm" aria-label="Member actions" icon={<MoreIcon size={16} />} />

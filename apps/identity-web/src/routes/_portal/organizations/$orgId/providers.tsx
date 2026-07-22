@@ -14,16 +14,23 @@ import { useStepUpGate } from '@/features/portal';
 import {
   type IdentityProvider,
   identityProvidersQueryOptions,
+  myOrganisationsQueryOptions,
+  orgAccessOf,
   useCreateIdentityProviderMutation,
   useDeleteIdentityProviderMutation,
   useIdentityProvidersQuery,
+  useOrgAccess,
   useUpdateIdentityProviderMutation,
 } from '@/lib/apis';
 
 import styles from './providers.module.css';
 
+/** Listing identity providers is an org-admin route, so plain members and personal workspaces skip the fetch instead of erroring the page. */
 export const Route = createFileRoute('/_portal/organizations/$orgId/providers')({
-  loader: ({ context, params }) => context.queryClient.ensureQueryData(identityProvidersQueryOptions(params.orgId)),
+  loader: async ({ context, params }) => {
+    const mine = await context.queryClient.ensureQueryData(myOrganisationsQueryOptions());
+    if (orgAccessOf(mine, params.orgId).canManage) await context.queryClient.ensureQueryData(identityProvidersQueryOptions(params.orgId));
+  },
   component: ProvidersPage,
 });
 
@@ -178,7 +185,8 @@ function IdpDialog({
 
 function ProvidersPage(): React.JSX.Element {
   const { orgId } = Route.useParams();
-  const providers = useIdentityProvidersQuery(orgId);
+  const { org, canManage } = useOrgAccess(orgId);
+  const providers = useIdentityProvidersQuery(orgId, canManage);
   const del = useDeleteIdentityProviderMutation(orgId);
   const { require, dialog } = useStepUpGate();
 
@@ -187,6 +195,14 @@ function ProvidersPage(): React.JSX.Element {
   const [deleteTarget, setDeleteTarget] = useState<IdentityProvider | null>(null);
 
   const list = providers.data?.items ?? [];
+
+  if (!canManage) {
+    return (
+      <p className={styles.intro}>
+        {org?.type === 'PERSONAL' ? 'Identity providers aren’t available for personal workspaces.' : 'Identity providers are managed by the organization’s owners and admins.'}
+      </p>
+    );
+  }
 
   const openCreate = (): void =>
     require(() => {

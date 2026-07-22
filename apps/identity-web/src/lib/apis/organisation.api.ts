@@ -54,6 +54,12 @@ export type MemberRole = MemberItem['role'];
 export type InvitableRole = InviteMemberBody['role'];
 export type DomainStatus = DomainItem['status'];
 
+export interface OrgAccess {
+  org: MyOrganisation | null;
+  /** ADMIN or OWNER of a TEAM organisation — the rank the server's org-administration routes require; personal workspaces reject administration outright. */
+  canManage: boolean;
+}
+
 /**
  * Declaring the constants
  */
@@ -145,6 +151,18 @@ export const myOrganisationsQueryOptions = () => queryOptions<MyOrganisationsRes
 
 export function useMyOrganisationsQuery(): UseQueryResult<MyOrganisationsResponse, ApiError> {
   return useQuery(myOrganisationsQueryOptions());
+}
+
+/** The caller's membership view of one organisation; admin-gated queries and controls key off `canManage` so non-admins never hit 403s. */
+export function orgAccessOf(response: MyOrganisationsResponse | undefined, orgId: string): OrgAccess {
+  const org = response?.organisations.find(item => item.id === orgId) ?? null;
+  const canManage = org !== null && org.type === 'TEAM' && (org.role === 'OWNER' || org.role === 'ADMIN');
+  return { org, canManage };
+}
+
+export function useOrgAccess(orgId: string): OrgAccess {
+  const orgs = useMyOrganisationsQuery();
+  return orgAccessOf(orgs.data, orgId);
 }
 
 export const organisationQueryOptions = (orgId: string, enabled = true) =>

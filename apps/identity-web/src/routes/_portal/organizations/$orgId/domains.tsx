@@ -11,7 +11,7 @@ import { Button, DescriptionList, Input, toast } from '@shadow-library/ui';
 import { PlusIcon } from '@/components/icons';
 import { QueryState, StatusChip } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
-import { domainsQueryOptions, type DomainStatus, useDomainsQuery, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';
+import { domainsQueryOptions, type DomainStatus, useDomainsQuery, useOrgAccess, useRegisterDomainMutation, useRemoveDomainMutation, useVerifyDomainMutation } from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './domains.module.css';
@@ -25,6 +25,7 @@ const STATUS_CHIP: Record<DomainStatus, 'success' | 'warning' | 'danger'> = { VE
 
 function DomainsPage(): React.JSX.Element {
   const { orgId } = Route.useParams();
+  const { canManage } = useOrgAccess(orgId);
   const domains = useDomainsQuery(orgId);
   const register = useRegisterDomainMutation(orgId);
   const verify = useVerifyDomainMutation(orgId);
@@ -49,12 +50,14 @@ function DomainsPage(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      <div className={styles.addRow}>
-        <Input placeholder="example.com" value={value} onValueChange={setValue} onKeyDown={event => event.key === 'Enter' && add()} />
-        <Button variant="secondary" prefix={<PlusIcon size={15} />} loading={register.isPending} onClick={add}>
-          Add domain
-        </Button>
-      </div>
+      {canManage && (
+        <div className={styles.addRow}>
+          <Input placeholder="example.com" value={value} onValueChange={setValue} onKeyDown={event => event.key === 'Enter' && add()} />
+          <Button variant="secondary" prefix={<PlusIcon size={15} />} loading={register.isPending} onClick={add}>
+            Add domain
+          </Button>
+        </div>
+      )}
 
       <QueryState
         isLoading={domains.isLoading}
@@ -74,7 +77,7 @@ function DomainsPage(): React.JSX.Element {
                   </StatusChip>
                 </div>
                 <div className={styles.cardActions}>
-                  {domain.status !== 'VERIFIED' && (
+                  {canManage && domain.status !== 'VERIFIED' && (
                     <Button
                       variant="secondary"
                       size="sm"
@@ -91,9 +94,11 @@ function DomainsPage(): React.JSX.Element {
                       Verify
                     </Button>
                   )}
-                  <Button variant="ghost" size="sm" onClick={() => require(() => remove.mutate(domain.id, { onSuccess: () => toast.success('Domain removed') }))}>
-                    Remove
-                  </Button>
+                  {canManage && (
+                    <Button variant="ghost" size="sm" onClick={() => require(() => remove.mutate(domain.id, { onSuccess: () => toast.success('Domain removed') }))}>
+                      Remove
+                    </Button>
+                  )}
                 </div>
               </div>
 
