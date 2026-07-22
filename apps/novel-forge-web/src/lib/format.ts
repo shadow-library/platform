@@ -4,7 +4,7 @@
  * The API models are intentionally lean (no cover art, no display genre), so
  * the UI derives a few stable presentational bits from the data it does have.
  */
-import { type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse } from '@/lib/apis';
+import { type ProjectModelRef, type ProjectResponse, type ProjectStatusResponse, type SessionResponse } from '@/lib/apis';
 
 // A role's model override is a `{ provider, model }` pair, but a `Select` needs a single string value,
 // so the two are joined on '::'. A model id never contains '::', so the split back is unambiguous.
@@ -67,6 +67,11 @@ export function imageUrl(ref?: string | null): string | undefined {
 /** The best human title for a project — its explicit title, falling back to its name. */
 export function projectTitle(project: Pick<ProjectResponse, 'name' | 'title'>): string {
   return project.title?.trim() || project.name;
+}
+
+/** The best human label for the signed-in user — name, falling back to email (both optional in the session contract). */
+export function userDisplayName(session?: Pick<SessionResponse, 'name' | 'email'>): string {
+  return session?.name?.trim() || session?.email || 'Account';
 }
 
 const kindLabels: Record<ProjectResponse['kind'], string> = {

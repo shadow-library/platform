@@ -8,8 +8,8 @@ import { Avatar, type CommandItem, CommandPalette, Kbd, Popover, Spinner } from 
 /**
  * Importing user defined modules
  */
-import { useListJobsQuery, useListProjectsQuery, useProjectQuery } from '@/lib/apis';
-import { projectTitle } from '@/lib/format';
+import { useListJobsQuery, useListProjectsQuery, useProjectQuery, useSessionQuery } from '@/lib/apis';
+import { projectTitle, userDisplayName } from '@/lib/format';
 import {
   BellIcon,
   BookIcon,
@@ -112,6 +112,7 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
   const inProject = Boolean(novelId);
   const [paletteOpen, setPaletteOpen] = useState(false);
 
+  const sessionQuery = useSessionQuery();
   const projectQuery = useProjectQuery(novelId ?? '', inProject);
   const projectsQuery = useListProjectsQuery({ limit: 50 });
   const projects = projectsQuery.data?.items ?? [];
@@ -176,7 +177,7 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
 
       <div className={styles.divider} />
       <Link to="/" aria-label="Account">
-        <Avatar name="Rowan Keller" size="sm" />
+        <Avatar name={userDisplayName(sessionQuery.data)} size="sm" />
       </Link>
     </header>
   );

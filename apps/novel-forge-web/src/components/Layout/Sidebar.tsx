@@ -8,8 +8,8 @@ import { Avatar, Badge, IconButton, Popover, Tooltip, useTheme } from '@shadow-l
 /**
  * Importing user defined modules
  */
-import { useListProjectsQuery, useListProposalsQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery } from '@/lib/apis';
-import { imageUrl, lifecyclePhase, projectDotColor, projectKindTag, projectTitle } from '@/lib/format';
+import { useListProjectsQuery, useListProposalsQuery, useProjectQuery, useProjectStatusQuery, useReviewQueueQuery, useSessionQuery } from '@/lib/apis';
+import { imageUrl, lifecyclePhase, projectDotColor, projectKindTag, projectTitle, userDisplayName } from '@/lib/format';
 import {
   BookIcon,
   ChatIcon,
@@ -82,6 +82,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const { theme, toggleTheme } = useTheme();
 
+  const sessionQuery = useSessionQuery();
   const projectsQuery = useListProjectsQuery({ limit: 50 });
   const projects = projectsQuery.data?.items ?? [];
   const projectQuery = useProjectQuery(novelId ?? '', inProject);
@@ -89,6 +90,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
   const reviewQuery = useReviewQueueQuery(novelId ?? '', inProject);
   const proposalsQuery = useListProposalsQuery(novelId ?? '', { status: 'pending', limit: 50 }, inProject);
 
+  const session = sessionQuery.data;
   const project = projectQuery.data;
   const status = statusQuery.data;
   const phase = lifecyclePhase(status);
@@ -258,10 +260,10 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
 
       {/* user footer */}
       <div className={styles.footer}>
-        <Avatar name="Rowan Keller" size="sm" />
+        <Avatar name={userDisplayName(session)} size="sm" />
         <div className={styles.footerInfo}>
-          <div className={styles.footerName}>Rowan Keller</div>
-          <div className={styles.footerRole}>Author workspace</div>
+          <div className={styles.footerName}>{userDisplayName(session)}</div>
+          <div className={styles.footerRole}>{session?.name && session.email ? session.email : 'Author workspace'}</div>
         </div>
         <Tooltip content={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
           <IconButton variant="ghost" size="sm" aria-label="Toggle theme" icon={theme === 'dark' ? <SunIcon /> : <MoonIcon />} onClick={toggleTheme} />
