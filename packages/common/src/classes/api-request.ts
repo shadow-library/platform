@@ -188,9 +188,13 @@ export class APIRequest {
       return { response, resData };
     };
     const { response, resData } = await perform().catch((error: unknown) => {
-      if (!signal?.aborted) throw error;
-      APIRequest.logger.error(`${reqLog} - timed out after ${timeout}ms`);
-      throw ErrorCode.API_REQUEST_TIMEOUT.create({ timeout }, error);
+      if (signal?.aborted) {
+        APIRequest.logger.error(`${reqLog} - timed out after ${timeout}ms`);
+        throw ErrorCode.API_REQUEST_TIMEOUT.create({ timeout }, error);
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      APIRequest.logger.error(`${reqLog} - failed`, { reason });
+      throw ErrorCode.API_REQUEST_NETWORK_ERROR.create({ reason }, error);
     });
     const endTime = process.hrtime(startTime);
     const timeTaken = (endTime[0] * 1e3 + endTime[1] * 1e-6).toFixed(3);

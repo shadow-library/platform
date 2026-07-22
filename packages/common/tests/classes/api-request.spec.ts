@@ -130,14 +130,42 @@ describe('APIRequest', () => {
       expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);
     });
 
-    it('should rethrow a non-timeout failure untouched', async () => {
-      const networkError = new Error('connect ECONNREFUSED');
-      mockRequest.mockRejectedValue(networkError);
+    it('should wrap a non-timeout failure as a network error even when a timeout is set', async () => {
+      mockRequest.mockRejectedValue(new Error('getaddrinfo ENOTFOUND nowhere.invalid'));
       const failure = await APIRequest.get('/down')
         .timeout(1000)
         .execute()
         .catch((error: unknown) => error);
-      expect(failure).toBe(networkError);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_NETWORK_ERROR)).toBe(true);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(false);
+    });
+  });
+
+  describe('network errors', () => {
+    it('should wrap a dispatch failure in API_REQUEST_NETWORK_ERROR with the cause preserved', async () => {
+      const networkError = new Error('connect ECONNREFUSED 127.0.0.1:80');
+      mockRequest.mockRejectedValue(networkError);
+      const failure = await APIRequest.get('/down')
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_NETWORK_ERROR)).toBe(true);
+      expect((failure as AppError).status).toBe(503);
+      expect((failure as AppError).message).toBe('API request failed due to a network or protocol error');
+      expect((failure as AppError).cause).toBe(networkError);
+      expect((failure as AppError).data).toStrictEqual({ reason: 'connect ECONNREFUSED 127.0.0.1:80' });
+    });
+
+    it('should wrap a body read failure in API_REQUEST_NETWORK_ERROR', async () => {
+      mockRequest.mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+        body: { json: () => Promise.reject(new SyntaxError('Unexpected token')) },
+      });
+      const failure = await APIRequest.get('/garbage')
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_NETWORK_ERROR)).toBe(true);
+      expect((failure as AppError).data).toStrictEqual({ reason: 'Unexpected token' });
     });
   });
 

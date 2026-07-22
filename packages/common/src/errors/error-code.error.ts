@@ -102,6 +102,8 @@ export class ErrorCode {
   static readonly API_REQUEST_FAILED = ErrorCode.internal('API_REQUEST_FAILED', 'API request failed with status code {status}');
   /** An outbound API request was aborted after exceeding its total time budget — retryable, hence 504 rather than a masked internal error */
   static readonly API_REQUEST_TIMEOUT = ErrorCode.unavailable('API_REQUEST_TIMEOUT', 'API request timed out after {timeout}ms', 504);
+  /** An outbound API request failed without a usable response — DNS, connection, TLS, aborted stream or malformed body; the message stays generic so `toResponse()` leaks no topology, detail rides on `data.reason` and `cause` */
+  static readonly API_REQUEST_NETWORK_ERROR = ErrorCode.unavailable('API_REQUEST_NETWORK_ERROR', 'API request failed due to a network or protocol error');
   /** An internal service call could not resolve the target service to a URL */
   static readonly SERVICE_UNKNOWN = ErrorCode.internal('SERVICE_UNKNOWN', 'Service could not be resolved: {reason}');
 }

@@ -746,22 +746,31 @@ try {
 
 #### Error Handling
 
+Every failure surfaces as a typed `AppError` — raw undici errors never escape:
+
+- **`ErrorCode.API_REQUEST_FAILED`** — the server answered a failure status (thrown unless `suppressErrors()` is on);
+  `error.data` carries `{ status, response }`.
+- **`ErrorCode.API_REQUEST_TIMEOUT`** — the total time budget expired (504, retryable).
+- **`ErrorCode.API_REQUEST_NETWORK_ERROR`** — no usable response: DNS, connection, TLS, an aborted stream or a
+  malformed JSON body (503, retryable). The message is deliberately generic so `toResponse()` leaks no internal
+  topology; the original error rides on `cause` and `error.data.reason`.
+
 ```ts
-// Suppress errors for custom handling
+import { APIRequest, AppError, ErrorCode } from '@shadow-library/common';
+
+// Suppress failure-status errors for custom handling
 const response = await APIRequest.get('/might-fail').suppressErrors().execute();
 
 if (response.statusCode >= 400) {
   console.log('Request failed:', response.data);
 }
 
-// Handle APIError
+// Match specific failures by catalog key
 try {
-  await APIRequest.post('/data').body({ invalid: 'data' });
+  await APIRequest.post('/data').body({ key: 'value' });
 } catch (error) {
-  if (error instanceof APIError) {
-    console.log('Status:', error.statusCode);
-    console.log('Response:', error.data);
-  }
+  if (AppError.is(error, ErrorCode.API_REQUEST_FAILED)) console.log('Upstream answered', error.data?.status);
+  if (AppError.is(error, ErrorCode.API_REQUEST_NETWORK_ERROR)) console.log('Transport failure, safe to retry', error.cause);
 }
 ```
 
