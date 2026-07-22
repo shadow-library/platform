@@ -95,6 +95,10 @@ export class ConsentRecordDto {
   @Field()
   clientName: string;
 
+  /** User-facing name of the application the client belongs to — what the connected-apps surface shows. */
+  @Field()
+  applicationName: string;
+
   @Field(() => [String])
   scopeNames: string[];
 

@@ -14,7 +14,7 @@ import { type ValidatedSession } from '@server/modules/auth/session';
 import { RefreshTokenService } from '@server/modules/auth/token';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Consent, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
-import { ApplicationMemberService } from '@server/modules/system/application';
+import { ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
 
 import { OAuthClientService } from './oauth-client.service';
 
@@ -43,6 +43,7 @@ export interface ConsentPromptData {
 export interface ConsentRecordData {
   clientId: string;
   clientName: string;
+  applicationName: string;
   scopeNames: string[];
   source: Consent.Source;
   grantedAt: Date;
@@ -83,6 +84,7 @@ export class ConsentService {
     databaseService: DatabaseService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly clientService: OAuthClientService,
+    private readonly applicationService: ApplicationService,
     private readonly applicationMemberService: ApplicationMemberService,
     private readonly auditService: AuditService,
   ) {
@@ -132,13 +134,21 @@ export class ConsentService {
     return { decision: 'DENY', redirectTo };
   }
 
-  /** The user's active grants enriched with the client display name, for the connected-apps surface. */
+  /** The user's active grants enriched with the owning application's display name, for the connected-apps surface. */
   async listConsentRecords(userId: bigint): Promise<ConsentRecordData[]> {
     const consents = await this.listForUser(userId);
     return Promise.all(
       consents.map(async consent => {
         const client = await this.clientService.getClient(consent.clientId);
-        return { clientId: consent.clientId, clientName: client?.name ?? 'Unknown application', scopeNames: consent.scopeNames, source: consent.source, grantedAt: consent.grantedAt };
+        const application = client ? this.applicationService.getApplicationById(client.applicationId) : null;
+        return {
+          clientId: consent.clientId,
+          clientName: client?.name ?? 'Unknown application',
+          applicationName: application?.displayName ?? application?.name ?? client?.name ?? 'Unknown application',
+          scopeNames: consent.scopeNames,
+          source: consent.source,
+          grantedAt: consent.grantedAt,
+        };
       }),
     );
   }
