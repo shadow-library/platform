@@ -720,6 +720,30 @@ await APIRequest.get('svc://pulse-server/api/v1/notifications');
 
 An invalid service name, or an override that is not a valid URL, throws `ErrorCode.SERVICE_UNKNOWN`.
 
+#### Timeouts
+
+`.timeout(ms)` bounds the **entire request** — connection, response headers and body read — with one total budget,
+implemented via `AbortSignal.timeout()`. On expiry the request is aborted and `ErrorCode.API_REQUEST_TIMEOUT` (504,
+retryable) is thrown; `suppressErrors()` does not apply, since a timed-out request has no response to return. Undici's
+per-phase `headersTimeout`/`bodyTimeout` remain available through the options passthrough for finer tuning.
+
+```ts
+// Abort if the whole request takes longer than 5 seconds
+await APIRequest.get('svc://pulse-server/api/v1/notifications').timeout(5000);
+
+// A child client can carry a default timeout for every request it makes
+const PulseAPI = APIRequest.get('svc://pulse-server').child();
+PulseAPI.setOptions({ timeout: 5000 });
+
+try {
+  await APIRequest.get('/slow').timeout(100);
+} catch (error) {
+  if (AppError.is(error, ErrorCode.API_REQUEST_TIMEOUT)) {
+    // transient — safe to retry
+  }
+}
+```
+
 #### Error Handling
 
 ```ts
@@ -1460,6 +1484,7 @@ The package uses environment variables for configuration. Below are the key vari
 - `.query(key, value)` - Add query parameter
 - `.field(path, value)` - Add nested field to body
 - `.body(object)` - Set request body
+- `.timeout(ms)` - Bound the entire request (connect + headers + body) to a total time budget; throws `ErrorCode.API_REQUEST_TIMEOUT` on expiry
 - `.suppressErrors()` - Disable automatic error throwing
 - `.child()` - Create reusable child class
 - `.execute()` - Execute request

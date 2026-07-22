@@ -86,6 +86,61 @@ describe('APIRequest', () => {
     expect(childInstance).toBeInstanceOf(APIRequest);
   });
 
+  describe('timeout', () => {
+    const abortable = (signal: AbortSignal): Promise<never> => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+
+    it('should reject a non-positive or non-finite timeout', () => {
+      expect(() => APIRequest.get('/test').timeout(0)).toThrow(AppError);
+      expect(() => APIRequest.get('/test').timeout(-100)).toThrow(AppError);
+      expect(() => APIRequest.get('/test').timeout(NaN)).toThrow(AppError);
+    });
+
+    it('should pass an abort signal to undici when a timeout is set', async () => {
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
+      await APIRequest.get('/test').timeout(1000);
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', signal: expect.any(AbortSignal) });
+    });
+
+    it('should not pass an abort signal when no timeout is set', async () => {
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
+      await APIRequest.get('/test');
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET' });
+    });
+
+    it('should throw API_REQUEST_TIMEOUT when the request exceeds the timeout', async () => {
+      mockRequest.mockImplementation((_url: string, options: { signal: AbortSignal }) => abortable(options.signal));
+      const failure = await APIRequest.get('/slow')
+        .timeout(10)
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);
+      expect((failure as AppError).status).toBe(504);
+      expect((failure as AppError).message).toBe('API request timed out after 10ms');
+      expect(((failure as AppError).cause as Error).name).toBe('TimeoutError');
+    });
+
+    it('should throw API_REQUEST_TIMEOUT when the body read exceeds the timeout', async () => {
+      mockRequest.mockImplementation((_url: string, options: { signal: AbortSignal }) =>
+        Promise.resolve({ statusCode: 200, headers: { 'content-type': 'application/json' }, body: { json: () => abortable(options.signal) } }),
+      );
+      const failure = await APIRequest.get('/slow-body')
+        .timeout(10)
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);
+    });
+
+    it('should rethrow a non-timeout failure untouched', async () => {
+      const networkError = new Error('connect ECONNREFUSED');
+      mockRequest.mockRejectedValue(networkError);
+      const failure = await APIRequest.get('/down')
+        .timeout(1000)
+        .execute()
+        .catch((error: unknown) => error);
+      expect(failure).toBe(networkError);
+    });
+  });
+
   describe('svc:// service resolution', () => {
     const SERVICE_ENV = ['SERVICE_URL_PULSE_SERVER', 'SERVICE_DISCOVERY_SCHEME'];
     beforeEach(() => {

@@ -21,6 +21,8 @@ import { utils } from '@lib/utils';
 export interface APIRequestOptions extends Partial<Dispatcher.DispatchOptions> {
   baseURL?: string;
   throwErrorOnFailure?: boolean;
+  /** Total time budget in milliseconds for the whole request — dispatch, response headers and body read — unlike undici's per-phase `headersTimeout`/`bodyTimeout` */
+  timeout?: number;
   data?: JsonObject;
 }
 
@@ -115,6 +117,13 @@ export class APIRequest {
     return this;
   }
 
+  /** Bounds the entire request to `ms` milliseconds; on expiry the request is aborted and `ErrorCode.API_REQUEST_TIMEOUT` is thrown regardless of `suppressErrors()` */
+  timeout(ms: number): this {
+    if (!Number.isFinite(ms) || ms <= 0) throw AppError.internal(`API request timeout must be a positive number of milliseconds, received ${ms}`);
+    this.options.timeout = ms;
+    return this;
+  }
+
   header(key: string, value: string): this {
     if (!this.options.headers) this.options.headers = {};
     (this.options.headers as Record<string, string>)[key] = value;
@@ -150,7 +159,7 @@ export class APIRequest {
   }
 
   async execute<T = any>(): Promise<APIResponse<T>> {
-    const { baseURL = '', throwErrorOnFailure, data, path, ...requestOptions } = this.options;
+    const { baseURL = '', throwErrorOnFailure, data, path, timeout, ...requestOptions } = this.options;
 
     const query = this.options.query ? `?${qs.stringify(this.options.query)}` : '';
     const url = APIRequest.resolveServiceUrl(baseURL + path);
@@ -170,10 +179,19 @@ export class APIRequest {
     if (isDebug) APIRequest.logger.debug(reqLog, requestOptions);
     else APIRequest.logger.info(reqLog);
 
-    /** Execute the request */
+    /** Execute the request. One signal bounds dispatch and body read together, so the timeout is a total budget rather than undici's per-phase ones. */
+    const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
     const startTime = process.hrtime();
-    const response = await request(url, requestOptions);
-    const resData = response.headers['content-type']?.includes('application/json') ? await response.body.json() : null;
+    const perform = async (): Promise<{ response: Dispatcher.ResponseData; resData: unknown }> => {
+      const response = await request(url, signal ? { ...requestOptions, signal } : requestOptions);
+      const resData = response.headers['content-type']?.includes('application/json') ? await response.body.json() : null;
+      return { response, resData };
+    };
+    const { response, resData } = await perform().catch((error: unknown) => {
+      if (!signal?.aborted) throw error;
+      APIRequest.logger.error(`${reqLog} - timed out after ${timeout}ms`);
+      throw ErrorCode.API_REQUEST_TIMEOUT.create({ timeout }, error);
+    });
     const endTime = process.hrtime(startTime);
     const timeTaken = (endTime[0] * 1e3 + endTime[1] * 1e-6).toFixed(3);
 

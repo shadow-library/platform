@@ -100,6 +100,8 @@ export class ErrorCode {
   static readonly INTERNAL = ErrorCode.internal('INTERNAL', '{reason}');
   /** An outbound API request answered a failure status */
   static readonly API_REQUEST_FAILED = ErrorCode.internal('API_REQUEST_FAILED', 'API request failed with status code {status}');
+  /** An outbound API request was aborted after exceeding its total time budget — retryable, hence 504 rather than a masked internal error */
+  static readonly API_REQUEST_TIMEOUT = ErrorCode.unavailable('API_REQUEST_TIMEOUT', 'API request timed out after {timeout}ms', 504);
   /** An internal service call could not resolve the target service to a URL */
   static readonly SERVICE_UNKNOWN = ErrorCode.internal('SERVICE_UNKNOWN', 'Service could not be resolved: {reason}');
 }
