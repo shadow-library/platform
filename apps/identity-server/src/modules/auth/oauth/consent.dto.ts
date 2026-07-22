@@ -83,7 +83,8 @@ export class ConsentDecisionResponse {
 
 @Schema()
 export class ConsentClientParams {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  /** Client ids are admin-chosen slugs (legacy lowercase UUIDs also match). */
+  @Field({ pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$' })
   clientId: string;
 }
 
