@@ -69,6 +69,19 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
     if (value !== 'SERVICE') setAuthMethod('client_secret');
   };
 
+  /** The dialog stays mounted between opens, so a successful registration must clear the form for the next client. */
+  const resetForm = (): void => {
+    setApplicationId('');
+    setClientId('');
+    setName('');
+    setKind('WEB_CONFIDENTIAL');
+    setGrant('auth_code');
+    setRedirectUris([]);
+    setFirstParty(false);
+    setAuthMethod('client_secret');
+    setWorkloadSubjects([]);
+  };
+
   const submit = (): void => {
     if (!applicationId || !name.trim()) {
       toast.danger('Choose an application and a name.');
@@ -98,6 +111,7 @@ function RegisterDialog({ open, onOpenChange, onSecret }: { open: boolean; onOpe
       {
         onSuccess: result => {
           onOpenChange(false);
+          resetForm();
           toast.success('Client registered');
           if (result.secret) onSecret(result.secret);
         },
