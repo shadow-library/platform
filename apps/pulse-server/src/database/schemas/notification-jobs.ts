@@ -7,7 +7,7 @@ import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, text, times
 /**
  * Importing user defined packages
  */
-import { templateGroups } from './templates';
+import { templates, templateVersions } from './templates';
 
 /**
  * Defining types
@@ -33,9 +33,13 @@ export const notificationJobs = pgTable(
   'notification_jobs',
   {
     id: uuid('id').defaultRandom().primaryKey(),
-    templateGroupId: bigint('template_group_id', { mode: 'bigint' })
+    templateId: bigint('template_id', { mode: 'bigint' })
       .notNull()
-      .references(() => templateGroups.id, { onDelete: 'restrict' }),
+      .references(() => templates.id, { onDelete: 'restrict' }),
+    /** The exact published version resolved at creation, so a retry re-renders identical content even after the template is re-edited. */
+    templateVersionId: bigint('template_version_id', { mode: 'bigint' })
+      .notNull()
+      .references(() => templateVersions.id, { onDelete: 'restrict' }),
     channel: notificationChannel('channel').notNull(),
     locale: varchar('locale', { length: 5 }).notNull(),
     priority: priority('priority').notNull().default('MEDIUM'),
@@ -79,7 +83,8 @@ export const notificationMessages = pgTable(
  */
 
 export const notificationJobRelations = relations(notificationJobs, ({ one, many }) => ({
-  templateGroup: one(templateGroups, { fields: [notificationJobs.templateGroupId], references: [templateGroups.id] }),
+  template: one(templates, { fields: [notificationJobs.templateId], references: [templates.id] }),
+  templateVersion: one(templateVersions, { fields: [notificationJobs.templateVersionId], references: [templateVersions.id] }),
   messages: many(notificationMessages),
 }));
 
