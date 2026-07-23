@@ -9,6 +9,8 @@ import { AppError, Config, throwError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
+import { isProduction } from '@server/common';
+
 import { PULSE_AUDIENCE } from './rbac.constants';
 import { RouteGuardSentinel } from './route-guard.sentinel';
 import { SessionController } from './session.controller';
@@ -39,21 +41,25 @@ type ResolvedAuthOptions = AuthModuleOptions & { issuer: string; audience: strin
  */
 const DEV_ISSUER = 'http://localhost:8080';
 const DEV_CLIENT_ID = 'pulse';
-const DEV_CLIENT_SECRET = 'dev-only-insecure-pulse-client-secret';
 
 const RP_CALLBACK_PATH = '/api/auth/callback';
 
-/** A wrong trust anchor in production means honouring tokens from the wrong authority, so it must never default there */
+/**
+ * A wrong trust anchor in production means honouring tokens from the wrong authority, so it must
+ * never default there. `isProduction()` keys the fail-fast on `APP_STAGE=prod` OR `NODE_ENV`, so a
+ * prod-staged box with `NODE_ENV` unset still aborts on a missing issuer or credential. The client
+ * secret is never hardcoded — it is required from the environment in every stage (a real assertion
+ * path is an accepted alternative), so a missing dev secret fails fast rather than trusting a
+ * committed placeholder.
+ */
 function resolveAuthOptions(): ResolvedAuthOptions {
-  const issuer = Config.get('auth.issuer') ?? (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'AUTH_ISSUER' not set`)) : DEV_ISSUER);
+  const production = isProduction();
+  const issuer = Config.get('auth.issuer') ?? (production ? throwError(AppError.internal(`Environment Variable 'AUTH_ISSUER' not set`)) : DEV_ISSUER);
   const audience = Config.get('auth.audience') ?? PULSE_AUDIENCE;
-  const clientId = Config.get('auth.client.id') ?? (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'AUTH_CLIENT_ID' not set`)) : DEV_CLIENT_ID);
+  const clientId = Config.get('auth.client.id') ?? (production ? throwError(AppError.internal(`Environment Variable 'AUTH_CLIENT_ID' not set`)) : DEV_CLIENT_ID);
   const assertionPath = Config.get('auth.client.assertion-path') || undefined;
-  let secret = Config.get('auth.client.secret') || undefined;
-  if (!secret && !assertionPath) {
-    if (Config.isProd()) throwError(AppError.internal(`Environment Variable 'AUTH_CLIENT_SECRET' or 'AUTH_CLIENT_ASSERTION_PATH' must be set`));
-    secret = DEV_CLIENT_SECRET;
-  }
+  const secret = Config.get('auth.client.secret') || undefined;
+  if (!secret && !assertionPath) throwError(AppError.internal(`Environment Variable 'AUTH_CLIENT_SECRET' or 'AUTH_CLIENT_ASSERTION_PATH' must be set`));
 
   const client: AuthClientCredential = { id: clientId, secret, assertionPath };
   return { issuer, audience, client, identityResource: Config.get('auth.identity-resource') };
@@ -70,9 +76,10 @@ function resolveRedirectUri(): string {
  * authorization-code flow. Development (and the test IdP) may fall back to the service client.
  */
 function resolveRelyingPartyClient(serviceClient: AuthClientCredential): AuthClientCredential {
+  const production = isProduction();
   const id = Config.get('app.client.id');
-  if (!id) return Config.isProd() ? throwError(AppError.internal(`Environment Variable 'APP_CLIENT_ID' not set`)) : serviceClient;
-  const secret = Config.get('app.client.secret') || (Config.isProd() ? throwError(AppError.internal(`Environment Variable 'APP_CLIENT_SECRET' not set`)) : undefined);
+  if (!id) return production ? throwError(AppError.internal(`Environment Variable 'APP_CLIENT_ID' not set`)) : serviceClient;
+  const secret = Config.get('app.client.secret') || (production ? throwError(AppError.internal(`Environment Variable 'APP_CLIENT_SECRET' not set`)) : undefined);
   return { id, secret };
 }
 

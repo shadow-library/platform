@@ -15,6 +15,7 @@ import { Get, HttpController, type HttpRequest, type HttpResponse, HttpStatus, P
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { isProduction } from '@server/common';
 import { APP_NAME } from '@server/constants';
 
 import { Public } from './public.decorator';
@@ -81,8 +82,9 @@ export class SessionController {
     private readonly relyingParty: RelyingParty,
   ) {}
 
+  /** Secure keys on the combined production signal (`APP_STAGE=prod` OR `NODE_ENV`), never `NODE_ENV` alone, so a prod-staged deployment always sets it; genuine local http dev stays cookie-usable */
   private cookieFlags(): { httpOnly: true; sameSite: 'lax'; secure: boolean } {
-    return { httpOnly: true, sameSite: 'lax', secure: Config.isProd() };
+    return { httpOnly: true, sameSite: 'lax', secure: isProduction() };
   }
 
   @Get('/login')
