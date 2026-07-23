@@ -45,7 +45,9 @@
     "@shadow-library/modules": "0.7.0-alpha.0",
     "ajv": "^8.17.1",
     "drizzle-orm": "^0.44.7",
+    "juice": "^12.1.1",
     "libphonenumber-js": "^1.12.33",
+    "liquidjs": "^10.27.2",
     "mustache": "^4.2.0",
     "reflect-metadata": "^0.2.2",
     "validator": "^13.15.26"
