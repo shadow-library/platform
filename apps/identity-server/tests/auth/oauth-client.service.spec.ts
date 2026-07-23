@@ -111,8 +111,8 @@ describe('OAuthClientService', () => {
 
   it('should register with an admin-chosen slug id', async () => {
     const app = await env.getService(ApplicationService).createApplication({ name: `slug-${Date.now()}`, subDomain: `slug-${Date.now()}` });
-    const { clientId } = await service.register({ id: 'pulse-server', applicationId: app.id, name: 'Pulse Server', kind: 'SERVICE', grantTypes: ['client_credentials'] });
-    expect(clientId).toBe('pulse-server');
+    const { clientId } = await service.register({ id: 'reporting-service', applicationId: app.id, name: 'Reporting Service', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    expect(clientId).toBe('reporting-service');
   });
 
   it('should refuse an exact workload subject already claimed by another client', async () => {

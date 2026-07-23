@@ -9,7 +9,7 @@ import { describe, expect, it } from 'bun:test';
 import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
-import { BootstrapService } from '@server/modules/bootstrap';
+import { BootstrapService, EcosystemSeedService } from '@server/modules/bootstrap';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
@@ -67,6 +67,7 @@ describe('BootstrapService', () => {
       env.getService(OAuthClientService),
       env.getService(PolicyDecisionService),
       env.getService(OrganisationService),
+      env.getService(EcosystemSeedService),
     );
     await bootstrap.onModuleInit();
 
@@ -78,17 +79,30 @@ describe('BootstrapService', () => {
 
     const organisations = (await env.getPostgresClient().select().from(schema.organisations)).filter(org => org.name === PLATFORM_ORG_NAME);
     expect(organisations).toHaveLength(1);
+
+    /** The pulse ecosystem seed is likewise idempotent — a re-run leaves exactly one pulse application. */
+    const pulseApps = (await env.getPostgresClient().select().from(schema.applications)).filter(app => app.name === 'pulse');
+    expect(pulseApps).toHaveLength(1);
   });
 
-  it('should not auto-provision any first-party consumer application or client (clean deployment)', async () => {
+  it('should seed the pulse application, its clients and the notification access rule', async () => {
     const applications = await env.getPostgresClient().select().from(schema.applications);
-    /** Only the identity platform itself may exist after a clean bootstrap — no pulse/novel-forge/webnovel. */
-    expect(applications.map(app => app.name)).toEqual(['shadow-identity']);
+    expect(applications.map(app => app.name).sort()).toEqual(['pulse', 'shadow-identity']);
 
+    const pulse = env.getService(ApplicationService).getApplication('pulse');
+    expect(pulse?.roles.map(role => role.roleName).sort()).toEqual(['PulseAdmin', 'PulseOperator', 'PulseViewer']);
+
+    /** The pulse relying party, the pulse service client, and identity's own outbound client. */
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients).toHaveLength(0);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'pulse', 'pulse-server']);
 
+    /** identity's outbound client must hold notifications:send, or NotificationTokenService cannot mint a token. */
+    const grantedScopes = await env.getService(OAuthClientService).getGrantedScopeNames('identity-server');
+    expect(grantedScopes).toContain('notifications:send');
+
+    /** pulse enforces deny-by-default, so identity's call to its notification API must be allow-listed. */
     const accessRules = await env.getPostgresClient().select().from(schema.serviceRouteAccess);
-    expect(accessRules).toHaveLength(0);
+    const notificationRule = accessRules.find(rule => rule.callerClientId === 'identity-server' && rule.pathPattern === '/api/v1/notifications');
+    expect(notificationRule?.method).toBe('POST');
   });
 });

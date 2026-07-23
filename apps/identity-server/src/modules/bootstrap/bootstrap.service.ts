@@ -17,6 +17,8 @@ import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
+import { EcosystemSeedService } from './ecosystem-seed.service';
+
 /**
  * Defining types
  */
@@ -47,9 +49,9 @@ const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
  * administrative role assignments, and a bootstrap administrator account. Runs on every boot and
  * is a no-op once the records exist, so it is safe under horizontal scaling and repeated restarts.
  *
- * Consumer ("first-party") applications — Novel Forge and the rest of the ecosystem — are NOT
- * seeded here: they are registered and configured by an administrator through the console, so a
- * clean deployment starts with only the identity platform itself and no pre-wired downstream apps.
+ * First-party ecosystem applications (currently pulse) are provisioned by {@link EcosystemSeedService},
+ * invoked as the final bootstrap step so it can rely on the platform application already existing; any
+ * other consumer application is registered by an administrator through the console.
  */
 @Injectable()
 export class BootstrapService implements OnModuleInit {
@@ -62,6 +64,7 @@ export class BootstrapService implements OnModuleInit {
     private readonly oauthClientService: OAuthClientService,
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly organisationService: OrganisationService,
+    private readonly ecosystemSeedService: EcosystemSeedService,
   ) {}
 
   async onModuleInit(): Promise<void> {
@@ -70,6 +73,8 @@ export class BootstrapService implements OnModuleInit {
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
     await this.ensureBootstrapAdmin(organisationId);
+    /** Runs last: the ecosystem seed provisions pulse and identity's outbound client on top of the platform records above. */
+    await this.ecosystemSeedService.seed();
   }
 
   /**
