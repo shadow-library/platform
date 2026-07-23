@@ -15,7 +15,26 @@ type TemplateVariantInsertModel = InferInsertModel<typeof schema.templateVariant
 
 /**
  * Declaring the constants
+ *
+ * EMAIL bodies are semantic HTML *fragments* — the branded, theme-aware shell (header, footer,
+ * design tokens) is applied at render time by `renderEmailDocument`, so each fragment only carries
+ * the message. SMS/PUSH bodies stay plain text. Mustache `{{var}}` tags are interpolated (and
+ * HTML-escaped) per request; the helpers below keep the recurring OTP/security shapes consistent.
  */
+
+/** One-time-code email: a heading, a line of context, the code block, and an expiry/ignore note. */
+const otpEmail = (heading: string, intro: string): string =>
+  `<h1 class="email-h1">${heading}</h1>
+<p class="email-text">${intro}</p>
+<div class="email-code">{{code}}</div>
+<p class="email-muted">This code expires in 10 minutes. If you didn't request it, you can safely ignore this email.</p>`;
+
+/** Security-alert email: a heading, the alert body, and a warning panel prompting action if unexpected. */
+const securityEmail = (heading: string, body: string, action = 'If this wasn’t you, secure your account and change your password right away.'): string =>
+  `<h1 class="email-h1">${heading}</h1>
+<p class="email-text">${body}</p>
+<div class="email-panel email-panel--warn">${action}</div>`;
+
 export const templateVariants: TemplateVariantInsertModel[] = [
   {
     id: 1n,
@@ -23,7 +42,9 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-US',
     subject: 'Welcome to Shadow',
-    body: 'Hi {{name}}, thanks for signing up!',
+    body: `<h1 class="email-h1">Welcome to Shadow, {{name}}</h1>
+<p class="email-text">Your account is ready. You now have a single secure identity across every Shadow app.</p>
+<p class="email-muted">We're glad to have you on board.</p>`,
     isActive: true,
   },
   {
@@ -40,7 +61,10 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-US',
     subject: 'Reset your password',
-    body: 'Click here to reset: {{resetLink}}',
+    body: `<h1 class="email-h1">Reset your password</h1>
+<p class="email-text">We received a request to reset your Shadow password. Click the button below to choose a new one.</p>
+<p><a class="email-btn" href="{{resetLink}}">Reset password</a></p>
+<p class="email-muted">If you didn't request this, you can safely ignore this email — your password won't change.</p>`,
     isActive: true,
   },
   {
@@ -49,7 +73,8 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-US',
     subject: 'Your weekly newsletter',
-    body: 'Latest updates and news.',
+    body: `<h1 class="email-h1">This week at Shadow</h1>
+<p class="email-text">Here are the latest updates, improvements, and news from across the Shadow ecosystem.</p>`,
     isActive: true,
   },
   {
@@ -67,7 +92,9 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Welcome to Shadow',
-    body: 'Hi {{name}}, thanks for signing up!',
+    body: `<h1 class="email-h1">Welcome to Shadow, {{name}}</h1>
+<p class="email-text">Your account is ready. You now have a single secure identity across every Shadow app.</p>
+<p class="email-muted">We're glad to have you on board.</p>`,
     isActive: true,
   },
   {
@@ -84,7 +111,10 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Reset your password',
-    body: 'Click here to reset: {{resetLink}}',
+    body: `<h1 class="email-h1">Reset your password</h1>
+<p class="email-text">We received a request to reset your Shadow password. Click the button below to choose a new one.</p>
+<p><a class="email-btn" href="{{resetLink}}">Reset password</a></p>
+<p class="email-muted">If you didn't request this, you can safely ignore this email — your password won't change.</p>`,
     isActive: true,
   },
   {
@@ -93,7 +123,8 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your weekly newsletter',
-    body: 'Latest updates and news.',
+    body: `<h1 class="email-h1">This week at Shadow</h1>
+<p class="email-text">Here are the latest updates, improvements, and news from across the Shadow ecosystem.</p>`,
     isActive: true,
   },
   {
@@ -113,7 +144,7 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your registration code',
-    body: 'Your Shadow registration code is {{code}}. It expires in 10 minutes. If you did not request this, you can ignore this email.',
+    body: otpEmail('Confirm your registration', 'Enter this code to finish creating your Shadow account:'),
     isActive: true,
   },
   {
@@ -130,7 +161,7 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your sign-in code',
-    body: 'Your Shadow sign-in code is {{code}}. It expires in 10 minutes. If you did not request this, please secure your account.',
+    body: otpEmail('Your sign-in code', 'Enter this code to finish signing in to your Shadow account:'),
     isActive: true,
   },
   {
@@ -147,7 +178,7 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your account recovery code',
-    body: 'Your Shadow account recovery code is {{code}}. It expires in 10 minutes. If you did not request this, you can ignore this email.',
+    body: otpEmail('Recover your account', 'Enter this code to continue recovering access to your Shadow account:'),
     isActive: true,
   },
   {
@@ -156,7 +187,7 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your password was changed',
-    body: 'The password for your Shadow account was changed from IP address {{ipAddress}}. If this was not you, reset your password immediately.',
+    body: securityEmail('Your password was changed', 'The password for your Shadow account was just changed from IP address <span class="email-strong">{{ipAddress}}</span>.'),
     isActive: true,
   },
   {
@@ -165,7 +196,9 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Two-factor authentication enabled',
-    body: 'Two-factor authentication using {{method}} was enabled on your Shadow account. If this was not you, review your account security.',
+    body: `<h1 class="email-h1">Two-factor authentication enabled</h1>
+<p class="email-text">Two-factor authentication using <span class="email-strong">{{method}}</span> was added to your Shadow account. Your account is now better protected.</p>
+<div class="email-panel">If you didn't enable this, review your account security and change your password immediately.</div>`,
     isActive: true,
   },
   {
@@ -174,7 +207,11 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Two-factor authentication disabled',
-    body: 'Two-factor authentication using {{method}} was disabled on your Shadow account. If this was not you, review your account security.',
+    body: securityEmail(
+      'Two-factor authentication disabled',
+      'Two-factor authentication using <span class="email-strong">{{method}}</span> was removed from your Shadow account. Your account is now less protected.',
+      'If you didn’t make this change, re-enable two-factor authentication and change your password right away.',
+    ),
     isActive: true,
   },
   {
@@ -183,7 +220,9 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'A recovery code was used',
-    body: 'A recovery code was used to access your Shadow account. You have {{remaining}} recovery codes remaining. If this was not you, review your account security.',
+    body: `<h1 class="email-h1">A recovery code was used</h1>
+<p class="email-text">One of your Shadow recovery codes was just used to access your account. You have <span class="email-strong">{{remaining}}</span> recovery codes remaining.</p>
+<div class="email-panel">Running low? Generate a fresh set of recovery codes from your security settings. If this wasn't you, secure your account immediately.</div>`,
     isActive: true,
   },
   {
@@ -192,7 +231,14 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'New sign-in to your account',
-    body: 'A new sign-in to your Shadow account was detected at {{time}} from IP address {{ipAddress}} using {{userAgent}}. If this was not you, secure your account immediately.',
+    body: `<h1 class="email-h1">New sign-in to your account</h1>
+<p class="email-text">We noticed a sign-in to your Shadow account from a device or location we haven't seen before.</p>
+<table class="email-meta" role="presentation" cellpadding="0" cellspacing="0">
+<tr><td class="email-meta-label">When</td><td>{{time}}</td></tr>
+<tr><td class="email-meta-label">IP address</td><td>{{ipAddress}}</td></tr>
+<tr><td class="email-meta-label">Device</td><td>{{userAgent}}</td></tr>
+</table>
+<div class="email-panel email-panel--warn">If this was you, no action is needed. If not, change your password and review your active sessions right away.</div>`,
     isActive: true,
   },
   {
@@ -201,7 +247,7 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Verify your email address',
-    body: 'Your Shadow email verification code is {{code}}. It expires in 10 minutes.',
+    body: otpEmail('Verify your email address', 'Enter this code to confirm this email address on your Shadow account:'),
     isActive: true,
   },
   {
@@ -218,7 +264,11 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your contact details were updated',
-    body: 'The {{type}} contact on your Shadow account was updated ({{action}}). If you did not make this change, review your account security.',
+    body: securityEmail(
+      'Your contact details were updated',
+      'A change was made to the <span class="email-strong">{{type}}</span> contact on your Shadow account ({{action}}).',
+      'If you didn’t make this change, secure your account and review your contact details right away.',
+    ),
     isActive: true,
   },
   {
@@ -227,7 +277,10 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'You have been invited to join {{organisationName}}',
-    body: 'You have been invited to join {{organisationName}} as {{role}}. Use the invitation code {{token}} to accept the invitation.',
+    body: `<h1 class="email-h1">You've been invited to {{organisationName}}</h1>
+<p class="email-text">You've been invited to join <span class="email-strong">{{organisationName}}</span> on Shadow as <span class="email-strong">{{role}}</span>. Use the invitation code below to accept:</p>
+<div class="email-code">{{token}}</div>
+<p class="email-muted">Enter this code when prompted to accept the invitation. If you weren't expecting this, you can ignore this email.</p>`,
     isActive: true,
   },
   {
@@ -236,7 +289,9 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'Your organisation role was changed',
-    body: 'Your role in the organisation has been changed to {{role}}.',
+    body: `<h1 class="email-h1">Your role was updated</h1>
+<p class="email-text">Your role in your organisation has been changed to <span class="email-strong">{{role}}</span>. This may change what you can see and do.</p>
+<p class="email-muted">If you have questions about this change, contact your organisation administrator.</p>`,
     isActive: true,
   },
   {
@@ -245,7 +300,9 @@ export const templateVariants: TemplateVariantInsertModel[] = [
     channel: 'EMAIL',
     locale: 'en-ZZ',
     subject: 'You were removed from an organisation',
-    body: 'Your membership in the organisation has been removed. If you believe this is a mistake, contact the organisation administrator.',
+    body: `<h1 class="email-h1">You were removed from an organisation</h1>
+<p class="email-text">Your membership in the organisation has been removed. You'll no longer have access to its resources on Shadow.</p>
+<p class="email-muted">If you believe this was a mistake, contact the organisation administrator.</p>`,
     isActive: true,
   },
 ];

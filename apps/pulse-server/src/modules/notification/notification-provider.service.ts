@@ -11,6 +11,7 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { Configuration, Notification, Template } from '@server/database';
 
+import { renderEmailDocument } from './email';
 import { DevNotificationProvider, EmailAddress, NotificationOpResult, SendEmailConfig, SendPushNotificationConfig, SendSMSConfig } from './providers';
 
 /**
@@ -44,8 +45,10 @@ export class NotificationProviderService {
     const fromEmail = this.parseEmailAddress(senderEndpoint.identifier);
     const payload: Record<string, any> = notificationJob.payload ?? {};
     const subject = mustache.render(templateVariant.subject ?? 'NA', payload);
+    /** Template bodies store a semantic content fragment; the branded, theme-aware shell is applied here so every email shares one design system. */
     const content = mustache.render(templateVariant.body, payload);
-    const config: SendEmailConfig = { to: [toEmail], from: fromEmail, subject, body: content, notificationId: notificationJob.id, payload: payload };
+    const html = renderEmailDocument({ contentHtml: content, preheader: subject });
+    const config: SendEmailConfig = { to: [toEmail], from: fromEmail, subject, body: html, notificationId: notificationJob.id, payload: payload };
 
     if (senderEndpoint.provider === 'DEV') return this.devProvider.sendEmail(config);
     else return { success: false, retriable: false, error: new Error('Not implemented') };

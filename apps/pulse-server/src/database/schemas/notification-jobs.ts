@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
+import { bigint, bigserial, index, jsonb, pgEnum, pgTable, smallint, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -66,7 +66,8 @@ export const notificationMessages = pgTable(
       .references(() => notificationJobs.id, { onDelete: 'cascade' }),
 
     renderedSubject: varchar('rendered_subject', { length: 255 }),
-    renderedBody: varchar('rendered_body', { length: 5000 }).notNull(),
+    /** Holds a fully rendered message body; email bodies are branded HTML documents that exceed any practical varchar cap, so this is unbounded text. */
+    renderedBody: text('rendered_body').notNull(),
 
     createdAt: timestamp('created_at').notNull().defaultNow(),
   },

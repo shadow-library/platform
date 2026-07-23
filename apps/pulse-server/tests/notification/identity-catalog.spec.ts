@@ -55,7 +55,7 @@ const IDENTITY_CATALOG: CatalogEntry[] = [
   { templateKey: 'auth.password.changed', channels: ['EMAIL'], payload: { ipAddress: '203.0.113.7' }, fragments: ['203.0.113.7'] },
   { templateKey: 'auth.mfa.enrolled', channels: ['EMAIL'], payload: { method: 'TOTP' }, fragments: ['TOTP'] },
   { templateKey: 'auth.mfa.disabled', channels: ['EMAIL'], payload: { method: 'WEBAUTHN' }, fragments: ['WEBAUTHN'] },
-  { templateKey: 'auth.mfa.recovery-code-used', channels: ['EMAIL'], payload: { remaining: 4 }, fragments: ['4 recovery codes'] },
+  { templateKey: 'auth.mfa.recovery-code-used', channels: ['EMAIL'], payload: { remaining: 4 }, fragments: ['4', 'recovery codes remaining'] },
   {
     templateKey: 'security.new-signin',
     channels: ['EMAIL'],

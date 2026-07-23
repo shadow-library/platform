@@ -17,6 +17,11 @@ import { TEST_REGEX, TestEnvironment } from '@tests/test-environment';
  */
 const testEnv = new TestEnvironment('template_variant_test');
 
+/** The seeded sign-up welcome email body (group 1, EMAIL) — a design-system content fragment, not plain text. */
+const SIGNUP_EMAIL_BODY = `<h1 class="email-h1">Welcome to Shadow, {{name}}</h1>
+<p class="email-text">Your account is ready. You now have a single secure identity across every Shadow app.</p>
+<p class="email-muted">We're glad to have you on board.</p>`;
+
 describe('Template Variant', () => {
   testEnv.init();
 
@@ -245,7 +250,7 @@ describe('Template Variant', () => {
             channel: 'EMAIL',
             locale: 'en-US',
             subject: 'Welcome to Shadow',
-            body: 'Hi {{name}}, thanks for signing up!',
+            body: SIGNUP_EMAIL_BODY,
             isActive: true,
             createdAt: expect.stringMatching(TEST_REGEX.dateISO),
             updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
@@ -255,7 +260,7 @@ describe('Template Variant', () => {
             channel: 'EMAIL',
             locale: 'en-ZZ',
             subject: 'Welcome to Shadow',
-            body: 'Hi {{name}}, thanks for signing up!',
+            body: SIGNUP_EMAIL_BODY,
             isActive: true,
             createdAt: expect.stringMatching(TEST_REGEX.dateISO),
             updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
@@ -358,7 +363,7 @@ describe('Template Variant', () => {
         channel: 'EMAIL',
         locale: 'en-US',
         subject: 'Welcome to Shadow',
-        body: 'Hi {{name}}, thanks for signing up!',
+        body: SIGNUP_EMAIL_BODY,
         isActive: true,
         createdAt: expect.stringMatching(TEST_REGEX.dateISO),
         updatedAt: expect.stringMatching(TEST_REGEX.dateISO),
