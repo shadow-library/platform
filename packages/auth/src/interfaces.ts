@@ -122,6 +122,13 @@ export interface AuthClientConfig {
    */
   roles?: RoleCatalogManifest;
 
+  /**
+   * Total time budget in milliseconds applied to every outbound request the client makes. On expiry the
+   * request is aborted; transport calls surface their path's failure error (e.g. `DISCOVERY_FAILED`), while
+   * `fetchService` surfaces the common package's retryable `API_REQUEST_TIMEOUT`. Unbounded when unset.
+   */
+  timeout?: number;
+
   /** Transport override, primarily for tests; defaults to global fetch */
   fetch?: FetchLike;
 }

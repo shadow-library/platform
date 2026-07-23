@@ -12,6 +12,7 @@ import { AuthCacheOptions, AuthClientCredential, FetchLike, JwtPayload } from '.
 import { DiscoveryClient } from '../lib/discovery';
 import { RemoteJwks } from '../lib/jwks';
 import { verifyJwt } from '../lib/jwt';
+import { assertValidTimeout, withTimeout } from '../lib/transport';
 import { createPkcePair, randomUrlSafeString } from './pkce';
 
 /**
@@ -26,6 +27,8 @@ export interface RelyingPartyConfig {
   scopes?: string[];
   clockSkewSeconds?: number;
   cache?: AuthCacheOptions;
+  /** Total time budget in milliseconds applied to every outbound request (discovery, JWKS, token exchange); unbounded when unset */
+  timeout?: number;
   fetch?: FetchLike;
 }
 
@@ -95,9 +98,10 @@ export class RelyingParty {
     if (!config.issuer || !URL.canParse(config.issuer)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'issuer must be a valid url' });
     if (!config.client?.id) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'client id is required' });
     if (!config.redirectUri || !URL.canParse(config.redirectUri)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'redirect uri must be a valid url' });
+    assertValidTimeout(config.timeout);
 
     this.issuer = config.issuer.replace(/\/+$/, '');
-    this.transport = config.fetch ?? ((url, init) => fetch(url, init));
+    this.transport = withTimeout(config.fetch ?? ((url, init) => fetch(url, init)), config.timeout);
     this.discovery = new DiscoveryClient(this.issuer, this.transport);
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
   }

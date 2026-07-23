@@ -26,6 +26,7 @@ import { RemoteJwks } from './jwks';
 import { type ClaimExpectations, verifyJwt } from './jwt';
 import { PdpClient } from './pdp-client';
 import { ServiceTokenManager } from './token-manager';
+import { assertValidTimeout, withTimeout } from './transport';
 
 /**
  * Defining types
@@ -67,6 +68,7 @@ export class AuthClient {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthClient.name);
   private readonly issuer: string;
   private readonly transport: FetchLike;
+  private readonly timeout?: number;
   private readonly clockSkewSeconds: number;
   private readonly jwks: RemoteJwks;
   private readonly tokens: ServiceTokenManager;
@@ -79,9 +81,11 @@ export class AuthClient {
     if (!config.audience) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'audience is required' });
     if (config.client && !config.client.id) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'client credentials require an id' });
     if ((config.clockSkewSeconds ?? 0) < 0) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'clock skew cannot be negative' });
+    assertValidTimeout(config.timeout);
 
     this.issuer = config.issuer.replace(/\/+$/, '');
-    this.transport = config.fetch ?? ((url, init) => fetch(url, init));
+    this.timeout = config.timeout;
+    this.transport = withTimeout(config.fetch ?? ((url, init) => fetch(url, init)), config.timeout);
     this.clockSkewSeconds = config.clockSkewSeconds ?? DEFAULT_CLOCK_SKEW_SECONDS;
     this.discovery = new DiscoveryClient(this.issuer, this.transport);
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
@@ -154,6 +158,7 @@ export class AuthClient {
                 ? APIRequest.delete(url)
                 : APIRequest.get(url);
       request.header('authorization', `Bearer ${bearer}`).suppressErrors();
+      if (this.timeout !== undefined) request.timeout(this.timeout);
       new Headers(init.headers).forEach((value, key) => key !== 'authorization' && request.header(key, value));
       if (init.body != null) request.body(typeof init.body === 'string' ? (JSON.parse(init.body) as object) : (init.body as object));
       return request.execute<T>();

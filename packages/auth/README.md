@@ -33,6 +33,16 @@ const response = await auth.fetchService('novel-forge', '/api/v1/books', {}, { r
 
 `fetchService` calls the service over the `svc://<name>/<path>` scheme, which APIRequest resolves to `http://<name>` (the in-cluster svc domain) by default; override per service with a `SERVICE_URL_<NAME>` env variable, or point a `svc://<name>.<namespace>/…` host at another namespace.
 
+### Request timeouts
+
+Pass `timeout` (milliseconds, also settable via `AUTH_TIMEOUT`) to bound **every** outbound request the client makes — discovery, JWKS, token minting, PDP checks, `fetch`, and `fetchService` — with one total time budget per attempt. A fresh budget is armed for each call, so the automatic 401 retry gets the full budget rather than sharing one clock. Transport calls surface their path's failure error (e.g. `DISCOVERY_FAILED`, `TOKEN_REQUEST_FAILED`) on expiry, while `fetchService` surfaces the common package's retryable `API_REQUEST_TIMEOUT` (504). Left unset, requests are unbounded.
+
+```ts
+const auth = new AuthClient({ issuer, audience, client, timeout: 5000 }); // abort any request that runs longer than 5s
+```
+
+`RelyingParty` takes the same `timeout` option, bounding its discovery, JWKS, and token-exchange calls.
+
 ## Framework guards
 
 ```ts
