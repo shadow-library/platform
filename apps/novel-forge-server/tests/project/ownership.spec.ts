@@ -51,7 +51,11 @@ const testEnv = new TestEnvironment('ownership_test');
 describe.if(pgAvailable)('Project ownership (BOLA)', () => {
   testEnv.init();
 
-  const asUser = (token: string) => testEnv.getRouter({ authenticated: false }).mockRequest().headers({ authorization: `Bearer ${token}` });
+  const asUser = (token: string) =>
+    testEnv
+      .getRouter({ authenticated: false })
+      .mockRequest()
+      .headers({ authorization: `Bearer ${token}` });
   const asAlice = () => asUser(aliceToken);
   const asBob = () => asUser(bobToken);
 
@@ -70,7 +74,7 @@ describe.if(pgAvailable)('Project ownership (BOLA)', () => {
   });
 
   describe('GET /api/v1/projects', () => {
-    it('should return only the caller\'s own projects', async () => {
+    it("should return only the caller's own projects", async () => {
       const aliceId = await createProjectAs(aliceToken, 'alice-list');
       const bobId = await createProjectAs(bobToken, 'bob-list');
 
@@ -83,7 +87,7 @@ describe.if(pgAvailable)('Project ownership (BOLA)', () => {
   });
 
   describe('project-scoped routes as a non-owner', () => {
-    it('should answer 404 for GET/PATCH/DELETE on another user\'s project', async () => {
+    it("should answer 404 for GET/PATCH/DELETE on another user's project", async () => {
       const aliceId = await createProjectAs(aliceToken, 'alice-crud');
 
       const get = await asBob().get(`/api/v1/projects/${aliceId}`);
@@ -96,7 +100,7 @@ describe.if(pgAvailable)('Project ownership (BOLA)', () => {
       expect(del.statusCode).toBe(404);
     });
 
-    it('should answer 404 for a nested route on another user\'s project', async () => {
+    it("should answer 404 for a nested route on another user's project", async () => {
       const aliceId = await createProjectAs(aliceToken, 'alice-nested');
       const nested = await asBob().get(`/api/v1/projects/${aliceId}/entities`);
       expect(nested.statusCode).toBe(404);
@@ -104,7 +108,7 @@ describe.if(pgAvailable)('Project ownership (BOLA)', () => {
   });
 
   describe('GET /api/v1/jobs/:jobId', () => {
-    it('should answer 404 when the job belongs to another user\'s project', async () => {
+    it("should answer 404 when the job belongs to another user's project", async () => {
       const aliceId = await createProjectAs(aliceToken, 'alice-job');
       const [job] = await testEnv
         .getPostgresClient()

@@ -5,11 +5,11 @@
 /**
  * Importing npm packages
  */
+import { eq } from 'drizzle-orm';
 import { type HandlerMetadata } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService, type HttpRequest, Middleware, type RouteHandler } from '@shadow-library/fastify';
 import { DatabaseService } from '@shadow-library/modules';
-import { eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
