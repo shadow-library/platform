@@ -20,6 +20,7 @@ declare module '@shadow-library/common' {
     'auth.client.id': string;
     'auth.client.secret': string;
     'auth.client.assertion-path': string;
+    'auth.timeout': number;
   }
 }
 
@@ -32,13 +33,15 @@ export type AuthModuleOptions = Partial<AuthClientConfig>;
  * Deploys configure the SDK through the environment instead of code: `AUTH_ISSUER` and
  * `AUTH_AUDIENCE` identify the issuer and this service's API resource, while the client either
  * presents a static secret (`AUTH_CLIENT_SECRET`) or — preferred inside Kubernetes — a projected
- * service-account token whose file path is `AUTH_CLIENT_ASSERTION_PATH`.
+ * service-account token whose file path is `AUTH_CLIENT_ASSERTION_PATH`. `AUTH_TIMEOUT` optionally
+ * bounds every outbound request to a total time budget in milliseconds.
  */
 Config.load('auth.issuer');
 Config.load('auth.audience');
 Config.load('auth.client.id');
 Config.load('auth.client.secret');
 Config.load('auth.client.assertion-path');
+Config.load('auth.timeout', { validateType: 'number' });
 
 /** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */
 export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthClientConfig {
@@ -51,5 +54,7 @@ export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthCl
     client = { id: clientId, secret: Config.get('auth.client.secret') || undefined, assertionPath: Config.get('auth.client.assertion-path') || undefined };
   }
 
-  return { ...options, issuer, audience, client };
+  const timeout = options.timeout ?? Config.get('auth.timeout');
+
+  return { ...options, issuer, audience, client, timeout };
 }

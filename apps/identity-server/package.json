@@ -44,7 +44,7 @@
     "@peculiar/x509": "^2.0.0",
     "@shadow-library/app": "2.0.0-alpha.0",
     "@shadow-library/class-schema": "0.5.0-alpha.0",
-    "@shadow-library/common": "2.0.0-alpha.2",
+    "@shadow-library/common": "^2.0.0-alpha.4",
     "@shadow-library/fastify": "2.0.0-alpha.0",
     "@shadow-library/modules": "0.7.0-alpha.0",
     "@simplewebauthn/server": "^13.3.2",
