@@ -24,9 +24,12 @@ CREATE TYPE "public"."refinement_proposal_status" AS ENUM('pending', 'applied', 
 CREATE TYPE "public"."rebrand_conversion_status" AS ENUM('converted', 'attention', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."rebrand_glossary_category" AS ENUM('character', 'place', 'country', 'culture', 'faction', 'technique', 'item', 'term');--> statement-breakpoint
 CREATE TYPE "public"."rebrand_status" AS ENUM('pending', 'ingesting', 'glossary', 'converting', 'done', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."reforge_chapter_status" AS ENUM('reforged', 'attention', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."reforge_fidelity" AS ENUM('preserve', 'close', 'loose');--> statement-breakpoint
+CREATE TYPE "public"."reforge_status" AS ENUM('pending', 'ingesting', 'glossary', 'reforging', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."chapter_publication_status" AS ENUM('scheduled', 'published', 'failed', 'unpublished');--> statement-breakpoint
 CREATE TYPE "public"."publication_status" AS ENUM('draft', 'live', 'retired');--> statement-breakpoint
-CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume', 'rebrand', 'publish');--> statement-breakpoint
+CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume', 'rebrand', 'reforge', 'publish');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('pending', 'in_progress', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."validation_scope" AS ENUM('novel', 'chapter');--> statement-breakpoint
 CREATE TYPE "public"."draft_revision_source" AS ENUM('generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited');--> statement-breakpoint
@@ -497,6 +500,40 @@ CREATE TABLE "rebrands" (
 	CONSTRAINT "rebrands_project_id_unique" UNIQUE("project_id")
 );
 --> statement-breakpoint
+CREATE TABLE "chapter_reforges" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"chapter" integer NOT NULL,
+	"title" varchar(500),
+	"body" text NOT NULL,
+	"summary" text,
+	"source_beats" jsonb,
+	"changes" jsonb,
+	"fidelity" jsonb,
+	"carry_state" jsonb,
+	"status" "reforge_chapter_status" NOT NULL,
+	"issues" jsonb,
+	"word_count" integer,
+	"run_id" uuid,
+	"revision" integer DEFAULT 1 NOT NULL,
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "chapter_reforges_project_id_chapter_unique" UNIQUE("project_id","chapter")
+);
+--> statement-breakpoint
+CREATE TABLE "reforges" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"project_id" bigint NOT NULL,
+	"status" "reforge_status" DEFAULT 'pending' NOT NULL,
+	"instructions" text,
+	"fidelity" "reforge_fidelity" DEFAULT 'preserve' NOT NULL,
+	"settings" jsonb,
+	"last_error" varchar(2000),
+	"created_at" timestamp DEFAULT now() NOT NULL,
+	"updated_at" timestamp DEFAULT now() NOT NULL,
+	CONSTRAINT "reforges_project_id_unique" UNIQUE("project_id")
+);
+--> statement-breakpoint
 CREATE TABLE "chapter_publications" (
 	"id" bigserial PRIMARY KEY NOT NULL,
 	"project_id" bigint NOT NULL,
@@ -732,6 +769,8 @@ ALTER TABLE "refinement_proposals" ADD CONSTRAINT "refinement_proposals_session_
 ALTER TABLE "chapter_conversions" ADD CONSTRAINT "chapter_conversions_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rebrand_glossary" ADD CONSTRAINT "rebrand_glossary_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "rebrands" ADD CONSTRAINT "rebrands_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "chapter_reforges" ADD CONSTRAINT "chapter_reforges_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "reforges" ADD CONSTRAINT "reforges_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapter_publications" ADD CONSTRAINT "chapter_publications_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "publications" ADD CONSTRAINT "publications_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "jobs" ADD CONSTRAINT "jobs_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -762,6 +801,7 @@ CREATE INDEX "refinement_proposals_session_id_idx" ON "refinement_proposals" USI
 CREATE INDEX "refinement_proposals_project_id_scope_status_idx" ON "refinement_proposals" USING btree ("project_id","scope_type","scope_ref","status");--> statement-breakpoint
 CREATE INDEX "chapter_conversions_project_id_status_idx" ON "chapter_conversions" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "rebrand_glossary_project_id_category_idx" ON "rebrand_glossary" USING btree ("project_id","category");--> statement-breakpoint
+CREATE INDEX "chapter_reforges_project_id_status_idx" ON "chapter_reforges" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "chapter_publications_project_id_status_idx" ON "chapter_publications" USING btree ("project_id","status");--> statement-breakpoint
 CREATE INDEX "chapter_publications_project_id_chapter_idx" ON "chapter_publications" USING btree ("project_id","chapter");--> statement-breakpoint
 CREATE INDEX "extraction_runs_project_id_chapter_idx" ON "extraction_runs" USING btree ("project_id","chapter");--> statement-breakpoint

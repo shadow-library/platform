@@ -19,6 +19,7 @@ Backend service for an AI-powered novel generation platform: story bible, world/
 - `docs/plan-import-design.md` — offline plan authoring: the `novel-plan-forge` skill's markdown workspace + JSON bundle contract, transactional `plan/import` endpoint with overwrite/approve semantics; drives tasks PI1–PI3.
 - `docs/character-knowledge-design.md` — epistemic filtering: `canon_facts` + `character_knowledge` ledger, per-brief `knowledgeContract`, POV-filtered generation context, judge `knowledgeCompliance` + leak pre-scan. **Adds Appendix A rule 15** (its §2); drives tasks CK1–CK5.
 - `docs/reader-publish-design.md` — the reader boundary: `publications`/`chapter_publications` ledger, one-way idempotent push to the external `novel-forge-reader` service, stable `publishedOrdinal`, reconcile/rebuild semantics, hard rules (its §9); drives tasks PB1–PB5.
+- `docs/reforge-pipeline-design.md` — the re-authoring pipeline: reuses the rebrand rename bible, then extracts a faithful per-chapter outline and re-writes each chapter in the house style (elevating machine-translation prose), with a fidelity judge + deterministic residue scan and flag-and-continue semantics; drives tasks RF1–RF6.
 
 Read the doc section referenced by the current task before writing code; do not re-design what the docs already decide.
 
@@ -118,5 +119,11 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] PB3 — Push executor & reconciliation: `publish` job kind, bearer-auth HTTP client, ledger-as-outbox retry + janitor sweep, manifest-diff `reconcile` endpoint (reader-publish §5–6). Verify: mocked reader-service e2e, retry idempotence, wipe-and-rebuild convergence test.
 - [x] PB4 — Web UI (`novel-forge-web`): publish panel — novel metadata editor, per-chapter publish/schedule/republish/unpublish with ledger status chips, reconcile action (reader-publish §7). Verify: web type-check/lint/build green.
 - [ ] PB5 — Reader service (external repo `novel-forge-reader`): scaffold per reader-publish §8 — internal upsert/manifest API, public catalog/chapter/progress API, ETag-first caching. Verify: forge e2e publish → read round-trip against the local reader service.
+- [x] RF1 — Reforge schema & error codes: `reforges` + `chapter_reforges` tables, `reforge_status`/`reforge_chapter_status`/`reforge_fidelity` enums, `job_kind` +`reforge`, `REF_` codes, baseline migration regen, design doc (reforge §3). Verify: migration applies to template DB, schema tests green.
+- [ ] RF2 — Reforge prompt modules: `AiRole 'reforge'`, `reforge-outline`/`reforge-write` (role reforge) + `reforge-judge` (role judge) prompts + class-schema outputs, registry entries, render goldens (reforge §4). Verify: prompt suite green.
+- [ ] RF3 — Reforge context purposes: `forReforgeOutline` + `forReforge` packs, `REFORGE_OUTLINE_BUDGET`/`REFORGE_BUDGET`, stable/volatile split (reforge §5). Verify: assembler tests — stable segment byte-identical across assemblies with unchanged canon.
+- [ ] RF4 — Chapter-reforge graph: outline → write → residueScan → judge with single-repair routing (`routeAfterJudge`), `sourceBeats` persistence, `runChapterReforge` (reforge §6). Verify: route matrix + mocked-router graph runs.
+- [ ] RF5 — Reforge job & endpoints: three-phase `runReforge` executor (flag-and-continue, reuses acquire/recombine/seedGlossary), reforge controller/DTOs wired via `PipelineModule`, `ReforgeModule → RebrandModule` reuse (reforge §7). Verify: executor + controller e2e tests.
+- [ ] RF6 — Web UI (`novel-forge-web`): reforge panel — config (instructions, fidelity, judge toggle), start + progress, chapter status list, source/reforged reader toggle, re-run, manuscript download (reforge §8). Verify: web type-check/build green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

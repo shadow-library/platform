@@ -1,5 +1,5 @@
 {
-  "id": "da4a6bf1-bed7-4f75-bf87-b82e7e360dcb",
+  "id": "4c046f1d-d0db-4a67-b222-8e6482bb3014",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -3668,6 +3668,265 @@
       "checkConstraints": {},
       "isRLSEnabled": false
     },
+    "public.chapter_reforges": {
+      "name": "chapter_reforges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "chapter": {
+          "name": "chapter",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "title": {
+          "name": "title",
+          "type": "varchar(500)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "body": {
+          "name": "body",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "summary": {
+          "name": "summary",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "source_beats": {
+          "name": "source_beats",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "changes": {
+          "name": "changes",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fidelity": {
+          "name": "fidelity",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "carry_state": {
+          "name": "carry_state",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "status": {
+          "name": "status",
+          "type": "reforge_chapter_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "issues": {
+          "name": "issues",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "word_count": {
+          "name": "word_count",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "run_id": {
+          "name": "run_id",
+          "type": "uuid",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "revision": {
+          "name": "revision",
+          "type": "integer",
+          "primaryKey": false,
+          "notNull": true,
+          "default": 1
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "chapter_reforges_project_id_status_idx": {
+          "name": "chapter_reforges_project_id_status_idx",
+          "columns": [
+            {
+              "expression": "project_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "status",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "chapter_reforges_project_id_projects_id_fk": {
+          "name": "chapter_reforges_project_id_projects_id_fk",
+          "tableFrom": "chapter_reforges",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "chapter_reforges_project_id_chapter_unique": {
+          "name": "chapter_reforges_project_id_chapter_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id",
+            "chapter"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.reforges": {
+      "name": "reforges",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "project_id": {
+          "name": "project_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "status": {
+          "name": "status",
+          "type": "reforge_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'pending'"
+        },
+        "instructions": {
+          "name": "instructions",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "fidelity": {
+          "name": "fidelity",
+          "type": "reforge_fidelity",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'preserve'"
+        },
+        "settings": {
+          "name": "settings",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "last_error": {
+          "name": "last_error",
+          "type": "varchar(2000)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "reforges_project_id_projects_id_fk": {
+          "name": "reforges_project_id_projects_id_fk",
+          "tableFrom": "reforges",
+          "tableTo": "projects",
+          "columnsFrom": [
+            "project_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "reforges_project_id_unique": {
+          "name": "reforges_project_id_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "project_id"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.chapter_publications": {
       "name": "chapter_publications",
       "schema": "",
@@ -5617,6 +5876,36 @@
         "failed"
       ]
     },
+    "public.reforge_chapter_status": {
+      "name": "reforge_chapter_status",
+      "schema": "public",
+      "values": [
+        "reforged",
+        "attention",
+        "failed"
+      ]
+    },
+    "public.reforge_fidelity": {
+      "name": "reforge_fidelity",
+      "schema": "public",
+      "values": [
+        "preserve",
+        "close",
+        "loose"
+      ]
+    },
+    "public.reforge_status": {
+      "name": "reforge_status",
+      "schema": "public",
+      "values": [
+        "pending",
+        "ingesting",
+        "glossary",
+        "reforging",
+        "done",
+        "failed"
+      ]
+    },
     "public.chapter_publication_status": {
       "name": "chapter_publication_status",
       "schema": "public",
@@ -5647,6 +5936,7 @@
         "backfill",
         "resume",
         "rebrand",
+        "reforge",
         "publish"
       ]
     },

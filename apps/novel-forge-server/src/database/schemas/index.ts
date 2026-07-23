@@ -27,6 +27,7 @@ export * from './bible';
 export * from './generation';
 export * from './refinement';
 export * from './rebrand';
+export * from './reforge';
 export * from './publishing';
 export * from './jobs';
 export * from './vectors';

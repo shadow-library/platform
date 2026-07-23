@@ -144,6 +144,13 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly RBR_003 = AppErrorCode.badRequest('RBR_003', 'Rebrand is only available for source projects');
 
   /*!
+   * Reforge Errors
+   */
+  static readonly REF_001 = AppErrorCode.notFound('REF_001', 'Reforge is not configured for this project');
+  static readonly REF_002 = AppErrorCode.notFound('REF_002', 'Reforged chapter not found');
+  static readonly REF_003 = AppErrorCode.badRequest('REF_003', 'Reforge is only available for source projects');
+
+  /*!
    * Context Errors
    */
   static readonly CTX_001 = AppErrorCode.notFound('CTX_001', 'No context pack is linked to this run');
