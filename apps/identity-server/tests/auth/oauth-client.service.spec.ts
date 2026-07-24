@@ -105,7 +105,9 @@ describe('OAuthClientService', () => {
   });
 
   it('should reject a reserved or malformed client id slug', async () => {
-    await expect(service.register({ id: 'shadow-identity', applicationId, name: 'Reserved', kind: 'SERVICE', grantTypes: ['client_credentials'] })).rejects.toMatchObject({ code: 'ADM_006' });
+    await expect(service.register({ id: 'shadow-identity', applicationId, name: 'Reserved', kind: 'SERVICE', grantTypes: ['client_credentials'] })).rejects.toMatchObject({
+      code: 'ADM_006',
+    });
     await expect(service.register({ id: 'Bad_Id', applicationId, name: 'Bad', kind: 'SERVICE', grantTypes: ['client_credentials'] })).rejects.toMatchObject({ code: 'ADM_006' });
   });
 
@@ -127,11 +129,24 @@ describe('OAuthClientService', () => {
     const app = await env.getService(ApplicationService).createApplication({ name: `shared-${Date.now()}`, subDomain: `shared-${Date.now()}` });
     const web = 'system:serviceaccount:web-ns:app-web';
     const server = 'system:serviceaccount:web-ns:app-server';
-    const { clientId } = await service.register({ id: 'shared-app', applicationId: app.id, name: 'Shared', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [web, server] });
+    const { clientId } = await service.register({
+      id: 'shared-app',
+      applicationId: app.id,
+      name: 'Shared',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+      workloadSubjects: [web, server],
+    });
     expect((await service.resolveClientBySubject(web))?.id).toBe(clientId);
     expect((await service.resolveClientBySubject(server))?.id).toBe(clientId);
 
-    const patterned = await service.register({ applicationId: app.id, name: 'Patterned', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: ['system:serviceaccount:fleet:*'] });
+    const patterned = await service.register({
+      applicationId: app.id,
+      name: 'Patterned',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+      workloadSubjects: ['system:serviceaccount:fleet:*'],
+    });
     const client = await service.getClient(patterned.clientId);
     if (!client) throw new Error('client not found');
     expect(service.subjectMatchesClient(client, 'system:serviceaccount:fleet:anything')).toBe(true);

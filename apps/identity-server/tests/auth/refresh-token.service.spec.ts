@@ -107,7 +107,9 @@ describe('RefreshTokenService', () => {
     expect(rejected).toHaveLength(1);
 
     /** Exactly one ACTIVE successor exists — the reuse-detection invariant (one live token per family) holds under the race. */
-    const active = (await env.getPostgresClient().select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, first.familyId))).filter(token => token.status === 'ACTIVE');
+    const active = (await env.getPostgresClient().select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, first.familyId))).filter(
+      token => token.status === 'ACTIVE',
+    );
     expect(active).toHaveLength(1);
   });
 

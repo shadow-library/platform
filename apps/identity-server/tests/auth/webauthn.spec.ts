@@ -185,7 +185,9 @@ describe('WebAuthn passkeys', () => {
 
     it("should reject another user's passkey for step-up", async () => {
       await registerPasskey();
-      const other = await env.getService(UserService).createUserWithPassword({ email: 'other-stepup@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
+      const other = await env
+        .getService(UserService)
+        .createUserWithPassword({ email: 'other-stepup@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
       const otherSession = (await env.getService(SessionService).create({ userId: other.id })).secret;
       const otherEmulator = await new WebauthnEmulator(RP_ID, ORIGIN).init();
       await registerPasskey(otherSession, otherEmulator);

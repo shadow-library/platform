@@ -243,7 +243,14 @@ export class OrganisationService {
   /** Members flattened for the member-management surface, with native id/date the serializer converts. */
   async listMemberItems(organisationId: bigint): Promise<MemberListItem[]> {
     const members = await this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.organisationId, organisationId) });
-    return Promise.all(members.map(async member => ({ userId: member.userId, role: member.role, email: (await this.getPrimaryVerifiedEmail(member.userId)) ?? undefined, joinedAt: member.joinedAt })));
+    return Promise.all(
+      members.map(async member => ({
+        userId: member.userId,
+        role: member.role,
+        email: (await this.getPrimaryVerifiedEmail(member.userId)) ?? undefined,
+        joinedAt: member.joinedAt,
+      })),
+    );
   }
 
   /**
@@ -272,7 +279,8 @@ export class OrganisationService {
     const target = await this.getMembership(targetUserId, organisationId);
     if (!target) throw AppErrorCode.USR_001.create();
     if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
-    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || caller.session.aal !== 'AAL2')) throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
+    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || caller.session.aal !== 'AAL2'))
+      throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
     if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
 
     await this.removeMember(organisationId, targetUserId);

@@ -118,7 +118,13 @@ describe('Admin application API', () => {
     const created = await request('post', '/api/v1/admin/applications').body({ name, subDomain: 'withclient' });
     const { id } = created.json() as { id: number };
 
-    const client = await request('post', '/api/v1/admin/clients').body({ clientId: 'app-svc', applicationId: id, name: 'svc', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const client = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'app-svc',
+      applicationId: id,
+      name: 'svc',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+    });
     expect(client.statusCode).toBe(201);
 
     const removed = await request('delete', `/api/v1/admin/applications/${id}`);
@@ -169,7 +175,9 @@ describe('Admin application API', () => {
     const created = await request('post', '/api/v1/admin/applications').body({ name: uniqueName('pulse'), subDomain: 'pulse', displayName: 'Pulse' });
     expect(created.statusCode).toBe(201);
     const { id } = created.json() as { id: number };
-    await env.getService(OAuthClientService).register({ applicationId: id, name: 'pulse-rp', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code', 'refresh_token'], redirectUris: [] });
+    await env
+      .getService(OAuthClientService)
+      .register({ applicationId: id, name: 'pulse-rp', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code', 'refresh_token'], redirectUris: [] });
 
     /** Two spellings of the same origin must collapse to one, not collide into a duplicate redirect URI. */
     const updated = await request('patch', `/api/v1/admin/applications/${id}`).body({ publicUrls: ['https://pulse.example.com', 'https://pulse.example.com/'] });

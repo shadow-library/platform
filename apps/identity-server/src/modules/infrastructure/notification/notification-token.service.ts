@@ -71,7 +71,14 @@ export class NotificationTokenService {
       .select({ id: schema.oauthClients.id, accessTokenTtl: schema.oauthClients.accessTokenTtl })
       .from(schema.oauthClients)
       .innerJoin(schema.applications, eq(schema.oauthClients.applicationId, schema.applications.id))
-      .where(and(eq(schema.applications.name, APP_NAME), eq(schema.oauthClients.name, SERVICE_CLIENT_NAME), eq(schema.oauthClients.kind, 'SERVICE'), eq(schema.oauthClients.isActive, true)));
+      .where(
+        and(
+          eq(schema.applications.name, APP_NAME),
+          eq(schema.oauthClients.name, SERVICE_CLIENT_NAME),
+          eq(schema.oauthClients.kind, 'SERVICE'),
+          eq(schema.oauthClients.isActive, true),
+        ),
+      );
     if (!client) throw AppError.internal(`Service client '${SERVICE_CLIENT_NAME}' is not provisioned`);
 
     const grants = await this.db

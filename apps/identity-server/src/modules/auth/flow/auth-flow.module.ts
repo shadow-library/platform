@@ -56,7 +56,17 @@ import { SuspiciousLoginService } from './suspicious-login.service';
     OrganisationModule,
   ],
   controllers: [AuthController, MeSessionsController, FederatedController],
-  providers: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService, MeSessionsService],
+  providers: [
+    AuthFlowService,
+    SignInEventService,
+    ChallengeService,
+    ChallengeFlowService,
+    SuspiciousLoginService,
+    LoginService,
+    RegistrationService,
+    RecoveryService,
+    MeSessionsService,
+  ],
   exports: [AuthFlowService, SignInEventService, ChallengeService, ChallengeFlowService, SuspiciousLoginService, LoginService, RegistrationService, RecoveryService],
 })
 export class AuthFlowModule {}

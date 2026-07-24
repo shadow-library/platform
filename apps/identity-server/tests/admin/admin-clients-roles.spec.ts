@@ -75,15 +75,33 @@ describe('Admin client, resource and role APIs', () => {
   });
 
   it('should reject unknown grant types and unknown applications', async () => {
-    const badGrant = await request('post', '/api/v1/admin/clients').body({ clientId: 'bad-grant', applicationId: platformAppId, name: 'X', kind: 'SERVICE', grantTypes: ['implicit'] });
+    const badGrant = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'bad-grant',
+      applicationId: platformAppId,
+      name: 'X',
+      kind: 'SERVICE',
+      grantTypes: ['implicit'],
+    });
     expect(badGrant.statusCode).toBe(400);
 
-    const badApp = await request('post', '/api/v1/admin/clients').body({ clientId: 'bad-app', applicationId: 999999, name: 'X', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const badApp = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'bad-app',
+      applicationId: 999999,
+      name: 'X',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+    });
     expect(badApp.statusCode).toBe(404);
   });
 
   it('should rotate a secret with an overlap window where both secrets verify', async () => {
-    const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'rotator', applicationId: platformAppId, name: 'Rotator', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const created = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'rotator',
+      applicationId: platformAppId,
+      name: 'Rotator',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+    });
     const { clientId, secret: oldSecret } = created.json() as { clientId: string; secret: string };
 
     const rotated = await request('post', `/api/v1/admin/clients/${clientId}/rotate-secret`);
@@ -115,7 +133,13 @@ describe('Admin client, resource and role APIs', () => {
   });
 
   it('should update the client name and active state', async () => {
-    const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'before-after', applicationId: platformAppId, name: 'Before', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const created = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'before-after',
+      applicationId: platformAppId,
+      name: 'Before',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+    });
     const { clientId } = created.json() as { clientId: string };
 
     const updated = await request('patch', `/api/v1/admin/clients/${clientId}`).body({ name: 'After', isActive: false });
@@ -176,7 +200,12 @@ describe('Admin client, resource and role APIs', () => {
 
       expect(await db.select().from(schema.consents).where(eq(schema.consents.clientId, clientId))).toHaveLength(0);
       expect(await db.select().from(schema.refreshTokenFamilies).where(eq(schema.refreshTokenFamilies.clientId, clientId))).toHaveLength(0);
-      expect(await db.select().from(schema.refreshTokens).where(eq(schema.refreshTokens.familyId, family?.id ?? ''))).toHaveLength(0);
+      expect(
+        await db
+          .select()
+          .from(schema.refreshTokens)
+          .where(eq(schema.refreshTokens.familyId, family?.id ?? '')),
+      ).toHaveLength(0);
     });
 
     it('should delete a first-party client too (deletion is name-confirmed, not carved out)', async () => {
@@ -197,7 +226,13 @@ describe('Admin client, resource and role APIs', () => {
     });
 
     it('should require a stepped-up session to delete a client', async () => {
-      const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'guarded', applicationId: platformAppId, name: 'Guarded', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+      const created = await request('post', '/api/v1/admin/clients').body({
+        clientId: 'guarded',
+        applicationId: platformAppId,
+        name: 'Guarded',
+        kind: 'SERVICE',
+        grantTypes: ['client_credentials'],
+      });
       const { clientId } = created.json() as { clientId: string };
 
       const aal1 = (await env.getService(SessionService).create({ userId: adminUserId })).secret;
@@ -215,7 +250,13 @@ describe('Admin client, resource and role APIs', () => {
     expect(scope.statusCode).toBe(201);
     const { id: scopeId } = scope.json() as { id: string };
 
-    const created = await request('post', '/api/v1/admin/clients').body({ clientId: 'scoped', applicationId: platformAppId, name: 'Scoped', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    const created = await request('post', '/api/v1/admin/clients').body({
+      clientId: 'scoped',
+      applicationId: platformAppId,
+      name: 'Scoped',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+    });
     const { clientId } = created.json() as { clientId: string };
 
     const granted = await request('post', `/api/v1/admin/clients/${clientId}/scopes`).body({ scopeId });

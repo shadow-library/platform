@@ -133,7 +133,9 @@ describe('workload identity client authentication', () => {
   it('should not let one workload impersonate another (per-subject binding)', async () => {
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
     const otherSubject = 'system:serviceaccount:prod:novel-forge-server';
-    const other = await env.getService(OAuthClientService).register({ applicationId, name: 'Forge Workload', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [otherSubject] });
+    const other = await env
+      .getService(OAuthClientService)
+      .register({ applicationId, name: 'Forge Workload', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [otherSubject] });
 
     /** pulse's SA token resolves to pulse's client only... */
     const asPulse = await requestToken(await signSaToken(saClaims()));
@@ -169,9 +171,14 @@ describe('workload identity client authentication', () => {
   /** A namespace pattern matches only with an explicit client_id; subject-only resolution stays exact. */
   it('should honour a namespace pattern with an explicit client_id but not by subject alone', async () => {
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
-    const pattern = await env
-      .getService(OAuthClientService)
-      .register({ id: 'staging-fleet', applicationId, name: 'Staging Fleet', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: ['system:serviceaccount:staging:*'] });
+    const pattern = await env.getService(OAuthClientService).register({
+      id: 'staging-fleet',
+      applicationId,
+      name: 'Staging Fleet',
+      kind: 'SERVICE',
+      grantTypes: ['client_credentials'],
+      workloadSubjects: ['system:serviceaccount:staging:*'],
+    });
     const token = await signSaToken(saClaims({ sub: 'system:serviceaccount:staging:api' }));
 
     /** Named client + covered subject → minted. */

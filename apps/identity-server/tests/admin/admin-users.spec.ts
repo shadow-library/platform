@@ -126,11 +126,7 @@ describe('Admin user lifecycle APIs', () => {
     expect(attempt.json()).toMatchObject({ status: 'AWAITING_PASSWORD_RESET' });
 
     /** The inline current+new password step rotates the credential and completes the sign-in — no recovery code. */
-    const reset = await env
-      .getRouter()
-      .mockRequest()
-      .post('/api/v1/auth/login/reset-password')
-      .body({ flowId, currentPassword: 'Password@123', newPassword: 'NewPassword@456' });
+    const reset = await env.getRouter().mockRequest().post('/api/v1/auth/login/reset-password').body({ flowId, currentPassword: 'Password@123', newPassword: 'NewPassword@456' });
     expect(reset.statusCode).toBe(200);
     expect(reset.json()).toMatchObject({ status: 'COMPLETED' });
 
