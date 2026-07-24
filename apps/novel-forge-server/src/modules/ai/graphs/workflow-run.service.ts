@@ -27,6 +27,7 @@ import { type BibleBuilderServices, createBibleBuilderGraph } from './bible-buil
 import { createChapterFinalizationGraph, type FinalizationServices } from './chapter-finalization.graph';
 import { createChapterGenerationGraph, type GraphServices } from './chapter-generation.graph';
 import { createChapterRebrandGraph, type RebrandGraphServices } from './chapter-rebrand.graph';
+import { createChapterReforgeGraph, type ReforgeGraphServices } from './chapter-reforge.graph';
 import { createNovelValidationGraph, type ValidationServices } from './novel-validation.graph';
 import { createSourceExtractionGraph, type ExtractionServices } from './source-extraction.graph';
 
@@ -70,6 +71,12 @@ export interface SourceExtractionInput {
 }
 
 export interface RebrandChapterInput {
+  projectId: bigint;
+  chapter: number;
+  jobId?: string;
+}
+
+export interface ReforgeChapterInput {
   projectId: bigint;
   chapter: number;
   jobId?: string;
@@ -321,6 +328,25 @@ export class WorkflowRunService {
       return { runId, outcome, status: 'completed' };
     } catch (err) {
       this.logger.error('runChapterRebrand failed', { err, runId });
+      await this.failRun(runId, err);
+      return { runId, outcome: 'failed', status: 'failed' };
+    }
+  }
+
+  async runChapterReforge(input: ReforgeChapterInput): Promise<WorkflowRunResult> {
+    const runId = await this.createRun(input.projectId, 'chapter-reforge', `chapter-${input.chapter}`, input, input.jobId);
+    const nodeTrace: string[] = [];
+
+    try {
+      const graph = createChapterReforgeGraph(this.graphServices as ReforgeGraphServices);
+      const rawState = await graph.invoke({ projectId: String(input.projectId), chapter: input.chapter, runId }, { configurable: { thread_id: runId } });
+      const outcome = (rawState as unknown as { outcome: string | null }).outcome ?? 'reforged';
+
+      nodeTrace.push('loadChapter', 'outlineContext', 'generateOutline', 'writeContext', 'write', 'residueScan', 'judge', 'persistReforge', 'mergeGlossary', 'finish');
+      await this.completeRun(runId, outcome, 'completed', nodeTrace);
+      return { runId, outcome, status: 'completed' };
+    } catch (err) {
+      this.logger.error('runChapterReforge failed', { err, runId });
       await this.failRun(runId, err);
       return { runId, outcome: 'failed', status: 'failed' };
     }
