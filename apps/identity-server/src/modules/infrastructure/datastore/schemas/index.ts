@@ -1,3 +1,4 @@
+export * from './app-sessions.schema';
 export * from './audit.schema';
 export * from './auth-tokens.schemas';
 export * from './authz.schema';
@@ -8,6 +9,7 @@ export * from './federation.schema';
 export * from './keys.schema';
 export * from './notification.schema';
 export * from './oauth.schema';
+export * from './policy.schema';
 export * from './refresh-tokens.schema';
 export * from './saml.schema';
 export * from './scim.schema';

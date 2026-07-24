@@ -24,6 +24,12 @@ export interface AccessTokenInput {
   sessionId?: string;
   ttlSeconds: number;
   actorType: 'user' | 'service';
+  /**
+   * Authentication assurance the token conveys. Present only on a token minted from a step-up that
+   * was granted for this exact audience, which is what lets a resource server trust `aal` without
+   * calling back to the identity service.
+   */
+  aal?: 'AAL1' | 'AAL2';
 }
 
 export interface IdTokenInput {
@@ -70,6 +76,7 @@ export class AccessTokenService {
     };
     if (input.organisationId) claims.org = input.organisationId;
     if (input.sessionId) claims.sid = input.sessionId;
+    if (input.aal) claims.aal = input.aal;
     return { token: this.keyService.sign(claims).token, expiresIn: input.ttlSeconds };
   }
 

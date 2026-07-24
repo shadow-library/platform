@@ -82,7 +82,10 @@ export class WorkerService implements OnApplicationReady, OnApplicationStop {
       if (logouts > 0) this.logger.debug('Dispatched back-channel logouts', { logouts });
       const webhooks = await this.webhookDeliveryService.dispatchPending();
       if (webhooks > 0) this.logger.debug('Dispatched webhooks', { webhooks });
-      if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) await this.maintenanceService.purgeStaleContactClaims();
+      if (this.ticks++ % MAINTENANCE_EVERY_TICKS === 0) {
+        await this.maintenanceService.purgeStaleContactClaims();
+        await this.maintenanceService.purgeStaleAppSessions();
+      }
     } catch (error) {
       this.logger.error('Worker tick failed', { error });
     }

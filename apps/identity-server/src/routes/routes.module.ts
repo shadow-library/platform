@@ -10,6 +10,7 @@ import { HttpCoreModule } from '@shadow-library/modules';
  */
 import { AccessModule } from '@server/modules/access/access.module';
 import { AdminModule } from '@server/modules/admin';
+import { AppSessionModule } from '@server/modules/auth/app-session';
 import { AuthFlowModule } from '@server/modules/auth/flow';
 import { KeyModule } from '@server/modules/auth/keys';
 import { MfaModule } from '@server/modules/auth/mfa';
@@ -26,6 +27,7 @@ import { HealthModule } from '@server/modules/infrastructure/health';
 import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { SecurityModule } from '@server/modules/infrastructure/security';
 import { ScimModule } from '@server/modules/scim';
+import { PolicyModule } from '@server/modules/system/policy';
 
 /**
  * Defining types
@@ -73,6 +75,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     SessionModule,
     TokenModule,
     OAuthModule,
+    AppSessionModule,
     SamlModule,
     AuthzModule,
     AuthFlowModule,
@@ -84,6 +87,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     NotificationModule,
     AdminModule,
     ScimModule,
+    PolicyModule,
     AccessModule,
   ],
 
@@ -93,6 +97,20 @@ export const HttpRouteModule = FastifyModule.forRoot({
     instance.addContentTypeParser('application/scim+json', { parseAs: 'string' }, (_request, body, done) => {
       try {
         done(null, typeof body === 'string' && body.length > 0 ? JSON.parse(body) : {});
+      } catch (error) {
+        done(error as Error);
+      }
+    });
+
+    /**
+     * RFC 6749 §2.3.1 requires the token, revocation and introspection endpoints to take
+     * form-encoded parameters, which is what every conforming OAuth client library sends. Decoding
+     * to a plain object lets the same class-schema DTOs validate both encodings. Repeated keys
+     * collapse to the last occurrence — no OAuth parameter is defined as multi-valued.
+     */
+    instance.addContentTypeParser('application/x-www-form-urlencoded', { parseAs: 'string' }, (_request, body, done) => {
+      try {
+        done(null, Object.fromEntries(new URLSearchParams(typeof body === 'string' ? body : '')));
       } catch (error) {
         done(error as Error);
       }

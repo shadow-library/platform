@@ -11,6 +11,7 @@ import { AppError, Config, Logger, throwError } from '@shadow-library/common';
  */
 import { APP_NAME } from '@server/constants';
 import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
+import { APP_SESSION_SCOPE } from '@server/modules/auth/app-session';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
@@ -117,6 +118,7 @@ export class BootstrapService implements OnModuleInit {
     const application = this.applicationService.getApplicationOrThrow(APP_NAME);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, AUTHZ_CHECK_SCOPE);
     await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, SCIM_PROVISION_SCOPE);
+    await this.oauthClientService.ensureScope(application.id, PLATFORM_RESOURCE, APP_SESSION_SCOPE);
   }
 
   private async ensurePlatformApplication(): Promise<void> {

@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { and, isNull, lt, sql } from 'drizzle-orm';
+import { and, eq, inArray, isNull, lt, ne, or, sql } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
@@ -51,6 +51,36 @@ export class MaintenanceService {
 
     const purged = emails.length + phones.length + challenges.length;
     if (purged > 0) this.logger.info('purged stale claims and challenges', { emails: emails.length, phones: phones.length, challenges: challenges.length });
+    return purged;
+  }
+
+  /**
+   * Retires application sessions whose central session has ended or whose own deadline has passed, and
+   * drops step-up grants that have closed. Neither sweep is load-bearing — an app session is validated
+   * against its central session on every use — but it keeps dead rows from accumulating.
+   */
+  async purgeStaleAppSessions(): Promise<number> {
+    const orphaned = await this.db
+      .update(schema.appSessions)
+      .set({ status: 'EXPIRED', terminatedAt: new Date() })
+      .where(
+        and(
+          eq(schema.appSessions.status, 'ACTIVE'),
+          or(
+            lt(schema.appSessions.expiresAt, new Date()),
+            inArray(schema.appSessions.identitySessionId, this.db.select({ id: schema.userSessions.id }).from(schema.userSessions).where(ne(schema.userSessions.status, 'ACTIVE'))),
+          ),
+        ),
+      )
+      .returning({ id: schema.appSessions.id });
+
+    const elevations = await this.db
+      .delete(schema.appSessionElevations)
+      .where(lt(schema.appSessionElevations.expiresAt, new Date()))
+      .returning({ id: schema.appSessionElevations.id });
+
+    const purged = orphaned.length + elevations.length;
+    if (purged > 0) this.logger.info('purged stale app sessions and elevations', { appSessions: orphaned.length, elevations: elevations.length });
     return purged;
   }
 }
