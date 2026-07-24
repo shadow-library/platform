@@ -4,6 +4,8 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createHash, randomBytes } from 'node:crypto';
 
+import { eq } from 'drizzle-orm';
+
 /**
  * Importing user defined packages
  */
@@ -304,8 +306,14 @@ describe('OAuth authorization-code flow', () => {
       const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
       const db = env.getPostgresClient();
       const [resource] = await db.insert(schema.apiResources).values({ applicationId, identifier: 'api://svc' }).returning();
-      const [shared] = await db.insert(schema.scopes).values({ apiResourceId: resource?.id ?? '', name: 'jobs:run', principalType: 'BOTH' }).returning();
-      const [userOnly] = await db.insert(schema.scopes).values({ apiResourceId: resource?.id ?? '', name: 'jobs:profile', principalType: 'USER' }).returning();
+      const [shared] = await db
+        .insert(schema.scopes)
+        .values({ apiResourceId: resource?.id ?? '', name: 'jobs:run', principalType: 'BOTH' })
+        .returning();
+      const [userOnly] = await db
+        .insert(schema.scopes)
+        .values({ apiResourceId: resource?.id ?? '', name: 'jobs:profile', principalType: 'USER' })
+        .returning();
       const service = await env
         .getService(OAuthClientService)
         .register({ applicationId, name: 'Worker', kind: 'SERVICE', grantTypes: ['client_credentials'], scopeIds: [shared?.id ?? '', userOnly?.id ?? ''] });
@@ -333,6 +341,175 @@ describe('OAuth authorization-code flow', () => {
       const names = prompt.scopes.map(scope => scope.name);
       expect(names).toContain('docs:read');
       expect(names).not.toContain('docs:sync');
+    });
+  });
+
+  describe('RFC 6749 request encoding', () => {
+    it('should accept a form-encoded token request', async () => {
+      const { verifier, challenge } = pkce();
+      const code = new URL((await authorize(challenge)).headers.location ?? '').searchParams.get('code') ?? '';
+      const form = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+
+      const token = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(clientId, secret), 'content-type': 'application/x-www-form-urlencoded' })
+        .body(form.toString());
+
+      expect(token.statusCode).toBe(200);
+      expect((token.json() as { token_type: string }).token_type).toBe('Bearer');
+    });
+
+    it('should advertise the revocation, introspection and client-authentication metadata', async () => {
+      const response = await env.getRouter().mockRequest().get('/.well-known/openid-configuration');
+      expect(response.json()).toMatchObject({
+        revocation_endpoint: `${response.json().issuer}/oauth2/revoke`,
+        introspection_endpoint: `${response.json().issuer}/oauth2/introspect`,
+        token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'private_key_jwt', 'none'],
+      });
+    });
+  });
+
+  describe('audience isolation', () => {
+    const clientService = () => env.getService(OAuthClientService);
+    const applicationId = () => env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+
+    const tokenFor = (client: { clientId: string; secret?: string }, resource: string, scope: string) =>
+      env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(client.clientId, client.secret ?? ''), 'content-type': 'application/x-www-form-urlencoded' })
+        .body(new URLSearchParams({ grant_type: 'client_credentials', scope, resource }).toString());
+
+    it('should refuse an audience the client holds no scope on', async () => {
+      await clientService().ensureScope(applicationId(), 'api://unentitled', 'vault:read');
+      const { challenge } = pkce();
+      const params = new URLSearchParams({
+        client_id: clientId,
+        redirect_uri: REDIRECT_URI,
+        response_type: 'code',
+        scope: 'openid',
+        code_challenge: challenge,
+        code_challenge_method: 'S256',
+        resource: 'api://unentitled',
+      });
+
+      const response = await env
+        .getRouter()
+        .mockRequest()
+        .get(`/oauth2/authorize?${params.toString()}`)
+        .cookies({ [SESSION_COOKIE_NAME]: sessionSecret });
+      expect(response.statusCode).toBe(400);
+    });
+
+    it('should not mint a scope granted on one resource into a token for another', async () => {
+      const alpha = await clientService().ensureScope(applicationId(), 'api://alpha', 'alpha:read');
+      const beta = await clientService().ensureScope(applicationId(), 'api://beta', 'beta:read');
+      const service = await clientService().register({
+        applicationId: applicationId(),
+        name: 'Cross Audience Service',
+        kind: 'SERVICE',
+        grantTypes: ['client_credentials'],
+        scopeIds: [alpha, beta],
+      });
+
+      const crossed = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': 'application/x-www-form-urlencoded' })
+        .body(new URLSearchParams({ grant_type: 'client_credentials', scope: 'alpha:read', resource: 'api://beta' }).toString());
+      expect(crossed.statusCode).toBe(400);
+
+      const aligned = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': 'application/x-www-form-urlencoded' })
+        .body(new URLSearchParams({ grant_type: 'client_credentials', scope: 'alpha:read', resource: 'api://alpha' }).toString());
+      expect(aligned.statusCode).toBe(200);
+      expect(env.getService(KeyService).verify((aligned.json() as { access_token: string }).access_token)?.aud).toBe('api://alpha');
+    });
+
+    it('should stop issuing tokens once the api resource is deactivated', async () => {
+      const scopeId = await clientService().ensureScope(applicationId(), 'api://retired', 'retired:read');
+      const service = await clientService().register({
+        applicationId: applicationId(),
+        name: 'Retiring Service',
+        kind: 'SERVICE',
+        grantTypes: ['client_credentials'],
+        scopeIds: [scopeId],
+      });
+      expect((await tokenFor(service, 'api://retired', 'retired:read')).statusCode).toBe(200);
+
+      await env.getPostgresClient().update(schema.apiResources).set({ isActive: false }).where(eq(schema.apiResources.identifier, 'api://retired'));
+      expect((await tokenFor(service, 'api://retired', 'retired:read')).statusCode).toBe(400);
+    });
+  });
+
+  describe('token endpoint caller scoping', () => {
+    const otherClient = async () => {
+      const registered = await env.getService(OAuthClientService).register({
+        applicationId: env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id,
+        name: 'Unrelated App',
+        kind: 'WEB_CONFIDENTIAL',
+        grantTypes: ['authorization_code', 'refresh_token'],
+        redirectUris: [REDIRECT_URI],
+      });
+      return registered;
+    };
+
+    const issueTokens = async () => {
+      const { verifier, challenge } = pkce();
+      const code = new URL((await authorize(challenge)).headers.location ?? '').searchParams.get('code') ?? '';
+      const token = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(clientId, secret) })
+        .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+      return token.json() as { access_token: string; refresh_token: string };
+    };
+
+    it('should report another client’s token as inactive', async () => {
+      const tokens = await issueTokens();
+      const stranger = await otherClient();
+
+      const mine = await env.getRouter().mockRequest().post('/oauth2/introspect').body({ token: tokens.access_token, client_id: clientId, client_secret: secret });
+      expect((mine.json() as { active: boolean }).active).toBe(true);
+
+      const theirs = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/introspect')
+        .body({ token: tokens.access_token, client_id: stranger.clientId, client_secret: stranger.secret });
+      expect((theirs.json() as { active: boolean }).active).toBe(false);
+    });
+
+    it('should ignore a revocation request from a client that does not own the token', async () => {
+      const tokens = await issueTokens();
+      const stranger = await otherClient();
+
+      await env.getRouter().mockRequest().post('/oauth2/revoke').body({ token: tokens.refresh_token, client_id: stranger.clientId, client_secret: stranger.secret });
+
+      const stillActive = await env.getRouter().mockRequest().post('/oauth2/introspect').body({ token: tokens.refresh_token, client_id: clientId, client_secret: secret });
+      expect((stillActive.json() as { active: boolean }).active).toBe(true);
+    });
+
+    it('should refuse introspection from a public client', async () => {
+      const publicClient = await env.getService(OAuthClientService).register({
+        applicationId: env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id,
+        name: 'Public SPA',
+        kind: 'SPA_PUBLIC',
+        grantTypes: ['authorization_code'],
+        redirectUris: [REDIRECT_URI],
+      });
+      const tokens = await issueTokens();
+
+      const response = await env.getRouter().mockRequest().post('/oauth2/introspect').body({ token: tokens.access_token, client_id: publicClient.clientId });
+      expect(response.statusCode).toBe(401);
     });
   });
 });

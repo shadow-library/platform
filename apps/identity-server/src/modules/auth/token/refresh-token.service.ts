@@ -14,6 +14,7 @@ import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, RefreshToken, schema } from '@server/modules/infrastructure/datastore';
+import { PolicyService } from '@server/modules/system/policy';
 
 /**
  * Defining types
@@ -28,6 +29,10 @@ export interface IssueRefreshToken {
   organisationId?: bigint | null;
   ipAddress?: string;
   ipCountry?: string;
+  /** The organisation owning the client, whose policy applies alongside the user's own. */
+  clientOrganisationId?: bigint | null;
+  /** Client-level override of the idle window (`oauth_clients.refresh_token_ttl`). */
+  clientTtlSeconds?: number | null;
 }
 
 export interface FamilyContext {
@@ -51,6 +56,10 @@ export interface RotationContext {
   ipCountry?: string;
   /** When set, the token's owning client must match before any state is mutated (prevents a forced-logout by a mismatched caller). */
   expectedClientId?: string;
+  /** The organisation owning the client, whose policy applies alongside the family's own. */
+  clientOrganisationId?: bigint | null;
+  /** Client-level override of the idle window (`oauth_clients.refresh_token_ttl`). */
+  clientTtlSeconds?: number | null;
 }
 
 export interface RefreshTokenDescription {
@@ -81,7 +90,6 @@ export class RefreshTokenClientMismatchError extends Error {
 /**
  * Declaring the constants
  */
-const REFRESH_TOKEN_TTL_MS = 180 * 24 * 60 * 60 * 1000;
 
 @Injectable()
 export class RefreshTokenService {
@@ -92,12 +100,24 @@ export class RefreshTokenService {
     databaseService: DatabaseService,
     private readonly sessionService: SessionService,
     private readonly auditService: AuditService,
+    private readonly policyService: PolicyService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
 
   private hash(secret: string): string {
     return createHash('sha256').update(secret).digest('hex');
+  }
+
+  /**
+   * Refresh tokens expire on idleness rather than age: every rotation re-arms the window, so a family
+   * that keeps being exercised keeps living while one that falls silent lapses. The window is the
+   * strictest of the platform default, the client's own setting, and the policy of every organisation
+   * involved.
+   */
+  private async idleExpiry(organisationIds: (bigint | null | undefined)[], clientValue?: number | null): Promise<Date> {
+    const ttlSeconds = await this.policyService.resolve('auth.refresh_token.idle_ttl', { organisationIds, clientValue });
+    return new Date(Date.now() + ttlSeconds * 1000);
   }
 
   private mint(): MintedSecret {
@@ -108,6 +128,7 @@ export class RefreshTokenService {
   /** Opens a new family and issues its first refresh token. */
   async issue(input: IssueRefreshToken): Promise<RefreshTokenResult> {
     const { secret, tokenHash } = this.mint();
+    const expiresAt = await this.idleExpiry([input.organisationId, input.clientOrganisationId], input.clientTtlSeconds);
     const result = await this.db.transaction(async tx => {
       const [family] = await tx
         .insert(schema.refreshTokenFamilies)
@@ -126,7 +147,7 @@ export class RefreshTokenService {
       }
       const [token] = await tx
         .insert(schema.refreshTokens)
-        .values({ familyId: family.id, tokenHash, expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS), ipAddress: input.ipAddress ?? null, ipCountry: input.ipCountry ?? null })
+        .values({ familyId: family.id, tokenHash, expiresAt, ipAddress: input.ipAddress ?? null, ipCountry: input.ipCountry ?? null })
         .returning();
       if (!token) {
         this.logger.error('failed to create refresh token', { userId: input.userId, familyId: family.id });
@@ -177,6 +198,7 @@ export class RefreshTokenService {
     }
 
     const { secret: nextSecret, tokenHash } = this.mint();
+    const expiresAt = await this.idleExpiry([family.organisationId, context.clientOrganisationId], context.clientTtlSeconds);
     const tokenId = await this.db.transaction(async tx => {
       /** Atomic single-use consumption: only an ACTIVE row rotates. Zero rows means a concurrent rotation already consumed it → reuse. */
       const consumed = await tx
@@ -191,7 +213,7 @@ export class RefreshTokenService {
           familyId: family.id,
           tokenHash,
           previousTokenId: presented.id,
-          expiresAt: new Date(Date.now() + REFRESH_TOKEN_TTL_MS),
+          expiresAt,
           ipAddress: context.ipAddress ?? null,
           ipCountry: context.ipCountry ?? null,
         })
@@ -203,10 +225,26 @@ export class RefreshTokenService {
     return { secret: nextSecret, familyId: family.id, tokenId, context: this.toContext(family) };
   }
 
-  /** Revokes the family a presented refresh token belongs to (RFC 7009); a no-op if unknown. */
-  async revokeBySecret(secret: string): Promise<void> {
+  /**
+   * Revokes the family a presented refresh token belongs to (RFC 7009); a no-op if unknown. When
+   * `expectedClientId` is given the token must belong to that client, so an authenticated client can
+   * never revoke another client's tokens by presenting a captured secret. RFC 7009 §2.2 requires the
+   * unknown-token and foreign-token cases to be indistinguishable, hence the silent return.
+   */
+  async revokeBySecret(secret: string, expectedClientId?: string): Promise<void> {
     const token = await this.db.query.refreshTokens.findFirst({ where: eq(schema.refreshTokens.tokenHash, this.hash(secret)) });
-    if (token) await this.revokeFamily(token.familyId, 'LOGOUT');
+    if (!token) return;
+    const family = await this.db.query.refreshTokenFamilies.findFirst({ where: eq(schema.refreshTokenFamilies.id, token.familyId) });
+    if (!family) return;
+    if (expectedClientId !== undefined && family.clientId !== expectedClientId) {
+      this.logger.warn('token revocation rejected: token belongs to another client', {
+        securityEvent: 'oauth.revocation_client_mismatch',
+        familyId: family.id,
+        callerClientId: expectedClientId,
+      });
+      return;
+    }
+    await this.revokeFamily(token.familyId, 'LOGOUT');
   }
 
   /** Describes a refresh token for introspection: active only if the token and its family are live. */

@@ -13,6 +13,7 @@ import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { ApplicationModule } from '@server/modules/system/application';
+import { PolicyModule } from '@server/modules/system/policy';
 
 import { AccessTokenService } from './access-token.service';
 import { AuthorizationCodeService } from './authorization-code.service';
@@ -33,9 +34,9 @@ import { WorkloadIdentityService } from './workload-identity.service';
  */
 
 @Module({
-  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule],
+  imports: [DatabaseModule, KeyModule, SessionModule, TokenModule, UserModule, AuditModule, ApplicationModule, PolicyModule],
   controllers: [OAuthController, ConsentController, MeConsentController],
   providers: [OAuthClientService, AuthorizationCodeService, AccessTokenService, ConsentService, OAuthService, WorkloadIdentityService],
-  exports: [OAuthClientService, AccessTokenService, ConsentService],
+  exports: [OAuthClientService, AccessTokenService, ConsentService, AuthorizationCodeService],
 })
 export class OAuthModule {}

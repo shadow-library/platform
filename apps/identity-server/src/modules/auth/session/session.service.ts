@@ -139,6 +139,27 @@ export class SessionService {
     return this.toValidated(session);
   }
 
+  /**
+   * Validates a session by id rather than by secret, for flows that hold a session reference instead
+   * of the cookie — refresh-token rotation and first-party app sessions. Exercising such a reference
+   * is genuine session activity, so the idle window is refreshed on success just as it is for a
+   * cookie-borne request.
+   */
+  async validateById(sessionId: bigint): Promise<ValidatedSession | null> {
+    const session = await this.getById(sessionId);
+    if (!session || session.status !== 'ACTIVE') return null;
+
+    const now = Date.now();
+    if (session.expiresAt.getTime() <= now || session.lastUsedAt.getTime() + SESSION_IDLE_TTL_MS <= now) {
+      await this.expire(session);
+      return null;
+    }
+
+    await this.touch(session, now);
+    await this.cache(session);
+    return this.toValidated(session);
+  }
+
   /** Refreshes `last_used_at` at most once per throttle window to bound write amplification. */
   private async touch(session: UserSession, now: number): Promise<void> {
     if (session.lastUsedAt.getTime() + SESSION_TOUCH_THROTTLE_MS > now) return;
@@ -161,6 +182,19 @@ export class SessionService {
 
   isElevated(session: ValidatedSession): boolean {
     return session.elevatedUntil !== null && session.elevatedUntil > Date.now();
+  }
+
+  /**
+   * Spends the step-up window while leaving the achieved `aal` intact.
+   *
+   * A step-up is proof for one privileged act, not a mode the session sits in. Once an application has
+   * exchanged it for an audience-scoped elevation grant, the window is closed so no second application
+   * — and no identity-domain route — can ride the same proof. `aal` remains AAL2 because the user did
+   * demonstrate a second factor; only the right to act on it is consumed.
+   */
+  async consumeElevation(sessionId: bigint): Promise<void> {
+    const [session] = await this.db.update(schema.userSessions).set({ elevatedUntil: null }).where(eq(schema.userSessions.id, sessionId)).returning();
+    if (session) await this.cache(session);
   }
 
   async revoke(sessionId: bigint, reason: TerminationReason = 'REVOKED'): Promise<void> {

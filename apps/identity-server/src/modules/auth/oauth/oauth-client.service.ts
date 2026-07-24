@@ -64,6 +64,14 @@ export interface RotatedSecret {
   previousSecretsExpireAt: Date;
 }
 
+/** A scope granted to a client, paired with the API resource that owns it. */
+export interface GrantedScope {
+  name: string;
+  /** Identifier of the owning API resource — the only audience this scope may be minted for. */
+  resourceIdentifier: string;
+  isSensitive: boolean;
+}
+
 /** The transaction handle drizzle passes to a `db.transaction` callback — a narrower type than the pooled db. */
 type PrimaryTransaction = Parameters<Parameters<PrimaryDatabase['transaction']>[0]>[0];
 
@@ -201,19 +209,44 @@ export class OAuthClientService {
     return scopeNames.filter(name => !disallowedNames.has(name));
   }
 
-  /** Whether an RFC 8707 `resource` value is a registered API resource identifier; the audience derives from this. */
+  /** Whether an RFC 8707 `resource` value is a registered, active API resource identifier. */
   async isRegisteredResource(identifier: string): Promise<boolean> {
-    const resource = await this.db.query.apiResources.findFirst({ where: eq(schema.apiResources.identifier, identifier), columns: { id: true } });
+    const resource = await this.db.query.apiResources.findFirst({
+      where: and(eq(schema.apiResources.identifier, identifier), eq(schema.apiResources.isActive, true)),
+      columns: { id: true },
+    });
     return resource !== undefined;
   }
 
-  async getGrantedScopeNames(clientId: string): Promise<string[]> {
-    const grants = await this.db
-      .select({ name: schema.scopes.name })
+  /**
+   * Every scope granted to a client, paired with the API resource that owns it. Scopes belonging to a
+   * deactivated resource are excluded, so deactivating a resource immediately stops token issuance
+   * against it. Callers match `resourceIdentifier` against the token's audience: a grant on one
+   * resource must never authorise a token addressed to another (SCOPE-02).
+   */
+  async getGrantedScopes(clientId: string): Promise<GrantedScope[]> {
+    if (!this.isValidClientId(clientId)) return [];
+    return this.db
+      .select({ name: schema.scopes.name, resourceIdentifier: schema.apiResources.identifier, isSensitive: schema.scopes.isSensitive })
       .from(schema.oauthClientScopeGrants)
       .innerJoin(schema.scopes, eq(schema.oauthClientScopeGrants.scopeId, schema.scopes.id))
-      .where(eq(schema.oauthClientScopeGrants.clientId, clientId));
-    return grants.map(grant => grant.name);
+      .innerJoin(schema.apiResources, eq(schema.scopes.apiResourceId, schema.apiResources.id))
+      .where(and(eq(schema.oauthClientScopeGrants.clientId, clientId), eq(schema.apiResources.isActive, true)));
+  }
+
+  async getGrantedScopeNames(clientId: string): Promise<string[]> {
+    const granted = await this.getGrantedScopes(clientId);
+    return granted.map(scope => scope.name);
+  }
+
+  /** Distinct scope names across all active API resources, advertised as `scopes_supported` in discovery. */
+  async listActiveScopeNames(): Promise<string[]> {
+    const rows = await this.db
+      .selectDistinct({ name: schema.scopes.name })
+      .from(schema.scopes)
+      .innerJoin(schema.apiResources, eq(schema.scopes.apiResourceId, schema.apiResources.id))
+      .where(eq(schema.apiResources.isActive, true));
+    return rows.map(row => row.name).sort();
   }
 
   async rotateSecret(clientId: string): Promise<string> {
