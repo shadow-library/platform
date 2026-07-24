@@ -39,7 +39,11 @@ export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse> {
     queryFn: ({ signal }) => APIRequest.get('/api/auth/session').signal(signal).execute<SessionResponse>(),
     /** A 401 means "no session" — retrying would only re-confirm it before the login bounce. */
     retry: false,
-    /** The gate runs on every navigation; a longer stale window keeps route transitions network-free. */
-    staleTime: 5 * 60_000,
+    /**
+     * The session mirrors live auth state, so it is never treated as fresh: the route gate and the
+     * in-shell `useSessionGuard` both re-validate against the server instead of trusting a cached
+     * snapshot, so the shell is shown only while the session is currently valid.
+     */
+    staleTime: 0,
   };
 }
