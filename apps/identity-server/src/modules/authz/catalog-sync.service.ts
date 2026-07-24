@@ -59,8 +59,6 @@ export interface CatalogSyncResult {
  * administrative operation — a service never grants roles to users.
  */
 
-const UUID_PATTERN = /^[0-9a-fA-F-]{36}$/;
-
 @Injectable()
 export class CatalogSyncService {
   private readonly logger = Logger.getLogger(APP_NAME, CatalogSyncService.name);
@@ -77,7 +75,6 @@ export class CatalogSyncService {
 
   /** Resolves the application a service account owns from its client id; the caller can only ever touch its own application's catalog. */
   private async resolveApplicationId(clientId: string): Promise<number> {
-    if (!UUID_PATTERN.test(clientId)) throw AppErrorCode.AUTHZ_002.create();
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
     if (!client) throw AppErrorCode.AUTHZ_002.create();
     return client.applicationId;

@@ -44,9 +44,8 @@ export class ServiceAccessService {
     this.db = databaseService.getPostgresClient();
   }
 
-  /** Rules a service enforces for its own routes, resolved from the caller's client id */
+  /** Rules a service enforces for its own routes, resolved from the caller's client id (an ecosystem client id, e.g. `pulse-server`) */
   async listForClient(clientId: string): Promise<ServiceRouteAccess[]> {
-    if (!UUID_PATTERN.test(clientId)) throw AppErrorCode.AUTHZ_002.create();
     const client = await this.db.query.oauthClients.findFirst({ where: eq(schema.oauthClients.id, clientId), columns: { applicationId: true } });
     if (!client) throw AppErrorCode.AUTHZ_002.create();
     return this.listForApplication(client.applicationId);
