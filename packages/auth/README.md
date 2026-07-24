@@ -1,8 +1,8 @@
 # `@shadow-library/auth`
 
-The consumer SDK for the Shadow Apps identity platform. Every Shadow Apps service uses this package — and only this package — to authenticate users and services and to enforce permissions. It is the policy-enforcement-point (PEP) half of the platform; [Shadow Identity](../../README.md) is the decision half.
+The consumer SDK for the Shadow Apps identity platform. Every Shadow Apps service uses this package — and only this package — to authenticate users and services and to enforce permissions. It is the policy-enforcement-point (PEP) half of the platform; [Shadow Identity](https://github.com/shadow-library/identity-server#readme) is the decision half.
 
-The full specification lives in [`docs/sdk.md`](../../docs/sdk.md); the task-oriented walkthrough in [`docs/service-integration-guide.md`](../../docs/service-integration-guide.md).
+The full specification lives in [`docs/sdk.md`](https://github.com/shadow-library/identity-server/blob/main/docs/sdk.md); the task-oriented walkthrough in [`docs/service-integration-guide.md`](https://github.com/shadow-library/identity-server/blob/main/docs/service-integration-guide.md).
 
 ## Install
 
