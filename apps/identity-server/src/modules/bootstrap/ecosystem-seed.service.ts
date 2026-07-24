@@ -51,6 +51,8 @@ const PULSE_PUBLIC_URLS = ['https://pulse.shadow-apps.com', 'http://localhost:80
 const PULSE_PERMISSIONS = {
   templatesRead: 'pulse:templates:read',
   templatesWrite: 'pulse:templates:write',
+  templatesPublish: 'pulse:templates:publish',
+  layoutsWrite: 'pulse:layouts:write',
   sendersRead: 'pulse:senders:read',
   sendersWrite: 'pulse:senders:write',
   metricsRead: 'pulse:metrics:read',
@@ -59,7 +61,9 @@ const PULSE_PERMISSIONS = {
 
 const PULSE_PERMISSION_DESCRIPTIONS: Record<string, string> = {
   [PULSE_PERMISSIONS.templatesRead]: 'Read notification templates',
-  [PULSE_PERMISSIONS.templatesWrite]: 'Create and edit notification templates',
+  [PULSE_PERMISSIONS.templatesWrite]: 'Create and edit notification template drafts',
+  [PULSE_PERMISSIONS.templatesPublish]: 'Publish and roll back notification template versions',
+  [PULSE_PERMISSIONS.layoutsWrite]: 'Manage the shared design system (email layouts and partials)',
   [PULSE_PERMISSIONS.sendersRead]: 'Read sender profiles, endpoints and routing rules',
   [PULSE_PERMISSIONS.sendersWrite]: 'Manage sender profiles, endpoints and routing rules',
   [PULSE_PERMISSIONS.metricsRead]: 'Read delivery metrics and dashboards',
@@ -72,9 +76,9 @@ const PULSE_ROLES = {
   viewer: 'PulseViewer',
 } as const;
 
-/** Read-only floor; every role builds on it. Operators additionally author templates; admins hold everything. */
+/** Read-only floor; every role builds on it. Operators author, publish and manage the design system; admins hold everything. */
 const VIEWER_PERMISSIONS = [PULSE_PERMISSIONS.templatesRead, PULSE_PERMISSIONS.sendersRead, PULSE_PERMISSIONS.metricsRead, PULSE_PERMISSIONS.logsRead];
-const OPERATOR_PERMISSIONS = [...VIEWER_PERMISSIONS, PULSE_PERMISSIONS.templatesWrite];
+const OPERATOR_PERMISSIONS = [...VIEWER_PERMISSIONS, PULSE_PERMISSIONS.templatesWrite, PULSE_PERMISSIONS.templatesPublish, PULSE_PERMISSIONS.layoutsWrite];
 const ADMIN_PERMISSIONS = Object.values(PULSE_PERMISSIONS);
 
 const PULSE_ROLE_GRANTS: { role: string; description: string; permissions: readonly string[] }[] = [

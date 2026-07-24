@@ -92,6 +92,10 @@ describe('BootstrapService', () => {
     const pulse = env.getService(ApplicationService).getApplication('pulse');
     expect(pulse?.roles.map(role => role.roleName).sort()).toEqual(['PulseAdmin', 'PulseOperator', 'PulseViewer']);
 
+    /** The pulse RBAC catalogue is kept in lockstep with pulse-server; the CMS lifecycle permissions must be seeded. */
+    const pulsePermissions = pulse ? (await env.getService(PolicyDecisionService).listPermissionsForApplication(pulse.id)).map(permission => permission.name) : [];
+    expect(pulsePermissions).toEqual(expect.arrayContaining(['pulse:templates:read', 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write']));
+
     /** The pulse relying party, the pulse service client, and identity's own outbound client. */
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
     expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'pulse', 'pulse-server']);
