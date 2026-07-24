@@ -10,6 +10,7 @@ export type ProjectRoute =
   | '/novels/$novelId/overview'
   | '/novels/$novelId/source'
   | '/novels/$novelId/rebrand'
+  | '/novels/$novelId/reforge'
   | '/novels/$novelId/story-bible'
   | '/novels/$novelId/volumes'
   | '/novels/$novelId/import-plan'
