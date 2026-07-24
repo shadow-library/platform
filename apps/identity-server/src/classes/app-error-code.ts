@@ -148,6 +148,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_010 = AppErrorCode.notFound('ORG_010', 'Domain not found');
 
   /*!
+   * Organisation Policy Error Codes
+   */
+
+  /** The policy key is not declared in the policy registry */
+  static readonly POL_001 = AppErrorCode.notFound('POL_001', 'Unknown organisation policy');
+  /** The policy value has the wrong type or falls outside the bounds the registry permits */
+  static readonly POL_002 = AppErrorCode.validation('POL_002', 'Invalid organisation policy value', 400);
+
+  /*!
    * Webhook Error Codes
    */
 
