@@ -14,7 +14,7 @@ import { DatabaseService } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { type Job, type PrimaryDatabase, type Rebrand, schema } from '@server/database';
+import { type Job, type PrimaryDatabase, type Rebrand, type Reforge, schema } from '@server/database';
 
 import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
@@ -47,6 +47,12 @@ interface IngestPayload {
 }
 
 interface RebrandPayload {
+  chapters?: number[];
+  force?: boolean;
+  limit?: number;
+}
+
+interface ReforgePayload {
   chapters?: number[];
   force?: boolean;
   limit?: number;
@@ -147,6 +153,8 @@ export class JobExecutor {
         return this.runIngest(job);
       case 'rebrand':
         return this.runRebrand(job);
+      case 'reforge':
+        return this.runReforge(job);
       case 'publish':
         return this.runPublish(job);
       default:
@@ -297,6 +305,75 @@ export class JobExecutor {
     }
   }
 
+  // ─── Reforge (reforge design §7) ──────────────────────────────────────────────
+  // Three phases, each derived from data — never from reforges.status, which is advisory display
+  // state. Reuses the rebrand acquire/recombine/seed backbone verbatim, then re-authors each chapter
+  // through the reforge graph. Per-chapter failures flag-and-continue, identical to runRebrand.
+  private async runReforge(job: Job.Row): Promise<void> {
+    const projectId = job.projectId;
+    const payload = (job.payload ?? {}) as ReforgePayload;
+    this.logger.info('runReforge: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
+
+    try {
+      // Phase 1: finish acquisition. Blocking on a stalled scrape is correct — nothing to reforge.
+      let project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+      if (!project) throw AppError.internal(`project ${projectId} not found`);
+      this.logger.debug('runReforge: phase 1 — acquisition', { jobId: job.id, projectId, scrapeComplete: project.scrapeComplete });
+      while (!project.scrapeComplete) {
+        await this.setReforgeStatus(projectId, 'ingesting');
+        await this.jobService.progress(job.id, { done: project.scrapeNextNumber ?? 0, total: 0, current: 'scraping', phase: 'ingest' });
+        const result = await this.acquireService.ingest(projectId, {});
+        project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+        if (!project) throw AppError.internal(`project ${projectId} not found`);
+        this.logger.debug('runReforge: acquisition batch', { jobId: job.id, ingested: result.ingested, scrapeComplete: project.scrapeComplete });
+        if (result.ingested === 0 && !project.scrapeComplete) throw AppError.internal('acquisition stalled: 0 pages ingested and the scrape is incomplete');
+      }
+
+      // Phase 1.5: reference titles from webnovel (when configured), then merge translator-split
+      // chapter parts — both before the glossary ever sees them (recombine design §1, §5); the
+      // guards make these safe no-ops on resume.
+      this.logger.info('runReforge: phase 1.5 — retitle + recombine', { jobId: job.id, projectId });
+      await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
+      await this.webnovelCatalog.autoSync(projectId);
+      await this.recombineService.autoRecombine(projectId);
+
+      // Phase 2: glossary seed via the SHARED rebrand rename bible (idempotent — resume never re-seeds
+      // or re-bills; a project that already ran rebrand reuses the seeded glossary as-is).
+      this.logger.info('runReforge: phase 2 — glossary seed', { jobId: job.id, projectId });
+      await this.setReforgeStatus(projectId, 'glossary');
+      await this.jobService.progress(job.id, { done: 0, total: 0, current: 'glossary', phase: 'glossary' });
+      await this.rebrandService.seedGlossary(projectId, job.id);
+
+      // Phase 3: reforge pending chapters ascending.
+      await this.setReforgeStatus(projectId, 'reforging');
+      const targets = await this.selectReforgeChapters(projectId, payload);
+      const total = targets.length;
+      this.logger.info('runReforge: phase 3 — reforging chapters', { jobId: job.id, projectId, total });
+      this.logger.debug('runReforge: reforge targets', { jobId: job.id, targets });
+      let failed = 0;
+      for (const [i, chapter] of targets.entries()) {
+        await this.jobService.progress(job.id, { done: i, total, current: String(chapter), phase: 'reforging' });
+        this.logger.debug('runReforge: reforging chapter', { jobId: job.id, chapter, index: i, total });
+        const result = await this.workflowRunService.runChapterReforge({ projectId, chapter, jobId: job.id });
+        this.logger.debug('runReforge: chapter reforge finished', { jobId: job.id, chapter, status: result.status, runId: result.runId });
+        // Flag-and-continue — a failed chapter records a failed reforge row and the loop moves on; the
+        // pipeline never blocks, identical semantics to runRebrand.
+        if (result.status === 'failed') {
+          failed++;
+          await this.recordFailedReforge(projectId, chapter, result.runId);
+        }
+      }
+
+      await this.jobService.progress(job.id, { done: total, total, current: 'done', phase: 'reforging' });
+      await this.setReforgeStatus(projectId, 'done');
+      this.logger.info('runReforge: complete', { jobId: job.id, projectId, total, reforged: total - failed, failed });
+    } catch (err) {
+      this.logger.error('runReforge: failed', { jobId: job.id, projectId, err });
+      await this.setReforgeStatus(projectId, 'failed', err instanceof Error ? err.message : String(err));
+      throw err;
+    }
+  }
+
   // ─── Publish (reader-publish design §5–6) ─────────────────────────────────────
   // One convergence pass over the publication ledger: novel metadata, due/drifted chapter PUTs,
   // ledgered-unpublish DELETEs. Per-row failures land on the ledger rows (the row is the outbox);
@@ -361,5 +438,59 @@ export class JobExecutor {
       .set({ status, lastError, updatedAt: new Date() })
       .where(eq(schema.rebrands.projectId, projectId))
       .catch(err => this.logger.warn('failed to update rebrand status', { err, status }));
+  }
+
+  /** payload.chapters wins; otherwise every source chapter without a reforged/attention row (failed rows always retry). */
+  private async selectReforgeChapters(projectId: bigint, payload: ReforgePayload): Promise<number[]> {
+    let targets: number[];
+    if (payload.chapters && payload.chapters.length > 0) {
+      targets = [...payload.chapters].sort((a, b) => a - b);
+    } else {
+      const rows = await this.db
+        .select({ number: schema.chapters.number })
+        .from(schema.chapters)
+        .where(eq(schema.chapters.projectId, projectId))
+        .orderBy(asc(schema.chapters.number));
+      targets = rows.map(r => r.number);
+    }
+
+    if (!payload.force) {
+      const done = await this.db
+        .select({ chapter: schema.chapterReforges.chapter })
+        .from(schema.chapterReforges)
+        .where(and(eq(schema.chapterReforges.projectId, projectId), ne(schema.chapterReforges.status, 'failed')));
+      const doneSet = new Set(done.map(d => d.chapter));
+      targets = targets.filter(n => !doneSet.has(n));
+    }
+
+    return payload.limit ? targets.slice(0, payload.limit) : targets;
+  }
+
+  // Insert an empty failed row for a fresh failure, but never clobber the body a previous successful
+  // reforge produced — only the status/issues flip, so the prose survives a failed forced re-run.
+  private async recordFailedReforge(projectId: bigint, chapter: number, runId: string): Promise<void> {
+    const issues = [{ source: 'run', type: 'run_failed', detail: `chapter ${chapter} reforge failed (run ${runId})` }];
+    await this.db
+      .insert(schema.chapterReforges)
+      .values({ projectId, chapter, body: '', status: 'failed', issues, runId })
+      .onConflictDoUpdate({
+        target: [schema.chapterReforges.projectId, schema.chapterReforges.chapter],
+        set: {
+          status: sql`EXCLUDED.status`,
+          issues: sql`EXCLUDED.issues`,
+          runId: sql`EXCLUDED.run_id`,
+          revision: sql`${schema.chapterReforges.revision} + 1`,
+          updatedAt: new Date(),
+        },
+      })
+      .catch(err => this.logger.error('failed to record failed reforge', { err, chapter }));
+  }
+
+  private async setReforgeStatus(projectId: bigint, status: Reforge.Status, lastError: string | null = null): Promise<void> {
+    await this.db
+      .update(schema.reforges)
+      .set({ status, lastError, updatedAt: new Date() })
+      .where(eq(schema.reforges.projectId, projectId))
+      .catch(err => this.logger.warn('failed to update reforge status', { err, status }));
   }
 }

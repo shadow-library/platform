@@ -17,6 +17,8 @@ import { PublishingController } from '../publishing/publishing.controller';
 import { PublishingModule } from '../publishing/publishing.module';
 import { RebrandController } from '../rebrand/rebrand.controller';
 import { RebrandModule } from '../rebrand/rebrand.module';
+import { ReforgeController } from '../reforge/reforge.controller';
+import { ReforgeModule } from '../reforge/reforge.module';
 import { SourceModule } from '../source/source.module';
 import { PipelineController } from './pipeline.controller';
 
@@ -37,7 +39,7 @@ import { PipelineController } from './pipeline.controller';
  * RebrandService in the rebrand job) — so their controllers live here.
  */
 @Module({
-  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, PublishingModule],
-  controllers: [PipelineController, RebrandController, PublishingController],
+  imports: [SourceModule, ExtractionModule, PlanningModule, JobsModule, RebrandModule, ReforgeModule, PublishingModule],
+  controllers: [PipelineController, RebrandController, ReforgeController, PublishingController],
 })
 export class PipelineModule {}
