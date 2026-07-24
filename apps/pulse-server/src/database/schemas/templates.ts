@@ -7,7 +7,7 @@ import { bigint, bigserial, boolean, integer, jsonb, pgEnum, pgTable, primaryKey
 /**
  * Importing user defined packages
  */
-import { notificationChannel, priority } from './notification-jobs';
+import { notificationChannel, priority as priorityEnum } from './notification-jobs';
 
 /**
  * Defining types
@@ -58,6 +58,8 @@ export const templates = pgTable('templates', {
   name: varchar('name', { length: 255 }).notNull(),
   description: varchar('description', { length: 500 }),
   messageType: messageTypes('message_type').notNull().default('TRANSACTIONAL'),
+  /** Delivery priority — an axis independent of messageType; sets the job's retry backoff aggressiveness. */
+  priority: priorityEnum('priority').notNull().default('MEDIUM'),
   category: varchar('category', { length: 100 }),
   /** The declared variable contract (see {@link Template.VariableSchema}); `{}` means "no declared variables". */
   variableSchema: jsonb('variable_schema').$type<Template.VariableSchema>().notNull().default({ variables: {} }),

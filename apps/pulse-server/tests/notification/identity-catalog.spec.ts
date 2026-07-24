@@ -4,7 +4,6 @@
 import { describe, expect, it } from 'bun:test';
 
 import { and, eq, isNull } from 'drizzle-orm';
-import mustache from 'mustache';
 
 /**
  * Importing user defined packages
@@ -99,28 +98,25 @@ describe('Identity notification catalog', () => {
     }
   });
 
-  it('should render an active en-ZZ variant for every identity template key and channel', async () => {
+  it('should render the published en-ZZ content for every identity template key and channel', async () => {
     const db = testEnv.getPostgresClient();
 
     for (const entry of IDENTITY_CATALOG) {
-      const group = await db.query.templateGroups.findFirst({
-        where: eq(schema.templateGroups.templateKey, entry.templateKey),
-        with: { variants: true, channelSettings: true },
-      });
-      expect(group?.isActive).toBe(true);
+      const template = await db.query.templates.findFirst({ where: eq(schema.templates.templateKey, entry.templateKey) });
+      expect(template?.isActive).toBe(true);
+      if (!template) continue;
 
       for (const channel of entry.channels) {
-        const setting = group?.channelSettings.find(channelSetting => channelSetting.channel === channel);
-        expect(setting?.isEnabled).toBe(true);
-
-        const variant = group?.variants.find(templateVariant => templateVariant.channel === channel && templateVariant.locale === DEFAULT_LOCALE);
-        expect(variant?.isActive).toBe(true);
-        if (!variant) continue;
-
-        if (channel === 'EMAIL') expect(variant.subject).toBeTruthy();
-
-        /** Rendered exactly as NotificationProviderService renders before handing the message to a provider */
-        const rendered = `${mustache.render(variant.subject ?? 'NA', entry.payload)}\n${mustache.render(variant.body, entry.payload)}`;
+        /** Renders exactly as the live send path does — through the engine, layout, and partials — via the studio preview API. */
+        const response = await testEnv
+          .getRouter()
+          .mockRequest()
+          .headers(testEnv.authHeaders())
+          .post(`/api/v1/templates/${template.id}/versions/preview`)
+          .body({ channel, data: entry.payload });
+        expect(response.statusCode).toBe(200);
+        const { subject, body } = response.json();
+        const rendered = `${subject ?? ''}\n${body}`;
         expect(rendered).not.toContain('{{');
         for (const fragment of entry.fragments) expect(rendered).toContain(fragment);
       }

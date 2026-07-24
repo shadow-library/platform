@@ -1,1 +1,0 @@
-ALTER TABLE "notification_jobs" ADD COLUMN "service" varchar(100);

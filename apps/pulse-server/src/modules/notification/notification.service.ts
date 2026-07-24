@@ -14,7 +14,7 @@ import { DatabaseService } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
-import { LinkedTemplateVariant, TemplateSettingsService, TemplateVariantService } from '@modules/template';
+import { DEFAULT_LOCALE, type ResolvedTemplate, resolvePayload, TemplateResolverService } from '@modules/template';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Configuration, Notification, PrimaryDatabase, schema, Template } from '@server/database';
@@ -49,11 +49,6 @@ export interface SendNotificationConfig {
   payload?: Record<string, any>;
   locale?: string;
   service?: string;
-}
-
-export interface TemplateConfig {
-  channel: Notification.Channel;
-  templateVariant: Template.Variant | null;
 }
 
 export interface ChannelSendResult {
@@ -92,7 +87,6 @@ export type NotificationMessage = Notification.Message & {
  * Declaring the constants
  */
 const MAX_ATTEMPTS = 5;
-const DEFAULT_LOCALE = 'en-ZZ';
 const BASE_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 2, TRANSACTIONAL: 30, PROMOTIONAL: 5 * 60 };
 const MAX_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 30, TRANSACTIONAL: 30 * 60, PROMOTIONAL: 6 * 60 * 60 };
 const PRIORITY_MODIFIER: Record<Notification.Priority, number> = { LOW: 2, MEDIUM: 1, HIGH: 0.5 };
@@ -111,8 +105,7 @@ export class NotificationService {
     private readonly databaseService: DatabaseService,
     private readonly notificationProviderService: NotificationProviderService,
 
-    private readonly templateVariantService: TemplateVariantService,
-    private readonly templateSettingsService: TemplateSettingsService,
+    private readonly templateResolver: TemplateResolverService,
     private readonly senderRoutingRuleService: SenderRoutingRuleService,
     private readonly senderEndpointService: SenderEndpointService,
   ) {
@@ -143,16 +136,6 @@ export class NotificationService {
     }
   }
 
-  private async resolveTemplateVariant(templateKey: string, channel: Notification.Channel, locale: string = DEFAULT_LOCALE): Promise<LinkedTemplateVariant | null> {
-    const localTemplate = await this.templateVariantService.getTemplateVariantByKey(templateKey, channel, locale);
-    if (localTemplate && localTemplate.isActive) return localTemplate;
-    if (locale === DEFAULT_LOCALE) return null;
-
-    const fallbackTemplateVariant = await this.templateVariantService.getTemplateVariantByKey(templateKey, channel, DEFAULT_LOCALE);
-    if (fallbackTemplateVariant && fallbackTemplateVariant.isActive) return fallbackTemplateVariant;
-    return null;
-  }
-
   private getRegion(notificationJob: Notification.Job): string {
     if (notificationJob.channel !== 'SMS') return 'ZZ';
     const phoneNumber = parsePhoneNumber(notificationJob.recipient);
@@ -169,25 +152,27 @@ export class NotificationService {
     return new Date(Date.now() + totalDelaySeconds * 1000);
   }
 
-  private async executeNotificationJob(notificationJob: Notification.Job, templateVariant?: LinkedTemplateVariant): Promise<void> {
+  /**
+   * Executes a single job end-to-end: re-resolves the render bundle from the pinned version (so a retry re-renders
+   * identical content), selects a vendor via the routing rules, renders + hands off to the provider, and records the
+   * outcome with an exponential, message-type-aware backoff. Stubbed out in tests to avoid real provider calls.
+   */
+  private async executeNotificationJob(notificationJob: Notification.Job): Promise<void> {
     const attempt = notificationJob.attempt + 1;
     const recipient = utils.string.mask(notificationJob.recipient);
     const jobLogData: Record<string, any> = { jobId: notificationJob.id, ...utils.object.pickKeys(notificationJob, ['channel', 'locale', 'createdAt']), recipient, attempt };
     try {
-      if (!templateVariant) {
-        const template = await this.templateVariantService.getTemplateVariant(notificationJob.templateGroupId, notificationJob.channel, notificationJob.locale);
-        assert(template, 'Template variant not found for notification job');
-        templateVariant = template;
-      }
-      this.logger.debug(`Template variant resolved for notification job - ${notificationJob.id}`, { templateVariantId: templateVariant.id });
+      const template = await this.db.query.templates.findFirst({ where: eq(schema.templates.id, notificationJob.templateId) });
+      assert(template, 'Template not found for notification job');
+      const bundle = await this.templateResolver.loadRenderBundle(notificationJob.templateVersionId, notificationJob.channel, notificationJob.locale);
+      assert(bundle, 'Render bundle not found for notification job');
 
       const region = this.getRegion(notificationJob);
       const service = notificationJob.service ?? 'default';
-      const templateGroup = templateVariant.getParent();
-      Object.assign(jobLogData, { templateKey: templateGroup.templateKey, service, region });
+      Object.assign(jobLogData, { templateKey: template.templateKey, service, region });
       this.logger.debug('Resolved service, region and messageType for notification job', jobLogData);
 
-      const routingRule = await this.senderRoutingRuleService.resolveSenderRoutingRule(service, region, templateGroup.messageType);
+      const routingRule = await this.senderRoutingRuleService.resolveSenderRoutingRule(service, region, template.messageType);
       const senderEndpoints = await this.senderEndpointService.getSenderEndpointsByChannel(routingRule.senderProfileId, notificationJob.channel);
       if (senderEndpoints.length === 0) throw AppErrorCode.SND_EP_001.create();
       Object.assign(jobLogData, { routingRuleId: routingRule.id, senderProfileId: routingRule.senderProfileId, senderEndpointCount: senderEndpoints.length });
@@ -199,9 +184,9 @@ export class NotificationService {
       this.logger.debug(`Resolved sender endpoint for notification job - ${notificationJob.id}`, jobLogData);
 
       let result: NotificationOpResult;
-      if (notificationJob.channel === 'SMS') result = await this.notificationProviderService.sendSMS(notificationJob, senderEndpoint, templateVariant);
-      else if (notificationJob.channel === 'EMAIL') result = await this.notificationProviderService.sendEmail(notificationJob, senderEndpoint, templateVariant);
-      else result = await this.notificationProviderService.sendPushNotification(notificationJob, senderEndpoint, templateVariant);
+      if (notificationJob.channel === 'SMS') result = await this.notificationProviderService.sendSMS(notificationJob, senderEndpoint, bundle);
+      else if (notificationJob.channel === 'EMAIL') result = await this.notificationProviderService.sendEmail(notificationJob, senderEndpoint, bundle);
+      else result = await this.notificationProviderService.sendPushNotification(notificationJob, senderEndpoint, bundle);
 
       let status: Notification.Status = result.success ? 'SENT' : 'FAILED';
       if (!result.success && attempt >= MAX_ATTEMPTS) status = 'PERMANENTLY_FAILED';
@@ -211,7 +196,7 @@ export class NotificationService {
           status,
           attempt: sql`${schema.notificationJobs.attempt} + 1`,
           lastAttemptedAt: new Date(),
-          nextAttemptAt: result.success ? null : this.getNextAttemptAt(templateGroup.messageType, notificationJob.priority, notificationJob.attempt + 1),
+          nextAttemptAt: result.success ? null : this.getNextAttemptAt(template.messageType, notificationJob.priority, notificationJob.attempt + 1),
         })
         .where(eq(schema.notificationJobs.id, notificationJob.id))
         .returning({ id: schema.notificationJobs.id, status: schema.notificationJobs.status });
@@ -232,42 +217,53 @@ export class NotificationService {
     }
   }
 
-  private async sendChannelNotification(channel: Notification.Channel, config: SendNotificationConfig): Promise<ChannelSendResult> {
+  private async sendChannelNotification(
+    channel: Notification.Channel,
+    resolved: ResolvedTemplate,
+    payload: Record<string, unknown>,
+    config: SendNotificationConfig,
+  ): Promise<ChannelSendResult> {
     const recipient = this.getValidatedRecipient(channel, config.recipients);
     if (!recipient) {
       const errorCode = RECIPIENT_VALIDATION_ERROR_CODES[channel];
       return { channel, status: ChannelNotificationStatus.FAILED, error: errorCode.create().toResponse() };
     }
 
-    const templateVariant = await this.resolveTemplateVariant(config.templateKey, channel, config.locale);
-    if (!templateVariant) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_VRT_003.create().toResponse() };
+    if (!resolved.publishedVersion) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_VER_003.create().toResponse() };
 
-    const templateGroup = templateVariant.getParent();
+    const content = await this.templateResolver.findContent(resolved.publishedVersion.id, channel, config.locale ?? DEFAULT_LOCALE);
+    if (!content) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_CNT_003.create().toResponse() };
+
     const [notification] = await this.db
       .insert(schema.notificationJobs)
       .values({
-        templateGroupId: templateVariant.templateGroupId,
+        templateId: resolved.template.id,
+        templateVersionId: resolved.publishedVersion.id,
         channel,
         service: config.service,
-        locale: templateVariant.locale,
-        priority: templateGroup.priority,
+        locale: content.locale,
+        priority: resolved.template.priority,
         recipient,
-        payload: config.payload,
+        payload,
         status: 'PENDING',
       })
       .returning();
     assert(notification, 'Failed to create notification job');
 
-    const logData = { channel, recipient: utils.string.mask(recipient), templateKey: config.templateKey, locale: templateVariant.locale };
+    const logData = { channel, recipient: utils.string.mask(recipient), templateKey: config.templateKey, locale: content.locale };
     this.logger.info(`Created notification job - ${notification.id}`, logData);
     this.logger.debug('Notification job details', { notification });
-    this.executeNotificationJob(notification, templateVariant);
-    return { jobId: notification.id, channel, status: ChannelNotificationStatus.QUEUED, locale: templateVariant.locale };
+    this.executeNotificationJob(notification);
+    return { jobId: notification.id, channel, status: ChannelNotificationStatus.QUEUED, locale: content.locale };
   }
 
   async send(config: SendNotificationConfig): Promise<SendNotificationResult> {
-    const templateSettings = await this.templateSettingsService.getEnabledChannels(config.templateKey);
-    const promises = templateSettings.map(setting => this.sendChannelNotification(setting.channel, config));
+    const resolved = await this.templateResolver.resolveForSend(config.templateKey);
+    if (resolved.enabledChannels.length === 0) return { status: NotificationStatus.ACCEPTED, channelResults: [] };
+
+    /** The variable contract is enforced once for the whole send — a breach is a producer bug, not a per-channel outcome. */
+    const payload = resolvePayload(resolved.template.variableSchema, config.payload ?? {});
+    const promises = resolved.enabledChannels.map(channel => this.sendChannelNotification(channel, resolved, payload, config));
     const results = await Promise.all(promises);
 
     let status = NotificationStatus.FAILED;
@@ -291,7 +287,7 @@ export class NotificationService {
       .select()
       .from(schema.notificationMessages)
       .innerJoin(schema.notificationJobs, eq(schema.notificationMessages.notificationJobId, schema.notificationJobs.id))
-      .innerJoin(schema.templateGroups, eq(schema.notificationJobs.templateGroupId, schema.templateGroups.id))
+      .innerJoin(schema.templates, eq(schema.notificationJobs.templateId, schema.templates.id))
       .where(where);
 
     const [countResult, rows] = await Promise.all([
@@ -307,7 +303,7 @@ export class NotificationService {
     const items = rows.map(row => ({
       ...row.notification_messages,
       ...utils.object.pickKeys(row.notification_jobs, ['channel', 'recipient', 'locale', 'payload']),
-      ...utils.object.pickKeys(row.template_groups, ['templateKey', 'messageType']),
+      ...utils.object.pickKeys(row.templates, ['templateKey', 'messageType']),
     }));
     return utils.pagination.createResult(query, items, total);
   }

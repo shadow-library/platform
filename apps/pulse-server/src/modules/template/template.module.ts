@@ -7,11 +7,16 @@ import { DatabaseModule } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { TemplateGroupController } from './template-group/template-group.controller';
-import { TemplateGroupService } from './template-group/template-group.service';
-import { TemplateSettingsService } from './template-settings.service';
-import { TemplateVariantController } from './template-variant/template-variant.controller';
-import { TemplateVariantService } from './template-variant/template-variant.service';
+import { LayoutController } from './layout.controller';
+import { LayoutService } from './layout.service';
+import { PartialController } from './partial.controller';
+import { PartialService } from './partial.service';
+import { TemplateEngineService } from './rendering/template-engine.service';
+import { TemplateResolverService } from './template-resolver.service';
+import { TemplateVersionController } from './template-version.controller';
+import { TemplateVersionService } from './template-version.service';
+import { TemplateController } from './template.controller';
+import { TemplateService } from './template.service';
 
 /**
  * Defining types
@@ -23,8 +28,8 @@ import { TemplateVariantService } from './template-variant/template-variant.serv
 
 @Module({
   imports: [DatabaseModule],
-  controllers: [TemplateGroupController, TemplateVariantController],
-  providers: [TemplateGroupService, TemplateSettingsService, TemplateVariantService],
-  exports: [TemplateGroupService, TemplateSettingsService, TemplateVariantService],
+  controllers: [TemplateController, TemplateVersionController, LayoutController, PartialController],
+  providers: [TemplateEngineService, TemplateResolverService, TemplateService, TemplateVersionService, LayoutService, PartialService],
+  exports: [TemplateEngineService, TemplateResolverService, TemplateService, TemplateVersionService, LayoutService, PartialService],
 })
 export class TemplateModule {}

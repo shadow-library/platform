@@ -27,6 +27,10 @@ export const PULSE_AUDIENCE = 'pulse-server';
 export const PULSE_PERMISSIONS = {
   templatesRead: 'pulse:templates:read',
   templatesWrite: 'pulse:templates:write',
+  /** The higher bar that gates draft → published transitions and rollbacks (a live-traffic change, unlike drafting) */
+  templatesPublish: 'pulse:templates:publish',
+  /** Governs the shared design-system assets (layouts + partials) every template renders through */
+  layoutsWrite: 'pulse:layouts:write',
   sendersRead: 'pulse:senders:read',
   sendersWrite: 'pulse:senders:write',
   metricsRead: 'pulse:metrics:read',

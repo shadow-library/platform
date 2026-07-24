@@ -110,7 +110,8 @@ export class TemplateEngineService {
         readFile: (file: string) => Promise.resolve(read(file)),
         existsSync: (file: string) => partials[file] != null,
         exists: (file: string) => Promise.resolve(partials[file] != null),
-        contains: () => true,
+        contains: () => Promise.resolve(true),
+        containsSync: () => true,
       },
     });
   }

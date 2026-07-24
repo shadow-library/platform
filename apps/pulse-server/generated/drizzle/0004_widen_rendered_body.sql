@@ -1,1 +1,0 @@
-ALTER TABLE "notification_messages" ALTER COLUMN "rendered_body" SET DATA TYPE text;

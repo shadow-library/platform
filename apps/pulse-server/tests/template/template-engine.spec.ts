@@ -6,7 +6,7 @@ import { describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { TemplateEngineService } from '@modules/notification/rendering/template-engine.service';
+import { TemplateEngineService } from '@modules/template';
 
 /**
  * Declaring the constants

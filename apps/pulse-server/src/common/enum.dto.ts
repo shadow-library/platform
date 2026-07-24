@@ -21,6 +21,7 @@ export const NotificationStatus = EnumType.create('NotificationStatus', schema.n
 export const Priority = EnumType.create('Priority', schema.priority.enumValues);
 export const NotificationServiceProvider = EnumType.create('NotificationServiceProvider', schema.notificationServiceProviders.enumValues);
 export const MessageType = EnumType.create('MessageType', schema.messageTypes.enumValues);
+export const VersionStatus = EnumType.create('VersionStatus', schema.versionStatus.enumValues);
 
 export const SortByCreatedAt = EnumType.create('SortByCreatedAt', ['createdAt']);
 export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);

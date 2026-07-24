@@ -15,7 +15,7 @@ import { IDENTITY_CLIENT_ID, TEST_AUDIENCE, TEST_ORG, TestEnvironment } from '@t
 const testEnv = new TestEnvironment('auth_guard_test');
 
 /** A management route gated by a PDP permission (`pulse:templates:read`) */
-const MANAGEMENT_ROUTE = '/api/v1/template-groups';
+const MANAGEMENT_ROUTE = '/api/v1/templates';
 /** The machine-to-machine send route gated by the `notifications:send` scope */
 const SEND_ROUTE = '/api/v1/notifications';
 const SEND_BODY = { templateKey: 'sign-up', recipients: { email: 'user@example.com', phone: '+919876543210' }, locale: 'en-US', service: 'default' };

@@ -1,1 +1,0 @@
-ALTER TYPE "public"."notification_service_providers" ADD VALUE 'DEV' BEFORE 'SENDGRID';

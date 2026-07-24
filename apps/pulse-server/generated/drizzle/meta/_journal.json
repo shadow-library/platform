@@ -5,36 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1767361578046,
-      "tag": "0000_equal_mesmero",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1767893699344,
-      "tag": "0001_nice_gressill",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1768072955335,
-      "tag": "0002_flaky_paper_doll",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1770058199630,
-      "tag": "0003_ordinary_gamma_corps",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1784828452121,
-      "tag": "0004_widen_rendered_body",
+      "when": 1784867757821,
+      "tag": "0000_init_template_cms",
       "breakpoints": true
     }
   ]

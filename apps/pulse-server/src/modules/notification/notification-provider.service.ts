@@ -1,17 +1,16 @@
 /**
  * Importing npm packages
  */
-import mustache from 'mustache';
 import { Injectable } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
+import { buildRenderGlobals, type RenderBundle, TemplateEngineService } from '@modules/template';
 import { APP_NAME } from '@server/constants';
-import { Configuration, Notification, Template } from '@server/database';
+import { Configuration, Notification } from '@server/database';
 
-import { renderEmailDocument } from './email';
 import { DevNotificationProvider, EmailAddress, NotificationOpResult, SendEmailConfig, SendPushNotificationConfig, SendSMSConfig } from './providers';
 
 /**
@@ -26,7 +25,10 @@ import { DevNotificationProvider, EmailAddress, NotificationOpResult, SendEmailC
 export class NotificationProviderService {
   private readonly logger = Logger.getLogger(APP_NAME, NotificationProviderService.name);
 
-  constructor(private readonly devProvider: DevNotificationProvider) {}
+  constructor(
+    private readonly devProvider: DevNotificationProvider,
+    private readonly engine: TemplateEngineService,
+  ) {}
 
   private parseEmailAddress(email: string): EmailAddress {
     const emailRegex = /^(.*?)(?:\s*<(.+?)>)?$/;
@@ -40,36 +42,57 @@ export class NotificationProviderService {
     return { email };
   }
 
-  async sendEmail(notificationJob: Notification.Job, senderEndpoint: Configuration.SenderEndpoint, templateVariant: Template.Variant): Promise<NotificationOpResult> {
+  /** The render dataset: ambient globals (brand, year, support) beneath the job's schema-validated payload. */
+  private buildData(notificationJob: Notification.Job): Record<string, unknown> {
+    return { ...buildRenderGlobals(), ...((notificationJob.payload as Record<string, unknown> | null) ?? {}) };
+  }
+
+  async sendEmail(notificationJob: Notification.Job, senderEndpoint: Configuration.SenderEndpoint, bundle: RenderBundle): Promise<NotificationOpResult> {
+    const { subject, body } = await this.engine.render({
+      channel: 'EMAIL',
+      subject: bundle.subject,
+      body: bundle.body,
+      layout: bundle.layout,
+      partials: bundle.partials,
+      data: this.buildData(notificationJob),
+    });
     const toEmail = this.parseEmailAddress(notificationJob.recipient);
     const fromEmail = this.parseEmailAddress(senderEndpoint.identifier);
-    const payload: Record<string, any> = notificationJob.payload ?? {};
-    const subject = mustache.render(templateVariant.subject ?? 'NA', payload);
-    /** Template bodies store a semantic content fragment; the branded, theme-aware shell is applied here so every email shares one design system. */
-    const content = mustache.render(templateVariant.body, payload);
-    const html = renderEmailDocument({ contentHtml: content, preheader: subject });
-    const config: SendEmailConfig = { to: [toEmail], from: fromEmail, subject, body: html, notificationId: notificationJob.id, payload: payload };
+    const config: SendEmailConfig = { to: [toEmail], from: fromEmail, subject: subject ?? '', body, notificationId: notificationJob.id, payload: this.rawPayload(notificationJob) };
 
     if (senderEndpoint.provider === 'DEV') return this.devProvider.sendEmail(config);
     else return { success: false, retriable: false, error: new Error('Not implemented') };
   }
 
-  async sendSMS(notificationJob: Notification.Job, senderEndpoint: Configuration.SenderEndpoint, templateVariant: Template.Variant): Promise<NotificationOpResult> {
-    const payload: Record<string, any> = notificationJob.payload ?? {};
-    const message = mustache.render(templateVariant.body, payload);
-    const config: SendSMSConfig = { from: senderEndpoint.identifier, to: notificationJob.recipient, message, notificationId: notificationJob.id, payload: payload };
+  async sendSMS(notificationJob: Notification.Job, senderEndpoint: Configuration.SenderEndpoint, bundle: RenderBundle): Promise<NotificationOpResult> {
+    const { body } = await this.engine.render({ channel: 'SMS', subject: null, body: bundle.body, data: this.buildData(notificationJob) });
+    const config: SendSMSConfig = {
+      from: senderEndpoint.identifier,
+      to: notificationJob.recipient,
+      message: body,
+      notificationId: notificationJob.id,
+      payload: this.rawPayload(notificationJob),
+    };
 
     if (senderEndpoint.provider === 'DEV') return this.devProvider.sendSMS(config);
     else return { success: false, retriable: false, error: new Error('Not implemented') };
   }
 
-  async sendPushNotification(notificationJob: Notification.Job, senderEndpoint: Configuration.SenderEndpoint, templateVariant: Template.Variant): Promise<NotificationOpResult> {
-    const payload: Record<string, any> = notificationJob.payload ?? {};
-    const title = mustache.render(templateVariant.subject ?? 'NA', payload);
-    const message = mustache.render(templateVariant.body, payload);
-    const config: SendPushNotificationConfig = { deviceToken: notificationJob.recipient, title, message, notificationId: notificationJob.id, payload: payload };
+  async sendPushNotification(notificationJob: Notification.Job, senderEndpoint: Configuration.SenderEndpoint, bundle: RenderBundle): Promise<NotificationOpResult> {
+    const { subject, body } = await this.engine.render({ channel: 'PUSH', subject: bundle.subject, body: bundle.body, data: this.buildData(notificationJob) });
+    const config: SendPushNotificationConfig = {
+      deviceToken: notificationJob.recipient,
+      title: subject ?? '',
+      message: body,
+      notificationId: notificationJob.id,
+      payload: this.rawPayload(notificationJob),
+    };
 
     if (senderEndpoint.provider === 'DEV') return this.devProvider.sendPushNotification(config);
     else return { success: false, retriable: false, error: new Error('Not implemented') };
+  }
+
+  private rawPayload(notificationJob: Notification.Job): Record<string, any> | undefined {
+    return (notificationJob.payload as Record<string, any> | null) ?? undefined;
   }
 }
