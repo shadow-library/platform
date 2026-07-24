@@ -57,6 +57,10 @@ export const PREMISE_BUDGET = 8_000;
 export const AUDIT_BUDGET = 12_000;
 export const REBRAND_SEED_BUDGET = 10_000;
 export const REBRAND_BUDGET = 12_000;
+// Reforge mirrors the rebrand chapter budget: the source prose (outline pack) and the outline (write
+// pack) both travel as template vars, not pack sections, so the pack itself stays rebrand-sized.
+export const REFORGE_OUTLINE_BUDGET = 12_000;
+export const REFORGE_BUDGET = 12_000;
 
 function makeSection(key: string, content: string, tier: ContextTier, sourceRefs: string[] = [], segment: ContextSegment = 'volatile'): ContextSection {
   const rendered = renderSection(key, content);
@@ -904,6 +908,41 @@ export class ContextAssembler {
     if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`conversion:${chapter - 1}`]));
 
     return this.finalize(projectId, 'rebrand', chapter, sections, [], REBRAND_BUDGET, false);
+  }
+
+  /**
+   * Pack for one chapter reforge outline (reforge design §5). Only the world notes are stable (the
+   * cache prefix, byte-identical across chapters); the glossary slice is volatile. The source prose
+   * itself travels as a template var, never in the pack, so the stable segment never churns.
+   */
+  async forReforgeOutline(projectId: bigint, chapter: number, input: { worldNotes: string; glossarySlice: string }): Promise<AssembledPack & { id: bigint | null }> {
+    const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
+    sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
+
+    return this.finalize(projectId, 'reforge_outline', chapter, sections, [], REFORGE_OUTLINE_BUDGET, false);
+  }
+
+  /**
+   * Pack for one chapter re-author (reforge design §5). World notes, directives, and the author's
+   * instructions are the stable segment (the provider cache prefix); the glossary slice, carry state,
+   * and previous REFORGED ending are volatile. `prev_ending` is the tail of the previous reforged
+   * body — never the source tail, which would leak pre-rename names and break re-authored continuity.
+   * The outline travels as a template var so the pack stays cacheable. Callers pass pre-rendered
+   * strings — the assembler stays free of reforge-table knowledge.
+   */
+  async forReforge(
+    projectId: bigint,
+    chapter: number,
+    input: { worldNotes: string; directives: string | null; instructions: string | null; glossarySlice: string; carryState: string | null; prevBody: string | null },
+  ): Promise<AssembledPack & { id: bigint | null }> {
+    const sections: ContextSection[] = [asStable(makeSection('world_notes', input.worldNotes, 'canonical', []))];
+    if (input.directives) sections.push(asStable(makeSection('directives', input.directives, 'approved_intent', [])));
+    if (input.instructions) sections.push(asStable(makeSection('instructions', input.instructions, 'approved_intent', [])));
+    sections.push(makeSection('glossary_slice', input.glossarySlice, 'canonical', []));
+    if (input.carryState) sections.push(makeSection('carry_state', input.carryState, 'working', []));
+    if (input.prevBody) sections.push(makeSectionTail('prev_ending', input.prevBody, PREV_ENDING_TAIL, 'canonical', [`reforge:${chapter - 1}`]));
+
+    return this.finalize(projectId, 'reforge', chapter, sections, [], REFORGE_BUDGET, false);
   }
 
   private async premisePack(projectId: bigint, purpose: ContextPurpose, inventoryLines: number, budgetTokens: number): Promise<AssembledPack & { id: bigint | null }> {

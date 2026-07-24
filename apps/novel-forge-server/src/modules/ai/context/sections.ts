@@ -15,7 +15,8 @@
  */
 
 export type ContextTier = 'canonical' | 'approved_intent' | 'working';
-export type ContextPurpose = 'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'rebrand_seed' | 'rebrand';
+export type ContextPurpose =
+  'generation' | 'revision' | 'validation' | 'outline' | 'chat' | 'chat_hub' | 'arc_plan' | 'premise' | 'audit' | 'rebrand_seed' | 'rebrand' | 'reforge_outline' | 'reforge';
 
 // Stable = scope canon that only changes when a proposal is applied or a manual edit lands; volatile
 // = per-turn/per-chapter content. The stable prefix must stay byte-identical across calls with
@@ -75,6 +76,7 @@ export const SECTION_LABELS: Record<string, string> = {
   changed_since: '## CHANGED SINCE THIS CONVERSATION STARTED',
   world_notes: '## WORLD NOTES',
   directives: '## DIRECTIVES',
+  instructions: '## AUTHOR INSTRUCTIONS',
   glossary_slice: '## GLOSSARY',
   carry_state: '## CARRY STATE',
   entity_roster: '## ENTITY ROSTER',

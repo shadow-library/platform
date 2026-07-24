@@ -489,6 +489,77 @@ describe('ContextAssembler.forRebrandSeed', () => {
   });
 });
 
+// ─── forReforgeOutline / forReforge — reforge packs (reforge design §5) ──────
+
+describe('ContextAssembler.forReforgeOutline', () => {
+  it('puts world notes in the stable segment and the glossary slice in the volatile tail', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforgeOutline(1n, 5, { worldNotes: 'Veldram replaces every real nation.', glossarySlice: 'Ye Fan → Evan Vale [character]' });
+
+    expect(pack.purpose).toBe('reforge_outline');
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({ world_notes: 'stable', glossary_slice: 'volatile' });
+    expect(pack.renderedStable).toContain('Veldram replaces');
+    expect(pack.renderedVolatile).toContain('Evan Vale');
+  });
+
+  it('keeps the stable segment byte-identical across chapters even when the volatile glossary slice changes', async () => {
+    const assembler = makeAssembler();
+    const worldNotes = 'Veldram replaces every real nation.';
+    const pack5 = await assembler.forReforgeOutline(1n, 5, { worldNotes, glossarySlice: 'Ye Fan → Evan Vale [character]' });
+    const pack6 = await assembler.forReforgeOutline(1n, 6, { worldNotes, glossarySlice: 'Long Aotian → Leo Sky [character]' });
+    expect(pack5.renderedStable.length).toBeGreaterThan(0);
+    expect(pack6.renderedStable).toBe(pack5.renderedStable);
+  });
+});
+
+describe('ContextAssembler.forReforge', () => {
+  const input = {
+    worldNotes: 'Veldram replaces every real nation.',
+    directives: 'weave romance in',
+    instructions: 'cut the filler tournament arc; raise the prose',
+    glossarySlice: 'Ye Fan → Evan Vale [character]',
+    carryState: '{"activeThreads":"Mira spark"}',
+    prevBody: `${'OPENING_MARKER: '.repeat(200)}\n\n${'CLOSING_MARKER: '.repeat(200)}`,
+  };
+
+  it('puts world notes, directives, and author instructions in the stable segment and the rest in the volatile tail', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforge(1n, 5, input);
+
+    expect(pack.purpose).toBe('reforge');
+    const segments = Object.fromEntries(pack.sections.map(s => [s.key, s.segment]));
+    expect(segments).toMatchObject({
+      world_notes: 'stable',
+      directives: 'stable',
+      instructions: 'stable',
+      glossary_slice: 'volatile',
+      carry_state: 'volatile',
+      prev_ending: 'volatile',
+    });
+    expect(pack.renderedStable).toContain('cut the filler tournament arc');
+    expect(pack.renderedVolatile).toContain('Evan Vale');
+  });
+
+  it('keeps the END of the previous reforged body and stays byte-identical across chapters with unchanged canon', async () => {
+    const assembler = makeAssembler();
+    const pack5 = await assembler.forReforge(1n, 5, input);
+    const pack6 = await assembler.forReforge(1n, 6, { ...input, carryState: '{"activeThreads":"Mira kiss"}' });
+
+    const prevEnding = pack5.sections.find(s => s.key === 'prev_ending');
+    expect(prevEnding?.rendered).toContain('CLOSING_MARKER');
+    expect(prevEnding?.rendered).not.toContain('OPENING_MARKER');
+    // The stable prefix is the provider prompt-cache key — volatile changes must not disturb it.
+    expect(pack6.renderedStable).toBe(pack5.renderedStable);
+  });
+
+  it('omits directives, instructions, and carry state sections when absent', async () => {
+    const assembler = makeAssembler();
+    const pack = await assembler.forReforge(1n, 1, { ...input, directives: null, instructions: null, carryState: null, prevBody: null });
+    expect(pack.sections.map(s => s.key)).toEqual(['world_notes', 'glossary_slice']);
+  });
+});
+
 // ─── forChapter — knowledge sections (character-knowledge design §5) ─────────
 
 describe('ContextAssembler.forChapter — knowledge sections', () => {
