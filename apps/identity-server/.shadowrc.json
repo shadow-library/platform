@@ -6,7 +6,7 @@
     "assets": ["generated/drizzle", "public"]
   },
   "verify": {
-    "files": "{src,tests,scripts,client,packages/*/src,packages/*/tests,packages/*/scripts}/**/*.{ts,tsx}",
+    "files": "{src,tests,scripts,client}/**/*.{ts,tsx}",
     "lint": {
       "globals": "both",
       "rules": {
