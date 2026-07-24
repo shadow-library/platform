@@ -73,6 +73,9 @@ Decisions are binding. Changing one requires updating this document first.
 | **D-15** | Role/permission **definitions are owned by each application in code** and pushed declaratively to identity by the SDK on startup (`PUT /api/v1/authz/catalog`, scope `authz:roles:sync`); the manifest is the source of truth and is reconciled full-sync (absent roles/permissions are deleted, cascading into assignments). Admins no longer create roles/permissions by hand. Role **assignments** (granting a defined role to a principal) remain an administrative operation — a service never assigns roles to users.                                                              | Removes manual role administration toil and drift; keeps the catalog versioned with the code that enforces it. A service is scoped to its own application, so it cannot escalate another app's privileges. Trade-off: a bad deploy can delete grants — bounded to the pushing application and audited.        |
 | **D-16** | In-cluster M2M clients authenticate to `/oauth2/token` with their **projected Kubernetes service-account token** as an RFC 7523 client assertion, validated against the cluster's OIDC JWKS and mapped to the client via an admin-set `workload_subject` binding. `client_secret_basic` stays supported for out-of-cluster workloads. Identity remains the sole issuer of platform access tokens.                                                                                                                                                                                     | Eliminates static client secrets inside the cluster (nothing to leak, rotate, or provision); the kubelet rotates the credential automatically. Scoped, short-lived platform tokens are unchanged, so callees and the PDP are untouched.                                                                       |
 | **D-17** | Which M2M caller may reach which routes is **administered centrally in identity** (`service_route_access`: application × caller client × method × path pattern) and loaded by each service's SDK at startup; the guard denies `kind=service` principals by default. The per-route `@AllowService` decorator is removed.                                                                                                                                                                                                                                                                | Caller topology becomes auditable, admin-changeable data instead of code constants scattered across repos; granting a caller no longer requires a redeploy. Trade-off: rules load at boot, so a grant needs a restart of the target service to take effect.                                                   |
+| **D-18** | **First-party** applications hold an opaque **app-session handle** (cookie on their own domain) and mint access tokens server-to-server with their own M2M credential (`/api/v1/app-sessions/*`); they are issued **no refresh tokens**. Third-party clients keep the standard OIDC + refresh-token flow of D-4/D-11.                                                                                                                                                                                                                                                                | The application becomes stateless per user — no refresh-token store, no session table — while identity keeps a single authoritative session it can revoke instantly. A stolen handle is inert without the app's M2M credential. Trade-off: one extra service-to-service call per token, and a first-party-only code path beside the standard one. |
+| **D-19** | A step-up is **spent**, not held: an application exchanges the central elevation window for a grant scoped to one `(app session, audience)` pair, and the central window is cleared in the same act. Scopes marked `is_sensitive` mint only into such a token.                                                                                                                                                                                                                                                                                                                       | Elevated authority cannot leak to a second application, to a second API, or linger on the parent session. Trade-off: a user driving two applications must step up in each, which is the intended cost of isolation.                                                                                          |
+| **D-20** | Organisation-level security settings live in one generic `organisation_policies` key/value table governed by a **typed registry in code** (type, bounds, default, fold strategy). Durations fold with `MIN` across the platform default, the client value and every applicable organisation.                                                                                                                                                                                                                                                                                        | New policies cost a registry entry rather than a migration, while the registry stops a generic table becoming untyped configuration. `MIN` gives the invariant that an organisation may tighten but never loosen, so two organisations meeting is always well-defined.                                        |
 
 ## 4. System context
 
@@ -191,6 +194,34 @@ First-party applications never touch credentials. Each app is a registered OAuth
 - Authorization codes: single-use, 60-second TTL, stored in Redis bound to client + redirect URI + PKCE challenge + session + nonce.
 - First-party clients skip the consent screen; a consent record is still written (`source = FIRST_PARTY_POLICY`) so the data model does not change when third-party clients arrive.
 
+### 8.3.1 First-party application sessions (D-18)
+
+Third-party clients use §8.3 unchanged. **First-party** applications instead exchange the authorization
+code for an opaque **application session handle** and hold no tokens at rest:
+
+1. The app runs code + PKCE as usual; identity redirects back to its callback.
+2. The app's backend calls `POST /api/v1/app-sessions` with the code, verifier and redirect URI,
+   authenticating with **its own M2M access token**. Identity records an `app_sessions` row and returns
+   the handle once.
+3. The app sets the handle as a cookie **on its own domain** (`Secure`, `HttpOnly`, `SameSite=Lax`,
+   `Path=/`). Identity cannot set that cookie — the domains differ — so this step belongs to the app.
+   The identity SSO cookie (`__Host-sid`) never leaves the identity host.
+4. Whenever the app needs an access token it calls `POST /api/v1/app-sessions/token` with the handle,
+   again authenticated with its M2M token, and receives a short-lived JWT the target API verifies
+   offline.
+
+Consequences:
+
+- **The app is stateless per user.** It stores no refresh token and no session record; every scrap of
+  session state lives on `app_sessions`. First-party clients are therefore issued no refresh tokens.
+- **A stolen handle is inert.** Minting requires the app's M2M credentials as well as the handle, and
+  the handle is bound to the issuing `client_id` — presenting it as another client reads as unknown.
+- **The central session stays authoritative.** Every mint re-validates `identity_session_id`, so a
+  sign-out at the identity service stops issuance across every application immediately.
+
+These routes live under `/api/v1/*`, not `/oauth2/*`, so the OAuth surface remains a plain conforming
+implementation.
+
 ### 8.4 Machine-to-machine authentication (D-2)
 
 Every internal service holds a service-account client. Flow:
@@ -211,6 +242,25 @@ Client authentication supports two confidential methods (D-16): **Kubernetes wor
 - Step-up: sensitive operations (credential changes, org deletion, client-secret reveal/rotation, admin actions) require `elevated_until` in the future; elevation lasts 10 minutes and requires re-auth with password or any enrolled MFA factor.
 - Authentication assurance recorded per session: `aal1` (single factor) / `aal2` (MFA); OIDC ID tokens expose it via `acr`/`amr`.
 
+#### Step-up never crosses a service boundary (D-19)
+
+For first-party applications, elevation is **not** a mode the session sits in. An application converts a
+completed step-up into a grant addressed to one application session **and** one audience:
+
+1. The user steps up on the identity domain, opening the usual 10-minute window.
+2. The application calls `POST /api/v1/app-sessions/elevation` with its handle and target `resource`.
+   Identity writes an `app_session_elevations` row for exactly that `(app session, audience)` pair and
+   then **consumes** the central window (`elevated_until` is cleared; the achieved `aal` remains AAL2,
+   because the user really did present a second factor).
+3. `POST /api/v1/app-sessions/token` with `elevated: true` requires a live grant for that same
+   audience. It never falls back to the central session.
+
+Consuming the window is what stops elevation leaking sideways. A second application cannot ride the
+first one's step-up, the same application cannot reuse it against a different API, and nothing elevated
+is left standing on the parent session. Scopes marked `is_sensitive` are mintable **only** into such a
+token, so a sensitive capability is unreachable from an ordinary one. The elevated token's lifetime is
+capped by the remaining grant, so it can never outlive the proof behind it.
+
 ## 9. Token model
 
 | Token                    | Format         | Lifetime                                        | Storage                                      | Notes                                                             |
@@ -219,12 +269,16 @@ Client authentication supports two confidential methods (D-16): **Kubernetes wor
 | Access token (user)      | JWT (EdDSA)    | **60 minutes** (default; per-client)            | Not stored server-side                       | `sub`, `org`, `aud`, `scope`, `sid`, `acr/amr`, `iat/exp/iss/jti` |
 | Access token (M2M)       | JWT (EdDSA)    | 60 minutes                                      | Not stored                                   | `sub` = client ID, `aud` = API resource                           |
 | ID token                 | JWT (EdDSA)    | 5 minutes                                       | Not stored                                   | OIDC claims + `nonce`; never used for API authorization           |
-| Refresh token            | Opaque 256-bit | 30 d idle / 180 d absolute (bounded by session) | `refresh_tokens` (hashed), grouped by family | Rotates on every use (D-11)                                       |
+| Refresh token            | Opaque 256-bit | **15 d idle** (bounded by session)              | `refresh_tokens` (hashed), grouped by family | Rotates on every use (D-11); idle window re-arms on rotation      |
+| App session handle       | Opaque 256-bit | 30 d idle / 180 d absolute (bounded by session) | `app_sessions` (hashed)                      | First-party only; useless without the app's M2M credential        |
 | Authorization code       | Opaque         | 60 seconds, single-use                          | Redis                                        | Bound to client, redirect URI, PKCE, nonce, session               |
 
 Rules:
 
-- Tokens **never** appear in URLs, logs, or audit payloads. Refresh tokens and session IDs are stored as SHA-256 hashes only.
+- Tokens **never** appear in URLs, logs, or audit payloads. Refresh tokens, app session handles and session IDs are stored as SHA-256 hashes only.
+- **A scope is only ever minted for the API resource that owns it.** A grant on one resource can never authorise a token addressed to another, and an explicitly requested `resource` must be one the client holds at least one scope on — registration alone is not entitlement. Unknown and un-entitled resources fail identically, so the check never reveals which resources exist. Scopes on a deactivated resource stop being mintable at once.
+- **Grants are re-resolved, never replayed.** Both code exchange and refresh recompute the permitted scope set from the client's current entitlements, so a revoked scope takes effect on the next call rather than lasting for the life of the family. A refresh whose scopes have all been revoked revokes the family.
+- **Refresh is bounded by its session.** Rotation re-validates the originating `user_sessions` row; a dead session revokes the family. Since the session carries a 180-day absolute cap, the idle-only refresh window cannot outlive it.
 - Verifiers MUST validate `iss`, `aud`, `exp` (±60 s clock skew), signature against a `kid`-matched JWKS key, and the `EdDSA`-only algorithm allowlist.
 - Access tokens contain no mutable authorization state (D-3). Revocation latency for access tokens is bounded by their 60-minute TTL; anything needing faster cutoff (session revocation, account suspension) is enforced via the PDP/session checks, which are cache-bounded at 15 minutes by default and **60 s for high-risk actions** (§11).
 - User-facing refresh: a rotated family; reuse of any revoked member revokes the family **and** terminates the linked session, and emits a `security.token_reuse` event.
@@ -266,7 +320,9 @@ The token/cache windows above are tuned for throughput and low chatter against t
 
 ## 12. Protocol surface
 
-All standard endpoints; no dynamic client registration, no implicit flow, no ROPC, ever.
+All standard endpoints; no dynamic client registration, no implicit flow, no ROPC, ever. The
+`/oauth2/*` endpoints take **`application/x-www-form-urlencoded`** bodies per RFC 6749 §2.3.1; JSON is
+still accepted for one release and every such call is logged under `deprecation: oauth.json_body`.
 
 | Endpoint                                | Purpose                                                                                  |
 | :-------------------------------------- | :--------------------------------------------------------------------------------------- |
@@ -281,6 +337,16 @@ All standard endpoints; no dynamic client registration, no implicit flow, no ROP
 | `POST` back-channel logout              | OIDC BCL logout tokens pushed to registered client endpoints                             |
 | `GET /saml2/metadata`                   | SAML 2.0 IdP metadata (RSA signing certificates, SSO location)                           |
 | `GET /saml2/sso` · `/saml2/sso/resume`  | SAML SP-initiated SSO (Redirect binding in, POST binding out; login detour resumes once) |
+
+First-party session surface (M2M-authenticated, deliberately outside `/oauth2/*` so that surface stays a plain conforming implementation — D-18):
+
+| Endpoint                                          | Purpose                                                                        |
+| :------------------------------------------------ | :----------------------------------------------------------------------------- |
+| `POST /api/v1/app-sessions`                       | Exchange an authorization code for an opaque app-session handle                |
+| `POST /api/v1/app-sessions/token`                 | Mint an access token from a handle (`elevated: true` needs a matching grant)   |
+| `POST /api/v1/app-sessions/elevation`             | Spend the central step-up into a grant for one `(app session, audience)` (D-19) |
+| `DELETE /api/v1/app-sessions`                     | End one application session, leaving the central session untouched             |
+| `GET·PUT·DELETE /api/v1/organisations/:id/policies` | Read and override organisation security policies (D-20)                      |
 
 Conformance: the OpenID Foundation conformance suite (OP Basic + Config profiles) runs in CI-adjacent tooling before the OIDC milestone exits (task T-309).
 
@@ -338,6 +404,35 @@ Provider-agnostic `NotificationModule`: templated email (verification, OTP, secu
 ### 13.6 Background jobs (D-13)
 
 Postgres queue (`jobs` table, `FOR UPDATE SKIP LOCKED`, per-type concurrency, exponential backoff, dead-letter state, idempotency keys). Initial jobs: notification dispatch, key rotation, expiry sweeps (sessions, tokens, challenges, flows), lockout release, audit-chain verification, HIBP password-breach checks.
+
+### 13.7 Organisation security policies (D-20)
+
+Organisations tighten platform security settings through one generic key/value table,
+`organisation_policies` (`organisation_id`, `policy_key`, `policy_value jsonb`). The value is `jsonb` so
+a future policy can carry a boolean, list or object without a migration.
+
+Genericity without a junk drawer comes from a **typed registry in code**. Each key declares its
+description, type, default, bounds and a fold strategy; a key absent from the registry is refused on
+write, and a key retired from it stops being honoured while its rows remain. Adding a policy is one
+registry entry plus its read site — no migration, no DTO change.
+
+Resolution folds every applicable source — the platform default, the client's own value, and the
+policies of every organisation involved (the acting user's and the one owning the client) — then clamps
+to the registry bounds:
+
+```
+effective(key) = clamp(fold(strategy, [default, clientValue?, policy(userOrg)?, policy(clientOrg)?]))
+```
+
+Every duration folds with `MIN`, which yields the governing invariant: **an organisation may tighten a
+lifetime but never extend one**, and when two organisations meet, the stricter wins. Boolean policies
+will fold with `AND`/`OR` and compose without special-casing.
+
+Currently registered: access-token TTL, elevated-token TTL, elevation window, refresh-token idle TTL,
+and app-session idle/absolute TTLs. Administrators manage them at
+`/api/v1/organisations/:organisationId/policies` (org `ADMIN`, step-up required); the list response
+carries each key's metadata so a console can render inputs generically. Reads are cached in Redis and
+invalidated on write. Policy changes are audited.
 
 ## 14. Deferred capabilities (design-compatible, not built)
 

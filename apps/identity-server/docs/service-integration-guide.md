@@ -379,6 +379,53 @@ const refreshed = await rp.refresh(tokens.refreshToken!);
 
 PKCE (`S256`) is mandatory for every client; redirect URIs are exact-match. Store `state`/`nonce`/`codeVerifier` bound to the browser (they're single-use, short-lived).
 
+### 7.1 First-party apps: app sessions instead of refresh tokens (D-18)
+
+If your client is registered `isFirstParty`, do **not** keep the tokens from step 2. Exchange the code
+for an opaque **app-session handle** and store nothing per user. Every call below is server-to-server
+and authenticates with your own M2M token (scope `app-session:manage`), so the handle alone grants
+nothing.
+
+```ts
+// On the callback — exchange the code for a handle instead of holding tokens:
+const { sessionHandle, expiresAt } = await authClient.fetchService('svc://identity/api/v1/app-sessions', {
+  method: 'POST',
+  body: { code, codeVerifier, redirectUri },
+});
+
+// Set it as YOUR cookie, on YOUR domain. Identity cannot set this — the domains differ.
+reply.setCookie('__Host-app_sid', sessionHandle, { httpOnly: true, secure: true, sameSite: 'lax', path: '/' });
+
+// Whenever you need to call an API, mint a short-lived token (cache it in memory until it expires):
+const { accessToken, expiresIn } = await authClient.fetchService('svc://identity/api/v1/app-sessions/token', {
+  method: 'POST',
+  body: { sessionHandle, resource: 'api://reports', scope: 'reports:read' },
+});
+```
+
+Notes:
+
+- **No refresh token is issued** to a first-party client — the handle is the renewal credential.
+- The handle is bound to your `client_id`; another client presenting it is told the session is unknown.
+- Identity re-validates the user's central session on every mint, so a sign-out there cuts you off at
+  once. Handle `401` by restarting the login flow.
+- Sign the user out of your app with `DELETE /api/v1/app-sessions`; that ends only your session.
+
+### 7.2 Step-up for a sensitive operation (D-19)
+
+A scope marked `is_sensitive` never appears in an ordinary token. To obtain one:
+
+1. Call `/api/v1/app-sessions/token` with `elevated: true`. A `403` means no step-up grant is held.
+2. Redirect the user to identity to perform step-up.
+3. Call `POST /api/v1/app-sessions/elevation` with your handle and the target `resource`. This spends
+   the user's step-up and creates a grant for **this application and this audience only**.
+4. Retry step 1 — the token now carries `aal: "AAL2"` and the sensitive scope, and expires when the
+   grant does.
+
+Send the elevated token **only** on the routes that need it; keep using the ordinary token elsewhere.
+Because the step-up is spent, a sibling application cannot ride it and the same handle cannot reuse it
+against a different API — each needs its own grant.
+
 ---
 
 ## 8. How verification works under the hood
