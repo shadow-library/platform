@@ -25,6 +25,38 @@ export interface InitOptions {
 const PRE_COMMIT_HOOK = 'shadow verify\n';
 const COMMIT_MSG_HOOK = 'shadow commit-msg "$1"\n';
 
+/** The prettier config `init` drops in the parent so a bare `prettier` run uses the shared shadow ruleset. */
+const PRETTIER_CONFIG_FILE = 'prettier.config.mjs';
+const PRETTIER_CONFIG_CONTENT = `// Shared prettier config — the same ruleset \`shadow verify\` formats with (base rules merged with
+// this repo's \`.shadowrc.json\` \`verify.format\`), so a bare \`prettier\` run — editor format-on-save,
+// \`bunx prettier --write\` — matches instead of falling back to prettier's own defaults. Managed by
+// \`shadow init\`; delete this line and edit freely to take it over.
+import { getPrettierConfig } from '@shadow-library/scripts/prettier';
+
+export default getPrettierConfig();
+`;
+
+/**
+ * Prettier config files, in prettier's own resolution order. A repo that already declares one (or a
+ * package.json "prettier" key) configures prettier its own way, so `init` never drops a competing file.
+ */
+const PRETTIER_CONFIG_FILENAMES = [
+  '.prettierrc',
+  '.prettierrc.json',
+  '.prettierrc.json5',
+  '.prettierrc.yaml',
+  '.prettierrc.yml',
+  '.prettierrc.toml',
+  '.prettierrc.js',
+  '.prettierrc.cjs',
+  '.prettierrc.mjs',
+  '.prettierrc.ts',
+  'prettier.config.js',
+  'prettier.config.cjs',
+  'prettier.config.mjs',
+  'prettier.config.ts',
+];
+
 /** The `.shadowrc.json` a fresh repo of each type starts from — only the fields that type actually uses. */
 const STARTER_CONFIG: Record<RepoType, Record<string, unknown>> = {
   library: { type: 'library', build: { exports: { '.': 'index' } } },
@@ -97,9 +129,41 @@ function writeHook(huskyDir: string, name: string, content: string): void {
 }
 
 /**
+ * True when the repo already configures prettier some other way — a config file `init` didn't write, or
+ * a package.json `"prettier"` key — so `init` leaves prettier alone rather than dropping a competing config.
+ */
+export function hasForeignPrettierConfig(cwd: string, packageJson: PackageJson): boolean {
+  if (packageJson.prettier !== undefined) return true;
+  return PRETTIER_CONFIG_FILENAMES.filter(name => name !== PRETTIER_CONFIG_FILE).some(name => fs.existsSync(path.join(cwd, name)));
+}
+
+/**
+ * Drops a `prettier.config.mjs` that re-exports the shared `@shadow-library/scripts/prettier` config, so
+ * a bare `prettier` run in the repo uses the same ruleset `shadow verify` does. Never clobbers a
+ * customized config: an existing `prettier.config.mjs` with different content, or any other prettier
+ * config the repo already declares, is left as-is. Idempotent.
+ */
+function writePrettierConfig(cwd: string, packageJson: PackageJson): void {
+  const configPath = path.join(cwd, PRETTIER_CONFIG_FILE);
+  if (fs.existsSync(configPath)) {
+    const existing = fs.readFileSync(configPath, 'utf-8').trim();
+    if (existing === PRETTIER_CONFIG_CONTENT.trim()) log.info(`unchanged  ${PRETTIER_CONFIG_FILE}`);
+    else log.warn(`skipped    ${PRETTIER_CONFIG_FILE} (has custom content — left as-is)`);
+    return;
+  }
+  if (hasForeignPrettierConfig(cwd, packageJson)) {
+    log.info(`skipped    ${PRETTIER_CONFIG_FILE} (repo already configures prettier)`);
+    return;
+  }
+  fs.writeFileSync(configPath, PRETTIER_CONFIG_CONTENT);
+  log.info(`created    ${PRETTIER_CONFIG_FILE}`);
+}
+
+/**
  * Sets up husky the ecosystem way: ensures a `prepare: husky` script, activates husky, and wires the
  * `pre-commit` → `shadow verify` and `commit-msg` → `shadow commit-msg "$1"` hooks — so a repo needs no
- * hand-written hooks or `commitlint.config.js`. Drops a starter `.shadowrc.json` if absent. Idempotent.
+ * hand-written hooks or `commitlint.config.js`. Drops a starter `.shadowrc.json` and a
+ * `prettier.config.mjs` (re-exporting the shared ruleset) if absent. Idempotent.
  */
 export async function init(options: InitOptions): Promise<void> {
   const repoType = resolveRepoType(options.type);
@@ -128,6 +192,8 @@ export async function init(options: InitOptions): Promise<void> {
     fs.writeFileSync(shadowrcPath, `${JSON.stringify(STARTER_CONFIG[repoType], null, 2)}\n`);
     log.info(`created    .shadowrc.json (type: ${repoType})`);
   }
+
+  writePrettierConfig(options.cwd, packageJson);
 
   installTypeDependencies(options.cwd, packageJson, repoType);
 

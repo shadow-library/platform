@@ -7,8 +7,9 @@ import prettier from 'prettier';
 /**
  * Importing user defined packages
  */
-import { loadConfig, PRETTIER_BASE, type VerifyConfig } from '@lib/config';
+import { loadConfig, type VerifyConfig } from '@lib/config';
 import { createLintConfig } from '@lib/eslint-config';
+import { mergePrettierConfig } from '@lib/prettier-config';
 import { findScript, log, type PackageJson, readPackageJson, run } from '@lib/utils';
 
 /**
@@ -61,7 +62,9 @@ function detectReactVersion(packageJson: PackageJson): string | undefined {
 
 /** Formats the repo's TypeScript with prettier — the base ruleset merged with `verify.format` overrides. */
 async function runFormat(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
-  const options = { ...PRETTIER_BASE, ...verifyConfig.format };
+  // The same merge the shareable `@shadow-library/scripts/prettier` config uses, so `shadow verify` and
+  // a bare `prettier` run (via the scaffolded `prettier.config.mjs`) format identically.
+  const options = mergePrettierConfig(verifyConfig.format);
   const files = Array.from(new Bun.Glob(verifyConfig.formatFiles).scanSync({ cwd, onlyFiles: true }));
 
   if (files.length === 0) {

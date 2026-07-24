@@ -6,5 +6,6 @@ export * from './config';
 export * from './eslint-config';
 export * from './gen-api-types';
 export * from './init';
+export * from './prettier-config';
 export * from './release';
 export * from './verify';

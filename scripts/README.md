@@ -84,7 +84,9 @@ the compiled `./…js`, gets a `bun` shebang injected if missing, and is `chmod 
 Runs, in order, stopping at the first failure:
 
 1. **format** — Prettier over `verify.files`. The base ruleset (`singleQuote`, `trailingComma: all`,
-   `printWidth: 180`, `arrowParens: avoid`) is merged with `verify.format` overrides.
+   `printWidth: 180`, `arrowParens: avoid`) is merged with `verify.format` overrides. The **same merged
+   options are exported as a shareable config** (see [Shared Prettier config](#shared-prettier-config)),
+   so a bare `prettier` run — editor format-on-save, `bunx prettier --write` — matches `shadow verify`.
 2. **lint** — ESLint using the **shipped flat config** (`typescript-eslint` strict + stylistic, with
    **`eslint-plugin-perfectionist`** handling import sorting). `verify.lint.rules` / `verify.lint.ignores`
    are layered on top. No `eslint.config.js` is needed in the consuming repo.
@@ -94,6 +96,27 @@ Runs, in order, stopping at the first failure:
 `--fix` applies Prettier and ESLint fixes in place. Steps 3–4 are delegated to the repo's own scripts;
 a step that maps back to `shadow verify` is skipped instead of recursing. This is a local pre-commit
 convenience, not a CI replacement.
+
+#### Shared Prettier config
+
+`shadow verify` owns the Prettier ruleset, but an editor's format-on-save or a bare `bunx prettier` call
+doesn't run `shadow` — without a config file at the repo root they fall back to Prettier's own defaults
+(double quotes, 80 columns), which then fight `shadow verify`. To fix that, the same ruleset is exported
+from the package and `shadow init` drops a `prettier.config.mjs` in the repo that re-exports it:
+
+```js
+// prettier.config.mjs — created by `shadow init`
+import { getPrettierConfig } from '@shadow-library/scripts/prettier';
+
+export default getPrettierConfig();
+```
+
+`getPrettierConfig(cwd?)` returns the base ruleset merged with the repo's `.shadowrc.json`
+`verify.format` — the exact options `shadow verify` formats with, so every path agrees. A repo that
+already declares a Prettier config (any `.prettierrc*` / `prettier.config.*` file or a package.json
+`"prettier"` key) is left untouched. The package also default-exports the static base ruleset, so a repo
+with no `verify.format` overrides can skip the file and just add `"prettier":
+"@shadow-library/scripts/prettier"` to its package.json.
 
 ### `gen-api-types <url>`
 

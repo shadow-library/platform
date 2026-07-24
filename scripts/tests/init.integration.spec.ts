@@ -46,6 +46,36 @@ describe('init (integration)', () => {
     expect(read('.husky/pre-commit')).toBe('shadow verify');
     expect(read('.husky/commit-msg')).toBe('shadow commit-msg "$1"');
     expect(fs.existsSync(path.join(fixtureDir, '.shadowrc.json'))).toBe(true);
+    // The parent gets a prettier.config.mjs re-exporting the shared ruleset, so a bare `prettier` run matches verify.
+    const prettierConfig = read('prettier.config.mjs');
+    expect(prettierConfig).toContain("from '@shadow-library/scripts/prettier'");
+    expect(prettierConfig).toContain('export default getPrettierConfig()');
+  });
+
+  it('should not clobber a customized prettier.config.mjs', async () => {
+    fixtureDir = createFixtureDir('shadow-init-prettier-custom-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/init', version: '1.0.0' }),
+      'prettier.config.mjs': 'export default { printWidth: 100 };\n',
+    });
+    initGit(fixtureDir);
+
+    await init({ cwd: fixtureDir });
+
+    expect(read('prettier.config.mjs')).toBe('export default { printWidth: 100 };');
+  });
+
+  it('should not drop a prettier.config.mjs when the repo already configures prettier another way', async () => {
+    fixtureDir = createFixtureDir('shadow-init-prettier-foreign-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/init', version: '1.0.0' }),
+      '.prettierrc.json': '{ "printWidth": 100 }\n',
+    });
+    initGit(fixtureDir);
+
+    await init({ cwd: fixtureDir });
+
+    expect(fs.existsSync(path.join(fixtureDir, 'prettier.config.mjs'))).toBe(false);
   });
 
   it('should write a type-specific starter .shadowrc.json from the --type flag', async () => {

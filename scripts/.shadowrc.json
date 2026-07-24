@@ -1,7 +1,8 @@
 {
   "build": {
     "exports": {
-      ".": "index"
+      ".": "index",
+      "./prettier": "prettier-config"
     },
     "bin": {
       "shadow": "bin/shadow"
