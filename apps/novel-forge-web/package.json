@@ -3,7 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "husky",
+    "prepare": "shadow prepare",
     "dev": "vite dev",
     "build": "shadow build",
     "verify": "shadow verify",
@@ -27,7 +27,7 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.57.0",
-    "@shadow-library/scripts": "0.2.3",
+    "@shadow-library/scripts": "0.3.0",
     "@tanstack/react-query-devtools": "^5.101.2",
     "@tanstack/react-router-devtools": "^1.167.0",
     "@types/bun": "^1.3.9",
