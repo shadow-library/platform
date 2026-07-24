@@ -3,7 +3,7 @@
  */
 import { and, asc, desc, eq } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { InMemoryStore, Logger, LRUCache } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
 /**
@@ -40,6 +40,12 @@ export interface RenderBundle {
 /** The neutral, language-agnostic base locale; every template must have en-ZZ content, so it is the universal fallback. */
 export const DEFAULT_LOCALE = 'en-ZZ';
 
+/** Bounds on the immutable per-version content and per-key layout caches, so a long-lived worker can never grow unboundedly. */
+const CONTENT_CACHE_CAPACITY = 2000;
+const LAYOUT_CACHE_CAPACITY = 200;
+/** Single-entry key under which the full published-partial set is memoised. */
+const PARTIALS_STORE_KEY = 'published-partials';
+
 /**
  * Resolves the renderable artifacts for a send. Two responsibilities:
  *
@@ -55,12 +61,12 @@ export class TemplateResolverService {
   private readonly logger = Logger.getLogger(APP_NAME, TemplateResolverService.name);
   private readonly db: PrimaryDatabase;
 
-  /** Keyed by `${versionId}:${channel}:${requestedLocale}` → resolved content (or null). Safe forever: version ids are immutable. */
-  private readonly contentCache = new Map<string, Template.Content | null>();
-  /** Keyed by layoutKey → published body (or null). Invalidated when any layout is (re)published. */
-  private readonly layoutCache = new Map<string, string | null>();
-  /** The full published-partial set, lazily built and invalidated when any partial is (re)published. */
-  private partialsCache: Record<string, string> | null = null;
+  /** Keyed by `${versionId}:${channel}:${requestedLocale}` → resolved content (or null). Safe forever: version ids are immutable, so a bounded LRU only ever evicts cold entries. */
+  private readonly contentCache = new LRUCache(CONTENT_CACHE_CAPACITY);
+  /** Keyed by layoutKey → published body (or null). Cleared when any layout is (re)published. */
+  private readonly layoutCache = new LRUCache(LAYOUT_CACHE_CAPACITY);
+  /** Holds the full published-partial set under a single key; dropped when any partial is (re)published. */
+  private readonly partialStore = new InMemoryStore();
 
   constructor(private readonly databaseService: DatabaseService) {
     this.db = this.databaseService.getPostgresClient();
@@ -84,8 +90,7 @@ export class TemplateResolverService {
   /** Resolves the content row for a pinned version + channel, honouring the en-ZZ locale fallback. Cached (immutable). */
   async findContent(versionId: bigint, channel: Notification.Channel, locale: string): Promise<Template.Content | null> {
     const cacheKey = `${versionId}:${channel}:${locale}`;
-    const cached = this.contentCache.get(cacheKey);
-    if (cached !== undefined) return cached;
+    if (this.contentCache.has(cacheKey)) return this.contentCache.get<Template.Content | null>(cacheKey) ?? null;
 
     let content = await this.queryContent(versionId, channel, locale);
     if (!content && locale !== DEFAULT_LOCALE) content = await this.queryContent(versionId, channel, DEFAULT_LOCALE);
@@ -106,8 +111,7 @@ export class TemplateResolverService {
 
   /** The published body of a layout, or null if the layout is unknown or has no published version. Cached until a layout publish. */
   async publishedLayoutBody(layoutKey: string): Promise<string | null> {
-    const cached = this.layoutCache.get(layoutKey);
-    if (cached !== undefined) return cached;
+    if (this.layoutCache.has(layoutKey)) return this.layoutCache.get<string | null>(layoutKey) ?? null;
 
     const layout = await this.db.query.layouts.findFirst({
       where: eq(schema.layouts.layoutKey, layoutKey),
@@ -120,7 +124,8 @@ export class TemplateResolverService {
 
   /** Every published partial keyed by partialKey. Cached as a set until a partial publish. */
   async publishedPartials(): Promise<Record<string, string>> {
-    if (this.partialsCache) return this.partialsCache;
+    const cached = this.partialStore.get<Record<string, string>>(PARTIALS_STORE_KEY);
+    if (cached) return cached;
 
     const rows = await this.db.query.partials.findMany({
       with: { versions: { where: eq(schema.partialVersions.status, 'PUBLISHED'), limit: 1 } },
@@ -130,7 +135,7 @@ export class TemplateResolverService {
       const body = partial.versions[0]?.body;
       if (body != null) map[partial.partialKey] = body;
     }
-    this.partialsCache = map;
+    this.partialStore.set(PARTIALS_STORE_KEY, map);
     return map;
   }
 
@@ -141,7 +146,7 @@ export class TemplateResolverService {
 
   /** Called by the partial service after a publish — the next render picks up the new partial set. */
   invalidatePartials(): void {
-    this.partialsCache = null;
+    this.partialStore.del(PARTIALS_STORE_KEY);
   }
 
   private queryContent(versionId: bigint, channel: Notification.Channel, locale: string): Promise<Template.Content | undefined> {
