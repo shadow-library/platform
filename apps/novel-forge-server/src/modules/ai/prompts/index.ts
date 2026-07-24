@@ -33,6 +33,9 @@ import { rebrandAuditPrompt } from './rebrand-audit.prompt';
 import { rebrandConvertPrompt } from './rebrand-convert.prompt';
 import { rebrandGlossaryPrompt } from './rebrand-glossary.prompt';
 import { recombinePrompt } from './recombine.prompt';
+import { reforgeJudgePrompt } from './reforge-judge.prompt';
+import { reforgeOutlinePrompt } from './reforge-outline.prompt';
+import { reforgeWritePrompt } from './reforge-write.prompt';
 import { reviewPrompt } from './review.prompt';
 import { revisionPrompt } from './revision.prompt';
 import { skeletonPrompt } from './skeleton.prompt';
@@ -77,6 +80,9 @@ export const PROMPT_REGISTRY: Record<PromptKey, PromptModule<unknown>> = {
   'rebrand-glossary': rebrandGlossaryPrompt as PromptModule<unknown>,
   'rebrand-convert': rebrandConvertPrompt as PromptModule<unknown>,
   'rebrand-audit': rebrandAuditPrompt as PromptModule<unknown>,
+  'reforge-outline': reforgeOutlinePrompt as PromptModule<unknown>,
+  'reforge-write': reforgeWritePrompt as PromptModule<unknown>,
+  'reforge-judge': reforgeJudgePrompt as PromptModule<unknown>,
   recombine: recombinePrompt as PromptModule<unknown>,
 };
 

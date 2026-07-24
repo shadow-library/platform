@@ -37,6 +37,7 @@ export * from './knowledge-contract.schema';
 export * from './premise.schema';
 export * from './bible-audit.schema';
 export * from './rebrand.schema';
+export * from './reforge.schema';
 export * from './recombine.schema';
 export * from './chat-refine.schema';
 export * from './arc-plan.schema';

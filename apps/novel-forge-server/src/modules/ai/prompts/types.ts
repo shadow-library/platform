@@ -47,6 +47,9 @@ export type PromptKey =
   | 'rebrand-glossary'
   | 'rebrand-convert'
   | 'rebrand-audit'
+  | 'reforge-outline'
+  | 'reforge-write'
+  | 'reforge-judge'
   | 'recombine';
 
 export interface PromptModule<TOut> {

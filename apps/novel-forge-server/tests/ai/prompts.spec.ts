@@ -16,6 +16,9 @@ import {
   PlanSchema,
   RebrandAuditSchema,
   RebrandConvertSchema,
+  ReforgeJudgeSchema,
+  ReforgeOutlineSchema,
+  ReforgeWriteSchema,
   validateArcCoverage,
   validatePlanContiguity,
 } from '@modules/ai/schemas';
@@ -250,6 +253,90 @@ describe('Prompt modules', () => {
       expect(audit.postValidate?.({ verdict: 'clean', issues: [{ type: 'naming', detail: 'x' }] })[0]).toMatch(/empty issues list/);
       expect(parseSchema(RebrandAuditSchema, { verdict: 'issues', issues: [{ type: 'real_world_reference', detail: 'mentions China' }] }).success).toBe(true);
       expect(parseSchema(RebrandAuditSchema, { verdict: 'maybe', issues: [] }).success).toBe(false);
+    });
+  });
+
+  describe('reforge prompt modules', () => {
+    it('registers the three reforge prompt keys with the expected roles', () => {
+      for (const key of ['reforge-outline', 'reforge-write', 'reforge-judge'] as const) {
+        expect(PROMPT_REGISTRY[key]).toBeDefined();
+        expect(PROMPT_REGISTRY[key].version).toBe('1.0.0');
+      }
+      // Outline and write ride the dedicated writing-group `reforge` role; the fidelity check reuses `judge`.
+      expect(PROMPT_REGISTRY['reforge-outline'].role).toBe('reforge');
+      expect(PROMPT_REGISTRY['reforge-write'].role).toBe('reforge');
+      expect(PROMPT_REGISTRY['reforge-judge'].role).toBe('judge');
+      // The re-author elevates prose, so it carries the house style; the two analytical prompts must not.
+      expect(PROMPT_REGISTRY['reforge-write'].kind).toBe('authoring');
+      expect(PROMPT_REGISTRY['reforge-write'].system).toContain(AUTHORING_STYLE.slice(0, 40));
+      expect(PROMPT_REGISTRY['reforge-outline'].kind).toBe('analytical');
+      expect(PROMPT_REGISTRY['reforge-judge'].kind).toBe('analytical');
+    });
+
+    it('renders reforge-outline with the stable pack first and the volatile source prose last', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-outline'].template.formatMessages({ contextPack: 'STABLE-WORLD-NOTES', chapterProse: 'VOLATILE-SOURCE-PROSE' });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toBe('STABLE-WORLD-NOTES');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-SOURCE-PROSE');
+    });
+
+    it('renders reforge-write in cache order: system, stable pack, volatile outline tail', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-write'].template.formatMessages({
+        contextPack: 'STABLE-PACK',
+        outline: 'VOLATILE-OUTLINE',
+        repairNotes: 'fix the leftover name',
+      });
+      expect(messages).toHaveLength(3);
+      expect(messages[0]?.getType()).toBe('system');
+      expect(String(messages[1]?.content)).toBe('STABLE-PACK');
+      expect(String(messages[2]?.content)).toContain('VOLATILE-OUTLINE');
+      expect(String(messages[2]?.content)).toContain('fix the leftover name');
+    });
+
+    it('renders reforge-judge with its outline, world notes, glossary, and written prose vars', async () => {
+      const messages = await PROMPT_REGISTRY['reforge-judge'].template.formatMessages({
+        outline: 'OUTLINE',
+        worldNotes: 'NOTES',
+        glossarySlice: 'SLICE',
+        writtenProse: 'PROSE',
+      });
+      expect(String(messages[1]?.content)).toContain('OUTLINE');
+      expect(String(messages[1]?.content)).toContain('SLICE');
+      expect(String(messages[2]?.content)).toContain('PROSE');
+    });
+
+    it('validates the reforge output shapes', () => {
+      expect(
+        parseSchema(ReforgeOutlineSchema, { title: 'The Vale Gate', throughline: 'Evan claims the gate.', beats: [{ summary: 'He enters.', purpose: 'set stakes' }] }).success,
+      ).toBe(true);
+      expect(parseSchema(ReforgeOutlineSchema, { title: 'Empty', throughline: 't', beats: [] }).success).toBe(false);
+
+      const body = 'p'.repeat(120);
+      expect(parseSchema(ReforgeWriteSchema, { title: 'The Vale Gate', body }).success).toBe(true);
+      expect(parseSchema(ReforgeWriteSchema, { title: 'Too short', body: 'tiny' }).success).toBe(false);
+      const withChanges = { title: 'The Vale Gate', body, changes: { renames: ['Ye Fan → Evan Vale'], removals: ['cut the filler tournament'] }, discoveredNames: [] };
+      expect(parseSchema(ReforgeWriteSchema, withChanges).success).toBe(true);
+
+      expect(parseSchema(ReforgeJudgeSchema, { verdict: 'clean', coveredBeats: 3, totalBeats: 3, issues: [] }).success).toBe(true);
+      expect(
+        parseSchema(ReforgeJudgeSchema, {
+          verdict: 'issues',
+          coveredBeats: 2,
+          totalBeats: 3,
+          missingBeats: ['the duel'],
+          issues: [{ type: 'missing_beat', detail: 'the duel is gone' }],
+        }).success,
+      ).toBe(true);
+      expect(parseSchema(ReforgeJudgeSchema, { verdict: 'bogus', coveredBeats: 0, totalBeats: 0, issues: [] }).success).toBe(false);
+    });
+
+    it('reforge-judge postValidate forces verdict/issues agreement and beat-count sanity', () => {
+      const judge = PROMPT_REGISTRY['reforge-judge'];
+      expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 3, totalBeats: 3, issues: [] })).toEqual([]);
+      expect(judge.postValidate?.({ verdict: 'issues', coveredBeats: 3, totalBeats: 3, issues: [] })[0]).toMatch(/at least one issue/);
+      expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 3, totalBeats: 3, issues: [{ type: 'naming', detail: 'x' }] })[0]).toMatch(/empty issues list/);
+      expect(judge.postValidate?.({ verdict: 'clean', coveredBeats: 4, totalBeats: 3, issues: [] })[0]).toMatch(/cannot exceed totalBeats/);
     });
   });
 

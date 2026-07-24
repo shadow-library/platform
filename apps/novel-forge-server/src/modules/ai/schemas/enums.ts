@@ -32,3 +32,5 @@ export const RebrandFixKind = EnumType.create('RebrandFixKind', ['name', 'attrib
 export const RebrandAuditVerdict = EnumType.create('RebrandAuditVerdict', ['clean', 'issues']);
 export const RebrandAuditIssueType = EnumType.create('RebrandAuditIssueType', ['nationalism', 'discrimination', 'naming', 'real_world_reference']);
 export const RecombineVerdict = EnumType.create('RecombineVerdict', ['merge', 'split']);
+export const ReforgeJudgeVerdict = EnumType.create('ReforgeJudgeVerdict', ['clean', 'issues']);
+export const ReforgeJudgeIssueType = EnumType.create('ReforgeJudgeIssueType', ['missing_beat', 'invented_beat', 'naming', 'nationalism', 'discrimination', 'real_world_reference']);
