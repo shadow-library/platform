@@ -62,6 +62,18 @@ describe('verify (integration)', () => {
     expect(fs.readFileSync(path.join(fixtureDir, 'src/index.ts'), 'utf-8')).toBe(CLEAN_SOURCE);
   });
 
+  it('should format using the repo .prettierrc.json rather than prettier defaults', async () => {
+    fixtureDir = createFixtureDir('shadow-verify-prettierrc-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/prc' }),
+      // semi:false makes a semicolon-less source "clean"; prettier's own default (semi:true) would flag it.
+      '.prettierrc.json': JSON.stringify({ semi: false }),
+      'src/index.ts': 'export const value = 1\n',
+    });
+
+    await expect(verify({ cwd: fixtureDir })).resolves.toBe(0);
+  });
+
   it('should fail when linting finds an error in a well-formatted file', async () => {
     fixtureDir = createFixtureDir('shadow-verify-lint-');
     writeFixtureFiles(fixtureDir, {

@@ -1,6 +1,8 @@
 /**
  * Importing npm packages
  */
+import path from 'node:path';
+
 import { ESLint, type Linter } from 'eslint';
 import prettier from 'prettier';
 
@@ -9,7 +11,6 @@ import prettier from 'prettier';
  */
 import { loadConfig, type VerifyConfig } from '@lib/config';
 import { createLintConfig } from '@lib/eslint-config';
-import { mergePrettierConfig } from '@lib/prettier-config';
 import { findScript, log, type PackageJson, readPackageJson, run } from '@lib/utils';
 
 /**
@@ -60,17 +61,24 @@ function detectReactVersion(packageJson: PackageJson): string | undefined {
   return match[2] ? `${match[1]}.${match[2]}` : match[1];
 }
 
-/** Formats the repo's TypeScript with prettier — the base ruleset merged with `verify.format` overrides. */
+/**
+ * Formats the repo's TypeScript with prettier, reading options from the repo's own `.prettierrc.json`
+ * (written by `shadow init`) via prettier's native config resolution — so `shadow verify` and a bare
+ * `prettier` run (editor format-on-save, `bunx prettier`) format identically. A repo with no prettier
+ * config falls back to prettier's built-in defaults, same as a bare `prettier` would.
+ */
 async function runFormat(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
-  // The same merge the shareable `@shadow-library/scripts/prettier` config uses, so `shadow verify` and
-  // a bare `prettier` run (via the scaffolded `prettier.config.mjs`) format identically.
-  const options = mergePrettierConfig(verifyConfig.format);
   const files = Array.from(new Bun.Glob(verifyConfig.formatFiles).scanSync({ cwd, onlyFiles: true }));
 
   if (files.length === 0) {
     log.info('skip   format (no files matched)');
     return true;
   }
+
+  // Resolve the repo's prettier config once from the root (a single `.prettierrc.json` is the standard);
+  // its options are reused for every file. `null` means the repo has no config — prettier defaults apply.
+  const options = await prettier.resolveConfig(path.join(cwd, files[0] as string), { editorconfig: true });
+  if (!options) log.warn('no prettier config found — run "shadow init" to create .prettierrc.json (using prettier defaults for now)');
 
   const unformatted: string[] = [];
   for (const relativePath of files) {

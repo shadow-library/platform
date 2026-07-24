@@ -8,6 +8,8 @@ import path from 'node:path';
  * Importing user defined packages
  */
 import { isRepoType, type RepoType, TYPE_DEPENDENCIES } from '@lib/config';
+import { prepare } from '@lib/prepare';
+import { renderPrettierConfig } from '@lib/prettier-config';
 import { log, type PackageJson, readPackageJson, run } from '@lib/utils';
 
 /**
@@ -25,20 +27,15 @@ export interface InitOptions {
 const PRE_COMMIT_HOOK = 'shadow verify\n';
 const COMMIT_MSG_HOOK = 'shadow commit-msg "$1"\n';
 
-/** The prettier config `init` drops in the parent so a bare `prettier` run uses the shared shadow ruleset. */
-const PRETTIER_CONFIG_FILE = 'prettier.config.mjs';
-const PRETTIER_CONFIG_CONTENT = `// Shared prettier config — the same ruleset \`shadow verify\` formats with (base rules merged with
-// this repo's \`.shadowrc.json\` \`verify.format\`), so a bare \`prettier\` run — editor format-on-save,
-// \`bunx prettier --write\` — matches instead of falling back to prettier's own defaults. Managed by
-// \`shadow init\`; delete this line and edit freely to take it over.
-import { getPrettierConfig } from '@shadow-library/scripts/prettier';
+const PREPARE_SCRIPT = 'shadow prepare';
 
-export default getPrettierConfig();
-`;
+/** The standard prettier config `init` drops in the repo so prettier and `shadow verify` read the same file. */
+const PRETTIER_CONFIG_FILE = '.prettierrc.json';
 
 /**
- * Prettier config files, in prettier's own resolution order. A repo that already declares one (or a
- * package.json "prettier" key) configures prettier its own way, so `init` never drops a competing file.
+ * Prettier config files, in prettier's own resolution order. A repo that already declares one (other than
+ * the `.prettierrc.json` shadow manages) or a package.json "prettier" key configures prettier its own
+ * way, so `init` never drops a competing file over it.
  */
 const PRETTIER_CONFIG_FILENAMES = [
   '.prettierrc',
@@ -138,47 +135,44 @@ export function hasForeignPrettierConfig(cwd: string, packageJson: PackageJson):
 }
 
 /**
- * Drops a `prettier.config.mjs` that re-exports the shared `@shadow-library/scripts/prettier` config, so
- * a bare `prettier` run in the repo uses the same ruleset `shadow verify` does. Never clobbers a
- * customized config: an existing `prettier.config.mjs` with different content, or any other prettier
- * config the repo already declares, is left as-is. Idempotent.
+ * Drops a `.prettierrc.json` holding the canonical ecosystem ruleset, so prettier itself and the
+ * `shadow verify` format step (which resolves the file) read the same options. Never clobbers a repo's
+ * own config: an existing `.prettierrc.json`, or any other prettier config the repo already declares, is
+ * left as-is. Idempotent.
  */
 function writePrettierConfig(cwd: string, packageJson: PackageJson): void {
   const configPath = path.join(cwd, PRETTIER_CONFIG_FILE);
   if (fs.existsSync(configPath)) {
-    const existing = fs.readFileSync(configPath, 'utf-8').trim();
-    if (existing === PRETTIER_CONFIG_CONTENT.trim()) log.info(`unchanged  ${PRETTIER_CONFIG_FILE}`);
-    else log.warn(`skipped    ${PRETTIER_CONFIG_FILE} (has custom content — left as-is)`);
+    log.info(`unchanged  ${PRETTIER_CONFIG_FILE} (already present)`);
     return;
   }
   if (hasForeignPrettierConfig(cwd, packageJson)) {
     log.info(`skipped    ${PRETTIER_CONFIG_FILE} (repo already configures prettier)`);
     return;
   }
-  fs.writeFileSync(configPath, PRETTIER_CONFIG_CONTENT);
+  fs.writeFileSync(configPath, renderPrettierConfig());
   log.info(`created    ${PRETTIER_CONFIG_FILE}`);
 }
 
 /**
- * Sets up husky the ecosystem way: ensures a `prepare: husky` script, activates husky, and wires the
- * `pre-commit` → `shadow verify` and `commit-msg` → `shadow commit-msg "$1"` hooks — so a repo needs no
- * hand-written hooks or `commitlint.config.js`. Drops a starter `.shadowrc.json` and a
- * `prettier.config.mjs` (re-exporting the shared ruleset) if absent. Idempotent.
+ * Sets up a repo the ecosystem way: ensures a `prepare: shadow prepare` script (which activates husky on
+ * every install), runs that setup now, and wires the `pre-commit` → `shadow verify` and `commit-msg` →
+ * `shadow commit-msg "$1"` hooks — so a repo needs no hand-written hooks or `commitlint.config.js`. Drops
+ * a starter `.shadowrc.json` and a `.prettierrc.json` (the canonical ruleset) if absent. Idempotent.
  */
 export async function init(options: InitOptions): Promise<void> {
   const repoType = resolveRepoType(options.type);
   const { filePath: packageJsonPath, data: packageJson } = readPackageJson(options.cwd);
 
   const scripts = (packageJson.scripts ??= {});
-  if (scripts.prepare !== 'husky') {
-    scripts.prepare = 'husky';
+  if (scripts.prepare !== PREPARE_SCRIPT) {
+    scripts.prepare = PREPARE_SCRIPT;
     fs.writeFileSync(packageJsonPath, `${JSON.stringify(packageJson, null, 2)}\n`);
-    log.info('set        package.json scripts.prepare = "husky"');
+    log.info(`set        package.json scripts.prepare = "${PREPARE_SCRIPT}"`);
   }
 
-  // Activate husky (creates .husky/_ and points git at it); tolerate a not-yet-initialized git repo.
-  const husky = run('bunx', ['husky'], { cwd: options.cwd, stream: false });
-  if (husky.status !== 0) log.warn('husky activation skipped (not a git repo yet?) — re-run after "git init"');
+  // Run the prepare-time setup now (activates husky); it tolerates a not-yet-initialized git repo.
+  prepare({ cwd: options.cwd });
 
   const huskyDir = path.join(options.cwd, '.husky');
   fs.mkdirSync(huskyDir, { recursive: true });

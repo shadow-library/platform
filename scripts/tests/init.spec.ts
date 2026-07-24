@@ -32,9 +32,9 @@ describe('init', () => {
       expect(hasForeignPrettierConfig(fixtureDir, {})).toBe(false);
     });
 
-    it('should ignore the managed prettier.config.mjs itself', () => {
+    it('should ignore the managed .prettierrc.json itself', () => {
       fixtureDir = createFixtureDir('shadow-prettier-managed-');
-      writeFixtureFiles(fixtureDir, { 'prettier.config.mjs': 'export default {};' });
+      writeFixtureFiles(fixtureDir, { '.prettierrc.json': '{}' });
       expect(hasForeignPrettierConfig(fixtureDir, {})).toBe(false);
     });
 
@@ -45,7 +45,7 @@ describe('init', () => {
 
     it('should detect another prettier config file', () => {
       fixtureDir = createFixtureDir('shadow-prettier-foreign-');
-      writeFixtureFiles(fixtureDir, { '.prettierrc.json': '{}' });
+      writeFixtureFiles(fixtureDir, { 'prettier.config.mjs': 'export default {};' });
       expect(hasForeignPrettierConfig(fixtureDir, {})).toBe(true);
     });
   });

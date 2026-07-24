@@ -1,7 +1,6 @@
 /**
  * Importing user defined packages
  */
-import { type FormatConfig, loadConfig, PRETTIER_BASE } from '@lib/config';
 
 /**
  * Defining types
@@ -12,29 +11,20 @@ import { type FormatConfig, loadConfig, PRETTIER_BASE } from '@lib/config';
  */
 
 /**
- * Merges a repo's `verify.format` overrides over the base prettier ruleset — the single place the
- * effective prettier options are computed, shared by `shadow verify` and the shareable config below.
+ * The canonical prettier ruleset for the ecosystem. `shadow init` writes it to a repo's
+ * `.prettierrc.json` — the single, standard place both prettier itself and `shadow verify` (which
+ * resolves the file rather than carrying its own copy) read formatting options from. It is never applied
+ * programmatically at format time: once written, the `.prettierrc.json` file is the source of truth, so
+ * an editor's format-on-save and a bare `prettier` run match `shadow verify` exactly.
  */
-export function mergePrettierConfig(format: FormatConfig = {}): FormatConfig {
-  return { ...PRETTIER_BASE, ...format };
-}
+export const PRETTIER_CONFIG = {
+  singleQuote: true,
+  trailingComma: 'all',
+  printWidth: 180,
+  arrowParens: 'avoid',
+} as const;
 
-/**
- * The resolved prettier options for the repo rooted at `cwd` (defaults to the process working
- * directory): the base ruleset merged with the repo's `.shadowrc.json` `verify.format`. A consuming
- * repo's `prettier.config.mjs` (scaffolded by `shadow init`) re-exports this, so a bare `prettier` run
- * — editor format-on-save, `bunx prettier --write` — formats with the exact same options `shadow
- * verify` uses instead of silently falling back to prettier's own defaults (double quotes, 80 columns).
- */
-export function getPrettierConfig(cwd: string = process.cwd()): FormatConfig {
-  return mergePrettierConfig(loadConfig(cwd).verify.format);
+/** The `.prettierrc.json` file body (pretty-printed JSON, trailing newline) `shadow init` writes into a repo. */
+export function renderPrettierConfig(): string {
+  return `${JSON.stringify(PRETTIER_CONFIG, null, 2)}\n`;
 }
-
-/**
- * The base ruleset as a static, zero-IO object — the default export, so a repo with no per-repo
- * `verify.format` overrides can wire the shared config with a single
- * `"prettier": "@shadow-library/scripts/prettier"` package.json key. Repos that do override prettier
- * options use the scaffolded `prettier.config.mjs`, which calls {@link getPrettierConfig} to fold the
- * `.shadowrc.json` overrides in.
- */
-export default PRETTIER_BASE;

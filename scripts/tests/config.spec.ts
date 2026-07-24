@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { loadConfig, PRETTIER_BASE } from '@lib/config';
+import { loadConfig } from '@lib/config';
 import { ShadowError } from '@lib/utils';
 
 import { createFixtureDir, removeFixtureDir, writeFixtureFiles } from './helpers/fixture';
@@ -107,19 +107,18 @@ describe('config', () => {
     expect(loadConfig(fixtureDir).build.bin).toStrictEqual({ foo: 'bin/foo' });
   });
 
-  it('should merge lint rule/ignore and format overrides over the defaults', () => {
+  it('should merge lint rule/ignore overrides over the defaults', () => {
     fixtureDir = createFixtureDir('shadow-config-verify-');
     writeFixtureFiles(fixtureDir, {
       '.shadowrc.json': JSON.stringify({
-        verify: { lint: { rules: { 'no-console': 'off' }, ignores: ['vendor/**'] }, format: { printWidth: 120 } },
+        verify: { lint: { rules: { 'no-console': 'off' }, ignores: ['vendor/**'] } },
       }),
     });
     const config = loadConfig(fixtureDir);
     expect(config.verify.lint.rules).toStrictEqual({ 'no-console': 'off' });
     expect(config.verify.lint.ignores).toStrictEqual(['vendor/**']);
-    expect(config.verify.format).toStrictEqual({ printWidth: 120 });
-    // the base ruleset is unchanged by a merge
-    expect(PRETTIER_BASE.printWidth).toBe(180);
+    // Prettier options no longer live in the shadow config — they belong in the repo's .prettierrc.json.
+    expect('format' in config.verify).toBe(false);
   });
 
   it('should merge verify.commit overrides over the base commitlint config', () => {

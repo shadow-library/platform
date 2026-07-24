@@ -101,9 +101,6 @@ export interface LintConfig {
   reactVersion?: string;
 }
 
-/** Prettier options merged over {@link PRETTIER_BASE}. Kept open — every prettier option is a valid override. */
-export type FormatConfig = Record<string, unknown>;
-
 export interface CommitConfig {
   /** commitlint configs to extend — replaced (not merged) by a `.shadowrc.json` override. */
   extends: string[];
@@ -113,7 +110,6 @@ export interface CommitConfig {
 
 export interface VerifyConfig {
   lint: LintConfig;
-  format: FormatConfig;
   /** Commit-message linting config, applied by `shadow commit-msg`. */
   commit: CommitConfig;
   /** Glob of files lint covers, relative to the repo root. */
@@ -171,7 +167,6 @@ export interface RawShadowConfig {
   };
   verify?: {
     lint?: { rules?: Record<string, unknown>; ignores?: string[]; overrides?: LintOverride[]; globals?: GlobalsEnv; react?: boolean; reactVersion?: string };
-    format?: FormatConfig;
     commit?: { extends?: string[]; rules?: Record<string, unknown> };
     /** One glob shared by lint + format, or `{ lint, format }` to cover different file sets. */
     files?: string | { lint?: string; format?: string };
@@ -222,14 +217,6 @@ export const TYPE_DEPENDENCIES: Record<RepoType, string[]> = {
 /** Base commitlint config the shipped commit-message linting extends. Overridable via `.shadowrc.json` `verify.commit`. */
 export const COMMITLINT_BASE_EXTENDS = ['@commitlint/config-conventional'];
 
-/** Base prettier ruleset. A repo's `verify.format` in `.shadowrc.json` is merged over this, so any option can be overridden. */
-export const PRETTIER_BASE: FormatConfig = {
-  singleQuote: true,
-  trailingComma: 'all',
-  printWidth: 180,
-  arrowParens: 'avoid',
-};
-
 /** Default file glob lint + format cover — includes `.tsx` so component libraries are checked out of the box. */
 const DEFAULT_FILES = '{src,tests,scripts}/**/*.{ts,tsx}';
 
@@ -238,7 +225,6 @@ const DEFAULT_CONFIG: ShadowConfig = {
   build: { exports: { '.': 'index' }, outDir: 'dist' },
   verify: {
     lint: { rules: {}, ignores: [], overrides: [] },
-    format: {},
     commit: { extends: COMMITLINT_BASE_EXTENDS, rules: {} },
     lintFiles: DEFAULT_FILES,
     formatFiles: DEFAULT_FILES,
@@ -309,7 +295,6 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
         react: raw.verify?.lint?.react,
         reactVersion: raw.verify?.lint?.reactVersion,
       },
-      format: { ...DEFAULT_CONFIG.verify.format, ...raw.verify?.format },
       commit: {
         extends: raw.verify?.commit?.extends ?? DEFAULT_CONFIG.verify.commit.extends,
         rules: { ...DEFAULT_CONFIG.verify.commit.rules, ...raw.verify?.commit?.rules },

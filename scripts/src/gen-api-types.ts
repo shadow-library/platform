@@ -10,7 +10,7 @@ import prettier from 'prettier';
 /**
  * Importing user defined packages
  */
-import { loadConfig, PRETTIER_BASE } from '@lib/config';
+import { loadConfig } from '@lib/config';
 import { log, ShadowError } from '@lib/utils';
 
 /**
@@ -158,9 +158,12 @@ export async function genApiTypes(options: GenApiTypesOptions): Promise<void> {
   const config = loadConfig(options.cwd);
   const outputPath = path.join(options.cwd, options.outputPath ?? config.genApiTypes.outputPath);
 
+  // Format the generated file with the repo's own `.prettierrc.json` (resolved by prettier), so it lands
+  // formatted exactly as `shadow verify` and the editor expect — no separate ruleset to drift.
+  const prettierOptions = await prettier.resolveConfig(outputPath);
   let contents: string;
   try {
-    contents = await prettier.format(rawContents, { ...PRETTIER_BASE, ...config.verify.format, parser: 'typescript' });
+    contents = await prettier.format(rawContents, { ...prettierOptions, parser: 'typescript' });
   } catch (cause) {
     throw new ShadowError(`Generated API types failed formatting — left ${outputPath} untouched`, { cause });
   }

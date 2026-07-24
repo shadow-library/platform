@@ -11,6 +11,7 @@ import { commitMsg } from '@lib/commit-msg';
 import { isRepoType, REPO_TYPES, type RepoType } from '@lib/config';
 import { genApiTypes } from '@lib/gen-api-types';
 import { init } from '@lib/init';
+import { prepare } from '@lib/prepare';
 import { release } from '@lib/release';
 import { log, ShadowError } from '@lib/utils';
 import { verify } from '@lib/verify';
@@ -28,6 +29,7 @@ const HELP_TEXT = `shadow — shared CLI for the Shadow Library ecosystem
 
 Usage:
   shadow init [--type <library|component|backend|spa|ssr>]
+  shadow prepare
   shadow build [--type <library|component|backend|spa|ssr>]
   shadow verify [--fix]
   shadow commit-msg <file>
@@ -36,9 +38,10 @@ Usage:
   shadow check-migrations [--dir <path>]
 
 Commands:
-  init [--type <t>]      Set up husky hooks + a starter .shadowrc.json (prompts for the repo type; --type skips it)
+  init [--type <t>]      Set up husky hooks, a starter .shadowrc.json + .prettierrc.json (prompts for the repo type; --type skips it)
+  prepare                Prepare-lifecycle setup (wired as "prepare": "shadow prepare"); activates husky. Runs on install
   build [--type <t>]     Build per .shadowrc.json by type: library (flat dist), component (Rollup+CSS Modules), backend (single-file bundle), spa/ssr (vite)
-  verify [--fix]         Format + lint the whole repo, then type-check + test
+  verify [--fix]         Format (via the repo's .prettierrc.json) + lint the whole repo, then type-check + test
   commit-msg <file>      Lint a commit message (drives the husky commit-msg hook)
   gen-api-types <url>    Fetch an OpenAPI document and generate TypeScript types
   release <type>         Release major|minor|patch (stable, guarded) or alpha|beta (prerelease); libraries only; --force overrides
@@ -74,6 +77,10 @@ async function main(): Promise<number> {
   switch (command) {
     case 'init':
       await init({ cwd, type: parseTypeFlag(flags) });
+      return 0;
+
+    case 'prepare':
+      prepare({ cwd });
       return 0;
 
     case 'build':
