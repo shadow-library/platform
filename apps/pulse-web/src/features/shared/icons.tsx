@@ -30,6 +30,14 @@ export function SenderIcon(): ReactElement {
   return <StrokeIcon paths={['M3 6h18v12H3z', 'M3 7l9 6 9-6']} />;
 }
 
+export function LayoutIcon(): ReactElement {
+  return <StrokeIcon paths={['M4 5h16v14H4z', 'M4 10h16', 'M9 10v9']} />;
+}
+
+export function PartialIcon(): ReactElement {
+  return <StrokeIcon paths={['M12 3l8 4.5v9L12 21l-8-4.5v-9z', 'M12 12l8-4.5', 'M12 12v9', 'M12 12L4 7.5']} />;
+}
+
 export function RoutingIcon(): ReactElement {
   return <StrokeIcon paths={['M6 3v6a4 4 0 0 0 4 4h8', 'M15 9l3-3-3-3', 'M18 21v-2']} />;
 }

@@ -1,2 +1,2 @@
-export { default as GroupDetail } from './GroupDetail';
-export { default as GroupList } from './GroupList';
+export { default as TemplateDetail } from './TemplateDetail';
+export { default as TemplateList } from './TemplateList';

@@ -1,20 +1,18 @@
 /**
  * Importing user defined packages
  */
-import { CHANNEL_OPTIONS, type FormConfig, MESSAGE_TYPE_OPTIONS, type Option, PRIORITY_OPTIONS } from '@/features/shared';
-import { type TemplateGroupResponse, type TemplateVariantResponse } from '@/lib';
+import { type FormConfig, MESSAGE_TYPE_OPTIONS, PRIORITY_OPTIONS } from '@/features/shared';
+import { type TemplateResponse } from '@/lib';
 
 /**
- * Declaring constants
+ * Declaring the constants
  */
-const PRIORITY_FORM_OPTIONS: Option[] = [{ value: 'NONE', label: 'None' }, ...PRIORITY_OPTIONS];
-
-export function groupFormConfig(row: TemplateGroupResponse | null): FormConfig {
+export function templateFormConfig(row: TemplateResponse | null): FormConfig {
   const edit = !!row;
   return {
-    title: edit ? 'Edit template group' : 'New template group',
+    title: edit ? 'Edit template' : 'New template',
     meta: edit ? row.templateKey : 'Templates are identified by a unique key',
-    submitLabel: edit ? 'Save changes' : 'Create group',
+    submitLabel: edit ? 'Save changes' : 'Create template',
     fields: [
       {
         key: 'templateKey',
@@ -25,39 +23,20 @@ export function groupFormConfig(row: TemplateGroupResponse | null): FormConfig {
         placeholder: 'order-confirmation',
         helper: edit ? 'Immutable after creation' : 'Lowercase, unique, immutable',
       },
+      { key: 'name', label: 'Name', type: 'text', required: true, placeholder: 'Order confirmation' },
       { key: 'messageType', label: 'Message type', type: 'select', required: true, options: MESSAGE_TYPE_OPTIONS, placeholder: 'Select type' },
+      { key: 'priority', label: 'Priority', type: 'select', required: true, options: PRIORITY_OPTIONS, placeholder: 'Select priority' },
+      { key: 'category', label: 'Category', type: 'text', optional: true, placeholder: 'transactional' },
       { key: 'description', label: 'Description', type: 'text', optional: true, placeholder: 'Short description' },
-      { key: 'priority', label: 'Priority', type: 'select', optional: true, options: PRIORITY_FORM_OPTIONS, placeholder: 'None' },
       { key: 'isActive', label: 'Active', type: 'switch' },
     ],
     initialValues: {
       templateKey: row?.templateKey ?? '',
+      name: row?.name ?? '',
       messageType: row?.messageType ?? '',
+      priority: row?.priority ?? 'MEDIUM',
+      category: row?.category ?? '',
       description: row?.description ?? '',
-      priority: row?.priority ?? 'NONE',
-      isActive: row ? !!row.isActive : true,
-    },
-  };
-}
-
-export function variantFormConfig(row: TemplateVariantResponse | null): FormConfig {
-  const edit = !!row;
-  return {
-    title: edit ? 'Edit variant' : 'New variant',
-    meta: edit ? `${row.channel} · ${row.locale}` : 'Channel + locale content',
-    submitLabel: edit ? 'Save changes' : 'Create variant',
-    fields: [
-      { key: 'channel', label: 'Channel', type: 'select', required: true, options: CHANNEL_OPTIONS, disabled: edit, placeholder: 'Select channel' },
-      { key: 'locale', label: 'Locale', type: 'text', required: true, disabled: edit, placeholder: 'en-US' },
-      { key: 'subject', label: 'Subject', type: 'text', optional: true, placeholder: 'Used for EMAIL' },
-      { key: 'body', label: 'Body', type: 'textarea', required: true, rows: 8, placeholder: 'Mustache template…' },
-      { key: 'isActive', label: 'Active', type: 'switch' },
-    ],
-    initialValues: {
-      channel: row?.channel ?? '',
-      locale: row?.locale ?? '',
-      subject: row?.subject ?? '',
-      body: row?.body ?? '',
       isActive: row ? row.isActive : true,
     },
   };

@@ -8,7 +8,7 @@ import { Alert, Badge, Button, Card, Combobox, FormField, Input, Textarea } from
  * Importing user defined packages
  */
 import { Mono, type Option, OutlineBadge, PageHeader, trimToUndefined } from '@/features/shared';
-import { type CreateNotificationBody, type CreateNotificationResponse, type NotificationRecipients, useCreateNotificationMutation, useListTemplateGroupsQuery } from '@/lib';
+import { type CreateNotificationBody, type CreateNotificationResponse, type NotificationRecipients, useCreateNotificationMutation, useListTemplatesQuery } from '@/lib';
 
 import styles from './Send.module.css';
 
@@ -20,8 +20,8 @@ export default function SendForm(): ReactElement {
   const [result, setResult] = useState<CreateNotificationResponse | null>(null);
   const mutation = useCreateNotificationMutation();
 
-  const { data: groupsData } = useListTemplateGroupsQuery({ limit: 100 });
-  const templateOptions: Option[] = (groupsData?.items ?? []).map(group => ({ value: group.templateKey, label: group.templateKey }));
+  const { data: templatesData } = useListTemplatesQuery({ limit: 100 });
+  const templateOptions: Option[] = (templatesData?.items ?? []).map(template => ({ value: template.templateKey, label: template.templateKey }));
 
   const update = (patch: Partial<typeof form>): void => setForm(prev => ({ ...prev, ...patch }));
 
@@ -71,7 +71,7 @@ export default function SendForm(): ReactElement {
       <PageHeader title="Send Notification" subtitle="Manually trigger a send to test templates and routing end-to-end." />
       <Card padding="lg">
         <div className={styles.formCol}>
-          <FormField label="Template key" required helper="References an existing template group.">
+          <FormField label="Template key" required helper="References an existing template.">
             <Combobox
               options={templateOptions}
               value={form.templateKey || null}

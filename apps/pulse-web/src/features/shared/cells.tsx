@@ -7,7 +7,7 @@ import { Badge, type BadgeIntent } from '@shadow-library/ui';
 /**
  * Importing user defined packages
  */
-import { type Priority } from '@/lib';
+import { type Priority, type VersionStatus } from '@/lib';
 
 import styles from './cells.module.css';
 
@@ -60,4 +60,15 @@ export function PriorityBadge({ priority }: { priority?: Priority | null }): Rea
 /** Neutral outlined pill for closed enums (channel / type / provider). */
 export function OutlineBadge({ children }: { children: ReactNode }): ReactElement {
   return <Badge variant="outline">{children}</Badge>;
+}
+
+/** Lifecycle badge for a template/design version: DRAFT neutral, PUBLISHED success, ARCHIVED muted outline. */
+export function VersionStatusBadge({ status }: { status: VersionStatus }): ReactElement {
+  const label = status.charAt(0) + status.slice(1).toLowerCase();
+  if (status === 'ARCHIVED') return <Badge variant="outline">{label}</Badge>;
+  return (
+    <Badge intent={status === 'PUBLISHED' ? 'success' : 'neutral'} variant="soft" dot>
+      {label}
+    </Badge>
+  );
 }

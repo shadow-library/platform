@@ -8,11 +8,11 @@ import { Sidebar, useTheme } from '@shadow-library/ui';
 /**
  * Importing user defined components
  */
-import { DashboardIcon, LogIcon, MoonIcon, PulseMark, RoutingIcon, SenderIcon, SendIcon, SunIcon, TemplateIcon } from '@/features/shared';
+import { DashboardIcon, LayoutIcon, LogIcon, MoonIcon, PartialIcon, PulseMark, RoutingIcon, SenderIcon, SendIcon, SunIcon, TemplateIcon } from '@/features/shared';
 
 import styles from './Layout.module.css';
 
-type NavTarget = '/' | '/templates' | '/senders' | '/routing' | '/send' | '/logs';
+type NavTarget = '/' | '/templates' | '/design/layouts' | '/design/partials' | '/senders' | '/routing' | '/send' | '/logs';
 
 export default function AppSidebar(): ReactElement {
   const navigate = useNavigate();
@@ -35,7 +35,15 @@ export default function AppSidebar(): ReactElement {
       </Sidebar.Section>
       <Sidebar.Section label="Templates">
         <Sidebar.Item icon={<TemplateIcon />} href="/templates" active={startsWith('/templates')} onClick={go('/templates')}>
-          Template Groups
+          Templates
+        </Sidebar.Item>
+      </Sidebar.Section>
+      <Sidebar.Section label="Design system">
+        <Sidebar.Item icon={<LayoutIcon />} href="/design/layouts" active={startsWith('/design/layouts')} onClick={go('/design/layouts')}>
+          Layouts
+        </Sidebar.Item>
+        <Sidebar.Item icon={<PartialIcon />} href="/design/partials" active={startsWith('/design/partials')} onClick={go('/design/partials')}>
+          Partials
         </Sidebar.Item>
       </Sidebar.Section>
       <Sidebar.Section label="Senders">

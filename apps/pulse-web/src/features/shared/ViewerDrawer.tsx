@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type ReactElement, useEffect, useRef, useState } from 'react';
+import { type ReactElement, type ReactNode, useEffect, useRef, useState } from 'react';
 import { Drawer, SegmentedControl } from '@shadow-library/ui';
 
 /**
@@ -32,15 +32,24 @@ export interface ViewerDrawerProps {
   open: boolean;
   data: ViewerData | null;
   onOpenChange: (open: boolean) => void;
+  /** Header title override (used by the live preview drawer, where `data` is absent until rendered). */
+  title?: ReactNode;
+  /** Header meta override. */
+  meta?: ReactNode;
+  /** Interactive inputs rendered above the preview (e.g. the preview channel / payload editor). */
+  controls?: ReactNode;
+  /** Shown in place of the preview while `controls` are present but nothing has been rendered yet. */
+  placeholder?: ReactNode;
 }
 
 type ViewerMode = 'rendered' | 'source';
 
 /**
- * Read-only inspector for a variant template or a sent message: a rendered channel preview
- * (email / SMS / push) with a toggle to the raw template source and rendering payload.
+ * Read-only inspector for template content or a sent message: a rendered channel preview
+ * (email / SMS / push) with a toggle to the raw template source and rendering payload. With `controls`
+ * it doubles as a live preview surface whose inputs drive the `data` the parent feeds back in.
  */
-export function ViewerDrawer({ open, data, onOpenChange }: ViewerDrawerProps): ReactElement {
+export function ViewerDrawer({ open, data, onOpenChange, title, meta, controls, placeholder }: ViewerDrawerProps): ReactElement {
   const [mode, setMode] = useState<ViewerMode>('rendered');
   const wasOpen = useRef(false);
 
@@ -53,8 +62,9 @@ export function ViewerDrawer({ open, data, onOpenChange }: ViewerDrawerProps): R
 
   return (
     <Drawer open={open} onOpenChange={onOpenChange} placement="right" size="lg">
-      <Drawer.Header title={data?.title ?? 'Preview'} meta={data?.meta} />
+      <Drawer.Header title={title ?? data?.title ?? 'Preview'} meta={meta ?? data?.meta} />
       <Drawer.Body>
+        {controls ? <div className={styles.controls}>{controls}</div> : null}
         {data ? (
           <>
             <div className={styles.top}>
@@ -74,6 +84,8 @@ export function ViewerDrawer({ open, data, onOpenChange }: ViewerDrawerProps): R
               </div>
             ) : null}
           </>
+        ) : controls ? (
+          <div className={styles.placeholder}>{placeholder ?? 'Render to preview the output.'}</div>
         ) : null}
       </Drawer.Body>
     </Drawer>

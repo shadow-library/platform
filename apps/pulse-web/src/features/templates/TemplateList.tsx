@@ -3,16 +3,18 @@
  */
 import { useNavigate } from '@tanstack/react-router';
 import { type ReactElement, useState } from 'react';
-import { Button, Input, Pagination, Table, type TableColumn } from '@shadow-library/ui';
+import { Button, Input, Pagination, Select, Table, type TableColumn } from '@shadow-library/ui';
 import { useSearchParams } from '@shadow-library/web/router';
 
 /**
  * Importing user defined packages
  */
 import {
+  ALL,
   formatDateTime,
   FormDrawer,
   type FormValues,
+  MESSAGE_TYPE_FILTER_OPTIONS,
   Mono,
   Muted,
   OutlineBadge,
@@ -28,43 +30,42 @@ import {
   useTableSort,
 } from '@/features/shared';
 import controls from '@/features/shared/controls.module.css';
-import { type MessageType, type Priority, type TemplateGroupResponse, useCreateTemplateGroupMutation, useListTemplateGroupsQuery, useUpdateTemplateGroupMutation } from '@/lib';
+import { type MessageType, type Priority, type TemplateResponse, useCreateTemplateMutation, useListTemplatesQuery, useUpdateTemplateMutation } from '@/lib';
 
-import { groupFormConfig } from './forms';
+import { templateFormConfig } from './forms';
 
-export default function GroupList(): ReactElement {
+export default function TemplateList(): ReactElement {
   const navigate = useNavigate();
-  const { search } = useSearchParams();
-  const { data, isLoading } = useListTemplateGroupsQuery(search);
+  const { search, appendSearch } = useSearchParams();
+  const { data, isLoading } = useListTemplatesQuery(search);
   const [searchValue, setSearchValue] = useDebouncedParam('key');
   const pagination = useTablePagination(data?.total);
   const { sort, onSortChange } = useTableSort({ id: 'updatedAt', direction: 'desc' });
 
-  const [editing, setEditing] = useState<{ open: boolean; row: TemplateGroupResponse | null }>({ open: false, row: null });
-  const createMutation = useCreateTemplateGroupMutation();
-  const updateMutation = useUpdateTemplateGroupMutation(editing.row?.id ?? '');
-  const config = groupFormConfig(editing.row);
+  const [editing, setEditing] = useState<{ open: boolean; row: TemplateResponse | null }>({ open: false, row: null });
+  const createMutation = useCreateTemplateMutation();
+  const updateMutation = useUpdateTemplateMutation(editing.row?.id ?? '');
+  const config = templateFormConfig(editing.row);
 
   const closeForm = (): void => setEditing(prev => ({ ...prev, open: false }));
 
   const submit = (values: FormValues): void => {
-    const priority = values.priority === 'NONE' ? undefined : (values.priority as Priority | undefined);
+    const name = String(values.name ?? '').trim();
+    const messageType = values.messageType as MessageType;
+    const priority = values.priority as Priority;
+    const category = trimToUndefined(values.category);
     const description = trimToUndefined(values.description);
     const isActive = values.isActive !== false;
-    if (editing.row) updateMutation.mutate({ messageType: values.messageType as MessageType, description, priority, isActive }, { onSuccess: closeForm });
-    else
-      createMutation.mutate(
-        { templateKey: String(values.templateKey ?? '').trim(), messageType: values.messageType as MessageType, description, priority, isActive },
-        { onSuccess: closeForm },
-      );
+    if (editing.row) updateMutation.mutate({ name, messageType, priority, category, description, isActive }, { onSuccess: closeForm });
+    else createMutation.mutate({ templateKey: String(values.templateKey ?? '').trim(), name, messageType, priority, category, description, isActive }, { onSuccess: closeForm });
   };
 
-  const columns: TableColumn<TemplateGroupResponse>[] = [
+  const columns: TableColumn<TemplateResponse>[] = [
     { id: 'templateKey', header: 'Template key', cell: row => <Mono>{row.templateKey}</Mono> },
+    { id: 'name', header: 'Name', cell: row => <TextOrDash value={row.name} /> },
     { id: 'messageType', header: 'Type', cell: row => <OutlineBadge>{row.messageType}</OutlineBadge> },
-    { id: 'description', header: 'Description', cell: row => <TextOrDash value={row.description} /> },
     { id: 'priority', header: 'Priority', cell: row => <PriorityBadge priority={row.priority} /> },
-    { id: 'isActive', header: 'Status', cell: row => <StatusBadge active={!!row.isActive} /> },
+    { id: 'isActive', header: 'Status', cell: row => <StatusBadge active={row.isActive} /> },
     { id: 'updatedAt', header: 'Updated', sortable: true, cell: row => <Muted>{formatDateTime(row.updatedAt)}</Muted> },
     {
       id: '_actions',
@@ -90,27 +91,39 @@ export default function GroupList(): ReactElement {
   return (
     <>
       <PageHeader
-        title="Template Groups"
-        subtitle="Notification templates, each identified by a unique template key."
+        title="Templates"
+        subtitle="Versioned notification templates, each identified by a unique key."
         action={
           <Button variant="primary" onClick={() => setEditing({ open: true, row: null })}>
-            New template group
+            New template
           </Button>
         }
       />
       <div className={controls.toolbar}>
         <Input className={controls.searchWide} value={searchValue} onValueChange={setSearchValue} placeholder="Search by template key" prefix={<SearchIcon />} clearable />
+        <Select
+          className={controls.filter}
+          value={search.messageType ?? ALL}
+          onValueChange={value => appendSearch({ messageType: value === ALL ? '' : value, offset: 0 })}
+          aria-label="Filter by type"
+        >
+          {MESSAGE_TYPE_FILTER_OPTIONS.map(option => (
+            <Select.Item key={option.value} value={option.value}>
+              {option.label}
+            </Select.Item>
+          ))}
+        </Select>
       </div>
       <Table
         data={data?.items ?? []}
         columns={columns}
         rowKey="id"
-        aria-label="Template groups"
+        aria-label="Templates"
         loading={isLoading}
-        onRowClick={row => navigate({ to: '/templates/$groupId', params: { groupId: row.id } })}
+        onRowClick={row => navigate({ to: '/templates/$templateId', params: { templateId: row.id } })}
         sort={sort}
         onSortChange={onSortChange}
-        emptyState="No template groups match your search."
+        emptyState="No templates match your search."
       />
       <div className={controls.pagination}>
         <Pagination
