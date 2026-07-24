@@ -2,19 +2,21 @@
  * Importing npm packages
  */
 import { type FastifyReply, type FastifyRequest } from 'fastify';
-import { Config } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
 import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
 import { Auth } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
 
 import { AccessTokenService } from './access-token.service';
+import { OAuthClientService } from './oauth-client.service';
 import { AuthorizeQuery, DiscoveryResponse, IntrospectionResponseDto, RevocationResponse, TokenActionBody, TokenRequestBody, TokenResponse, UserInfoResponse } from './oauth.dto';
 import { ClientCredential, OAuthService } from './oauth.service';
 
@@ -35,15 +37,18 @@ interface ClientAuthenticationBody {
 
 /** RFC 7523 §2.2 — client authentication with a JWT (projected k8s service-account tokens, D-16) */
 const JWT_BEARER_ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
 @HttpController()
 export class OAuthController {
+  private readonly logger = Logger.getLogger(APP_NAME, OAuthController.name);
   private readonly issuer = Config.get('oauth.issuer');
   private readonly loginUrl = Config.get('oauth.login-url');
 
   constructor(
     private readonly oauthService: OAuthService,
     private readonly accessTokenService: AccessTokenService,
+    private readonly clientService: OAuthClientService,
     private readonly keyService: KeyService,
     private readonly userEmailService: UserEmailService,
   ) {}
@@ -52,13 +57,18 @@ export class OAuthController {
   @Auth({ public: true })
   @Header('cache-control', 'public, max-age=300')
   @RespondFor(200, DiscoveryResponse)
-  getOpenidConfiguration(): DiscoveryResponse {
+  async getOpenidConfiguration(): Promise<DiscoveryResponse> {
     return {
       issuer: this.issuer,
       authorization_endpoint: `${this.issuer}/oauth2/authorize`,
       token_endpoint: `${this.issuer}/oauth2/token`,
       userinfo_endpoint: `${this.issuer}/oauth2/userinfo`,
       jwks_uri: `${this.issuer}/.well-known/jwks.json`,
+      revocation_endpoint: `${this.issuer}/oauth2/revoke`,
+      introspection_endpoint: `${this.issuer}/oauth2/introspect`,
+      /** Secret-bearing clients may present their credential as Basic auth or as form parameters; workload clients use RFC 7523 assertions. */
+      token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'private_key_jwt', 'none'],
+      scopes_supported: await this.clientService.listActiveScopeNames(),
       response_types_supported: ['code'],
       grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
       subject_types_supported: ['public'],
@@ -101,6 +111,7 @@ export class OAuthController {
   @Auth({ public: true })
   @RespondFor(200, TokenResponse)
   async exchangeToken(@Body() body: TokenRequestBody, @Req() request: FastifyRequest): Promise<TokenResponse> {
+    this.recordRequestEncoding(request, '/oauth2/token');
     const credential = this.parseClientCredential(request, body);
     const result = await this.oauthService.token(
       {
@@ -142,6 +153,7 @@ export class OAuthController {
   @HttpStatus(200)
   @RespondFor(200, RevocationResponse)
   async revokeToken(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<RevocationResponse> {
+    this.recordRequestEncoding(request, '/oauth2/revoke');
     await this.oauthService.revoke(body.token, this.parseClientCredential(request, body));
     return { revoked: true };
   }
@@ -151,8 +163,20 @@ export class OAuthController {
   @HttpStatus(200)
   @RespondFor(200, IntrospectionResponseDto)
   async introspectToken(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<IntrospectionResponseDto> {
+    this.recordRequestEncoding(request, '/oauth2/introspect');
     const result = await this.oauthService.introspect(body.token, this.parseClientCredential(request, body));
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
+  }
+
+  /**
+   * RFC 6749 mandates form encoding on the token endpoints. JSON is still accepted for one release so
+   * existing consumers keep working; every JSON call is recorded here so the remaining callers can be
+   * identified before the encoding is withdrawn.
+   */
+  private recordRequestEncoding(request: FastifyRequest, endpoint: string): void {
+    const contentType = request.headers['content-type'] ?? '';
+    if (contentType.startsWith(FORM_CONTENT_TYPE)) return;
+    this.logger.warn('oauth endpoint called with a deprecated request encoding', { deprecation: 'oauth.json_body', endpoint, contentType });
   }
 
   private parseClientCredential(request: FastifyRequest, body: ClientAuthenticationBody): ClientCredential {

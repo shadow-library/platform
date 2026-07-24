@@ -172,6 +172,18 @@ export class DiscoveryResponse {
   @Field()
   jwks_uri: string;
 
+  @Field()
+  revocation_endpoint: string;
+
+  @Field()
+  introspection_endpoint: string;
+
+  @Field(() => [String])
+  token_endpoint_auth_methods_supported: string[];
+
+  @Field(() => [String])
+  scopes_supported: string[];
+
   @Field(() => [String])
   response_types_supported: string[];
 
