@@ -1,6 +1,8 @@
 # RFC 0001 — Templates as a First-Class CMS in Pulse
 
-> Status: **Proposed** · Owner: Pulse · Supersedes: the in-code email design system (`renderEmailDocument`) and the seed-file template catalogue.
+> Status: **Implemented** · Owner: Pulse · Supersedes: the in-code email design system (`renderEmailDocument`) and the seed-file template catalogue.
+
+> **As-built note (deviations from this proposal):** The engine ships as **LiquidJS + juice** as proposed, but the email **layout is authored as hand-written responsive HTML** (the ported `@shadow-library/ui` design system) rather than **MJML**. MJML's component packages do not lazy-load under the Bun runtime (`mjml2html` returns empty output), so a compile-at-publish MJML step was dropped in favour of a self-contained HTML layout that juice inlines at render — simpler, dependency-light, and fully client-compatible. The render-bundle cache is an in-process, immutable-version-keyed cache (content is pinned by version id; layouts/partials invalidate on publish) rather than the L1/L2 `CacheService` sketched in §11 — sufficient for the single-instance deployment and trivially swappable. Everything else (versioned draft→publish→rollback, variable contract enforced at publish + send, layouts/partials, preview, granular RBAC `templates:publish` / `layouts:write`, idempotent overwritable fixtures, unchanged `POST /api/v1/notifications` contract) shipped as designed.
 
 ## 1. Summary
 
