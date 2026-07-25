@@ -28,6 +28,8 @@ const env = new TestEnvironment('workload-identity').init();
 const WORKLOAD_ISSUER = 'http://127.0.0.1:45123';
 const SUBJECT = 'system:serviceaccount:prod:pulse';
 const ASSERTION_TYPE = 'urn:ietf:params:oauth:client-assertion-type:jwt-bearer';
+/** The token endpoint accepts only `application/x-www-form-urlencoded` (RFC 6749 §2.3.1, C-3). */
+const FORM = 'application/x-www-form-urlencoded';
 
 const base64url = (input: Uint8Array | string): string => Buffer.from(input).toString('base64url');
 
@@ -48,12 +50,13 @@ describe('workload identity client authentication', () => {
     return { iss: WORKLOAD_ISSUER, sub: SUBJECT, aud: Config.get('oauth.issuer'), iat: now, exp: now + 600, ...overrides };
   };
 
-  const requestToken = (assertion: string, extra: Record<string, unknown> = {}) =>
+  const requestToken = (assertion: string, extra: Record<string, string> = {}) =>
     env
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .body({ grant_type: 'client_credentials', client_assertion_type: ASSERTION_TYPE, client_assertion: assertion, ...extra });
+      .headers({ 'content-type': FORM })
+      .body(new URLSearchParams({ grant_type: 'client_credentials', client_assertion_type: ASSERTION_TYPE, client_assertion: assertion, ...extra }).toString());
 
   beforeAll(async () => {
     keyPair = (await crypto.subtle.generateKey({ name: 'RSASSA-PKCS1-v1_5', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-256' }, true, [
@@ -128,7 +131,8 @@ describe('workload identity client authentication', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .body({ grant_type: 'client_credentials', client_assertion_type: 'urn:something:else', client_assertion: assertion });
+      .headers({ 'content-type': FORM })
+      .body(new URLSearchParams({ grant_type: 'client_credentials', client_assertion_type: 'urn:something:else', client_assertion: assertion }).toString());
     expect(wrongType.statusCode).toBe(401);
   });
 
@@ -177,16 +181,17 @@ describe('workload identity client authentication', () => {
     const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
     const web = 'system:serviceaccount:nf:nf-web';
     const server = 'system:serviceaccount:nf:nf-server';
+    /** A test-local id: `novel-forge` is now a seeded ecosystem client, so this shared-subject case uses its own slug. */
     const shared = await env
       .getService(OAuthClientService)
-      .register({ id: 'novel-forge', applicationId, name: 'Novel Forge', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [web, server] });
+      .register({ id: 'nf-shared', applicationId, name: 'Novel Forge', kind: 'SERVICE', grantTypes: ['client_credentials'], workloadSubjects: [web, server] });
 
     for (const sub of [web, server]) {
       const response = await requestToken(await signSaToken(saClaims({ sub })));
       expect(response.statusCode).toBe(200);
       expect((env.getService(KeyService).verify((response.json() as { access_token: string }).access_token) as { client_id: string }).client_id).toBe(shared.clientId);
     }
-    expect(shared.clientId).toBe('novel-forge');
+    expect(shared.clientId).toBe('nf-shared');
   });
 
   /** A namespace pattern matches only with an explicit client_id; subject-only resolution stays exact. */
@@ -214,8 +219,8 @@ describe('workload identity client authentication', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ 'x-service-account': SUBJECT })
-      .body({ grant_type: 'client_credentials', client_id: clientId, scope: 'authz:check' });
+      .headers({ 'x-service-account': SUBJECT, 'content-type': FORM })
+      .body(new URLSearchParams({ grant_type: 'client_credentials', client_id: clientId, scope: 'authz:check' }).toString());
     expect(spoofed.statusCode).toBe(401);
   });
 });

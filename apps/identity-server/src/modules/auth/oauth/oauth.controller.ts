@@ -2,14 +2,13 @@
  * Importing npm packages
  */
 import { type FastifyReply, type FastifyRequest } from 'fastify';
-import { Config, Logger } from '@shadow-library/common';
+import { Config } from '@shadow-library/common';
 import { Body, Get, Header, HttpController, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
 import { Auth } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
@@ -43,7 +42,6 @@ const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
 @HttpController()
 export class OAuthController {
-  private readonly logger = Logger.getLogger(APP_NAME, OAuthController.name);
   private readonly issuer = Config.get('oauth.issuer');
   private readonly loginUrl = Config.get('oauth.login-url');
 
@@ -79,10 +77,14 @@ export class OAuthController {
       backchannel_logout_supported: true,
       backchannel_logout_session_supported: true,
       /**
-       * Global rather than per-client, so they belong in the public document (D-21 §8.6): a service
-       * reads its step-up URL from here instead of restating it in its own configuration.
+       * Global rather than per-client, so it belongs in the public document (D-21 §8.6): a service
+       * reads its step-up URL from here instead of restating it in its own configuration. It is the
+       * hosted prompt *page* (D-19, T-801) — same origin as the issuer, served by identity-web, so it
+       * sits outside the `/api` prefix — that the SDK redirects the browser to. The prompt forwards
+       * `client_id`/`resource` into the step-up so the window it opens names its beneficiary rather
+       * than being claimable first-come-first-served.
        */
-      step_up_endpoint: `${this.issuer}/api/v1/me/mfa/step-up`,
+      step_up_endpoint: `${this.issuer}/step-up`,
       app_session_endpoint: `${this.issuer}/api/v1/app-sessions`,
     };
   }
@@ -120,7 +122,7 @@ export class OAuthController {
   @M2MBudget()
   @RespondFor(200, TokenResponse)
   async exchangeToken(@Body() body: TokenRequestBody, @Req() request: FastifyRequest): Promise<TokenResponse> {
-    this.recordRequestEncoding(request, '/oauth2/token');
+    this.assertFormEncoded(request);
     const credential = this.parseClientCredential(request, body);
     const result = await this.oauthService.token(
       {
@@ -167,7 +169,7 @@ export class OAuthController {
   @HttpStatus(200)
   @RespondFor(200, RevocationResponse)
   async revokeToken(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<RevocationResponse> {
-    this.recordRequestEncoding(request, '/oauth2/revoke');
+    this.assertFormEncoded(request);
     await this.oauthService.revoke(body.token, this.parseClientCredential(request, body));
     return { revoked: true };
   }
@@ -177,20 +179,19 @@ export class OAuthController {
   @HttpStatus(200)
   @RespondFor(200, IntrospectionResponseDto)
   async introspectToken(@Body() body: TokenActionBody, @Req() request: FastifyRequest): Promise<IntrospectionResponseDto> {
-    this.recordRequestEncoding(request, '/oauth2/introspect');
+    this.assertFormEncoded(request);
     const result = await this.oauthService.introspect(body.token, this.parseClientCredential(request, body));
     return { active: result.active, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, client_id: result.clientId, token_type: result.tokenType };
   }
 
   /**
-   * RFC 6749 mandates form encoding on the token endpoints. JSON is still accepted for one release so
-   * existing consumers keep working; every JSON call is recorded here so the remaining callers can be
-   * identified before the encoding is withdrawn.
+   * RFC 6749 §2.3.1 mandates form encoding on the token, revocation and introspection endpoints. A
+   * request in any other encoding (JSON, most often) is refused as `invalid_request` rather than
+   * parsed, so a non-conforming client fails fast with a machine-readable OAuth error.
    */
-  private recordRequestEncoding(request: FastifyRequest, endpoint: string): void {
+  private assertFormEncoded(request: FastifyRequest): void {
     const contentType = request.headers['content-type'] ?? '';
-    if (contentType.startsWith(FORM_CONTENT_TYPE)) return;
-    this.logger.warn('oauth endpoint called with a deprecated request encoding', { deprecation: 'oauth.json_body', endpoint, contentType });
+    if (!contentType.startsWith(FORM_CONTENT_TYPE)) throw AppErrorCode.OAU_001.create();
   }
 
   private parseClientCredential(request: FastifyRequest, body: ClientAuthenticationBody): ClientCredential {

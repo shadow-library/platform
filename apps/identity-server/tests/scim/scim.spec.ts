@@ -27,6 +27,8 @@ type Json = Record<string, unknown>;
 const env = new TestEnvironment('scim').init();
 const USER_SCHEMA = 'urn:ietf:params:scim:schemas:core:2.0:User';
 const PATCH_SCHEMA = 'urn:ietf:params:scim:api:messages:2.0:PatchOp';
+/** The token endpoint accepts only `application/x-www-form-urlencoded` (RFC 6749 §2.3.1, C-3). */
+const FORM = 'application/x-www-form-urlencoded';
 
 describe('SCIM 2.0 provisioning', () => {
   let token: string;
@@ -50,7 +52,8 @@ describe('SCIM 2.0 provisioning', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .body({ grant_type: 'client_credentials', client_id: client.clientId, client_secret: client.secret, scope: 'scim:provision' });
+      .headers({ 'content-type': FORM })
+      .body(new URLSearchParams({ grant_type: 'client_credentials', client_id: client.clientId, client_secret: client.secret ?? '', scope: 'scim:provision' }).toString());
     expect(response.statusCode).toBe(200);
     return { token: (response.json() as { access_token: string }).access_token, orgId: organisation.id };
   };
@@ -85,7 +88,8 @@ describe('SCIM 2.0 provisioning', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .body({ grant_type: 'client_credentials', client_id: wrongScope.clientId, client_secret: wrongScope.secret, scope: 'authz:check' });
+      .headers({ 'content-type': FORM })
+      .body(new URLSearchParams({ grant_type: 'client_credentials', client_id: wrongScope.clientId, client_secret: wrongScope.secret ?? '', scope: 'authz:check' }).toString());
     const misScoped = await scim('get', '/Users', (wrongToken.json() as { access_token: string }).access_token);
     expect(misScoped.statusCode).toBe(403);
 
@@ -97,7 +101,8 @@ describe('SCIM 2.0 provisioning', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .body({ grant_type: 'client_credentials', client_id: unbound.clientId, client_secret: unbound.secret, scope: 'scim:provision' });
+      .headers({ 'content-type': FORM })
+      .body(new URLSearchParams({ grant_type: 'client_credentials', client_id: unbound.clientId, client_secret: unbound.secret ?? '', scope: 'scim:provision' }).toString());
     const orgless = await scim('get', '/Users', (unboundToken.json() as { access_token: string }).access_token);
     expect(orgless.statusCode).toBe(403);
     expect((orgless.json() as Json)['schemas']).toEqual(['urn:ietf:params:scim:api:messages:2.0:Error']);

@@ -36,6 +36,10 @@ const pkce = () => {
 
 const basic = (clientId: string, secret: string) => `Basic ${Buffer.from(`${clientId}:${secret}`).toString('base64')}`;
 
+/** The token, revocation and introspection endpoints accept only `application/x-www-form-urlencoded` (RFC 6749 §2.3.1, C-3). */
+const FORM = 'application/x-www-form-urlencoded';
+const form = (fields: Record<string, string>) => new URLSearchParams(fields).toString();
+
 describe('OAuth authorization-code flow', () => {
   let clientId: string;
   let secret: string;
@@ -94,8 +98,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
     expect(token.statusCode).toBe(200);
     const body = token.json() as { access_token: string; id_token: string; refresh_token: string; token_type: string };
     expect(body.token_type).toBe('Bearer');
@@ -124,8 +128,8 @@ describe('OAuth authorization-code flow', () => {
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(clientId, secret) })
-        .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+        .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+        .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
 
     expect((await exchange()).statusCode).toBe(200);
     expect((await exchange()).statusCode).toBe(400);
@@ -139,8 +143,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: 'wrong-verifier' });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: 'wrong-verifier' }));
     expect(badVerifier.statusCode).toBe(400);
 
     const { verifier, challenge: c2 } = pkce();
@@ -149,8 +153,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, 'wrong-secret') })
-      .body({ grant_type: 'authorization_code', code: code2, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+      .headers({ authorization: basic(clientId, 'wrong-secret'), 'content-type': FORM })
+      .body(form({ grant_type: 'authorization_code', code: code2, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
     expect(badSecret.statusCode).toBe(401);
   });
 
@@ -168,24 +172,24 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
     const refreshToken = (first.json() as { refresh_token: string }).refresh_token;
 
     const refreshed = await env
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ grant_type: 'refresh_token', refresh_token: refreshToken });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'refresh_token', refresh_token: refreshToken }));
     expect(refreshed.statusCode).toBe(200);
 
     const reuse = await env
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ grant_type: 'refresh_token', refresh_token: refreshToken });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'refresh_token', refresh_token: refreshToken }));
     expect(reuse.statusCode).toBe(400);
   });
 
@@ -196,8 +200,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
     return token.json() as { access_token: string; refresh_token: string };
   };
 
@@ -209,8 +213,8 @@ describe('OAuth authorization-code flow', () => {
         .getRouter()
         .mockRequest()
         .post('/oauth2/introspect')
-        .headers({ authorization: basic(clientId, secret) })
-        .body({ token });
+        .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+        .body(form({ token }));
 
     expect((await introspect(access_token)).json()).toMatchObject({ active: true, token_type: 'access_token', sub: userId.toString() });
     expect((await introspect(refresh_token)).json()).toMatchObject({ active: true, token_type: 'refresh_token' });
@@ -219,8 +223,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/revoke')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ token: refresh_token });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ token: refresh_token }));
     expect(revoked.statusCode).toBe(200);
 
     expect((await introspect(refresh_token)).json()).toMatchObject({ active: false });
@@ -231,8 +235,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/introspect')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ token: 'garbage' });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ token: 'garbage' }));
     expect(response.json()).toMatchObject({ active: false });
   });
 
@@ -250,8 +254,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/introspect')
-      .headers({ authorization: basic(clientId, secret) })
-      .body({ token: refresh_token });
+      .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+      .body(form({ token: refresh_token }));
     expect(introspect.json()).toMatchObject({ active: false });
     expect(await env.getService(ConsentService).getActive(userId, clientId)).toBeNull();
   });
@@ -269,8 +273,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(service.clientId, service.secret ?? '') })
-      .body({ grant_type: 'client_credentials', scope: 'reports:read', resource: 'api://reports' });
+      .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': FORM })
+      .body(form({ grant_type: 'client_credentials', scope: 'reports:read', resource: 'api://reports' }));
     expect(granted.statusCode).toBe(200);
     const claims = env.getService(KeyService).verify((granted.json() as { access_token: string }).access_token);
     expect(claims?.aud).toBe('api://reports');
@@ -280,8 +284,8 @@ describe('OAuth authorization-code flow', () => {
       .getRouter()
       .mockRequest()
       .post('/oauth2/token')
-      .headers({ authorization: basic(service.clientId, service.secret ?? '') })
-      .body({ grant_type: 'client_credentials', scope: 'reports:admin', resource: 'api://reports' });
+      .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': FORM })
+      .body(form({ grant_type: 'client_credentials', scope: 'reports:admin', resource: 'api://reports' }));
     expect(ungranted.statusCode).toBe(400);
   });
 
@@ -322,8 +326,8 @@ describe('OAuth authorization-code flow', () => {
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(service.clientId, service.secret ?? '') })
-        .body({ grant_type: 'client_credentials', scope: 'jobs:run jobs:profile', resource: 'api://svc' });
+        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': FORM })
+        .body(form({ grant_type: 'client_credentials', scope: 'jobs:run jobs:profile', resource: 'api://svc' }));
       expect(granted.statusCode).toBe(200);
       const claims = env.getService(KeyService).verify((granted.json() as { access_token: string }).access_token);
       expect(claims?.scope).toBe('jobs:run');
@@ -348,17 +352,43 @@ describe('OAuth authorization-code flow', () => {
     it('should accept a form-encoded token request', async () => {
       const { verifier, challenge } = pkce();
       const code = new URL((await authorize(challenge)).headers.location ?? '').searchParams.get('code') ?? '';
-      const form = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+      const body = new URLSearchParams({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
 
       const token = await env
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(clientId, secret), 'content-type': 'application/x-www-form-urlencoded' })
-        .body(form.toString());
+        .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+        .body(body.toString());
 
       expect(token.statusCode).toBe(200);
       expect((token.json() as { token_type: string }).token_type).toBe('Bearer');
+    });
+
+    it('should refuse a JSON token request with invalid_request', async () => {
+      const { verifier, challenge } = pkce();
+      const code = new URL((await authorize(challenge)).headers.location ?? '').searchParams.get('code') ?? '';
+
+      const token = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/token')
+        .headers({ authorization: basic(clientId, secret), 'content-type': 'application/json' })
+        .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+
+      expect(token.statusCode).toBe(400);
+      expect(token.json()).toMatchObject({ code: 'invalid_request' });
+    });
+
+    it('should refuse a JSON introspection request with invalid_request', async () => {
+      const response = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/introspect')
+        .headers({ authorization: basic(clientId, secret), 'content-type': 'application/json' })
+        .body({ token: 'anything' });
+      expect(response.statusCode).toBe(400);
+      expect(response.json()).toMatchObject({ code: 'invalid_request' });
     });
 
     it('should advertise the revocation, introspection and client-authentication metadata', async () => {
@@ -380,8 +410,8 @@ describe('OAuth authorization-code flow', () => {
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(client.clientId, client.secret ?? ''), 'content-type': 'application/x-www-form-urlencoded' })
-        .body(new URLSearchParams({ grant_type: 'client_credentials', scope, resource }).toString());
+        .headers({ authorization: basic(client.clientId, client.secret ?? ''), 'content-type': FORM })
+        .body(form({ grant_type: 'client_credentials', scope, resource }));
 
     it('should refuse an audience the client holds no scope on', async () => {
       await clientService().ensureScope(applicationId(), 'api://unentitled', 'vault:read');
@@ -419,16 +449,16 @@ describe('OAuth authorization-code flow', () => {
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': 'application/x-www-form-urlencoded' })
-        .body(new URLSearchParams({ grant_type: 'client_credentials', scope: 'alpha:read', resource: 'api://beta' }).toString());
+        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': FORM })
+        .body(form({ grant_type: 'client_credentials', scope: 'alpha:read', resource: 'api://beta' }));
       expect(crossed.statusCode).toBe(400);
 
       const aligned = await env
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': 'application/x-www-form-urlencoded' })
-        .body(new URLSearchParams({ grant_type: 'client_credentials', scope: 'alpha:read', resource: 'api://alpha' }).toString());
+        .headers({ authorization: basic(service.clientId, service.secret ?? ''), 'content-type': FORM })
+        .body(form({ grant_type: 'client_credentials', scope: 'alpha:read', resource: 'api://alpha' }));
       expect(aligned.statusCode).toBe(200);
       expect(env.getService(KeyService).verify((aligned.json() as { access_token: string }).access_token)?.aud).toBe('api://alpha');
     });
@@ -468,8 +498,8 @@ describe('OAuth authorization-code flow', () => {
         .getRouter()
         .mockRequest()
         .post('/oauth2/token')
-        .headers({ authorization: basic(clientId, secret) })
-        .body({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier });
+        .headers({ authorization: basic(clientId, secret), 'content-type': FORM })
+        .body(form({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: verifier }));
       return token.json() as { access_token: string; refresh_token: string };
     };
 
@@ -477,14 +507,20 @@ describe('OAuth authorization-code flow', () => {
       const tokens = await issueTokens();
       const stranger = await otherClient();
 
-      const mine = await env.getRouter().mockRequest().post('/oauth2/introspect').body({ token: tokens.access_token, client_id: clientId, client_secret: secret });
+      const mine = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/introspect')
+        .headers({ 'content-type': FORM })
+        .body(form({ token: tokens.access_token, client_id: clientId, client_secret: secret }));
       expect((mine.json() as { active: boolean }).active).toBe(true);
 
       const theirs = await env
         .getRouter()
         .mockRequest()
         .post('/oauth2/introspect')
-        .body({ token: tokens.access_token, client_id: stranger.clientId, client_secret: stranger.secret });
+        .headers({ 'content-type': FORM })
+        .body(form({ token: tokens.access_token, client_id: stranger.clientId, client_secret: stranger.secret ?? '' }));
       expect((theirs.json() as { active: boolean }).active).toBe(false);
     });
 
@@ -492,9 +528,19 @@ describe('OAuth authorization-code flow', () => {
       const tokens = await issueTokens();
       const stranger = await otherClient();
 
-      await env.getRouter().mockRequest().post('/oauth2/revoke').body({ token: tokens.refresh_token, client_id: stranger.clientId, client_secret: stranger.secret });
+      await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/revoke')
+        .headers({ 'content-type': FORM })
+        .body(form({ token: tokens.refresh_token, client_id: stranger.clientId, client_secret: stranger.secret ?? '' }));
 
-      const stillActive = await env.getRouter().mockRequest().post('/oauth2/introspect').body({ token: tokens.refresh_token, client_id: clientId, client_secret: secret });
+      const stillActive = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/introspect')
+        .headers({ 'content-type': FORM })
+        .body(form({ token: tokens.refresh_token, client_id: clientId, client_secret: secret }));
       expect((stillActive.json() as { active: boolean }).active).toBe(true);
     });
 
@@ -508,7 +554,12 @@ describe('OAuth authorization-code flow', () => {
       });
       const tokens = await issueTokens();
 
-      const response = await env.getRouter().mockRequest().post('/oauth2/introspect').body({ token: tokens.access_token, client_id: publicClient.clientId });
+      const response = await env
+        .getRouter()
+        .mockRequest()
+        .post('/oauth2/introspect')
+        .headers({ 'content-type': FORM })
+        .body(form({ token: tokens.access_token, client_id: publicClient.clientId }));
       expect(response.statusCode).toBe(401);
     });
   });
