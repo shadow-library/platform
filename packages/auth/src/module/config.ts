@@ -166,7 +166,14 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
   login: '/login',
   callback: '/callback',
   logout: '/logout',
-  backchannelLogout: '/backchannel-logout',
+
+  /**
+   * Off by default. First-party revocation is pull-based: identity ends the central session and the
+   * next mint from that handle fails, so it never sends a back-channel logout to an app-session
+   * client — the route would sit there accepting nothing. It stays available for the third-party
+   * `RelyingParty` path, where a logout token really is the only notice a consumer gets.
+   */
+  backchannelLogout: false,
   session: '/session',
   stepUp: '/step-up',
 };

@@ -76,9 +76,15 @@ interface TokenEndpointResponse {
 /**
  * Declaring the constants
  *
- * The protocol core of an OIDC relying party: apps never build authorization URLs, verify PKCE,
- * or parse tokens themselves. Session-cookie management and back-channel logout are deliberately
- * left to the consuming app (see docs/sdk.md).
+ * The protocol core of an OIDC relying party: authorization URLs, PKCE, code exchange, ID-token
+ * validation. Session-cookie management and back-channel logout are deliberately left to the
+ * consuming app (see docs/sdk.md).
+ *
+ * **For third-party and external consumers only.** A Shadow app is first-party: it logs users in
+ * through `AuthModule`'s browser routes, exchanges the code for an opaque app-session handle, and
+ * holds no tokens at rest (D-18). Reaching for this class inside a Shadow app means reintroducing the
+ * token pair that model exists to remove — and hand-writing the login, cookie and cache code
+ * `AuthModule.forRoot()` already provides.
  */
 const DEFAULT_SCOPES = ['openid'];
 const DEFAULT_CLOCK_SKEW_SECONDS = 60;
@@ -86,7 +92,7 @@ const DEFAULT_JWKS_TTL_SECONDS = 300;
 
 /**
  * Injectable class: `RelyingPartyModule.forRoot()` registers it under its own class token so app
- * services take it as an ordinary constructor dependency.
+ * services take it as an ordinary constructor dependency. Third-party consumers only — see above.
  */
 export class RelyingParty {
   private readonly logger = Logger.getLogger(NAMESPACE, RelyingParty.name);

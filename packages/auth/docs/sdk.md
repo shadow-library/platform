@@ -2,7 +2,7 @@
 
 |                  |                                                                                                                                                                              |
 | :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**       | v1 implemented                                                                                                                                                               |
+| **Status**       | v1.1 implemented in the SDK (A-1 … A-9); integration against a server carrying T-801/T-805/T-806/T-807 still outstanding                                                      |
 | **Version**      | 1.1.0 (spec)                                                                                                                                                                 |
 | **Last updated** | 2026-07-25                                                                                                                                                                   |
 | **Repository**   | this repository — originally developed inside `identity-server` as the workspace package `packages/auth`, since extracted so consumers version the SDK independently (§11.1) |
@@ -26,7 +26,7 @@ Design principles:
 export { AuthClient, ServiceDiscovery } from '@shadow-library/auth';
 // framework integration
 export { AuthModule, RelyingPartyModule, Authenticated, RequirePermission, RequireScope, extendContextWithAuth } from '@shadow-library/auth/module';
-// OIDC relying-party helper (apps with user login)
+// OIDC relying-party helper — third-party/external consumers only, never a Shadow app (§7)
 export { RelyingParty } from '@shadow-library/auth/rp';
 // test utilities
 export { createTestIdP } from '@shadow-library/auth/testing';
@@ -190,7 +190,7 @@ auth.resolveService('pulse'); // → 'http://pulse'
 
 Resolution order: `SERVICE_URL_<NAME>` env override (dashes become underscores — e.g. `SERVICE_URL_PULSE=https://pulse.shadow-apps.com` for services outside the cluster or on custom domains) → default `{SERVICE_DISCOVERY_SCHEME:-http}://<name>{SERVICE_DISCOVERY_SUFFIX:-}`. Set `SERVICE_DISCOVERY_SUFFIX=.prod.svc.cluster.local` for cross-namespace DNS. The standalone `ServiceDiscovery` class is exported for non-auth uses.
 
-## 7. Relying-party helper (third-party / external clients)
+## 7. Relying-party helper — third-party / external clients only
 
 **A first-party Shadow app never uses `RelyingParty`**: it logs users in through `AuthModule`'s browser routes, exchanging the authorization code for an app-session handle and holding no tokens at rest (D-18). The RP helper implements the standard OIDC token-pair flow for everything else — third-party clients and non-Shadow consumers:
 
@@ -226,13 +226,15 @@ It tracks the protocol, not a subset of it. The v1.1 surface it answers for: `GE
 
 No token issuance, no credential storage, no login UI, no session storage backends beyond cookie+memory/Redis adapters, no support for non-Shadow identity providers. Anything issuing or persisting credentials belongs to Shadow Identity itself.
 
-## 11. Implementation notes (v1)
+## 11. Implementation notes
 
-Deliberate deviations from this spec in the shipped v1, each to be revisited with T-303:
+Deliberate deviations from this spec in the shipped SDK, each to be revisited with T-303:
 
 1. **Monorepo placement — superseded.** v1 was developed at `packages/auth` in the identity repo so its integration suite could run against the real server; the package has since been **extracted into its own repository** and versions independently (D-5 updated 2026-07-25).
 2. **JSON token-endpoint bodies — resolved.** The server now accepts RFC 6749 form encoding (JSON remains accepted for one release, logged under `deprecation: oauth.json_body`) and the SDK sends form-encoded requests.
-3. **RP scope.** `RelyingParty` ships the protocol core — authorization URL with PKCE S256 + `state`/`nonce`, code exchange, ID-token validation (including `nonce`), refresh. App-session cookie management and back-channel logout are the consuming app's responsibility until the session adapters land with T-303.
+3. **RP scope — third-party only.** `RelyingParty` ships the protocol core for external consumers: authorization URL with PKCE S256 + `state`/`nonce`, code exchange, ID-token validation (including `nonce`), refresh. Its app-session cookie management and back-channel logout stay the consuming app's responsibility until the session adapters land with T-303. A Shadow app never touches it — `AuthModule.forRoot()` is the whole first-party integration (§4).
 4. **`@Principal()`.** The framework's parameter decorators are a fixed set, so the principal is read from the request context: `context.getAuthPrincipal()` on the injected `ContextService` replaces the spec'd param decorator.
 5. **PDP transport.** `checkAll` fans out to parallel single checks; the batch HTTP endpoint arrives with the PDP batch API.
-6. **Logging.** Every outbound call and guard decision logs under the `@shadow-library/auth` namespace via common's `Logger` — lifecycle milestones at info (discovery loaded, jwks refreshed, token minted, roles synced, rules loaded), degraded paths at warn (jwks served stale, PDP fallback, 401 retry, guard denials), failures at error. Only debug entries may carry sensitive material (token bodies, state/nonce); info and above never do.
+6. **Logging.** Every outbound call and guard decision logs under the `@shadow-library/auth` namespace via common's `Logger` — lifecycle milestones at info (discovery loaded, jwks refreshed, token minted, registration resolved, roles synced, rules loaded), degraded paths at warn (jwks served stale, PDP fallback, 401 retry, guard denials, scope narrowed, refresh failed and last good kept), failures at error. Only debug entries may carry sensitive material (token bodies, state/nonce); info and above never do.
+7. **Multi-environment redirect URIs.** When several registered redirect URIs point at the same callback path, the SDK cannot tell which origin this deployment serves — it warns and takes the first. Pin `browser.redirectUri` in that case.
+8. **Integration suite — outstanding.** The v1.1 SDK work (A-1 … A-9) is complete and covered against `createTestIdP`, but it has not yet been run against a live identity build carrying T-801/T-805/T-806/T-807. The server contracts the SDK assumes and that pass therefore has to confirm: `GET /api/v1/apps/me`'s response shape, the `step_up_endpoint` / `app_session_endpoint` discovery keys, `AUTH_007` for an elevation intent mismatch, HTTP 409 plus `?force=true` on catalog sync, and the RFC 8693 grant's `resource` / `scope` handling.

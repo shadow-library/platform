@@ -156,7 +156,9 @@ class PostController {
 
 `AuthModule.forRoot(...)` must be imported inside `FastifyModule.forRoot({ imports: [...] })` so the guard middleware registers against the HTTP routes. Which M2M caller may reach which route is administered centrally in the identity admin panel and loaded at startup — there is no per-route caller allowlist in code.
 
-## OIDC relying party
+## OIDC relying party — third-party consumers only
+
+**A Shadow app never uses this.** It logs users in through `AuthModule`'s browser routes, exchanges the code for an opaque app-session handle, and holds no tokens at rest. `RelyingParty` is the standard OIDC token-pair flow for everything else: third-party clients, SPAs, and non-Shadow consumers. Reaching for it inside a Shadow app means reintroducing the token pair the first-party model exists to remove, and hand-writing the login, cookie and cache code `AuthModule.forRoot()` already provides.
 
 ```ts
 import { RelyingPartyModule } from '@shadow-library/auth/module';
@@ -211,6 +213,27 @@ idp.getAppSessionCount(); // asserts a revocation actually reached identity
 ```
 
 ## Migration
+
+### 0.4 — derived configuration (breaking)
+
+Four environment variables are **removed**, not deprecated:
+
+| Removed                | Now                                                                                    |
+| :--------------------- | :------------------------------------------------------------------------------------- |
+| `AUTH_AUDIENCE`        | derived from `GET /api/v1/apps/me`; pin with `audience` in code if a deploy truly needs |
+| `AUTH_REDIRECT_URI`    | derived from the registered redirect URIs; pin with `browser.redirectUri`               |
+| `AUTH_SCOPES`          | the scopes an admin granted this application; narrow with `browser.scopes`              |
+| `AUTH_STEP_UP_URL`     | discovery's `step_up_endpoint`; pin with `browser.stepUpUrl`                            |
+| `AUTH_SESSION_SECRET`  | nothing — the login-state cookie no longer needs a key or a store                      |
+
+Add `AUTH_APP_ID` (required in production; it doubles as the OAuth client id, so `AUTH_CLIENT_ID` is only needed when the two differ). A deploy is then `AUTH_ISSUER` + `AUTH_APP_ID` + one credential. There is no fallback reading of the old variables — a stale value silently overriding what identity says is worse than no override, so the escape hatches live in code where they are visible and reviewed.
+
+Other breaking changes on this line:
+
+- **`AUTH_BROWSER_LOGIN` replaces "set a redirect URI to switch login on".** The browser flow is on whenever a credential is configured; an API-only service sets `AUTH_BROWSER_LOGIN=false` or `browser: { enabled: false }`.
+- **`routes.backchannelLogout` defaults off.** First-party revocation is pull-based — identity ends the central session and the next mint fails — so it never posts a logout token to an app-session client. Turn it on explicitly if you serve the third-party `RelyingParty` path.
+- **`ResolvedBrowserAuthConfig` no longer carries `clientId`, `audience`, `redirectUri`, `scopes` or `stepUpUrl`**, and `AppSessionService.identityStepUpUrl()` is async. `LoginStateStore`, `SealedLoginStateStore` and `InMemoryLoginStateStore` are gone.
+- **`AppSessionToken.grantedScopes` is required**, and the token cache is keyed by the granted scope.
 
 ### Token requests are form-encoded (breaking)
 

@@ -77,6 +77,9 @@ describe('first-party browser flow', () => {
               audience: AUDIENCE,
               client: CLIENT,
               browser: { redirectUri: REDIRECT_URI, scopes: ['openid', 'reports:read'], allowedRedirects: ['https://reports.test'] },
+
+              /** Off by default for a first-party app, so this spec has to ask for it to exercise it */
+              routes: { backchannelLogout: '/backchannel-logout' },
             }),
             ReportModule,
           ],

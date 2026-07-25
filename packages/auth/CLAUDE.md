@@ -14,12 +14,14 @@ hand-rolling config, logging, errors, or validation.
 ## Layout
 
 - `src/index.ts` — functional core (`AuthClient`, interfaces, `AuthErrorCode`).
-- `src/lib/` — internals: discovery, JWKS, JWT verify, PDP client, token manager, transport, and the
-  first-party app-session client plus its access-token cache.
+- `src/lib/` — internals: discovery, JWKS, JWT verify, PDP client, token manager, client
+  authentication, transport, the app registry (derived configuration), the service-access rule cache,
+  and the first-party app-session client plus its access-token cache.
 - `src/module/` — framework integration (`@shadow-library/auth/module`): `AuthModule`/`RelyingPartyModule`,
   the wired browser auth controllers, guards, decorators (`Authenticated`, `RequirePermission`,
   `RequireScope`, `RequireElevation`), session cookie/login-state/registry, context augmentation.
 - `src/rp/` — OIDC relying party (`@shadow-library/auth/rp`): `RelyingParty`, authorization URL, PKCE.
+  **Third-party/external consumers only** — a Shadow app uses `AuthModule.forRoot()`.
 - `src/testing/` — test utilities (`@shadow-library/auth/testing`): `createTestIdP`.
 - `tests/` — `*.spec.ts`, driven by `bun test`; consume the package through its four public entry points only.
 
@@ -48,3 +50,11 @@ hand-rolling config, logging, errors, or validation.
   is a required runtime peer, the rest are optional (only needed for the framework module).
 - **Never log a token, a session handle, a cookie value, a PKCE verifier, `state`, or `nonce`.** Only a
   `sha256` hash of a handle may be retained, and only as a cache or registry key.
+- **Configuration is derived, not restated** (D-21). A deploy sets `AUTH_ISSUER` + `AUTH_APP_ID` + one
+  credential; the audience, redirect URIs and granted scopes come from `GET /api/v1/apps/me` and the
+  step-up/app-session endpoints from discovery, refreshed on a TTL. Do not reintroduce `AUTH_AUDIENCE`,
+  `AUTH_REDIRECT_URI`, `AUTH_SCOPES`, `AUTH_STEP_UP_URL` or `AUTH_SESSION_SECRET` — overrides belong in
+  code, where they are visible and reviewed.
+- **Failure asymmetry on anything refreshed on a TTL** (app registration, service-access rules): the
+  first resolve throws so the boot fails, a later refresh warns and keeps the last good value. An
+  identity outage must never change what a running service accepts.

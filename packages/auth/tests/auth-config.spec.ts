@@ -138,8 +138,14 @@ describe('environment-driven configuration', () => {
     expect(resolveBrowserAuthConfig({ issuer: CLIENT.issuer, audience: 'api://reports' }, resolveAuthRoutes()).enabled).toBe(false);
   });
 
-  it('should let a service turn individual routes off', () => {
-    const routes = resolveAuthRoutes({ basePath: '/session', backchannelLogout: false, stepUp: '/elevate' });
-    expect(routes).toMatchObject({ basePath: '/session', login: '/login', backchannelLogout: false, stepUp: '/elevate' });
+  it('should let a service move or turn off individual routes', () => {
+    const routes = resolveAuthRoutes({ basePath: '/session', stepUp: '/elevate', login: false });
+    expect(routes).toMatchObject({ basePath: '/session', login: false, stepUp: '/elevate' });
+  });
+
+  it('should leave back-channel logout off, since first-party revocation is pull-based', () => {
+    /** Identity never sends a logout token to an app-session client; the route would accept nothing */
+    expect(resolveAuthRoutes().backchannelLogout).toBe(false);
+    expect(resolveAuthRoutes({ backchannelLogout: '/backchannel-logout' }).backchannelLogout).toBe('/backchannel-logout');
   });
 });

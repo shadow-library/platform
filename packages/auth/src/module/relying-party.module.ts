@@ -19,6 +19,10 @@ export type RelyingPartyModuleOptions = Omit<RelyingPartyConfig, 'issuer'> & { i
 
 /**
  * Declaring the constants
+ *
+ * **For third-party and external consumers only.** A Shadow app imports `AuthModule.forRoot()` and
+ * gets first-party login end to end; importing this module instead reintroduces the token pair D-18
+ * exists to remove. See `RelyingParty` for the full reasoning.
  */
 
 @Module({})
