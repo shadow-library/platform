@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Link, useLocation, useNavigate, useParams } from '@tanstack/react-router';
+import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type ReactNode, useMemo, useState } from 'react';
-import { Avatar, type CommandItem, CommandPalette, Kbd, Popover, Spinner } from '@shadow-library/ui';
+import { Avatar, type CommandItem, CommandPalette, DropdownMenu, Kbd, Popover, Spinner, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
  */
-import { useListJobsQuery, useListProjectsQuery, useProjectQuery, useSessionQuery } from '@/lib/apis';
+import { useListJobsQuery, useListProjectsQuery, useLogoutMutation, useProjectQuery, useSessionQuery } from '@/lib/apis';
 import { projectTitle, userDisplayName } from '@/lib/format';
 import {
   BellIcon,
@@ -18,6 +18,7 @@ import {
   EditIcon,
   GridIcon,
   ListIcon,
+  LogoutIcon,
   MenuIcon,
   OverviewIcon,
   ProposalsIcon,
@@ -113,6 +114,7 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
   const [paletteOpen, setPaletteOpen] = useState(false);
 
   const sessionQuery = useSessionQuery();
+  const logout = useLogoutMutation();
   const projectQuery = useProjectQuery(novelId ?? '', inProject);
   const projectsQuery = useListProjectsQuery({ limit: 50 });
   const projects = projectsQuery.data?.items ?? [];
@@ -148,6 +150,15 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
     return items;
   }, [navigate, novelId, projects]);
 
+  // Ends the app session, then hands the browser back to the login shim. The SDK ends only this app's
+  // session (identity's own persists), so the shim may re-establish it — that is the SDK's logout semantics.
+  const signOut = (): void => {
+    logout.mutate(undefined, {
+      onSuccess: () => void navigate({ to: '/login', search: { returnTo: '/' } }),
+      onError: err => toast.danger(err.message),
+    });
+  };
+
   return (
     <header className={styles.topbar}>
       <button className={`nf-ib nf-hamburger ${styles.hamburger}`} aria-label="Open navigation" onClick={onMenuClick}>
@@ -176,9 +187,24 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
       {inProject && <JobsTray novelId={novelId} />}
 
       <div className={styles.divider} />
-      <Link to="/" aria-label="Account">
-        <Avatar name={userDisplayName(sessionQuery.data)} size="sm" />
-      </Link>
+      <DropdownMenu>
+        <DropdownMenu.Trigger asChild>
+          <button className={styles.avatarBtn} aria-label="Account menu">
+            <Avatar name={userDisplayName(sessionQuery.data)} size="sm" />
+          </button>
+        </DropdownMenu.Trigger>
+        <DropdownMenu.Content align="end" sideOffset={8}>
+          <DropdownMenu.Label>{userDisplayName(sessionQuery.data)}</DropdownMenu.Label>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item icon={<GridIcon />} onSelect={() => void navigate({ to: '/' })}>
+            All projects
+          </DropdownMenu.Item>
+          <DropdownMenu.Separator />
+          <DropdownMenu.Item icon={<LogoutIcon />} destructive disabled={logout.isPending} onSelect={signOut}>
+            Sign out
+          </DropdownMenu.Item>
+        </DropdownMenu.Content>
+      </DropdownMenu>
     </header>
   );
 }
