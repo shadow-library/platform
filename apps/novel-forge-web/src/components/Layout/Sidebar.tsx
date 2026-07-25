@@ -265,7 +265,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
         <Avatar name={userDisplayName(session)} size="sm" />
         <div className={styles.footerInfo}>
           <div className={styles.footerName}>{userDisplayName(session)}</div>
-          <div className={styles.footerRole}>{session?.name && session.email ? session.email : 'Author workspace'}</div>
+          <div className={styles.footerRole}>Author workspace</div>
         </div>
         <Tooltip content={theme === 'dark' ? 'Light theme' : 'Dark theme'}>
           <IconButton variant="ghost" size="sm" aria-label="Toggle theme" icon={theme === 'dark' ? <SunIcon /> : <MoonIcon />} onClick={toggleTheme} />

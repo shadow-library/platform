@@ -69,9 +69,9 @@ export function projectTitle(project: Pick<ProjectResponse, 'name' | 'title'>): 
   return project.title?.trim() || project.name;
 }
 
-/** The best human label for the signed-in user — name, falling back to email (both optional in the session contract). */
-export function userDisplayName(session?: Pick<SessionResponse, 'name' | 'email'>): string {
-  return session?.name?.trim() || session?.email || 'Account';
+/** A label for the signed-in user. The session surface exposes only the opaque `sub`, so it stands in for a name until a richer profile call exists. */
+export function userDisplayName(session?: Pick<SessionResponse, 'sub'>): string {
+  return session?.sub?.trim() || 'Account';
 }
 
 const kindLabels: Record<ProjectResponse['kind'], string> = {

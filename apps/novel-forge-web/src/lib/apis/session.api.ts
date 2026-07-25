@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { queryOptions, useQuery, type UseQueryResult } from '@tanstack/react-query';
+import { queryOptions, useMutation, type UseMutationResult, useQuery, type UseQueryResult } from '@tanstack/react-query';
 import { createServerFn } from '@tanstack/react-start';
 import { call } from '@shadow-library/web';
 
@@ -16,14 +16,22 @@ import { serverAuthFetch } from './server-fetch';
  */
 
 /**
- * The BINDING flat session contract of novel-forge-server's first-party session surface:
- * `GET /api/auth/session` answers 200 with this shape for an established session and 401 otherwise —
- * never a 200 null.
+ * The principal shape the `@shadow-library/auth` SDK's session surface answers with:
+ * `GET /api/auth/session` returns 200 with this for an established session and 401 otherwise — never a
+ * 200 null. `sub` is the stable user id; the SDK no longer returns `email`/`name` (the cookie carries an
+ * opaque handle, not a token, so the browser is told only what the guard exposes).
  */
 export interface SessionResponse {
-  userId: string;
-  email?: string;
-  name?: string;
+  sub: string;
+  scopes: string[];
+  org?: string;
+  aal?: string;
+  clientId?: string;
+}
+
+/** `POST /api/auth/logout` ends the app session and clears the cookie; identity's own session is untouched. */
+export interface LogoutResponse {
+  success: boolean;
 }
 
 /**
@@ -34,6 +42,8 @@ const sessionKeys = {
 };
 
 const fetchSession = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<SessionResponse>({ method: 'GET', path: '/session' }));
+
+const requestLogout = createServerFn({ method: 'POST' }).handler(() => serverAuthFetch<LogoutResponse>({ method: 'POST', path: '/logout' }));
 
 /**
  * Route-critical: the signed-in identity. A 401 here means "no session" — the route gates read that to
@@ -49,4 +59,9 @@ export const sessionQuery = queryOptions<SessionResponse, ApiError>({
 
 export function useSessionQuery(): UseQueryResult<SessionResponse, ApiError> {
   return useQuery(sessionQuery);
+}
+
+/** Ends the first-party app session. The caller navigates to `/login` on success — the SDK ends only this app's session, so identity may re-establish it. */
+export function useLogoutMutation(): UseMutationResult<LogoutResponse, ApiError, undefined> {
+  return useMutation<LogoutResponse, ApiError, undefined>({ mutationFn: () => call(requestLogout()) });
 }

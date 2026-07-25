@@ -22,7 +22,7 @@ interface LoginSearch {
 
 /**
  * The only public route. There is no local sign-in UI — the backend's relying-party auth module owns the
- * OIDC flow — so this shim immediately hands the browser to `/api/auth/login?returnTo=` with a full-page
+ * OIDC flow — so this shim immediately hands the browser to `/api/auth/login?return_to=` with a full-page
  * load. It exists (rather than `requireAuth` redirecting straight to the backend path) so client-side
  * navigations land on a real route and escape the SPA cleanly.
  */
@@ -41,7 +41,7 @@ function LoginRedirect(): React.JSX.Element {
   const { returnTo } = Route.useSearch();
 
   useEffect(() => {
-    window.location.replace(`/api/auth/login?returnTo=${encodeURIComponent(returnTo)}`);
+    window.location.replace(`/api/auth/login?return_to=${encodeURIComponent(returnTo)}`);
   }, [returnTo]);
 
   return (
