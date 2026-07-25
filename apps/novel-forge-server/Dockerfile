@@ -11,10 +11,8 @@ ENV HUSKY=0
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Install dependencies first so the layer caches until a manifest changes. The vendored auth SDK is a
-# `file:` dependency, so it must be in the build context before install resolves the lockfile.
+# Install dependencies first so the layer caches until a manifest changes.
 COPY package.json bun.lock bunfig.toml ./
-COPY vendor ./vendor
 RUN bun install --frozen-lockfile
 
 # Build the bundles: dist/main.js (server) and dist/migrate.js (migrations), plus the drizzle SQL
