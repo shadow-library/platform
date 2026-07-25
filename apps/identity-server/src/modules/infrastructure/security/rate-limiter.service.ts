@@ -8,8 +8,11 @@ import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
+import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { DatabaseService } from '@server/modules/infrastructure/datastore';
+
+import { M2M_CLIENT_BUCKET, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS } from './security.constants';
 
 /**
  * Defining types
@@ -68,6 +71,31 @@ export class RateLimiterService {
     const ttl = Number(ttlResult?.[1] ?? windowSeconds);
     const retryAfterSeconds = ttl > 0 ? ttl : windowSeconds;
     return { allowed: count <= limit, remaining: Math.max(0, limit - count), retryAfterSeconds };
+  }
+
+  /**
+   * Reports a counter's standing without counting a hit against it. M2M routes read the IP tier this
+   * way so an authenticated fleet never spends it, while a caller that has already flooded past the
+   * limit is still turned away before the handler runs.
+   */
+  async peek(bucket: string, key: string, limit: number, windowSeconds: number): Promise<RateDecision> {
+    if (!this.enabled) return { allowed: true, remaining: limit, retryAfterSeconds: 0 };
+    const redisKey = `rl:${bucket}:${key}`;
+    const [count, ttl] = await Promise.all([this.redis.get(redisKey), this.redis.ttl(redisKey)]);
+    const hits = Number(count ?? 0);
+    return { allowed: hits < limit, remaining: Math.max(0, limit - hits), retryAfterSeconds: ttl > 0 ? ttl : windowSeconds };
+  }
+
+  /**
+   * Charges one M2M call to the client that made it, once its credential has been proven. Callers
+   * invoke this at the point of authentication, so an unauthenticated request can never reach a
+   * client's budget — nor spend another client's.
+   */
+  async consumeClientBudget(clientId: string): Promise<void> {
+    const decision = await this.consume(M2M_CLIENT_BUCKET, clientId, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS);
+    if (decision.allowed) return;
+    this.logger.warn('M2M client exceeded its request budget', { securityEvent: 'security.client_rate_limited', clientId });
+    throw AppErrorCode.SEC_001.create();
   }
 
   /** Temporarily denies every request from the IP; used by failure correlation and incident response. */

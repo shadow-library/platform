@@ -15,6 +15,7 @@ import { RefreshTokenClientMismatchError, RefreshTokenReuseError, RefreshTokenSe
 import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
+import { RateLimiterService } from '@server/modules/infrastructure/security';
 import { PolicyService } from '@server/modules/system/policy';
 
 import { AccessTokenService } from './access-token.service';
@@ -116,6 +117,7 @@ export class OAuthService {
     private readonly consentService: ConsentService,
     private readonly workloadIdentityService: WorkloadIdentityService,
     private readonly policyService: PolicyService,
+    private readonly rateLimiterService: RateLimiterService,
   ) {}
 
   /**
@@ -285,7 +287,7 @@ export class OAuthService {
   }
 
   private async exchangeCode(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
-    const client = await this.authenticateClient(credential);
+    const client = await this.authenticateGrantClient(credential);
     if (!params.code || !params.redirectUri || !params.codeVerifier) throw AppErrorCode.OAU_001.create();
 
     const payload = await this.codeService.consume(params.code);
@@ -359,7 +361,7 @@ export class OAuthService {
   }
 
   private async refresh(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
-    const client = await this.authenticateClient(credential);
+    const client = await this.authenticateGrantClient(credential);
     if (!params.refreshToken) throw AppErrorCode.OAU_001.create();
 
     /** The client binding is verified INSIDE rotate() before the token is consumed, so a mismatched caller cannot burn the victim's token. */
@@ -435,7 +437,7 @@ export class OAuthService {
   }
 
   private async clientCredentials(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
-    const client = await this.authenticateClient(credential);
+    const client = await this.authenticateGrantClient(credential);
     if (!client.grantTypes.includes('client_credentials')) throw AppErrorCode.OAU_004.create();
 
     /** A service flow asks for exactly what it needs, so an un-granted scope is an error rather than something to quietly drop. */
@@ -468,6 +470,18 @@ export class OAuthService {
       scope,
     });
     return { accessToken, tokenType: 'Bearer', expiresIn, scope };
+  }
+
+  /**
+   * Authenticates the client for a `/oauth2/token` grant and charges the call to that client's own
+   * budget rather than to its network's (T-804). Revocation and introspection deliberately stay on
+   * the IP tier: they are administrative and low-volume, not what a fleet behind one egress IP
+   * floods, so they would only pay twice.
+   */
+  private async authenticateGrantClient(credential: ClientCredential): Promise<OAuthClient> {
+    const client = await this.authenticateClient(credential);
+    await this.rateLimiterService.consumeClientBudget(client.id);
+    return client;
   }
 
   private async authenticateClient(credential: ClientCredential): Promise<OAuthClient> {

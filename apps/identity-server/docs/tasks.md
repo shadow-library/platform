@@ -319,11 +319,15 @@ Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-
 - **Fix:** reject client assertions whose `aud` is not the identity issuer; document the required projection (`audience: <issuer>`); regression-test with an API-server-audience token.
 - **DoD:** an assertion carrying the cluster default audience is rejected; the dedicated audience is accepted.
 
-### T-804 — Per-client budgets on M2M endpoints · S · Sec: Medium
+### T-804 — Per-client budgets on M2M endpoints · S · Sec: Medium — **done**
 
 - **Change:** `POST /oauth2/token` and `/api/v1/app-sessions/*` sit on the 100 req/min per-IP tier; a fleet behind one egress IP shares one budget (and the SDK token cache is the only thing keeping it under).
 - **Fix:** budget authenticated M2M calls per client id (Redis, same tier machinery); unauthenticated traffic to the same endpoints stays on the IP tier.
 - **DoD:** two clients behind one IP consume independent budgets; an unauthenticated flood is still IP-limited.
+
+**Landed:** `@M2MBudget()` marks `POST /oauth2/token` and `/api/v1/app-sessions/*`. Authentication happens in a guard or a service, long after the `onRequest` rate-limit middleware, so the outcome is only knowable later — the marked routes therefore **read** the IP counter before the handler (`RateLimiterService.peek`, still fail-closed and still refusing an IP that has already flooded) and an `onResponse` middleware counts the request against that IP only when the reply says the caller never authenticated (401/403). A caller that does authenticate is charged to `m2m-client:<clientId>` at the point its credential is proven — `authenticateGrantClient` for the token grants, `callingClient()` for app-sessions. Revocation and introspection deliberately stay on the IP tier: administrative and low-volume, they would only pay twice.
+
+A refund-on-success design was rejected: the refund lags the consume by an argon2 verification, so a concurrent fleet would trip the IP limit before its refunds landed.
 
 ### T-805 — Catalog-sync deletion guardrail (D-15) · S · Sec: Medium — **done**
 

@@ -12,8 +12,10 @@ import { AsyncRouteHandler, Middleware, MiddlewareGenerator } from '@shadow-libr
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 
+import { M2M_BUDGET_METADATA } from './m2m-budget.decorator';
 import { RATE_LIMIT_METADATA, RateLimitPolicy } from './rate-limit.decorator';
 import { RateDecision, RateLimiterService } from './rate-limiter.service';
+import { GENERAL_LIMIT, GENERAL_WINDOW_SECONDS, IP_GENERAL_BUCKET } from './security.constants';
 
 /**
  * Defining types
@@ -26,8 +28,6 @@ import { RateDecision, RateLimiterService } from './rate-limiter.service';
  * routes add their own tighter budget. Runs at `onRequest` so rejected floods never reach body
  * parsing, and before the CSRF middleware (weight 90).
  */
-const GENERAL_LIMIT = 100;
-const GENERAL_WINDOW_SECONDS = 60;
 
 @Middleware({ type: 'onRequest', weight: 95 })
 export class RateLimitMiddleware implements MiddlewareGenerator {
@@ -46,17 +46,24 @@ export class RateLimitMiddleware implements MiddlewareGenerator {
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler {
     const policy = metadata[RATE_LIMIT_METADATA] as RateLimitPolicy | undefined;
+    const isM2M = metadata[M2M_BUDGET_METADATA] === true;
 
     return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
       if (!this.rateLimiter.enabled) return;
       const ip = request.ip || 'unknown';
       if (this.rateLimiter.isAllowlisted(ip)) return;
 
-      const failClosed = Boolean(policy);
+      const failClosed = Boolean(policy) || isM2M;
       const blockTtl = await this.guarded(() => this.rateLimiter.getIpBlockTtl(ip), failClosed);
       if (blockTtl) return this.reject(reply, blockTtl);
 
-      const general = await this.guarded(() => this.rateLimiter.consume('ip-general', ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS), failClosed);
+      /**
+       * An M2M route only reads the IP tier: a caller that already flooded it is turned away, but a
+       * request that goes on to authenticate is charged to its own client budget instead (T-804).
+       * `M2MRateLimitMiddleware` counts the ones that never authenticate.
+       */
+      const chargeIp = isM2M ? this.rateLimiter.peek.bind(this.rateLimiter) : this.rateLimiter.consume.bind(this.rateLimiter);
+      const general = await this.guarded(() => chargeIp(IP_GENERAL_BUCKET, ip, GENERAL_LIMIT, GENERAL_WINDOW_SECONDS), failClosed);
       if (general && !general.allowed) return this.reject(reply, general.retryAfterSeconds);
       if (!policy) return;
 

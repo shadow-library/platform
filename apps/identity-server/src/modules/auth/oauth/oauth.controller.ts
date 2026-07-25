@@ -14,6 +14,7 @@ import { Auth } from '@server/modules/access';
 import { KeyService } from '@server/modules/auth/keys';
 import { SESSION_COOKIE_NAME } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
+import { M2MBudget } from '@server/modules/infrastructure/security';
 
 import { AccessTokenService } from './access-token.service';
 import { OAuthClientService } from './oauth-client.service';
@@ -109,6 +110,7 @@ export class OAuthController {
 
   @Post('/oauth2/token')
   @Auth({ public: true })
+  @M2MBudget()
   @RespondFor(200, TokenResponse)
   async exchangeToken(@Body() body: TokenRequestBody, @Req() request: FastifyRequest): Promise<TokenResponse> {
     this.recordRequestEncoding(request, '/oauth2/token');

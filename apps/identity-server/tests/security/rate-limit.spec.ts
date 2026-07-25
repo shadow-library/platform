@@ -6,7 +6,9 @@ import { afterAll, beforeEach, describe, expect, it } from 'bun:test';
 /**
  * Importing user defined packages
  */
-import { RateLimiterService } from '@server/modules/infrastructure/security';
+import { OAuthClientService } from '@server/modules/auth/oauth';
+import { GENERAL_LIMIT, IP_GENERAL_BUCKET, M2M_CLIENT_BUCKET, M2M_CLIENT_LIMIT, M2M_CLIENT_WINDOW_SECONDS, RateLimiterService } from '@server/modules/infrastructure/security';
+import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
 
@@ -65,6 +67,14 @@ describe('Rate limiting', () => {
       await rateLimiter.unblockIp('10.0.0.9');
       expect(await rateLimiter.getIpBlockTtl('10.0.0.9')).toBe(0);
     });
+
+    it('should report a counter’s standing without counting a hit against it', async () => {
+      expect(await rateLimiter.peek('spec', 'p1', 1, 60)).toMatchObject({ allowed: true, remaining: 1 });
+      /** Repeated peeks never move the counter, so a consume afterwards still sees a fresh budget. */
+      await rateLimiter.peek('spec', 'p1', 1, 60);
+      expect(await rateLimiter.consume('spec', 'p1', 1, 60)).toMatchObject({ allowed: true, remaining: 0 });
+      expect(await rateLimiter.peek('spec', 'p1', 1, 60)).toMatchObject({ allowed: false, remaining: 0 });
+    });
   });
 
   describe('middleware', () => {
@@ -98,6 +108,62 @@ describe('Rate limiting', () => {
         const response = await registerInit('10.1.0.5', `off${attempt}@example.com`);
         expect(response.statusCode).toBe(200);
       }
+    });
+  });
+
+  /**
+   * A fleet of pods shares one egress IP but is many callers (T-804). Budgets are seeded directly
+   * rather than driven to their limit: 600 argon2 secret verifications per assertion would dominate
+   * the suite, and what matters is which counter each request lands on, not the arithmetic.
+   */
+  describe('per-client M2M budgets', () => {
+    const EGRESS_IP = '10.2.0.1';
+    let alpha: { clientId: string; secret?: string };
+    let beta: { clientId: string; secret?: string };
+
+    const ipCounter = () => env.getRedisClient().get(`rl:${IP_GENERAL_BUCKET}:${EGRESS_IP}`);
+    const seedClientBudget = (clientId: string, hits: number) => env.getRedisClient().set(`rl:${M2M_CLIENT_BUCKET}:${clientId}`, String(hits), 'EX', M2M_CLIENT_WINDOW_SECONDS);
+
+    const token = (client: { clientId: string; secret?: string }, ip = EGRESS_IP) =>
+      env.getRouter().mockRequest({
+        method: 'POST',
+        url: '/oauth2/token',
+        remoteAddress: ip,
+        headers: { authorization: `Basic ${Buffer.from(`${client.clientId}:${client.secret}`).toString('base64')}`, 'content-type': 'application/x-www-form-urlencoded' },
+        payload: 'grant_type=client_credentials',
+      });
+
+    beforeEach(async () => {
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const clients = env.getService(OAuthClientService);
+      alpha = await clients.register({ applicationId, name: 'Alpha Fleet', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+      beta = await clients.register({ applicationId, name: 'Beta Fleet', kind: 'SERVICE', grantTypes: ['client_credentials'] });
+    });
+
+    it('should give two clients behind one ip independent budgets', async () => {
+      await seedClientBudget(alpha.clientId, M2M_CLIENT_LIMIT);
+
+      expect((await token(alpha)).statusCode).toBe(429);
+      /** Same source IP, different client — beta's budget is untouched by alpha's exhaustion. */
+      expect((await token(beta)).statusCode).toBe(200);
+    });
+
+    it('should not spend the ip budget on a call that authenticates', async () => {
+      expect((await token(alpha)).statusCode).toBe(200);
+      expect(await ipCounter()).toBeNull();
+    });
+
+    it('should charge a call that never authenticates to its source ip', async () => {
+      const forged = await token({ clientId: alpha.clientId, secret: 'not-the-secret' });
+      expect(forged.statusCode).toBe(401);
+      expect(Number(await ipCounter())).toBe(1);
+    });
+
+    it('should still refuse an authenticated call once its ip has flooded', async () => {
+      await env.getRedisClient().set(`rl:${IP_GENERAL_BUCKET}:${EGRESS_IP}`, String(GENERAL_LIMIT), 'EX', 60);
+      expect((await token(alpha)).statusCode).toBe(429);
+      /** The flood is the IP's, not the client's — the same credential works from elsewhere. */
+      expect((await token(alpha, '10.2.0.2')).statusCode).toBe(200);
     });
   });
 });

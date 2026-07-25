@@ -10,6 +10,7 @@ import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
 import { OAuthClientService } from '@server/modules/auth/oauth';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
+import { M2MBudget, RateLimiterService } from '@server/modules/infrastructure/security';
 
 import { APP_SESSION_SCOPE } from './app-session.constants';
 import {
@@ -39,10 +40,12 @@ import { AppSessionService } from './app-session.service';
  */
 @HttpController('/api/v1/app-sessions')
 @Auth({ service: APP_SESSION_SCOPE })
+@M2MBudget()
 export class AppSessionController {
   constructor(
     private readonly appSessionService: AppSessionService,
     private readonly clientService: OAuthClientService,
+    private readonly rateLimiterService: RateLimiterService,
   ) {}
 
   @Post()
@@ -94,12 +97,17 @@ export class AppSessionController {
     return { success: true };
   }
 
-  /** The acting client is taken from the verified service token, never from the request body. */
+  /**
+   * The acting client is taken from the verified service token, never from the request body, and the
+   * call is charged to that client's own budget — a fleet of pods behind one egress IP is many
+   * callers, not one (T-804).
+   */
   private async callingClient(): Promise<OAuthClient> {
     const claims = Context.getServiceToken();
     const clientId = typeof claims.client_id === 'string' ? claims.client_id : '';
     const client = await this.clientService.getClient(clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_002.create();
+    await this.rateLimiterService.consumeClientBudget(client.id);
     return client;
   }
 }
