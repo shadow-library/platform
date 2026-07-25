@@ -1,7 +1,8 @@
 /**
  * Importing npm packages
  */
-import { createServerFetch } from '@shadow-library/web/server';
+import { getRequest } from '@tanstack/react-start/server';
+import { createServerFetch, type ServerFetch } from '@shadow-library/web/server';
 
 /**
  * Importing user defined packages
@@ -23,4 +24,15 @@ export type { ServerFetchSpec } from '@shadow-library/web/server';
  */
 const SERVER_URL = process.env.SERVER_URL ?? 'http://localhost:9091';
 
-export const serverFetch = createServerFetch({ baseUrl: `${SERVER_URL}/api/v1` });
+const baseServerFetch = createServerFetch({ baseUrl: `${SERVER_URL}/api/v1` });
+
+/**
+ * Relays the browser's `User-Agent` to the identity server. `createServerFetch` forwards only the session
+ * cookie and CSRF token, so without this every session the backend mints would record this SSR runtime as
+ * the device — leaving "Sessions & devices" showing "Unknown device". The incoming request (browser → Start
+ * server) carries the real agent for both the SSR document and client-invoked server-function RPC.
+ */
+export const serverFetch: ServerFetch = spec => {
+  const userAgent = getRequest().headers.get('user-agent');
+  return baseServerFetch(userAgent ? { ...spec, headers: { 'user-agent': userAgent, ...spec.headers } } : spec);
+};
