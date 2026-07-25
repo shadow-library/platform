@@ -13,6 +13,7 @@ import { DiscoveryClient } from '../lib/discovery';
 import { RemoteJwks } from '../lib/jwks';
 import { verifyJwt } from '../lib/jwt';
 import { assertValidTimeout, withTimeout } from '../lib/transport';
+import { buildAuthorizationUrl } from './authorization-url';
 import { createPkcePair, randomUrlSafeString } from './pkce';
 
 /**
@@ -112,21 +113,22 @@ export class RelyingParty {
     const pkce = await createPkcePair();
     const state = options.state ?? randomUrlSafeString(16);
     const nonce = options.nonce ?? randomUrlSafeString(16);
+    const scopes = options.scopes ?? this.config.scopes ?? DEFAULT_SCOPES;
 
-    const url = new URL(document.authorization_endpoint);
-    url.searchParams.set('response_type', 'code');
-    url.searchParams.set('client_id', this.config.client.id);
-    url.searchParams.set('redirect_uri', this.config.redirectUri);
-    url.searchParams.set('scope', (options.scopes ?? this.config.scopes ?? DEFAULT_SCOPES).join(' '));
-    url.searchParams.set('state', state);
-    url.searchParams.set('nonce', nonce);
-    url.searchParams.set('code_challenge', pkce.challenge);
-    url.searchParams.set('code_challenge_method', 'S256');
-    if (options.resource) url.searchParams.set('resource', options.resource);
+    const url = buildAuthorizationUrl({
+      authorizationEndpoint: document.authorization_endpoint,
+      clientId: this.config.client.id,
+      redirectUri: this.config.redirectUri,
+      scopes,
+      state,
+      nonce,
+      codeChallenge: pkce.challenge,
+      resource: options.resource,
+    });
 
-    /** Debug-only: state and nonce are single-use secrets while the flow is in flight */
-    this.logger.debug('authorization url created', { state, nonce, scopes: options.scopes ?? this.config.scopes ?? DEFAULT_SCOPES });
-    return { url: url.toString(), state, nonce, codeVerifier: pkce.verifier };
+    /** Never `state` or `nonce`: both are single-use secrets for as long as the flow is in flight */
+    this.logger.debug('authorization url created', { scopes, resource: options.resource });
+    return { url, state, nonce, codeVerifier: pkce.verifier };
   }
 
   /** Exchanges the callback code, validating the ID token (signature, `iss`/`aud`/`exp`/`nonce`) */
