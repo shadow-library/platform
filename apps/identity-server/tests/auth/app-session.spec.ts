@@ -213,6 +213,28 @@ describe('First-party app sessions', () => {
       expect((await mint(sessionHandle, { elevated: true, resource: BILLING })).statusCode).toBe(403);
     });
 
+    it('should mint for the application’s own audience without any scope grant on it', async () => {
+      const clientService = env.getService(OAuthClientService);
+      const application = await env.getService(ApplicationService).createApplication({ name: 'gazette', subDomain: 'gazette' });
+      await clientService.ensureResource(application.id, 'api://gazette');
+      const platformId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const manage = await clientService.ensureScope(platformId, 'shadow-identity', 'app-session:manage');
+      const app = await clientService.register({
+        applicationId: application.id,
+        name: 'Gazette',
+        kind: 'WEB_CONFIDENTIAL',
+        isFirstParty: true,
+        grantTypes: ['authorization_code', 'client_credentials'],
+        redirectUris: [REDIRECT_URI],
+        scopeIds: [manage],
+      });
+
+      const { sessionHandle } = (await openSession(app, 'api://gazette', 'openid')).json() as { sessionHandle: string };
+      const minted = await mint(sessionHandle, { resource: 'api://gazette' }, app);
+      expect(minted.statusCode).toBe(200);
+      expect((minted.json() as { audience: string }).audience).toBe('api://gazette');
+    });
+
     it('should leave no elevation standing on the parent session', async () => {
       const { sessionHandle } = (await openSession()).json() as { sessionHandle: string };
       await elevateCentralSession();

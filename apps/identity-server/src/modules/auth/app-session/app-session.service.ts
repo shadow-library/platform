@@ -148,7 +148,8 @@ export class AppSessionService {
     const granted = await this.clientService.getGrantedScopes(input.client.id);
     const audience = input.resource ?? DEFAULT_AUDIENCE;
     const grantedHere = new Map(granted.filter(scope => scope.resourceIdentifier === audience).map(scope => [scope.name, scope]));
-    if (input.resource !== undefined && grantedHere.size === 0) {
+    if (input.resource !== undefined && grantedHere.size === 0 && !(await this.clientService.isOwnAudience(input.client, input.resource))) {
+      /** Same carve-out as the OAuth grant resolver: an application's own canonical audience needs no scope grant (D-21). */
       this.logger.warn('app session token refused: client holds no scope on the requested resource', {
         securityEvent: 'oauth.audience_denied',
         clientId: input.client.id,
