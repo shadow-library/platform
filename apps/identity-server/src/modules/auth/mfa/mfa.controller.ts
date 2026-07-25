@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 
-import { Body, Delete, Get, HttpController, HttpStatus, Post, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -14,6 +14,8 @@ import {
   OperationSuccessResponse,
   RecoveryCodesResponse,
   StepUpBody,
+  StepUpIntentQuery,
+  StepUpIntentResponse,
   StepUpMethodsResponse,
   StepUpResponse,
   TotpActivateResponse,
@@ -76,6 +78,13 @@ export class MfaController {
   @RespondFor(200, StepUpMethodsResponse)
   async stepUpMethods(): Promise<StepUpMethodsResponse> {
     return { methods: await this.mfaService.getStepUpMethods(Context.getSession().userId) };
+  }
+
+  /** The beneficiary label the hosted step-up prompt renders for an app-initiated ceremony (D-19, T-801). */
+  @Get('/step-up/intent')
+  @RespondFor(200, StepUpIntentResponse)
+  resolveStepUpIntent(@Query() query: StepUpIntentQuery): ReturnType<MfaService['resolveStepUpIntent']> {
+    return this.mfaService.resolveStepUpIntent(query.clientId);
   }
 
   @Post('/step-up')

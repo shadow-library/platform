@@ -245,6 +245,16 @@ export class MfaService {
    * therefore derived from the account's own enrolled factors, not from what the caller supplies.
    * Passkey-only accounts elevate through the WebAuthn step-up ceremony, not this method.
    */
+  /**
+   * The beneficiary label a hosted step-up prompt shows for an app-initiated ceremony (D-19, T-801).
+   * An unknown or inactive client id resolves to no name — the prompt renders that as a neutral
+   * failure rather than confirming or denying the id's existence.
+   */
+  async resolveStepUpIntent(clientId: string): Promise<{ applicationName?: string }> {
+    const applicationName = await this.clientService.resolveApplicationLabel(clientId);
+    return { applicationName: applicationName ?? undefined };
+  }
+
   async stepUp(
     session: ValidatedSession,
     proof: { code?: string; password?: string; clientId?: string; resource?: string },

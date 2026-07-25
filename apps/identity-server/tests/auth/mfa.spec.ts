@@ -226,6 +226,34 @@ describe('MFA', () => {
       });
     });
 
+    /**
+     * The hosted prompt resolves the client id it was handed to a human application name (D-19,
+     * T-801). An unknown id yields no name so the prompt can fail neutrally rather than confirm the
+     * id's existence.
+     */
+    describe('intent label', () => {
+      it('should resolve the owning application display name for a client id', async () => {
+        const application = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity');
+        const app = await env
+          .getService(OAuthClientService)
+          .register({ applicationId: application.id, name: 'Label App', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code'] });
+        const response = await request('get', `/api/v1/me/mfa/step-up/intent?clientId=${app.clientId}`);
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({ applicationName: application.displayName ?? application.name });
+      });
+
+      it('should omit the name for an unknown client id, giving a neutral non-probe answer', async () => {
+        const response = await request('get', '/api/v1/me/mfa/step-up/intent?clientId=no-such-client');
+        expect(response.statusCode).toBe(200);
+        expect(response.json()).toEqual({});
+      });
+
+      it('should require a session', async () => {
+        const response = await env.getRouter().mockRequest().get('/api/v1/me/mfa/step-up/intent?clientId=shadow-identity');
+        expect(response.statusCode).toBe(401);
+      });
+    });
+
     it('should allow disabling totp only from an elevated session', async () => {
       await setupTotp();
 

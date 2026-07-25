@@ -98,6 +98,23 @@ export class StepUpBody extends ElevationIntentFields {
 }
 
 @Schema()
+export class StepUpIntentQuery {
+  @Field({ maxLength: 64 })
+  clientId: string;
+}
+
+/**
+ * The label a hosted step-up prompt renders for an app-initiated ceremony (D-19, T-801).
+ * `applicationName` is absent for an unknown or inactive client id, which the prompt shows as a
+ * neutral failure rather than a probe result.
+ */
+@Schema()
+export class StepUpIntentResponse {
+  @Field({ optional: true })
+  applicationName?: string;
+}
+
+@Schema()
 export class StepUpMethodsResponse {
   /** Methods the account may use to elevate; empty means it must enrol a factor first. */
   @Field(() => [String])
