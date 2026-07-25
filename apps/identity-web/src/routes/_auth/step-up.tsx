@@ -17,10 +17,11 @@ import { requireSession } from '@/lib/session';
 /**
  * Defining types
  */
+/** Kept snake_case to round-trip the SDK's OAuth-style URL — a renamed shape makes the router rewrite the address with duplicate params. */
 interface StepUpSearch {
-  clientId?: string;
+  client_id?: string;
   resource?: string;
-  returnTo?: string;
+  return_to?: string;
 }
 
 /**
@@ -37,12 +38,12 @@ interface StepUpSearch {
 export const Route = createFileRoute('/_auth/step-up')({
   /** The SDK sends OAuth-style snake_case params; the console may send none. */
   validateSearch: (search: Record<string, unknown>): StepUpSearch => ({
-    clientId: typeof search.client_id === 'string' ? search.client_id : undefined,
+    client_id: typeof search.client_id === 'string' ? search.client_id : undefined,
     resource: typeof search.resource === 'string' ? search.resource : undefined,
-    returnTo: typeof search.return_to === 'string' ? search.return_to : undefined,
+    return_to: typeof search.return_to === 'string' ? search.return_to : undefined,
   }),
   beforeLoad: ({ context, location }) => requireSession(context.queryClient, location.href),
-  loaderDeps: ({ search }) => ({ clientId: search.clientId }),
+  loaderDeps: ({ search }) => ({ clientId: search.client_id }),
   loader: ({ context, deps }) => {
     if (!deps.clientId) return;
     return context.queryClient.ensureQueryData(stepUpIntentQueryOptions(deps.clientId));
@@ -73,7 +74,7 @@ function safeReturnTo(candidate: string | undefined, rootDomain: string): string
 }
 
 function StepUpPage(): React.JSX.Element {
-  const { clientId, resource, returnTo } = Route.useSearch();
+  const { client_id: clientId, resource, return_to: returnTo } = Route.useSearch();
   const navigate = useNavigate();
   const rootDomain = useRootDomain();
   const appInitiated = Boolean(clientId);
