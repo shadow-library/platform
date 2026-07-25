@@ -11,7 +11,7 @@ import { Button, Dialog, FormField, Input, OtpInput, Spinner, toast } from '@sha
  */
 import { LockIcon } from '@/components/icons';
 import { assertPasskey } from '@/features/auth';
-import { meKeys, requestPasskeyStepUpOptions, type StepUpMethod, useMeQuery, useStepUpMethodsQuery, useStepUpMutation, verifyPasskeyStepUp } from '@/lib/apis';
+import { meKeys, requestPasskeyStepUpOptions, type StepUpIntent, type StepUpMethod, useMeQuery, useStepUpMethodsQuery, useStepUpMutation, verifyPasskeyStepUp } from '@/lib/apis';
 
 import styles from './portal.module.css';
 
@@ -21,6 +21,8 @@ import styles from './portal.module.css';
 interface StepUpFieldsProps {
   methods: StepUpMethod[] | undefined;
   loading?: boolean;
+  /** Binds the elevation to the application it is performed for (D-19, T-801); absent opens a console-only window. */
+  intent?: StepUpIntent;
   onElevated: () => void;
 }
 
@@ -51,7 +53,7 @@ const METHOD_REASON: Record<StepUpMethod, string> = {
  * re-entry. An account with no usable method (e.g. federated with no MFA) is sent to enrol one.
  * Shared by the console step-up dialog and the consent screen so both negotiate factors identically.
  */
-export function StepUpFields({ methods, loading, onElevated }: StepUpFieldsProps): ReactElement {
+export function StepUpFields({ methods, loading, intent, onElevated }: StepUpFieldsProps): ReactElement {
   const queryClient = useQueryClient();
   const stepUp = useStepUpMutation();
   const [code, setCode] = useState('');
@@ -64,7 +66,7 @@ export function StepUpFields({ methods, loading, onElevated }: StepUpFieldsProps
       const ceremony = await assertPasskey(options);
       if (ceremony.outcome === 'UNSUPPORTED') throw new Error('This device doesn’t support passkeys.');
       if (ceremony.outcome === 'CANCELLED') throw new Error('CANCELLED');
-      return verifyPasskeyStepUp(ceremony.response);
+      return verifyPasskeyStepUp(ceremony.response, intent);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: meKeys.all });
@@ -88,11 +90,11 @@ export function StepUpFields({ methods, loading, onElevated }: StepUpFieldsProps
 
   const submitCode = (value: string): void => {
     if (value.length < OTP_LENGTH) return;
-    stepUp.mutate({ code: value }, { onSuccess: onElevated, onError: error => toast.danger(error.message) });
+    stepUp.mutate({ code: value, ...intent }, { onSuccess: onElevated, onError: error => toast.danger(error.message) });
   };
   const submitPassword = (): void => {
     if (!password) return;
-    stepUp.mutate({ password }, { onSuccess: onElevated, onError: error => toast.danger(error.message) });
+    stepUp.mutate({ password, ...intent }, { onSuccess: onElevated, onError: error => toast.danger(error.message) });
   };
 
   if (current === null)
