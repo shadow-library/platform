@@ -13,14 +13,17 @@ import {
   AuthPrincipal,
   CheckInput,
   CheckOptions,
+  DiscoveryDocument,
   FetchLike,
   IntrospectionResult,
   JwtPayload,
+  LogoutTokenClaims,
   RoleCatalogManifest,
   RoleCatalogSyncResult,
   ServiceAccessRule,
   ServiceTokenOptions,
 } from '../interfaces';
+import { AppSessionClient } from './app-session-client';
 import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
 import { type ClaimExpectations, verifyJwt } from './jwt';
@@ -58,6 +61,12 @@ const PDP_SCOPE = 'authz:check';
 /** The catalog-sync endpoint requires a service token granted this scope */
 const ROLE_SYNC_SCOPE = 'authz:roles:sync';
 
+/** The app-session endpoints require a service token granted this scope */
+const APP_SESSION_SCOPE = 'app-session:manage';
+
+/** The `events` member that marks a JWT as a back-channel logout notice rather than an ID token */
+const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
+
 /**
  * The consumer-facing auth client: offline token verification, PDP checks, M2M tokens, role
  * catalog sync, and admin-managed service-access rules. Designed as an injectable class —
@@ -74,6 +83,10 @@ export class AuthClient {
   private readonly tokens: ServiceTokenManager;
   private readonly pdp: PdpClient;
   private readonly discovery: DiscoveryClient;
+
+  /** The first-party app-session protocol client; see `AppSessionClient` for why it is M2M-only */
+  readonly appSessions: AppSessionClient;
+
   private serviceAccess: ServiceAccessRule[] | null = null;
 
   constructor(private readonly config: AuthClientConfig) {
@@ -96,7 +109,33 @@ export class AuthClient {
       ttlSeconds: config.cache?.decisionTtlSeconds ?? DEFAULT_DECISION_TTL_SECONDS,
       getToken: config.client ? () => this.identityToken(PDP_SCOPE) : undefined,
     });
+    this.appSessions = new AppSessionClient({
+      issuer: this.issuer,
+      fetchFn: this.transport,
+      getToken: () => this.identityToken(APP_SESSION_SCOPE),
+      invalidateToken: () => this.tokens.invalidate(this.identityTokenOptions(APP_SESSION_SCOPE)),
+    });
     this.logger.info('auth client initialised', { issuer: this.issuer, audience: config.audience, hasClientCredentials: Boolean(config.client) });
+  }
+
+  /** The issuer's discovery document, fetched once per process and cached for the deployment's lifetime */
+  getDiscovery(): Promise<DiscoveryDocument> {
+    return this.discovery.get();
+  }
+
+  /**
+   * Fails the boot when a configured scope is absent from the issuer's published `scopes_supported`.
+   * A typo would otherwise mint quietly — with the misspelt scope simply dropped — and only surface
+   * as a puzzling 403 deep inside a request, so it is worth one startup round trip.
+   */
+  async assertScopesSupported(scopes: string[]): Promise<void> {
+    if (scopes.length === 0) return;
+    const supported = (await this.discovery.get()).scopes_supported;
+    if (!supported?.length) return;
+
+    const unknown = scopes.filter(scope => !supported.includes(scope));
+    if (unknown.length > 0) throw this.logged(AuthErrorCode.SCOPE_UNSUPPORTED.create({ scopes: unknown.join(', ') }));
+    this.logger.debug('configured scopes validated against discovery', { scopes });
   }
 
   /** Verifies a bearer token offline against the issuer's JWKS and returns the resolved principal */
@@ -106,6 +145,33 @@ export class AuthClient {
     const principal = this.toPrincipal(payload);
     this.logger.debug('token verified', { sub: principal.sub, kind: principal.kind, scopes: principal.scopes });
     return principal;
+  }
+
+  /**
+   * Verifies an OIDC back-channel logout token (OpenID Connect Back-Channel Logout 1.0 §2.6). Unlike
+   * an access token it is addressed to this *client*, not to this API, and the `events` claim plus
+   * the absence of `nonce` are what separate it from an ID token replayed as a logout notice.
+   */
+  async verifyLogoutToken(token: string): Promise<LogoutTokenClaims> {
+    const clientId = this.config.client?.id;
+    if (!clientId) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'back-channel logout requires client credentials' });
+
+    const reject = (reason: string): never => throwError(this.logged(AuthErrorCode.LOGOUT_TOKEN_INVALID.create({ reason })));
+    const payload = await verifyJwt(token, kid => this.jwks.getKey(kid), { issuer: this.issuer, audience: clientId, clockSkewSeconds: this.clockSkewSeconds }).catch(
+      (error: Error) => reject(error.message),
+    );
+
+    const events = payload.events;
+    if (typeof events !== 'object' || events === null || !(BACKCHANNEL_LOGOUT_EVENT in events)) reject('missing the back-channel logout event');
+    if (payload.nonce !== undefined) reject('a logout token must not carry a nonce');
+    if (typeof payload.iat !== 'number') reject('missing iat claim');
+
+    const sub = typeof payload.sub === 'string' ? payload.sub : undefined;
+    const sid = typeof payload.sid === 'string' ? payload.sid : undefined;
+    if (!sub && !sid) reject('a logout token must carry sub, sid, or both');
+
+    this.logger.info('back-channel logout token verified', { hasSub: Boolean(sub), hasSid: Boolean(sid) });
+    return { sub, sid, claims: payload };
   }
 
   /** Asks the PDP whether the principal may perform the action; deny-by-default on any failure */
@@ -211,25 +277,54 @@ export class AuthClient {
     return this.serviceAccess.some(rule => rule.callerClientId === callerClientId && this.matchesMethod(rule.method, method) && this.matchesPath(rule.path, path));
   }
 
-  /** Explicit fallback for opaque tokens; MUST NOT be used for routine verification */
+  /**
+   * Explicit fallback for opaque tokens; MUST NOT be used for routine verification. Introspection is
+   * now caller-scoped — another client's token reads as `active: false` — so it can no longer be used
+   * to probe tokens this application does not own.
+   */
   async introspect(token: string): Promise<IntrospectionResult> {
-    const client = this.config.client;
-    if (!client?.secret) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'introspection requires confidential client credentials' });
-
-    const document = await this.discovery.get();
-    const endpoint = document.introspection_endpoint ?? `${this.issuer}/oauth2/introspect`;
-    const headers = { 'content-type': 'application/json', authorization: `Basic ${Buffer.from(`${client.id}:${client.secret}`).toString('base64')}` };
-    const response = await this.transport(endpoint, { method: 'POST', headers, body: JSON.stringify({ token }) }).catch((error: Error) =>
-      throwError(this.logged(AuthErrorCode.INTROSPECTION_FAILED.create({ reason: `introspection failed: ${error.message}` }))),
-    );
-    if (!response.ok) throw this.logged(AuthErrorCode.INTROSPECTION_FAILED.create({ reason: `introspection endpoint returned http ${response.status}` }));
-
+    const endpoint = await this.oauthEndpoint('introspection_endpoint', 'introspect');
+    const response = await this.postToOAuthEndpoint(endpoint, { token }, AuthErrorCode.INTROSPECTION_FAILED, 'introspection');
     const result = (await response.json()) as IntrospectionResponse;
     return { active: result.active === true, sub: result.sub, scope: result.scope, aud: result.aud, exp: result.exp, clientId: result.client_id, tokenType: result.token_type };
   }
 
+  /** RFC 7009 revocation; `tokenTypeHint` narrows the lookup when the token's kind is known */
+  async revoke(token: string, tokenTypeHint?: 'access_token' | 'refresh_token'): Promise<void> {
+    const endpoint = await this.oauthEndpoint('revocation_endpoint', 'revoke');
+    const body: Record<string, string> = { token };
+    if (tokenTypeHint) body.token_type_hint = tokenTypeHint;
+    await this.postToOAuthEndpoint(endpoint, body, AuthErrorCode.REVOCATION_FAILED, 'revocation');
+    this.logger.info('token revoked', { tokenTypeHint });
+  }
+
+  /** Discovery is the source of truth; the issuer-relative path stays only as a last resort for older deployments */
+  private async oauthEndpoint(key: 'introspection_endpoint' | 'revocation_endpoint', fallbackPath: string): Promise<string> {
+    const document = await this.discovery.get();
+    const advertised = document[key];
+    if (advertised) return advertised;
+    this.logger.warn('discovery advertises no endpoint; falling back to the issuer-relative path', { endpoint: key });
+    return `${this.issuer}/oauth2/${fallbackPath}`;
+  }
+
+  private async postToOAuthEndpoint(endpoint: string, body: Record<string, string>, errorCode: AuthErrorCode, description: string): Promise<Response> {
+    const client = this.config.client;
+    if (!client?.secret) throw AuthErrorCode.CONFIG_INVALID.create({ reason: `${description} requires confidential client credentials` });
+
+    const headers = { 'content-type': 'application/x-www-form-urlencoded', authorization: `Basic ${Buffer.from(`${client.id}:${client.secret}`).toString('base64')}` };
+    const response = await this.transport(endpoint, { method: 'POST', headers, body: new URLSearchParams(body).toString() }).catch((error: Error) =>
+      throwError(this.logged(errorCode.create({ reason: `${description} failed: ${error.message}` }))),
+    );
+    if (!response.ok) throw this.logged(errorCode.create({ reason: `${description} endpoint returned http ${response.status}` }));
+    return response;
+  }
+
   private identityToken(scope: string): Promise<string> {
-    return this.tokens.getToken({ resource: this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE, scopes: [scope] });
+    return this.tokens.getToken(this.identityTokenOptions(scope));
+  }
+
+  private identityTokenOptions(scope: string): ServiceTokenOptions {
+    return { resource: this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE, scopes: [scope] };
   }
 
   private matchesMethod(pattern: string, method: string): boolean {
@@ -254,7 +349,7 @@ export class AuthClient {
       clientId: typeof payload.client_id === 'string' ? payload.client_id : undefined,
       org: typeof payload.org === 'string' ? payload.org : undefined,
       sid: typeof payload.sid === 'string' ? payload.sid : undefined,
-      aal: typeof payload.aal === 'string' ? payload.aal : undefined,
+      aal: payload.aal === 'AAL2' ? 'AAL2' : payload.aal === 'AAL1' ? 'AAL1' : undefined,
       claims: payload,
     };
   }

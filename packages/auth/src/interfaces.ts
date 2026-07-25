@@ -34,6 +34,13 @@ export interface JwtPayload {
 
 export type PrincipalKind = 'user' | 'service';
 
+/**
+ * Authentication assurance level (D-19). `AAL2` is only ever minted from a live step-up grant scoped
+ * to one (app session, audience) pair, so it never travels to another service or up to the parent
+ * identity session.
+ */
+export type AssuranceLevel = 'AAL1' | 'AAL2';
+
 export interface AuthPrincipal {
   kind: PrincipalKind;
   sub: string;
@@ -41,7 +48,7 @@ export interface AuthPrincipal {
   clientId?: string;
   org?: string;
   sid?: string;
-  aal?: string;
+  aal?: AssuranceLevel;
   claims: JwtPayload;
 }
 
@@ -150,6 +157,64 @@ export interface DiscoveryDocument {
   userinfo_endpoint?: string;
   introspection_endpoint?: string;
   revocation_endpoint?: string;
+  end_session_endpoint?: string;
+  token_endpoint_auth_methods_supported?: string[];
+  /** When published, configured scopes are validated against it at startup so a typo fails the boot */
+  scopes_supported?: string[];
+}
+
+/*!
+ * First-party app sessions (D-18/D-19)
+ *
+ * A first-party application exchanges its authorization code for an opaque session handle and is
+ * issued no refresh token: the handle itself is the renewal credential. Every call below is
+ * machine-to-machine and authenticated with the application's own M2M token, so possessing a handle
+ * grants nothing on its own.
+ */
+
+export interface AppSessionCreateInput {
+  code: string;
+  codeVerifier: string;
+  redirectUri: string;
+}
+
+export interface AppSession {
+  /** Opaque, returned once; belongs in the application's own cookie and nowhere else */
+  sessionHandle: string;
+  userId: string;
+  expiresAt: string;
+  scope?: string;
+}
+
+export interface AppSessionTokenInput {
+  sessionHandle: string;
+  /** Always send it: omitted, the token is addressed to the identity service rather than this app's API */
+  resource?: string;
+  /** Narrows the token; omitted, the session's full consented scope is minted */
+  scope?: string;
+  /** Mints from the session's live step-up grant; fails with `ELEVATION_REQUIRED` when there is none */
+  elevated?: boolean;
+}
+
+export interface AppSessionToken {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+  scope?: string;
+  audience?: string;
+  aal?: AssuranceLevel;
+}
+
+export interface LogoutTokenClaims {
+  /** The user whose sessions end; at least one of `sub` and `sid` is always present */
+  sub?: string;
+  sid?: string;
+  claims: JwtPayload;
+}
+
+export interface AppSessionElevation {
+  /** When the grant for this (app session, audience) pair closes; cached elevated tokens die with it */
+  expiresAt: string;
 }
 
 export interface ServiceTokenOptions {
