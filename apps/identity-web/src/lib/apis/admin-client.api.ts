@@ -8,22 +8,14 @@ import { createServerFn } from '@tanstack/react-start';
  * Importing user defined packages
  */
 import { type ApiError, call } from './api-request';
-import {
-  type ClientDetailResponse,
-  type ClientListResponse,
-  type ClientSummaryItem,
-  type RegisterClientBody,
-  type RegisterClientResponse,
-  type RotateSecretResponse,
-  type UpdateClientBody,
-} from './api-types.gen';
+import { type ClientDetailResponse, type ClientListResponse, type ClientSummaryItem, type RotateSecretResponse, type UpdateClientBody } from './api-types.gen';
 import { serverFetch } from './server-fetch';
 
 /**
  * Defining types
  */
 
-export type { ClientDetailResponse, ClientListResponse, ClientSummaryItem, RegisterClientBody, RegisterClientResponse, RotateSecretResponse, UpdateClientBody };
+export type { ClientDetailResponse, ClientListResponse, ClientSummaryItem, RotateSecretResponse, UpdateClientBody };
 export type ClientKind = ClientSummaryItem['kind'];
 export type GrantType = 'authorization_code' | 'refresh_token' | 'client_credentials';
 
@@ -42,9 +34,6 @@ const fetchClients = createServerFn({ method: 'GET' }).handler(() => serverFetch
 const fetchClient = createServerFn({ method: 'GET' })
   .validator((clientId: string) => clientId)
   .handler(({ data }) => serverFetch<ClientDetailResponse>({ method: 'GET', path: `/admin/clients/${data}` }));
-const registerClient = createServerFn({ method: 'POST' })
-  .validator((body: RegisterClientBody) => body)
-  .handler(({ data }) => serverFetch<RegisterClientResponse>({ method: 'POST', path: '/admin/clients', body: data }));
 const updateClient = createServerFn({ method: 'POST' })
   .validator((input: { clientId: string; body: UpdateClientBody }) => input)
   .handler(({ data }) => serverFetch<ClientDetailResponse>({ method: 'PATCH', path: `/admin/clients/${data.clientId}`, body: data.body }));
@@ -57,9 +46,6 @@ const grantClientScope = createServerFn({ method: 'POST' })
 const revokeClientScope = createServerFn({ method: 'POST' })
   .validator((input: { clientId: string; scopeId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/clients/${data.clientId}/scopes/${data.scopeId}` }));
-const deleteClient = createServerFn({ method: 'POST' })
-  .validator((clientId: string) => clientId)
-  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/clients/${data}` }));
 
 /* ---------- queries ---------- */
 
@@ -81,14 +67,6 @@ export function useClientQuery(clientId: string, enabled = true): UseQueryResult
 }
 
 /* ---------- mutations ---------- */
-
-export function useRegisterClientMutation(): UseMutationResult<RegisterClientResponse, ApiError, RegisterClientBody> {
-  const queryClient = useQueryClient();
-  return useMutation<RegisterClientResponse, ApiError, RegisterClientBody>({
-    mutationFn: body => call(registerClient({ data: body })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminClientKeys.list() }),
-  });
-}
 
 export function useUpdateClientMutation(): UseMutationResult<ClientDetailResponse, ApiError, { clientId: string; body: UpdateClientBody }> {
   const queryClient = useQueryClient();
@@ -118,13 +96,5 @@ export function useRevokeClientScopeMutation(): UseMutationResult<undefined, Api
   return useMutation<undefined, ApiError, { clientId: string; scopeId: string }>({
     mutationFn: input => call(revokeClientScope({ data: input })),
     onSuccess: (_data, { clientId }) => queryClient.invalidateQueries({ queryKey: adminClientKeys.detail(clientId) }),
-  });
-}
-
-export function useDeleteClientMutation(): UseMutationResult<undefined, ApiError, string> {
-  const queryClient = useQueryClient();
-  return useMutation<undefined, ApiError, string>({
-    mutationFn: clientId => call(deleteClient({ data: clientId })),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: adminClientKeys.list() }),
   });
 }

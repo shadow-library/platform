@@ -8,7 +8,7 @@ import { Avatar, DropdownMenu, Spinner } from '@shadow-library/ui';
 /**
  * Importing user defined packages
  */
-import { GridIcon, KeyIcon, LayersIcon, LinkIcon, LogOutIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
+import { GridIcon, LayersIcon, LinkIcon, LogOutIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
@@ -31,8 +31,6 @@ const NAV: NavGroup[] = [
     label: 'Applications',
     items: [
       { to: '/console/applications', label: 'Applications', icon: <GridIcon size={18} /> },
-      { to: '/console/clients', label: 'OAuth clients', icon: <KeyIcon size={18} /> },
-      { to: '/console/resources', label: 'API resources', icon: <LayersIcon size={18} /> },
       { to: '/console/saml', label: 'SAML providers', icon: <LinkIcon size={18} /> },
     ],
   },

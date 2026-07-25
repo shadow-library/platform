@@ -18,20 +18,18 @@ import { Route as InviteTokenRouteImport } from './routes/invite.$token'
 import { Route as ConsoleWebhooksRouteImport } from './routes/console/webhooks'
 import { Route as ConsoleSamlRouteImport } from './routes/console/saml'
 import { Route as ConsoleRolesRouteImport } from './routes/console/roles'
-import { Route as ConsoleResourcesRouteImport } from './routes/console/resources'
 import { Route as PortalApplicationsRouteImport } from './routes/_portal/applications'
+import { Route as AuthStepUpRouteImport } from './routes/_auth/step-up'
 import { Route as AuthRegisterRouteImport } from './routes/_auth/register'
 import { Route as AuthRecoverRouteImport } from './routes/_auth/recover'
 import { Route as AuthLoginRouteImport } from './routes/_auth/login'
 import { Route as AuthErrorRouteImport } from './routes/_auth/error'
 import { Route as AuthConsentRouteImport } from './routes/_auth/consent'
 import { Route as ConsoleUsersIndexRouteImport } from './routes/console/users.index'
-import { Route as ConsoleClientsIndexRouteImport } from './routes/console/clients.index'
 import { Route as ConsoleApplicationsIndexRouteImport } from './routes/console/applications.index'
 import { Route as PortalOrganizationsIndexRouteImport } from './routes/_portal/organizations/index'
 import { Route as PortalAccountIndexRouteImport } from './routes/_portal/account/index'
 import { Route as ConsoleUsersUserIdRouteImport } from './routes/console/users.$userId'
-import { Route as ConsoleClientsClientIdRouteImport } from './routes/console/clients.$clientId'
 import { Route as ConsoleApplicationsAppIdRouteImport } from './routes/console/applications.$appId'
 import { Route as PortalOrganizationsOrgIdRouteImport } from './routes/_portal/organizations/$orgId'
 import { Route as PortalAccountSessionsRouteImport } from './routes/_portal/account/sessions'
@@ -41,6 +39,7 @@ import { Route as PortalAccountContactsRouteImport } from './routes/_portal/acco
 import { Route as PortalAccountConnectedRouteImport } from './routes/_portal/account/connected'
 import { Route as PortalOrganizationsOrgIdIndexRouteImport } from './routes/_portal/organizations/$orgId/index'
 import { Route as PortalOrganizationsOrgIdSettingsRouteImport } from './routes/_portal/organizations/$orgId/settings'
+import { Route as PortalOrganizationsOrgIdSecurityRouteImport } from './routes/_portal/organizations/$orgId/security'
 import { Route as PortalOrganizationsOrgIdProvidersRouteImport } from './routes/_portal/organizations/$orgId/providers'
 import { Route as PortalOrganizationsOrgIdMembersRouteImport } from './routes/_portal/organizations/$orgId/members'
 import { Route as PortalOrganizationsOrgIdDomainsRouteImport } from './routes/_portal/organizations/$orgId/domains'
@@ -88,15 +87,15 @@ const ConsoleRolesRoute = ConsoleRolesRouteImport.update({
   path: '/roles',
   getParentRoute: () => ConsoleRoute,
 } as any)
-const ConsoleResourcesRoute = ConsoleResourcesRouteImport.update({
-  id: '/resources',
-  path: '/resources',
-  getParentRoute: () => ConsoleRoute,
-} as any)
 const PortalApplicationsRoute = PortalApplicationsRouteImport.update({
   id: '/applications',
   path: '/applications',
   getParentRoute: () => PortalRoute,
+} as any)
+const AuthStepUpRoute = AuthStepUpRouteImport.update({
+  id: '/step-up',
+  path: '/step-up',
+  getParentRoute: () => AuthRoute,
 } as any)
 const AuthRegisterRoute = AuthRegisterRouteImport.update({
   id: '/register',
@@ -128,11 +127,6 @@ const ConsoleUsersIndexRoute = ConsoleUsersIndexRouteImport.update({
   path: '/users/',
   getParentRoute: () => ConsoleRoute,
 } as any)
-const ConsoleClientsIndexRoute = ConsoleClientsIndexRouteImport.update({
-  id: '/clients/',
-  path: '/clients/',
-  getParentRoute: () => ConsoleRoute,
-} as any)
 const ConsoleApplicationsIndexRoute =
   ConsoleApplicationsIndexRouteImport.update({
     id: '/applications/',
@@ -153,11 +147,6 @@ const PortalAccountIndexRoute = PortalAccountIndexRouteImport.update({
 const ConsoleUsersUserIdRoute = ConsoleUsersUserIdRouteImport.update({
   id: '/users/$userId',
   path: '/users/$userId',
-  getParentRoute: () => ConsoleRoute,
-} as any)
-const ConsoleClientsClientIdRoute = ConsoleClientsClientIdRouteImport.update({
-  id: '/clients/$clientId',
-  path: '/clients/$clientId',
   getParentRoute: () => ConsoleRoute,
 } as any)
 const ConsoleApplicationsAppIdRoute =
@@ -209,6 +198,12 @@ const PortalOrganizationsOrgIdSettingsRoute =
     path: '/settings',
     getParentRoute: () => PortalOrganizationsOrgIdRoute,
   } as any)
+const PortalOrganizationsOrgIdSecurityRoute =
+  PortalOrganizationsOrgIdSecurityRouteImport.update({
+    id: '/security',
+    path: '/security',
+    getParentRoute: () => PortalOrganizationsOrgIdRoute,
+  } as any)
 const PortalOrganizationsOrgIdProvidersRoute =
   PortalOrganizationsOrgIdProvidersRouteImport.update({
     id: '/providers',
@@ -236,8 +231,8 @@ export interface FileRoutesByFullPath {
   '/login': typeof AuthLoginRoute
   '/recover': typeof AuthRecoverRoute
   '/register': typeof AuthRegisterRoute
+  '/step-up': typeof AuthStepUpRoute
   '/applications': typeof PortalApplicationsRoute
-  '/console/resources': typeof ConsoleResourcesRoute
   '/console/roles': typeof ConsoleRolesRoute
   '/console/saml': typeof ConsoleSamlRoute
   '/console/webhooks': typeof ConsoleWebhooksRoute
@@ -250,16 +245,15 @@ export interface FileRoutesByFullPath {
   '/account/sessions': typeof PortalAccountSessionsRoute
   '/organizations/$orgId': typeof PortalOrganizationsOrgIdRouteWithChildren
   '/console/applications/$appId': typeof ConsoleApplicationsAppIdRoute
-  '/console/clients/$clientId': typeof ConsoleClientsClientIdRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/account/': typeof PortalAccountIndexRoute
   '/organizations/': typeof PortalOrganizationsIndexRoute
   '/console/applications/': typeof ConsoleApplicationsIndexRoute
-  '/console/clients/': typeof ConsoleClientsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
   '/organizations/$orgId/domains': typeof PortalOrganizationsOrgIdDomainsRoute
   '/organizations/$orgId/members': typeof PortalOrganizationsOrgIdMembersRoute
   '/organizations/$orgId/providers': typeof PortalOrganizationsOrgIdProvidersRoute
+  '/organizations/$orgId/security': typeof PortalOrganizationsOrgIdSecurityRoute
   '/organizations/$orgId/settings': typeof PortalOrganizationsOrgIdSettingsRoute
   '/organizations/$orgId/': typeof PortalOrganizationsOrgIdIndexRoute
 }
@@ -270,8 +264,8 @@ export interface FileRoutesByTo {
   '/login': typeof AuthLoginRoute
   '/recover': typeof AuthRecoverRoute
   '/register': typeof AuthRegisterRoute
+  '/step-up': typeof AuthStepUpRoute
   '/applications': typeof PortalApplicationsRoute
-  '/console/resources': typeof ConsoleResourcesRoute
   '/console/roles': typeof ConsoleRolesRoute
   '/console/saml': typeof ConsoleSamlRoute
   '/console/webhooks': typeof ConsoleWebhooksRoute
@@ -283,16 +277,15 @@ export interface FileRoutesByTo {
   '/account/security': typeof PortalAccountSecurityRoute
   '/account/sessions': typeof PortalAccountSessionsRoute
   '/console/applications/$appId': typeof ConsoleApplicationsAppIdRoute
-  '/console/clients/$clientId': typeof ConsoleClientsClientIdRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/account': typeof PortalAccountIndexRoute
   '/organizations': typeof PortalOrganizationsIndexRoute
   '/console/applications': typeof ConsoleApplicationsIndexRoute
-  '/console/clients': typeof ConsoleClientsIndexRoute
   '/console/users': typeof ConsoleUsersIndexRoute
   '/organizations/$orgId/domains': typeof PortalOrganizationsOrgIdDomainsRoute
   '/organizations/$orgId/members': typeof PortalOrganizationsOrgIdMembersRoute
   '/organizations/$orgId/providers': typeof PortalOrganizationsOrgIdProvidersRoute
+  '/organizations/$orgId/security': typeof PortalOrganizationsOrgIdSecurityRoute
   '/organizations/$orgId/settings': typeof PortalOrganizationsOrgIdSettingsRoute
   '/organizations/$orgId': typeof PortalOrganizationsOrgIdIndexRoute
 }
@@ -307,8 +300,8 @@ export interface FileRoutesById {
   '/_auth/login': typeof AuthLoginRoute
   '/_auth/recover': typeof AuthRecoverRoute
   '/_auth/register': typeof AuthRegisterRoute
+  '/_auth/step-up': typeof AuthStepUpRoute
   '/_portal/applications': typeof PortalApplicationsRoute
-  '/console/resources': typeof ConsoleResourcesRoute
   '/console/roles': typeof ConsoleRolesRoute
   '/console/saml': typeof ConsoleSamlRoute
   '/console/webhooks': typeof ConsoleWebhooksRoute
@@ -321,16 +314,15 @@ export interface FileRoutesById {
   '/_portal/account/sessions': typeof PortalAccountSessionsRoute
   '/_portal/organizations/$orgId': typeof PortalOrganizationsOrgIdRouteWithChildren
   '/console/applications/$appId': typeof ConsoleApplicationsAppIdRoute
-  '/console/clients/$clientId': typeof ConsoleClientsClientIdRoute
   '/console/users/$userId': typeof ConsoleUsersUserIdRoute
   '/_portal/account/': typeof PortalAccountIndexRoute
   '/_portal/organizations/': typeof PortalOrganizationsIndexRoute
   '/console/applications/': typeof ConsoleApplicationsIndexRoute
-  '/console/clients/': typeof ConsoleClientsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
   '/_portal/organizations/$orgId/domains': typeof PortalOrganizationsOrgIdDomainsRoute
   '/_portal/organizations/$orgId/members': typeof PortalOrganizationsOrgIdMembersRoute
   '/_portal/organizations/$orgId/providers': typeof PortalOrganizationsOrgIdProvidersRoute
+  '/_portal/organizations/$orgId/security': typeof PortalOrganizationsOrgIdSecurityRoute
   '/_portal/organizations/$orgId/settings': typeof PortalOrganizationsOrgIdSettingsRoute
   '/_portal/organizations/$orgId/': typeof PortalOrganizationsOrgIdIndexRoute
 }
@@ -344,8 +336,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/recover'
     | '/register'
+    | '/step-up'
     | '/applications'
-    | '/console/resources'
     | '/console/roles'
     | '/console/saml'
     | '/console/webhooks'
@@ -358,16 +350,15 @@ export interface FileRouteTypes {
     | '/account/sessions'
     | '/organizations/$orgId'
     | '/console/applications/$appId'
-    | '/console/clients/$clientId'
     | '/console/users/$userId'
     | '/account/'
     | '/organizations/'
     | '/console/applications/'
-    | '/console/clients/'
     | '/console/users/'
     | '/organizations/$orgId/domains'
     | '/organizations/$orgId/members'
     | '/organizations/$orgId/providers'
+    | '/organizations/$orgId/security'
     | '/organizations/$orgId/settings'
     | '/organizations/$orgId/'
   fileRoutesByTo: FileRoutesByTo
@@ -378,8 +369,8 @@ export interface FileRouteTypes {
     | '/login'
     | '/recover'
     | '/register'
+    | '/step-up'
     | '/applications'
-    | '/console/resources'
     | '/console/roles'
     | '/console/saml'
     | '/console/webhooks'
@@ -391,16 +382,15 @@ export interface FileRouteTypes {
     | '/account/security'
     | '/account/sessions'
     | '/console/applications/$appId'
-    | '/console/clients/$clientId'
     | '/console/users/$userId'
     | '/account'
     | '/organizations'
     | '/console/applications'
-    | '/console/clients'
     | '/console/users'
     | '/organizations/$orgId/domains'
     | '/organizations/$orgId/members'
     | '/organizations/$orgId/providers'
+    | '/organizations/$orgId/security'
     | '/organizations/$orgId/settings'
     | '/organizations/$orgId'
   id:
@@ -414,8 +404,8 @@ export interface FileRouteTypes {
     | '/_auth/login'
     | '/_auth/recover'
     | '/_auth/register'
+    | '/_auth/step-up'
     | '/_portal/applications'
-    | '/console/resources'
     | '/console/roles'
     | '/console/saml'
     | '/console/webhooks'
@@ -428,16 +418,15 @@ export interface FileRouteTypes {
     | '/_portal/account/sessions'
     | '/_portal/organizations/$orgId'
     | '/console/applications/$appId'
-    | '/console/clients/$clientId'
     | '/console/users/$userId'
     | '/_portal/account/'
     | '/_portal/organizations/'
     | '/console/applications/'
-    | '/console/clients/'
     | '/console/users/'
     | '/_portal/organizations/$orgId/domains'
     | '/_portal/organizations/$orgId/members'
     | '/_portal/organizations/$orgId/providers'
+    | '/_portal/organizations/$orgId/security'
     | '/_portal/organizations/$orgId/settings'
     | '/_portal/organizations/$orgId/'
   fileRoutesById: FileRoutesById
@@ -515,19 +504,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleRolesRouteImport
       parentRoute: typeof ConsoleRoute
     }
-    '/console/resources': {
-      id: '/console/resources'
-      path: '/resources'
-      fullPath: '/console/resources'
-      preLoaderRoute: typeof ConsoleResourcesRouteImport
-      parentRoute: typeof ConsoleRoute
-    }
     '/_portal/applications': {
       id: '/_portal/applications'
       path: '/applications'
       fullPath: '/applications'
       preLoaderRoute: typeof PortalApplicationsRouteImport
       parentRoute: typeof PortalRoute
+    }
+    '/_auth/step-up': {
+      id: '/_auth/step-up'
+      path: '/step-up'
+      fullPath: '/step-up'
+      preLoaderRoute: typeof AuthStepUpRouteImport
+      parentRoute: typeof AuthRoute
     }
     '/_auth/register': {
       id: '/_auth/register'
@@ -571,13 +560,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ConsoleUsersIndexRouteImport
       parentRoute: typeof ConsoleRoute
     }
-    '/console/clients/': {
-      id: '/console/clients/'
-      path: '/clients'
-      fullPath: '/console/clients/'
-      preLoaderRoute: typeof ConsoleClientsIndexRouteImport
-      parentRoute: typeof ConsoleRoute
-    }
     '/console/applications/': {
       id: '/console/applications/'
       path: '/applications'
@@ -604,13 +586,6 @@ declare module '@tanstack/react-router' {
       path: '/users/$userId'
       fullPath: '/console/users/$userId'
       preLoaderRoute: typeof ConsoleUsersUserIdRouteImport
-      parentRoute: typeof ConsoleRoute
-    }
-    '/console/clients/$clientId': {
-      id: '/console/clients/$clientId'
-      path: '/clients/$clientId'
-      fullPath: '/console/clients/$clientId'
-      preLoaderRoute: typeof ConsoleClientsClientIdRouteImport
       parentRoute: typeof ConsoleRoute
     }
     '/console/applications/$appId': {
@@ -676,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalOrganizationsOrgIdSettingsRouteImport
       parentRoute: typeof PortalOrganizationsOrgIdRoute
     }
+    '/_portal/organizations/$orgId/security': {
+      id: '/_portal/organizations/$orgId/security'
+      path: '/security'
+      fullPath: '/organizations/$orgId/security'
+      preLoaderRoute: typeof PortalOrganizationsOrgIdSecurityRouteImport
+      parentRoute: typeof PortalOrganizationsOrgIdRoute
+    }
     '/_portal/organizations/$orgId/providers': {
       id: '/_portal/organizations/$orgId/providers'
       path: '/providers'
@@ -706,6 +688,7 @@ interface AuthRouteChildren {
   AuthLoginRoute: typeof AuthLoginRoute
   AuthRecoverRoute: typeof AuthRecoverRoute
   AuthRegisterRoute: typeof AuthRegisterRoute
+  AuthStepUpRoute: typeof AuthStepUpRoute
 }
 
 const AuthRouteChildren: AuthRouteChildren = {
@@ -714,6 +697,7 @@ const AuthRouteChildren: AuthRouteChildren = {
   AuthLoginRoute: AuthLoginRoute,
   AuthRecoverRoute: AuthRecoverRoute,
   AuthRegisterRoute: AuthRegisterRoute,
+  AuthStepUpRoute: AuthStepUpRoute,
 }
 
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
@@ -722,6 +706,7 @@ interface PortalOrganizationsOrgIdRouteChildren {
   PortalOrganizationsOrgIdDomainsRoute: typeof PortalOrganizationsOrgIdDomainsRoute
   PortalOrganizationsOrgIdMembersRoute: typeof PortalOrganizationsOrgIdMembersRoute
   PortalOrganizationsOrgIdProvidersRoute: typeof PortalOrganizationsOrgIdProvidersRoute
+  PortalOrganizationsOrgIdSecurityRoute: typeof PortalOrganizationsOrgIdSecurityRoute
   PortalOrganizationsOrgIdSettingsRoute: typeof PortalOrganizationsOrgIdSettingsRoute
   PortalOrganizationsOrgIdIndexRoute: typeof PortalOrganizationsOrgIdIndexRoute
 }
@@ -732,6 +717,8 @@ const PortalOrganizationsOrgIdRouteChildren: PortalOrganizationsOrgIdRouteChildr
     PortalOrganizationsOrgIdMembersRoute: PortalOrganizationsOrgIdMembersRoute,
     PortalOrganizationsOrgIdProvidersRoute:
       PortalOrganizationsOrgIdProvidersRoute,
+    PortalOrganizationsOrgIdSecurityRoute:
+      PortalOrganizationsOrgIdSecurityRoute,
     PortalOrganizationsOrgIdSettingsRoute:
       PortalOrganizationsOrgIdSettingsRoute,
     PortalOrganizationsOrgIdIndexRoute: PortalOrganizationsOrgIdIndexRoute,
@@ -770,30 +757,24 @@ const PortalRouteWithChildren =
   PortalRoute._addFileChildren(PortalRouteChildren)
 
 interface ConsoleRouteChildren {
-  ConsoleResourcesRoute: typeof ConsoleResourcesRoute
   ConsoleRolesRoute: typeof ConsoleRolesRoute
   ConsoleSamlRoute: typeof ConsoleSamlRoute
   ConsoleWebhooksRoute: typeof ConsoleWebhooksRoute
   ConsoleIndexRoute: typeof ConsoleIndexRoute
   ConsoleApplicationsAppIdRoute: typeof ConsoleApplicationsAppIdRoute
-  ConsoleClientsClientIdRoute: typeof ConsoleClientsClientIdRoute
   ConsoleUsersUserIdRoute: typeof ConsoleUsersUserIdRoute
   ConsoleApplicationsIndexRoute: typeof ConsoleApplicationsIndexRoute
-  ConsoleClientsIndexRoute: typeof ConsoleClientsIndexRoute
   ConsoleUsersIndexRoute: typeof ConsoleUsersIndexRoute
 }
 
 const ConsoleRouteChildren: ConsoleRouteChildren = {
-  ConsoleResourcesRoute: ConsoleResourcesRoute,
   ConsoleRolesRoute: ConsoleRolesRoute,
   ConsoleSamlRoute: ConsoleSamlRoute,
   ConsoleWebhooksRoute: ConsoleWebhooksRoute,
   ConsoleIndexRoute: ConsoleIndexRoute,
   ConsoleApplicationsAppIdRoute: ConsoleApplicationsAppIdRoute,
-  ConsoleClientsClientIdRoute: ConsoleClientsClientIdRoute,
   ConsoleUsersUserIdRoute: ConsoleUsersUserIdRoute,
   ConsoleApplicationsIndexRoute: ConsoleApplicationsIndexRoute,
-  ConsoleClientsIndexRoute: ConsoleClientsIndexRoute,
   ConsoleUsersIndexRoute: ConsoleUsersIndexRoute,
 }
 

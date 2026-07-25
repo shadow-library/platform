@@ -16,6 +16,7 @@ import {
   type ApplicationRoleItem,
   type ApplicationSummaryItem,
   type CreateApplicationBody,
+  type CreateApplicationResponse,
   type UpdateApplicationBody,
 } from './api-types.gen';
 import { serverFetch } from './server-fetch';
@@ -32,6 +33,7 @@ export type {
   ApplicationRoleItem,
   ApplicationSummaryItem,
   CreateApplicationBody,
+  CreateApplicationResponse,
   UpdateApplicationBody,
 };
 
@@ -56,7 +58,7 @@ const fetchApplicationMembers = createServerFn({ method: 'GET' })
   .handler(({ data }) => serverFetch<ApplicationMemberListResponse>({ method: 'GET', path: `/admin/applications/${data}/members` }));
 const createApplication = createServerFn({ method: 'POST' })
   .validator((body: CreateApplicationBody) => body)
-  .handler(({ data }) => serverFetch<{ id: number }>({ method: 'POST', path: '/admin/applications', body: data }));
+  .handler(({ data }) => serverFetch<CreateApplicationResponse>({ method: 'POST', path: '/admin/applications', body: data }));
 const updateApplication = createServerFn({ method: 'POST' })
   .validator((input: { appId: string; body: UpdateApplicationBody }) => input)
   .handler(({ data }) => serverFetch<ApplicationDetailResponse>({ method: 'PATCH', path: `/admin/applications/${data.appId}`, body: data.body }));
@@ -100,9 +102,9 @@ export function useApplicationMembersQuery(appId: string, enabled = true): UseQu
 
 /* ---------- mutations ---------- */
 
-export function useCreateApplicationMutation(): UseMutationResult<{ id: number }, ApiError, CreateApplicationBody> {
+export function useCreateApplicationMutation(): UseMutationResult<CreateApplicationResponse, ApiError, CreateApplicationBody> {
   const queryClient = useQueryClient();
-  return useMutation<{ id: number }, ApiError, CreateApplicationBody>({
+  return useMutation<CreateApplicationResponse, ApiError, CreateApplicationBody>({
     mutationFn: body => call(createApplication({ data: body })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: adminApplicationKeys.list() }),
   });
