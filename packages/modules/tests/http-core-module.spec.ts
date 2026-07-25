@@ -22,6 +22,8 @@ interface CSRFToken {
   cookieToken: string;
 }
 
+type OpenAPIOverrides = NonNullable<Parameters<typeof HttpCoreModule.forRoot>[0]>['openapi'];
+
 /**
  * Declaring the constants
  */
@@ -395,6 +397,55 @@ describe('HttpCore Module', () => {
         const json = response.json();
         expect(json.openapi).toBeDefined();
         expect(json.info).toBeDefined();
+      });
+    });
+
+    describe('document info', () => {
+      /** Config resolves every key once per process, so the env driven cases must drop the cached entry before booting another app */
+      function setAppVersion(version?: string): void {
+        const config = Config as unknown as { cache: Map<string, unknown>; loadedOptions: Map<string, unknown> };
+        config.cache.delete('app.version');
+        config.loadedOptions.delete('app.version');
+        if (version === undefined) delete process.env.APP_VERSION;
+        else process.env.APP_VERSION = version;
+      }
+
+      async function getServedInfo(openapi: OpenAPIOverrides = {}): Promise<Record<string, string>> {
+        const HttpCoreInfo = HttpCoreModule.forRoot({ csrf: { expiresIn: { seconds: 10 } }, openapi: { enabled: true, routePrefix: '/docs', ...openapi } });
+
+        @Module({ imports: [FastifyModule.forRoot({ imports: [HttpCoreInfo] })] })
+        class InfoAppModule {}
+
+        const infoApp = await ShadowFactory.create(InfoAppModule);
+        const infoRouter = infoApp.get(Dispatcher) as FastifyRouter;
+        const response = await infoRouter.mockRequest().get('/docs/openapi.json');
+        return response.json().info;
+      }
+
+      afterAll(() => setAppVersion());
+
+      it('should stamp the APP_VERSION env value as the document version', async () => {
+        setAppVersion('abc1234');
+        const info = await getServedInfo();
+        expect(info.version).toBe('abc1234');
+      });
+
+      it('should fall back to local when APP_VERSION is not set', async () => {
+        setAppVersion();
+        const info = await getServedInfo();
+        expect(info.version).toBe('local');
+      });
+
+      it('should retain an explicitly configured version', async () => {
+        setAppVersion('abc1234');
+        const info = await getServedInfo({ info: { title: 'Explicit API', version: '2.1.0' } });
+        expect(info).toEqual({ title: 'Explicit API', version: '2.1.0' });
+      });
+
+      it('should default the title to the app name', async () => {
+        setAppVersion('abc1234');
+        const info = await getServedInfo();
+        expect(info.title).toBe(Config.get('app.name'));
       });
     });
 

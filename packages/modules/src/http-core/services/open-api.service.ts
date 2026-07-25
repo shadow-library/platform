@@ -8,12 +8,12 @@ import { FastifyApiReferenceOptions } from '@scalar/fastify-api-reference';
 import { OpenAPIV3 } from 'openapi-types';
 import { Inject, Injectable } from '@shadow-library/app';
 import { JSONSchema } from '@shadow-library/class-schema';
-import { AppError, utils } from '@shadow-library/common';
+import { AppError, Config, utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
-import { HTTP_CORE_CONFIGS } from '../http-core.constants';
+import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS } from '../http-core.constants';
 import { type HttpCoreModuleOptions, type OpenAPIOptions } from '../http-core.types';
 
 /**
@@ -32,7 +32,9 @@ export class OpenApiService {
   private schemaIdMap = new Map<string, string>();
 
   constructor(@Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions) {
-    this.options = options.openapi;
+    /** The stamped version ties the served contract to the code revision that produced it, so consumers can trace generated artifacts back to a commit */
+    const version = options.openapi.info?.version ?? Config.register('app.version', DEFAULT_CONFIGS['app.version']);
+    this.options = { ...options.openapi, info: { title: Config.get('app.name'), ...options.openapi.info, version } };
   }
 
   private resolveSchemaId(id: string): string {

@@ -16,6 +16,9 @@ import { CSRFOptions } from './services';
 
 declare module '@shadow-library/common' {
   export interface ConfigRecords {
+    /*! Build metadata stamped into the served OpenAPI document */
+    'app.version': string;
+
     'http-core.csrf.enabled': boolean;
     'http-core.helmet.enabled'?: boolean;
     'http-core.compress.enabled'?: boolean;

@@ -132,6 +132,7 @@ import { HttpCoreModule } from '@shadow-library/modules/http-core';
             enabled: true, // Enable/disable OpenAPI documentation (defaults to true in development)
             routePrefix: '/dev/api-docs', // Custom route prefix for OpenAPI docs
             normalizeSchemaIds: true, // Normalize class-schema IDs for cleaner OpenAPI spec
+            info: { title: 'My API', version: '2.1.0' }, // Optional, defaults to the app name and the build version
             // ... OpenAPI document definition
           },
         }),
@@ -165,6 +166,26 @@ For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the follo
 | Host    | `HEALTH_HOST`        | `localhost` |
 | Port    | `HEALTH_PORT`        | `8081`      |
 
+##### OpenAPI Document Info
+
+The served document's `info` block is resolved per field, so partial overrides keep the defaults for the rest:
+
+| Field     | Precedence                                                      |
+| --------- | --------------------------------------------------------------- |
+| `title`   | `openapi.info.title` → `APP_NAME`                                 |
+| `version` | `openapi.info.version` → `APP_VERSION` → `local`                  |
+
+`APP_VERSION` is build metadata, not configuration: it is the 7-character head commit
+(`git rev-parse --short=7 HEAD`), baked into the image at build time via a Docker build argument, and must not be
+hand-set in `.env` files. Stamping it makes every served contract traceable to the code revision that produced it — the
+contract pipeline pulls `openapi.json` from deployed instances, so a generated SDK or API type set can record the exact
+server commit it was derived from. An image built without the argument serves `local`.
+
+```dockerfile
+ARG APP_VERSION=local
+ENV APP_VERSION=${APP_VERSION}
+```
+
 #### Features in Detail
 
 1.  **Health Check**: Runs a standalone HTTP server (separate from the main Fastify server) that provides Kubernetes-compatible health probes:
@@ -187,6 +208,7 @@ For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the follo
 5.  **OpenAPI Documentation**:
     - **Route Prefix**: Configure the route prefix with `openapi.routePrefix` (defaults to `/dev/api-docs`).
     - **Schema Normalization**: Set `openapi.normalizeSchemaIds: true` to normalize `class-schema:` prefixed IDs for cleaner OpenAPI specifications.
+    - **Build Stamping**: `info.title` and `info.version` default to the app name and the `APP_VERSION` build argument (`local` when unset), so every served contract names the commit it came from.
     - Seamless integration with `@fastify/swagger` and `@scalar/fastify-api-reference` for interactive API documentation.
 6.  **Request Initialization**:
     - Ensures every request has a unique `x-correlation-id` header for tracing.

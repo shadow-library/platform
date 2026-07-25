@@ -60,7 +60,6 @@ const DEFAULT_HTTP_CORE_CONFIGS = {
   },
   openapi: {
     routePrefix: '/dev/api-docs',
-    info: { title: Config.get('app.name'), version: '1.0.0' },
     components: { schemas: {} },
   },
 } satisfies HttpCoreModuleOptions;
