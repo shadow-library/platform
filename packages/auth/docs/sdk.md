@@ -36,24 +36,39 @@ export { createTestIdP } from '@shadow-library/auth/testing';
 
 `AuthClient` is a plain class; `AuthModule.forRoot()` constructs it and registers it under its own class token, so application services inject it as an ordinary constructor dependency. Everything not passed in code is resolved from the environment:
 
-| Env variable                 | Config                 | Meaning                                                                       |
-| :--------------------------- | :--------------------- | :---------------------------------------------------------------------------- |
-| `AUTH_ISSUER`                | `issuer`               | Identity base URL; discovery from `{issuer}/.well-known/openid-configuration` |
-| `AUTH_AUDIENCE`              | `audience`             | This service's API resource identifier (`aud` it accepts)                     |
-| `AUTH_CLIENT_ID`             | `client.id`            | Service-account client id (M2M + PDP calls)                                   |
-| `AUTH_CLIENT_SECRET`         | `client.secret`        | Static secret (`client_secret_basic`) — for workloads outside the cluster     |
-| `AUTH_CLIENT_ASSERTION_PATH` | `client.assertionPath` | Path to a projected k8s SA token; preferred in-cluster, replaces the secret   |
+Steady-state configuration is **three settings** (D-21, architecture §8.6):
+
+| Env variable                 | Config                 | Meaning                                                                        |
+| :--------------------------- | :--------------------- | :----------------------------------------------------------------------------- |
+| `AUTH_ISSUER`                | `issuer`               | Identity base URL; discovery from `{issuer}/.well-known/openid-configuration`   |
+| `AUTH_APP_ID`                | `appId`                | This application's id at identity; also the OAuth client id unless overridden   |
+| `AUTH_CLIENT_ASSERTION_PATH` | `client.assertionPath` | Path to a projected k8s SA token — the in-cluster credential                    |
+| `AUTH_CLIENT_SECRET`         | `client.secret`        | Static secret (`client_secret_basic`) — the credential outside the cluster      |
+| `AUTH_CLIENT_ID`             | `client.id`            | Only when the OAuth client id differs from the app id                           |
+
+Everything else identity already stores is **derived** and refreshed on a TTL (`AUTH_APP_REFRESH_SECONDS`, default 300 s):
+
+| Derived value                     | Source                                    |
+| :-------------------------------- | :---------------------------------------- |
+| audience (`aud` this API accepts) | `GET /api/v1/apps/me` → `audience`        |
+| browser redirect URI              | `GET /api/v1/apps/me` → `redirectUris`    |
+| requested scopes                  | `GET /api/v1/apps/me` → `scopes`          |
+| step-up endpoint                  | discovery → `step_up_endpoint`            |
+| app-session endpoint              | discovery → `app_session_endpoint`        |
+
+`AUTH_AUDIENCE`, `AUTH_REDIRECT_URI`, `AUTH_SCOPES` and `AUTH_STEP_UP_URL` are **removed**, not deprecated: a stale value in a deploy silently overriding what identity says is worse than having no override. The escape hatch is code — `audience` on the client, `browser: { redirectUri, scopes, stepUpUrl }` on the module — where it is visible and reviewed.
 
 ```ts
-// zero-config: issuer, audience, and client all come from AUTH_* env variables
+// zero-config: issuer, app id and credential come from AUTH_* env variables, the rest from identity
 AuthModule.forRoot();
 
 // or explicit (code wins over environment):
 AuthModule.forRoot({
   issuer: 'https://identity.shadow-apps.com',
-  audience: 'api://pulse',
-  client: { id: Bun.env.AUTH_CLIENT_ID!, assertionPath: '/var/run/secrets/shadow/identity-token' },
+  appId: 'svc-pulse',
+  client: { id: 'svc-pulse', assertionPath: '/var/run/secrets/shadow/identity-token' },
   cache: { decisionTtlSeconds: 900, jwksTtlSeconds: 43200 }, // defaults: 15 min decisions, 12 h JWKS
+  app: { refreshSeconds: 300 }, // how long an admin's grant change may take to land
   roles: {
     // this application's role catalog, owned in code and pushed on startup (see §4.1)
     permissions: [{ name: 'posts:write', description: 'Create and edit posts' }, { name: 'posts:delete' }],
@@ -62,9 +77,7 @@ AuthModule.forRoot({
 });
 ```
 
-Config is validated at startup; missing issuer/audience/client in production is a boot failure (fail-closed, mirrors identity's own config policy).
-
-D-21 (architecture §8.6) reduces steady-state configuration to `AUTH_ISSUER` + `AUTH_APP_ID` + a credential — audience, redirect URIs, scopes and the step-up URL are read back from identity and refreshed on a TTL (T-807).
+Config is validated at startup; a missing app id in production is a boot failure, and so is a first registration resolve that fails or answers for a different application (a credential provisioned elsewhere would otherwise boot and then reject every token addressed to it). A *later* refresh failure keeps the last good registration — an identity outage must not change which tokens a service accepts. `AuthClient` also refuses to construct with neither an explicit `audience` nor a credential to derive one with.
 
 ### 2.2 Client authentication: projected SA token or secret
 

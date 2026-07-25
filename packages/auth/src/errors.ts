@@ -27,6 +27,12 @@ export class AuthErrorCode extends ErrorCode {
 
   /** The auth client configuration is invalid */
   static readonly CONFIG_INVALID = AuthErrorCode.internal('CONFIG_INVALID', 'Auth client configuration is invalid: {reason}');
+  /**
+   * This application's registration could not be read back from identity. Until it resolves once the
+   * SDK does not know its own audience, so the first failure aborts the boot; a later one keeps the
+   * last good registration, because an outage must not change which tokens a service accepts.
+   */
+  static readonly APP_REGISTRATION_FAILED = AuthErrorCode.unavailable('APP_REGISTRATION_FAILED', 'Application registration could not be resolved: {reason}');
 
   /*!
    * Token Verification Errors

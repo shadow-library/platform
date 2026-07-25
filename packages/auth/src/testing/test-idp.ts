@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AssuranceLevel, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
+import { AppRegistration, AssuranceLevel, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
 import { createTestSigner, TestSigner } from './signer';
 
 /**
@@ -27,6 +27,12 @@ export interface TestIdPOptions {
 
   /** How long an app session lives before its handle stops minting; defaults to an hour */
   appSessionTtlSeconds?: number;
+
+  /**
+   * What `GET /api/v1/apps/me` answers (D-21). Left unset, the mock publishes a registration derived
+   * from `clientId`, so a consumer configured with nothing but issuer + app id + credential still boots.
+   */
+  app?: Partial<AppRegistration>;
 }
 
 export interface TestTokenInput {
@@ -106,6 +112,12 @@ export interface TestIdP {
 
   /** Configures the rules the `/api/v1/authz/service-access` endpoint returns */
   setServiceAccess(rules: ServiceAccessRule[]): void;
+
+  /** The registration `GET /api/v1/apps/me` currently answers */
+  getAppRegistration(): AppRegistration;
+
+  /** Replaces it, so a test can watch an admin's grant change reach a running consumer */
+  setAppRegistration(registration: Partial<AppRegistration>): void;
 
   /** Returns the most recent token-endpoint request the mock received, if any */
   getLastTokenRequest(): CapturedTokenRequest | undefined;
@@ -190,6 +202,17 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let serviceAccessRules: ServiceAccessRule[] = [];
   let catalogGuardrail = false;
   const unexchangeableScopes = new Set<string>();
+
+  /** The default registration is what a real `apps/me` would return for a freshly provisioned app */
+  const appId = options.clientId ?? 'test-client';
+  let appRegistration: AppRegistration = {
+    appId,
+    name: appId,
+    audience: `api://${appId}`,
+    redirectUris: ['https://app.test/auth/callback'],
+    scopes: ['openid'],
+    ...options.app,
+  };
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
   const sessionTtl = options.appSessionTtlSeconds ?? DEFAULT_APP_SESSION_TTL_SECONDS;
@@ -422,6 +445,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
           introspection_endpoint: `${issuer}/oauth2/introspect`,
           revocation_endpoint: `${issuer}/oauth2/revoke`,
           end_session_endpoint: `${issuer}/oauth2/logout`,
+          step_up_endpoint: `${issuer}/auth/step-up`,
+          app_session_endpoint: `${issuer}/api/v1/app-sessions`,
           token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'private_key_jwt'],
           ...(options.scopesSupported && { scopes_supported: options.scopesSupported }),
         });
@@ -441,6 +466,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
         return handleCatalog(request);
       case '/api/v1/authz/service-access':
         return json({ rules: serviceAccessRules });
+      case '/api/v1/apps/me':
+        return json(appRegistration);
       default:
         return new Response('not found', { status: 404 });
     }
@@ -476,6 +503,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       for (const scope of scopes) unexchangeableScopes.add(scope);
     },
     setServiceAccess: rules => void (serviceAccessRules = rules),
+    getAppRegistration: () => appRegistration,
+    setAppRegistration: registration => void (appRegistration = { ...appRegistration, ...registration }),
     getLastTokenRequest: () => lastTokenRequest,
     setSteppedUp: (userId, isSteppedUp) => void (isSteppedUp ? steppedUp.add(userId) : steppedUp.delete(userId)),
     endIdentitySession: userId => {

@@ -153,7 +153,7 @@ export class AuthController {
         return false;
       });
 
-    const target = claimed ? returnTo : this.sessions.identityStepUpUrl(`${this.sessions.stepUpUrl(returnTo)}&claimed=1`);
+    const target = claimed ? returnTo : await this.sessions.identityStepUpUrl(`${this.sessions.stepUpUrl(returnTo)}&claimed=1`);
     this.send(this.context.getResponse(), [], target);
   }
 

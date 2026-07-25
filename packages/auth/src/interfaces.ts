@@ -128,11 +128,24 @@ export interface AuthClientConfig {
   /** Issuer base URL of the identity service; discovery is fetched from `{issuer}/.well-known/openid-configuration` */
   issuer: string;
 
-  /** This service's API resource identifier; tokens whose `aud` does not include it are rejected */
-  audience: string;
+  /**
+   * This application's identifier at identity, and by default the id its credential authenticates
+   * with. Everything else about the registration — audience, redirect URIs, granted scopes — is read
+   * back from `GET /api/v1/apps/me` rather than restated here.
+   */
+  appId?: string;
+
+  /**
+   * Overrides the derived API resource identifier; tokens whose `aud` does not include it are
+   * rejected. Only needed when there is no credential to resolve the registration with, or when a
+   * deployment genuinely serves an audience identity does not know about.
+   */
+  audience?: string;
 
   /** Service-account credentials used for M2M tokens, PDP calls, and introspection */
   client?: AuthClientCredential;
+
+  app?: AppRegistryOptions;
 
   /** Audience of the SDK's own service token towards the identity service (PDP calls). Defaults to the identity default audience */
   identityResource?: string;
@@ -189,6 +202,47 @@ export interface DiscoveryDocument {
   token_endpoint_auth_methods_supported?: string[];
   /** When published, configured scopes are validated against it at startup so a typo fails the boot */
   scopes_supported?: string[];
+
+  /** Where a browser is sent to satisfy a step-up prompt (D-19); derived rather than configured */
+  step_up_endpoint?: string;
+
+  /** Base of the first-party app-session API (D-18); derived rather than configured */
+  app_session_endpoint?: string;
+}
+
+/*!
+ * Derived configuration (D-21)
+ *
+ * Identity already stores what every consumer used to restate in environment variables: the API
+ * resource its tokens are addressed to, the redirect URIs an admin registered, the scopes an admin
+ * granted. Reading it back leaves `AUTH_ISSUER` + `AUTH_APP_ID` + a credential as the whole of a
+ * steady-state deployment, and — because the registration is refreshed on a TTL — an admin granting
+ * a scope takes effect without a redeploy.
+ */
+
+export interface AppRegistration {
+  /** Identity's own view of which application this credential belongs to */
+  appId: string;
+  name?: string;
+
+  /** The API resource identifier this application's tokens are addressed to */
+  audience: string;
+
+  /** Redirect URIs an admin registered for the browser flow */
+  redirectUris: string[];
+
+  /** Scopes an admin has granted this application; the browser flow requests exactly these */
+  scopes: string[];
+
+  postLogoutRedirectUris?: string[];
+}
+
+export interface AppRegistryOptions {
+  /**
+   * How often the registration is re-resolved, in seconds. Defaults to 300, which is also the upper
+   * bound on how long an admin's grant change takes to reach a running service.
+   */
+  refreshSeconds?: number;
 }
 
 /*!

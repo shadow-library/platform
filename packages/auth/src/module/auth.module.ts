@@ -56,6 +56,7 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
 
   constructor(
     private readonly client: AuthClient,
+    private readonly sessions: AppSessionService,
     private readonly context: ContextService,
     @Inject(AUTH_CONFIG) private readonly config: AuthClientConfig,
     @Inject(BROWSER_CONFIG) private readonly browser: ResolvedBrowserAuthConfig,
@@ -65,11 +66,19 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
   async onModuleInit(): Promise<void> {
     extendContextWithAuth(this.context);
     if (this.browser.enabled && this.browser.routes.backchannelLogout) this.registerFormParser();
-    if (this.browser.enabled && this.browser.validateScopes) await this.client.assertScopesSupported(this.browser.scopes);
+
+    /**
+     * Resolving the registration here is what makes a misconfiguration a boot failure rather than a
+     * puzzling 401 on a user's first login: audience, redirect uri and granted scopes all come from
+     * identity now, so this is the first moment the service can be told it is wrong.
+     */
+    if (this.browser.enabled) await this.sessions.warmUp();
+
     /** Never forced: overriding identity's destructive-sync guardrail on every boot would defeat it */
     if (this.config.roles) await this.client.syncRoles(this.config.roles);
     if (this.config.client) await this.client.loadServiceAccess();
     this.logger.info('auth module initialised', {
+      appId: this.config.appId,
       rolesDeclared: Boolean(this.config.roles),
       serviceAccessLoaded: Boolean(this.config.client),
       browserFlow: this.browser.enabled,

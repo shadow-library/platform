@@ -20,9 +20,9 @@ import { AuthClient } from '@shadow-library/auth';
 // usually constructed by AuthModule.forRoot() and injected; constructable directly for plain Bun processes
 const auth = new AuthClient({
   issuer: 'https://identity.shadow-apps.com',
-  audience: 'api://pulse',
+  appId: 'svc-pulse', // audience, redirect URIs and granted scopes are read back from identity
   // in-cluster: projected k8s SA token as RFC 7523 client assertion; outside: { id, secret }
-  client: { id: Bun.env.AUTH_CLIENT_ID!, assertionPath: '/var/run/secrets/shadow/identity-token' },
+  client: { id: 'svc-pulse', assertionPath: '/var/run/secrets/shadow/identity-token' },
 });
 
 const principal = await auth.verify(bearerToken); // → AuthPrincipal, throws AppError with an AuthErrorCode key
@@ -72,13 +72,11 @@ FastifyModule.forRoot({
 
 ```sh
 AUTH_ISSUER=https://identity.shadow-apps.com
-AUTH_AUDIENCE=api://reports              # this service's own API resource
-AUTH_CLIENT_ID=svc-reports
-AUTH_CLIENT_ASSERTION_PATH=/var/run/secrets/shadow/identity-token   # or AUTH_CLIENT_SECRET
-AUTH_REDIRECT_URI=https://reports.shadow-apps.com/auth/callback     # setting this turns the browser flow on
-AUTH_SCOPES="openid reports:read"
-AUTH_ALLOWED_REDIRECTS=https://reports.shadow-apps.com              # the `return_to` allow-list
+AUTH_APP_ID=svc-reports
+AUTH_CLIENT_ASSERTION_PATH=/var/run/secrets/shadow/identity-token   # or AUTH_CLIENT_SECRET outside the cluster
 ```
+
+That is the whole of a steady-state deployment. The audience this service's tokens are addressed to, the redirect URIs an admin registered, the scopes an admin granted and the step-up endpoint are all **read back from identity** at startup (`GET /api/v1/apps/me` plus discovery) and refreshed on a TTL, so an admin granting a scope reaches a running service without a redeploy. Add `AUTH_ALLOWED_REDIRECTS` when a `return_to` may leave this origin — that allow-list is genuinely local policy.
 
 That registers, wired and working:
 
@@ -91,7 +89,7 @@ That registers, wired and working:
 | `GET /auth/session` | The current principal, or `401` — so a browser client never has to parse a token |
 | `GET /auth/step-up` | Claims a step-up grant, prompting identity only when there is nothing left to claim |
 
-Everything is overridable and nothing is required: `AuthModule.forRoot({ routes: { basePath: '/session', backchannelLogout: false } })` moves or disables any of them, and `browser: { … }` overrides any of the `AUTH_*` values in code. A service that sets no `AUTH_REDIRECT_URI` gets none of it — the API-only integration below is unchanged.
+Everything is overridable and nothing is required: `AuthModule.forRoot({ routes: { basePath: '/session', backchannelLogout: false } })` moves or disables any of them, and `browser: { redirectUri, scopes, stepUpUrl, … }` pins in code anything the registration would otherwise supply — the escape hatch lives in code, where it is visible and reviewed, rather than in an environment variable a stale deploy can silently keep overriding. An API-only service sets `AUTH_BROWSER_LOGIN=false` (or `browser: { enabled: false }`) and gets none of it; a service with no credential at all never had a login it could complete, so the routes are not offered either.
 
 ### How a browser request is served
 

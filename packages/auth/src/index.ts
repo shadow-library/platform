@@ -2,6 +2,8 @@ export * from './errors';
 export * from './interfaces';
 export { AccessTokenCache, hashSessionHandle } from './lib/access-token-cache';
 export type { AccessTokenKey } from './lib/access-token-cache';
+export { AppRegistryClient } from './lib/app-registry';
+export type { AppRegistryClientOptions } from './lib/app-registry';
 export { AppSessionClient } from './lib/app-session-client';
 export type { AppSessionClientOptions } from './lib/app-session-client';
 export { AuthClient } from './lib/auth-client';

@@ -9,6 +9,7 @@ import { APIRequest, type APIResponse, AppError, Logger, throwError } from '@sha
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import {
+  AppRegistration,
   AuthClientConfig,
   AuthPrincipal,
   CheckInput,
@@ -26,6 +27,7 @@ import {
   ServiceTokenOptions,
   TokenExchangeInput,
 } from '../interfaces';
+import { AppRegistryClient } from './app-registry';
 import { AppSessionClient } from './app-session-client';
 import { buildClientAuthentication, isConfidential } from './client-auth';
 import { DiscoveryClient } from './discovery';
@@ -104,14 +106,23 @@ export class AuthClient {
   private readonly pdp: PdpClient;
   private readonly discovery: DiscoveryClient;
   private readonly serviceAccess: ServiceAccessClient;
+  private readonly apps: AppRegistryClient;
 
   /** The first-party app-session protocol client; see `AppSessionClient` for why it is M2M-only */
   readonly appSessions: AppSessionClient;
 
   constructor(private readonly config: AuthClientConfig) {
     if (!config.issuer || !URL.canParse(config.issuer)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'issuer must be a valid url' });
-    if (!config.audience) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'audience is required' });
     if (config.client && !config.client.id) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'client credentials require an id' });
+
+    /**
+     * The audience is normally derived from the registration, which takes a credential to read. With
+     * neither, the client could never learn which tokens are addressed to it — so it refuses to start
+     * rather than accept every token or none, depending on which bug surfaces first.
+     */
+    if (!config.audience && !isConfidential(config.client)) {
+      throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'either an explicit audience or a credential to resolve the app registration with is required' });
+    }
     if ((config.clockSkewSeconds ?? 0) < 0) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'clock skew cannot be negative' });
     if ((config.serviceAccess?.refreshSeconds ?? 1) <= 0) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service access refresh interval must be positive' });
     assertValidTimeout(config.timeout);
@@ -142,7 +153,31 @@ export class AuthClient {
       getToken: () => this.identityToken(PDP_SCOPE),
       refreshSeconds: config.serviceAccess?.refreshSeconds,
     });
-    this.logger.info('auth client initialised', { issuer: this.issuer, audience: config.audience, hasClientCredentials: Boolean(config.client) });
+    this.apps = new AppRegistryClient({
+      issuer: this.issuer,
+      fetchFn: this.transport,
+      getToken: () => this.tokens.getToken({ resource: this.identityResource() }),
+      appId: config.appId,
+      refreshSeconds: config.app?.refreshSeconds,
+    });
+    this.logger.info('auth client initialised', { issuer: this.issuer, appId: config.appId, audience: config.audience, hasClientCredentials: Boolean(config.client) });
+  }
+
+  /**
+   * This application's registration at identity: audience, redirect URIs, and the scopes an admin has
+   * granted it. Resolved on first use and refreshed on a TTL, so a grant change propagates without a
+   * redeploy; the last good registration survives an identity outage.
+   */
+  getAppRegistration(): Promise<AppRegistration> {
+    return this.apps.get();
+  }
+
+  /**
+   * The API resource this service's tokens must be addressed to. The explicit `audience` wins when one
+   * is configured, which is the escape hatch for a deployment identity does not know the whole of.
+   */
+  async getAudience(): Promise<string> {
+    return this.config.audience ?? (await this.apps.get()).audience;
   }
 
   /** The issuer's discovery document, fetched once per process and cached for the deployment's lifetime */
@@ -168,7 +203,7 @@ export class AuthClient {
   /** Verifies a bearer token offline against the issuer's JWKS and returns the resolved principal */
   async verify(token: string): Promise<AuthPrincipal> {
     if (!token) throw AuthErrorCode.TOKEN_INVALID.create({ reason: 'no token provided' });
-    const payload = await verifyJwt(token, kid => this.jwks.getKey(kid), this.expectations());
+    const payload = await verifyJwt(token, kid => this.jwks.getKey(kid), await this.expectations());
     const principal = this.toPrincipal(payload);
     this.logger.debug('token verified', { sub: principal.sub, kind: principal.kind, scopes: principal.scopes });
     return principal;
@@ -434,11 +469,24 @@ export class AuthClient {
   }
 
   private identityTokenOptions(scope: string): ServiceTokenOptions {
-    return { resource: this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE, scopes: [scope] };
+    return { resource: this.identityResource(), scopes: [scope] };
   }
 
-  private expectations(): ClaimExpectations {
-    return { issuer: this.issuer, audience: this.config.audience, clockSkewSeconds: this.clockSkewSeconds };
+  private identityResource(): string {
+    return this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE;
+  }
+
+  /** Where a browser goes to satisfy a step-up prompt; published by discovery rather than configured */
+  async getStepUpEndpoint(): Promise<string> {
+    const advertised = (await this.discovery.get()).step_up_endpoint;
+    if (advertised) return advertised;
+
+    this.logger.warn('discovery advertises no step-up endpoint; falling back to the issuer-relative path');
+    return `${this.issuer}/auth/step-up`;
+  }
+
+  private async expectations(): Promise<ClaimExpectations> {
+    return { issuer: this.issuer, audience: await this.getAudience(), clockSkewSeconds: this.clockSkewSeconds };
   }
 
   private toPrincipal(payload: JwtPayload): AuthPrincipal {

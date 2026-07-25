@@ -7,7 +7,6 @@ import { Config, Logger, utils } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { NAMESPACE } from '../constants';
-import { AuthErrorCode } from '../errors';
 import { type AuthClientConfig } from '../interfaces';
 import { assertValidCookieName, type CookieAttributes, type SameSitePolicy } from './cookie';
 import { LOGIN_STATE_TTL_SECONDS } from './login-state';
@@ -20,17 +19,17 @@ declare module '@shadow-library/common' {
   export interface ConfigRecords {
     /** Auth SDK configs (consumed by `AuthModule.forRoot` / `RelyingPartyModule.forRoot`) */
     'auth.issuer': string;
-    'auth.audience': string;
+    'auth.app-id': string;
     'auth.client.id': string;
     'auth.client.secret': string;
     'auth.client.assertion-path': string;
     'auth.timeout': number;
+    'auth.app.refresh-seconds': number;
     'auth.service-access.refresh-seconds': number;
     'auth.strict-scopes': boolean;
 
     /** First-party browser flow configs (consumed by `AuthModule.forRoot`) */
-    'auth.redirect-uri': string;
-    'auth.scopes': string;
+    'auth.browser-login': boolean;
     'auth.session.cookie-name': string;
     'auth.session.cookie-secure': boolean;
     'auth.session.cookie-same-site': SameSitePolicy;
@@ -38,7 +37,6 @@ declare module '@shadow-library/common' {
     'auth.post-login-redirect': string;
     'auth.post-logout-redirect': string;
     'auth.allowed-redirects': string[];
-    'auth.step-up-url': string;
   }
 }
 
@@ -54,11 +52,25 @@ export interface AuthRoutePaths {
 }
 
 export interface BrowserAuthOptions {
-  /** Defaults to on whenever a redirect uri and client credentials are configured; an API-only service simply sets neither */
+  /**
+   * Defaults to on whenever a credential is configured, because identity already knows this
+   * application's redirect URIs and granted scopes — there is nothing left for a deploy to supply.
+   * An API-only service turns it off here or with `AUTH_BROWSER_LOGIN=false`.
+   */
   enabled?: boolean;
 
+  /**
+   * Overrides the redirect URI identity has registered for this application. Only for a deployment
+   * behind a proxy that rewrites the callback path; normally the registration is the truth.
+   */
   redirectUri?: string;
+
+  /** Overrides the scopes an admin granted this application; narrows, it cannot grant */
   scopes?: string[];
+
+  /** Overrides discovery's `step_up_endpoint`; the endpoint is derived, not configured */
+  stepUpUrl?: string;
+
   postLoginRedirect?: string;
 
   /** Where identity sends the browser after an RP-initiated logout; omitted, logout ends here */
@@ -66,9 +78,6 @@ export interface BrowserAuthOptions {
 
   /** Absolute origins (optionally with a path prefix) a `return_to` may point at; same-origin paths are always allowed */
   allowedRedirects?: string[];
-
-  /** Where to send a browser that must step up; defaults to `{issuer}/auth/step-up` */
-  stepUpUrl?: string;
 
   cookieName?: string;
   cookieSameSite?: SameSitePolicy;
@@ -80,7 +89,7 @@ export interface BrowserAuthOptions {
    */
   cookieSecure?: boolean;
 
-  /** Checks the configured scopes against the issuer's published `scopes_supported` at startup; on by default */
+  /** Checks the granted scopes against the issuer's published `scopes_supported` at startup; on by default */
   validateScopes?: boolean;
 }
 
@@ -90,17 +99,20 @@ export interface AuthModuleOptions extends Partial<AuthClientConfig> {
   routes?: Partial<AuthRoutePaths>;
 }
 
+/**
+ * The locally-decided half of the browser configuration. Audience, redirect URI, granted scopes and
+ * the step-up endpoint are deliberately absent: they come from identity at runtime (D-21), so they
+ * cannot be settled here at `forRoot()` time. Only the overrides for them live here.
+ */
 export interface ResolvedBrowserAuthConfig {
   enabled: boolean;
-  clientId: string;
-  audience: string;
   routes: AuthRoutePaths;
-  redirectUri: string;
-  scopes: string[];
+  redirectUri?: string;
+  scopes?: string[];
+  stepUpUrl?: string;
   postLoginRedirect: string;
   postLogoutRedirect?: string;
   allowedRedirects: string[];
-  stepUpUrl: string;
   validateScopes: boolean;
   cookieName: string;
   cookie: CookieAttributes;
@@ -111,27 +123,31 @@ export interface ResolvedBrowserAuthConfig {
 /**
  * Declaring the constants
  *
- * Deploys configure the SDK through the environment instead of code: `AUTH_ISSUER` and
- * `AUTH_AUDIENCE` identify the issuer and this service's API resource, while the client either
- * presents a static secret (`AUTH_CLIENT_SECRET`) or — preferred inside Kubernetes — a projected
- * service-account token whose file path is `AUTH_CLIENT_ASSERTION_PATH`. `AUTH_TIMEOUT` optionally
- * bounds every outbound request to a total time budget in milliseconds, and
- * `AUTH_SERVICE_ACCESS_REFRESH_SECONDS` sets how long a revoked M2M caller may keep its access.
+ * A steady-state deploy configures three things: `AUTH_ISSUER`, `AUTH_APP_ID`, and one credential —
+ * a projected service-account token at `AUTH_CLIENT_ASSERTION_PATH` in-cluster, or a static
+ * `AUTH_CLIENT_SECRET` outside it. Everything identity already stores about the application is read
+ * back from it (D-21): the audience its tokens are addressed to, the redirect URIs an admin
+ * registered, the scopes an admin granted, and the step-up endpoint from discovery. Restating those
+ * in environment variables is what the old `AUTH_AUDIENCE` / `AUTH_REDIRECT_URI` / `AUTH_SCOPES` /
+ * `AUTH_STEP_UP_URL` did, and they are gone rather than deprecated — a stale value in a deploy
+ * silently overriding what identity says is worse than having no override at all. The escape hatch is
+ * `browser: { … }` in code, where it is visible and reviewed.
  *
- * The browser flow adds `AUTH_REDIRECT_URI` and `AUTH_SCOPES`; setting those two is what turns the
- * login/callback/logout surface on. Everything else has a safe default, and the one setting that can
- * weaken security — `AUTH_SESSION_COOKIE_SECURE` — announces itself in the logs when it is used.
+ * The rest tunes behaviour and has safe defaults. The one setting that can weaken security —
+ * `AUTH_SESSION_COOKIE_SECURE` — announces itself in the logs when it is used.
  */
 Config.load('auth.issuer');
-Config.load('auth.audience');
+
+/** Without it a production service cannot read its own registration back, and so cannot know its own audience */
+Config.load('auth.app-id', { isProdRequired: true });
 Config.load('auth.client.id');
 Config.load('auth.client.secret');
 Config.load('auth.client.assertion-path');
 Config.load('auth.timeout', { validateType: 'number' });
+Config.load('auth.app.refresh-seconds', { validateType: 'number', defaultValue: '300' });
 Config.load('auth.service-access.refresh-seconds', { validateType: 'number', defaultValue: '300' });
 Config.load('auth.strict-scopes', { validateType: 'boolean', defaultValue: 'false' });
-Config.load('auth.redirect-uri');
-Config.load('auth.scopes');
+Config.load('auth.browser-login', { validateType: 'boolean', defaultValue: 'true' });
 Config.load('auth.session.cookie-name', { defaultValue: '__Host-shadow-session' });
 Config.load('auth.session.cookie-secure', { validateType: 'boolean', defaultValue: 'true' });
 Config.load('auth.session.cookie-same-site', { allowedValues: ['Lax', 'Strict', 'None'], defaultValue: 'Lax' });
@@ -139,7 +155,6 @@ Config.load('auth.session.cookie-domain');
 Config.load('auth.post-login-redirect', { defaultValue: '/' });
 Config.load('auth.post-logout-redirect');
 Config.load('auth.allowed-redirects', { isArray: true });
-Config.load('auth.step-up-url');
 
 const logger = Logger.getLogger(NAMESPACE, 'AuthConfig');
 
@@ -159,19 +174,21 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
 /** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */
 export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthClientConfig {
   const issuer = options.issuer ?? Config.get('auth.issuer');
-  const audience = options.audience ?? Config.get('auth.audience');
+  const appId = options.appId ?? Config.get('auth.app-id') ?? undefined;
 
+  /** The app id doubles as the OAuth client id, so a deploy names the application once and only once */
   let client = options.client;
-  const clientId = Config.get('auth.client.id');
+  const clientId = Config.get('auth.client.id') || appId;
   if (!client && clientId) {
     client = { id: clientId, secret: Config.get('auth.client.secret') || undefined, assertionPath: Config.get('auth.client.assertion-path') || undefined };
   }
 
   const timeout = options.timeout ?? Config.get('auth.timeout');
+  const app = { refreshSeconds: options.app?.refreshSeconds ?? Config.get('auth.app.refresh-seconds') };
   const serviceAccess = { refreshSeconds: options.serviceAccess?.refreshSeconds ?? Config.get('auth.service-access.refresh-seconds') };
   const strictScopes = options.strictScopes ?? Config.get('auth.strict-scopes');
 
-  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, audience, client, timeout, serviceAccess, strictScopes };
+  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, appId, client, timeout, app, serviceAccess, strictScopes };
 }
 
 export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): AuthRoutePaths {
@@ -179,13 +196,12 @@ export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): Auth
 }
 
 /**
- * Resolves the browser-facing half. It stays off until a redirect uri and client credentials both
- * exist, because minting on a browser's behalf is impossible without the app's own M2M credential —
- * registering the routes anyway would only hand callers a login that cannot complete.
+ * Resolves the browser-facing half. It stays off without client credentials, because minting on a
+ * browser's behalf is impossible without the application's own M2M credential — registering the
+ * routes anyway would only hand callers a login that cannot complete.
  */
 export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthRoutePaths, options: BrowserAuthOptions = {}): ResolvedBrowserAuthConfig {
-  const redirectUri = options.redirectUri ?? Config.get('auth.redirect-uri') ?? '';
-  const enabled = options.enabled ?? Boolean(redirectUri && client.client);
+  const enabled = (options.enabled ?? Config.get('auth.browser-login')) && Boolean(client.client);
   const secure = options.cookieSecure ?? Config.get('auth.session.cookie-secure');
   const sameSite = options.cookieSameSite ?? Config.get('auth.session.cookie-same-site');
   const domain = options.cookieDomain ?? Config.get('auth.session.cookie-domain') ?? undefined;
@@ -193,7 +209,6 @@ export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthR
 
   const cookie: CookieAttributes = { path: '/', httpOnly: true, secure, sameSite, domain };
   if (enabled) {
-    if (!URL.canParse(redirectUri)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'AUTH_REDIRECT_URI must be an absolute url' });
     if (!secure) logger.warn('session cookies are configured without the Secure attribute; this is for plain-http development only and must never reach production');
     if (sameSite === 'None') {
       logger.warn(
@@ -203,19 +218,15 @@ export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthR
     assertValidCookieName(cookieName, cookie);
   }
 
-  if (enabled && routes.callback) warnOnRedirectUriMismatch(redirectUri, `${routes.basePath}${routes.callback}`);
-
   return {
     enabled,
-    clientId: client.client?.id ?? '',
-    audience: client.audience,
     routes,
-    redirectUri,
-    scopes: options.scopes ?? parseScopes(Config.get('auth.scopes')),
+    redirectUri: options.redirectUri,
+    scopes: options.scopes,
+    stepUpUrl: options.stepUpUrl,
     postLoginRedirect: options.postLoginRedirect ?? Config.get('auth.post-login-redirect'),
     postLogoutRedirect: options.postLogoutRedirect ?? Config.get('auth.post-logout-redirect') ?? undefined,
     allowedRedirects: options.allowedRedirects ?? Config.get('auth.allowed-redirects') ?? [],
-    stepUpUrl: options.stepUpUrl ?? Config.get('auth.step-up-url') ?? `${client.issuer.replace(/\/+$/, '')}/auth/step-up`,
     validateScopes: options.validateScopes ?? true,
     cookieName,
     cookie,
@@ -228,23 +239,4 @@ export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthR
      */
     stateCookie: { ...cookie, sameSite: sameSite === 'Strict' ? 'Lax' : sameSite, maxAge: LOGIN_STATE_TTL_SECONDS },
   };
-}
-
-/**
- * A registered redirect uri that does not point at the callback route is the classic silent failure:
- * login works, the browser comes back to nothing. It stays a warning rather than an error because a
- * reverse proxy is perfectly entitled to rewrite the path in front of the service.
- */
-function warnOnRedirectUriMismatch(redirectUri: string, callbackPath: string): void {
-  const registered = URL.parse(redirectUri);
-  if (!registered || registered.pathname === callbackPath) return;
-  logger.warn('AUTH_REDIRECT_URI does not point at the callback route; identity will send the browser somewhere this service does not serve', {
-    redirectPath: registered.pathname,
-    callbackPath,
-  });
-}
-
-/** `AUTH_SCOPES` is space separated, matching how a `scope` parameter travels on the wire */
-function parseScopes(value: string | undefined): string[] {
-  return (value ?? '').split(/\s+/).filter(Boolean);
 }

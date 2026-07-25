@@ -9,7 +9,7 @@ import { Config } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { type AuthClientConfig } from '@shadow-library/auth';
-import { resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
+import { resolveAuthClientConfig, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 
 /**
  * Defining types
@@ -18,22 +18,24 @@ import { resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/aut
 /**
  * Declaring the constants
  *
- * The headline promise is that a service configures the SDK through the environment and writes no
- * auth code, so the environment path deserves its own coverage rather than riding on the in-code
- * overrides every other spec uses.
+ * The headline promise is that a service configures the SDK with an issuer, an app id and a credential
+ * and writes no auth code — everything else identity already knows is read back from it. These specs
+ * cover the environment path that promise rests on, rather than riding on the in-code overrides every
+ * other spec uses.
  */
 const ENVIRONMENT: Record<string, string> = {
-  AUTH_REDIRECT_URI: 'https://reports.test/auth/callback',
-  AUTH_SCOPES: 'openid reports:read  reports:write',
+  AUTH_ISSUER: 'https://identity.test',
+  AUTH_APP_ID: 'svc-reports',
+  AUTH_CLIENT_ASSERTION_PATH: '/var/run/secrets/shadow/identity-token',
   AUTH_ALLOWED_REDIRECTS: 'https://reports.test,https://admin.reports.test/ops',
 };
 
 /** Only the keys without a default can be reloaded mid-process; `Config` keeps a resolved value for good */
-const CONFIG_KEYS = ['auth.redirect-uri', 'auth.scopes', 'auth.allowed-redirects'] as const;
+const CONFIG_KEYS = ['auth.issuer', 'auth.app-id', 'auth.client.assertion-path', 'auth.allowed-redirects'] as const;
 
-const CLIENT: AuthClientConfig = { issuer: 'https://identity.test', audience: 'api://reports', client: { id: 'svc-reports', secret: 's3cr3t' } };
+const CLIENT: AuthClientConfig = { issuer: 'https://identity.test', appId: 'svc-reports', client: { id: 'svc-reports', secret: 's3cr3t' } };
 
-describe('environment-driven browser config', () => {
+describe('environment-driven configuration', () => {
   const original = new Map<string, string | undefined>();
 
   /** `Config` caches on load, so the keys are reloaded once the environment is in place — and again on the way out */
@@ -55,16 +57,42 @@ describe('environment-driven browser config', () => {
     reload();
   });
 
-  it('should turn the browser flow on from AUTH_REDIRECT_URI alone', () => {
-    const browser = resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes());
-    expect(browser.enabled).toBe(true);
-    expect(browser.redirectUri).toBe(ENVIRONMENT.AUTH_REDIRECT_URI as string);
-    expect(browser.audience).toBe('api://reports');
+  it('should need nothing but an issuer, an app id and a credential', () => {
+    const config = resolveAuthClientConfig();
+    expect(config.issuer).toBe('https://identity.test');
+    expect(config.appId).toBe('svc-reports');
+
+    /** The app id doubles as the OAuth client id, so a deploy names the application once */
+    expect(config.client).toMatchObject({ id: 'svc-reports', assertionPath: ENVIRONMENT.AUTH_CLIENT_ASSERTION_PATH as string });
+    expect(config.audience).toBeUndefined();
   });
 
-  it('should read space-separated scopes and comma-separated redirects', () => {
+  it('should default the refresh intervals that bound how stale derived config may get', () => {
+    const config = resolveAuthClientConfig();
+    expect(config.app?.refreshSeconds).toBe(300);
+    expect(config.serviceAccess?.refreshSeconds).toBe(300);
+    expect(config.strictScopes).toBe(false);
+  });
+
+  it('should let code override what the environment supplied', () => {
+    const config = resolveAuthClientConfig({ issuer: 'https://other.test', audience: 'api://explicit', app: { refreshSeconds: 30 } });
+    expect(config.issuer).toBe('https://other.test');
+    expect(config.audience).toBe('api://explicit');
+    expect(config.app?.refreshSeconds).toBe(30);
+  });
+
+  it('should turn the browser flow on from a credential alone, with no redirect uri to configure', () => {
     const browser = resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes());
-    expect(browser.scopes).toEqual(['openid', 'reports:read', 'reports:write']);
+    expect(browser.enabled).toBe(true);
+
+    /** Redirect uri, scopes and step-up url are identity's to answer, so nothing is settled here */
+    expect(browser.redirectUri).toBeUndefined();
+    expect(browser.scopes).toBeUndefined();
+    expect(browser.stepUpUrl).toBeUndefined();
+  });
+
+  it('should read the comma-separated redirect allow-list, which stays local', () => {
+    const browser = resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes());
     expect(browser.allowedRedirects).toEqual(['https://reports.test', 'https://admin.reports.test/ops']);
   });
 
@@ -104,8 +132,10 @@ describe('environment-driven browser config', () => {
   });
 
   it('should stay off, and register no routes, for an api-only service', () => {
-    const browser = resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes(), { enabled: false });
-    expect(browser.enabled).toBe(false);
+    expect(resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes(), { enabled: false }).enabled).toBe(false);
+
+    /** Without a credential the login could never complete, so the routes are not offered either */
+    expect(resolveBrowserAuthConfig({ issuer: CLIENT.issuer, audience: 'api://reports' }, resolveAuthRoutes()).enabled).toBe(false);
   });
 
   it('should let a service turn individual routes off', () => {

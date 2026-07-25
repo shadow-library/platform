@@ -8,7 +8,7 @@ import { AppError, Logger } from '@shadow-library/common';
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
-import { AppSessionToken, AuthPrincipal } from '../interfaces';
+import { AppRegistration, AppSessionToken, AuthPrincipal } from '../interfaces';
 import { AccessTokenCache, hashSessionHandle } from '../lib/access-token-cache';
 import { AuthClient } from '../lib/auth-client';
 import { buildAuthorizationUrl } from '../rp/authorization-url';
@@ -40,6 +40,19 @@ export interface TokenRequest {
 }
 
 /**
+ * The half of the browser configuration identity owns (D-21), resolved per request from the
+ * application's registration and refreshed with it — so an admin granting a scope or registering a
+ * redirect URI reaches a running service without a redeploy.
+ */
+export interface BrowserAuthRuntime {
+  clientId: string;
+  audience: string;
+  redirectUri: string;
+  scopes: string[];
+  stepUpUrl: string;
+}
+
+/**
  * Declaring the constants
  *
  * The whole first-party browser flow lives here so a consuming service inherits it rather than
@@ -68,29 +81,54 @@ export class AppSessionService {
   private readonly tokens = new AccessTokenCache();
   private readonly registry = new SessionRegistry();
 
-  /** Elevation grant windows in epoch milliseconds, keyed by (session hash, audience) — the D-19 isolation boundary */
+  /**
+   * Elevation grant windows in epoch milliseconds, keyed by session hash. The D-19 isolation boundary
+   * is (app session, audience), but a service only ever mints for its own audience, so the audience is
+   * a constant here — carrying it in the key would only invite a stale one into a lookup.
+   */
   private readonly grants = new Map<string, number>();
+
+  /** The last runtime derived from a registration, kept so an unchanged registration costs nothing */
+  private derived: { registration: AppRegistration; runtime: BrowserAuthRuntime } | null = null;
 
   constructor(
     private readonly client: AuthClient,
     private readonly config: ResolvedBrowserAuthConfig,
   ) {}
 
+  /**
+   * Resolves the identity-owned half of the configuration and validates what a deploy can still get
+   * wrong. Called once at startup so a misregistration surfaces at boot rather than on a user's first
+   * login, and cheap afterwards — the registration is cached and refreshed on its own TTL.
+   */
+  async warmUp(): Promise<BrowserAuthRuntime> {
+    const runtime = await this.runtime();
+    if (this.config.validateScopes) await this.client.assertScopesSupported(runtime.scopes);
+    this.warnOnRedirectUriMismatch(runtime.redirectUri);
+    this.logger.info('browser auth resolved from the app registration', {
+      clientId: runtime.clientId,
+      audience: runtime.audience,
+      redirectUri: runtime.redirectUri,
+      scopes: runtime.scopes,
+    });
+    return runtime;
+  }
+
   /** Starts a login: PKCE, `state`, `nonce` and `resource` out; the transient state rides in its own cookie */
   async beginLogin(returnTo?: string): Promise<LoginRedirect> {
-    const document = await this.client.getDiscovery();
+    const [document, runtime] = await Promise.all([this.client.getDiscovery(), this.runtime()]);
     const pkce = await createPkcePair();
     const state: LoginState = { state: randomUrlSafeString(16), nonce: randomUrlSafeString(16), codeVerifier: pkce.verifier, returnTo: this.resolveReturnTo(returnTo) };
 
     const url = buildAuthorizationUrl({
       authorizationEndpoint: document.authorization_endpoint,
-      clientId: this.config.clientId,
-      redirectUri: this.config.redirectUri,
-      scopes: this.config.scopes,
+      clientId: runtime.clientId,
+      redirectUri: runtime.redirectUri,
+      scopes: runtime.scopes,
       state: state.state,
       nonce: state.nonce,
       codeChallenge: pkce.challenge,
-      resource: this.config.audience,
+      resource: runtime.audience,
     });
 
     this.logger.debug('login started', { returnTo: state.returnTo });
@@ -104,7 +142,8 @@ export class AppSessionService {
     if (!query.code) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'the callback carried no authorization code' }));
     if (!query.state || !matchesState(pending.state, query.state)) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'the callback state did not match' }));
 
-    const session = await this.client.appSessions.createSession({ code: query.code, codeVerifier: pending.codeVerifier, redirectUri: this.config.redirectUri });
+    const { redirectUri } = await this.runtime();
+    const session = await this.client.appSessions.createSession({ code: query.code, codeVerifier: pending.codeVerifier, redirectUri });
     const handleHash = hashSessionHandle(session.sessionHandle);
     this.registry.register(handleHash, session.userId, parseExpiry(session.expiresAt, Date.now() + FALLBACK_SESSION_TTL_MS));
 
@@ -131,12 +170,13 @@ export class AppSessionService {
     const handleHash = hashSessionHandle(handle);
     if (!this.registry.isActive(handleHash)) throw AuthErrorCode.SESSION_INVALID.create({ reason: 'session was ended by a back-channel logout' });
 
+    const runtime = await this.runtime();
     const elevated = request.elevated ?? false;
-    const key = { handleHash, audience: this.config.audience, elevated, scope: this.config.scopes.join(' ') || undefined };
+    const key = { handleHash, audience: runtime.audience, elevated, scope: runtime.scopes.join(' ') || undefined };
     const cached = this.tokens.get(key);
     if (cached) return cached;
 
-    const minted = await this.mint(handle, handleHash, elevated);
+    const minted = await this.mint(runtime, handle, handleHash, elevated);
 
     /**
      * An elevated token is only cached for as long as the grant it came from is known to last. When
@@ -144,7 +184,7 @@ export class AppSessionService {
      * expiry passed here is already in the past, so the token is used once and never stored. Guessing
      * a window would be the one way an `AAL2` token could outlive its elevation.
      */
-    this.tokens.set(key, minted, elevated ? (this.grants.get(this.grantKey(handleHash)) ?? 0) : undefined);
+    this.tokens.set(key, minted, elevated ? (this.grants.get(handleHash) ?? 0) : undefined);
     return minted;
   }
 
@@ -155,9 +195,10 @@ export class AppSessionService {
    */
   async claimElevation(handle: string): Promise<void> {
     const handleHash = hashSessionHandle(handle);
-    const elevation = await this.client.appSessions.claimElevation(handle, this.config.audience).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
+    const { audience } = await this.runtime();
+    const elevation = await this.client.appSessions.claimElevation(handle, audience).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
     /** An unreadable grant window records as already closed, so nothing elevated is ever cached from it */
-    this.grants.set(this.grantKey(handleHash), parseExpiry(elevation.expiresAt, 0));
+    this.grants.set(handleHash, parseExpiry(elevation.expiresAt, 0));
 
     /** Anything cached before the grant opened predates the elevation and must not be reused across it */
     this.tokens.evictElevated(handleHash);
@@ -213,9 +254,10 @@ export class AppSessionService {
   }
 
   /** Identity's step-up prompt, for when there is no step-up left to claim */
-  identityStepUpUrl(returnTo: string): string {
-    const url = new URL(this.config.stepUpUrl);
-    url.searchParams.set('return_to', new URL(returnTo, this.config.redirectUri).toString());
+  async identityStepUpUrl(returnTo: string): Promise<string> {
+    const runtime = await this.runtime();
+    const url = new URL(runtime.stepUpUrl);
+    url.searchParams.set('return_to', new URL(returnTo, runtime.redirectUri).toString());
     url.searchParams.set('acr_values', STEP_UP_ACR);
     return url.toString();
   }
@@ -234,7 +276,7 @@ export class AppSessionService {
     if (!endpoint) return this.resolveReturnTo(postLogout);
 
     const url = new URL(endpoint);
-    url.searchParams.set('client_id', this.config.clientId);
+    url.searchParams.set('client_id', (await this.runtime()).clientId);
     url.searchParams.set('post_logout_redirect_uri', this.assertAllowedRedirect(postLogout));
     return url.toString();
   }
@@ -273,10 +315,72 @@ export class AppSessionService {
     return target.pathname === allowed.pathname || target.pathname.startsWith(`${allowed.pathname.replace(/\/+$/, '')}/`);
   }
 
-  private async mint(handle: string, handleHash: string, elevated: boolean): Promise<AppSessionToken> {
-    const scope = this.config.scopes.join(' ') || undefined;
-    const input = { sessionHandle: handle, resource: this.config.audience, scope, elevated };
+  private async mint(runtime: BrowserAuthRuntime, handle: string, handleHash: string, elevated: boolean): Promise<AppSessionToken> {
+    const scope = runtime.scopes.join(' ') || undefined;
+    const input = { sessionHandle: handle, resource: runtime.audience, scope, elevated };
     return this.client.appSessions.mintToken(input).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
+  }
+
+  /**
+   * Merges what identity says about this application with the local overrides. Recomputed only when the
+   * registration itself changes, so a request pays one map lookup rather than re-deriving on every call.
+   */
+  private async runtime(): Promise<BrowserAuthRuntime> {
+    const [registration, audience, stepUpEndpoint] = await Promise.all([
+      this.client.getAppRegistration(),
+      this.client.getAudience(),
+      this.config.stepUpUrl ? Promise.resolve(this.config.stepUpUrl) : this.client.getStepUpEndpoint(),
+    ]);
+
+    const cached = this.derived;
+    if (cached?.registration === registration && cached.runtime.audience === audience && cached.runtime.stepUpUrl === stepUpEndpoint) return cached.runtime;
+
+    const runtime: BrowserAuthRuntime = {
+      clientId: registration.appId,
+      audience,
+      redirectUri: this.config.redirectUri ?? this.callbackRedirectUri(registration.redirectUris),
+      scopes: this.config.scopes ?? registration.scopes,
+      stepUpUrl: stepUpEndpoint,
+    };
+    this.derived = { registration, runtime };
+    return runtime;
+  }
+
+  /**
+   * An application may have several registered redirect URIs. The one belonging to this deployment is
+   * the one pointing at the callback route this process actually serves — which is all the SDK can
+   * know, since a service behind a proxy cannot see its own public origin. When that is still
+   * ambiguous the choice is arbitrary, so it says so and the deploy is expected to pin `redirectUri`.
+   */
+  private callbackRedirectUri(redirectUris: string[]): string {
+    const callbackPath = this.config.routes.callback ? `${this.config.routes.basePath}${this.config.routes.callback}` : '';
+    const matches = redirectUris.filter(uri => URL.parse(uri)?.pathname === callbackPath);
+    if (matches.length > 1) {
+      this.logger.warn('several registered redirect uris point at the callback route; pin browser.redirectUri to say which origin this deployment serves', {
+        candidates: matches,
+      });
+    }
+
+    const chosen = matches[0] ?? redirectUris[0];
+    if (!chosen) throw this.logged(AuthErrorCode.CONFIG_INVALID.create({ reason: 'identity has no redirect uri registered for this application' }));
+    return chosen;
+  }
+
+  /**
+   * A registered redirect uri that does not point at the callback route is the classic silent failure:
+   * login works, the browser comes back to nothing. It stays a warning rather than an error because a
+   * reverse proxy is perfectly entitled to rewrite the path in front of the service.
+   */
+  private warnOnRedirectUriMismatch(redirectUri: string): void {
+    if (!this.config.routes.callback) return;
+    const callbackPath = `${this.config.routes.basePath}${this.config.routes.callback}`;
+    const registered = URL.parse(redirectUri);
+    if (!registered || registered.pathname === callbackPath) return;
+
+    this.logger.warn('the registered redirect uri does not point at the callback route; identity will send the browser somewhere this service does not serve', {
+      redirectPath: registered.pathname,
+      callbackPath,
+    });
   }
 
   /**
@@ -297,11 +401,7 @@ export class AppSessionService {
 
   private evictTokens(handleHash: string): void {
     this.tokens.evictSession(handleHash);
-    this.grants.delete(this.grantKey(handleHash));
-  }
-
-  private grantKey(handleHash: string): string {
-    return `${handleHash}|${this.config.audience}`;
+    this.grants.delete(handleHash);
   }
 
   /** Records the failure at warn level before it propagates; browser-flow rejections are expected traffic, not defects */
