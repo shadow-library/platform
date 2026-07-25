@@ -11,8 +11,10 @@ ENV HUSKY=0
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Install dependencies first so the layer caches until a manifest changes.
+# Install dependencies first so the layer caches until a manifest changes. The vendored auth SDK is a
+# `file:` dependency, so it must be in the build context before install resolves the lockfile.
 COPY package.json bun.lock bunfig.toml ./
+COPY vendor ./vendor
 RUN bun install --frozen-lockfile
 
 # Build the bundles: dist/main.js (server) and dist/migrate.js (migrations), plus the drizzle SQL
@@ -25,6 +27,10 @@ RUN git config --global --add safe.directory /app && bun run build
 # Runs the prebuilt output; no compiler toolchain or node_modules ship in the image.
 FROM ${BUN_IMAGE} AS runtime
 
+# CI passes the release version through `--build-arg APP_VERSION=...`; it defaults to `local` for
+# plain local builds and is surfaced to the runtime as APP_VERSION.
+ARG APP_VERSION=local
+ENV APP_VERSION=${APP_VERSION}
 ENV SERVER_PORT=8080
 ENV NODE_ENV=production
 
