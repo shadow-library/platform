@@ -144,7 +144,6 @@ bootstrap();
 @RawBody()                     // Untouched request body buffer (also flags the route to capture it)
 @Request() / @Req()            // Raw Fastify request
 @Response() / @Res()           // Raw Fastify response
-@Ctx()                         // Request-scoped ContextService
 ```
 
 `@Cookie()` loads `@fastify/cookie` lazily and only when a route uses it — the package is an optional peer

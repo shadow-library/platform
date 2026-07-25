@@ -24,7 +24,6 @@ export enum RouteInputType {
   RAW_BODY = 'rawBody',
   REQUEST = 'request',
   RESPONSE = 'response',
-  CTX = 'ctx',
 }
 
 export type RouteInputSchemas = Partial<Record<'body' | 'params' | 'query', JSONSchema | SchemaClass>>;
@@ -90,6 +89,3 @@ export const Req = Request;
 
 export const Response = (): ParameterDecorator => HttpInput(RouteInputType.RESPONSE);
 export const Res = Response;
-
-/** Injects the request-scoped `ContextService`. */
-export const Ctx = (): ParameterDecorator => HttpInput(RouteInputType.CTX);

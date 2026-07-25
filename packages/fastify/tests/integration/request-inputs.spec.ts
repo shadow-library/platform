@@ -7,7 +7,7 @@ import { Dispatcher, Module, ShadowApplication, ShadowFactory } from '@shadow-li
 /**
  * Importing user defined packages
  */
-import { ContextService, Cookie, Ctx, FastifyModule, FastifyRouter, Get, Headers, HttpController, Post, RawBody } from '@shadow-library/fastify';
+import { Cookie, FastifyModule, FastifyRouter, Get, Headers, HttpController, Post, RawBody } from '@shadow-library/fastify';
 
 /**
  * Defining types
@@ -22,11 +22,6 @@ class InputsController {
   @Post('/echo')
   echo(@Headers() headers: Record<string, string>, @RawBody() raw: Buffer) {
     return { xCustom: headers['x-custom'], rawLength: raw.length, raw: raw.toString() };
-  }
-
-  @Get('/context')
-  context(@Ctx() ctx: ContextService) {
-    return { rid: ctx.getRID() };
   }
 
   @Get('/cookies')
@@ -56,12 +51,6 @@ describe('request input decorators', () => {
     expect(json.xCustom).toBe('hello');
     expect(json.rawLength).toBeGreaterThan(0);
     expect(JSON.parse(json.raw)).toStrictEqual({ name: 'world' });
-  });
-
-  it('should inject the request-scoped ContextService via @Ctx', async () => {
-    const response = await router.mockRequest().get('/inputs/context');
-    expect(response.statusCode).toBe(200);
-    expect(response.json().rid).toEqual(expect.any(String));
   });
 
   it('should inject parsed cookies via @Cookie (loads @fastify/cookie lazily)', async () => {

@@ -20,7 +20,7 @@ const app = await import('@shadow-library/app');
 const decorator = jest.fn();
 const Handler = jest.fn(() => decorator);
 mock.module('@shadow-library/app', () => ({ ...app, Handler }));
-const { Body, Cookie, Ctx, Headers, HttpInput, Params, Query, RawBody, Req, Res, RouteInputType } = await import('@shadow-library/fastify');
+const { Body, Cookie, Headers, HttpInput, Params, Query, RawBody, Req, Res, RouteInputType } = await import('@shadow-library/fastify');
 
 describe('HTTP Input Decorators', () => {
   const schema = { type: 'string' } as any;
@@ -42,8 +42,6 @@ describe('HTTP Input Decorators', () => {
     static res(@Res() _res: any) {}
 
     static headers(@Headers() _headers: any) {}
-
-    static ctx(@Ctx() _ctx: any) {}
   }
 
   beforeEach(() => {
@@ -108,11 +106,6 @@ describe('HTTP Input Decorators', () => {
     const paramtypes = Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, Controller, 'raw');
     expect(paramtypes).toStrictEqual(['rawBody']);
     expect(Handler).toHaveBeenCalledWith({ rawBody: true });
-  });
-
-  it(`should enhance the method with the context input metadata`, () => {
-    const paramtypes = Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, Controller, 'ctx');
-    expect(paramtypes).toStrictEqual(['ctx']);
   });
 
   it(`should enhance the method with the cookies input metadata and flag the route`, () => {

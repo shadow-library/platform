@@ -57,7 +57,6 @@ export interface RequestContext {
   headers: HttpRequest['headers'];
   cookies?: CookieValues;
   rawBody?: Buffer;
-  ctx: ContextService;
 }
 
 interface ParsedController<T> {
@@ -296,14 +295,13 @@ export class FastifyRouter extends Dispatcher {
     const statusCode = this.getStatusCode(metadata);
     const argsOrder = (Reflect.getMetadata(HTTP_CONTROLLER_INPUTS, route.instance, route.handlerName) as (keyof RequestContext | undefined)[]) ?? [];
     const headerEntries = Object.entries(metadata.headers ?? {});
-    const contextService = this.context;
 
     return async (request, response) => {
       const params = request.params as Record<string, string>;
       const query = request.query as Record<string, string>;
       const body = request.body as JsonObject;
       const cookies = (request as { cookies?: CookieValues }).cookies;
-      const context: RequestContext = { request, response, params, query, body, headers: request.headers, cookies, rawBody: request.rawBody, ctx: contextService };
+      const context: RequestContext = { request, response, params, query, body, headers: request.headers, cookies, rawBody: request.rawBody };
 
       /** Setting the status code and headers */
       response.status(statusCode);
