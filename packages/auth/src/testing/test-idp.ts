@@ -360,9 +360,13 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const elevated = body.elevated === true;
     if (elevated && (elevationGrants.get(`${String(body.sessionHandle)}|${audience}`) ?? 0) <= Date.now()) return elevationRequired();
 
-    const scope = typeof body.scope === 'string' && body.scope ? body.scope : session.scope;
+    /** Identity narrows silently: an unconsented scope is filtered out and the mint still answers 200 */
+    const consented = session.scope.split(' ').filter(Boolean);
+    const requested = typeof body.scope === 'string' && body.scope ? body.scope.split(' ').filter(Boolean) : consented;
+    const granted = requested.filter(entry => consented.includes(entry));
+    const scope = granted.join(' ');
     const aal: AssuranceLevel = elevated ? 'AAL2' : 'AAL1';
-    const accessToken = await issueToken({ sub: session.userId, audience, scopes: scope.split(' ').filter(Boolean), claims: { aal } });
+    const accessToken = await issueToken({ sub: session.userId, audience, scopes: granted, claims: { aal } });
     return json({ accessToken, tokenType: 'Bearer', expiresIn: ttl, scope, audience, aal });
   };
 

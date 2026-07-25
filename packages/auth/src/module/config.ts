@@ -26,6 +26,7 @@ declare module '@shadow-library/common' {
     'auth.client.assertion-path': string;
     'auth.timeout': number;
     'auth.service-access.refresh-seconds': number;
+    'auth.strict-scopes': boolean;
 
     /** First-party browser flow configs (consumed by `AuthModule.forRoot`) */
     'auth.redirect-uri': string;
@@ -128,6 +129,7 @@ Config.load('auth.client.secret');
 Config.load('auth.client.assertion-path');
 Config.load('auth.timeout', { validateType: 'number' });
 Config.load('auth.service-access.refresh-seconds', { validateType: 'number', defaultValue: '300' });
+Config.load('auth.strict-scopes', { validateType: 'boolean', defaultValue: 'false' });
 Config.load('auth.redirect-uri');
 Config.load('auth.scopes');
 Config.load('auth.session.cookie-name', { defaultValue: '__Host-shadow-session' });
@@ -167,8 +169,9 @@ export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthCl
 
   const timeout = options.timeout ?? Config.get('auth.timeout');
   const serviceAccess = { refreshSeconds: options.serviceAccess?.refreshSeconds ?? Config.get('auth.service-access.refresh-seconds') };
+  const strictScopes = options.strictScopes ?? Config.get('auth.strict-scopes');
 
-  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, audience, client, timeout, serviceAccess };
+  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, audience, client, timeout, serviceAccess, strictScopes };
 }
 
 export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): AuthRoutePaths {

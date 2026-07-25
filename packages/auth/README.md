@@ -101,6 +101,8 @@ The transient login-state cookie (`state`, PKCE verifier, `return_to`) carries n
 
 The cookie defaults to `__Host-`-prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`. Because a cookie is now a credential on guarded routes, `SameSite` is what stands between you and CSRF: keep it at `Lax` or `Strict`, and if a deployment genuinely needs `None` (a cross-site iframe), the application must supply its own CSRF defence on every state-changing route — the SDK warns at startup when it sees it. `AUTH_SESSION_COOKIE_SECURE=false` exists only for plain-HTTP development; it drops the `__Host-` prefix with it and says so loudly.
 
+Minting **narrows silently**: identity answers 200 with whatever scope survived filtering rather than refusing, so `AppSessionToken.grantedScopes` carries what was actually granted and the SDK logs the delta at warn on every narrowing. Cached tokens are filed under the **granted** scope, never the requested one — a cache that labelled an entry `reports:read reports:write` while holding only `reports:read` would be lying about its own contents. Set `strictScopes: true` (or `AUTH_STRICT_SCOPES=true`) where a partial grant is worse than an outright failure and a narrowed mint throws `SCOPE_NOT_GRANTED` instead.
+
 Both credentials land in the same principal, so a route handler never learns which the caller used:
 
 ```ts

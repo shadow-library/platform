@@ -8,7 +8,7 @@ import { AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { AccessTokenCache, AuthClient, hashSessionHandle } from '@shadow-library/auth';
+import { AccessTokenCache, type AppSessionToken, AuthClient, hashSessionHandle } from '@shadow-library/auth';
 import { AppSessionService, decodeLoginState, encodeLoginState, type LoginState, matchesState, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
@@ -91,6 +91,27 @@ describe('AppSessionClient', () => {
     await expect(auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).rejects.toMatchObject({ code: 'SESSION_INVALID' });
   });
 
+  it('should surface the scope that survived filtering, not the one requested', async () => {
+    const session = await createSession('narrowed', ['openid', 'reports:read']);
+
+    /** Minting answers 200 with whatever survived, so the delta has to reach the caller somehow */
+    const token = await auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, scope: 'reports:read reports:write' });
+    expect(token.grantedScopes).toEqual(['reports:read']);
+    expect(token.scope).toBe('reports:read');
+  });
+
+  it('should throw instead of warning when strictScopes is on', async () => {
+    const strict = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, strictScopes: true });
+    const session = await createSession('strict', ['reports:read']);
+
+    await expect(strict.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, scope: 'reports:read reports:write' })).rejects.toMatchObject({
+      code: 'SCOPE_NOT_GRANTED',
+    });
+    await expect(strict.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, scope: 'reports:read' })).resolves.toMatchObject({
+      grantedScopes: ['reports:read'],
+    });
+  });
+
   it('should refuse to mint without the app-session:manage service token', async () => {
     const anonymous = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: (url, init) => fetch(url, { ...init, headers: stripBearer(init) }) });
     const session = await createSession('handle-alone');
@@ -106,7 +127,14 @@ const stripBearer = (init: RequestInit = {}): Headers => {
 };
 
 describe('AccessTokenCache', () => {
-  const token = (aal: 'AAL1' | 'AAL2', expiresIn = 600) => ({ accessToken: `token-${aal}`, tokenType: 'Bearer', expiresIn, aal });
+  const token = (aal: 'AAL1' | 'AAL2', expiresIn = 600, grantedScopes: string[] = []): AppSessionToken => ({
+    accessToken: `token-${aal}`,
+    tokenType: 'Bearer',
+    expiresIn,
+    aal,
+    scope: grantedScopes.join(' '),
+    grantedScopes,
+  });
   const handleHash = hashSessionHandle('handle');
 
   it('should never answer a non-elevated lookup with an elevated token', () => {
@@ -119,11 +147,54 @@ describe('AccessTokenCache', () => {
 
   it('should never answer a lookup for another audience or scope', () => {
     const cache = new AccessTokenCache();
-    cache.set({ handleHash, audience: AUDIENCE, elevated: true, scope: 'reports:read' }, token('AAL2'));
+    cache.set({ handleHash, audience: AUDIENCE, elevated: true, scope: 'reports:read' }, token('AAL2', 600, ['reports:read']));
 
     expect(cache.get({ handleHash, audience: OTHER_AUDIENCE, elevated: true, scope: 'reports:read' })).toBeUndefined();
     expect(cache.get({ handleHash, audience: AUDIENCE, elevated: true, scope: 'reports:write' })).toBeUndefined();
     expect(cache.get({ handleHash: hashSessionHandle('other'), audience: AUDIENCE, elevated: true, scope: 'reports:read' })).toBeUndefined();
+  });
+
+  it('should file a narrowed token under what was granted, never under what was requested', () => {
+    const cache = new AccessTokenCache();
+    const requested = { handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read reports:write' };
+
+    /** Identity granted only the read scope; nothing may end up labelled as carrying the write scope */
+    cache.set(requested, token('AAL1', 600, ['reports:read']));
+
+    /** The entry is honest about what it holds, and no other request borrows it without minting */
+    expect(cache.get(requested)?.grantedScopes).toEqual(['reports:read']);
+    expect(cache.get({ handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read' })).toBeUndefined();
+  });
+
+  it('should share one entry between two requests identity narrows to the same grant', () => {
+    const cache = new AccessTokenCache();
+    const wide = { handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read reports:write' };
+    const narrow = { handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read' };
+
+    cache.set(wide, token('AAL1', 600, ['reports:read']));
+    cache.set(narrow, token('AAL1', 600, ['reports:read']));
+
+    /** Both requests resolved to the same grant, so evicting it must take both lookups with it */
+    cache.evictSession(handleHash);
+    expect(cache.get(wide)).toBeUndefined();
+    expect(cache.get(narrow)).toBeUndefined();
+  });
+
+  it('should drop the stale lookup when a request starts being granted something else', () => {
+    const cache = new AccessTokenCache();
+    const requested = { handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read reports:write' };
+
+    cache.set(requested, token('AAL1', 600, ['reports:read']));
+    cache.set(requested, token('AAL1', 600, ['reports:read', 'reports:write']));
+
+    expect(cache.get(requested)?.grantedScopes).toEqual(['reports:read', 'reports:write']);
+    expect(cache.get({ handleHash, audience: AUDIENCE, elevated: false, scope: 'reports:read' })).toBeUndefined();
+  });
+
+  it('should treat a reordered scope request as the same request', () => {
+    const cache = new AccessTokenCache();
+    cache.set({ handleHash, audience: AUDIENCE, elevated: false, scope: 'a b' }, token('AAL1', 600, ['b', 'a']));
+    expect(cache.get({ handleHash, audience: AUDIENCE, elevated: false, scope: 'b a' })).toBeDefined();
   });
 
   it('should not outlive the elevation grant it was minted from', () => {

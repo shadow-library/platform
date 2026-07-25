@@ -23,6 +23,9 @@ export interface AppSessionClientOptions {
 
   /** Drops that cached M2M token so a rejected credential is retried once with a fresh one */
   invalidateToken: () => void;
+
+  /** Turns a narrowed mint into a thrown `SCOPE_NOT_GRANTED` rather than a warning */
+  strictScopes?: boolean;
 }
 
 interface ErrorBody {
@@ -67,10 +70,12 @@ export class AppSessionClient {
 
   /** Mints an access token from the session handle, optionally from its live step-up grant */
   async mintToken(input: AppSessionTokenInput): Promise<AppSessionToken> {
-    const token = await this.request<AppSessionToken>('POST', '/token', input);
+    const minted = await this.request<AppSessionToken>('POST', '/token', input);
+    const token: AppSessionToken = { ...minted, grantedScopes: parseScopes(minted.scope) };
     if (input.elevated && token.aal !== 'AAL2') {
       throw this.logged(AuthErrorCode.ELEVATION_REQUIRED.create({ reason: `identity answered an elevated mint with aal '${String(token.aal)}'` }));
     }
+    this.assertScopesSurvived(input, token);
     this.logger.debug('app session token minted', { audience: token.audience, scope: token.scope, aal: token.aal, expiresIn: token.expiresIn });
     return token;
   }
@@ -89,6 +94,22 @@ export class AppSessionClient {
   async revokeSession(sessionHandle: string): Promise<void> {
     await this.request<{ success: boolean }>('DELETE', '', { sessionHandle });
     this.logger.info('app session revoked');
+  }
+
+  /**
+   * Minting answers 200 with whatever scope survived filtering rather than refusing, so a caller that
+   * never compares gets a token quietly missing the capability its API is about to check for. The
+   * delta is always logged; `strictScopes` makes it fatal for deployments where a partial grant is
+   * worse than an outright failure.
+   */
+  private assertScopesSurvived(input: AppSessionTokenInput, token: AppSessionToken): void {
+    const requested = parseScopes(input.scope);
+    const dropped = requested.filter(scope => !token.grantedScopes.includes(scope));
+    if (dropped.length === 0) return;
+
+    const detail = { resource: input.resource, requested, granted: token.grantedScopes, dropped };
+    if (this.options.strictScopes) throw this.logged(AuthErrorCode.SCOPE_NOT_GRANTED.create({ reason: `identity dropped the scope(s) '${dropped.join(', ')}'` }));
+    this.logger.warn('identity narrowed the minted scope; the token carries less than was requested', detail);
   }
 
   /**
@@ -140,4 +161,9 @@ export class AppSessionClient {
     this.logger.error(error.message);
     return error;
   }
+}
+
+/** A `scope` parameter is space separated on the wire, matching how it travels in an OAuth request */
+function parseScopes(scope: string | undefined): string[] {
+  return (scope ?? '').split(' ').filter(Boolean);
 }

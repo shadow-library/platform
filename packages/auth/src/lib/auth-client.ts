@@ -134,6 +134,7 @@ export class AuthClient {
       fetchFn: this.transport,
       getToken: () => this.identityToken(APP_SESSION_SCOPE),
       invalidateToken: () => this.tokens.invalidate(this.identityTokenOptions(APP_SESSION_SCOPE)),
+      strictScopes: config.strictScopes,
     });
     this.serviceAccess = new ServiceAccessClient({
       issuer: this.issuer,

@@ -145,6 +145,13 @@ export interface AuthClientConfig {
   serviceAccess?: ServiceAccessOptions;
 
   /**
+   * Turns a silently narrowed mint into a thrown `SCOPE_NOT_GRANTED` instead of a warning. Off by
+   * default because a missing scope is usually only fatal to the one route that needs it; turn it on
+   * where a partial grant would be worse than no service at all.
+   */
+  strictScopes?: boolean;
+
+  /**
    * The application's role catalog. When set (and `client` credentials are present), `AuthModule`
    * pushes it to identity on startup so roles are owned in code, not administered by hand.
    */
@@ -224,6 +231,13 @@ export interface AppSessionToken {
   scope?: string;
   audience?: string;
   aal?: AssuranceLevel;
+
+  /**
+   * What identity actually granted, parsed from `scope`. Minting answers 200 with whatever survived
+   * filtering rather than refusing, so a caller that reads its own request back instead of this hands
+   * its API a token missing the capability it asked for.
+   */
+  grantedScopes: string[];
 }
 
 export interface LogoutTokenClaims {
