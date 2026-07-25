@@ -16,3 +16,4 @@ export * from './admin-role.api';
 export * from './admin-saml.api';
 export * from './admin-webhook.api';
 export * from './admin-application.api';
+export * from './policy.api';

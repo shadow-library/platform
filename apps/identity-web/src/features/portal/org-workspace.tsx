@@ -32,6 +32,7 @@ const TABS = [
   { to: '/organizations/$orgId/members', label: 'Members & roles', teamOnly: false, manageOnly: false },
   { to: '/organizations/$orgId/domains', label: 'Domains', teamOnly: true, manageOnly: false },
   { to: '/organizations/$orgId/providers', label: 'Identity providers', teamOnly: false, manageOnly: true },
+  { to: '/organizations/$orgId/security', label: 'Security', teamOnly: false, manageOnly: true },
 ] as const;
 
 const ROLE_INTENT: Record<MemberRole, 'info' | 'neutral'> = { OWNER: 'info', ADMIN: 'neutral', MEMBER: 'neutral' };
