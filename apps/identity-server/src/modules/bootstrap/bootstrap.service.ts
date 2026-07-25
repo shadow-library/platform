@@ -12,7 +12,7 @@ import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { APP_SESSION_SCOPE } from '@server/modules/auth/app-session';
-import { applicationAudience, OAuthClientService } from '@server/modules/auth/oauth';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -50,9 +50,10 @@ const ADMIN_PERMISSION_DESCRIPTIONS: Record<string, string> = {
  * administrative role assignments, and a bootstrap administrator account. Runs on every boot and
  * is a no-op once the records exist, so it is safe under horizontal scaling and repeated restarts.
  *
- * First-party ecosystem applications (currently pulse) are provisioned by {@link EcosystemSeedService},
- * invoked as the final bootstrap step so it can rely on the platform application already existing; any
- * other consumer application is registered by an administrator through the console.
+ * First-party ecosystem applications (pulse, novel-forge, webnovel) are provisioned by
+ * {@link EcosystemSeedService}, invoked as the final bootstrap step so it can rely on the platform
+ * application already existing; any other consumer application is registered by an administrator
+ * through the console.
  */
 @Injectable()
 export class BootstrapService implements OnModuleInit {
@@ -74,39 +75,8 @@ export class BootstrapService implements OnModuleInit {
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
     await this.ensureBootstrapAdmin(organisationId);
-    await this.ensureFirstPartyRegistrations();
-    /** Runs last: the ecosystem seed provisions pulse and identity's outbound client on top of the platform records above. */
+    /** Runs last: the ecosystem seed provisions the product applications and identity's outbound client on top of the platform records above. */
     await this.ecosystemSeedService.seed();
-  }
-
-  /**
-   * Registers the first-party ecosystem's API resources and cross-service scopes so audience/scope
-   * validation (RFC 8707 + the scope-grant ceiling) has something to validate against — previously
-   * these lived only in a manually-populated database, so a fresh deployment could not issue a
-   * correctly-audienced token. Idempotent: safe on every boot. Clients themselves (with their
-   * secrets/redirect URIs) are still registered through the console; only resources, the
-   * service-only publish scope, and its grant to the existing publisher client are seeded here.
-   * The pulse application (with its clients) is provisioned separately by {@link EcosystemSeedService}.
-   */
-  private async ensureFirstPartyRegistrations(): Promise<void> {
-    const novelForge = await this.ensureApplication('novel-forge');
-    await this.oauthClientService.ensureResource(novelForge.id, applicationAudience('novel-forge'), 'Novel Forge API');
-
-    const webnovel = await this.ensureApplication('webnovel');
-    const webnovelResource = await this.oauthClientService.ensureResource(webnovel.id, applicationAudience('webnovel'), 'Webnovel Reader API');
-    /** `webnovel:publish` is service-only: a user token can never carry it, and only the granted M2M client can request it. */
-    const publishScopeId = await this.oauthClientService.createScope(webnovelResource.id, 'webnovel:publish', 'Publish rendered novels to the reader', false, 'SERVICE');
-
-    const publisher = await this.oauthClientService.getClient('novel-forge-service');
-    if (publisher) {
-      await this.oauthClientService.grantScope(publisher.id, publishScopeId);
-      this.logger.info("Granted 'webnovel:publish' to the novel-forge service client");
-    }
-  }
-
-  /** Ensures a first-party application exists (idempotent); consumer clients are still console-registered. */
-  private async ensureApplication(name: string): Promise<{ id: number }> {
-    return this.applicationService.getApplication(name) ?? (await this.applicationService.createApplication({ name, subDomain: name }));
   }
 
   /**

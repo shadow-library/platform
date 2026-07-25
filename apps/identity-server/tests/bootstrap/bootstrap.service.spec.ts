@@ -8,7 +8,7 @@ import { describe, expect, it } from 'bun:test';
  */
 import { PLATFORM_ORG_NAME } from '@server/modules/admin';
 import { OAuthClientService } from '@server/modules/auth/oauth';
-import { PolicyDecisionService } from '@server/modules/authz';
+import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
 import { BootstrapService, EcosystemSeedService } from '@server/modules/bootstrap';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -80,12 +80,16 @@ describe('BootstrapService', () => {
     const organisations = (await env.getPostgresClient().select().from(schema.organisations)).filter(org => org.name === PLATFORM_ORG_NAME);
     expect(organisations).toHaveLength(1);
 
-    /** The pulse ecosystem seed is likewise idempotent — a re-run leaves exactly one pulse application. */
+    /** The ecosystem seed is likewise idempotent — a re-run leaves exactly one pulse application... */
     const pulseApps = (await env.getPostgresClient().select().from(schema.applications)).filter(app => app.name === 'pulse');
     expect(pulseApps).toHaveLength(1);
+
+    /** ...and never mints a second client, re-grants, or duplicates a workload-subject binding for any app. */
+    const clients = await env.getPostgresClient().select().from(schema.oauthClients);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'webnovel']);
   });
 
-  it('should seed the pulse application, its clients and the notification access rule', async () => {
+  it('should seed the ecosystem applications, their clients and the notification access rule', async () => {
     const applications = await env.getPostgresClient().select().from(schema.applications);
     expect(applications.map(app => app.name).sort()).toEqual(['novel-forge', 'pulse', 'shadow-identity', 'webnovel']);
 
@@ -96,13 +100,13 @@ describe('BootstrapService', () => {
     const pulsePermissions = pulse ? (await env.getService(PolicyDecisionService).listPermissionsForApplication(pulse.id)).map(permission => permission.name) : [];
     expect(pulsePermissions).toEqual(expect.arrayContaining(['pulse:templates:read', 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write']));
 
-    /** One client per application (D-21): pulse's, plus identity's own outbound client. */
+    /** One client per application whose id equals the app name (D-21), plus identity's own outbound client. */
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'pulse']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'novel-forge', 'pulse', 'webnovel']);
 
     /** That one client serves both faces of the application — the code flow and the M2M credential. */
     const pulseClient = clients.find(client => client.id === 'pulse');
-    expect(pulseClient?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials']));
+    expect(pulseClient?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange']));
     expect(await env.getService(OAuthClientService).getGrantedScopeNames('pulse')).toEqual(expect.arrayContaining(['authz:check', 'authz:roles:sync', 'app-session:manage']));
 
     /** identity's outbound client must hold notifications:send, or NotificationTokenService cannot mint a token. */
@@ -115,8 +119,51 @@ describe('BootstrapService', () => {
     expect(notificationRule?.method).toBe('POST');
   });
 
+  it('should provision novel-forge and webnovel exactly like pulse (client, grants, token-exchange)', async () => {
+    const clientService = env.getService(OAuthClientService);
+    for (const app of ['novel-forge', 'webnovel']) {
+      const client = await clientService.getClient(app);
+      expect(client?.kind).toBe('WEB_CONFIDENTIAL');
+      expect(client?.isFirstParty).toBe(true);
+      expect(client?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials', 'urn:ietf:params:oauth:grant-type:token-exchange']));
+      /** Authoring apps get authz:check + app-session:manage; only pulse keeps authz:roles:sync. */
+      const scopes = await clientService.getGrantedScopeNames(app);
+      expect(scopes).toEqual(expect.arrayContaining(['authz:check', 'app-session:manage']));
+      expect(scopes).not.toContain('authz:roles:sync');
+    }
+  });
+
+  it('should grant novel-forge the cross-application webnovel:publish scope as its delegation ceiling', async () => {
+    const description = await env.getService(OAuthClientService).describeApplication('novel-forge');
+    const webnovelGrant = description?.grants.find(grant => grant.audience === 'api://webnovel');
+    expect(webnovelGrant?.scopes).toContain('webnovel:publish');
+  });
+
+  it('should bind each app client to its in-cluster workload subject and drop the legacy publisher client', async () => {
+    const clients = await env.getPostgresClient().select().from(schema.oauthClients);
+    const subjectOf = (id: string) => clients.find(client => client.id === id)?.workloadSubjects ?? [];
+    expect(subjectOf('pulse')).toEqual(['system:serviceaccount:pulse:pulse-server']);
+    expect(subjectOf('novel-forge')).toEqual(['system:serviceaccount:novel-forge:novel-forge-server']);
+    expect(subjectOf('webnovel')).toEqual(['system:serviceaccount:webnovel:webnovel-server']);
+
+    /** The old console-registered `novel-forge-service` client is gone; the app client itself now delegates. */
+    expect(clients.find(client => client.id === 'novel-forge-service')).toBeUndefined();
+  });
+
+  it('should allow novel-forge to reach webnovel internal routes via a service-access rule', async () => {
+    const webnovel = env.getService(ApplicationService).getApplicationOrThrow('webnovel');
+    const rules = await env.getService(ServiceAccessService).listForApplication(webnovel.id);
+    const internalRule = rules.find(rule => rule.callerClientId === 'novel-forge' && rule.pathPattern === '/internal/*');
+    expect(internalRule?.method).toBe('*');
+  });
+
+  it('should derive each app relying party redirect URI from the issuer host', async () => {
+    /** Root domain = issuer host minus its first label (identity.shadow-apps.com → shadow-apps.com), so redirects follow the deployment domain rather than a hardcode. */
+    const redirects = (await env.getService(OAuthClientService).getClientDetail('pulse'))?.redirectUris ?? [];
+    expect(redirects).toContain('https://pulse.shadow-apps.com/api/auth/callback');
+  });
+
   it('should register first-party API resources and the service-only publish scope', async () => {
-    /** Resources are seeded declaratively so audience/scope validation has something to validate against; consumer clients stay console-registered. */
     const resources = await env.getPostgresClient().select().from(schema.apiResources);
     /** Audiences are derived as `api://<app>` (D-21); identity's own platform API keeps its bare name. */
     expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://novel-forge', 'api://pulse', 'api://webnovel', 'shadow-identity']);
