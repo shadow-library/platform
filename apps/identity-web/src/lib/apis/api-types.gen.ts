@@ -50,6 +50,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/organisations/{organisationId}/policies': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Policies */
+    get: operations['get_api_v1_organisations_organisationId_policies'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/policies/{policyKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Set Policy */
+    put: operations['put_api_v1_organisations_organisationId_policies_policyKey'];
+    post?: never;
+    /** Clear Policy */
+    delete: operations['delete_api_v1_organisations_organisationId_policies_policyKey'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/.well-known/openid-configuration': {
     parameters: {
       query?: never;
@@ -199,6 +234,23 @@ export interface paths {
     post?: never;
     /** Revoke My Consent */
     delete: operations['delete_api_v1_me_consents_clientId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/apps/me': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Describe Self */
+    get: operations['get_api_v1_apps_me'];
+    put?: never;
+    post?: never;
+    delete?: never;
     options?: never;
     head?: never;
     patch?: never;
@@ -532,6 +584,58 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/app-sessions': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Create App Session */
+    post: operations['post_api_v1_app_sessions'];
+    /** Revoke App Session */
+    delete: operations['delete_api_v1_app_sessions'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-sessions/token': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Mint Token */
+    post: operations['post_api_v1_app_sessions_token'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-sessions/elevation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Claim Elevation */
+    post: operations['post_api_v1_app_sessions_elevation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/saml2/metadata': {
     parameters: {
       query?: never;
@@ -594,6 +698,23 @@ export interface paths {
     put?: never;
     /** Login Init */
     post: operations['post_api_v1_auth_login_init'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/auth/login/reset-password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Login Reset Password */
+    post: operations['post_api_v1_auth_login_reset_password'];
     delete?: never;
     options?: never;
     head?: never;
@@ -958,6 +1079,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/me/mfa/step-up/methods': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Step Up Methods */
+    get: operations['get_api_v1_me_mfa_step_up_methods'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me/mfa/step-up/intent': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Resolve Step Up Intent */
+    get: operations['get_api_v1_me_mfa_step_up_intent'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/me/mfa/step-up': {
     parameters: {
       query?: never;
@@ -1003,6 +1158,40 @@ export interface paths {
     put?: never;
     /** Verify Webauthn Registration */
     post: operations['post_api_v1_me_webauthn_register_verify'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me/webauthn/step-up/options': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Step Up Options */
+    post: operations['post_api_v1_me_webauthn_step_up_options'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/me/webauthn/step-up': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Step Up */
+    post: operations['post_api_v1_me_webauthn_step_up'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1439,7 +1628,8 @@ export interface paths {
     get: operations['get_api_v1_admin_clients_clientId'];
     put?: never;
     post?: never;
-    delete?: never;
+    /** Delete Client */
+    delete: operations['delete_api_v1_admin_clients_clientId'];
     options?: never;
     head?: never;
     /** Update Client */
@@ -1911,12 +2101,39 @@ export interface components {
       use: string;
       alg: string;
     };
+    PolicyListResponse: {
+      policies: components['schemas']['PolicyItem'][];
+    };
+    PolicyItem: {
+      key: string;
+      description: string;
+      type: string;
+      defaultValue?: number;
+      min?: number;
+      max?: number;
+      effectiveValue?: number;
+      configuredValue?: number;
+      defaultEnabled?: boolean;
+      effectiveEnabled?: boolean;
+      configuredEnabled?: boolean;
+    };
+    SetPolicyBody: {
+      value?: number;
+      enabled?: boolean;
+    };
+    PolicyActionResponse: {
+      success: boolean;
+    };
     DiscoveryResponse: {
       issuer: string;
       authorization_endpoint: string;
       token_endpoint: string;
       userinfo_endpoint: string;
       jwks_uri: string;
+      revocation_endpoint: string;
+      introspection_endpoint: string;
+      token_endpoint_auth_methods_supported: string[];
+      scopes_supported: string[];
       response_types_supported: string[];
       grant_types_supported: string[];
       subject_types_supported: string[];
@@ -1924,6 +2141,8 @@ export interface components {
       code_challenge_methods_supported: string[];
       backchannel_logout_supported: boolean;
       backchannel_logout_session_supported: boolean;
+      step_up_endpoint: string;
+      app_session_endpoint: string;
     };
     TokenRequestBody: {
       grant_type: string;
@@ -1937,6 +2156,10 @@ export interface components {
       client_secret?: string;
       client_assertion_type?: string;
       client_assertion?: string;
+      subject_token?: string;
+      subject_token_type?: string;
+      requested_token_type?: string;
+      actor_token?: string;
     };
     TokenResponse: {
       access_token: string;
@@ -1945,6 +2168,7 @@ export interface components {
       scope: string;
       id_token?: string;
       refresh_token?: string;
+      issued_token_type?: string;
     };
     UserInfoResponse: {
       sub: string;
@@ -1998,7 +2222,6 @@ export interface components {
     ConsentRecordDto: {
       clientId: string;
       clientName: string;
-      /** User-facing name of the application the client belongs to — what the connected-apps surface shows. */
       applicationName: string;
       scopeNames: string[];
       /** @enum {string} */
@@ -2007,6 +2230,21 @@ export interface components {
     };
     ConsentOperationResponse: {
       success: boolean;
+    };
+    ApplicationSelfResponse: {
+      appId: string;
+      name?: string;
+      isFirstParty: boolean;
+      audience?: string;
+      redirectUris: string[];
+      scopes: string[];
+      sensitiveScopes: string[];
+      grants: components['schemas']['ApplicationGrantItem'][];
+      accessTokenTtl: number;
+    };
+    ApplicationGrantItem: {
+      audience: string;
+      scopes: string[];
     };
     MeResponse: {
       userId: string;
@@ -2136,6 +2374,7 @@ export interface components {
     CatalogSyncBody: {
       permissions: components['schemas']['CatalogPermission'][];
       roles: components['schemas']['CatalogRole'][];
+      force?: boolean;
     };
     CatalogPermission: {
       name: string;
@@ -2161,6 +2400,44 @@ export interface components {
       method: string;
       path: string;
     };
+    CreateAppSessionBody: {
+      code: string;
+      codeVerifier: string;
+      redirectUri: string;
+    };
+    AppSessionResponse: {
+      sessionHandle: string;
+      userId: string;
+      expiresAt: string;
+      scope: string;
+    };
+    MintAppTokenBody: {
+      sessionHandle: string;
+      resource?: string;
+      scope?: string;
+      elevated?: boolean;
+    };
+    AppTokenResponse: {
+      accessToken: string;
+      tokenType: string;
+      expiresIn: number;
+      scope: string;
+      audience: string;
+      aal: string;
+    };
+    ClaimElevationBody: {
+      sessionHandle: string;
+      resource?: string;
+    };
+    ElevationResponse: {
+      expiresAt: string;
+    };
+    AppSessionHandleBody: {
+      sessionHandle: string;
+    };
+    AppSessionActionResponse: {
+      success: boolean;
+    };
     LoginInitBody: {
       identifier: string;
       deviceId?: string;
@@ -2175,6 +2452,16 @@ export interface components {
     FederatedLoginOptionDto: {
       authorizationUrl: string;
       enforced: boolean;
+    };
+    LoginResetPasswordBody: {
+      flowId: string;
+      currentPassword: string;
+      newPassword: string;
+    };
+    ChallengeVerifyResponse: {
+      flowId: string;
+      status: string;
+      attemptsLeft?: number;
     };
     RegisterInitBody: {
       email: string;
@@ -2204,11 +2491,6 @@ export interface components {
     SetPasswordBody: {
       flowId: string;
       password: string;
-    };
-    ChallengeVerifyResponse: {
-      flowId: string;
-      status: string;
-      attemptsLeft?: number;
     };
     RecoverInitBody: {
       identifier: string;
@@ -2334,6 +2616,18 @@ export interface components {
     OperationSuccessResponse: {
       success: boolean;
     };
+    StepUpMethodsResponse: {
+      methods: string[];
+    };
+    StepUpIntentResponse: {
+      applicationName?: string;
+    };
+    StepUpBody: {
+      clientId?: string;
+      resource?: string;
+      code?: string;
+      password?: string;
+    };
     StepUpResponse: {
       /** @enum {string} */
       aal: 'AAL1' | 'AAL2';
@@ -2389,6 +2683,19 @@ export interface components {
     WebauthnRegisterResponse: {
       success: boolean;
       recoveryCodes?: string[];
+    };
+    WebauthnStepUpOptionsResponse: {
+      options: components['schemas']['WebauthnAuthenticationOptions'];
+    };
+    WebauthnStepUpBody: {
+      id: string;
+      rawId: string;
+      /** @enum {string} */
+      type: 'public-key';
+      response: components['schemas']['WebauthnAssertionData'];
+      authenticatorAttachment?: string;
+      clientId?: string;
+      resource?: string;
     };
     IdentityProviderListResponse: {
       items: components['schemas']['IdentityProviderResponse'][];
@@ -2540,6 +2847,9 @@ export interface components {
     };
     CreateApplicationResponse: {
       id: number;
+      clientId: string;
+      audience: string;
+      clientSecret?: string;
     };
     ApplicationDetailResponse: {
       id: number;
@@ -2905,6 +3215,146 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['JwksResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_policies: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PolicyListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_organisations_organisationId_policies_policyKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        policyKey:
+          | 'auth.access_token.ttl'
+          | 'auth.elevated_token.ttl'
+          | 'auth.elevation.window'
+          | 'auth.refresh_token.idle_ttl'
+          | 'auth.app_session.idle_ttl'
+          | 'auth.app_session.absolute_ttl'
+          | 'mfa.email_otp_fallback.enabled';
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['SetPolicyBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PolicyActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_organisations_organisationId_policies_policyKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        policyKey:
+          | 'auth.access_token.ttl'
+          | 'auth.elevated_token.ttl'
+          | 'auth.elevation.window'
+          | 'auth.refresh_token.idle_ttl'
+          | 'auth.app_session.idle_ttl'
+          | 'auth.app_session.absolute_ttl'
+          | 'mfa.email_otp_fallback.enabled';
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PolicyActionResponse'];
         };
       };
       /** @description Default Response */
@@ -3307,6 +3757,44 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ConsentOperationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_apps_me: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplicationSelfResponse'];
         };
       };
       /** @description Default Response */
@@ -4314,6 +4802,174 @@ export interface operations {
       };
     };
   };
+  post_api_v1_app_sessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['CreateAppSessionBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_app_sessions: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['AppSessionHandleBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppSessionActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_app_sessions_token: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['MintAppTokenBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppTokenResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_app_sessions_elevation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ClaimElevationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ElevationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_saml2_metadata: {
     parameters: {
       query?: never;
@@ -4426,6 +5082,57 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['LoginInitResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_auth_login_reset_password: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['LoginResetPasswordBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChallengeVerifyResponse'];
+        };
+      };
+      /** @description Default Response */
+      401: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChallengeVerifyResponse'];
         };
       };
       /** @description Default Response */
@@ -5331,6 +6038,84 @@ export interface operations {
       };
     };
   };
+  get_api_v1_me_mfa_step_up_methods: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StepUpMethodsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_me_mfa_step_up_intent: {
+    parameters: {
+      query: {
+        clientId: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StepUpIntentResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_me_mfa_step_up: {
     parameters: {
       query?: never;
@@ -5340,7 +6125,7 @@ export interface operations {
     };
     requestBody?: {
       content: {
-        'application/json': components['schemas']['TotpCodeBody'];
+        'application/json': components['schemas']['StepUpBody'];
       };
     };
     responses: {
@@ -5431,6 +6216,86 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['WebauthnRegisterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_me_webauthn_step_up_options: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['WebauthnStepUpOptionsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_me_webauthn_step_up: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['WebauthnStepUpBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['StepUpResponse'];
         };
       };
       /** @description Default Response */
@@ -6898,6 +7763,46 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['ClientDetailResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_admin_clients_clientId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        clientId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
         };
       };
       /** @description Default Response */
@@ -8500,6 +9405,10 @@ export type ReadinessResponse = components['schemas']['ReadinessResponse'];
 export type ReadinessDependencies = components['schemas']['ReadinessDependencies'];
 export type JwksResponse = components['schemas']['JwksResponse'];
 export type JwkDto = components['schemas']['JwkDto'];
+export type PolicyListResponse = components['schemas']['PolicyListResponse'];
+export type PolicyItem = components['schemas']['PolicyItem'];
+export type SetPolicyBody = components['schemas']['SetPolicyBody'];
+export type PolicyActionResponse = components['schemas']['PolicyActionResponse'];
 export type DiscoveryResponse = components['schemas']['DiscoveryResponse'];
 export type TokenRequestBody = components['schemas']['TokenRequestBody'];
 export type TokenResponse = components['schemas']['TokenResponse'];
@@ -8514,6 +9423,8 @@ export type ConsentDecisionResponse = components['schemas']['ConsentDecisionResp
 export type ConsentRecordsResponse = components['schemas']['ConsentRecordsResponse'];
 export type ConsentRecordDto = components['schemas']['ConsentRecordDto'];
 export type ConsentOperationResponse = components['schemas']['ConsentOperationResponse'];
+export type ApplicationSelfResponse = components['schemas']['ApplicationSelfResponse'];
+export type ApplicationGrantItem = components['schemas']['ApplicationGrantItem'];
 export type MeResponse = components['schemas']['MeResponse'];
 export type UpdateProfileBody = components['schemas']['UpdateProfileBody'];
 export type MyApplicationsResponse = components['schemas']['MyApplicationsResponse'];
@@ -8542,16 +9453,25 @@ export type CatalogRole = components['schemas']['CatalogRole'];
 export type CatalogSyncResponse = components['schemas']['CatalogSyncResponse'];
 export type ServiceAccessResponse = components['schemas']['ServiceAccessResponse'];
 export type ServiceAccessRuleDto = components['schemas']['ServiceAccessRuleDto'];
+export type CreateAppSessionBody = components['schemas']['CreateAppSessionBody'];
+export type AppSessionResponse = components['schemas']['AppSessionResponse'];
+export type MintAppTokenBody = components['schemas']['MintAppTokenBody'];
+export type AppTokenResponse = components['schemas']['AppTokenResponse'];
+export type ClaimElevationBody = components['schemas']['ClaimElevationBody'];
+export type ElevationResponse = components['schemas']['ElevationResponse'];
+export type AppSessionHandleBody = components['schemas']['AppSessionHandleBody'];
+export type AppSessionActionResponse = components['schemas']['AppSessionActionResponse'];
 export type LoginInitBody = components['schemas']['LoginInitBody'];
 export type LoginInitResponse = components['schemas']['LoginInitResponse'];
 export type FederatedLoginOptionDto = components['schemas']['FederatedLoginOptionDto'];
+export type LoginResetPasswordBody = components['schemas']['LoginResetPasswordBody'];
+export type ChallengeVerifyResponse = components['schemas']['ChallengeVerifyResponse'];
 export type RegisterInitBody = components['schemas']['RegisterInitBody'];
 export type FlowStatusResponse = components['schemas']['FlowStatusResponse'];
 export type ChallengeMethodMetadata = components['schemas']['ChallengeMethodMetadata'];
 export type DemographicsBody = components['schemas']['DemographicsBody'];
 export type ProfileBody = components['schemas']['ProfileBody'];
 export type SetPasswordBody = components['schemas']['SetPasswordBody'];
-export type ChallengeVerifyResponse = components['schemas']['ChallengeVerifyResponse'];
 export type RecoverInitBody = components['schemas']['RecoverInitBody'];
 export type ResetPasswordBody = components['schemas']['ResetPasswordBody'];
 export type ChallengeVerifyBody = components['schemas']['ChallengeVerifyBody'];
@@ -8577,6 +9497,9 @@ export type TotpCodeBody = components['schemas']['TotpCodeBody'];
 export type TotpActivateResponse = components['schemas']['TotpActivateResponse'];
 export type RecoveryCodesResponse = components['schemas']['RecoveryCodesResponse'];
 export type OperationSuccessResponse = components['schemas']['OperationSuccessResponse'];
+export type StepUpMethodsResponse = components['schemas']['StepUpMethodsResponse'];
+export type StepUpIntentResponse = components['schemas']['StepUpIntentResponse'];
+export type StepUpBody = components['schemas']['StepUpBody'];
 export type StepUpResponse = components['schemas']['StepUpResponse'];
 export type WebauthnRegistrationOptionsResponse = components['schemas']['WebauthnRegistrationOptionsResponse'];
 export type WebauthnRpEntity = components['schemas']['WebauthnRpEntity'];
@@ -8587,6 +9510,8 @@ export type WebauthnExtensions = components['schemas']['WebauthnExtensions'];
 export type WebauthnRegisterVerifyBody = components['schemas']['WebauthnRegisterVerifyBody'];
 export type WebauthnAttestationData = components['schemas']['WebauthnAttestationData'];
 export type WebauthnRegisterResponse = components['schemas']['WebauthnRegisterResponse'];
+export type WebauthnStepUpOptionsResponse = components['schemas']['WebauthnStepUpOptionsResponse'];
+export type WebauthnStepUpBody = components['schemas']['WebauthnStepUpBody'];
 export type IdentityProviderListResponse = components['schemas']['IdentityProviderListResponse'];
 export type IdentityProviderResponse = components['schemas']['IdentityProviderResponse'];
 export type CreateIdentityProviderBody = components['schemas']['CreateIdentityProviderBody'];
@@ -8655,6 +9580,7 @@ export type UpdateWebhookBody = components['schemas']['UpdateWebhookBody'];
 export type RotatedWebhookSecretResponse = components['schemas']['RotatedWebhookSecretResponse'];
 export type WebhookDeliveriesResponse = components['schemas']['WebhookDeliveriesResponse'];
 export type WebhookDeliveryItem = components['schemas']['WebhookDeliveryItem'];
+export type ListPoliciesPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/policies']['get']['parameters']['path'], undefined>;
 export type AuthorizeQueryParams = Exclude<paths['/oauth2/authorize']['get']['parameters']['query'], undefined>;
 export type GetConsentPromptQueryParams = Exclude<paths['/api/v1/auth/consent']['get']['parameters']['query'], undefined>;
 export type GetOrganisationDetailsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}']['get']['parameters']['path'], undefined>;
@@ -8665,6 +9591,7 @@ export type HandleSamlSsoQueryParams = Exclude<paths['/saml2/sso']['get']['param
 export type ResumeSamlSsoQueryParams = Exclude<paths['/saml2/sso/resume']['get']['parameters']['query'], undefined>;
 export type ChallengeMethodsQueryParams = Exclude<paths['/api/v1/auth/challenge/methods']['get']['parameters']['query'], undefined>;
 export type HandleFederatedCallbackQueryParams = Exclude<paths['/api/v1/auth/federated/callback']['get']['parameters']['query'], undefined>;
+export type ResolveStepUpIntentQueryParams = Exclude<paths['/api/v1/me/mfa/step-up/intent']['get']['parameters']['query'], undefined>;
 export type ListIdentityProvidersPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/identity-providers']['get']['parameters']['path'], undefined>;
 export type SearchUsersQueryParams = Exclude<paths['/api/v1/admin/users']['get']['parameters']['query'], undefined>;
 export type GetUserDetailPathParams = Exclude<paths['/api/v1/admin/users/{userId}']['get']['parameters']['path'], undefined>;
