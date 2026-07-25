@@ -6,6 +6,7 @@
       "name": "@shadow-library/auth",
       "devDependencies": {
         "@shadow-library/app": "2.0.0-alpha.0",
+        "@shadow-library/class-schema": "0.5.0-alpha.0",
         "@shadow-library/common": "2.0.0-alpha.4",
         "@shadow-library/fastify": "2.0.0-alpha.0",
         "@shadow-library/scripts": "0.3.0",
@@ -16,11 +17,13 @@
       },
       "peerDependencies": {
         "@shadow-library/app": "2.0.0-alpha.0",
+        "@shadow-library/class-schema": "0.5.0-alpha.0",
         "@shadow-library/common": "2.0.0-alpha.4",
         "@shadow-library/fastify": "2.0.0-alpha.0",
       },
       "optionalPeers": [
         "@shadow-library/app",
+        "@shadow-library/class-schema",
         "@shadow-library/fastify",
       ],
     },

@@ -18,6 +18,7 @@ export interface AuthRouteMetadata {
   permission?: string;
   failOpen?: boolean;
   highRisk?: boolean;
+  elevated?: boolean;
 }
 
 export interface RequirePermissionOptions {
@@ -48,3 +49,13 @@ export const RequireScope = (...scopes: string[]): AuthDecorator => authRoute({ 
 
 /** Requires a PDP PERMIT for the action, checked in the principal's organisation (implies `@Authenticated`) */
 export const RequirePermission = (permission: string, options: RequirePermissionOptions = {}): AuthDecorator => authRoute({ authenticated: true, permission, ...options });
+
+/**
+ * Requires an `AAL2` principal, minted from a step-up grant scoped to this application's audience
+ * (D-19). For a browser session the SDK drives the whole cycle — claim, prompt if there is nothing to
+ * claim, retry — while a bearer caller is answered with `IAM_003` so it can drive the cycle itself.
+ *
+ * Elevation is deliberately not contagious: the elevated token is minted for these routes only and
+ * never attached to ordinary requests, so a user working across two applications steps up in each.
+ */
+export const RequireElevation = (...scopes: string[]): AuthDecorator => authRoute({ authenticated: true, elevated: true, ...(scopes.length > 0 && { scopes }) });

@@ -84,7 +84,7 @@ describe('AuthGuard', () => {
     hook({ id: rid }, {}, run);
   };
 
-  const runGuarded = (handler: (request: GuardedRequest) => Promise<void>, req: GuardedRequest, after?: () => void): Promise<void> =>
+  const runGuarded = (handler: (request: GuardedRequest) => Promise<unknown>, req: GuardedRequest, after?: () => void): Promise<void> =>
     new Promise((resolve, reject) => {
       runInContext('test-rid', () => {
         handler(req)
@@ -93,13 +93,13 @@ describe('AuthGuard', () => {
       });
     });
 
-  const expectStatus = async (handler: (request: GuardedRequest) => Promise<void>, req: GuardedRequest, statusCode: number) => {
+  const expectStatus = async (handler: (request: GuardedRequest) => Promise<unknown>, req: GuardedRequest, statusCode: number) => {
     const error = await runGuarded(handler, req).catch((caught: unknown) => caught);
     expect(error).toBeInstanceOf(AppError);
     expect((error as AppError).status).toBe(statusCode);
   };
 
-  const generate = (metadata: HandlerMetadata): ((request: GuardedRequest) => Promise<void>) => {
+  const generate = (metadata: HandlerMetadata): ((request: GuardedRequest) => Promise<unknown>) => {
     const handler = guard.generate(metadata);
     if (!handler) throw new Error('expected a handler');
     return handler;

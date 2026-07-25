@@ -33,6 +33,7 @@
   "homepage": "https://github.com/shadow-library/auth#readme",
   "peerDependencies": {
     "@shadow-library/app": "2.0.0-alpha.0",
+    "@shadow-library/class-schema": "0.5.0-alpha.0",
     "@shadow-library/common": "2.0.0-alpha.4",
     "@shadow-library/fastify": "2.0.0-alpha.0"
   },
@@ -42,10 +43,14 @@
     },
     "@shadow-library/fastify": {
       "optional": true
+    },
+    "@shadow-library/class-schema": {
+      "optional": true
     }
   },
   "devDependencies": {
     "@shadow-library/app": "2.0.0-alpha.0",
+    "@shadow-library/class-schema": "0.5.0-alpha.0",
     "@shadow-library/common": "2.0.0-alpha.4",
     "@shadow-library/fastify": "2.0.0-alpha.0",
     "@shadow-library/scripts": "0.3.0",
