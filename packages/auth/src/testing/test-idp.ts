@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
+import { AssuranceLevel, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
 import { createTestSigner, TestSigner } from './signer';
 
 /**
@@ -21,6 +21,12 @@ export interface TestIdPOptions {
   clientSecret?: string;
 
   accessTokenTtlSeconds?: number;
+
+  /** Published as `scopes_supported`; left unset, discovery omits it and startup scope validation stands down */
+  scopesSupported?: string[];
+
+  /** How long an app session lives before its handle stops minting; defaults to an hour */
+  appSessionTtlSeconds?: number;
 }
 
 export interface TestTokenInput {
@@ -41,6 +47,12 @@ export interface TestPrincipalRef {
   sub: string;
 }
 
+interface AppSessionRecord {
+  userId: string;
+  scope: string;
+  expiresAt: number;
+}
+
 export interface CapturedCatalog {
   manifest: { permissions: unknown[]; roles: unknown[] };
   authorization: string | null;
@@ -49,6 +61,13 @@ export interface CapturedCatalog {
 export interface CapturedTokenRequest {
   body: Record<string, unknown>;
   authorization: string | null;
+  contentType: string | null;
+}
+
+export interface TestLogoutTokenInput {
+  sub?: string;
+  sid?: string;
+  claims?: JwtPayload;
 }
 
 export interface TestIdP {
@@ -83,6 +102,25 @@ export interface TestIdP {
   /** Returns the most recent token-endpoint request the mock received, if any */
   getLastTokenRequest(): CapturedTokenRequest | undefined;
 
+  /*!
+   * First-party app sessions (D-18/D-19)
+   */
+
+  /** Marks the user as having satisfied a step-up on the identity domain, so an elevation claim succeeds */
+  setSteppedUp(userId: string, steppedUp: boolean): void;
+
+  /** Ends the central identity session: every app session of that user starts answering `AUTH_005` */
+  endIdentitySession(userId: string): void;
+
+  /** Signs an OIDC back-channel logout token addressed to the configured client */
+  issueLogoutToken(input: TestLogoutTokenInput): Promise<string>;
+
+  /** How many app sessions are live, for asserting that a revocation actually reached identity */
+  getAppSessionCount(): number;
+
+  /** Returns the most recent mint request the app-session token endpoint received, if any */
+  getLastMintRequest(): Record<string, unknown> | undefined;
+
   stop(): void;
 }
 
@@ -90,9 +128,22 @@ export interface TestIdP {
  * Declaring the constants
  */
 const DEFAULT_ACCESS_TOKEN_TTL_SECONDS = 600;
+const DEFAULT_APP_SESSION_TTL_SECONDS = 3600;
 const DEFAULT_AUDIENCE = 'shadow-identity';
 
+/** How long a claimed step-up grant stays live, mirroring identity's short elevation window */
+const ELEVATION_WINDOW_SECONDS = 600;
+
+/** The scope every app-session route demands of its M2M caller */
+const APP_SESSION_SCOPE = 'app-session:manage';
+
+const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
+
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+/** Identity's catalog keys for the two app-session failures an SDK is expected to branch on */
+const sessionInvalid = (): Response => json({ code: 'AUTH_005', message: 'Application session is no longer valid' }, 401);
+const elevationRequired = (): Response => json({ code: 'AUTH_006', message: 'Step-up authentication is required' }, 403);
 
 /**
  * Spins an in-process mock identity provider: an ephemeral Ed25519 key, discovery + JWKS + token +
@@ -107,13 +158,18 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const authorizationCodes = new Map<string, TestTokenInput & { nonce?: string }>();
   const refreshTokens = new Map<string, TestTokenInput>();
   const grants = new Set<string>();
+  const appSessions = new Map<string, AppSessionRecord>();
+  const elevationGrants = new Map<string, number>();
+  const steppedUp = new Set<string>();
   let authzVersion = 1;
   let issuer = '';
   let lastCatalog: CapturedCatalog | undefined;
   let lastTokenRequest: CapturedTokenRequest | undefined;
+  let lastMintRequest: Record<string, unknown> | undefined;
   let serviceAccessRules: ServiceAccessRule[] = [];
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
+  const sessionTtl = options.appSessionTtlSeconds ?? DEFAULT_APP_SESSION_TTL_SECONDS;
 
   const buildClaims = (input: TestTokenInput): JwtPayload => {
     const now = Math.floor(Date.now() / 1000);
@@ -157,7 +213,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
 
   const handleToken = async (request: Request): Promise<Response> => {
     const body = await readTokenBody(request);
-    lastTokenRequest = { body, authorization: request.headers.get('authorization') };
+    lastTokenRequest = { body, authorization: request.headers.get('authorization'), contentType: request.headers.get('content-type') };
     if (!isClientAuthorized(request, body)) return json({ error: 'invalid_client' }, 401);
 
     if (body.grant_type === 'client_credentials') {
@@ -201,6 +257,87 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     return json({ error: 'unsupported_grant_type' }, 400);
   };
 
+  /**
+   * Every app-session route is machine-to-machine: possessing a handle grants nothing without the
+   * application's own M2M token carrying `app-session:manage`. The mock enforces that so a consuming
+   * service can actually test the property rather than take it on trust.
+   */
+  const isAppSessionCaller = (request: Request): boolean => {
+    const header = request.headers.get('authorization');
+    if (!header?.startsWith('Bearer ')) return false;
+    const segment = header.slice(7).split('.')[1];
+    if (!segment) return false;
+    const claims = JSON.parse(Buffer.from(segment, 'base64url').toString()) as JwtPayload;
+    return (
+      claims.token_type === 'service' &&
+      String(claims.scope ?? '')
+        .split(' ')
+        .includes(APP_SESSION_SCOPE)
+    );
+  };
+
+  const liveSession = (handle: unknown): AppSessionRecord | undefined => {
+    if (typeof handle !== 'string') return undefined;
+    const session = appSessions.get(handle);
+    if (session && session.expiresAt > Date.now()) return session;
+    appSessions.delete(String(handle));
+    return undefined;
+  };
+
+  const handleAppSessions = async (request: Request): Promise<Response> => {
+    if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+    if (request.method === 'DELETE') {
+      if (typeof body.sessionHandle === 'string') appSessions.delete(body.sessionHandle);
+      return json({ success: true });
+    }
+
+    const stored = typeof body.code === 'string' ? authorizationCodes.get(body.code) : undefined;
+    if (!stored) return json({ code: 'OAU_003', message: 'invalid_grant' }, 400);
+    authorizationCodes.delete(String(body.code));
+
+    const handle = crypto.randomUUID();
+    const scope = (stored.scopes ?? []).join(' ');
+    const expiresAt = Date.now() + sessionTtl * 1000;
+    appSessions.set(handle, { userId: stored.sub, scope, expiresAt });
+    return json({ sessionHandle: handle, userId: stored.sub, expiresAt: new Date(expiresAt).toISOString(), scope }, 201);
+  };
+
+  const handleAppSessionToken = async (request: Request): Promise<Response> => {
+    if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    lastMintRequest = body;
+
+    const session = liveSession(body.sessionHandle);
+    if (!session) return sessionInvalid();
+
+    const audience = typeof body.resource === 'string' ? body.resource : DEFAULT_AUDIENCE;
+    const elevated = body.elevated === true;
+    if (elevated && (elevationGrants.get(`${String(body.sessionHandle)}|${audience}`) ?? 0) <= Date.now()) return elevationRequired();
+
+    const scope = typeof body.scope === 'string' && body.scope ? body.scope : session.scope;
+    const aal: AssuranceLevel = elevated ? 'AAL2' : 'AAL1';
+    const accessToken = await issueToken({ sub: session.userId, audience, scopes: scope.split(' ').filter(Boolean), claims: { aal } });
+    return json({ accessToken, tokenType: 'Bearer', expiresIn: ttl, scope, audience, aal });
+  };
+
+  const handleAppSessionElevation = async (request: Request): Promise<Response> => {
+    if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+    const session = liveSession(body.sessionHandle);
+    if (!session) return sessionInvalid();
+    if (!steppedUp.has(session.userId)) return elevationRequired();
+
+    /** The step-up is *spent*: the grant covers this session and this audience, and nothing else */
+    steppedUp.delete(session.userId);
+    const audience = typeof body.resource === 'string' ? body.resource : DEFAULT_AUDIENCE;
+    const expiresAt = Date.now() + ELEVATION_WINDOW_SECONDS * 1000;
+    elevationGrants.set(`${String(body.sessionHandle)}|${audience}`, expiresAt);
+    return json({ expiresAt: new Date(expiresAt).toISOString() });
+  };
+
   const handleAuthzCheck = async (request: Request): Promise<Response> => {
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
     const kind: PrincipalKind = body.principalType === 'SERVICE_ACCOUNT' ? 'service' : 'user';
@@ -230,11 +367,22 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
           token_endpoint: `${issuer}/oauth2/token`,
           authorization_endpoint: `${issuer}/oauth2/authorize`,
           userinfo_endpoint: `${issuer}/oauth2/userinfo`,
+          introspection_endpoint: `${issuer}/oauth2/introspect`,
+          revocation_endpoint: `${issuer}/oauth2/revoke`,
+          end_session_endpoint: `${issuer}/oauth2/logout`,
+          token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'private_key_jwt'],
+          ...(options.scopesSupported && { scopes_supported: options.scopesSupported }),
         });
       case '/.well-known/jwks.json':
         return json({ keys: [signer.publicJwk, ...retiredJwks] });
       case '/oauth2/token':
         return handleToken(request);
+      case '/api/v1/app-sessions':
+        return handleAppSessions(request);
+      case '/api/v1/app-sessions/token':
+        return handleAppSessionToken(request);
+      case '/api/v1/app-sessions/elevation':
+        return handleAppSessionElevation(request);
       case '/api/v1/authz/check':
         return handleAuthzCheck(request);
       case '/api/v1/authz/catalog':
@@ -272,6 +420,30 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     getLastCatalog: () => lastCatalog,
     setServiceAccess: rules => void (serviceAccessRules = rules),
     getLastTokenRequest: () => lastTokenRequest,
+    setSteppedUp: (userId, isSteppedUp) => void (isSteppedUp ? steppedUp.add(userId) : steppedUp.delete(userId)),
+    endIdentitySession: userId => {
+      for (const [handle, session] of appSessions) {
+        if (session.userId !== userId) continue;
+        appSessions.delete(handle);
+        for (const key of elevationGrants.keys()) if (key.startsWith(`${handle}|`)) elevationGrants.delete(key);
+      }
+    },
+    issueLogoutToken: input => {
+      const now = Math.floor(Date.now() / 1000);
+      const claims: JwtPayload = {
+        iss: issuer,
+        aud: options.clientId ?? 'test-client',
+        iat: now,
+        exp: now + ttl,
+        jti: crypto.randomUUID(),
+        events: { [BACKCHANNEL_LOGOUT_EVENT]: {} },
+      };
+      if (input.sub) claims.sub = input.sub;
+      if (input.sid) claims.sid = input.sid;
+      return signer.sign({ ...claims, ...input.claims });
+    },
+    getAppSessionCount: () => appSessions.size,
+    getLastMintRequest: () => lastMintRequest,
     stop: () => void server.stop(true),
   };
 }

@@ -18,7 +18,69 @@ import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 /**
  * Declaring the constants
  */
+
 const AUDIENCE = 'api://pulse';
+
+describe('AuthClient discovery-driven endpoints', () => {
+  let idp: TestIdP;
+
+  beforeAll(async () => void (idp = await createTestIdP({ clientId: 'svc-pulse', clientSecret: 's3cr3t', scopesSupported: ['openid', 'posts:read'] })));
+  afterAll(() => idp.stop());
+
+  const client = (): AuthClient => new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 's3cr3t' } });
+
+  it('should publish the endpoints the sdk now reads instead of hard-coding', async () => {
+    const document = await client().getDiscovery();
+    expect(document.introspection_endpoint).toBe(`${idp.issuer}/oauth2/introspect`);
+    expect(document.revocation_endpoint).toBe(`${idp.issuer}/oauth2/revoke`);
+    expect(document.token_endpoint_auth_methods_supported).toContain('client_secret_basic');
+  });
+
+  it('should fail the boot when a configured scope is absent from scopes_supported', async () => {
+    const auth = client();
+    await expect(auth.assertScopesSupported(['openid', 'posts:read'])).resolves.toBeUndefined();
+    await expect(auth.assertScopesSupported(['openid', 'psots:read'])).rejects.toMatchObject({ code: 'SCOPE_UNSUPPORTED' });
+  });
+
+  it('should stand down when the issuer publishes no scope list', async () => {
+    const silent = await createTestIdP();
+    const auth = new AuthClient({ issuer: silent.issuer, audience: AUDIENCE });
+    await expect(auth.assertScopesSupported(['anything'])).resolves.toBeUndefined();
+    silent.stop();
+  });
+});
+
+describe('AuthClient.verifyLogoutToken', () => {
+  let idp: TestIdP;
+  let auth: AuthClient;
+
+  beforeAll(async () => {
+    idp = await createTestIdP({ clientId: 'svc-pulse', clientSecret: 's3cr3t' });
+    auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-pulse', secret: 's3cr3t' } });
+  });
+  afterAll(() => idp.stop());
+
+  it('should accept a well-formed back-channel logout token', async () => {
+    const token = await idp.issueLogoutToken({ sub: '42', sid: 'sess-1' });
+    await expect(auth.verifyLogoutToken(token)).resolves.toMatchObject({ sub: '42', sid: 'sess-1' });
+  });
+
+  it('should reject a token that is an id token wearing a logout token costume', async () => {
+    const withNonce = await idp.issueLogoutToken({ sub: '42', claims: { nonce: 'n' } });
+    await expect(auth.verifyLogoutToken(withNonce)).rejects.toMatchObject({ code: 'LOGOUT_TOKEN_INVALID' });
+
+    const withoutEvents = await idp.issueLogoutToken({ sub: '42', claims: { events: undefined } });
+    await expect(auth.verifyLogoutToken(withoutEvents)).rejects.toMatchObject({ code: 'LOGOUT_TOKEN_INVALID' });
+
+    const withoutSubject = await idp.issueLogoutToken({});
+    await expect(auth.verifyLogoutToken(withoutSubject)).rejects.toMatchObject({ code: 'LOGOUT_TOKEN_INVALID' });
+  });
+
+  it('should reject a token addressed to another client', async () => {
+    const other = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: { id: 'svc-other', secret: 'x' } });
+    await expect(other.verifyLogoutToken(await idp.issueLogoutToken({ sub: '42' }))).rejects.toMatchObject({ code: 'LOGOUT_TOKEN_INVALID' });
+  });
+});
 
 describe('AuthClient constructor', () => {
   it('should reject invalid configuration outright', () => {

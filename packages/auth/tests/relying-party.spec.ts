@@ -64,6 +64,20 @@ describe('RelyingParty', () => {
     expect(url.searchParams.get('resource')).toBe('api://pulse');
   });
 
+  it('should send the token request form-encoded with the secret in an authorization header', async () => {
+    const request = await rp.createAuthorizationUrl();
+    const code = idp.createAuthorizationCode({ sub: '42', nonce: request.nonce });
+    await rp.exchangeCode({ code, codeVerifier: request.codeVerifier, nonce: request.nonce });
+
+    const captured = idp.getLastTokenRequest();
+    expect(captured?.contentType).toContain('application/x-www-form-urlencoded');
+    expect(captured?.body).toMatchObject({ grant_type: 'authorization_code', code, redirect_uri: REDIRECT_URI, code_verifier: request.codeVerifier });
+
+    /** Basic keeps the secret out of the body entirely */
+    expect(captured?.authorization).toBe(`Basic ${Buffer.from(`${CLIENT_ID}:${CLIENT_SECRET}`).toString('base64')}`);
+    expect(captured?.body).not.toHaveProperty('client_secret');
+  });
+
   it('should exchange a code and validate the id token nonce', async () => {
     const request = await rp.createAuthorizationUrl();
     const code = idp.createAuthorizationCode({ sub: '42', nonce: request.nonce, scopes: ['openid'] });
