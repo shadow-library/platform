@@ -50,6 +50,12 @@ export interface VerifiedWorkload {
  * and cached, and tokens are verified offline (RS256/ES256), checking `iss`, `aud`, and `exp`.
  * The trusted issuer is configured via `AUTH_WORKLOAD_ISSUER`; when unset, workload identity is
  * disabled and assertion-based client authentication is rejected outright.
+ *
+ * The accepted audience is pinned to the identity issuer and is deliberately not configurable
+ * (T-803): every pod already carries a service-account token projected for the API server, so an
+ * audience that could be relaxed to the cluster default would let any workload in the cluster
+ * authenticate as any client. Callers MUST project a dedicated token — a `serviceAccountToken`
+ * volume whose `audience` is the identity issuer.
  */
 const JWKS_TTL_MS = 12 * 3_600_000;
 const REFRESH_BACKOFF_MS = 30_000;
@@ -69,7 +75,7 @@ export class WorkloadAssertionError extends Error {}
 export class WorkloadIdentityService {
   private readonly logger = Logger.getLogger(APP_NAME, WorkloadIdentityService.name);
   private readonly issuer = Config.get('auth.workload.issuer');
-  private readonly audience = Config.get('auth.workload.audience') || Config.get('oauth.issuer');
+  private readonly audience = Config.get('oauth.issuer');
   private readonly jwksUriOverride = Config.get('auth.workload.jwks-uri');
   private readonly saTokenPath = Config.get('auth.workload.sa-token-path');
 

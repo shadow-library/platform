@@ -43,7 +43,6 @@ declare module '@shadow-library/common' {
 
     /** Kubernetes workload identity (D-16): trusted cluster OIDC issuer for SA-token client assertions */
     'auth.workload.issuer': string;
-    'auth.workload.audience': string;
     'auth.workload.jwks-uri': string;
     'auth.workload.sa-token-path': string;
   }
@@ -75,11 +74,12 @@ Config.load('oauth.login-url', { defaultValue: 'https://identity.shadow-apps.com
 
 /**
  * Workload identity is opt-in: with no trusted cluster issuer configured, SA-token client
- * assertions are rejected and clients must present their static secret. The audience defaults to
- * the oauth issuer; the jwks uri is normally resolved via the cluster's OIDC discovery document.
+ * assertions are rejected and clients must present their static secret. The accepted audience is
+ * deliberately not configurable — it is pinned to `oauth.issuer` (T-803), so a token projected for
+ * the API server or any other consumer can never authenticate a client. The jwks uri is normally
+ * resolved via the cluster's OIDC discovery document.
  */
 Config.load('auth.workload.issuer', { defaultValue: '' });
-Config.load('auth.workload.audience', { defaultValue: '' });
 Config.load('auth.workload.jwks-uri', { defaultValue: '' });
 /**
  * The kube-apiserver gates its OIDC discovery/JWKS endpoints behind the

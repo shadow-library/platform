@@ -97,6 +97,27 @@ describe('workload identity client authentication', () => {
     expect((await requestToken(await signSaToken(saClaims({ iss: 'https://evil.example.com' })))).statusCode).toBe(401);
   });
 
+  /**
+   * T-803: the audience is pinned to the identity issuer. Every pod already carries a token
+   * projected for the API server, so accepting the cluster default audience would let any workload
+   * in the cluster authenticate as any client it can name.
+   */
+  it('should reject cluster-default audiences and accept only the dedicated identity audience', async () => {
+    const clusterAudiences = ['https://kubernetes.default.svc.cluster.local', 'kubernetes.default.svc', 'api'];
+    for (const aud of clusterAudiences) expect((await requestToken(await signSaToken(saClaims({ aud })))).statusCode).toBe(401);
+
+    /** A token projected for several consumers passes only because the identity issuer is among them. */
+    expect((await requestToken(await signSaToken(saClaims({ aud: ['https://kubernetes.default.svc.cluster.local'] })))).statusCode).toBe(401);
+    expect((await requestToken(await signSaToken(saClaims({ aud: ['https://kubernetes.default.svc.cluster.local', Config.get('oauth.issuer')] })))).statusCode).toBe(200);
+    expect((await requestToken(await signSaToken(saClaims({ aud: Config.get('oauth.issuer') })))).statusCode).toBe(200);
+  });
+
+  /** An assertion carrying no audience at all must not fall through the array-normalising check. */
+  it('should reject an assertion with no audience claim', async () => {
+    const { aud: _omitted, ...claimsWithoutAudience } = saClaims();
+    expect((await requestToken(await signSaToken(claimsWithoutAudience))).statusCode).toBe(401);
+  });
+
   it('should reject a forged signature and an unknown assertion type', async () => {
     const [head = '', body = ''] = (await signSaToken(saClaims())).split('.');
     const forged = `${head}.${body}.${base64url('not-a-signature')}`;
