@@ -14,6 +14,7 @@ import {
   CheckInput,
   CheckOptions,
   DiscoveryDocument,
+  ExchangedToken,
   FetchLike,
   IntrospectionResult,
   JwtPayload,
@@ -23,11 +24,13 @@ import {
   RoleCatalogSyncResult,
   ServiceAccessRule,
   ServiceTokenOptions,
+  TokenExchangeInput,
 } from '../interfaces';
 import { AppSessionClient } from './app-session-client';
+import { buildClientAuthentication, isConfidential } from './client-auth';
 import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
-import { type ClaimExpectations, verifyJwt } from './jwt';
+import { type ClaimExpectations, decodeJwt, verifyJwt } from './jwt';
 import { PdpClient } from './pdp-client';
 import { ServiceAccessClient } from './service-access';
 import { ServiceTokenManager } from './token-manager';
@@ -45,6 +48,14 @@ interface IntrospectionResponse {
   exp?: number;
   client_id?: string;
   token_type?: string;
+}
+
+interface TokenExchangeResponse {
+  access_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  scope?: string;
+  audience?: string;
 }
 
 /**
@@ -71,6 +82,10 @@ const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-lo
 
 /** How identity spells "your manifest would delete too much"; anything else on catalog sync is a plain failure */
 const CONFLICT = 409;
+
+/** RFC 8693 §2.1 — exchanging one token for another, here to act as the user towards another application */
+const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
 
 /**
  * The consumer-facing auth client: offline token verification, PDP checks, M2M tokens, role
@@ -197,6 +212,67 @@ export class AuthClient {
   /** Returns a cached client-credentials token for calling another service */
   getServiceToken(options?: ServiceTokenOptions): Promise<string> {
     return this.tokens.getToken(options);
+  }
+
+  /**
+   * Exchanges the user's token for one addressed to another application, acting *as the user* (RFC
+   * 8693, D-22). This is the only supported way to do that: forwarding the user's own token gives the
+   * receiving API an audience that is not its own, and asserting the user in a header is forbidden
+   * outright because a header is not a credential.
+   *
+   * The result is never cached. It belongs to one user, is short-lived, and its `exp` is capped by the
+   * subject token's — caching it would key a per-user credential by resource and hand it to the wrong
+   * caller the moment two users' requests overlap.
+   */
+  async exchangeUserToken(input: TokenExchangeInput): Promise<ExchangedToken> {
+    const client = this.config.client;
+    if (!isConfidential(client)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'token exchange requires confidential client credentials' });
+    if (!input.resource) throw AuthErrorCode.TOKEN_EXCHANGE_REFUSED.create({ reason: 'a target resource is required' });
+    this.assertSingleHop(input.subjectToken);
+
+    const endpoint = (await this.discovery.get()).token_endpoint;
+    const requested = input.scopes ?? [];
+    const body: Record<string, string> = {
+      grant_type: TOKEN_EXCHANGE_GRANT_TYPE,
+      subject_token: input.subjectToken,
+      subject_token_type: ACCESS_TOKEN_TYPE,
+      resource: input.resource,
+    };
+    if (requested.length > 0) body.scope = requested.join(' ');
+
+    /** Never the body: it carries the user's live access token */
+    this.logger.debug('exchanging a user token', { endpoint, resource: input.resource, scopes: requested });
+    const response = await this.postToOAuthEndpoint(endpoint, body, AuthErrorCode.TOKEN_EXCHANGE_FAILED, 'token exchange');
+    const payload = (await response.json()) as TokenExchangeResponse;
+    if (!payload.access_token || typeof payload.expires_in !== 'number') {
+      throw this.logged(AuthErrorCode.TOKEN_EXCHANGE_FAILED.create({ reason: 'malformed token exchange response' }));
+    }
+
+    const granted = (payload.scope ?? '').split(' ').filter(Boolean);
+    const dropped = requested.filter(scope => !granted.includes(scope));
+    if (dropped.length > 0) this.logger.warn('token exchange returned a narrowed scope', { resource: input.resource, requested, granted, dropped });
+
+    this.logger.info('user token exchanged', { resource: input.resource, granted, expiresIn: payload.expires_in });
+    return { accessToken: payload.access_token, tokenType: payload.token_type ?? 'Bearer', expiresIn: payload.expires_in, scope: granted, audience: payload.audience };
+  }
+
+  /**
+   * Delegation is single-hop by protocol rule, and the check belongs client-side: a service that is
+   * itself being called through an exchange must learn that from the token it holds, not from a round
+   * trip to identity that fails for reasons it cannot distinguish from an outage.
+   */
+  private assertSingleHop(subjectToken: string): void {
+    if (!subjectToken) throw AuthErrorCode.TOKEN_EXCHANGE_REFUSED.create({ reason: 'no subject token provided' });
+
+    const refuse = (reason: string): never => throwError(this.logged(AuthErrorCode.TOKEN_EXCHANGE_REFUSED.create({ reason })));
+    const payload = (() => {
+      try {
+        return decodeJwt(subjectToken).payload;
+      } catch {
+        return refuse('the subject token is not a readable jwt');
+      }
+    })();
+    if (payload.act !== undefined) refuse('the subject token already carries act; delegation is single-hop');
   }
 
   /** `fetch` with the service token injected and a single automatic retry on a stale-token 401 */
@@ -337,15 +413,18 @@ export class AuthClient {
     return `${this.issuer}/oauth2/${fallbackPath}`;
   }
 
+  /** Every `/oauth2/*` grant this client drives: form-encoded, authenticated by secret or SA assertion */
   private async postToOAuthEndpoint(endpoint: string, body: Record<string, string>, errorCode: AuthErrorCode, description: string): Promise<Response> {
     const client = this.config.client;
-    if (!client?.secret) throw AuthErrorCode.CONFIG_INVALID.create({ reason: `${description} requires confidential client credentials` });
+    if (!isConfidential(client)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: `${description} requires confidential client credentials` });
 
-    const headers = { 'content-type': 'application/x-www-form-urlencoded', authorization: `Basic ${Buffer.from(`${client.id}:${client.secret}`).toString('base64')}` };
-    const response = await this.transport(endpoint, { method: 'POST', headers, body: new URLSearchParams(body).toString() }).catch((error: Error) =>
+    const authentication = await buildClientAuthentication(client);
+    const headers = { 'content-type': 'application/x-www-form-urlencoded', ...authentication.headers };
+    const form = new URLSearchParams({ ...body, ...authentication.body }).toString();
+    const response = await this.transport(endpoint, { method: 'POST', headers, body: form }).catch((error: Error) =>
       throwError(this.logged(errorCode.create({ reason: `${description} failed: ${error.message}` }))),
     );
-    if (!response.ok) throw this.logged(errorCode.create({ reason: `${description} endpoint returned http ${response.status}` }));
+    if (!response.ok) throw this.logged(errorCode.create({ reason: `${description} endpoint returned http ${response.status}: ${await this.readFailureReason(response)}` }));
     return response;
   }
 

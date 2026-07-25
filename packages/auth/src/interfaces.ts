@@ -243,6 +243,40 @@ export interface ServiceTokenOptions {
   scopes?: string[];
 }
 
+/*!
+ * Token exchange (D-22)
+ *
+ * The only supported way to call another application *as the user*. Forwarding the user's own token
+ * is forbidden — the receiving API would see an audience that is not its own — and asserting the
+ * user's identity in a header is forbidden outright: a header is not a credential.
+ */
+
+export interface TokenExchangeInput {
+  /** The user's access token as presented to this service; it must not itself be a delegated token */
+  subjectToken: string;
+
+  /** The API resource the exchanged token is addressed to */
+  resource: string;
+
+  /** Narrows the exchange; identity intersects it with what both the user and this application hold */
+  scopes?: string[];
+}
+
+export interface ExchangedToken {
+  accessToken: string;
+  tokenType: string;
+  expiresIn: number;
+
+  /**
+   * What identity actually granted. The server narrows silently, so a caller that assumes it received
+   * what it asked for will hand its downstream API a token missing the capability it needs.
+   */
+  scope: string[];
+
+  /** Present when identity echoes the audience the token was addressed to */
+  audience?: string;
+}
+
 export interface CheckPrincipal {
   kind: PrincipalKind;
   sub: string;

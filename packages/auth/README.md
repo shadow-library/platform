@@ -31,6 +31,20 @@ const token = await auth.getServiceToken({ resource: 'api://novel-forge', scopes
 const response = await auth.fetchService('novel-forge', '/api/v1/books', {}, { resource: 'api://novel-forge' }); // → APIResponse; svc:// resolution + token, one retry on 401
 ```
 
+### Calling another application as the user
+
+`fetchService` and `getServiceToken` speak as the *service*. To act for the user in a downstream application, exchange their token — this is the only supported way, because forwarding the user's own token gives the receiving API an audience that is not its own, and asserting the user in a header is forbidden outright:
+
+```ts
+const { accessToken, scope } = await auth.exchangeUserToken({
+  subjectToken: bearerTokenThisServiceReceived,
+  resource: 'api://novel-forge',
+  scopes: ['books:read'],
+});
+```
+
+Identity **narrows the scope silently** — it intersects what you asked for with what the user and this application both hold — so read `scope` rather than assuming you got what you requested. Delegation is single-hop: a subject token that already carries `act` is refused locally with `TOKEN_EXCHANGE_REFUSED` before any network call. The result is never cached; it belongs to one user, is short-lived, and its `exp` is capped by its subject's.
+
 `fetchService` calls the service over the `svc://<name>/<path>` scheme, which APIRequest resolves to `http://<name>` (the in-cluster svc domain) by default; override per service with a `SERVICE_URL_<NAME>` env variable, or point a `svc://<name>.<namespace>/…` host at another namespace.
 
 ### Request timeouts

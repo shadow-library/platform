@@ -151,7 +151,18 @@ fetch(url, { headers: { authorization: `Bearer ${token}` } });
 - Client-credentials call to `/oauth2/token`; token cached until `exp − 60 s`; concurrent callers share one in-flight refresh (singleflight); 401/`invalid_client` responses surface immediately (no retry storm).
 - Convenience: `auth.fetch(url, init, { resource })` — a `fetch` wrapper that injects and refreshes the token, with single automatic retry on a 401 caused by a just-expired token.
 
-### 6.1 Service discovery
+### 6.1 Acting as the user (token exchange, D-22)
+
+```ts
+const { accessToken, scope } = await auth.exchangeUserToken({ subjectToken, resource: 'api://novel-forge', scopes: ['books:read'] });
+```
+
+- RFC 8693 `urn:ietf:params:oauth:grant-type:token-exchange` against `/oauth2/token`, authenticated with the application's own credential (secret or projected SA assertion).
+- The server **narrows silently** — it intersects the request with what the subject and the calling application both hold — so the granted `scope` is returned and callers must read it rather than assume.
+- **Single hop**: a subject token already carrying `act` is refused client-side with `AuthErrorCode.TOKEN_EXCHANGE_REFUSED` before any network call, so a service being called through an exchange learns it from the token it holds.
+- **Never cached**: the result is per-user, short-lived, and `exp`-capped by its subject.
+
+### 6.2 Service discovery
 
 Inside the cluster a Service is reachable by its own name, so the service name **is** the domain by default:
 

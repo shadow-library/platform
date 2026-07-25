@@ -101,6 +101,9 @@ export interface TestIdP {
   /** Makes the catalog endpoint answer identity's destructive-sync refusal unless the caller forces past it */
   setCatalogGuardrail(refuse: boolean): void;
 
+  /** Scopes a token exchange always drops, so a test can watch the SDK surface a silent narrowing */
+  setUnexchangeableScopes(scopes: string[]): void;
+
   /** Configures the rules the `/api/v1/authz/service-access` endpoint returns */
   setServiceAccess(rules: ServiceAccessRule[]): void;
 
@@ -144,7 +147,20 @@ const APP_SESSION_SCOPE = 'app-session:manage';
 
 const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
+const TOKEN_EXCHANGE_GRANT_TYPE = 'urn:ietf:params:oauth:grant-type:token-exchange';
+
 const json = (body: unknown, status = 200): Response => new Response(JSON.stringify(body), { status, headers: { 'content-type': 'application/json' } });
+
+/** Reads a token's claims without verifying it; the mock signed everything it is ever handed back */
+const readClaims = (token: string): JwtPayload | undefined => {
+  const segment = token.split('.')[1];
+  if (!segment) return undefined;
+  try {
+    return JSON.parse(Buffer.from(segment, 'base64url').toString()) as JwtPayload;
+  } catch {
+    return undefined;
+  }
+};
 
 /** Identity's catalog keys for the two app-session failures an SDK is expected to branch on */
 const sessionInvalid = (): Response => json({ code: 'AUTH_005', message: 'Application session is no longer valid' }, 401);
@@ -173,6 +189,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let lastMintRequest: Record<string, unknown> | undefined;
   let serviceAccessRules: ServiceAccessRule[] = [];
   let catalogGuardrail = false;
+  const unexchangeableScopes = new Set<string>();
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
   const sessionTtl = options.appSessionTtlSeconds ?? DEFAULT_APP_SESSION_TTL_SECONDS;
@@ -246,6 +263,27 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
       const refreshToken = crypto.randomUUID();
       refreshTokens.set(refreshToken, stored);
       return json({ access_token: accessToken, id_token: idToken, token_type: 'Bearer', expires_in: ttl, scope: (stored.scopes ?? []).join(' '), refresh_token: refreshToken });
+    }
+
+    /**
+     * RFC 8693 (D-22): the exchanged token is addressed to the target resource, acts for the subject,
+     * and carries only what the subject and the requesting application both hold. Identity narrows
+     * silently — no error, just a smaller `scope` — which is exactly the trap the SDK guards against.
+     */
+    if (body.grant_type === TOKEN_EXCHANGE_GRANT_TYPE) {
+      const subject = readClaims(typeof body.subject_token === 'string' ? body.subject_token : '');
+      if (!subject?.sub) return json({ error: 'invalid_grant' }, 400);
+      if (subject.act !== undefined) return json({ error: 'invalid_request', message: 'delegation is single-hop' }, 400);
+
+      const held = String(subject.scope ?? '')
+        .split(' ')
+        .filter(Boolean);
+      const requested = typeof body.scope === 'string' && body.scope ? body.scope.split(' ').filter(Boolean) : held;
+      const granted = requested.filter(scope => held.includes(scope) && !unexchangeableScopes.has(scope));
+      const audience = typeof body.resource === 'string' ? body.resource : DEFAULT_AUDIENCE;
+      const actor = options.clientId ?? 'test-client';
+      const accessToken = await issueToken({ sub: subject.sub, audience, scopes: granted, claims: { act: { sub: actor } } });
+      return json({ access_token: accessToken, token_type: 'Bearer', expires_in: ttl, scope: granted.join(' '), audience });
     }
 
     if (body.grant_type === 'refresh_token') {
@@ -429,6 +467,10 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     getRequestCount: pathname => requestCounts.get(pathname) ?? 0,
     getLastCatalog: () => lastCatalog,
     setCatalogGuardrail: refuse => void (catalogGuardrail = refuse),
+    setUnexchangeableScopes: scopes => {
+      unexchangeableScopes.clear();
+      for (const scope of scopes) unexchangeableScopes.add(scope);
+    },
     setServiceAccess: rules => void (serviceAccessRules = rules),
     getLastTokenRequest: () => lastTokenRequest,
     setSteppedUp: (userId, isSteppedUp) => void (isSteppedUp ? steppedUp.add(userId) : steppedUp.delete(userId)),

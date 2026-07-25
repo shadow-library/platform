@@ -104,6 +104,14 @@ export class AuthErrorCode extends ErrorCode {
   static readonly ROLE_SYNC_REFUSED = AuthErrorCode.conflict('ROLE_SYNC_REFUSED', 'Role catalog sync was refused as too destructive: {reason}');
   /** The service-access rules could not be loaded at startup */
   static readonly SERVICE_ACCESS_FAILED = AuthErrorCode.unavailable('SERVICE_ACCESS_FAILED', 'Service access rules could not be loaded: {reason}');
+  /** The RFC 8693 token exchange was rejected by identity or its endpoint was unreachable */
+  static readonly TOKEN_EXCHANGE_FAILED = AuthErrorCode.unavailable('TOKEN_EXCHANGE_FAILED', 'Token exchange failed: {reason}');
+  /**
+   * The SDK refused to attempt the exchange. Delegation is single-hop by protocol rule (D-22), so a
+   * subject token that already carries `act` is rejected here rather than at identity — the caller
+   * learns it is being called through an exchange instead of watching a round trip fail.
+   */
+  static readonly TOKEN_EXCHANGE_REFUSED = AuthErrorCode.badRequest('TOKEN_EXCHANGE_REFUSED', 'Token exchange refused: {reason}');
   /** The client-credentials token request failed */
   static readonly TOKEN_REQUEST_FAILED = AuthErrorCode.unavailable('TOKEN_REQUEST_FAILED', 'Token request failed: {reason}');
 }
