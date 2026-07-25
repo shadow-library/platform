@@ -71,6 +71,10 @@ export class CatalogSyncBody {
 
   @Field(() => [CatalogRole])
   roles: CatalogRole[];
+
+  /** Overrides the guardrail that refuses a manifest deleting more than half of the catalog (D-15) */
+  @Field(() => Boolean, { optional: true })
+  force?: boolean;
 }
 
 @Schema()

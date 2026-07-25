@@ -314,6 +314,8 @@ AuthModule.forRoot({
 On boot the SDK calls `PUT /api/v1/authz/catalog` (needs the `authz:roles:sync` scope). You can also call `auth.syncRoles(manifest)` yourself from a migration/CI step.
 
 > **⚠️ This is a full declarative sync.** The manifest is the complete truth for **your** application. Any role/permission **not** in it is **deleted** in identity, cascading into live user assignments (with affected principals cache-invalidated). A typo or truncated manifest revokes grants — treat it as production config. It is bounded to your application (derived from your token, never the request body) and every sync is audited.
+>
+> A manifest that would delete **more than half** of your application's existing permissions or roles is refused with `409 AUTHZ_004`, changes nothing, and is audited as `authz.catalog.sync_refused` (T-805). That is the broken-build guard; when the shrink is intentional, re-send it with `force: true`.
 
 **Assignments are not managed here.** Granting a role to a specific user stays a deliberate admin operation (`POST /api/v1/admin/role-assignments`) — a service can define roles but never assign privileges to users.
 

@@ -34,6 +34,8 @@ interface CatalogRole {
 export interface CatalogManifest {
   permissions: CatalogPermission[];
   roles: CatalogRole[];
+  /** Overrides the deletion guardrail; a deliberate catalog shrink must say so explicitly */
+  force?: boolean;
 }
 
 export interface CatalogSyncResult {
@@ -80,6 +82,49 @@ export class CatalogSyncService {
     return client.applicationId;
   }
 
+  /**
+   * A full sync is destructive by design, so a manifest that would remove more than half of an
+   * application's permissions or roles is refused unless the push says `force` (D-15, T-805). This
+   * catches a broken build pushing a truncated manifest; it is not a security boundary, since the
+   * caller may always set `force`. Consequently the counts are read outside the sync transaction —
+   * a second concurrent push from the same application is a deploy anomaly, not a threat.
+   */
+  private async assertDeletionAllowed(
+    applicationId: number,
+    actorClientId: string,
+    manifest: CatalogManifest,
+    kept: { permissions: Set<string>; roles: Set<string> },
+  ): Promise<void> {
+    const [existingPermissions, existingRoles] = await Promise.all([
+      this.db.select({ name: schema.permissions.name }).from(schema.permissions).where(eq(schema.permissions.applicationId, applicationId)),
+      this.db.select({ name: schema.applicationRoles.roleName }).from(schema.applicationRoles).where(eq(schema.applicationRoles.applicationId, applicationId)),
+    ]);
+
+    const permissionsDeleted = existingPermissions.filter(row => !kept.permissions.has(row.name)).length;
+    const rolesDeleted = existingRoles.filter(row => !kept.roles.has(row.name)).length;
+    /** Integer form of `deleted > existing / 2`, so an even split is allowed and only a majority trips. */
+    const exceedsHalf = (deleted: number, existing: number): boolean => deleted * 2 > existing;
+    if (!exceedsHalf(permissionsDeleted, existingPermissions.length) && !exceedsHalf(rolesDeleted, existingRoles.length)) return;
+
+    const detail = { permissionsDeleted, permissionsExisting: existingPermissions.length, rolesDeleted, rolesExisting: existingRoles.length };
+    if (manifest.force) {
+      this.logger.warn('role catalog sync forced past the deletion guardrail', { applicationId, actorClientId, ...detail });
+      return;
+    }
+
+    await this.auditService.record({
+      action: 'authz.catalog.sync_refused',
+      outcome: 'DENIED',
+      actorType: 'SERVICE_ACCOUNT',
+      actorId: actorClientId,
+      targetType: 'application',
+      targetId: String(applicationId),
+      detail,
+    });
+    this.logger.warn('role catalog sync refused by the deletion guardrail', { securityEvent: 'authz.catalog_sync_refused', applicationId, actorClientId, ...detail });
+    throw AppErrorCode.AUTHZ_004.create();
+  }
+
   async sync(actorClientId: string, manifest: CatalogManifest): Promise<CatalogSyncResult> {
     const applicationId = await this.resolveApplicationId(actorClientId);
     const permissionNames = new Set(manifest.permissions.map(permission => permission.name));
@@ -87,6 +132,8 @@ export class CatalogSyncService {
     const roleNames = new Set(manifest.roles.map(role => role.name));
     if (roleNames.size !== manifest.roles.length) throw AppErrorCode.AUTHZ_001.create();
     for (const role of manifest.roles) for (const permission of role.permissions) if (!permissionNames.has(permission)) throw AppErrorCode.AUTHZ_001.create();
+
+    await this.assertDeletionAllowed(applicationId, actorClientId, manifest, { permissions: permissionNames, roles: roleNames });
 
     const { result, principals } = await this.db.transaction(async tx => {
       /** Snapshot every principal holding a role here before mutating, so a cascade-deleted assignment or a changed binding still invalidates its caches. */

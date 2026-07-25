@@ -42,7 +42,7 @@ export class AuthzController {
   @Auth({ service: 'authz:roles:sync' })
   @RespondFor(200, CatalogSyncResponse)
   syncCatalog(@Body() body: CatalogSyncBody): Promise<CatalogSyncResponse> {
-    return this.catalogSyncService.sync(serviceClientId(Context.getServiceToken()), { permissions: body.permissions, roles: body.roles });
+    return this.catalogSyncService.sync(serviceClientId(Context.getServiceToken()), { permissions: body.permissions, roles: body.roles, force: body.force });
   }
 
   /** A service fetches the admin-configured M2M allowlist for its own routes; the application is derived from the caller's token (D-17). */

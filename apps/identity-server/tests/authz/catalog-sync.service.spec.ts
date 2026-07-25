@@ -9,6 +9,7 @@ import { beforeEach, describe, expect, it } from 'bun:test';
 import { AccessTokenService, OAuthClientService } from '@server/modules/auth/oauth';
 import { CatalogSyncService, PolicyDecisionService } from '@server/modules/authz';
 import { UserService } from '@server/modules/identity/user';
+import { schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationService } from '@server/modules/system/application';
 
 import { TestEnvironment } from '../test-environment';
@@ -25,12 +26,16 @@ const env = new TestEnvironment('catalog-sync').init();
 interface Manifest {
   permissions: { name: string; description?: string }[];
   roles: { name: string; description?: string; permissions: string[] }[];
+  force?: boolean;
 }
 
 const manifest = (
   roles: Manifest['roles'] = [{ name: 'editor', permissions: ['posts:write'] }],
   permissions: Manifest['permissions'] = [{ name: 'posts:write' }, { name: 'posts:delete' }],
 ): Manifest => ({ permissions, roles });
+
+/** Shrinking a catalog past half trips the T-805 guardrail, so deletion cases opt in explicitly. */
+const forced = (roles?: Manifest['roles'], permissions?: Manifest['permissions']): Manifest => ({ ...manifest(roles, permissions), force: true });
 
 describe('CatalogSyncService', () => {
   let sync: CatalogSyncService;
@@ -65,7 +70,7 @@ describe('CatalogSyncService', () => {
 
   it('should delete roles and permissions absent from a later manifest (full-sync)', async () => {
     await sync.sync(clientId, manifest());
-    const result = await sync.sync(clientId, manifest([], [{ name: 'posts:write' }]));
+    const result = await sync.sync(clientId, forced([], [{ name: 'posts:write' }]));
     expect(result).toMatchObject({ permissionsDeleted: 1, rolesDeleted: 1 });
     const permissions = await pdp.listPermissionsForApplication(applicationId);
     expect(permissions.map(permission => permission.name)).toEqual(['posts:write']);
@@ -94,7 +99,7 @@ describe('CatalogSyncService', () => {
     expect((await pdp.check({ principal, organisationId: orgId, action: 'posts:write' })).decision).toBe('PERMIT');
 
     const versionBefore = await pdp.getAuthzVersion(principal);
-    const result = await sync.sync(clientId, manifest([]));
+    const result = await sync.sync(clientId, forced([]));
     expect(result.rolesDeleted).toBe(1);
     expect(result.principalsInvalidated).toBeGreaterThanOrEqual(1);
     expect((await pdp.check({ principal, organisationId: orgId, action: 'posts:write' })).decision).toBe('DENY');
@@ -108,8 +113,59 @@ describe('CatalogSyncService', () => {
   it('should leave other applications untouched (app-scoped)', async () => {
     const seeded = applications.getApplicationOrThrow('shadow-identity').roles.length;
     await sync.sync(clientId, manifest());
-    await sync.sync(clientId, { permissions: [], roles: [] });
+    await sync.sync(clientId, { permissions: [], roles: [], force: true });
     expect(applications.getApplicationOrThrow('shadow-identity').roles.length).toBe(seeded);
+  });
+
+  /**
+   * A broken build pushing a truncated manifest must not cascade into role assignments (D-15,
+   * T-805): the guardrail refuses past a majority deletion and the catalog is left exactly as it was.
+   */
+  describe('deletion guardrail', () => {
+    it('should refuse a manifest deleting more than half of the permissions', async () => {
+      await sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }, { name: 'posts:delete' }, { name: 'posts:read' }]));
+      await expect(sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }]))).rejects.toThrow();
+
+      const permissions = await pdp.listPermissionsForApplication(applicationId);
+      expect(permissions.map(permission => permission.name).sort()).toEqual(['posts:delete', 'posts:read', 'posts:write']);
+    });
+
+    it('should refuse a manifest deleting more than half of the roles', async () => {
+      const roles = [
+        { name: 'editor', permissions: ['posts:write'] },
+        { name: 'reviewer', permissions: ['posts:write'] },
+        { name: 'admin', permissions: ['posts:delete'] },
+      ];
+      await sync.sync(clientId, manifest(roles));
+      await expect(sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }]))).rejects.toThrow();
+      expect(applications.getApplicationByIdOrThrow(applicationId).roles.length).toBe(3);
+    });
+
+    /** Exactly half is a shrink the guardrail tolerates — only a majority is treated as a broken push. */
+    it('should allow a manifest deleting exactly half without force', async () => {
+      await sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }, { name: 'posts:delete' }]));
+      const result = await sync.sync(clientId, manifest([{ name: 'editor', permissions: ['posts:write'] }], [{ name: 'posts:write' }]));
+      expect(result.permissionsDeleted).toBe(1);
+    });
+
+    it('should proceed and audit when the same manifest carries force', async () => {
+      await sync.sync(clientId, manifest());
+      const result = await sync.sync(clientId, { permissions: [], roles: [], force: true });
+      expect(result).toMatchObject({ permissionsDeleted: 2, rolesDeleted: 1 });
+      expect(await pdp.listPermissionsForApplication(applicationId)).toEqual([]);
+    });
+
+    it('should record a refusal in the audit chain and change nothing', async () => {
+      await sync.sync(clientId, manifest());
+      const db = env.getPostgresClient();
+      const before = await db.select().from(schema.auditEvents);
+      await expect(sync.sync(clientId, { permissions: [], roles: [] })).rejects.toThrow();
+
+      const after = await db.select().from(schema.auditEvents);
+      expect(after.length).toBe(before.length + 1);
+      expect(after.at(-1)).toMatchObject({ action: 'authz.catalog.sync_refused', outcome: 'DENIED', actorId: clientId });
+      expect((await pdp.listPermissionsForApplication(applicationId)).length).toBe(2);
+    });
   });
 
   describe('over the HTTP catalog endpoint', () => {
@@ -133,6 +189,23 @@ describe('CatalogSyncService', () => {
 
     it('should reject a service token lacking the roles:sync scope', async () => {
       expect((await call(serviceToken('authz:check'))).statusCode).toBe(403);
+    });
+
+    it('should answer 409 for a guardrail refusal and 200 once force is set', async () => {
+      await sync.sync(clientId, manifest());
+      const truncate = (body: Manifest) =>
+        env
+          .getRouter()
+          .mockRequest()
+          .put('/api/v1/authz/catalog')
+          .headers({ authorization: `Bearer ${serviceToken()}` })
+          .body(body);
+
+      const refused = await truncate({ permissions: [], roles: [] });
+      expect(refused.statusCode).toBe(409);
+      expect(refused.json()).toMatchObject({ code: 'AUTHZ_004' });
+
+      expect((await truncate({ permissions: [], roles: [], force: true })).statusCode).toBe(200);
     });
   });
 });

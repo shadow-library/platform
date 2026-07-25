@@ -121,6 +121,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUTHZ_002 = AppErrorCode.forbidden('AUTHZ_002', 'Service token is not bound to an application');
   /** A service-access rule is malformed — bad method, path pattern, or an unknown caller client */
   static readonly AUTHZ_003 = AppErrorCode.validation('AUTHZ_003', 'Invalid service access rule', 400);
+  /** The pushed manifest would delete more than half of the application's catalog and did not carry `force` */
+  static readonly AUTHZ_004 = AppErrorCode.conflict('AUTHZ_004', 'Role catalog sync would delete too much of the catalog');
 
   /*!
    * Organisation Error Codes
