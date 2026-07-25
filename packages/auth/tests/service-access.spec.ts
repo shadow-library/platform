@@ -26,10 +26,11 @@ const RULE = { callerClientId: 'svc-indexer', method: 'POST', path: '/api/v1/ind
 
 const SERVICE_ACCESS_PATH = '/api/v1/authz/service-access';
 
+/** Only for proving a timer does *not* fire; every other wait is driven by the mock's request counter */
+const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
+
 /** Short enough that a test can watch the interval fire without sleeping for a perceptible time */
 const REFRESH_SECONDS = 0.05;
-
-const sleep = (ms: number): Promise<void> => new Promise(resolve => setTimeout(resolve, ms));
 
 describe('service access rules', () => {
   let idp: TestIdP;
@@ -61,18 +62,27 @@ describe('service access rules', () => {
     expect(() => auth.refreshServiceAccess()).toThrow(/CONFIG_INVALID|configuration/);
   });
 
-  it('should pick up a rule an admin removed within one refresh interval', async () => {
+  it('should deny a caller whose rule an admin removed, with no restart', async () => {
     const auth = client();
     idp.setServiceAccess([RULE]);
     await auth.loadServiceAccess();
     expect(auth.isServiceCallerAllowed(RULE.callerClientId, RULE.method, RULE.path)).toBe(true);
 
     idp.setServiceAccess([]);
-    const before = idp.getRequestCount(SERVICE_ACCESS_PATH);
-    await sleep(REFRESH_SECONDS * 1000 * 3);
+    await auth.refreshServiceAccess();
 
-    expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBeGreaterThan(before);
     expect(auth.isServiceCallerAllowed(RULE.callerClientId, RULE.method, RULE.path)).toBe(false);
+    auth.stop();
+  });
+
+  it('should keep re-fetching on the interval so nothing has to drive the refresh', async () => {
+    const auth = client();
+    await auth.loadServiceAccess();
+
+    /** Two more calls than the initial load proves the interval is rearming, not firing once */
+    const target = idp.getRequestCount(SERVICE_ACCESS_PATH) + 2;
+    await idp.waitForRequest(SERVICE_ACCESS_PATH, target);
+    expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBeGreaterThanOrEqual(target);
     auth.stop();
   });
 
@@ -106,8 +116,10 @@ describe('service access rules', () => {
     await auth.loadServiceAccess();
     auth.stop();
 
+    /** A timer that outlives the application would keep calling identity from a dead process */
     const before = idp.getRequestCount(SERVICE_ACCESS_PATH);
-    await sleep(REFRESH_SECONDS * 1000 * 3);
+    const fired = await Promise.race([idp.waitForRequest(SERVICE_ACCESS_PATH, before + 1).then(() => true), sleep(REFRESH_SECONDS * 1000 * 4).then(() => false)]);
+    expect(fired).toBe(false);
     expect(idp.getRequestCount(SERVICE_ACCESS_PATH)).toBe(before);
   });
 

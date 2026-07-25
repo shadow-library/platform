@@ -212,7 +212,9 @@ The RP helper owns: PKCE generation/verification, `state`/`nonce` handling, ID-t
 
 ## 8. Test utilities
 
-`createTestIdP()` spins an in-process mock: generates an ephemeral Ed25519 key, serves discovery + JWKS on a random port, and mints arbitrary user/service tokens — so consuming services can integration-test guards without a running identity service. Also exported: `signTestToken(claims)` for unit tests.
+`createTestIdP()` spins an in-process mock: generates an ephemeral Ed25519 key, serves discovery + JWKS on a random port, and mints arbitrary user/service tokens — so consuming services can integration-test guards without a running identity service.
+
+It tracks the protocol, not a subset of it. The v1.1 surface it answers for: `GET /api/v1/apps/me` and the `step_up_endpoint` / `app_session_endpoint` discovery keys (§2.1), intent-bound elevation with the `AUTH_007` mismatch refusal, RFC 8693 exchange with scope intersection and the single-hop refusal (§6.1), silently narrowed app-session mints (§4.1.1), and identity's destructive-sync guardrail (§4.1). Drivers for the properties that are otherwise hard to reach: `setAppRegistration` (an admin's grant change mid-test), `setSteppedUp({ clientId, resource })`, `setUnexchangeableScopes`, `setCatalogGuardrail`, `getLastElevationRequest`, `handleOnlyTransport()` (a request arriving with a handle and no application credential — the property the first-party model rests on), and `waitForRequest(path, count)` (wait for a scheduled refresh rather than sleeping past it).
 
 ## 9. Compatibility contract
 

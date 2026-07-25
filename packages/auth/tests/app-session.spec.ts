@@ -3,8 +3,6 @@
  */
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 
-import { AppError } from '@shadow-library/common';
-
 /**
  * Importing user defined packages
  */
@@ -127,19 +125,20 @@ describe('AppSessionClient', () => {
     });
   });
 
-  it('should refuse to mint without the app-session:manage service token', async () => {
-    const anonymous = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: (url, init) => fetch(url, { ...init, headers: stripBearer(init) }) });
+  it('should grant nothing to a handle presented without the application credential', async () => {
+    const handleOnly = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT, fetch: idp.handleOnlyTransport() });
     const session = await createSession('handle-alone');
-    await expect(anonymous.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).rejects.toBeInstanceOf(AppError);
+
+    /** The property the whole first-party model rests on: the handle says *which* session, not *who asks* */
+    await expect(handleOnly.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
+    await expect(handleOnly.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
+    await expect(handleOnly.appSessions.revokeSession(session.sessionHandle)).rejects.toMatchObject({ code: 'APP_SESSION_FAILED' });
+
+    /** ...and the session is still there, so the refusal was authentication, not an accidental revoke */
+    await expect(auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE })).resolves.toMatchObject({ tokenType: 'Bearer' });
+    handleOnly.stop();
   });
 });
-
-/** Drops the authorization header so a request arrives carrying nothing but the handle */
-const stripBearer = (init: RequestInit = {}): Headers => {
-  const headers = new Headers(init.headers);
-  headers.delete('authorization');
-  return headers;
-};
 
 describe('AccessTokenCache', () => {
   const token = (aal: 'AAL1' | 'AAL2', expiresIn = 600, grantedScopes: string[] = []): AppSessionToken => ({

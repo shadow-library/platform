@@ -176,20 +176,37 @@ const tokens = await rp.exchangeCode({ code, codeVerifier: request.codeVerifier,
 ```ts
 import { createTestIdP } from '@shadow-library/auth/testing';
 
-const idp = await createTestIdP();
-const auth = new AuthClient({ issuer: idp.issuer, audience: 'api://pulse' });
+const idp = await createTestIdP({ clientId: 'svc-pulse', clientSecret: 's3cr3t', app: { audience: 'api://pulse', scopes: ['posts:read'] } });
+const auth = new AuthClient({ issuer: idp.issuer, appId: 'svc-pulse', client: { id: 'svc-pulse', secret: 's3cr3t' } });
 const token = await idp.issueToken({ sub: '42', audience: 'api://pulse', scopes: ['posts:read'] });
 await auth.verify(token);
 idp.setServiceAccess([{ callerClientId: 'svc-indexer', method: 'POST', path: '/api/v1/index' }]);
 idp.stop();
 ```
 
-The mock also stands in for the app-session endpoints, so a service can integration-test its whole browser flow without a live identity service:
+The mock stands in for the whole v1.1 surface, so a service can integration-test its browser flow, its guards and its M2M paths without a live identity service:
 
 ```ts
-idp.setSteppedUp('user-42', { clientId: 'svc-reports', resource: 'api://reports' }); // intent-bound; `true` matches any claimant
+// derived configuration (A-3): apps/me + the step_up_endpoint / app_session_endpoint discovery keys
+idp.setAppRegistration({ scopes: ['openid', 'posts:write'] }); // an admin's grant change, mid-test
+
+// intent-bound step-up (A-2): a window prompted for by one app cannot be claimed by another
+idp.setSteppedUp('user-42', { clientId: 'svc-reports', resource: 'api://reports' }); // `true` matches any claimant
+idp.getLastElevationRequest(); // what the claim actually asked for
+
+// token exchange (A-5): scope intersection and the single-hop refusal
+idp.setUnexchangeableScopes(['posts:write']);
+
+// catalog sync (A-6): identity's destructive-sync guardrail
+idp.setCatalogGuardrail(true); // syncRoles now answers ROLE_SYNC_REFUSED until { force: true }
+
+// "a handle alone grants nothing" — a transport that drops the app's own bearer on app-session routes
+new AuthClient({ issuer: idp.issuer, appId, client, fetch: idp.handleOnlyTransport() });
+
+// rule-refresh timing (A-1): wait for the scheduled refresh instead of sleeping past it
+await idp.waitForRequest('/api/v1/authz/service-access', 2);
+
 idp.endIdentitySession('user-42'); // every app session of that user starts answering AUTH_005
-const logoutToken = await idp.issueLogoutToken({ sub: 'user-42' });
 idp.getAppSessionCount(); // asserts a revocation actually reached identity
 ```
 

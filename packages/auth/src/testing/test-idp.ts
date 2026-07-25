@@ -5,7 +5,7 @@
 /**
  * Importing user defined packages
  */
-import { AppRegistration, AssuranceLevel, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
+import { AppRegistration, AssuranceLevel, FetchLike, Jwk, JwtPayload, PrincipalKind, ServiceAccessRule } from '../interfaces';
 import { createTestSigner, TestSigner } from './signer';
 
 /**
@@ -51,6 +51,12 @@ export interface TestTokenInput {
 export interface TestPrincipalRef {
   kind: PrincipalKind;
   sub: string;
+}
+
+interface RequestWaiter {
+  pathname: string;
+  count: number;
+  resolve: () => void;
 }
 
 interface AppSessionRecord {
@@ -107,6 +113,20 @@ export interface TestIdP {
   setEndpointFailure(pathname: string, fail: boolean): void;
   getRequestCount(pathname: string): number;
 
+  /**
+   * Resolves once an endpoint has been called `count` times, so a test can wait for a scheduled
+   * refresh to fire instead of sleeping for longer than it should take. It reports that the request
+   * arrived, not that the SDK has finished applying the answer — assert on observable state after it.
+   */
+  waitForRequest(pathname: string, count?: number): Promise<void>;
+
+  /**
+   * A transport that drops the application's own M2M bearer, so a request arrives carrying nothing but
+   * the session handle. Every app-session route then refuses it, which is the property the whole
+   * first-party model rests on: possessing a handle grants nothing.
+   */
+  handleOnlyTransport(): FetchLike;
+
   /** Returns the most recent role-catalog sync the mock received, if any */
   getLastCatalog(): CapturedCatalog | undefined;
 
@@ -151,6 +171,9 @@ export interface TestIdP {
   /** Returns the most recent mint request the app-session token endpoint received, if any */
   getLastMintRequest(): Record<string, unknown> | undefined;
 
+  /** Returns the most recent elevation claim, so a test can assert which resource it named */
+  getLastElevationRequest(): Record<string, unknown> | undefined;
+
   stop(): void;
 }
 
@@ -166,6 +189,8 @@ const ELEVATION_WINDOW_SECONDS = 600;
 
 /** The scope every app-session route demands of its M2M caller */
 const APP_SESSION_SCOPE = 'app-session:manage';
+
+const SESSIONS_PATH = '/api/v1/app-sessions';
 
 const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
 
@@ -198,6 +223,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let signer: TestSigner = await createTestSigner();
   const retiredJwks: (Jwk & { kid: string })[] = [];
   const requestCounts = new Map<string, number>();
+  const waiters: RequestWaiter[] = [];
   const failingEndpoints = new Set<string>();
   const authorizationCodes = new Map<string, TestTokenInput & { nonce?: string }>();
   const refreshTokens = new Map<string, TestTokenInput>();
@@ -210,6 +236,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let lastCatalog: CapturedCatalog | undefined;
   let lastTokenRequest: CapturedTokenRequest | undefined;
   let lastMintRequest: Record<string, unknown> | undefined;
+  let lastElevationRequest: Record<string, unknown> | undefined;
   let serviceAccessRules: ServiceAccessRule[] = [];
   let catalogGuardrail = false;
   const unexchangeableScopes = new Set<string>();
@@ -405,6 +432,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const caller = appSessionCaller(request);
     if (!caller) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+    lastElevationRequest = body;
 
     const session = liveSession(body.sessionHandle);
     if (!session) return sessionInvalid();
@@ -451,7 +479,12 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
 
   const handle = async (request: Request): Promise<Response> => {
     const url = new URL(request.url);
-    requestCounts.set(url.pathname, (requestCounts.get(url.pathname) ?? 0) + 1);
+    const seen = (requestCounts.get(url.pathname) ?? 0) + 1;
+    requestCounts.set(url.pathname, seen);
+    for (const waiter of waiters.filter(entry => entry.pathname === url.pathname && seen >= entry.count)) {
+      waiters.splice(waiters.indexOf(waiter), 1);
+      waiter.resolve();
+    }
     if (failingEndpoints.has(url.pathname)) return new Response('injected failure', { status: 503 });
 
     switch (url.pathname) {
@@ -516,6 +549,22 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     },
     setEndpointFailure: (pathname, fail) => void (fail ? failingEndpoints.add(pathname) : failingEndpoints.delete(pathname)),
     getRequestCount: pathname => requestCounts.get(pathname) ?? 0,
+    waitForRequest: (pathname, count = 1) =>
+      new Promise(resolve => {
+        if ((requestCounts.get(pathname) ?? 0) >= count) return resolve();
+        waiters.push({ pathname, count, resolve });
+      }),
+    handleOnlyTransport:
+      () =>
+      (url, init = {}) => {
+        if (!new URL(url).pathname.startsWith(SESSIONS_PATH)) return fetch(url, init);
+
+        /** Only the app-session bearer goes; the client still authenticates to /oauth2/token normally,
+         * so what arrives at the route really is a handle and nothing else. */
+        const headers = new Headers(init.headers);
+        headers.delete('authorization');
+        return fetch(url, { ...init, headers });
+      },
     getLastCatalog: () => lastCatalog,
     setCatalogGuardrail: refuse => void (catalogGuardrail = refuse),
     setUnexchangeableScopes: scopes => {
@@ -550,6 +599,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     },
     getAppSessionCount: () => appSessions.size,
     getLastMintRequest: () => lastMintRequest,
+    getLastElevationRequest: () => lastElevationRequest,
     stop: () => void server.stop(true),
   };
 }
