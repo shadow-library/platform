@@ -34,8 +34,12 @@ export interface AuthOptions {
   orgMember?: boolean;
   /** Path parameter carrying the organisation id for `orgRole`/`orgMember`. Defaults to `organisationId`. */
   orgParam?: string;
-  /** Accept only an M2M service token carrying this scope (mutually exclusive with the session modes). */
-  service?: string;
+  /**
+   * Accept only an M2M service token (mutually exclusive with the session modes). A string
+   * additionally requires that scope; `true` accepts any valid service token, for a route whose
+   * only subject is the caller itself and which therefore needs no further entitlement.
+   */
+  service?: string | true;
   /** Explicitly unauthenticated. Documents intent and makes the guard a no-op for the route. */
   public?: boolean;
 }

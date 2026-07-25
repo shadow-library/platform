@@ -1,3 +1,4 @@
+CREATE TYPE "public"."app_session_status" AS ENUM('ACTIVE', 'REVOKED', 'EXPIRED');--> statement-breakpoint
 CREATE TYPE "public"."audit_actor_type" AS ENUM('USER', 'SERVICE_ACCOUNT', 'SYSTEM', 'ADMIN');--> statement-breakpoint
 CREATE TYPE "public"."audit_outcome" AS ENUM('SUCCESS', 'DENIED', 'FAILURE');--> statement-breakpoint
 CREATE TYPE "public"."session_aal" AS ENUM('AAL1', 'AAL2');--> statement-breakpoint
@@ -29,6 +30,33 @@ CREATE TYPE "public"."user_auth_provider" AS ENUM('PASSWORD', 'OTP', 'TOTP', 'WE
 CREATE TYPE "public"."user_lock_mode" AS ENUM('NONE', 'OTP_ONLY', 'FULL');--> statement-breakpoint
 CREATE TYPE "public"."user_status" AS ENUM('ACTIVE', 'INACTIVE', 'DISABLED', 'BLOCKED', 'SUSPENDED', 'CLOSED');--> statement-breakpoint
 CREATE TYPE "public"."webhook_delivery_status" AS ENUM('PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD');--> statement-breakpoint
+CREATE TABLE "app_session_elevations" (
+	"id" uuid PRIMARY KEY DEFAULT gen_random_uuid() NOT NULL,
+	"app_session_id" bigint NOT NULL,
+	"audience" varchar(255) NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "app_session_elevations_session_audience_unique" UNIQUE("app_session_id","audience")
+);
+--> statement-breakpoint
+CREATE TABLE "app_sessions" (
+	"id" bigserial PRIMARY KEY NOT NULL,
+	"session_hash" varchar(64) NOT NULL,
+	"client_id" varchar(64) NOT NULL,
+	"identity_session_id" bigint NOT NULL,
+	"user_id" bigint NOT NULL,
+	"organisation_id" bigint,
+	"granted_scope" text DEFAULT '' NOT NULL,
+	"status" "app_session_status" DEFAULT 'ACTIVE' NOT NULL,
+	"expires_at" timestamp with time zone NOT NULL,
+	"last_used_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"terminated_at" timestamp with time zone,
+	"ip_address" varchar(45),
+	"user_agent" text,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "app_sessions_session_hash_unique" UNIQUE("session_hash")
+);
+--> statement-breakpoint
 CREATE TABLE "audit_events" (
 	"id" uuid PRIMARY KEY NOT NULL,
 	"occurred_at" timestamp with time zone DEFAULT now() NOT NULL,
@@ -70,6 +98,8 @@ CREATE TABLE "user_sessions" (
 	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"last_used_at" timestamp with time zone DEFAULT now() NOT NULL,
 	"elevated_until" timestamp with time zone,
+	"elevation_intent_client_id" varchar(64),
+	"elevation_intent_resource" varchar(255),
 	"ip_address" varchar(45),
 	"ip_country" varchar(2),
 	"user_agent" text,
@@ -322,6 +352,15 @@ CREATE TABLE "scopes" (
 	"is_sensitive" boolean DEFAULT false NOT NULL,
 	"principal_type" "scope_principal_type" DEFAULT 'BOTH' NOT NULL,
 	CONSTRAINT "scopes_resource_name_unique" UNIQUE("api_resource_id","name")
+);
+--> statement-breakpoint
+CREATE TABLE "organisation_policies" (
+	"organisation_id" bigint NOT NULL,
+	"policy_key" varchar(128) NOT NULL,
+	"policy_value" jsonb NOT NULL,
+	"updated_by" bigint,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	CONSTRAINT "organisation_policies_organisation_id_policy_key_pk" PRIMARY KEY("organisation_id","policy_key")
 );
 --> statement-breakpoint
 CREATE TABLE "refresh_token_families" (
@@ -579,6 +618,10 @@ CREATE TABLE "webhook_subscriptions" (
 	"updated_at" timestamp with time zone DEFAULT now() NOT NULL
 );
 --> statement-breakpoint
+ALTER TABLE "app_session_elevations" ADD CONSTRAINT "app_session_elevations_app_session_id_app_sessions_id_fk" FOREIGN KEY ("app_session_id") REFERENCES "public"."app_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_sessions" ADD CONSTRAINT "app_sessions_client_id_oauth_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."oauth_clients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_sessions" ADD CONSTRAINT "app_sessions_identity_session_id_user_sessions_id_fk" FOREIGN KEY ("identity_session_id") REFERENCES "public"."user_sessions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "app_sessions" ADD CONSTRAINT "app_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "devices" ADD CONSTRAINT "devices_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_sessions" ADD CONSTRAINT "user_sessions_user_sign_in_event_id_user_sign_in_events_id_fk" FOREIGN KEY ("user_sign_in_event_id") REFERENCES "public"."user_sign_in_events"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
@@ -604,6 +647,7 @@ ALTER TABLE "oauth_client_secrets" ADD CONSTRAINT "oauth_client_secrets_client_i
 ALTER TABLE "oauth_clients" ADD CONSTRAINT "oauth_clients_application_id_applications_id_fk" FOREIGN KEY ("application_id") REFERENCES "public"."applications"("id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "oidc_logout_deliveries" ADD CONSTRAINT "oidc_logout_deliveries_client_id_oauth_clients_id_fk" FOREIGN KEY ("client_id") REFERENCES "public"."oauth_clients"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "scopes" ADD CONSTRAINT "scopes_api_resource_id_api_resources_id_fk" FOREIGN KEY ("api_resource_id") REFERENCES "public"."api_resources"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "organisation_policies" ADD CONSTRAINT "organisation_policies_organisation_id_organisations_id_fk" FOREIGN KEY ("organisation_id") REFERENCES "public"."organisations"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_token_families" ADD CONSTRAINT "refresh_token_families_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_token_families" ADD CONSTRAINT "refresh_token_families_session_id_user_sessions_id_fk" FOREIGN KEY ("session_id") REFERENCES "public"."user_sessions"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "refresh_tokens" ADD CONSTRAINT "refresh_tokens_family_id_refresh_token_families_id_fk" FOREIGN KEY ("family_id") REFERENCES "public"."refresh_token_families"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
@@ -628,6 +672,8 @@ ALTER TABLE "user_passwords" ADD CONSTRAINT "user_passwords_user_auth_identity_i
 ALTER TABLE "user_phones" ADD CONSTRAINT "user_phones_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "user_profiles" ADD CONSTRAINT "user_profiles_user_id_users_id_fk" FOREIGN KEY ("user_id") REFERENCES "public"."users"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "webhook_deliveries" ADD CONSTRAINT "webhook_deliveries_subscription_id_webhook_subscriptions_id_fk" FOREIGN KEY ("subscription_id") REFERENCES "public"."webhook_subscriptions"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "app_sessions_identity_session_idx" ON "app_sessions" USING btree ("identity_session_id");--> statement-breakpoint
+CREATE INDEX "app_sessions_client_user_idx" ON "app_sessions" USING btree ("client_id","user_id");--> statement-breakpoint
 CREATE INDEX "audit_events_organisation_id_id_idx" ON "audit_events" USING btree ("organisation_id","id");--> statement-breakpoint
 CREATE INDEX "audit_events_action_id_idx" ON "audit_events" USING btree ("action","id");--> statement-breakpoint
 CREATE INDEX "user_sessions_user_id_status_idx" ON "user_sessions" USING btree ("user_id","status");--> statement-breakpoint

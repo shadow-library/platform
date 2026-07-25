@@ -1,9 +1,264 @@
 {
-  "id": "5b365623-036d-403b-950c-a241c3e92773",
+  "id": "882e5fab-4513-402f-97ba-7ebfd3af7478",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
   "tables": {
+    "public.app_session_elevations": {
+      "name": "app_session_elevations",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "uuid",
+          "primaryKey": true,
+          "notNull": true,
+          "default": "gen_random_uuid()"
+        },
+        "app_session_id": {
+          "name": "app_session_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "audience": {
+          "name": "audience",
+          "type": "varchar(255)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "app_session_elevations_app_session_id_app_sessions_id_fk": {
+          "name": "app_session_elevations_app_session_id_app_sessions_id_fk",
+          "tableFrom": "app_session_elevations",
+          "tableTo": "app_sessions",
+          "columnsFrom": [
+            "app_session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "app_session_elevations_session_audience_unique": {
+          "name": "app_session_elevations_session_audience_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "app_session_id",
+            "audience"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.app_sessions": {
+      "name": "app_sessions",
+      "schema": "",
+      "columns": {
+        "id": {
+          "name": "id",
+          "type": "bigserial",
+          "primaryKey": true,
+          "notNull": true
+        },
+        "session_hash": {
+          "name": "session_hash",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "client_id": {
+          "name": "client_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "identity_session_id": {
+          "name": "identity_session_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "user_id": {
+          "name": "user_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "organisation_id": {
+          "name": "organisation_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "granted_scope": {
+          "name": "granted_scope",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "''"
+        },
+        "status": {
+          "name": "status",
+          "type": "app_session_status",
+          "typeSchema": "public",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "'ACTIVE'"
+        },
+        "expires_at": {
+          "name": "expires_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "last_used_at": {
+          "name": "last_used_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        },
+        "terminated_at": {
+          "name": "terminated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "ip_address": {
+          "name": "ip_address",
+          "type": "varchar(45)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "user_agent": {
+          "name": "user_agent",
+          "type": "text",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "created_at": {
+          "name": "created_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {
+        "app_sessions_identity_session_idx": {
+          "name": "app_sessions_identity_session_idx",
+          "columns": [
+            {
+              "expression": "identity_session_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "app_sessions_client_user_idx": {
+          "name": "app_sessions_client_user_idx",
+          "columns": [
+            {
+              "expression": "client_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            },
+            {
+              "expression": "user_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        }
+      },
+      "foreignKeys": {
+        "app_sessions_client_id_oauth_clients_id_fk": {
+          "name": "app_sessions_client_id_oauth_clients_id_fk",
+          "tableFrom": "app_sessions",
+          "tableTo": "oauth_clients",
+          "columnsFrom": [
+            "client_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "app_sessions_identity_session_id_user_sessions_id_fk": {
+          "name": "app_sessions_identity_session_id_user_sessions_id_fk",
+          "tableFrom": "app_sessions",
+          "tableTo": "user_sessions",
+          "columnsFrom": [
+            "identity_session_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        },
+        "app_sessions_user_id_users_id_fk": {
+          "name": "app_sessions_user_id_users_id_fk",
+          "tableFrom": "app_sessions",
+          "tableTo": "users",
+          "columnsFrom": [
+            "user_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {},
+      "uniqueConstraints": {
+        "app_sessions_session_hash_unique": {
+          "name": "app_sessions_session_hash_unique",
+          "nullsNotDistinct": false,
+          "columns": [
+            "session_hash"
+          ]
+        }
+      },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
     "public.audit_events": {
       "name": "audit_events",
       "schema": "",
@@ -306,6 +561,18 @@
         "elevated_until": {
           "name": "elevated_until",
           "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elevation_intent_client_id": {
+          "name": "elevation_intent_client_id",
+          "type": "varchar(64)",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "elevation_intent_resource": {
+          "name": "elevation_intent_resource",
+          "type": "varchar(255)",
           "primaryKey": false,
           "notNull": false
         },
@@ -2455,6 +2722,72 @@
           ]
         }
       },
+      "policies": {},
+      "checkConstraints": {},
+      "isRLSEnabled": false
+    },
+    "public.organisation_policies": {
+      "name": "organisation_policies",
+      "schema": "",
+      "columns": {
+        "organisation_id": {
+          "name": "organisation_id",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "policy_key": {
+          "name": "policy_key",
+          "type": "varchar(128)",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "policy_value": {
+          "name": "policy_value",
+          "type": "jsonb",
+          "primaryKey": false,
+          "notNull": true
+        },
+        "updated_by": {
+          "name": "updated_by",
+          "type": "bigint",
+          "primaryKey": false,
+          "notNull": false
+        },
+        "updated_at": {
+          "name": "updated_at",
+          "type": "timestamp with time zone",
+          "primaryKey": false,
+          "notNull": true,
+          "default": "now()"
+        }
+      },
+      "indexes": {},
+      "foreignKeys": {
+        "organisation_policies_organisation_id_organisations_id_fk": {
+          "name": "organisation_policies_organisation_id_organisations_id_fk",
+          "tableFrom": "organisation_policies",
+          "tableTo": "organisations",
+          "columnsFrom": [
+            "organisation_id"
+          ],
+          "columnsTo": [
+            "id"
+          ],
+          "onDelete": "cascade",
+          "onUpdate": "no action"
+        }
+      },
+      "compositePrimaryKeys": {
+        "organisation_policies_organisation_id_policy_key_pk": {
+          "name": "organisation_policies_organisation_id_policy_key_pk",
+          "columns": [
+            "organisation_id",
+            "policy_key"
+          ]
+        }
+      },
+      "uniqueConstraints": {},
       "policies": {},
       "checkConstraints": {},
       "isRLSEnabled": false
@@ -4709,6 +5042,15 @@
     }
   },
   "enums": {
+    "public.app_session_status": {
+      "name": "app_session_status",
+      "schema": "public",
+      "values": [
+        "ACTIVE",
+        "REVOKED",
+        "EXPIRED"
+      ]
+    },
     "public.audit_actor_type": {
       "name": "audit_actor_type",
       "schema": "public",

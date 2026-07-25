@@ -88,7 +88,7 @@ describe('NotificationClient', () => {
     const token = lastToken();
     const claims = decodeClaims(token);
     expect(claims.iss).toBe(Config.get('oauth.issuer'));
-    expect(claims.aud).toBe('pulse-server');
+    expect(claims.aud).toBe('api://pulse');
     expect(claims.token_type).toBe('service');
     expect(claims.scope).toBe('notifications:send');
     expect(claims.sub).toBe(claims.client_id as string);

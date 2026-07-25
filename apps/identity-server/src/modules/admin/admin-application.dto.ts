@@ -147,6 +147,19 @@ export class ApplicationDetailResponse extends ApplicationSummaryItem {
 export class CreateApplicationResponse {
   @Field(() => Number)
   id: number;
+
+  /**
+   * The application's identity, provisioned with it rather than configured separately (D-21): one
+   * client and one derived `api://<app>` audience. The secret is shown exactly once, here.
+   */
+  @Field()
+  clientId: string;
+
+  @Field()
+  audience: string;
+
+  @Field({ optional: true })
+  clientSecret?: string;
 }
 
 @Schema()

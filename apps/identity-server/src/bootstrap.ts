@@ -64,8 +64,8 @@ Config.load('auth.password.breach-check-enabled', { defaultValue: 'false', valid
 Config.load('auth.webauthn.rp-id', { defaultValue: 'localhost' });
 Config.load('auth.webauthn.origin', { defaultValue: 'http://localhost:8080' });
 
-/** `aud` of the outbound service token; must mirror pulse-server's AUTH_AUDIENCE (the identity-seeded `pulse-server` API resource). */
-Config.load('notification.audience', { defaultValue: 'pulse-server' });
+/** `aud` of the outbound service token; must mirror pulse's AUTH_AUDIENCE — its one API resource, derived as `api://pulse` (D-21). */
+Config.load('notification.audience', { defaultValue: 'api://pulse' });
 
 Config.load('worker.poll-interval', { defaultValue: '5000', validateType: 'number' });
 

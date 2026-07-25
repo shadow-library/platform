@@ -78,6 +78,12 @@ export class OAuthController {
       code_challenge_methods_supported: ['S256'],
       backchannel_logout_supported: true,
       backchannel_logout_session_supported: true,
+      /**
+       * Global rather than per-client, so they belong in the public document (D-21 §8.6): a service
+       * reads its step-up URL from here instead of restating it in its own configuration.
+       */
+      step_up_endpoint: `${this.issuer}/api/v1/me/mfa/step-up`,
+      app_session_endpoint: `${this.issuer}/api/v1/app-sessions`,
     };
   }
 

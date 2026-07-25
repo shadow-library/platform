@@ -10,7 +10,7 @@ import { Body, Delete, Get, HttpController, Params, Patch, Post, RespondFor } fr
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
-import { OAuthClientService } from '@server/modules/auth/oauth';
+import { OAUTH_CALLBACK_PATH, OAuthClientService } from '@server/modules/auth/oauth';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Application } from '@server/modules/infrastructure/datastore';
 import { ApplicationDetails, ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
@@ -52,8 +52,6 @@ interface ApplicationUpdate {
  * resource cannot exist without an `applicationId`). The platform application (`shadow-identity`)
  * is protected: it may never be deactivated or deleted, since the whole IdP hangs off it.
  */
-
-const OAUTH_CALLBACK_PATH = '/api/auth/callback';
 
 @HttpController('/api/v1/admin/applications')
 export class AdminApplicationController {
@@ -123,8 +121,19 @@ export class AdminApplicationController {
       isActive: body.isActive,
       publicUrls: body.publicUrls ? this.normaliseOrigins(body.publicUrls) : undefined,
     });
-    await this.record(actor, 'admin.application.created', String(application.id), { name: application.name });
-    return { id: application.id };
+
+    /**
+     * The application *is* the unit of identity (D-21), so its client and its `api://<app>` resource
+     * are provisioned with it. Registering them separately was the step that let an application's
+     * two clients drift apart and made "which client id?" an ambiguous question.
+     */
+    const provisioned = await this.clientService.provisionApplicationIdentity({
+      applicationId: application.id,
+      name: application.name,
+      publicUrls: application.publicUrls,
+    });
+    await this.record(actor, 'admin.application.created', String(application.id), { name: application.name, clientId: provisioned.clientId });
+    return { id: application.id, clientId: provisioned.clientId, audience: provisioned.audience, clientSecret: provisioned.secret };
   }
 
   @Get('/:applicationId')
@@ -185,9 +194,15 @@ export class AdminApplicationController {
     const application = this.applicationService.getApplicationByIdOrThrow(params.applicationId);
     if (application.name === APP_NAME) throw AppErrorCode.APP_004.create();
 
-    /** Clients FK-restrict the delete; resources, roles, permissions and keys cascade away with it. */
-    const clients = await this.clientService.listClients();
-    if (clients.some(client => client.applicationId === application.id)) throw AppErrorCode.APP_005.create();
+    /**
+     * Clients FK-restrict the delete, and under D-21 every application owns its own provisioned
+     * client — so that one goes with it, since it *is* the application's identity. Any further
+     * client is a separate registration someone made deliberately: the guard still refuses rather
+     * than destroying it as a side effect.
+     */
+    const clients = (await this.clientService.listClients()).filter(client => client.applicationId === application.id);
+    if (clients.some(client => client.id !== application.name)) throw AppErrorCode.APP_005.create();
+    for (const client of clients) await this.clientService.deleteClient(client.id);
 
     await this.applicationService.deleteApplication(application.name);
     await this.record(actor, 'admin.application.deleted', String(application.id), { name: application.name });

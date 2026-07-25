@@ -222,4 +222,11 @@ export class DiscoveryResponse {
 
   @Field(() => Boolean)
   backchannel_logout_session_supported: boolean;
+
+  /** Global first-party endpoints (D-21 §8.6) — a service derives them rather than configuring them. */
+  @Field()
+  step_up_endpoint: string;
+
+  @Field()
+  app_session_endpoint: string;
 }

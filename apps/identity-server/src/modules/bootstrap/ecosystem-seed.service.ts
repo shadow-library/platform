@@ -12,7 +12,7 @@ import { Logger } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { APP_NAME } from '@server/constants';
-import { OAuthClientService, RegisterClient } from '@server/modules/auth/oauth';
+import { applicationAudience, OAuthClientService, RegisterClient } from '@server/modules/auth/oauth';
 import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
@@ -32,14 +32,17 @@ const PLATFORM_RESOURCE = 'shadow-identity';
 const AUTHZ_CHECK_SCOPE = 'authz:check';
 const AUTHZ_ROLES_SYNC_SCOPE = 'authz:roles:sync';
 
-/** The pulse application, its OAuth clients and its token audience — mirrors pulse-server's own constants. */
+const APP_SESSION_SCOPE = 'app-session:manage';
+
+/**
+ * The pulse application. Under D-21 it holds **one** client (`pulse`) and exposes **one** API
+ * resource, `api://pulse`, both derived from the application name — the former `pulse` / `pulse-server`
+ * client pair and the `pulse-server` audience are gone, since an id that could mean either of an
+ * application's two clients was ambiguous at exactly the moments it mattered.
+ */
 const PULSE_APP = 'pulse';
-const PULSE_RESOURCE = 'pulse-server';
 const NOTIFICATIONS_SEND_SCOPE = 'notifications:send';
-const PULSE_RP_CLIENT = 'pulse';
-const PULSE_SERVICE_CLIENT = 'pulse-server';
 const IDENTITY_SERVICE_CLIENT = 'identity-server';
-const RP_CALLBACK_PATH = '/api/auth/callback';
 
 /** Browser origins that host the pulse relying party; each yields a `{origin}/api/auth/callback` redirect URI. */
 const PULSE_PUBLIC_URLS = ['https://pulse.shadow-apps.com', 'http://localhost:8080'];
@@ -114,7 +117,7 @@ export class EcosystemSeedService {
     const pulseApplicationId = await this.ensurePulseApplication();
     const scopes = await this.ensureScopes(pulseApplicationId);
     await this.ensurePulseRbac(pulseApplicationId);
-    await this.ensurePulseClients(pulseApplicationId, scopes);
+    await this.ensurePulseClient(pulseApplicationId, scopes);
     await this.ensureIdentityNotificationAccess(pulseApplicationId, scopes.notificationsSend);
   }
 
@@ -134,16 +137,17 @@ export class EcosystemSeedService {
     return application.id;
   }
 
-  /** Provisions the pulse API resource + `notifications:send`, and the identity-side authz scopes pulse's SDK needs. */
-  private async ensureScopes(pulseApplicationId: number): Promise<{ notificationsSend: string; authzCheck: string; authzRolesSync: string }> {
-    const resource = await this.oauthClientService.ensureResource(pulseApplicationId, PULSE_RESOURCE, 'Pulse notification API');
+  /** Provisions the pulse API resource + `notifications:send`, and the identity-side platform scopes pulse's SDK needs. */
+  private async ensureScopes(pulseApplicationId: number): Promise<{ notificationsSend: string; authzCheck: string; authzRolesSync: string; appSession: string }> {
+    const resource = await this.oauthClientService.ensureResource(pulseApplicationId, applicationAudience(PULSE_APP), 'Pulse notification API');
     /** A machine-to-machine capability, so it must never leak into a user token. */
     const notificationsSend = await this.oauthClientService.createScope(resource.id, NOTIFICATIONS_SEND_SCOPE, 'Send notifications through pulse', false, 'SERVICE');
 
     const platform = this.applicationService.getApplicationOrThrow(APP_NAME);
     const authzCheck = await this.oauthClientService.ensureScope(platform.id, PLATFORM_RESOURCE, AUTHZ_CHECK_SCOPE);
     const authzRolesSync = await this.oauthClientService.ensureScope(platform.id, PLATFORM_RESOURCE, AUTHZ_ROLES_SYNC_SCOPE);
-    return { notificationsSend, authzCheck, authzRolesSync };
+    const appSession = await this.oauthClientService.ensureScope(platform.id, PLATFORM_RESOURCE, APP_SESSION_SCOPE);
+    return { notificationsSend, authzCheck, authzRolesSync, appSession };
   }
 
   private async ensurePulseRbac(pulseApplicationId: number): Promise<void> {
@@ -169,30 +173,25 @@ export class EcosystemSeedService {
     return role.id;
   }
 
-  private async ensurePulseClients(pulseApplicationId: number, scopes: { authzCheck: string; authzRolesSync: string }): Promise<void> {
-    await this.ensureClient({
-      id: PULSE_RP_CLIENT,
-      label: 'pulse relying-party',
+  /**
+   * One client for the whole application (D-21): the same credential runs the browser code flow and
+   * the server-to-server calls, because they are one deployment and therefore one identity.
+   */
+  private async ensurePulseClient(pulseApplicationId: number, scopes: { authzCheck: string; authzRolesSync: string; appSession: string }): Promise<void> {
+    const provisioned = await this.oauthClientService.provisionApplicationIdentity({
       applicationId: pulseApplicationId,
-      name: 'Pulse Web',
-      kind: 'WEB_CONFIDENTIAL',
+      name: PULSE_APP,
+      publicUrls: PULSE_PUBLIC_URLS,
       isFirstParty: true,
-      grantTypes: ['authorization_code', 'refresh_token'],
-      redirectUris: PULSE_PUBLIC_URLS.map(origin => `${origin}${RP_CALLBACK_PATH}`),
     });
+    if (provisioned.created && provisioned.secret) {
+      this.logger.warn(`Seeded pulse client '${provisioned.clientId}' — store this secret now, it is shown only once: ${provisioned.secret}`, { clientId: provisioned.clientId });
+    }
 
-    await this.ensureClient({
-      id: PULSE_SERVICE_CLIENT,
-      label: 'pulse service',
-      applicationId: pulseApplicationId,
-      name: 'Pulse Server',
-      kind: 'SERVICE',
-      isFirstParty: true,
-      grantTypes: ['client_credentials'],
-    });
-    /** The SDK loads its service-access rules and calls the PDP, so the service client carries the identity-side authz scopes. */
-    await this.oauthClientService.grantScope(PULSE_SERVICE_CLIENT, scopes.authzCheck);
-    await this.oauthClientService.grantScope(PULSE_SERVICE_CLIENT, scopes.authzRolesSync);
+    /** The SDK loads its service-access rules, calls the PDP and opens app sessions for its users. */
+    await this.oauthClientService.grantScope(provisioned.clientId, scopes.authzCheck);
+    await this.oauthClientService.grantScope(provisioned.clientId, scopes.authzRolesSync);
+    await this.oauthClientService.grantScope(provisioned.clientId, scopes.appSession);
   }
 
   /**

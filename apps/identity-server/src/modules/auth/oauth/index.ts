@@ -1,4 +1,6 @@
 export * from './access-token.service';
+export * from './apps.controller';
+export * from './apps.dto';
 export * from './authorization-code.service';
 export * from './consent.controller';
 export * from './consent.dto';

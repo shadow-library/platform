@@ -63,7 +63,7 @@ export class AccessGuard implements MiddlewareGenerator {
       const context: AuthContext = { clientInfo: clientInfoOf(request as AuthenticatedRequest) };
 
       if (options.service) {
-        context.serviceToken = this.verifyServiceToken(request, options.service);
+        context.serviceToken = this.verifyServiceToken(request, options.service === true ? undefined : options.service);
         (request as AuthenticatedRequest).auth = context;
         return;
       }
@@ -93,7 +93,8 @@ export class AccessGuard implements MiddlewareGenerator {
     return BigInt(value);
   }
 
-  private verifyServiceToken(request: FastifyRequest, scope: string): JwtClaims {
+  /** An omitted `scope` still demands a valid platform service token — only the entitlement check is skipped. */
+  private verifyServiceToken(request: FastifyRequest, scope?: string): JwtClaims {
     const header = request.headers.authorization;
     const token = typeof header === 'string' && header.startsWith('Bearer ') ? header.slice(7) : undefined;
     if (!token) throw AppErrorCode.SEC_003.create();
@@ -103,7 +104,8 @@ export class AccessGuard implements MiddlewareGenerator {
     if (!claims || typeof claims.exp !== 'number' || claims.exp <= now || claims.iss !== this.issuer) throw AppErrorCode.SEC_003.create();
 
     const scopes = typeof claims.scope === 'string' ? claims.scope.split(' ') : [];
-    if (claims.token_type !== 'service' || claims.aud !== PLATFORM_AUDIENCE || !scopes.includes(scope)) throw AppErrorCode.SEC_004.create();
+    if (claims.token_type !== 'service' || claims.aud !== PLATFORM_AUDIENCE) throw AppErrorCode.SEC_004.create();
+    if (scope !== undefined && !scopes.includes(scope)) throw AppErrorCode.SEC_004.create();
     return claims;
   }
 }

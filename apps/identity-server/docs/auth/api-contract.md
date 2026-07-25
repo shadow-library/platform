@@ -259,6 +259,25 @@ Specified in `docs/architecture.md` §12; not duplicated here. The interactive f
 
 Clients registered with a `backchannel_logout_uri` receive an [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) token whenever a session that issued them a refresh-token family terminates (signout, self-service revocation, admin termination, lock, erasure). The logout token is an EdDSA JWT (`iss`, `sub`, `aud` = client id, `iat`, `exp` +120 s, `jti`, `events`, `sid`; never `nonce`), POSTed as `logout_token=<jwt>` (`application/x-www-form-urlencoded`). Delivery is transactional with retries/backoff and dead-letters after 5 attempts; the worker process is the sender. ID tokens carry `sid` so clients can correlate. Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`. First-party app-session clients hold no refresh-token family and therefore receive **no logout token** — they observe termination at their next mint (`AUTH_005`), per D-18.
 
+### 5.2 Application self-description — _implemented (T-807)_
+
+`GET /api/v1/apps/me` (M2M service token; **no additional scope** — a client may only ever read itself, and the subject comes from the token rather than the path) returns the registration a service would otherwise have restated in its own environment (D-21):
+
+```jsonc
+{
+  "app": "pulse",
+  "isFirstParty": true,
+  "audience": "api://pulse",
+  "redirectUris": ["https://pulse.shadow-apps.com/api/auth/callback"],
+  "scopes": ["reports:read", "reports:write"],
+  "sensitiveScopes": ["reports:admin"],
+  "grants": [{ "audience": "api://novel-forge", "scopes": ["books:read"] }],
+  "accessTokenTtl": 3600,
+}
+```
+
+`grants` lists this application's scope grants on **other** applications and is the ceiling for delegated calls (§6.2 of the integration guide). An application holds exactly one client and exposes exactly one API resource, `api://<app>`, both provisioned when the application is registered — `POST /api/v1/admin/applications` returns `clientId`, `audience` and the once-shown `clientSecret`. Discovery additionally publishes `step_up_endpoint` and `app_session_endpoint`, which are global rather than per-client.
+
 ## 6. Administrative APIs (`/api/v1/admin/*`) — _implemented (M6)_
 
 Session cookie + CSRF; every endpoint is PDP-guarded in the platform organisation (T-601): reads need the matching `iam:*:read`/manage permission at AAL1+, mutations demand an AAL2 step-up. All mutations are actor-attributed in the audit chain.

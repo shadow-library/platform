@@ -12,7 +12,7 @@ import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { ADMIN_PERMISSIONS, IAM_ADMIN_ROLE, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { APP_SESSION_SCOPE } from '@server/modules/auth/app-session';
-import { OAuthClientService } from '@server/modules/auth/oauth';
+import { applicationAudience, OAuthClientService } from '@server/modules/auth/oauth';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
@@ -90,10 +90,10 @@ export class BootstrapService implements OnModuleInit {
    */
   private async ensureFirstPartyRegistrations(): Promise<void> {
     const novelForge = await this.ensureApplication('novel-forge');
-    await this.oauthClientService.ensureResource(novelForge.id, 'novel-forge-server', 'Novel Forge API');
+    await this.oauthClientService.ensureResource(novelForge.id, applicationAudience('novel-forge'), 'Novel Forge API');
 
     const webnovel = await this.ensureApplication('webnovel');
-    const webnovelResource = await this.oauthClientService.ensureResource(webnovel.id, 'webnovel-server', 'Webnovel Reader API');
+    const webnovelResource = await this.oauthClientService.ensureResource(webnovel.id, applicationAudience('webnovel'), 'Webnovel Reader API');
     /** `webnovel:publish` is service-only: a user token can never carry it, and only the granted M2M client can request it. */
     const publishScopeId = await this.oauthClientService.createScope(webnovelResource.id, 'webnovel:publish', 'Publish rendered novels to the reader', false, 'SERVICE');
 

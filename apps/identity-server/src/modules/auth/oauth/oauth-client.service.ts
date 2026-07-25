@@ -15,7 +15,7 @@ import { APP_NAME } from '@server/constants';
 import { type ElevationIntent } from '@server/modules/auth/session';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
-import { DEFAULT_AUDIENCE } from './oauth.constants';
+import { applicationAudience, DEFAULT_AUDIENCE, OAUTH_CALLBACK_PATH, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from './workload-subject.util';
 
 /**
@@ -46,6 +46,27 @@ export interface RegisterClient {
 }
 
 export type ClientAuthMethod = 'client_secret' | 'workload_identity';
+
+export interface ProvisionedApplication {
+  clientId: string;
+  secret?: string;
+  audience: string;
+  /** False when the application already held its client, so a caller knows not to expect a secret. */
+  created: boolean;
+}
+
+/** An application's own registration, as it reads itself back at `GET /api/v1/apps/me` (D-21 §8.6). */
+export interface ApplicationDescription {
+  app: string;
+  isFirstParty: boolean;
+  audience: string | null;
+  redirectUris: string[];
+  scopes: string[];
+  sensitiveScopes: string[];
+  /** This application's grants on *other* applications — the ceiling for delegated calls (D-22). */
+  grants: { audience: string; scopes: string[] }[];
+  accessTokenTtl: number;
+}
 
 export interface RegisteredClient {
   clientId: string;
@@ -226,6 +247,81 @@ export class OAuthClientService {
     const client = await this.getClient(clientId);
     if (!client || !client.isActive) throw AppErrorCode.OAU_002.create();
     return { clientId: client.id, resource: resource ?? DEFAULT_AUDIENCE };
+  }
+
+  /**
+   * Provisions the identity of an application: exactly one client and exactly one API resource,
+   * whose identifier is derived as `api://<app>` rather than configured (D-21). The cluster is the
+   * trust boundary, so processes inside one application share its identity; splitting a product
+   * into an `<app>` and an `<app>-server` client only ever created ambiguity about which of the two
+   * an id referred to.
+   *
+   * Idempotent: an application that already holds its client is returned unchanged, so re-running a
+   * seed or replaying a registration never mints a second credential.
+   */
+  async provisionApplicationIdentity(input: { applicationId: number; name: string; publicUrls?: string[]; isFirstParty?: boolean }): Promise<ProvisionedApplication> {
+    const audience = applicationAudience(input.name);
+    await this.ensureResource(input.applicationId, audience, `${input.name} API`);
+
+    const existing = await this.getClient(input.name);
+    if (existing) return { clientId: existing.id, audience, created: false };
+
+    const registered = await this.register({
+      id: input.name,
+      applicationId: input.applicationId,
+      name: input.name,
+      /**
+       * One client serves both faces of an application: the browser-facing code flow and the
+       * server-to-server credential. They are the same deployment, so they are the same identity.
+       */
+      kind: 'WEB_CONFIDENTIAL',
+      isFirstParty: input.isFirstParty ?? true,
+      grantTypes: ['authorization_code', 'client_credentials', TOKEN_EXCHANGE_GRANT],
+      redirectUris: (input.publicUrls ?? []).map(origin => `${origin}${OAUTH_CALLBACK_PATH}`),
+    });
+    return { clientId: registered.clientId, secret: registered.secret, audience, created: true };
+  }
+
+  /**
+   * The registration a service would otherwise have restated in its own environment (D-21, §8.6):
+   * its audience, redirect URIs, the scopes its own API defines, and its grants on *other*
+   * applications — which are the ceiling for delegated calls (D-22). A client may only ever read
+   * itself, so the route needs no scope beyond a valid service token.
+   */
+  async describeApplication(clientId: string): Promise<ApplicationDescription | null> {
+    const client = await this.getClient(clientId);
+    if (!client || !client.isActive) return null;
+
+    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true } });
+    if (!application) return null;
+
+    const owned = await this.db
+      .select({ identifier: schema.apiResources.identifier, scope: schema.scopes.name, isSensitive: schema.scopes.isSensitive })
+      .from(schema.apiResources)
+      .leftJoin(schema.scopes, eq(schema.scopes.apiResourceId, schema.apiResources.id))
+      .where(and(eq(schema.apiResources.applicationId, client.applicationId), eq(schema.apiResources.isActive, true)));
+
+    const redirectUris = await this.db
+      .select({ uri: schema.oauthClientRedirectUris.uri })
+      .from(schema.oauthClientRedirectUris)
+      .where(eq(schema.oauthClientRedirectUris.clientId, client.id));
+
+    const ownIdentifiers = new Set(owned.map(row => row.identifier));
+    /** Grants on an application's own API are not delegation — they are simply its own surface. */
+    const foreign = (await this.getGrantedScopes(client.id)).filter(scope => !ownIdentifiers.has(scope.resourceIdentifier));
+    const byAudience = new Map<string, string[]>();
+    for (const scope of foreign) byAudience.set(scope.resourceIdentifier, [...(byAudience.get(scope.resourceIdentifier) ?? []), scope.name]);
+
+    return {
+      app: application.name,
+      isFirstParty: client.isFirstParty,
+      audience: owned.find(row => row.identifier === applicationAudience(application.name))?.identifier ?? owned[0]?.identifier ?? null,
+      redirectUris: redirectUris.map(row => row.uri),
+      scopes: owned.filter(row => row.scope && !row.isSensitive).map(row => row.scope as string),
+      sensitiveScopes: owned.filter(row => row.scope && row.isSensitive).map(row => row.scope as string),
+      grants: [...byAudience].map(([audience, scopes]) => ({ audience, scopes })),
+      accessTokenTtl: client.accessTokenTtl,
+    };
   }
 
   /**

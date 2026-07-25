@@ -101,7 +101,18 @@ describe('Admin application API', () => {
     expect(detail.json()).toMatchObject({ displayName: 'Novel Forge', logoUrl: 'https://cdn.example.com/logo.png' });
   });
 
-  it('should delete an application that owns no clients', async () => {
+  /** An application *is* its client and its audience (D-21), so registration provisions both at once. */
+  it('should provision one client and one derived audience with the application', async () => {
+    const name = uniqueName('provisioned');
+    const created = await request('post', '/api/v1/admin/applications').body({ name, subDomain: 'provisioned' });
+    expect(created.statusCode).toBe(201);
+    const body = created.json() as { clientId: string; audience: string; clientSecret?: string };
+    expect(body).toMatchObject({ clientId: name, audience: `api://${name}` });
+    /** The secret is shown exactly once, here. */
+    expect(body.clientSecret).toBeString();
+  });
+
+  it('should delete an application together with its own provisioned client', async () => {
     const name = uniqueName('ephemeral');
     const created = await request('post', '/api/v1/admin/applications').body({ name, subDomain: 'ephemeral' });
     const { id } = created.json() as { id: number };
@@ -111,9 +122,11 @@ describe('Admin application API', () => {
 
     const detail = await request('get', `/api/v1/admin/applications/${id}`);
     expect(detail.statusCode).toBe(404);
+    /** Its identity went with it rather than being left orphaned. */
+    expect(await env.getService(OAuthClientService).getClient(name)).toBeNull();
   });
 
-  it('should refuse to delete an application that still owns clients', async () => {
+  it('should refuse to delete an application that owns a client beyond its own', async () => {
     const name = uniqueName('withclient');
     const created = await request('post', '/api/v1/admin/applications').body({ name, subDomain: 'withclient' });
     const { id } = created.json() as { id: number };

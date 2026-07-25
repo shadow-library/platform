@@ -57,18 +57,22 @@ You'll receive a **client id** and, for secret-based confidential clients, a **s
 
 The identity server's boot seed (`EcosystemSeedService`) idempotently provisions the first-party ecosystem on every boot — no admin request needed for these apps:
 
-| Application                  | RP client (`WEB_CONFIDENTIAL`, code + PKCE) | Service client (`SERVICE`, `client_credentials`)  | API resource / audience |
-| :--------------------------- | :------------------------------------------ | :------------------------------------------------ | :---------------------- |
-| `pulse`                      | `pulse`                                     | `pulse-server`                                    | `pulse-server`          |
-| `novel-forge`                | `novel-forge`                               | `novel-forge-server`                              | `novel-forge-server`    |
-| `webnovel`                   | `webnovel`                                  | `webnovel-server`                                 | `webnovel-server`       |
-| `shadow-identity` (platform) | —                                           | `identity-server` (identity's own outbound calls) | `shadow-identity`       |
+An application holds **one** client and exposes **one** API resource, both derived from its name (D-21) — the former `<app>` / `<app>-server` client pair is gone, along with the ambiguity of which of the two an id referred to:
+
+| Application                  | Client                                            | API resource / audience |
+| :--------------------------- | :------------------------------------------------ | :---------------------- |
+| `pulse`                      | `pulse`                                           | `api://pulse`           |
+| `novel-forge`                | `novel-forge`                                     | `api://novel-forge`     |
+| `webnovel`                   | `webnovel`                                        | `api://webnovel`        |
+| `shadow-identity` (platform) | `identity-server` (identity's own outbound calls) | `shadow-identity`       |
+
+Identity's own platform API keeps its bare identifier: it is the platform rather than an application onboarding onto it, and every service token and guard already names it.
 
 Also seeded:
 
-- Every `*-server` client is granted `authz:check` and `authz:roles:sync` (so the SDK can load service-access rules, call the PDP, and push a role catalog).
-- `novel-forge-server` is granted the `webnovel:publish` scope (on the `webnovel-server` resource).
-- Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge-server` → webnovel `* /internal/*`.
+- Each application's client is granted `authz:check`, `authz:roles:sync` and `app-session:manage` (so the SDK can load service-access rules, call the PDP, push a role catalog, and open app sessions).
+- `novel-forge` is granted the `webnovel:publish` scope (on the `api://webnovel` resource).
+- Service-access rules: `identity-server` → pulse `POST /api/v1/notifications`; `novel-forge` → webnovel `* /internal/*`.
 - RP redirect URIs: `{origin}/api/auth/callback` for every public origin on the application. Origins are stored on the application (`applications.public_urls`) — seeded with defaults (`http://<app>.shadow-apps.test` plus a localhost dev variant) the first time the app is created, then managed through the admin console's application page. Editing an app's public URLs regenerates its relying-party clients' redirect URIs; the seed no longer overwrites them on boot.
 
 **Client ids and secrets.** By default client ids are database-generated UUIDs, so they differ per environment. On the boot that first creates a client, its id and secret are logged once (`Registered service client '<name>' …` — same convention as the bootstrap-admin password); afterwards look ids up via `GET /api/v1/admin/clients` and mint a fresh secret with `POST /api/v1/admin/clients/:clientId/rotate-secret` (dual-secret overlap, so running consumers keep working while you re-configure). Secrets are stored hashed; they cannot be read back.
@@ -97,8 +101,8 @@ Every variable is optional and each pair's halves are independent; whatever is u
 ```sh
 # SDK (AuthModule) — token verification, rules loading, PDP, M2M
 AUTH_ISSUER=<identity base URL>            # e.g. http://localhost:8080 in dev
-AUTH_AUDIENCE=<your API resource>          # e.g. pulse-server
-AUTH_CLIENT_ID=<uuid of your *-server client>
+AUTH_AUDIENCE=<your API resource>          # derived as api://<app>, e.g. api://pulse
+AUTH_CLIENT_ID=<your application's client id>
 AUTH_CLIENT_SECRET=<secret>                # or AUTH_CLIENT_ASSERTION_PATH in-cluster
 
 # RP login flow (RelyingPartyModule) — app-defined keys, guide convention:

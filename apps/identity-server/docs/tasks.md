@@ -347,10 +347,26 @@ A refund-on-success design was rejected: the refund lags the consume by an argon
 
 **Decision beyond the task text:** sensitive scopes are excluded from an exchanged token entirely. D-19 mints an `is_sensitive` scope only into an elevated token, and D-22 fixes an exchanged token at AAL1 — so letting one through would have been the one path where a sensitive capability reached a token that never proved a second factor.
 
-### T-807 — Application as the unit of identity (D-21) · L
+### T-807 — Application as the unit of identity (D-21) · L — **done (server side; A-3 + W-3 still required)**
 
 - **Change:** `GET /api/v1/apps/me` self-description; provision the client and the `api://<app>` resource 1:1 from application registration; publish `step_up_endpoint` and `app_session_endpoint` in discovery; SDK derives configuration from `AUTH_ISSUER` + `AUTH_APP_ID` and refreshes it on a TTL.
 - **DoD:** a service boots with issuer + app id + credential only; an admin scope grant propagates without a redeploy; the step-up URL comes from discovery.
+
+**Landed:** `GET /api/v1/apps/me` describes the caller's own registration — audience, redirect URIs, the scopes its API defines (sensitive ones listed apart), its grants on other applications, and `accessTokenTtl`. It takes `@Auth({ service: true })`, a new mode meaning "any valid platform service token, no further entitlement": the only subject is the caller itself, resolved from the token rather than the path, so there is nothing one application could read about another. Deliberately **not** `@M2MBudget()` — that decorator only peeks the IP tier and expects something to charge the client budget at the point of authentication, which this route has no reason to do.
+
+`provisionApplicationIdentity` creates the one client and the one `api://<app>` resource together, and it is idempotent, so a replayed registration never mints a second credential. Admin registration returns `clientId`, `audience` and the once-shown `clientSecret`. Discovery publishes `step_up_endpoint` and `app_session_endpoint`.
+
+**Consequence worth noting:** every application now owns a client by construction, which would have made `DELETE /admin/applications/:id` permanently refuse (clients FK-restrict it). Deletion now removes the application's *own* provisioned client with it — that client is its identity — while still refusing when any further client exists, so a deliberate extra registration is never destroyed as a side effect.
+
+### C-1 — Re-seed the ecosystem per D-21 — **done**
+
+Pulse holds one client (`pulse`, `authorization_code` + `client_credentials` + token-exchange, granted `authz:check`, `authz:roles:sync` and `app-session:manage`) instead of the `pulse` / `pulse-server` pair, and its audience is `api://pulse`. `novel-forge-server` / `webnovel-server` became `api://novel-forge` / `api://webnovel`; `notification.audience` now defaults to `api://pulse`.
+
+**Decision:** identity's own platform API keeps the bare `shadow-identity` identifier rather than becoming `api://shadow-identity`. It is not an application onboarding onto the platform but the platform itself, and the name is load-bearing in the access guard, SCIM auth, app-sessions and every service token already issued — renaming it buys symmetry at the cost of reconfiguring every consumer. C-1 targets the `<app>-server`-style identifiers, which are gone.
+
+### C-2 — Reset the migration baseline — **done**
+
+The journal and the `0000`–`0003` sequence were dropped and regenerated as a single `0000` baseline covering all 50 tables, including T-801's `elevation_intent_*` columns. `shadow check-migrations` is clean and the test template builds from it.
 
 ### T-808 — `mfa.email_otp_fallback.enabled` policy (D-20) · S · Sec: Medium — **done (policy registered; exclusion has no target yet)**
 

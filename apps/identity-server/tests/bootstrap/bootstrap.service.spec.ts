@@ -96,9 +96,14 @@ describe('BootstrapService', () => {
     const pulsePermissions = pulse ? (await env.getService(PolicyDecisionService).listPermissionsForApplication(pulse.id)).map(permission => permission.name) : [];
     expect(pulsePermissions).toEqual(expect.arrayContaining(['pulse:templates:read', 'pulse:templates:write', 'pulse:templates:publish', 'pulse:layouts:write']));
 
-    /** The pulse relying party, the pulse service client, and identity's own outbound client. */
+    /** One client per application (D-21): pulse's, plus identity's own outbound client. */
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
-    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'pulse', 'pulse-server']);
+    expect(clients.map(client => client.id).sort()).toEqual(['identity-server', 'pulse']);
+
+    /** That one client serves both faces of the application — the code flow and the M2M credential. */
+    const pulseClient = clients.find(client => client.id === 'pulse');
+    expect(pulseClient?.grantTypes).toEqual(expect.arrayContaining(['authorization_code', 'client_credentials']));
+    expect(await env.getService(OAuthClientService).getGrantedScopeNames('pulse')).toEqual(expect.arrayContaining(['authz:check', 'authz:roles:sync', 'app-session:manage']));
 
     /** identity's outbound client must hold notifications:send, or NotificationTokenService cannot mint a token. */
     const grantedScopes = await env.getService(OAuthClientService).getGrantedScopeNames('identity-server');
@@ -113,7 +118,8 @@ describe('BootstrapService', () => {
   it('should register first-party API resources and the service-only publish scope', async () => {
     /** Resources are seeded declaratively so audience/scope validation has something to validate against; consumer clients stay console-registered. */
     const resources = await env.getPostgresClient().select().from(schema.apiResources);
-    expect(resources.map(resource => resource.identifier).sort()).toEqual(['novel-forge-server', 'pulse-server', 'shadow-identity', 'webnovel-server']);
+    /** Audiences are derived as `api://<app>` (D-21); identity's own platform API keeps its bare name. */
+    expect(resources.map(resource => resource.identifier).sort()).toEqual(['api://novel-forge', 'api://pulse', 'api://webnovel', 'shadow-identity']);
 
     const publishScope = (await env.getPostgresClient().select().from(schema.scopes)).find(scope => scope.name === 'webnovel:publish');
     expect(publishScope?.principalType).toBe('SERVICE');
