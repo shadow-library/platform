@@ -40,12 +40,16 @@ export interface ServiceTokenOptions {
 Logger.attachTransport('file:json');
 const baseConnectionString = process.env.DATABASE_POSTGRES_URL ?? 'postgresql://postgres:postgres@localhost/shadow_pulse';
 
-/** Pulse's resource identifier (ecosystem-standard audience); every test token is minted for this audience so the guard accepts it */
-export const TEST_AUDIENCE = 'pulse-server';
+/** Pulse's app id at identity; the SDK reads it from `AUTH_APP_ID` and it doubles as the OAuth client id */
+export const TEST_APP_ID = 'pulse';
+/** Pulse's API resource identifier; the mock's `apps/me` publishes it and the SDK derives it as the audience the guard accepts */
+export const TEST_AUDIENCE = 'api://pulse';
+/** The platform scopes an admin has granted the pulse client; the SDK's `apps/me` publishes exactly these */
+export const TEST_GRANTED_SCOPES = ['authz:check', 'authz:roles:sync', 'app-session:manage'] as const;
 /** The single platform organisation operator permissions are evaluated in (pulse is single-tenant) */
 export const TEST_ORG = '1';
 /** The client id the identity server calls pulse with — the in-cluster M2M compatibility contract */
-export const IDENTITY_CLIENT_ID = 'identity';
+export const IDENTITY_CLIENT_ID = 'identity-server';
 /** Generic allow-listed M2M caller used by business-logic specs */
 export const TEST_SERVICE_CLIENT_ID = 'test-service';
 const ADMIN_SUB = 'test-operator';
@@ -80,13 +84,24 @@ export class TestEnvironment {
 
     /**
      * An in-process mock identity provider stands in for the real platform: it serves discovery,
-     * JWKS, the token endpoint, the PDP, and the service-access rules so the SDK auth guard
-     * exercises its real verification and authorization paths. Its config is injected — and the
-     * M2M service-access rules configured — before `AppModule` is imported, because the SDK's
-     * `AuthModule.forRoot` snapshots the auth config when the module graph is loaded.
+     * JWKS, the token endpoint, the PDP, the service-access rules, `GET /api/v1/apps/me`, and the
+     * first-party app-session routes, so the SDK auth guard and browser flow exercise their real
+     * paths. The mock publishes pulse's registration (app id `pulse`, audience `api://pulse`, the
+     * granted platform scopes, and the callback redirect uri) from which the SDK derives everything
+     * a deploy used to restate. Its config is injected — and the M2M service-access rules
+     * configured — before `AppModule` is imported, because `AuthModule.forRoot` resolves the auth
+     * config when the module graph is loaded.
      */
     beforeAll(async () => {
-      this.idp = await createTestIdP();
+      this.idp = await createTestIdP({
+        app: {
+          appId: TEST_APP_ID,
+          name: TEST_APP_ID,
+          audience: TEST_AUDIENCE,
+          redirectUris: ['http://localhost:8080/api/auth/callback'],
+          scopes: [...TEST_GRANTED_SCOPES],
+        },
+      });
       this.idp.setServiceAccess([
         /** The production contract: identity calls the notification send endpoint in-cluster */
         { callerClientId: IDENTITY_CLIENT_ID, method: 'POST', path: '/api/v1/notifications' },
@@ -94,10 +109,8 @@ export class TestEnvironment {
         { callerClientId: TEST_SERVICE_CLIENT_ID, method: '*', path: '/api/v1/*' },
       ]);
       Config['cache'].set('auth.issuer', this.idp.issuer);
-      Config['cache'].set('auth.audience', TEST_AUDIENCE);
-      Config['cache'].set('auth.client.id', 'pulse');
+      Config['cache'].set('auth.app-id', TEST_APP_ID);
       Config['cache'].set('auth.client.secret', 'test-secret');
-      Config['cache'].set('auth.identity-resource', 'shadow-identity');
 
       const { AppModule } = await import('@server/app.module');
       this.app = new ShadowApplication(AppModule);
