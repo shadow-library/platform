@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Controller, EnableIf, Handler } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Logger } from '@shadow-library/common';
 import { Body, ContextService, Get, HttpController, type HttpResponse, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
@@ -133,9 +133,13 @@ export class AuthController {
 
   /**
    * The step-up landing point. It first tries to *claim* an existing step-up — the user may already
-   * have satisfied identity elsewhere — and only prompts when there is nothing to claim. The
-   * `claimed` marker is what keeps that prompt from becoming a loop when identity sends back a
-   * browser that still cannot be elevated.
+   * have satisfied identity elsewhere — and only prompts when there is nothing to claim.
+   *
+   * Both failures lead back to the prompt, but for opposite reasons, so each gets its own marker to
+   * keep the bounce from becoming a loop. `claimed` says a prompt has already been answered and there
+   * was still nothing to claim, which is terminal. `retried` says the step-up existed but named
+   * another beneficiary (D-19) — a claim can never fix that, only a fresh prompt carrying this
+   * application's intent can, and it gets exactly one.
    */
   @Get('/step-up')
   @EnableIf(() => isEnabled('stepUp'))
@@ -144,17 +148,31 @@ export class AuthController {
     if (!handle) throw AuthGuardErrorCode.IAM_001.create();
 
     const returnTo = this.sessions.resolveReturnTo(query.return_to);
-    const claimed = await this.sessions
+    const outcome = await this.claim(handle, query);
+    const target = outcome === 'claimed' ? returnTo : await this.promptUrl(returnTo, outcome, query);
+    this.send(this.context.getResponse(), [], target);
+  }
+
+  private async claim(handle: string, query: AuthStepUpQuery): Promise<'claimed' | 'absent' | 'mismatch'> {
+    return this.sessions
       .claimElevation(handle)
-      .then(() => true)
+      .then((): 'claimed' => 'claimed')
       .catch((error: unknown) => {
+        if (AppError.is(error, AuthErrorCode.ELEVATION_INTENT_MISMATCH)) {
+          if (query.retried) throw error;
+          this.logger.warn('the step-up named another beneficiary; restarting the prompt with this application intent');
+          return 'mismatch';
+        }
         if (query.claimed) throw error;
         this.logger.debug('no step-up left to claim; handing the browser to identity');
-        return false;
+        return 'absent';
       });
+  }
 
-    const target = claimed ? returnTo : await this.sessions.identityStepUpUrl(`${this.sessions.stepUpUrl(returnTo)}&claimed=1`);
-    this.send(this.context.getResponse(), [], target);
+  /** Carries both markers forward, so neither failure can bounce the browser more than once each */
+  private promptUrl(returnTo: string, outcome: 'absent' | 'mismatch', query: AuthStepUpQuery): Promise<string> {
+    const markers = [outcome === 'absent' || query.claimed ? 'claimed=1' : '', outcome === 'mismatch' || query.retried ? 'retried=1' : ''].filter(Boolean);
+    return this.sessions.identityStepUpUrl(`${this.sessions.stepUpUrl(returnTo)}&${markers.join('&')}`);
   }
 
   private cookies(): Record<string, string> {

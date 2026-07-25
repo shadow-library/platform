@@ -66,6 +66,21 @@ describe('AppSessionClient', () => {
     await expect(auth.appSessions.mintToken({ sessionHandle: session.sessionHandle, resource: AUDIENCE, elevated: true })).rejects.toMatchObject({ code: 'ELEVATION_REQUIRED' });
   });
 
+  it('should refuse a claim on a step-up granted to another application or resource', async () => {
+    const session = await createSession('someone-elses-step-up');
+
+    /** D-19: the step-up names its beneficiary, so whoever asks first cannot simply take the window */
+    idp.setSteppedUp('someone-elses-step-up', { clientId: 'svc-somebody-else' });
+    await expect(auth.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).rejects.toMatchObject({ code: 'ELEVATION_INTENT_MISMATCH', status: 403 });
+
+    idp.setSteppedUp('someone-elses-step-up', { clientId: CLIENT.id, resource: OTHER_AUDIENCE });
+    await expect(auth.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).rejects.toMatchObject({ code: 'ELEVATION_INTENT_MISMATCH' });
+
+    /** The step-up is still there to be spent — a mismatch refuses the claim, it does not consume it */
+    idp.setSteppedUp('someone-elses-step-up', { clientId: CLIENT.id, resource: AUDIENCE });
+    await expect(auth.appSessions.claimElevation(session.sessionHandle, AUDIENCE)).resolves.toMatchObject({ expiresAt: expect.any(String) });
+  });
+
   it('should spend a step-up into a grant that mints AAL2 for that audience only', async () => {
     const session = await createSession('stepped-up');
     idp.setSteppedUp('stepped-up', true);

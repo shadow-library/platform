@@ -249,6 +249,42 @@ describe('first-party browser flow', () => {
       expect(target.origin).toBe(new URL(idp.issuer).origin);
       expect(target.searchParams.get('acr_values')).toBe('AAL2');
       expect(target.searchParams.get('return_to')).toContain('claimed=1');
+
+      /** Naming the beneficiary is what stops another application claiming the resulting window first */
+      expect(target.searchParams.get('client_id')).toBe(CLIENT.id);
+      expect(target.searchParams.get('resource')).toBe(AUDIENCE);
+    });
+
+    it('should restart the prompt when the step-up was granted to another application', async () => {
+      idp.setSteppedUp('user-stepping-up', { clientId: 'svc-somebody-else' });
+
+      const response = await get('/auth/step-up?return_to=%2Freports%2Fsensitive', elevated);
+      expect(response.statusCode).toBe(302);
+
+      /** Retrying the claim could never succeed; only a fresh prompt naming this application can */
+      const target = new URL(response.headers.location as string);
+      expect(target.searchParams.get('client_id')).toBe(CLIENT.id);
+      expect(target.searchParams.get('return_to')).toContain('retried=1');
+      expect(target.searchParams.get('return_to')).not.toContain('claimed=1');
+    });
+
+    it('should fail rather than loop when the restarted prompt still mismatches', async () => {
+      idp.setSteppedUp('user-stepping-up', { clientId: 'svc-somebody-else' });
+
+      const response = await get('/auth/step-up?return_to=%2Freports%2Fsensitive&retried=1', elevated);
+      expect(response.statusCode).toBe(403);
+      expect(body(response)).toMatchObject({ code: 'ELEVATION_INTENT_MISMATCH' });
+
+      idp.setSteppedUp('user-stepping-up', false);
+    });
+
+    it('should refuse a step-up granted for another resource', async () => {
+      idp.setSteppedUp('user-stepping-up', { clientId: CLIENT.id, resource: 'api://billing' });
+
+      const response = await get('/auth/step-up?return_to=%2Freports%2Fsensitive&retried=1', elevated);
+      expect(response.statusCode).toBe(403);
+
+      idp.setSteppedUp('user-stepping-up', false);
     });
 
     it('should claim the step-up and serve the elevated route on the retry', async () => {

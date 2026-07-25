@@ -74,6 +74,12 @@ export class AuthErrorCode extends ErrorCode {
   static readonly APP_SESSION_FAILED = AuthErrorCode.unavailable('APP_SESSION_FAILED', 'Application session request failed: {reason}');
   /** The route needs an AAL2 token and no live elevation grant covers this app session and audience */
   static readonly ELEVATION_REQUIRED = AuthErrorCode.forbidden('ELEVATION_REQUIRED', 'Step-up authentication is required');
+  /**
+   * The user did step up, but for a different application or resource, so this claim cannot spend it
+   * (D-19: the step-up names its beneficiary, which is what closes the acquisition race). Distinct
+   * from `ELEVATION_REQUIRED` because retrying the claim can never succeed — only a fresh prompt can.
+   */
+  static readonly ELEVATION_INTENT_MISMATCH = AuthErrorCode.forbidden('ELEVATION_INTENT_MISMATCH', 'The step-up was not granted for this application and resource');
   /** The client holds no scope on the requested resource — a registration defect, never retryable */
   static readonly RESOURCE_NOT_ENTITLED = AuthErrorCode.internal('RESOURCE_NOT_ENTITLED', 'Client is not entitled to the requested resource: {reason}');
   /** The requested scope is not granted for this audience — a configuration defect, never retryable */

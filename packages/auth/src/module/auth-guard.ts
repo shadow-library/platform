@@ -138,7 +138,8 @@ export class AuthGuard {
       return this.bounce(response, sessions.loginUrl(returnTo));
     }
 
-    if (AppError.is(error, AuthErrorCode.ELEVATION_REQUIRED)) {
+    /** A mismatch lands here too: the step-up route is where the prompt is restarted with this app's intent */
+    if (AppError.is(error, AuthErrorCode.ELEVATION_REQUIRED) || AppError.is(error, AuthErrorCode.ELEVATION_INTENT_MISMATCH)) {
       this.logger.warn('route requires elevation and the principal is not elevated', { method });
       if (!sessions || !response || !isNavigation(request, method)) throw AuthGuardErrorCode.IAM_003.create();
       return this.bounce(response, sessions.stepUpUrl(returnTo));

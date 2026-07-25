@@ -121,6 +121,8 @@ transfer() {} // principal.aal === 'AAL2', guaranteed
 
 A browser is bounced to `/auth/step-up`, which claims the user's step-up into a grant scoped to **this app session and this audience**, then retries. A non-browser caller gets `403 IAM_003` instead and can drive the same cycle itself.
 
+The prompt identity is handed names its beneficiary — `client_id` and `resource` travel alongside `return_to` — so a window one application prompted for cannot be claimed by another that happens to ask first. A claim rejected for intent mismatch (`ELEVATION_INTENT_MISMATCH`) restarts the prompt rather than retrying, because retrying a claim can never fix it; the restart happens exactly once.
+
 Elevation never spreads: the elevated token is minted for the routes that ask for it, is cached under a separate key so it can never answer an ordinary request, and dies with its grant window. A user working across two applications therefore steps up in each — that is the cost of the isolation, not a bug to work around.
 
 ## Framework guards
@@ -185,7 +187,7 @@ idp.stop();
 The mock also stands in for the app-session endpoints, so a service can integration-test its whole browser flow without a live identity service:
 
 ```ts
-idp.setSteppedUp('user-42', true); // the next elevation claim succeeds
+idp.setSteppedUp('user-42', { clientId: 'svc-reports', resource: 'api://reports' }); // intent-bound; `true` matches any claimant
 idp.endIdentitySession('user-42'); // every app session of that user starts answering AUTH_005
 const logoutToken = await idp.issueLogoutToken({ sub: 'user-42' });
 idp.getAppSessionCount(); // asserts a revocation actually reached identity

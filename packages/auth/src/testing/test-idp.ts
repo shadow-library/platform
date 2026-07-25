@@ -72,6 +72,12 @@ export interface CapturedTokenRequest {
   contentType: string | null;
 }
 
+/** Which application and resource a step-up was granted for; an absent field matches anything */
+export interface TestStepUpIntent {
+  clientId?: string;
+  resource?: string;
+}
+
 export interface TestLogoutTokenInput {
   sub?: string;
   sid?: string;
@@ -126,8 +132,12 @@ export interface TestIdP {
    * First-party app sessions (D-18/D-19)
    */
 
-  /** Marks the user as having satisfied a step-up on the identity domain, so an elevation claim succeeds */
-  setSteppedUp(userId: string, steppedUp: boolean): void;
+  /**
+   * Marks the user as having satisfied a step-up on the identity domain, so an elevation claim succeeds.
+   * The intent names which application and resource the step-up was for (D-19) — a claim from anybody
+   * else is refused with `AUTH_007`. Pass `true` for a step-up any claimant may spend, `false` to clear.
+   */
+  setSteppedUp(userId: string, intent: TestStepUpIntent | boolean): void;
 
   /** Ends the central identity session: every app session of that user starts answering `AUTH_005` */
   endIdentitySession(userId: string): void;
@@ -177,6 +187,7 @@ const readClaims = (token: string): JwtPayload | undefined => {
 /** Identity's catalog keys for the two app-session failures an SDK is expected to branch on */
 const sessionInvalid = (): Response => json({ code: 'AUTH_005', message: 'Application session is no longer valid' }, 401);
 const elevationRequired = (): Response => json({ code: 'AUTH_006', message: 'Step-up authentication is required' }, 403);
+const intentMismatch = (): Response => json({ code: 'AUTH_007', message: 'the step-up was not granted for this application and resource' }, 403);
 
 /**
  * Spins an in-process mock identity provider: an ephemeral Ed25519 key, discovery + JWKS + token +
@@ -193,7 +204,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const grants = new Set<string>();
   const appSessions = new Map<string, AppSessionRecord>();
   const elevationGrants = new Map<string, number>();
-  const steppedUp = new Set<string>();
+  const steppedUp = new Map<string, TestStepUpIntent>();
   let authzVersion = 1;
   let issuer = '';
   let lastCatalog: CapturedCatalog | undefined;
@@ -329,19 +340,16 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
    * application's own M2M token carrying `app-session:manage`. The mock enforces that so a consuming
    * service can actually test the property rather than take it on trust.
    */
-  const isAppSessionCaller = (request: Request): boolean => {
+  const appSessionCaller = (request: Request): JwtPayload | undefined => {
     const header = request.headers.get('authorization');
-    if (!header?.startsWith('Bearer ')) return false;
-    const segment = header.slice(7).split('.')[1];
-    if (!segment) return false;
-    const claims = JSON.parse(Buffer.from(segment, 'base64url').toString()) as JwtPayload;
-    return (
-      claims.token_type === 'service' &&
-      String(claims.scope ?? '')
-        .split(' ')
-        .includes(APP_SESSION_SCOPE)
-    );
+    if (!header?.startsWith('Bearer ')) return undefined;
+    const claims = readClaims(header.slice(7));
+    if (!claims || claims.token_type !== 'service') return undefined;
+    const scopes = String(claims.scope ?? '').split(' ');
+    return scopes.includes(APP_SESSION_SCOPE) ? claims : undefined;
   };
+
+  const isAppSessionCaller = (request: Request): boolean => appSessionCaller(request) !== undefined;
 
   const liveSession = (handle: unknown): AppSessionRecord | undefined => {
     if (typeof handle !== 'string') return undefined;
@@ -394,16 +402,28 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   };
 
   const handleAppSessionElevation = async (request: Request): Promise<Response> => {
-    if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
+    const caller = appSessionCaller(request);
+    if (!caller) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
     const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
 
     const session = liveSession(body.sessionHandle);
     if (!session) return sessionInvalid();
-    if (!steppedUp.has(session.userId)) return elevationRequired();
+
+    const intent = steppedUp.get(session.userId);
+    if (!intent) return elevationRequired();
+
+    /**
+     * D-19: the step-up names its beneficiary, so a window one application prompted for cannot be
+     * claimed by another that happens to ask first. A mismatch is its own answer — retrying the claim
+     * can never succeed, only a fresh prompt carrying the right intent can.
+     */
+    const audience = typeof body.resource === 'string' ? body.resource : DEFAULT_AUDIENCE;
+    const clientId = typeof caller.client_id === 'string' ? caller.client_id : undefined;
+    if (intent.clientId && intent.clientId !== clientId) return intentMismatch();
+    if (intent.resource && intent.resource !== audience) return intentMismatch();
 
     /** The step-up is *spent*: the grant covers this session and this audience, and nothing else */
     steppedUp.delete(session.userId);
-    const audience = typeof body.resource === 'string' ? body.resource : DEFAULT_AUDIENCE;
     const expiresAt = Date.now() + ELEVATION_WINDOW_SECONDS * 1000;
     elevationGrants.set(`${String(body.sessionHandle)}|${audience}`, expiresAt);
     return json({ expiresAt: new Date(expiresAt).toISOString() });
@@ -506,7 +526,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     getAppRegistration: () => appRegistration,
     setAppRegistration: registration => void (appRegistration = { ...appRegistration, ...registration }),
     getLastTokenRequest: () => lastTokenRequest,
-    setSteppedUp: (userId, isSteppedUp) => void (isSteppedUp ? steppedUp.add(userId) : steppedUp.delete(userId)),
+    setSteppedUp: (userId, intent) => void (intent === false ? steppedUp.delete(userId) : steppedUp.set(userId, intent === true ? {} : intent)),
     endIdentitySession: userId => {
       for (const [handle, session] of appSessions) {
         if (session.userId !== userId) continue;

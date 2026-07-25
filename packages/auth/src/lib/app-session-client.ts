@@ -45,9 +45,12 @@ interface ErrorBody {
  */
 const SESSIONS_PATH = '/api/v1/app-sessions';
 
-/** Identity's codes for the two failures a caller is expected to branch on rather than retry blindly */
+/** Identity's codes for the failures a caller is expected to branch on rather than retry blindly */
 const SESSION_INVALID_CODE = 'AUTH_005';
 const ELEVATION_REQUIRED_CODE = 'AUTH_006';
+
+/** The step-up existed but named another beneficiary; a retry cannot fix it, only a fresh prompt can */
+const ELEVATION_INTENT_MISMATCH_CODES = ['AUTH_007', 'elevation_intent_mismatch'];
 
 /** RFC 6749 §5.2 codes, as identity's own catalog keys and as the bare OAuth strings */
 const INVALID_TARGET_CODES = ['OAU_005', 'invalid_target'];
@@ -150,6 +153,7 @@ export class AppSessionClient {
   private toError(status: number, failure: { code?: string; reason: string }, path: string): AppError {
     const code = failure.code ?? '';
     if (status === 401 && code === SESSION_INVALID_CODE) return this.logged(AuthErrorCode.SESSION_INVALID.create({ reason: failure.reason }));
+    if (ELEVATION_INTENT_MISMATCH_CODES.includes(code)) return this.logged(AuthErrorCode.ELEVATION_INTENT_MISMATCH.create({ reason: failure.reason }));
     if (status === 403 && code === ELEVATION_REQUIRED_CODE) return this.logged(AuthErrorCode.ELEVATION_REQUIRED.create({ reason: failure.reason }));
     if (INVALID_TARGET_CODES.includes(code)) return this.logged(AuthErrorCode.RESOURCE_NOT_ENTITLED.create({ reason: failure.reason }));
     if (INVALID_SCOPE_CODES.includes(code)) return this.logged(AuthErrorCode.SCOPE_NOT_GRANTED.create({ reason: failure.reason }));

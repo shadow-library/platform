@@ -253,10 +253,17 @@ export class AppSessionService {
     return this.localUrl(this.config.routes.stepUp, returnTo);
   }
 
-  /** Identity's step-up prompt, for when there is no step-up left to claim */
+  /**
+   * Identity's step-up prompt, for when there is no step-up left to claim. It names its beneficiary:
+   * without `client_id` and `resource` the resulting window is unattributed, and any application the
+   * user happens to be driving could claim it first — the D-19 acquisition race. With them, identity
+   * records who the step-up was for and refuses a claim from anybody else.
+   */
   async identityStepUpUrl(returnTo: string): Promise<string> {
     const runtime = await this.runtime();
     const url = new URL(runtime.stepUpUrl);
+    url.searchParams.set('client_id', runtime.clientId);
+    url.searchParams.set('resource', runtime.audience);
     url.searchParams.set('return_to', new URL(returnTo, runtime.redirectUri).toString());
     url.searchParams.set('acr_values', STEP_UP_ACR);
     return url.toString();

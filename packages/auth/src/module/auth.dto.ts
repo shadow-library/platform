@@ -51,6 +51,10 @@ export class AuthStepUpQuery {
   /** Set on the way back from identity, so a step-up that still cannot be claimed fails instead of looping */
   @Field({ optional: true })
   claimed?: string;
+
+  /** Set after a prompt was restarted for an intent mismatch, so a second mismatch fails instead of looping */
+  @Field({ optional: true })
+  retried?: string;
 }
 
 @Schema()
