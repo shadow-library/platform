@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { forwardRef, type Import } from '@shadow-library/app';
+import { forwardRef, type Import, Module } from '@shadow-library/app';
 import { FastifyModule } from '@shadow-library/fastify';
 import { HttpCoreModule } from '@shadow-library/modules';
 
@@ -38,18 +38,31 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
 });
 
 /**
- * Deferred with `forwardRef` for two load-bearing reasons: the root `@Module` decorator
- * deep-freezes everything reachable from its metadata, which would freeze the live
- * `AuthClient`/`RelyingParty` instances the SDK registers via `useValue` (breaking their internal
- * caches at runtime); and deferral moves auth-config resolution from import time to application
- * scan time, so tests can inject a per-file mock IdP first. The cast bridges `forwardRef`'s
- * class-oriented typing to the dynamic module it actually resolves — the module scanner handles
- * both.
+ * Deferred with `forwardRef` so `AuthModule.forRoot`'s config resolution runs at application scan
+ * time rather than at import time — this is what lets a test point the SDK at its per-file mock IdP
+ * (issuer, app id, credential) before the module graph loads. The SDK registers its live `AuthClient`
+ * via `useFactory`, so the root `@Module`'s metadata deep-freeze never reaches the instance or its
+ * caches. The cast bridges `forwardRef`'s class-oriented typing to the dynamic module it actually
+ * resolves — the module scanner handles both.
  */
 const DeferredSessionModule = forwardRef(() => SessionModule.forRoot()) as unknown as Import;
 
+/**
+ * `HttpCoreModule` and the auth SDK both construct a provider that injects the `FASTIFY_INSTANCE`
+ * factory token, and both import `FastifyModule` — so each forms an init cycle with it. The app
+ * framework breaks such a cycle by initialising the module with the smallest import count first, and
+ * a factory-provided token cannot stand in as a cycle-breaking prototype: whichever of the two the
+ * ordering places *before* `FastifyModule` fails to construct. Bundling both under a single
+ * `FastifyModule` child collapses them into one cyclic import, so `FastifyModule`'s far higher
+ * `requiredBy` wins the tie and it — and thus `FASTIFY_INSTANCE` — initialises before either
+ * consumer. Kept as a `FastifyModule` descendant (not a sibling) so its controllers still register
+ * with the router.
+ */
+@Module({ imports: [AppHttpCoreModule, DeferredSessionModule] })
+class PlatformModule {}
+
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, DeferredSessionModule, ConfigurationModule, NotificationModule, TemplateModule, MetricsModule],
+  imports: [PlatformModule, ConfigurationModule, NotificationModule, TemplateModule, MetricsModule],
 
   transformers: CUSTOM_DATA_TRANSFORMERS,
 });

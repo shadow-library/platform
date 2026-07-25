@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Pulse Server is a multi-channel notification service (SMS, Email, Push, WhatsApp) built on the @shadow-library framework ecosystem with Bun as the runtime. It uses Drizzle ORM with PostgreSQL, Fastify for HTTP, and Mustache for template rendering.
+Pulse Server is a multi-channel notification service (SMS, Email, Push, WhatsApp) built on the @shadow-library framework ecosystem with Bun as the runtime. It uses Drizzle ORM with PostgreSQL, Fastify for HTTP, and a sandboxed LiquidJS engine for template rendering (with `juice` inlining CSS for email).
 
 ## Commands
 
@@ -35,10 +35,10 @@ Tests require a running PostgreSQL instance. The template database must be creat
 **Module structure** (`src/modules/`):
 
 - **notification/** - Core notification delivery with provider abstraction and failover logic
-- **template/** - Template groups, variants (locale/channel-specific), and channel settings
+- **template/** - The template CMS: templates with an immutable version publishing lifecycle (draft → published), per-`(version, channel, locale)` content, channel settings, and a declared variable-schema contract, plus reusable **layouts** (email shells) and **partials** (Liquid `{% render %}` blocks). Controllers: `TemplateController`, `TemplateVersionController`, `LayoutController`, `PartialController`; rendering + resolution live in `rendering/template-engine.service.ts` and `template-resolver.service.ts`. See `docs/proposals/0001-template-cms.md`.
 - **configuration/** - Sender profiles, endpoints, and routing rules (vendor selection by service/region/message type)
 - **metrics/** - Dashboard controller
-- **auth/** - The pulse-native remainder of the auth stack: the default-deny `RouteGuardSentinel` + `@Public()` decorator, the RBAC catalog constants, and the first-party session surface (`/api/auth/*`). Bearer verification, `@RequireScope`/`@RequirePermission`, the PDP client, and M2M service-access enforcement come from `@shadow-library/auth/module` (`AuthModule.forRoot` + `AuthGuard`)
+- **auth/** - The pulse-native remainder of the auth stack: the default-deny `RouteGuardSentinel` + `@Public()` decorator, the RBAC catalog constants, and the `/api/auth` base-path constant. Bearer verification, `@RequireScope`/`@RequirePermission`, the PDP client, M2M service-access enforcement, **and the complete first-party browser login flow** (`/api/auth/*`) all come from `@shadow-library/auth/module` (`AuthModule.forRoot` + `AuthGuard`) — pulse no longer implements its own login/callback/logout/session
 
 Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts`, plus DTOs and domain logic. Modules are registered in `src/modules/dynamic.modules.ts`. Controllers carry explicit full paths (`/api/v1/*` for the versioned surface, `/api/auth/*` for the session surface) — there is no global route prefix or version prefixing.
 
@@ -49,14 +49,25 @@ Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts
 - Database constraint errors are mapped to custom app error codes in `database.constants.ts`
 - Type alias `PrimaryDatabase` exported from `database.module.ts`
 
-**Configuration:** Uses `@shadow-library/common` Config system. Key env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod), `APP_PUBLIC_URL` (prod-required; the RP callback URL is derived from it); auth (loaded by the SDK): `AUTH_ISSUER`, `AUTH_AUDIENCE` (default `pulse-server`), `AUTH_CLIENT_ID`, `AUTH_CLIENT_SECRET` (or `AUTH_CLIENT_ASSERTION_PATH`), `AUTH_IDENTITY_RESOURCE` (default `shadow-identity`); RP login: `APP_CLIENT_ID`, `APP_CLIENT_SECRET` (the `pulse` WEB_CONFIDENTIAL client; dev falls back to the service client). Dev fallbacks and prod fail-fast checks for the `AUTH_*` keys live in `src/modules/auth/auth.module.ts`.
+**Configuration:** Uses `@shadow-library/common` Config system. Pulse-owned env vars: `DATABASE_POSTGRES_URL`, `LOG_LEVEL`, `APP_STAGE` (dev/staging/prod).
+
+The entire auth surface is declared and loaded by `@shadow-library/auth/module` (the v1.1 "derived configuration" SDK), so pulse restates none of it. A steady-state deploy sets exactly three things plus one credential:
+
+| Env var | Meaning |
+| --- | --- |
+| `AUTH_ISSUER` | Identity base URL; must match identity's issuer exactly (a trailing-slash mismatch is a blanket 401) |
+| `AUTH_APP_ID` | Pulse's app id at identity (`pulse`); doubles as the OAuth client id. Prod-required |
+| `AUTH_CLIENT_SECRET` | Static client secret — the credential outside the cluster |
+| `AUTH_CLIENT_ASSERTION_PATH` | Projected k8s SA token — the preferred in-cluster credential (use instead of the secret) |
+
+The audience (`api://pulse`), redirect URIs (`{origin}/api/auth/callback`), and granted scopes (`authz:check`, `authz:roles:sync`, `app-session:manage`) are **derived** from `GET {AUTH_ISSUER}/api/v1/apps/me` at boot and refreshed on a TTL — never set in a pulse env var. Optional local-dev-over-http knobs (the session cookie defaults to the `__Host-`-prefixed, `Secure` `__Host-shadow-session`): `AUTH_SESSION_COOKIE_SECURE=false` (drops `Secure` + the `__Host-` prefix), `AUTH_SESSION_COOKIE_NAME`, `AUTH_SESSION_COOKIE_SAME_SITE`. `APP_PUBLIC_URL`, `AUTH_AUDIENCE`, `AUTH_IDENTITY_RESOURCE`, `APP_CLIENT_ID`/`APP_CLIENT_SECRET` are all **gone**.
 
 **Authentication & Authorization** (`src/modules/auth/`):
 
 - Pulse is an OAuth2 **resource server** standardised on `@shadow-library/auth/module`: `AuthModule.forRoot` provides the `AuthClient` and the shared `AuthGuard` preHandler, which verifies EdDSA bearer tokens offline against the identity JWKS and enforces access per route (401 `IAM_001` / 403 `IAM_002`).
-- Route decorators (imported from `@shadow-library/auth/module`): `@Authenticated()`, `@RequireScope('notifications:send')` (token scope), `@RequirePermission('pulse:...')` (identity PDP check in the caller's org). `@Public()` (pulse-native, from `@modules/auth`) exempts a route from the default-deny `RouteGuardSentinel` — the sentinel is a deliberate pulse-specific delta the SDK lacks.
-- **M2M callers are deny-by-default**: a service token passes only when an admin-configured service-access rule (loaded from identity at startup via `loadServiceAccess`) covers that route for that caller. Identity's own calls to `POST /api/v1/notifications` must be allow-listed in the identity admin panel.
-- **First-party session surface** (`session.controller.ts`, consumed by pulse-web): `GET /api/auth/login?returnTo=` starts the OIDC code+PKCE flow via the SDK `RelyingParty`, `GET /api/auth/callback` exchanges the code and stores the pulse-audience access token in the `pulse_session` httpOnly cookie, `GET /api/auth/session` returns flat `{ userId, email?, name? }` or 401, `POST /api/auth/logout` clears the cookie.
+- Route decorators (imported from `@shadow-library/auth/module`): `@Authenticated()`, `@RequireScope('notifications:send')` (token scope), `@RequirePermission('pulse:...')` (identity PDP check in the caller's org), `@RequireElevation()` (AAL2). `@Public()` (pulse-native, from `@modules/auth`) exempts a route from the default-deny `RouteGuardSentinel` — the sentinel is a deliberate pulse-specific delta the SDK lacks. The sentinel also recognises the SDK's own `/api/auth/*` routes (which carry no auth decorator) as declared-public via the shared `AUTH_ROUTES_BASE_PATH` constant.
+- **M2M callers are deny-by-default**: a service token passes only when an admin-configured service-access rule (loaded from identity at startup) covers that route for that caller. Identity's own calls to `POST /api/v1/notifications` (client `identity-server`, scope `notifications:send`) must be allow-listed in the identity admin panel.
+- **First-party session surface** (owned end-to-end by `AuthModule.forRoot`, consumed by pulse-web): `GET /api/auth/login?return_to=` starts PKCE and redirects to identity, `GET /api/auth/callback` redeems the code for an **opaque app-session handle** stored in the `__Host-shadow-session` httpOnly cookie (never a token), `GET /api/auth/session` returns `{ sub, scopes, org?, aal?, clientId? }` or 401, `POST /api/auth/logout` ends the app session and clears the cookie, `GET /api/auth/step-up` drives AAL2 elevation. The SDK mints access tokens server-to-server from the handle; pulse holds no tokens at rest.
 - The RBAC catalog (`rbac.constants.ts`) — permissions `pulse:{templates,senders}:{read,write}`, `pulse:metrics:read`, `pulse:logs:read`; scope `notifications:send`; roles PulseViewer/Operator/Admin — is seeded into identity by its BootstrapService, so the strings must stay in sync (SDK role sync is intentionally not enabled).
 
 ## Path Aliases

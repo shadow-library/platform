@@ -135,17 +135,12 @@ export class AppErrorCode extends ServerErrorCode {
 
   /*!
    * Authorization Errors
+   *
+   * Authentication (`IAM_001`), authorization (`IAM_002`) and step-up (`IAM_003`) failures are owned
+   * by `@shadow-library/auth`; the browser session surface it mounts answers those directly. Pulse
+   * keeps only the default-deny sentinel's own code here.
    */
 
-  /** Authentication is required but no valid session or bearer token accompanied the request */
-  static readonly SEC_001 = AppErrorCode.unauthenticated('SEC_001', 'Authentication required');
   /** A route reached the default-deny sentinel without declaring an access policy */
   static readonly SEC_003 = AppErrorCode.forbidden('SEC_003', 'Access denied');
-
-  /*!
-   * Session Errors
-   */
-
-  /** The OIDC callback did not match a pending login flow (missing/expired flow cookie or state mismatch) */
-  static readonly SES_001 = AppErrorCode.badRequest('SES_001', 'Login flow not found or expired');
 }

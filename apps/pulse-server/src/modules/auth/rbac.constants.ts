@@ -18,10 +18,9 @@ export type PulseRole = (typeof PULSE_ROLES)[keyof typeof PULSE_ROLES];
  *
  * The authoritative pulse RBAC catalog. Route decorators reference these strings and the identity
  * BootstrapService seeds the matching application permissions and roles — the two must stay in sync.
+ * The service audience (`api://pulse`) is no longer restated here: the SDK derives it, the redirect
+ * URIs, and the granted scopes from `GET {issuer}/api/v1/apps/me` at boot.
  */
-
-/** Ecosystem-standard API resource identifier for pulse — the audience of every token this service accepts or requests */
-export const PULSE_AUDIENCE = 'pulse-server';
 
 /** PDP-checked permissions, granted to operators through roles and evaluated in the platform organisation */
 export const PULSE_PERMISSIONS = {
