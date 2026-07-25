@@ -3,8 +3,8 @@
 |                  |                                                                                                                           |
 | :--------------- | :------------------------------------------------------------------------------------------------------------------------ |
 | **Status**       | Approved for development                                                                                                  |
-| **Version**      | 2.0.0                                                                                                                     |
-| **Last updated** | 2026-07-11                                                                                                                |
+| **Version**      | 2.1.0                                                                                                                     |
+| **Last updated** | 2026-07-25                                                                                                                |
 | **Supersedes**   | v1 of this document (the pre-review schema). Corrections mandated by the 2026-07-11 architecture review are incorporated. |
 
 This document is the authoritative specification of the persistent data model. Drizzle schemas under `src/modules/infrastructure/datastore/schemas/` implement it; where they disagree, this document wins and a task must be raised.
@@ -56,7 +56,7 @@ erDiagram
   users ||--o{ sign_in_events : generates
 ```
 
-(`audit_events`, `notification_outbox`, `jobs`, and the reserved enterprise tables are omitted from the diagram for legibility; they are specified below.)
+(`app_sessions`/`app_session_elevations`, `organisation_policies`, `service_route_access`, `audit_events`, `notification_outbox`, `jobs`, and the enterprise tables are omitted from the diagram for legibility; they are specified below.)
 
 ## 2. Directory domain
 
@@ -147,6 +147,10 @@ PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN �
 
 `id` PK, `organisation_id` FK cascade, `domain` varchar(253) (lowercased, validated hostname), `verification_token` varchar(64), `status` enum (`PENDING · VERIFIED · FAILED`), `verified_at`, `last_checked_at`, `matched_record` (evidence), `last_check_error`, `created_at`. Unique `(organisation_id, domain)`; partial unique `(domain) WHERE status = 'VERIFIED'` — one verified holder at a time. A VERIFIED row never demotes on failed re-checks.
 
+### `organisation_policies` — org security-policy overrides (D-20) — _implemented_
+
+PK `(organisation_id, policy_key)`, `organisation_id` FK cascade, `policy_key` varchar(128) — refused on write unless declared in the code registry (type, bounds, default, fold strategy), `policy_value` jsonb, `updated_by` nullable, `updated_at`. Effective values fold per the registry strategy (`MIN` for every duration) across the platform default, any client-level value, and every applicable organisation, then clamp to the registry bounds. Reads are Redis-cached and invalidated on write; changes are audited.
+
 ## 5. Application and client domain **[global]**
 
 ### `applications`
@@ -155,19 +159,19 @@ PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN �
 
 ### `oauth_clients`
 
-| Column                                       | Notes                                                                                                           |
-| :------------------------------------------- | :-------------------------------------------------------------------------------------------------------------- |
-| `id` uuid PK                                 | external form `cli_…`; this is the OAuth `client_id`                                                            |
-| `application_id` FK restrict                 |                                                                                                                 |
-| `kind` enum                                  | `WEB_CONFIDENTIAL · SPA_PUBLIC · NATIVE_PUBLIC · SERVICE`                                                       |
-| `is_first_party` boolean                     | consent-bypass flag (D-4)                                                                                       |
-| `token_endpoint_auth_method` enum            | `client_secret_basic · none` (public clients: `none`)                                                          |
-| `grant_types` text[]                         | subset of `authorization_code · refresh_token · client_credentials`; `SERVICE` ⇒ exactly `[client_credentials]` |
-| `require_pkce` boolean                       | default true; MUST be true for `authorization_code`                                                             |
-| `access_token_ttl` / `refresh_token_ttl` int | seconds; defaults 600 / session-bound                                                                           |
-| `organisation_id` uuid FK                    | owning org; platform services live in the platform organisation                                                 |
-| `is_active`, timestamps                      |                                                                                                                 |
-| `backchannel_logout_uri` text nullable       | OIDC back-channel logout endpoint; logout tokens for terminated sessions POST here (M6)                         |
+| Column                                       | Notes                                                                                                                           |
+| :------------------------------------------- | :------------------------------------------------------------------------------------------------------------------------------ |
+| `id` uuid PK                                 | external form `cli_…`; this is the OAuth `client_id`                                                                            |
+| `application_id` FK restrict                 |                                                                                                                                 |
+| `kind` enum                                  | `WEB_CONFIDENTIAL · SPA_PUBLIC · NATIVE_PUBLIC · SERVICE`                                                                       |
+| `is_first_party` boolean                     | consent-bypass flag (D-4)                                                                                                       |
+| `token_endpoint_auth_method` enum            | `client_secret_basic · none` (public clients: `none`)                                                                           |
+| `grant_types` text[]                         | subset of `authorization_code · refresh_token · client_credentials`; `SERVICE` ⇒ exactly `[client_credentials]`                 |
+| `require_pkce` boolean                       | default true; MUST be true for `authorization_code`                                                                             |
+| `access_token_ttl` / `refresh_token_ttl` int | seconds; client defaults 600 / session-bound; effective values fold `MIN` with the D-20 policy registry (platform default 3600) |
+| `organisation_id` uuid FK                    | owning org; platform services live in the platform organisation                                                                 |
+| `is_active`, timestamps                      |                                                                                                                                 |
+| `backchannel_logout_uri` text nullable       | OIDC back-channel logout endpoint; logout tokens for terminated sessions POST here (M6)                                         |
 
 ### `oauth_client_secrets`
 
@@ -228,21 +232,26 @@ PK `(role_id, permission_id)`, both FK cascade.
 
 Unique `(principal_type, principal_id, role_id, organisation_id)`. Index `(principal_type, principal_id, organisation_id)` — the PDP hot path.
 
+### `service_route_access` — M2M route allowlist (D-17) — _implemented_
+
+`id` PK, `application_id` FK cascade (the target application), `caller_client_id` FK cascade, `method` (an HTTP verb or `*`), `path_pattern` varchar(512) (absolute path; trailing `*` matches any suffix), `created_by`, `created_at`. Unique `(application_id, caller_client_id, method, path_pattern)`; index `(application_id)`. Loaded by the target service's SDK at startup and re-fetched on a TTL (T-802); enforced locally, deny-by-default for service principals.
+
 ## 7. Session and token domain
 
 ### `user_sessions`
 
-| Column                                                                                                | Notes                                                             |
-| :---------------------------------------------------------------------------------------------------- | :---------------------------------------------------------------- |
-| `id` uuid PK                                                                                          | external `sess_…`                                                 |
-| `user_id` FK cascade                                                                                  |                                                                   |
-| `session_hash` varchar(64) unique                                                                     | SHA-256 of the opaque cookie value; the raw value is never stored |
-| `sign_in_event_id` uuid nullable, `ON DELETE SET NULL`                                                | _(v1 had NOT NULL + RESTRICT — corrected)_                        |
-| `status` enum                                                                                         | `ACTIVE · TERMINATED · EXPIRED`                                   |
-| `aal` enum                                                                                            | `AAL1 · AAL2`                                                     |
-| `device_id` uuid nullable FK                                                                          |                                                                   |
-| `ip_address` inet, `ip_country` varchar(2), `user_agent` text                                         | snapshot at creation                                              |
-| `expires_at` (absolute), `last_used_at` (idle basis), `terminated_at`, `elevated_until`, `created_at` |                                                                   |
+| Column                                                                                                | Notes                                                                                                                                                     |
+| :---------------------------------------------------------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id` uuid PK                                                                                          | external `sess_…`                                                                                                                                         |
+| `user_id` FK cascade                                                                                  |                                                                                                                                                           |
+| `session_hash` varchar(64) unique                                                                     | SHA-256 of the opaque cookie value; the raw value is never stored                                                                                         |
+| `sign_in_event_id` uuid nullable, `ON DELETE SET NULL`                                                | _(v1 had NOT NULL + RESTRICT — corrected)_                                                                                                                |
+| `status` enum                                                                                         | `ACTIVE · TERMINATED · EXPIRED`                                                                                                                           |
+| `aal` enum                                                                                            | `AAL1 · AAL2`                                                                                                                                             |
+| `device_id` uuid nullable FK                                                                          |                                                                                                                                                           |
+| `ip_address` inet, `ip_country` varchar(2), `user_agent` text                                         | snapshot at creation                                                                                                                                      |
+| `expires_at` (absolute), `last_used_at` (idle basis), `terminated_at`, `elevated_until`, `created_at` |                                                                                                                                                           |
+| `elevation_intent_client_id` varchar nullable, `elevation_intent_resource` varchar nullable           | the D-19 step-up intent recorded at ceremony start (T-801): an elevation claim must match both; `NULL` (a console step-up) is claimable by no application |
 
 Index `(user_id, status)`.
 
@@ -265,7 +274,26 @@ Index `(user_id, status)`.
 | `previous_token_id` uuid nullable FK → self                          | _(v1 had `bigint` against a uuid PK — corrected)_ |
 | `created_at`, `expires_at`, `rotated_at`, `ip_address`, `ip_country` |                                                   |
 
-Constraint: at most one `ACTIVE` token per family (partial unique `(family_id) WHERE status = 'ACTIVE'`). _(The v1 `unique(session_id, application_id)` that made rotation impossible is dropped.)_
+Constraint: at most one `ACTIVE` token per family (partial unique `(family_id) WHERE status = 'ACTIVE'`). _(The v1 `unique(session_id, application_id)` that made rotation impossible is dropped.)_ Refresh tokens are issued to third-party clients only (D-18); the tables have no first-party consumer until third-party enablement.
+
+### `app_sessions` — first-party application sessions (D-18) — _implemented_
+
+| Column                                                                                  | Notes                                                                                                         |
+| :-------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------ |
+| `id` PK                                                                                 |                                                                                                               |
+| `session_hash` varchar(64) unique                                                       | SHA-256 of the opaque handle; the handle itself exists only in the application's cookie                       |
+| `client_id` FK cascade                                                                  | the issuing first-party client; minting requires this client's own M2M credential, so a handle alone is inert |
+| `identity_session_id` FK cascade                                                        | the central session — every mint re-validates it, so revocation propagates pull-style                         |
+| `user_id` FK cascade, `organisation_id` nullable                                        |                                                                                                               |
+| `granted_scope` text                                                                    | the consented scope frozen at creation; a mint may narrow it but never exceed it                              |
+| `status` enum                                                                           | `ACTIVE · REVOKED · EXPIRED`                                                                                  |
+| `expires_at`, `last_used_at`, `terminated_at`, `ip_address`, `user_agent`, `created_at` | idle/absolute lifetimes fold from the D-20 `auth.app_session.*` policies                                      |
+
+Index `(identity_session_id)`, `(client_id, user_id)`. _(Implementation currently uses bigint keys like the rest of the pre-T-010 schema; converts with D-8.)_
+
+### `app_session_elevations` — spent step-up grants (D-19) — _implemented_
+
+`id` PK, `app_session_id` FK cascade, `audience` varchar(255) (the single API resource the elevation authorises), `expires_at`, `created_at`. Unique `(app_session_id, audience)` — elevation is a grant to exactly one application session **and** one audience; it never lives on the user or the central session.
 
 Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-use `GETDEL`) — no table.
 
@@ -321,13 +349,13 @@ Authorization codes are **Redis-only** (`authz_code:{hash}`, 60 s TTL, single-us
 
 ## 12. Retention and erasure
 
-| Data                              | Retention                                                                           |
-| :-------------------------------- | :---------------------------------------------------------------------------------- |
-| `audit_events`, `sign_in_events`  | ≥ 400 days; PII columns scrubbed on erasure requests, rows and hash chain preserved |
-| `user_sessions`, `refresh_tokens` | 90 days after termination/expiry, then hard-deleted                                 |
-| `verification_challenges`         | 24 h after expiry                                                                   |
-| Soft-deleted users                | 30-day window, then hard delete (cascades) + email release                          |
-| `notification_outbox`             | 30 days after terminal state                                                        |
+| Data                                              | Retention                                                                           |
+| :------------------------------------------------ | :---------------------------------------------------------------------------------- |
+| `audit_events`, `sign_in_events`                  | ≥ 400 days; PII columns scrubbed on erasure requests, rows and hash chain preserved |
+| `user_sessions`, `refresh_tokens`, `app_sessions` | 90 days after termination/expiry, then hard-deleted                                 |
+| `verification_challenges`                         | 24 h after expiry                                                                   |
+| Soft-deleted users                                | 30-day window, then hard delete (cascades) + email release                          |
+| `notification_outbox`                             | 30 days after terminal state                                                        |
 
 ## 13. Migration reset
 

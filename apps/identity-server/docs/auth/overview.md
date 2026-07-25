@@ -3,8 +3,8 @@
 |                  |                                                                                                                                                                                                                                                            |
 | :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Status**       | Approved for development                                                                                                                                                                                                                                   |
-| **Version**      | 2.0.0                                                                                                                                                                                                                                                      |
-| **Last updated** | 2026-07-11                                                                                                                                                                                                                                                 |
+| **Version**      | 2.1.0                                                                                                                                                                                                                                                      |
+| **Last updated** | 2026-07-25                                                                                                                                                                                                                                                 |
 | **Supersedes**   | v1 of this document. The bespoke first-party SSO protocol (former §E) is **withdrawn** in favour of OIDC Authorization Code + PKCE (`docs/architecture.md` §8.3, decision D-4). Conditional refresh rotation (former §D) is **withdrawn** (decision D-11). |
 
 This document specifies the browser-facing authentication flows executed on the identity domain. Application login is _not_ specified here — applications obtain tokens exclusively through the OAuth/OIDC endpoints; these flows only establish the identity-domain session that `/oauth2/authorize` consumes.
@@ -23,7 +23,7 @@ Flows are state machines built on `FlowManager`/`FlowRegistry` from `@shadow-lib
 
 | Field                                 | Type    | Description                                                                                                     |
 | :------------------------------------ | :------ | :-------------------------------------------------------------------------------------------------------------- |
-| `kind`                                | enum    | `REGISTRATION · LOGIN · RECOVERY · STEP_UP`                                                                     |
+| `kind`                                | enum    | `REGISTRATION · LOGIN · RECOVERY` — step-up is not a flow (api-contract §4.3)                                   |
 | `identifier`                          | string  | as submitted (email/phone/username)                                                                             |
 | `userId`                              | string? | resolved internally; **never returned to the client**                                                           |
 | `authMethod` / `mfaMethod`            | enum?   | populate `sign_in_events` on completion                                                                         |
@@ -102,8 +102,8 @@ Session semantics (idle 30 d, absolute 180 d, fixation, step-up `elevated_until`
 
 ## 7. Sign-out
 
-- **Per-app sign-out** is an application concern (its own session) plus optional RP-initiated logout at `/oauth2/logout`.
-- **Global sign-out** (`POST /auth/signout`, CSRF-protected): terminate the session row, revoke linked refresh-token families, bust the session cache, dispatch OIDC back-channel logout tokens to all registered clients with an active grant for this session, clear cookies.
+- **Per-app sign-out** is an application concern: the app ends its own session (`DELETE /api/v1/app-sessions` for first-party apps) and clears its cookie. There is no RP-initiated logout endpoint — the central session is only ever terminated on the identity domain.
+- **Global sign-out** (`POST /auth/signout`, CSRF-protected): terminate the session row, revoke linked refresh-token families and app sessions, bust the session cache, dispatch OIDC back-channel logout tokens to third-party clients holding a refresh-token family for the session (first-party apps observe the revocation at their next app-session mint — D-18), clear cookies.
 
 ## 8. Brute-force and abuse tiers
 

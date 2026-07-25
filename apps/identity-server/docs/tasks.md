@@ -3,10 +3,10 @@
 |                  |                          |
 | :--------------- | :----------------------- |
 | **Status**       | Approved for development |
-| **Version**      | 1.0.0                    |
-| **Last updated** | 2026-07-11               |
+| **Version**      | 1.1.0                    |
+| **Last updated** | 2026-07-25               |
 
-This is the authoritative build plan to take Shadow Identity from its current state (schema + design + DI skeleton, no working auth) to a secure, scalable production platform, then to enterprise readiness. It implements `docs/architecture.md`, `docs/database.md`, `docs/auth/*`, and `docs/sdk.md`.
+This is the authoritative build plan to take Shadow Identity from its current state (schema + design + DI skeleton, no working auth) to a secure, scalable production platform, then to enterprise readiness. It implements `docs/architecture.md`, `docs/database.md`, `docs/auth/*`, and the SDK spec (`docs/sdk.md`, now in the `@shadow-library/auth` repository).
 
 ## How to read this
 
@@ -163,7 +163,7 @@ This is the authoritative build plan to take Shadow Identity from its current st
 
 ### T-204 — Revocation, introspection, logout, back-channel · M · Sec: High
 
-- `POST /oauth2/revoke` (RFC 7009), `POST /oauth2/introspect` (RFC 7662, confidential only), `GET /oauth2/logout` (RP-initiated), OIDC back-channel logout tokens to registered clients (arch §17.5).
+- `POST /oauth2/revoke` (RFC 7009), `POST /oauth2/introspect` (RFC 7662, confidential only), OIDC back-channel logout tokens to registered clients (arch §17.5). _Update 2026-07-25:_ `GET /oauth2/logout` (RP-initiated) is **descoped** — there is no end-session endpoint; first-party sign-out is app-session termination (D-18) and global sign-out lives on the identity domain. Revisit with M8.
 - **DoD:** revoke kills a family; global sign-out triggers back-channel logout received by a test RP.
 
 ### T-205 — Consent records + withdrawal · M · Sec: Medium
@@ -181,12 +181,12 @@ This is the authoritative build plan to take Shadow Identity from its current st
 
 ### T-301 — RBAC model + PDP API · L · Sec: High
 
-- `permissions`, `application_roles` (extended), `role_permissions`, `role_assignments` (org-scoped, principal = user|service) per DB §6 — **this fills the gap where roles cannot currently be assigned to anyone.** `POST /api/v1/authz/check` (+batch), deny-by-default, `authz_version` invalidation (arch §11, §17.4).
+- `permissions`, `application_roles` (extended), `role_permissions`, `role_assignments` (org-scoped, principal = user|service) per DB §6 — **this fills the gap where roles cannot currently be assigned to anyone.** `POST /api/v1/authz/check` (batch deferred — the SDK's `checkAll` composes parallel single checks), deny-by-default, `authz_version` invalidation (arch §11, §17.4).
 - **DoD:** assign a role; PDP returns PERMIT/DENY correctly; grant change bumps version and invalidates cached decisions; authorization-matrix tests pass.
 
 ### T-302 — `@shadow-library/auth` SDK v1 · XL · Sec: Critical
 
-- Build the package per `docs/sdk.md` as the **in-repo workspace package `packages/auth`** (decision: same repo as the identity server because the two share protocol logic and the SDK is integration-tested against the real server): Bun-native Ed25519 verify (JWKS cache + unknown-`kid` refetch), `AuthModule` guards (`@Authenticated`, `@RequirePermission`, `@RequireScope`, `@AllowService`), PDP client (60 s cache), M2M token manager (singleflight), RP helper (PKCE/state/nonce), `createTestIdP` utilities. Session-cookie adapters and back-channel logout ship with T-303 when the first consumer integrates.
+- Build the package per `docs/sdk.md` as the **in-repo workspace package `packages/auth`** (decision: same repo as the identity server because the two share protocol logic and the SDK is integration-tested against the real server; _update 2026-07-25:_ since extracted into its own repository together with its spec — its `docs/sdk.md` §11): Bun-native Ed25519 verify (JWKS cache + unknown-`kid` refetch), `AuthModule` guards (`@Authenticated`, `@RequirePermission`, `@RequireScope`, `@AllowService`), PDP client (60 s cache), M2M token manager (singleflight), RP helper (PKCE/state/nonce), `createTestIdP` utilities. Session-cookie adapters and back-channel logout ship with T-303 when the first consumer integrates.
 - **DoD:** a reference consumer service verifies tokens with no network on the hot path, enforces a permission via PDP, and calls another service M2M — all through the SDK; fail-closed behaviour tested.
 
 ### T-303 — Migrate one real service (`pulse-server`) as reference · L
@@ -294,6 +294,56 @@ Users + Groups + discovery documents per organisation (api-contract §9). Record
 Home-realm discovery riding T-703's verified domains (api-contract §10): the login flow offers (or, when `enforced`, requires) the org's external OIDC IdP; the server-side RP does code+PKCE with per-flow state/nonce, verifies upstream ID tokens against the upstream JWKS (RS256/ES256/EdDSA allow-list) and demands `email_verified`. Tenant-takeover prevention is layered: endpoints only ever come from the issuer's own discovery document (issuer-match + SSRF guard), returning users match on (provider, subject) — never bare email after first link — and linking a first-time subject to an existing local account requires an email-OTP proof of control. JIT-provisioned users are passwordless org MEMBERs; federated proof is a first factor, so MFA-enrolled accounts still walk their local second factor; platform admins keep the password path as break-glass. Deferred + recorded: SAML **inbound** federation, group/claim mapping, upstream forced re-auth on step-up.
 
 **M7 is complete** (T-701, T-702, T-703, T-704, T-705, T-706).
+
+---
+
+## M7c — 2026-07-25 architecture-review remediation
+
+Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-22). Ordered by security impact; T-801/T-802/T-803 SHOULD land before any new first-party application onboards.
+
+### T-801 — Step-up intent binding (D-19) · M · Sec: High
+
+- **Change:** the elevation window is claimable first-come-first-served, so any first-party app holding a live app session can spend a step-up the user performed for a different app or for the identity console.
+- **Fix:** record intent at ceremony start — `POST /me/mfa/step-up` and `POST /me/webauthn/step-up` accept optional `clientId` + `resource` (identity-web forwards them from the step-up page URL; the SDK appends them to `AUTH_STEP_UP_URL`); store as `user_sessions.elevation_intent_client_id` / `elevation_intent_resource` (DB §7); `POST /api/v1/app-sessions/elevation` succeeds only on a matching `(client, audience)`; a `NULL` intent is claimable by no application. **Cross-repo:** identity-web step-up page + SDK step-up redirect.
+- **DoD:** claim with a mismatched client or audience fails; a console step-up is unclaimable; a matching claim consumes the window; existing elevation specs updated.
+
+### T-802 — Service-access rule TTL refresh (D-17) · S · Sec: High
+
+- **Change:** rules load once at boot, making **revocation** restart-dependent — unbounded latency in a system that bounds every other window (arch §9.1).
+- **Fix (SDK):** re-fetch `GET /api/v1/authz/service-access` on an interval (default 300 s); a failed refresh keeps the last good rules; a failed initial load still aborts boot.
+- **DoD:** revoking a rule denies the caller within one interval without a restart; a transient identity outage does not flip the guard to deny-all.
+
+### T-803 — Workload-assertion audience pinning (D-16) · S · Sec: High
+
+- **Change:** the spec validated the assertion's `aud` without pinning the value, so any projected SA token could in principle pass.
+- **Fix:** reject client assertions whose `aud` is not the identity issuer; document the required projection (`audience: <issuer>`); regression-test with an API-server-audience token.
+- **DoD:** an assertion carrying the cluster default audience is rejected; the dedicated audience is accepted.
+
+### T-804 — Per-client budgets on M2M endpoints · S · Sec: Medium
+
+- **Change:** `POST /oauth2/token` and `/api/v1/app-sessions/*` sit on the 100 req/min per-IP tier; a fleet behind one egress IP shares one budget (and the SDK token cache is the only thing keeping it under).
+- **Fix:** budget authenticated M2M calls per client id (Redis, same tier machinery); unauthenticated traffic to the same endpoints stays on the IP tier.
+- **DoD:** two clients behind one IP consume independent budgets; an unauthenticated flood is still IP-limited.
+
+### T-805 — Catalog-sync deletion guardrail (D-15) · S · Sec: Medium
+
+- **Fix:** `PUT /api/v1/authz/catalog` refuses a manifest that would delete more than half of the application's existing permissions or roles unless the push carries `force: true`; refusals are audited (`authz.catalog.sync_refused`) and change nothing.
+- **DoD:** a truncated manifest is refused without `force`; a forced sync proceeds and audits.
+
+### T-806 — Token exchange (D-22) · L · Sec: High
+
+- **Change:** implement RFC 8693 at `POST /oauth2/token`: verify the subject token, require the caller's application to own the subject token's `aud`, mint the same `sub`/`org`/`sid` with a mandatory `act` naming the caller, scope = caller's grants on the target ∩ the target's defined scopes, `aal` omitted (always AAL1), `exp` ≤ the subject token's, and refuse subject tokens that already carry `act` (single-hop delegation).
+- **DoD:** exchange yields a correctly bounded token; a chained exchange is refused; an elevated subject token yields an AAL1 result; `act` present on every exchanged token.
+
+### T-807 — Application as the unit of identity (D-21) · L
+
+- **Change:** `GET /api/v1/apps/me` self-description; provision the client and the `api://<app>` resource 1:1 from application registration; publish `step_up_endpoint` and `app_session_endpoint` in discovery; SDK derives configuration from `AUTH_ISSUER` + `AUTH_APP_ID` and refreshes it on a TTL.
+- **DoD:** a service boots with issuer + app id + credential only; an admin scope grant propagates without a redeploy; the step-up URL comes from discovery.
+
+### T-808 — `mfa.email_otp_fallback.enabled` policy (D-20) · S · Sec: Medium
+
+- **Fix:** register the boolean key (default `true`, folds `AND`); when folded `false` for a user's applicable organisations, EMAIL_OTP is excluded as an MFA second factor (first-factor OTP for passwordless accounts and recovery-flow proof of address control are unaffected).
+- **DoD:** an organisation disabling the policy removes EMAIL_OTP from its members' MFA options; passwordless sign-in and recovery still work.
 
 ---
 

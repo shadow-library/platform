@@ -3,8 +3,8 @@
 |                  |                                                                                                                                                                                                                                           |
 | :--------------- | :---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Status**       | Approved for development                                                                                                                                                                                                                  |
-| **Version**      | 2.0.0                                                                                                                                                                                                                                     |
-| **Last updated** | 2026-07-12                                                                                                                                                                                                                                |
+| **Version**      | 2.1.0                                                                                                                                                                                                                                     |
+| **Last updated** | 2026-07-25                                                                                                                                                                                                                                |
 | **Base URL**     | `https://identity.shadow-apps.com/api/v1`                                                                                                                                                                                                 |
 | **Supersedes**   | v1. Token-cookie delivery (`AT`/`RT` cookies) and `POST /auth/session/refresh` are **withdrawn** — the browser holds only the `__Host-sid` session cookie (decision D-10); applications use `/oauth2/*` (see `docs/architecture.md` §12). |
 
@@ -192,11 +192,17 @@ When a flow was started by a redirect from `/oauth2/authorize`, `COMPLETED` resp
 
 Requires session + CSRF. `204`; clears the session cookies and revokes the **current** session and
 its refresh-token families. Revoking every other session is `DELETE /me/sessions` (§4.4).
-Clients registered with a `backchannel_logout_uri` receive an OIDC back-channel logout token (§6).
+Clients registered with a `backchannel_logout_uri` receive an OIDC back-channel logout token (§5.1).
 
-### 4.3 `POST /auth/step-up`
+### 4.3 Step-up (AAL2 elevation)
 
-Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the current session; on completion sets `elevated_until = now() + 10m`. Same challenge endpoints as login.
+Step-up is **not** a flow-engine flow — it is a session-authenticated call on the identity domain using an enrolled factor:
+
+- `GET /me/mfa/step-up/methods` → the factors the account can present.
+- `POST /me/mfa/step-up` `{ code, clientId?, resource? }` → `{ aal, elevatedUntil }` — TOTP (§4.5).
+- `POST /me/webauthn/step-up/options` · `POST /me/webauthn/step-up` `{ assertion, clientId?, resource? }` — passkey.
+
+Success sets `elevated_until = now() + 10m` on the session. `clientId` + `resource`, when present, record the window's **intent** (D-19, T-801): only a matching `POST /api/v1/app-sessions/elevation` claim can spend it, and a window opened without an intent (the identity console's own step-up) is claimable by no application.
 
 ### 4.4 Session management (under `/me`, session cookie + CSRF) — _implemented (M6)_
 
@@ -210,7 +216,7 @@ Re-authentication for sensitive operations: starts a `STEP_UP` flow bound to the
 - `POST /me/mfa/totp/enroll` → `{ secret, uri }` (base32 seed + otpauth URI, shown once). Adding the _first_ factor needs only a session; changing factors once MFA exists requires elevation.
 - `POST /me/mfa/totp/activate` `{ code }` → `{ success, recoveryCodes? }` — proof-of-possession activates the enrollment; the account's first factor also returns its one-time recovery-code batch.
 - `DELETE /me/mfa/totp` — step-up required.
-- `POST /me/mfa/step-up` `{ code }` → `{ aal, elevatedUntil }` — elevates the current session to AAL2 via TOTP.
+- `POST /me/mfa/step-up` `{ code, clientId?, resource? }` → `{ aal, elevatedUntil }` — elevates the current session to AAL2 via TOTP; optional D-19 intent per §4.3.
 - `POST /me/mfa/recovery-codes` → `{ recoveryCodes }` — regenerates (step-up required); previous batch is retired atomically.
 
 ### 4.6 WebAuthn (passkeys) — _implemented (M4)_
@@ -251,7 +257,7 @@ Specified in `docs/architecture.md` §12; not duplicated here. The interactive f
 
 ### 5.1 Back-channel logout — _implemented (M6)_
 
-Clients registered with a `backchannel_logout_uri` receive an [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) token whenever a session that issued them a refresh-token family terminates (signout, self-service revocation, admin termination, lock, erasure). The logout token is an EdDSA JWT (`iss`, `sub`, `aud` = client id, `iat`, `exp` +120 s, `jti`, `events`, `sid`; never `nonce`), POSTed as `logout_token=<jwt>` (`application/x-www-form-urlencoded`). Delivery is transactional with retries/backoff and dead-letters after 5 attempts; the worker process is the sender. ID tokens carry `sid` so clients can correlate. Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`.
+Clients registered with a `backchannel_logout_uri` receive an [OIDC Back-Channel Logout 1.0](https://openid.net/specs/openid-connect-backchannel-1_0.html) token whenever a session that issued them a refresh-token family terminates (signout, self-service revocation, admin termination, lock, erasure). The logout token is an EdDSA JWT (`iss`, `sub`, `aud` = client id, `iat`, `exp` +120 s, `jti`, `events`, `sid`; never `nonce`), POSTed as `logout_token=<jwt>` (`application/x-www-form-urlencoded`). Delivery is transactional with retries/backoff and dead-letters after 5 attempts; the worker process is the sender. ID tokens carry `sid` so clients can correlate. Discovery advertises `backchannel_logout_supported` and `backchannel_logout_session_supported`. First-party app-session clients hold no refresh-token family and therefore receive **no logout token** — they observe termination at their next mint (`AUTH_005`), per D-18.
 
 ## 6. Administrative APIs (`/api/v1/admin/*`) — _implemented (M6)_
 
@@ -275,11 +281,11 @@ Session cookie + CSRF; every endpoint is PDP-guarded in the platform organisatio
 - `POST /admin/clients/{id}/scopes` `{ scopeId }` · `DELETE /admin/clients/{id}/scopes/{scopeId}`.
 - `GET/POST /admin/resources` · `POST /admin/resources/{id}/scopes` — API resources and their scopes.
 
-`workloadSubject` binds a Kubernetes service-account subject (`system:serviceaccount:<ns>:<name>`, unique across clients) to the client; the workload then authenticates to `/oauth2/token` with its projected SA token as an RFC 7523 `client_assertion` instead of a secret (D-16).
+`workloadSubject` binds a Kubernetes service-account subject (`system:serviceaccount:<ns>:<name>`, unique across clients) to the client; the workload then authenticates to `/oauth2/token` with its projected SA token as an RFC 7523 `client_assertion` instead of a secret (D-16). The projected token's `audience` MUST be the identity issuer itself; an assertion bearing any other audience (e.g. the cluster's API-server default) is rejected (T-803).
 
 ### 6.2a Service access rules (`/admin/service-access`) — requires `iam:clients:read` / `iam:clients:manage`
 
-The M2M route allowlist (D-17): which caller client may invoke which routes of a target application. Consuming services load their own application's rules at startup via `GET /api/v1/authz/service-access` (service token, scope `authz:check`) and enforce them locally, deny-by-default.
+The M2M route allowlist (D-17): which caller client may invoke which routes of a target application. Consuming services load their own application's rules at startup and re-fetch them on a TTL (default 300 s — T-802) via `GET /api/v1/authz/service-access` (service token, scope `authz:check`) and enforce them locally, deny-by-default; grants and revocations take effect within one interval, no restart.
 
 - `GET /admin/service-access?applicationId=` — list an application's rules.
 - `POST /admin/service-access` `{ applicationId, callerClientId, method, pathPattern }` — `method` is an HTTP verb or `*`; `pathPattern` is an absolute path, trailing `*` matches any suffix. Idempotent on the natural key.
@@ -289,7 +295,7 @@ The M2M route allowlist (D-17): which caller client may invoke which routes of a
 
 Two-tier authorization (T-601): `iam:roles:manage` platform-wide, or `app:roles:manage` scoped to the owning application.
 
-Role and permission **definitions** are no longer created here — each application owns its catalog in code and pushes it via the SDK (`PUT /api/v1/authz/catalog`, scope `authz:roles:sync`, full declarative sync; see architecture.md D-15 and sdk.md). The admin surface keeps only the read view and **assignment**:
+Role and permission **definitions** are no longer created here — each application owns its catalog in code and pushes it via the SDK (`PUT /api/v1/authz/catalog`, scope `authz:roles:sync`, full declarative sync; a manifest deleting more than half of the existing catalog is refused without `force` — T-805; see architecture.md D-15 and the SDK repo's `docs/sdk.md`). The admin surface keeps only the read view and **assignment**:
 
 - `GET /admin/permissions?applicationId=` — read the catalog.
 - `POST /admin/role-assignments` and `POST /admin/role-assignments/revoke` `{ principalType, principalId, roleId, organisationId }` · `GET /admin/role-assignments?…` (platform tier only).

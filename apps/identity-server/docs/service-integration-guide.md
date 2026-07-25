@@ -1,11 +1,11 @@
 # Shadow Identity — Service Integration Guide
 
-|                  |                                                    |
-| :--------------- | :------------------------------------------------- |
-| **Audience**     | Teams building a first-party service on the platform |
-| **SDK**          | `@shadow-library/auth`                             |
-| **Status**       | Living document                                    |
-| **See also**     | `docs/architecture.md` (design), `docs/sdk.md` (SDK reference), `docs/auth/api-contract.md` (HTTP contract) |
+|              |                                                                                                                                      |
+| :----------- | :----------------------------------------------------------------------------------------------------------------------------------- |
+| **Audience** | Teams building a first-party service on the platform                                                                                 |
+| **SDK**      | `@shadow-library/auth`                                                                                                               |
+| **Status**   | Living document                                                                                                                      |
+| **See also** | `docs/architecture.md` (design), `@shadow-library/auth` → `docs/sdk.md` (SDK reference), `docs/auth/api-contract.md` (HTTP contract) |
 
 This is the practical, task-oriented guide for wiring your service into Shadow Identity: how authentication and authorization actually work, how services talk to each other, and how to use the `@shadow-library/auth` package to protect your routes. If you just want the checklist, jump to [§10](#10-integration-checklist).
 
@@ -15,17 +15,17 @@ This is the practical, task-oriented guide for wiring your service into Shadow I
 
 Shadow Identity separates two credentials that people often conflate. **Your service only ever deals with the second one.**
 
-| | Browser session | Access token (what your service sees) |
-| :-- | :-- | :-- |
-| Format | Opaque cookie (`__Host-sid`) | **JWT, EdDSA-signed** |
-| Who holds it | The identity domain only | Passed to your service as `Authorization: Bearer …` |
+|                  | Browser session                   | Access token (what your service sees)                        |
+| :--------------- | :-------------------------------- | :----------------------------------------------------------- |
+| Format           | Opaque cookie (`__Host-sid`)      | **JWT, EdDSA-signed**                                        |
+| Who holds it     | The identity domain only          | Passed to your service as `Authorization: Bearer …`          |
 | How it's checked | DB + cache lookup inside identity | **Verified offline in your process** against identity's JWKS |
-| Your involvement | None | You verify it locally; no call back to identity |
+| Your involvement | None                              | You verify it locally; no call back to identity              |
 
 Three consequences that shape everything below:
 
 1. **Token verification is offline and stateless.** After the SDK fetches identity's public keys once (cached ~12 h), verifying a request is a local signature + claims check — **zero network calls, zero DB hits, identity is not in your hot path.**
-2. **Access tokens carry identity, not permissions.** A token says *who* you are (`sub`, `org`, `aud`, `scope`, `sid`, `aal`) but not *what you may do* on a fine-grained resource. Permission decisions go to the **PDP** (`/api/v1/authz/check`), which the SDK calls and caches.
+2. **Access tokens carry identity, not permissions.** A token says _who_ you are (`sub`, `org`, `aud`, `scope`, `sid`, `aal`) but not _what you may do_ on a fine-grained resource. Permission decisions go to the **PDP** (`/api/v1/authz/check`), which the SDK calls and caches.
 3. **Revocation is eventually-consistent, by design.** Because verification is offline, a revoked session keeps working until its token expires (≤ 60 min), and a revoked grant until the PDP cache entry expires (≤ 15 min, or 60 s for high-risk actions). This is an accepted tradeoff — see `architecture.md` §9.1. If you need an instant kill-switch on a specific route, mark it `highRisk` (§4.4).
 
 ---
@@ -34,12 +34,12 @@ Three consequences that shape everything below:
 
 Before writing code, ask the **identity platform admin** to register your service. You are an OAuth client. Decide which shape you are:
 
-| You are… | Client type | Auth method | Needs |
-| :-- | :-- | :-- | :-- |
-| A backend/API service **in the cluster** | **`SERVICE`** (service account) | **k8s workload identity** (projected SA token as client assertion) | client id + `workloadSubject` binding, granted scopes — **no secret** |
-| A backend/API service outside the cluster | **`SERVICE`** (service account) | `client_secret_basic` | client id + secret, granted scopes |
-| A server-rendered app that logs users in | **`WEB_CONFIDENTIAL`** | `client_secret_basic` + PKCE | client id + secret, redirect URIs |
-| A browser SPA with no backend | **`SPA_PUBLIC`** | PKCE only (`none`) | client id, redirect URIs |
+| You are…                                  | Client type                     | Auth method                                                        | Needs                                                                 |
+| :---------------------------------------- | :------------------------------ | :----------------------------------------------------------------- | :-------------------------------------------------------------------- |
+| A backend/API service **in the cluster**  | **`SERVICE`** (service account) | **k8s workload identity** (projected SA token as client assertion) | client id + `workloadSubject` binding, granted scopes — **no secret** |
+| A backend/API service outside the cluster | **`SERVICE`** (service account) | `client_secret_basic`                                              | client id + secret, granted scopes                                    |
+| A server-rendered app that logs users in  | **`WEB_CONFIDENTIAL`**          | `client_secret_basic` + PKCE                                       | client id + secret, redirect URIs                                     |
+| A browser SPA with no backend             | **`SPA_PUBLIC`**                | PKCE only (`none`)                                                 | client id, redirect URIs                                              |
 
 What to request from the admin:
 
@@ -57,12 +57,12 @@ You'll receive a **client id** and, for secret-based confidential clients, a **s
 
 The identity server's boot seed (`EcosystemSeedService`) idempotently provisions the first-party ecosystem on every boot — no admin request needed for these apps:
 
-| Application | RP client (`WEB_CONFIDENTIAL`, code + PKCE) | Service client (`SERVICE`, `client_credentials`) | API resource / audience |
-| :-- | :-- | :-- | :-- |
-| `pulse` | `pulse` | `pulse-server` | `pulse-server` |
-| `novel-forge` | `novel-forge` | `novel-forge-server` | `novel-forge-server` |
-| `webnovel` | `webnovel` | `webnovel-server` | `webnovel-server` |
-| `shadow-identity` (platform) | — | `identity-server` (identity's own outbound calls) | `shadow-identity` |
+| Application                  | RP client (`WEB_CONFIDENTIAL`, code + PKCE) | Service client (`SERVICE`, `client_credentials`)  | API resource / audience |
+| :--------------------------- | :------------------------------------------ | :------------------------------------------------ | :---------------------- |
+| `pulse`                      | `pulse`                                     | `pulse-server`                                    | `pulse-server`          |
+| `novel-forge`                | `novel-forge`                               | `novel-forge-server`                              | `novel-forge-server`    |
+| `webnovel`                   | `webnovel`                                  | `webnovel-server`                                 | `webnovel-server`       |
+| `shadow-identity` (platform) | —                                           | `identity-server` (identity's own outbound calls) | `shadow-identity`       |
 
 Also seeded:
 
@@ -75,15 +75,15 @@ Also seeded:
 
 **Fixed credentials (optional).** Instead of capturing random credentials from the first-boot log, a cluster can pre-declare them through the identity server's environment — one id/secret pair per seeded client:
 
-| Seeded client | Client id env (must be a UUID) | Secret env |
-| :-- | :-- | :-- |
-| `pulse` (RP) | `ECOSYSTEM_PULSE_RP_CLIENT_ID` | `ECOSYSTEM_PULSE_RP_CLIENT_SECRET` |
-| `pulse-server` | `ECOSYSTEM_PULSE_SERVER_CLIENT_ID` | `ECOSYSTEM_PULSE_SERVER_CLIENT_SECRET` |
-| `novel-forge` (RP) | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_ID` | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_SECRET` |
+| Seeded client        | Client id env (must be a UUID)           | Secret env                                   |
+| :------------------- | :--------------------------------------- | :------------------------------------------- |
+| `pulse` (RP)         | `ECOSYSTEM_PULSE_RP_CLIENT_ID`           | `ECOSYSTEM_PULSE_RP_CLIENT_SECRET`           |
+| `pulse-server`       | `ECOSYSTEM_PULSE_SERVER_CLIENT_ID`       | `ECOSYSTEM_PULSE_SERVER_CLIENT_SECRET`       |
+| `novel-forge` (RP)   | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_ID`     | `ECOSYSTEM_NOVEL_FORGE_RP_CLIENT_SECRET`     |
 | `novel-forge-server` | `ECOSYSTEM_NOVEL_FORGE_SERVER_CLIENT_ID` | `ECOSYSTEM_NOVEL_FORGE_SERVER_CLIENT_SECRET` |
-| `webnovel` (RP) | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_ID` | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_SECRET` |
-| `webnovel-server` | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_ID` | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_SECRET` |
-| `identity-server` | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_ID` | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_SECRET` |
+| `webnovel` (RP)      | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_ID`        | `ECOSYSTEM_WEBNOVEL_RP_CLIENT_SECRET`        |
+| `webnovel-server`    | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_ID`    | `ECOSYSTEM_WEBNOVEL_SERVER_CLIENT_SECRET`    |
+| `identity-server`    | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_ID`    | `ECOSYSTEM_IDENTITY_SERVER_CLIENT_SECRET`    |
 
 Every variable is optional and each pair's halves are independent; whatever is unset keeps the random behaviour above. Semantics:
 
@@ -119,12 +119,12 @@ bun add @shadow-library/auth
 
 Import subpaths (accurate as of SDK 0.1):
 
-| Path | Gives you |
-| :-- | :-- |
-| `@shadow-library/auth` | `AuthClient` (injectable class), `ServiceDiscovery`, `AuthErrorCode`, all interfaces, low-level `verifyJwt` |
-| `@shadow-library/auth/module` | `AuthModule`, `RelyingPartyModule`, guard decorators (`@Authenticated`, `@RequirePermission`, …), the `ContextService` auth extension |
-| `@shadow-library/auth/rp` | `RelyingParty` (OIDC login for apps) |
-| `@shadow-library/auth/testing` | `createTestIdP` (in-process mock identity for your tests) |
+| Path                           | Gives you                                                                                                                             |
+| :----------------------------- | :------------------------------------------------------------------------------------------------------------------------------------ |
+| `@shadow-library/auth`         | `AuthClient` (injectable class), `ServiceDiscovery`, `AuthErrorCode`, all interfaces, low-level `verifyJwt`                           |
+| `@shadow-library/auth/module`  | `AuthModule`, `RelyingPartyModule`, guard decorators (`@Authenticated`, `@RequirePermission`, …), the `ContextService` auth extension |
+| `@shadow-library/auth/rp`      | `RelyingParty` (OIDC login for apps)                                                                                                  |
+| `@shadow-library/auth/testing` | `createTestIdP` (in-process mock identity for your tests)                                                                             |
 
 The SDK is Bun-first (WebCrypto Ed25519, native `fetch`), zero heavy deps.
 
@@ -147,7 +147,7 @@ import { AuthModule } from '@shadow-library/auth/module';
 @Module({
   imports: [
     FastifyModule.forRoot({
-      imports: [AuthModule.forRoot()],   // issuer, audience, client all come from AUTH_* env vars
+      imports: [AuthModule.forRoot()], // issuer, audience, client all come from AUTH_* env vars
     }),
   ],
 })
@@ -160,19 +160,19 @@ On startup the module also: extends the request context with `getAuthPrincipal()
 
 ### 4.2 Configuration reference
 
-| Env variable | Config field | Required | Default | Purpose |
-| :-- | :-- | :-- | :-- | :-- |
-| `AUTH_ISSUER` | `issuer` | ✅ | — | Identity base URL; discovery + JWKS are fetched from it |
-| `AUTH_AUDIENCE` | `audience` | ✅ | — | Your API resource id; tokens whose `aud` doesn't include it are rejected |
-| `AUTH_CLIENT_ID` | `client.id` | for PDP/M2M | — | Service-account client id |
-| `AUTH_CLIENT_ASSERTION_PATH` | `client.assertionPath` | in-cluster | — | Path to the projected k8s SA token (preferred; replaces the secret) |
-| `AUTH_CLIENT_SECRET` | `client.secret` | out-of-cluster | — | Static client secret (`client_secret_basic`) |
-| — | `identityResource` | — | `shadow-identity` | Audience of the SDK's own token toward identity (PDP calls) |
-| — | `clockSkewSeconds` | — | `60` | Tolerated `exp`/`nbf` drift |
-| — | `cache.jwksTtlSeconds` | — | `43200` (12 h) | In-process JWKS cache |
-| — | `cache.decisionTtlSeconds` | — | `900` (15 min) | PDP decision cache |
-| — | `roles` | — | — | Your role catalog, pushed on startup (§5.2) |
-| — | `fetch` | — | global `fetch` | Transport override (tests) |
+| Env variable                 | Config field               | Required       | Default           | Purpose                                                                  |
+| :--------------------------- | :------------------------- | :------------- | :---------------- | :----------------------------------------------------------------------- |
+| `AUTH_ISSUER`                | `issuer`                   | ✅             | —                 | Identity base URL; discovery + JWKS are fetched from it                  |
+| `AUTH_AUDIENCE`              | `audience`                 | ✅             | —                 | Your API resource id; tokens whose `aud` doesn't include it are rejected |
+| `AUTH_CLIENT_ID`             | `client.id`                | for PDP/M2M    | —                 | Service-account client id                                                |
+| `AUTH_CLIENT_ASSERTION_PATH` | `client.assertionPath`     | in-cluster     | —                 | Path to the projected k8s SA token (preferred; replaces the secret)      |
+| `AUTH_CLIENT_SECRET`         | `client.secret`            | out-of-cluster | —                 | Static client secret (`client_secret_basic`)                             |
+| —                            | `identityResource`         | —              | `shadow-identity` | Audience of the SDK's own token toward identity (PDP calls)              |
+| —                            | `clockSkewSeconds`         | —              | `60`              | Tolerated `exp`/`nbf` drift                                              |
+| —                            | `cache.jwksTtlSeconds`     | —              | `43200` (12 h)    | In-process JWKS cache                                                    |
+| —                            | `cache.decisionTtlSeconds` | —              | `900` (15 min)    | PDP decision cache                                                       |
+| —                            | `roles`                    | —              | —                 | Your role catalog, pushed on startup (§5.2)                              |
+| —                            | `fetch`                    | —              | global `fetch`    | Transport override (tests)                                               |
 
 Config is validated at startup; a missing `issuer`/`audience` in production is a boot failure (fail-closed).
 
@@ -204,30 +204,36 @@ export class PostController {
   constructor(private readonly context: ContextService) {}
 
   @Get()
-  @Authenticated()                         // any valid bearer token
+  @Authenticated() // any valid bearer token
   list() {
     const who = this.context.getAuthPrincipal(); // { kind, sub, org, sid, scopes, aal, clientId?, claims }
     return this.posts.forOrg(who.org);
   }
 
   @Post()
-  @RequirePermission('posts:write')        // PDP PERMIT required (implies @Authenticated)
-  create() { /* … */ }
+  @RequirePermission('posts:write') // PDP PERMIT required (implies @Authenticated)
+  create() {
+    /* … */
+  }
 
   @Post('/:id/publish')
-  @RequirePermission('posts:publish', { highRisk: true })  // 60 s cache instead of 15 min
-  publish() { /* … */ }
+  @RequirePermission('posts:publish', { highRisk: true }) // 60 s cache instead of 15 min
+  publish() {
+    /* … */
+  }
 
   @Post('/internal/reindex')
-  @RequireScope('posts:admin')             // M2M callers additionally need an admin-configured access rule (§6.1)
-  reindex() { /* … */ }
+  @RequireScope('posts:admin') // M2M callers additionally need an admin-configured access rule (§6.1)
+  reindex() {
+    /* … */
+  }
 }
 ```
 
-| Decorator | Enforces |
-| :-- | :-- |
-| `@Authenticated()` | A valid, unexpired, correctly-signed bearer token for your `audience` |
-| `@RequireScope(...scopes)` | Token carries **every** listed scope |
+| Decorator                           | Enforces                                                                                                                                                               |
+| :---------------------------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@Authenticated()`                  | A valid, unexpired, correctly-signed bearer token for your `audience`                                                                                                  |
+| `@RequireScope(...scopes)`          | Token carries **every** listed scope                                                                                                                                   |
 | `@RequirePermission(action, opts?)` | PDP returns `PERMIT` for `action` in the principal's org. `opts.highRisk` → 60 s cache; `opts.failOpen` → permit when the PDP is unreachable (opt-in, read paths only) |
 
 There is **no per-route caller-allowlist decorator**. Any `kind=service` caller is denied on every authenticated route unless an admin-configured service-access rule covers it (§6.1) — deny-by-default, administered centrally.
@@ -239,13 +245,13 @@ There is **no per-route caller-allowlist decorator**. Any `kind=service` caller 
 ```ts
 interface AuthPrincipal {
   kind: 'user' | 'service';
-  sub: string;          // user id or service client id
-  scopes: string[];     // from the token's `scope` claim
-  clientId?: string;    // OAuth client id
-  org?: string;         // active organisation (tenant)
-  sid?: string;         // session id (users) — links back to the identity session
-  aal?: string;         // 'aal1' | 'aal2' (MFA) authentication assurance
-  claims: JwtPayload;   // the raw decoded claims
+  sub: string; // user id or service client id
+  scopes: string[]; // from the token's `scope` claim
+  clientId?: string; // OAuth client id
+  org?: string; // active organisation (tenant)
+  sid?: string; // session id (users) — links back to the identity session
+  aal?: string; // 'AAL1' | 'AAL2' (MFA) — uppercase on the wire; set on app-session mints only
+  claims: JwtPayload; // the raw decoded claims
 }
 ```
 
@@ -276,7 +282,7 @@ export class PostService {
   async assertCanWrite(who: AuthPrincipal): Promise<void> {
     const allowed = await this.auth.check({ action: 'posts:write', organisationId: who.org!, principal: who });
     const [canRead, canDelete] = await this.auth.checkAll([
-      { action: 'posts:read',   organisationId: who.org!, principal: who },
+      { action: 'posts:read', organisationId: who.org!, principal: who },
       { action: 'posts:delete', organisationId: who.org!, principal: who },
     ]);
   }
@@ -294,12 +300,12 @@ AuthModule.forRoot({
   // issuer/audience/client come from AUTH_* env vars
   roles: {
     permissions: [
-      { name: 'posts:write',   description: 'Create and edit posts' },
+      { name: 'posts:write', description: 'Create and edit posts' },
       { name: 'posts:publish', description: 'Publish posts' },
     ],
     roles: [
-      { name: 'editor',    description: 'Content editor', permissions: ['posts:write'] },
-      { name: 'publisher', description: 'Can publish',    permissions: ['posts:write', 'posts:publish'] },
+      { name: 'editor', description: 'Content editor', permissions: ['posts:write'] },
+      { name: 'publisher', description: 'Can publish', permissions: ['posts:write', 'posts:publish'] },
     ],
   },
 });
@@ -345,13 +351,13 @@ export class SearchGateway {
 
 Which services may call **your** routes is configured by the platform admin in identity (`POST /api/v1/admin/service-access`: your application, the caller's client id, method, path pattern — trailing `*` wildcard). Your `AuthModule` loads these rules at startup and the guard enforces them: a service token hitting any authenticated route without a matching rule gets a 403, even if its scopes are right. Nothing about the caller is hard-coded in your route handlers.
 
-To let `svc-poster` call `POST /api/v1/posts/reindex` on your app, the admin creates the rule and you **restart** (rules load at boot). Combine with `@RequireScope` for defense in depth.
+To let `svc-poster` call `POST /api/v1/posts/reindex` on your app, the admin creates the rule; it takes effect within one rule-refresh interval (default 300 s — T-802; until that ships, rules load once at boot and you **restart**). Combine with `@RequireScope` for defense in depth.
 
 ---
 
 ## 7. Logging users in (OIDC Authorization Code + PKCE)
 
-First-party apps never touch credentials — they run the OIDC code flow. Use the RP helper for a server-rendered/backend app (`WEB_CONFIDENTIAL`); SPAs use the same flow as a public client (PKCE, no secret).
+First-party apps never touch credentials — they run the OIDC code flow and exchange the code for an **app-session handle** (§7.1); a first-party app never holds the token pair shown below. The raw RP helper exists for third-party / external clients only, and public clients (SPA without a backend, native) are not currently expressible for first-party apps at all (D-21).
 
 ```ts
 import { RelyingPartyModule } from '@shadow-library/auth/module';
@@ -416,7 +422,7 @@ Notes:
 A scope marked `is_sensitive` never appears in an ordinary token. To obtain one:
 
 1. Call `/api/v1/app-sessions/token` with `elevated: true`. A `403` means no step-up grant is held.
-2. Redirect the user to identity to perform step-up.
+2. Redirect the user to identity to perform step-up, carrying your `clientId` and target `resource` as the step-up **intent** (D-19, T-801) — only a claim matching that intent can spend the resulting window.
 3. Call `POST /api/v1/app-sessions/elevation` with your handle and the target `resource`. This spends
    the user's step-up and creates a grant for **this application and this audience only**.
 4. Retry step 1 — the token now carries `aal: "AAL2"` and the sensitive scope, and expires when the
@@ -438,12 +444,12 @@ Useful for reasoning about latency and revocation:
 
 ### Lifetimes & revocation windows
 
-| Thing | Value | Worst-case staleness |
-| :-- | :-- | :-- |
-| User access token | 60 min | Revoked session works until token expiry |
-| JWKS cache (SDK) | 12 h | Un-published key trusted until refetch |
+| Thing              | Value                   | Worst-case staleness                       |
+| :----------------- | :---------------------- | :----------------------------------------- |
+| User access token  | 60 min                  | Revoked session works until token expiry   |
+| JWKS cache (SDK)   | 12 h                    | Un-published key trusted until refetch     |
 | PDP decision cache | 15 min (60 s high-risk) | Revoked grant permits until entry expires* |
-| M2M access token | 60 min | — |
+| M2M access token   | 60 min                  | —                                          |
 
 \* `authz_version` piggybacking collapses this to one round-trip once the principal has any other PDP traffic, so 15 min is the no-other-traffic worst case. Need faster? Mark the route `highRisk`. The platform-wide path to instant, event-driven revocation is CAEP/SSF (future — `architecture.md` §9.1).
 
@@ -457,11 +463,11 @@ The SDK ships an **in-process mock identity provider** so you can test guards an
 import { createTestIdP } from '@shadow-library/auth/testing';
 import { AuthClient } from '@shadow-library/auth';
 
-const idp = await createTestIdP();                 // ephemeral Ed25519 key + discovery/JWKS/token/PDP
+const idp = await createTestIdP(); // ephemeral Ed25519 key + discovery/JWKS/token/PDP
 const auth = new AuthClient({ issuer: idp.issuer, audience: 'api://pulse' });
 
 const token = await idp.issueToken({ sub: 'u1', audience: 'api://pulse', scopes: ['posts:write'], org: '7' });
-const principal = await auth.verify(token);         // → resolves offline
+const principal = await auth.verify(token); // → resolves offline
 
 idp.grantPermission({ kind: 'user', sub: 'u1' }, '7', 'posts:write'); // PDP answers PERMIT
 idp.stop();
@@ -490,16 +496,16 @@ It supports token minting, key rotation, grant/deny, injected endpoint failures,
 
 ## 11. Troubleshooting
 
-| Symptom | Likely cause |
-| :-- | :-- |
-| All requests 401 | `audience` mismatch (token `aud` ≠ your resource), wrong `issuer`, or clock skew > 60 s |
-| `@RequirePermission` always 403 | Your client lacks the `authz:check` scope, or the user genuinely has no assigned role granting the action |
-| `AppError` with `AuthErrorCode.KEY_UNKNOWN` | Token signed by a key not in identity's JWKS (rotation gap, or token from a different environment) |
-| `syncRoles` → `ROLE_SYNC_FAILED` / 403 | Missing `authz:roles:sync` scope, or a role references a permission not declared in the same manifest |
-| Revoked user still works for a bit | Expected — bounded by the token TTL (≤ 60 min) / PDP cache (≤ 15 min); use `highRisk` for faster cutoff |
-| M2M call 403 | Requested `scopes` exceed what your client was granted for that `resource`, or the callee has no service-access rule for your client + method + path (or hasn't restarted since it was added) |
-| Token endpoint 401 with SA token | `workloadSubject` not bound (or wrong), projected volume `audience` ≠ identity issuer, or identity's `AUTH_WORKLOAD_ISSUER` doesn't trust your cluster |
-| `fetchService` hits the wrong host | Missing `SERVICE_URL_<NAME>` override (dashes → underscores) or wrong `SERVICE_DISCOVERY_SUFFIX` |
-| Boot fails at startup with `SERVICE_ACCESS_FAILED` | Your client lacks `authz:check`, or identity is unreachable — the module aborts rather than silently denying all M2M callers |
+| Symptom                                            | Likely cause                                                                                                                                                                                  |
+| :------------------------------------------------- | :-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| All requests 401                                   | `audience` mismatch (token `aud` ≠ your resource), wrong `issuer`, or clock skew > 60 s                                                                                                       |
+| `@RequirePermission` always 403                    | Your client lacks the `authz:check` scope, or the user genuinely has no assigned role granting the action                                                                                     |
+| `AppError` with `AuthErrorCode.KEY_UNKNOWN`        | Token signed by a key not in identity's JWKS (rotation gap, or token from a different environment)                                                                                            |
+| `syncRoles` → `ROLE_SYNC_FAILED` / 403             | Missing `authz:roles:sync` scope, or a role references a permission not declared in the same manifest                                                                                         |
+| Revoked user still works for a bit                 | Expected — bounded by the token TTL (≤ 60 min) / PDP cache (≤ 15 min); use `highRisk` for faster cutoff                                                                                       |
+| M2M call 403                                       | Requested `scopes` exceed what your client was granted for that `resource`, or the callee has no service-access rule for your client + method + path (or hasn't restarted since it was added) |
+| Token endpoint 401 with SA token                   | `workloadSubject` not bound (or wrong), projected volume `audience` ≠ identity issuer, or identity's `AUTH_WORKLOAD_ISSUER` doesn't trust your cluster                                        |
+| `fetchService` hits the wrong host                 | Missing `SERVICE_URL_<NAME>` override (dashes → underscores) or wrong `SERVICE_DISCOVERY_SUFFIX`                                                                                              |
+| Boot fails at startup with `SERVICE_ACCESS_FAILED` | Your client lacks `authz:check`, or identity is unreachable — the module aborts rather than silently denying all M2M callers                                                                  |
 
 `AuthError.code` values you may catch: `TOKEN_EXPIRED`, `TOKEN_INVALID`, `AUDIENCE_MISMATCH`, `ISSUER_MISMATCH`, `ALG_REJECTED`, `KEY_UNKNOWN`, `PDP_UNAVAILABLE`, `ROLE_SYNC_FAILED`, `SERVICE_ACCESS_FAILED`, `SERVICE_UNKNOWN`, `CONFIG_INVALID`, `TOKEN_REQUEST_FAILED`.
