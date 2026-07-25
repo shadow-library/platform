@@ -72,8 +72,22 @@ export class StepUpResponse {
   elevatedUntil: string;
 }
 
+/**
+ * The application a step-up is being performed *for* (D-19, T-801). Only a claim naming the same
+ * pair can spend the window; omitting them opens a window for the identity console alone, which no
+ * application may claim.
+ */
 @Schema()
-export class StepUpBody {
+export class ElevationIntentFields {
+  @Field({ optional: true, maxLength: 64 })
+  clientId?: string;
+
+  @Field({ optional: true, maxLength: 255 })
+  resource?: string;
+}
+
+@Schema()
+export class StepUpBody extends ElevationIntentFields {
   /** A 6-digit TOTP code — required to elevate when the account holds a second factor. */
   @Field({ optional: true, pattern: '^\\d{6}$' })
   code?: string;

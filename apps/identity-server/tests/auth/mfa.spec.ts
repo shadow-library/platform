@@ -9,9 +9,11 @@ import { eq } from 'drizzle-orm';
  * Importing user defined packages
  */
 import { base32Decode, base32Encode, hotp } from '@server/modules/auth/mfa';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
+import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 
@@ -176,6 +178,52 @@ describe('MFA', () => {
       const aal1 = (await env.getService(SessionService).create({ userId })).secret;
       const stepUp = await request('post', '/api/v1/me/mfa/step-up', aal1).body({ code: '000000' });
       expect(stepUp.statusCode).toBe(401);
+    });
+
+    /**
+     * The window is opened *for* what the ceremony declared (D-19, T-801), so only a matching
+     * application can spend it and a console step-up can be spent by none.
+     */
+    describe('elevation intent', () => {
+      const sessionFor = async () => {
+        const created = await env.getService(SessionService).create({ userId });
+        return { secret: created.secret, id: created.session.id };
+      };
+
+      const intentOf = async (sessionId: bigint) => (await env.getService(SessionService).validateById(sessionId))?.elevationIntent;
+
+      it('should record the declared client and resource on the session', async () => {
+        const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+        const app = await env.getService(OAuthClientService).register({ applicationId, name: 'Intent App', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code'] });
+        const secret = await setupTotp();
+        const session = await sessionFor();
+
+        const stepUp = await request('post', '/api/v1/me/mfa/step-up', session.secret).body({
+          code: codeAt(secret, currentStep() + 1),
+          clientId: app.clientId,
+          resource: 'api://reports',
+        });
+        expect(stepUp.statusCode).toBe(200);
+        expect(await intentOf(session.id)).toEqual({ clientId: app.clientId, resource: 'api://reports' });
+      });
+
+      it('should leave no intent when the ceremony declares none', async () => {
+        const secret = await setupTotp();
+        const session = await sessionFor();
+
+        expect((await request('post', '/api/v1/me/mfa/step-up', session.secret).body({ code: codeAt(secret, currentStep() + 1) })).statusCode).toBe(200);
+        expect(await intentOf(session.id)).toBeNull();
+      });
+
+      it('should refuse a ceremony naming a client that does not exist', async () => {
+        const secret = await setupTotp();
+        const session = await sessionFor();
+
+        const stepUp = await request('post', '/api/v1/me/mfa/step-up', session.secret).body({ code: codeAt(secret, currentStep() + 1), clientId: 'no-such-client' });
+        expect(stepUp.statusCode).toBe(401);
+        /** The ceremony failed outright, so no window was opened. */
+        expect(await intentOf(session.id)).toBeNull();
+      });
     });
 
     it('should allow disabling totp only from an elevated session', async () => {

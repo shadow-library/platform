@@ -12,7 +12,7 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
-import { AccessTokenService, AuthorizationCodeService, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
+import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
 import { SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -59,7 +59,6 @@ export interface MintedToken {
 /**
  * Declaring the constants
  */
-const DEFAULT_AUDIENCE = 'shadow-identity';
 const OIDC_PROTOCOL_SCOPES = new Set(['openid', 'profile', 'email', 'offline_access', 'address', 'phone']);
 
 @Injectable()
@@ -213,6 +212,12 @@ export class AppSessionService {
    * so a second application — or the same application targeting a different API — cannot ride this
    * step-up and must send the user through their own. Elevation therefore never bleeds sideways
    * between services, and never lingers on the parent session.
+   *
+   * Consuming it is not enough on its own, though: a live window was previously claimable
+   * first-come-first-served, so whichever application asked first won a proof the user performed for
+   * someone else. The claim must therefore also match the intent recorded when the ceremony began
+   * (D-19, T-801), and a window opened with no intent — the identity console's own step-up — is
+   * claimable by no application at all.
    */
   async claimElevation(client: OAuthClient, handle: string, resource?: string): Promise<Date> {
     const session = await this.requireLiveSession(client, handle);
@@ -223,6 +228,18 @@ export class AppSessionService {
         securityEvent: 'app_session.elevation_denied',
         clientId: client.id,
         appSessionId: session.id.toString(),
+      });
+      throw AppErrorCode.AUTH_006.create();
+    }
+
+    if (!this.sessionService.matchesElevationIntent(identitySession, client.id, audience)) {
+      this.logger.warn('elevation claim refused: the step-up was performed for a different client or audience', {
+        securityEvent: 'app_session.elevation_intent_mismatch',
+        clientId: client.id,
+        appSessionId: session.id.toString(),
+        audience,
+        intentClientId: identitySession.elevationIntent?.clientId ?? null,
+        intentResource: identitySession.elevationIntent?.resource ?? null,
       });
       throw AppErrorCode.AUTH_006.create();
     }

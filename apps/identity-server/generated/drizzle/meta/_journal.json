@@ -22,6 +22,13 @@
       "when": 1784922930484,
       "tag": "0002_tired_maggott",
       "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1784971063867,
+      "tag": "0003_lowly_masque",
+      "breakpoints": true
     }
   ]
 }

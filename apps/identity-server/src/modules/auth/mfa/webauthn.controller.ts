@@ -10,11 +10,11 @@ import { Auth, Context } from '@server/modules/access';
 
 import { OperationSuccessResponse, StepUpResponse } from './mfa.dto';
 import {
-  WebauthnAssertion,
   WebauthnRegisterResponse,
   WebauthnRegisterVerifyBody,
   WebauthnRegistrationOptionsResponse,
   WebauthnRemoveParams,
+  WebauthnStepUpBody,
   WebauthnStepUpOptionsResponse,
 } from './webauthn.dto';
 import { WebauthnService } from './webauthn.service';
@@ -56,8 +56,8 @@ export class WebauthnController {
   @Post('/step-up')
   @HttpStatus(200)
   @RespondFor(200, StepUpResponse)
-  stepUp(@Body() body: WebauthnAssertion): ReturnType<WebauthnService['completeStepUp']> {
-    return this.webauthnService.completeStepUp(Context.getSession(), body);
+  stepUp(@Body() body: WebauthnStepUpBody): ReturnType<WebauthnService['completeStepUp']> {
+    return this.webauthnService.completeStepUp(Context.getSession(), body, { clientId: body.clientId, resource: body.resource });
   }
 
   @Delete('/:credentialId')

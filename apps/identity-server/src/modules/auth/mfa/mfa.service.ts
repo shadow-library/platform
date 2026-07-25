@@ -13,6 +13,7 @@ import { Config, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { KeyProvider } from '@server/modules/auth/keys';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { PasswordService } from '@server/modules/identity/credentials';
 import { UserEmailService } from '@server/modules/identity/user';
@@ -81,6 +82,7 @@ export class MfaService {
     private readonly sessionService: SessionService,
     private readonly recoveryCodeService: RecoveryCodeService,
     private readonly passwordService: PasswordService,
+    private readonly clientService: OAuthClientService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -243,7 +245,13 @@ export class MfaService {
    * therefore derived from the account's own enrolled factors, not from what the caller supplies.
    * Passkey-only accounts elevate through the WebAuthn step-up ceremony, not this method.
    */
-  async stepUp(session: ValidatedSession, proof: { code?: string; password?: string }): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+  async stepUp(
+    session: ValidatedSession,
+    proof: { code?: string; password?: string; clientId?: string; resource?: string },
+  ): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+    /** Resolved before the factor check so a bad intent fails the ceremony rather than opening an unclaimable window. */
+    const intent = await this.clientService.resolveElevationIntent(proof.clientId, proof.resource);
+
     const factors = await this.getFactors(session.userId);
     let method: StepUpMethod;
     if (factors.totp || factors.webauthn) {
@@ -255,9 +263,15 @@ export class MfaService {
       method = 'PASSWORD';
     }
 
-    const elevated = await this.sessionService.elevate(session.id);
+    const elevated = await this.sessionService.elevate(session.id, intent ?? undefined);
     if (!elevated || !elevated.elevatedUntil) throw AppErrorCode.AUTH_005.create();
-    await this.auditService.record({ action: 'auth.mfa.step_up', outcome: 'SUCCESS', actorType: 'USER', actorId: session.userId.toString(), detail: { method } });
+    await this.auditService.record({
+      action: 'auth.mfa.step_up',
+      outcome: 'SUCCESS',
+      actorType: 'USER',
+      actorId: session.userId.toString(),
+      detail: { method, intentClientId: intent?.clientId ?? null, intentResource: intent?.resource ?? null },
+    });
     return { aal: elevated.aal, elevatedUntil: new Date(elevated.elevatedUntil) };
   }
 

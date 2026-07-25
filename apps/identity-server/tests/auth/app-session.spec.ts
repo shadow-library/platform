@@ -166,7 +166,8 @@ describe('First-party app sessions', () => {
   });
 
   describe('step-up isolation', () => {
-    const elevateCentralSession = () => env.getService(SessionService).elevate(sessionId);
+    /** A ceremony always declares what it is for (D-19, T-801); an intentless window is claimable by nobody. */
+    const elevateCentralSession = (app = client, resource = REPORTS) => env.getService(SessionService).elevate(sessionId, { clientId: app.clientId, resource });
 
     it('should withhold a sensitive scope from an ordinary token and require a grant to elevate', async () => {
       const { sessionHandle } = (await openSession()).json() as { sessionHandle: string };
@@ -228,6 +229,77 @@ describe('First-party app sessions', () => {
     it('should refuse to claim a step-up the user never performed', async () => {
       const { sessionHandle } = (await openSession()).json() as { sessionHandle: string };
       expect((await claimElevation(sessionHandle)).statusCode).toBe(403);
+    });
+
+    /**
+     * Spending the window is not enough on its own: before T-801 a live window was claimable
+     * first-come-first-served, so whichever application asked first won a proof the user performed
+     * for someone else.
+     */
+    describe('intent binding', () => {
+      it('should refuse a claim from a client the step-up was not performed for', async () => {
+        const theirs = (await openSession(rival)).json() as { sessionHandle: string };
+        await elevateCentralSession(client);
+
+        expect((await claimElevation(theirs.sessionHandle, REPORTS, rival)).statusCode).toBe(403);
+        /** The window was not spent by the refused claim, so its rightful owner can still take it. */
+        const mine = (await openSession()).json() as { sessionHandle: string };
+        expect((await claimElevation(mine.sessionHandle)).statusCode).toBe(200);
+      });
+
+      it('should refuse a claim for an audience the step-up was not performed for', async () => {
+        const { sessionHandle } = (await openSession()).json() as { sessionHandle: string };
+        await elevateCentralSession(client, REPORTS);
+
+        expect((await claimElevation(sessionHandle, BILLING)).statusCode).toBe(403);
+        expect((await claimElevation(sessionHandle, REPORTS)).statusCode).toBe(200);
+      });
+
+      /** The identity console steps up for itself; no application may spend that proof. */
+      it('should make a console step-up unclaimable by every application', async () => {
+        const mine = (await openSession()).json() as { sessionHandle: string };
+        const theirs = (await openSession(rival)).json() as { sessionHandle: string };
+        await env.getService(SessionService).elevate(sessionId);
+
+        expect((await claimElevation(mine.sessionHandle)).statusCode).toBe(403);
+        expect((await claimElevation(theirs.sessionHandle, REPORTS, rival)).statusCode).toBe(403);
+      });
+
+      it('should clear the intent when the window is spent, so a replayed claim finds nothing', async () => {
+        const { sessionHandle } = (await openSession()).json() as { sessionHandle: string };
+        await elevateCentralSession();
+
+        expect((await claimElevation(sessionHandle)).statusCode).toBe(200);
+        expect((await claimElevation(sessionHandle)).statusCode).toBe(403);
+        const parent = await env.getService(SessionService).validateById(sessionId);
+        expect(parent?.elevationIntent).toBeNull();
+      });
+
+      it('should record the intent a step-up ceremony declares and refuse an unknown client', async () => {
+        const sessionService = env.getService(SessionService);
+        const intent = await env.getService(OAuthClientService).resolveElevationIntent(client.clientId, REPORTS);
+        await sessionService.elevate(sessionId, intent ?? undefined);
+        expect((await sessionService.validateById(sessionId))?.elevationIntent).toEqual({ clientId: client.clientId, resource: REPORTS });
+
+        /** A misconfigured step-up URL fails the ceremony rather than opening a window nothing can claim. */
+        expect(env.getService(OAuthClientService).resolveElevationIntent('no-such-client', REPORTS)).rejects.toThrow();
+      });
+
+      it('should default a claimless intent to the platform audience on both sides', async () => {
+        const { sessionHandle } = (await openSession()).json() as { sessionHandle: string };
+        const intent = await env.getService(OAuthClientService).resolveElevationIntent(client.clientId);
+        await env.getService(SessionService).elevate(sessionId, intent ?? undefined);
+
+        /** Neither side named a resource, so both resolve to `shadow-identity` and the claim matches. */
+        const bearer = await serviceToken(client);
+        const claim = await env
+          .getRouter()
+          .mockRequest()
+          .post('/api/v1/app-sessions/elevation')
+          .headers({ authorization: `Bearer ${bearer}` })
+          .body({ sessionHandle });
+        expect(claim.statusCode).toBe(200);
+      });
     });
   });
 });

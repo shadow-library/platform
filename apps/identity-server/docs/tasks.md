@@ -301,11 +301,15 @@ Home-realm discovery riding T-703's verified domains (api-contract §10): the lo
 
 Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-22). Ordered by security impact; T-801/T-802/T-803 SHOULD land before any new first-party application onboards.
 
-### T-801 — Step-up intent binding (D-19) · M · Sec: High
+### T-801 — Step-up intent binding (D-19) · M · Sec: High — **done (server side; W-1 + A-2 still required)**
 
 - **Change:** the elevation window is claimable first-come-first-served, so any first-party app holding a live app session can spend a step-up the user performed for a different app or for the identity console.
 - **Fix:** record intent at ceremony start — `POST /me/mfa/step-up` and `POST /me/webauthn/step-up` accept optional `clientId` + `resource` (identity-web forwards them from the step-up page URL; the SDK appends them to `AUTH_STEP_UP_URL`); store as `user_sessions.elevation_intent_client_id` / `elevation_intent_resource` (DB §7); `POST /api/v1/app-sessions/elevation` succeeds only on a matching `(client, audience)`; a `NULL` intent is claimable by no application. **Cross-repo:** identity-web step-up page + SDK step-up redirect.
 - **DoD:** claim with a mismatched client or audience fails; a console step-up is unclaimable; a matching claim consumes the window; existing elevation specs updated.
+
+**Landed:** `POST /me/mfa/step-up` and `POST /me/webauthn/step-up` accept optional `clientId` + `resource`, resolved through `OAuthClientService.resolveElevationIntent` **before** the factor is checked and stored on `user_sessions.elevation_intent_{client_id,resource}`. An intent naming an unknown or inactive client fails the ceremony (`OAU_002`) rather than opening a window nothing could ever claim — client ids already travel in browser authorize URLs, so answering reveals nothing new. `claimElevation` now demands a matching `(client, audience)`; a mismatch answers `AUTH_006` and, importantly, **does not spend the window**, so its rightful owner can still take it. `consumeElevation` clears the intent with the window. Enforcement is strict per the deployment decision: a `NULL` intent is claimable by no application.
+
+**Cross-repo — not yet satisfied.** Until identity-web (W-1) forwards `clientId`/`resource` from the step-up page URL and the SDK (A-2) appends them to `AUTH_STEP_UP_URL`, every *application* step-up opens an intentless window and its claim fails closed. Identity-console step-ups and every non-app-session route are unaffected.
 
 ### T-802 — Service-access rule TTL refresh (D-17) · S · Sec: High
 

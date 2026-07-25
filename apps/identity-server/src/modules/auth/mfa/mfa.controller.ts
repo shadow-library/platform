@@ -82,6 +82,6 @@ export class MfaController {
   @HttpStatus(200)
   @RespondFor(200, StepUpResponse)
   stepUp(@Body() body: StepUpBody): ReturnType<MfaService['stepUp']> {
-    return this.mfaService.stepUp(Context.getSession(), { code: body.code, password: body.password });
+    return this.mfaService.stepUp(Context.getSession(), { code: body.code, password: body.password, clientId: body.clientId, resource: body.resource });
   }
 }

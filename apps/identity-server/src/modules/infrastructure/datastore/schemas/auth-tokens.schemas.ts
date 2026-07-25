@@ -67,6 +67,14 @@ export const userSessions = pgTable(
     createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
     lastUsedAt: timestamp('last_used_at', { withTimezone: true }).notNull().defaultNow(),
     elevatedUntil: timestamp('elevated_until', { withTimezone: true }),
+    /**
+     * What the open step-up window was performed *for* (D-19, T-801). A window is claimable only by
+     * the application and audience named here, so elevation cannot leak to a second application or a
+     * second API. Both NULL means the ceremony carried no application intent — the identity
+     * console's own step-up — which no application may claim.
+     */
+    elevationIntentClientId: varchar('elevation_intent_client_id', { length: 64 }),
+    elevationIntentResource: varchar('elevation_intent_resource', { length: 255 }),
 
     ipAddress: varchar('ip_address', { length: 45 }),
     ipCountry: varchar('ip_country', { length: 2 }),

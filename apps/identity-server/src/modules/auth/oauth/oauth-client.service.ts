@@ -12,8 +12,10 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { type ElevationIntent } from '@server/modules/auth/session';
 import { ApiResource, DatabaseService, OAuthClient, PrimaryDatabase, schema, Scope } from '@server/modules/infrastructure/datastore';
 
+import { DEFAULT_AUDIENCE } from './oauth.constants';
 import { assertValidWorkloadBinding, isWorkloadPattern, matchesWorkloadBinding } from './workload-subject.util';
 
 /**
@@ -207,6 +209,23 @@ export class OAuthClientService {
     const disallowed = kind === 'user' ? 'SERVICE' : 'USER';
     const disallowedNames = new Set(rows.filter(row => row.principalType === disallowed).map(row => row.name));
     return scopeNames.filter(name => !disallowedNames.has(name));
+  }
+
+  /**
+   * Resolves the intent a step-up ceremony declared (D-19, T-801). No client id means the ceremony
+   * carried no application intent — the identity console's own step-up — and the window it opens is
+   * claimable by no application.
+   *
+   * An unknown or inactive client is refused rather than silently recorded: the alternative opens a
+   * window nothing can ever claim, turning a misconfigured step-up URL into a failure that only
+   * surfaces one call later. Client ids already travel in browser authorize URLs, so answering here
+   * reveals nothing a caller could not already observe.
+   */
+  async resolveElevationIntent(clientId?: string, resource?: string): Promise<ElevationIntent | null> {
+    if (!clientId) return null;
+    const client = await this.getClient(clientId);
+    if (!client || !client.isActive) throw AppErrorCode.OAU_002.create();
+    return { clientId: client.id, resource: resource ?? DEFAULT_AUDIENCE };
   }
 
   /** Whether an RFC 8707 `resource` value is a registered, active API resource identifier. */

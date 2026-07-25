@@ -22,6 +22,7 @@ import { AccessTokenService } from './access-token.service';
 import { AuthorizationCodeService } from './authorization-code.service';
 import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
+import { DEFAULT_AUDIENCE } from './oauth.constants';
 import { verifyPkce } from './pkce';
 import { WorkloadIdentityService } from './workload-identity.service';
 
@@ -91,7 +92,6 @@ interface ResolvedGrant {
 /**
  * Declaring the constants
  */
-const DEFAULT_AUDIENCE = 'shadow-identity';
 
 /**
  * OIDC protocol scopes are never resource-server capabilities: they are always honoured for any

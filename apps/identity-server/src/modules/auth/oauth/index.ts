@@ -4,6 +4,7 @@ export * from './consent.controller';
 export * from './consent.dto';
 export * from './consent.service';
 export * from './oauth-client.service';
+export * from './oauth.constants';
 export * from './oauth.controller';
 export * from './oauth.dto';
 export * from './oauth.module';

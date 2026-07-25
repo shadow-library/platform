@@ -43,11 +43,23 @@ export interface SessionWithDevice {
   deviceName: string | null;
 }
 
+/**
+ * What an open step-up window was performed for (D-19, T-801). `clientId` absent means the ceremony
+ * carried no application intent — the identity console's own step-up — and no application may claim
+ * it. A resolved `resource` is always present alongside a client so the audience comparison has a
+ * value on both sides.
+ */
+export interface ElevationIntent {
+  clientId: string;
+  resource: string;
+}
+
 interface CachedSession {
   id: string;
   userId: string;
   aal: UserSession.Aal;
   elevatedUntil: number | null;
+  elevationIntent: ElevationIntent | null;
   expiresAt: number;
 }
 
@@ -56,6 +68,7 @@ export interface ValidatedSession {
   userId: bigint;
   aal: UserSession.Aal;
   elevatedUntil: number | null;
+  elevationIntent: ElevationIntent | null;
   expiresAt: number;
 }
 
@@ -171,10 +184,18 @@ export class SessionService {
   /**
    * Records a fresh second-factor proof: the session's achieved AAL becomes AAL2 permanently while
    * the elevation window that gates sensitive operations is time-boxed.
+   *
+   * The window is opened *for* the intent the ceremony declared (D-19, T-801) and only a matching
+   * claim can spend it. Re-elevating overwrites the previous intent, so a window is never claimable
+   * by an application the user did not just step up for.
    */
-  async elevate(sessionId: bigint): Promise<ValidatedSession | null> {
+  async elevate(sessionId: bigint, intent?: ElevationIntent): Promise<ValidatedSession | null> {
     const elevatedUntil = new Date(Date.now() + SESSION_ELEVATION_TTL_MS);
-    const [session] = await this.db.update(schema.userSessions).set({ aal: 'AAL2', elevatedUntil }).where(eq(schema.userSessions.id, sessionId)).returning();
+    const [session] = await this.db
+      .update(schema.userSessions)
+      .set({ aal: 'AAL2', elevatedUntil, elevationIntentClientId: intent?.clientId ?? null, elevationIntentResource: intent?.resource ?? null })
+      .where(eq(schema.userSessions.id, sessionId))
+      .returning();
     if (!session) return null;
     await this.cache(session);
     return this.toValidated(session);
@@ -182,6 +203,16 @@ export class SessionService {
 
   isElevated(session: ValidatedSession): boolean {
     return session.elevatedUntil !== null && session.elevatedUntil > Date.now();
+  }
+
+  /**
+   * Whether an open window was opened for this exact `(client, audience)` pair. A window with no
+   * intent belongs to the identity console and is claimable by no application, so elevated authority
+   * can never cross from the console — or from a sibling application — into an API.
+   */
+  matchesElevationIntent(session: ValidatedSession, clientId: string, resource: string): boolean {
+    const intent = session.elevationIntent;
+    return intent !== null && intent.clientId === clientId && intent.resource === resource;
   }
 
   /**
@@ -193,7 +224,11 @@ export class SessionService {
    * demonstrate a second factor; only the right to act on it is consumed.
    */
   async consumeElevation(sessionId: bigint): Promise<void> {
-    const [session] = await this.db.update(schema.userSessions).set({ elevatedUntil: null }).where(eq(schema.userSessions.id, sessionId)).returning();
+    const [session] = await this.db
+      .update(schema.userSessions)
+      .set({ elevatedUntil: null, elevationIntentClientId: null, elevationIntentResource: null })
+      .where(eq(schema.userSessions.id, sessionId))
+      .returning();
     if (session) await this.cache(session);
   }
 
@@ -255,6 +290,7 @@ export class SessionService {
       userId: session.userId.toString(),
       aal: session.aal,
       elevatedUntil: session.elevatedUntil ? session.elevatedUntil.getTime() : null,
+      elevationIntent: SessionService.toIntent(session),
       expiresAt: session.expiresAt.getTime(),
     });
     await this.redis.set(this.cacheKey(session.sessionHash), payload, 'EX', SESSION_CACHE_TTL_S);
@@ -265,18 +301,32 @@ export class SessionService {
     await this.redis.srem(this.userSetKey(session.userId), session.sessionHash);
   }
 
+  /** Both columns are written together, so a client without a resource is not a representable state. */
+  private static toIntent(session: UserSession): ElevationIntent | null {
+    if (!session.elevationIntentClientId || !session.elevationIntentResource) return null;
+    return { clientId: session.elevationIntentClientId, resource: session.elevationIntentResource };
+  }
+
   private toValidated(session: UserSession): ValidatedSession {
     return {
       id: session.id,
       userId: session.userId,
       aal: session.aal,
       elevatedUntil: session.elevatedUntil ? session.elevatedUntil.getTime() : null,
+      elevationIntent: SessionService.toIntent(session),
       expiresAt: session.expiresAt.getTime(),
     };
   }
 
   private reviveCached(cached: string): ValidatedSession {
     const parsed = JSON.parse(cached) as CachedSession;
-    return { id: BigInt(parsed.id), userId: BigInt(parsed.userId), aal: parsed.aal, elevatedUntil: parsed.elevatedUntil, expiresAt: parsed.expiresAt };
+    return {
+      id: BigInt(parsed.id),
+      userId: BigInt(parsed.userId),
+      aal: parsed.aal,
+      elevatedUntil: parsed.elevatedUntil,
+      elevationIntent: parsed.elevationIntent ?? null,
+      expiresAt: parsed.expiresAt,
+    };
   }
 }

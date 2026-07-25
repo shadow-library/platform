@@ -7,6 +7,7 @@ import { Module } from '@shadow-library/app';
  * Importing user defined packages
  */
 import { KeyModule } from '@server/modules/auth/keys';
+import { OAuthModule } from '@server/modules/auth/oauth';
 import { SessionModule } from '@server/modules/auth/session';
 import { CredentialsModule } from '@server/modules/identity/credentials';
 import { UserModule } from '@server/modules/identity/user';
@@ -29,7 +30,7 @@ import { WebauthnService } from './webauthn.service';
  */
 
 @Module({
-  imports: [DatabaseModule, KeyModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule],
+  imports: [DatabaseModule, KeyModule, OAuthModule, SessionModule, CredentialsModule, UserModule, AuditModule, NotificationModule],
   controllers: [MfaController, WebauthnController],
   providers: [MfaService, RecoveryCodeService, WebauthnService],
   exports: [MfaService, RecoveryCodeService, WebauthnService],

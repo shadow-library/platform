@@ -217,6 +217,20 @@ export class WebauthnAssertion {
   authenticatorAttachment?: string;
 }
 
+/**
+ * A step-up assertion additionally declares what the elevation is for (D-19, T-801). The intent
+ * fields are restated rather than inherited because the assertion shape is the base here and login
+ * MFA — which reuses `WebauthnAssertion` — must never carry an application intent.
+ */
+@Schema()
+export class WebauthnStepUpBody extends WebauthnAssertion {
+  @Field({ optional: true, maxLength: 64 })
+  clientId?: string;
+
+  @Field({ optional: true, maxLength: 255 })
+  resource?: string;
+}
+
 @Schema()
 export class WebauthnRegisterResponse {
   @Field()

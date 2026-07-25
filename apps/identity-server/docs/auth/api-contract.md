@@ -200,9 +200,9 @@ Step-up is **not** a flow-engine flow — it is a session-authenticated call on 
 
 - `GET /me/mfa/step-up/methods` → the factors the account can present.
 - `POST /me/mfa/step-up` `{ code, clientId?, resource? }` → `{ aal, elevatedUntil }` — TOTP (§4.5).
-- `POST /me/webauthn/step-up/options` · `POST /me/webauthn/step-up` `{ assertion, clientId?, resource? }` — passkey.
+- `POST /me/webauthn/step-up/options` · `POST /me/webauthn/step-up` `{ ...assertion, clientId?, resource? }` — passkey; the assertion fields sit at the top level and the intent fields are added beside them.
 
-Success sets `elevated_until = now() + 10m` on the session. `clientId` + `resource`, when present, record the window's **intent** (D-19, T-801): only a matching `POST /api/v1/app-sessions/elevation` claim can spend it, and a window opened without an intent (the identity console's own step-up) is claimable by no application.
+Success sets `elevated_until = now() + 10m` on the session. `clientId` + `resource`, when present, record the window's **intent** (D-19, T-801): only a matching `POST /api/v1/app-sessions/elevation` claim can spend it, and a window opened without an intent (the identity console's own step-up) is claimable by no application. `resource` defaults to the platform audience on both sides, so naming a client alone is a complete intent. A `clientId` that is unknown or inactive fails the ceremony with `401 OAU_002` rather than opening a window nothing could claim; a claim that does not match answers `403 AUTH_006` and leaves the window standing for its rightful owner.
 
 ### 4.4 Session management (under `/me`, session cookie + CSRF) — _implemented (M6)_
 

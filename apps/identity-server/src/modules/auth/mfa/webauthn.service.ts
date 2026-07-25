@@ -20,6 +20,7 @@ import { Config, Logger } from '@shadow-library/common';
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -84,6 +85,7 @@ export class WebauthnService {
     private readonly mfaService: MfaService,
     private readonly sessionService: SessionService,
     private readonly recoveryCodeService: RecoveryCodeService,
+    private readonly clientService: OAuthClientService,
   ) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
@@ -136,13 +138,30 @@ export class WebauthnService {
     return this.startAuthentication(this.stepUpKey(session.id), session.userId, true);
   }
 
-  /** Completes a passkey step-up: a user-verified assertion by the session's own user elevates it to AAL2. */
-  async completeStepUp(session: ValidatedSession, assertion: WebauthnAssertion): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+  /**
+   * Completes a passkey step-up: a user-verified assertion by the session's own user elevates it to
+   * AAL2. The window is opened for the intent the ceremony declared, so only a matching application
+   * can spend it (D-19, T-801); an intent naming an unknown client fails here rather than opening a
+   * window nothing can claim.
+   */
+  async completeStepUp(
+    session: ValidatedSession,
+    assertion: WebauthnAssertion,
+    intentInput?: { clientId?: string; resource?: string },
+  ): Promise<{ aal: 'AAL1' | 'AAL2'; elevatedUntil: Date }> {
+    const intent = await this.clientService.resolveElevationIntent(intentInput?.clientId, intentInput?.resource);
     const result = await this.finishAuthentication(this.stepUpKey(session.id), this.toAuthenticationResponse(assertion), true);
     if (!result || result.userId !== session.userId) throw AppErrorCode.MFA_002.create();
-    const elevated = await this.sessionService.elevate(session.id);
+
+    const elevated = await this.sessionService.elevate(session.id, intent ?? undefined);
     if (!elevated || !elevated.elevatedUntil) throw AppErrorCode.AUTH_005.create();
-    await this.auditService.record({ action: 'auth.mfa.step_up', outcome: 'SUCCESS', actorType: 'USER', actorId: session.userId.toString(), detail: { method: 'WEBAUTHN' } });
+    await this.auditService.record({
+      action: 'auth.mfa.step_up',
+      outcome: 'SUCCESS',
+      actorType: 'USER',
+      actorId: session.userId.toString(),
+      detail: { method: 'WEBAUTHN', intentClientId: intent?.clientId ?? null, intentResource: intent?.resource ?? null },
+    });
     return { aal: elevated.aal, elevatedUntil: new Date(elevated.elevatedUntil) };
   }
 

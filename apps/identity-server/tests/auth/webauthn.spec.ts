@@ -8,9 +8,11 @@ import { eq } from 'drizzle-orm';
 /**
  * Importing user defined packages
  */
+import { OAuthClientService } from '@server/modules/auth/oauth';
 import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { schema } from '@server/modules/infrastructure/datastore';
+import { ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
 import { WebauthnEmulator } from './webauthn-emulator';
@@ -181,6 +183,24 @@ describe('WebAuthn passkeys', () => {
     it('should refuse a passkey step-up for an account with no passkey', async () => {
       const options = await request('post', '/api/v1/me/webauthn/step-up/options');
       expect(options.statusCode).toBe(404);
+    });
+
+    /** A passkey ceremony records the same D-19 intent a TOTP one does (T-801). */
+    it('should record the declared elevation intent alongside the assertion', async () => {
+      await registerPasskey();
+      const applicationId = env.getService(ApplicationService).getApplicationOrThrow('shadow-identity').id;
+      const app = await env.getService(OAuthClientService).register({ applicationId, name: 'Passkey Intent App', kind: 'WEB_CONFIDENTIAL', grantTypes: ['authorization_code'] });
+      const created = await env.getService(SessionService).create({ userId });
+
+      const options = await request('post', '/api/v1/me/webauthn/step-up/options', created.secret);
+      const challenge = (options.json() as { options: { challenge: string } }).options.challenge;
+      const assertion = await emulator.authenticate({ challenge });
+
+      const done = await request('post', '/api/v1/me/webauthn/step-up', created.secret).body({ ...assertion, clientId: app.clientId, resource: 'api://reports' });
+      expect(done.statusCode).toBe(200);
+
+      const session = await env.getService(SessionService).validateById(created.session.id);
+      expect(session?.elevationIntent).toEqual({ clientId: app.clientId, resource: 'api://reports' });
     });
 
     it("should reject another user's passkey for step-up", async () => {
