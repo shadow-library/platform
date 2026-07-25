@@ -66,6 +66,7 @@ class AuthInitializer implements OnModuleInit, OnModuleDestroy {
     extendContextWithAuth(this.context);
     if (this.browser.enabled && this.browser.routes.backchannelLogout) this.registerFormParser();
     if (this.browser.enabled && this.browser.validateScopes) await this.client.assertScopesSupported(this.browser.scopes);
+    /** Never forced: overriding identity's destructive-sync guardrail on every boot would defeat it */
     if (this.config.roles) await this.client.syncRoles(this.config.roles);
     if (this.config.client) await this.client.loadServiceAccess();
     this.logger.info('auth module initialised', {

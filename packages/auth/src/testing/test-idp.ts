@@ -56,6 +56,8 @@ interface AppSessionRecord {
 export interface CapturedCatalog {
   manifest: { permissions: unknown[]; roles: unknown[] };
   authorization: string | null;
+  /** Whether the caller asked identity to override its destructive-sync guardrail */
+  forced: boolean;
 }
 
 export interface CapturedTokenRequest {
@@ -95,6 +97,9 @@ export interface TestIdP {
 
   /** Returns the most recent role-catalog sync the mock received, if any */
   getLastCatalog(): CapturedCatalog | undefined;
+
+  /** Makes the catalog endpoint answer identity's destructive-sync refusal unless the caller forces past it */
+  setCatalogGuardrail(refuse: boolean): void;
 
   /** Configures the rules the `/api/v1/authz/service-access` endpoint returns */
   setServiceAccess(rules: ServiceAccessRule[]): void;
@@ -167,6 +172,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   let lastTokenRequest: CapturedTokenRequest | undefined;
   let lastMintRequest: Record<string, unknown> | undefined;
   let serviceAccessRules: ServiceAccessRule[] = [];
+  let catalogGuardrail = false;
 
   const ttl = options.accessTokenTtlSeconds ?? DEFAULT_ACCESS_TOKEN_TTL_SECONDS;
   const sessionTtl = options.appSessionTtlSeconds ?? DEFAULT_APP_SESSION_TTL_SECONDS;
@@ -350,7 +356,11 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const manifest = (await request.json().catch(() => ({ permissions: [], roles: [] }))) as { permissions?: unknown[]; roles?: unknown[] };
     const permissions = manifest.permissions ?? [];
     const roles = manifest.roles ?? [];
-    lastCatalog = { manifest: { permissions, roles }, authorization: request.headers.get('authorization') };
+    const forced = new URL(request.url).searchParams.get('force') === 'true';
+    lastCatalog = { manifest: { permissions, roles }, authorization: request.headers.get('authorization'), forced };
+
+    /** Identity's D-15 guardrail: a manifest that would delete too much is refused unless forced */
+    if (catalogGuardrail && !forced) return json({ code: 'AUTHZ_009', message: 'catalog sync would delete 80% of the application catalog' }, 409);
     return json({ permissionsUpserted: permissions.length, permissionsDeleted: 0, rolesUpserted: roles.length, rolesDeleted: 0, principalsInvalidated: 0 });
   };
 
@@ -418,6 +428,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     setEndpointFailure: (pathname, fail) => void (fail ? failingEndpoints.add(pathname) : failingEndpoints.delete(pathname)),
     getRequestCount: pathname => requestCounts.get(pathname) ?? 0,
     getLastCatalog: () => lastCatalog,
+    setCatalogGuardrail: refuse => void (catalogGuardrail = refuse),
     setServiceAccess: rules => void (serviceAccessRules = rules),
     getLastTokenRequest: () => lastTokenRequest,
     setSteppedUp: (userId, isSteppedUp) => void (isSteppedUp ? steppedUp.add(userId) : steppedUp.delete(userId)),

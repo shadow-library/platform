@@ -105,6 +105,16 @@ export interface RoleCatalogManifest {
   roles: RoleManifest[];
 }
 
+export interface RoleCatalogSyncOptions {
+  /**
+   * Overrides the server's guardrail against a destructive sync (D-15). Identity refuses a manifest
+   * that would delete an unreasonable share of an application's catalog, because that is what a
+   * truncated or half-generated manifest looks like. Forcing past it is a deliberate call-site
+   * decision — `AuthModule` never passes it on the startup sync.
+   */
+  force?: boolean;
+}
+
 export interface RoleCatalogSyncResult {
   permissionsUpserted: number;
   permissionsDeleted: number;

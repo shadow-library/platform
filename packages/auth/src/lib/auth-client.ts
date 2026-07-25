@@ -19,6 +19,7 @@ import {
   JwtPayload,
   LogoutTokenClaims,
   RoleCatalogManifest,
+  RoleCatalogSyncOptions,
   RoleCatalogSyncResult,
   ServiceAccessRule,
   ServiceTokenOptions,
@@ -67,6 +68,9 @@ const APP_SESSION_SCOPE = 'app-session:manage';
 
 /** The `events` member that marks a JWT as a back-channel logout notice rather than an ID token */
 const BACKCHANNEL_LOGOUT_EVENT = 'http://schemas.openid.net/event/backchannel-logout';
+
+/** How identity spells "your manifest would delete too much"; anything else on catalog sync is a plain failure */
+const CONFLICT = 409;
 
 /**
  * The consumer-facing auth client: offline token verification, PDP checks, M2M tokens, role
@@ -245,17 +249,24 @@ export class AuthClient {
     return dispatch(await this.tokens.getToken({ ...options, resource }));
   }
 
-  /** Declaratively replaces this application's role catalog in identity; requires service-account credentials */
-  async syncRoles(manifest: RoleCatalogManifest): Promise<RoleCatalogSyncResult> {
+  /**
+   * Declaratively replaces this application's role catalog in identity; requires service-account
+   * credentials. The manifest is the complete truth — anything absent from it is deleted there — so
+   * identity guards against a sync that would delete too much and answers `ROLE_SYNC_REFUSED`. That
+   * refusal is deliberately its own error: a truncated manifest must not read as a transport blip.
+   */
+  async syncRoles(manifest: RoleCatalogManifest, options: RoleCatalogSyncOptions = {}): Promise<RoleCatalogSyncResult> {
     if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'role sync requires service-account client credentials' });
     const token = await this.identityToken(ROLE_SYNC_SCOPE);
     const headers = { 'content-type': 'application/json', authorization: `Bearer ${token}` };
-    const response = await this.transport(`${this.issuer}/api/v1/authz/catalog`, { method: 'PUT', headers, body: JSON.stringify(manifest) }).catch((error: Error) =>
+    const url = `${this.issuer}/api/v1/authz/catalog${options.force ? '?force=true' : ''}`;
+    const response = await this.transport(url, { method: 'PUT', headers, body: JSON.stringify(manifest) }).catch((error: Error) =>
       throwError(this.logged(AuthErrorCode.ROLE_SYNC_FAILED.create({ reason: `role sync failed: ${error.message}` }))),
     );
+    if (response.status === CONFLICT) throw this.logged(AuthErrorCode.ROLE_SYNC_REFUSED.create({ reason: await this.readFailureReason(response) }));
     if (!response.ok) throw this.logged(AuthErrorCode.ROLE_SYNC_FAILED.create({ reason: `role sync endpoint returned http ${response.status}` }));
     const result = (await response.json()) as RoleCatalogSyncResult;
-    this.logger.info('role catalog synced', { permissions: manifest.permissions.length, roles: manifest.roles.length });
+    this.logger.info('role catalog synced', { permissions: manifest.permissions.length, roles: manifest.roles.length, forced: options.force ?? false });
     return result;
   }
 
@@ -309,6 +320,12 @@ export class AuthClient {
     if (tokenTypeHint) body.token_type_hint = tokenTypeHint;
     await this.postToOAuthEndpoint(endpoint, body, AuthErrorCode.REVOCATION_FAILED, 'revocation');
     this.logger.info('token revoked', { tokenTypeHint });
+  }
+
+  /** Identity's own explanation, when it sent one — a guardrail refusal is only actionable with its reason */
+  private async readFailureReason(response: Response): Promise<string> {
+    const body = (await response.json().catch(() => ({}))) as { code?: string; message?: string };
+    return body.message ?? body.code ?? `http ${response.status}`;
   }
 
   /** Discovery is the source of truth; the issuer-relative path stays only as a last resort for older deployments */

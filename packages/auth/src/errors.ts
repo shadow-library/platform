@@ -96,6 +96,12 @@ export class AuthErrorCode extends ErrorCode {
   static readonly PDP_UNAVAILABLE = AuthErrorCode.unavailable('PDP_UNAVAILABLE', 'Policy decision point is unavailable: {reason}');
   /** The role-catalog sync was rejected or unreachable */
   static readonly ROLE_SYNC_FAILED = AuthErrorCode.unavailable('ROLE_SYNC_FAILED', 'Role catalog sync failed: {reason}');
+  /**
+   * Identity's guardrail refused the manifest as too destructive — the signature of a truncated or
+   * half-generated catalog. Distinct from `ROLE_SYNC_FAILED` so such a deploy fails loudly instead of
+   * looking like a transport blip somebody retries past; never retryable, only correctable or forced.
+   */
+  static readonly ROLE_SYNC_REFUSED = AuthErrorCode.conflict('ROLE_SYNC_REFUSED', 'Role catalog sync was refused as too destructive: {reason}');
   /** The service-access rules could not be loaded at startup */
   static readonly SERVICE_ACCESS_FAILED = AuthErrorCode.unavailable('SERVICE_ACCESS_FAILED', 'Service access rules could not be loaded: {reason}');
   /** The client-credentials token request failed */
