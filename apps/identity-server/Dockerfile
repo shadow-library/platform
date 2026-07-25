@@ -11,9 +11,9 @@ ENV HUSKY=0
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 
-# Install dependencies first so the layer caches until a manifest or workspace package changes.
+# Install dependencies first so the layer caches until a manifest changes. The SDK ships from the
+# registry (no local `packages/` workspace), so only the manifests are needed here.
 COPY package.json bun.lock bunfig.toml ./
-COPY packages ./packages
 RUN bun install --frozen-lockfile
 
 # Build the bundle: dist/main.js (server), dist/worker.js (worker), dist/migrate.js (migrations),
@@ -26,6 +26,9 @@ RUN git config --global --add safe.directory /app && bun run build
 # Runs the prebuilt output; no compiler toolchain or node_modules ship in the image.
 FROM ${BUN_IMAGE} AS runtime
 
+# Stamped by CI with the release version (ecosystem container-build convention); `local` for ad-hoc builds.
+ARG APP_VERSION=local
+ENV APP_VERSION=${APP_VERSION}
 ENV SERVER_PORT=8080
 ENV NODE_ENV=production
 
