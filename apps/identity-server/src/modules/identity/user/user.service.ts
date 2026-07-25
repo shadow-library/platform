@@ -7,17 +7,19 @@ import { and, eq, inArray, isNotNull, SQL } from 'drizzle-orm';
 import { DateTime } from 'luxon';
 import validator from 'validator';
 import { Injectable } from '@shadow-library/app';
-import { Logger, MaybeNull, ValidationError } from '@shadow-library/common';
+import { AppError, Logger, MaybeNull, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
-import { type ValidatedSession } from '@server/modules/auth/session';
+import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
 import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
 import { OrganisationService } from '@server/modules/identity/organisation';
+import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, ID, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
+import { NotificationService } from '@server/modules/infrastructure/notification';
 
 import { UserEmailService } from './user-email.service';
 
@@ -77,6 +79,9 @@ interface FindUserFilter {
  * Declaring the constants
  */
 
+/** pulse-server template that emails the account owner when their password is rotated (shared with the flow-based reset paths). */
+const PASSWORD_CHANGED_TEMPLATE = 'auth.password.changed';
+
 @Injectable()
 export class UserService {
   private readonly logger = Logger.getLogger(APP_NAME, UserService.name);
@@ -88,6 +93,9 @@ export class UserService {
     private readonly passwordPolicyService: PasswordPolicyService,
     private readonly organisationService: OrganisationService,
     private readonly userEmailService: UserEmailService,
+    private readonly sessionService: SessionService,
+    private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -237,5 +245,30 @@ export class UserService {
     if (Object.keys(update).length === 0) return;
     await this.db.update(schema.userProfiles).set(update).where(eq(schema.userProfiles.userId, userId));
     this.logger.debug('user profile updated', { userId });
+  }
+
+  /**
+   * Self-service password change for a signed-in user. Re-proves the current credential, enforces the
+   * password policy and reuse guard, rotates the credential, then signs every *other* session out — the
+   * caller's own session is spared so they stay logged in. Mirrors the recovery and admin-forced reset
+   * paths (audit + owner notification), minus the flow machinery. A wrong current password answers with
+   * the same opaque `AUTH_003` the authenticated step-up check uses — it never reveals whether the
+   * account even has a local password.
+   */
+  async changePassword(session: ValidatedSession, currentPassword: string, newPassword: string, ipAddress: string): Promise<void> {
+    const { userId } = session;
+    if (!(await this.passwordService.verifyForUser(userId, currentPassword))) throw AppErrorCode.AUTH_003.create();
+
+    await this.passwordPolicyService.assertAcceptable(newPassword);
+    if (await this.passwordService.isReused(userId, newPassword)) throw new ValidationError('password', ERROR_MESSAGES.REUSED_PASSWORD);
+
+    const email = await this.userEmailService.getPrimaryEmail(userId);
+    if (!email) throw AppError.internal('cannot change the password of a user without a primary email');
+
+    await this.passwordService.changePassword(userId, newPassword, email);
+    await this.sessionService.terminateAllForUser(userId, session.id);
+    await this.auditService.record({ action: 'auth.password.changed', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString(), ipAddress });
+    await this.notificationService.enqueue({ templateKey: PASSWORD_CHANGED_TEMPLATE, recipients: { email }, payload: { ipAddress } });
+    this.logger.info('user password changed', { userId });
   }
 }

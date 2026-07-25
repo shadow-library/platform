@@ -9,7 +9,9 @@ import { Module } from '@shadow-library/app';
 import { SessionModule } from '@server/modules/auth/session';
 import { CredentialsModule } from '@server/modules/identity/credentials';
 import { OrganisationModule } from '@server/modules/identity/organisation';
+import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
+import { NotificationModule } from '@server/modules/infrastructure/notification';
 import { ApplicationModule } from '@server/modules/system/application';
 
 import { MeApplicationController } from './me-application.controller';
@@ -26,7 +28,7 @@ import { UserService } from './user.service';
  */
 
 @Module({
-  imports: [DatabaseModule, SessionModule, CredentialsModule, OrganisationModule, ApplicationModule],
+  imports: [DatabaseModule, SessionModule, CredentialsModule, OrganisationModule, ApplicationModule, AuditModule, NotificationModule],
   controllers: [MeController, MeApplicationController],
   providers: [UserService, UserEmailService],
   exports: [UserService, UserEmailService],

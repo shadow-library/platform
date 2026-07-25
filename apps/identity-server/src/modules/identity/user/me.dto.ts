@@ -48,3 +48,19 @@ export class UpdateProfileBody {
   @Field({ optional: true, minLength: 1, maxLength: 255 })
   lastName?: string;
 }
+
+@Schema()
+export class ChangePasswordBody {
+  /** Re-proves the account before the credential is rotated; a session cookie alone must not change a password. */
+  @Field()
+  currentPassword: string;
+
+  @Field()
+  newPassword: string;
+}
+
+@Schema()
+export class ChangePasswordResponse {
+  @Field(() => Boolean)
+  success: boolean;
+}

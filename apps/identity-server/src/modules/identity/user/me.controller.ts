@@ -1,14 +1,14 @@
 /**
  * Importing npm packages
  */
-import { Body, Get, HttpController, Patch, RespondFor } from '@shadow-library/fastify';
+import { Body, Get, HttpController, HttpStatus, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { Auth, Context } from '@server/modules/access';
 
-import { MeResponse, UpdateProfileBody } from './me.dto';
+import { ChangePasswordBody, ChangePasswordResponse, MeResponse, UpdateProfileBody } from './me.dto';
 import { type CurrentUserSummary, UserService } from './user.service';
 
 /**
@@ -41,5 +41,14 @@ export class MeController {
   async updateCurrentUserProfile(@Body() body: UpdateProfileBody): Promise<CurrentUserSummary> {
     await this.userService.updateProfile(Context.getSession().userId, { firstName: body.firstName, lastName: body.lastName });
     return this.summary();
+  }
+
+  /** Rotates the signed-in user's password after re-proving the current one; every other session is signed out. */
+  @Post('/password')
+  @HttpStatus(200)
+  @RespondFor(200, ChangePasswordResponse)
+  async changePassword(@Body() body: ChangePasswordBody): Promise<ChangePasswordResponse> {
+    await this.userService.changePassword(Context.getSession(), body.currentPassword, body.newPassword, Context.getClientInfo().ip);
+    return { success: true };
   }
 }
