@@ -21,7 +21,8 @@ import { Spinner } from '@shadow-library/ui';
  */
 export const Route = createFileRoute('/login')({
   validateSearch: (search: Record<string, unknown>) => ({ returnTo: typeof search.returnTo === 'string' && search.returnTo.startsWith('/') ? search.returnTo : '/' }),
-  beforeLoad: ({ search }) => window.location.replace(`/api/auth/login?returnTo=${encodeURIComponent(search.returnTo)}`),
+  /** The SDK login route reads `return_to` (snake_case); the SPA keeps `returnTo` for its own search param */
+  beforeLoad: ({ search }) => window.location.replace(`/api/auth/login?return_to=${encodeURIComponent(search.returnTo)}`),
   component: LoginRedirect,
 });
 

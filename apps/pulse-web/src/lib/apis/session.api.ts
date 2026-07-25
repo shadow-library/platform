@@ -13,16 +13,18 @@ import { APIRequest } from '@shadow-library/web';
  */
 
 /**
- * The session surface pulse-server will expose once it adopts `RelyingPartyModule` from
- * `@shadow-library/auth`. The module ships only the OIDC protocol core (authorization URL, code
- * exchange, refresh) and leaves the HTTP session surface to the consuming app, so this contract is
- * the agreed target: `GET /api/auth/session` answers 200 with the session payload for an
- * authenticated cookie and 401 otherwise.
+ * The `/api/auth/session` contract, owned end-to-end by `@shadow-library/auth`'s first-party browser
+ * flow on pulse-server: 200 with the principal descriptor for an authenticated app-session cookie,
+ * 401 otherwise (never a 200 with a null body). The cookie carries an opaque handle, never a token —
+ * the server resolves it to this shape and pulse-web only ever gates on presence, never on the fields.
  */
 export interface SessionResponse {
-  userId: string;
-  email?: string;
-  name?: string;
+  sub: string;
+  scopes: string[];
+  org?: string;
+  /** `AAL2` only while a step-up grant for pulse's audience is live */
+  aal?: string;
+  clientId?: string;
 }
 
 /**
@@ -46,4 +48,12 @@ export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse> {
      */
     staleTime: 0,
   };
+}
+
+/**
+ * Ends the app session on pulse-server (`POST /api/auth/logout`). The SDK revokes the session and
+ * clears the `__Host-shadow-session` cookie; the central identity session is deliberately untouched.
+ */
+export function logout(): Promise<{ success: boolean }> {
+  return APIRequest.post('/api/auth/logout').execute<{ success: boolean }>();
 }
