@@ -8,15 +8,16 @@ import { createServerFn } from '@tanstack/react-start';
  * Importing user defined packages
  */
 import { type ApiError, call } from './api-request';
-import { type MeResponse, type UpdateProfileBody } from './api-types.gen';
+import { type ChangePasswordBody, type ChangePasswordResponse, type MeResponse, type UpdateProfileBody } from './api-types.gen';
 import { serverFetch } from './server-fetch';
+import { sessionKeys } from './session.api';
 
 /**
  * Defining types
  */
 
 /** `GET /me` — profile basics plus the current session's assurance, for first-party surfaces. */
-export type { MeResponse, UpdateProfileBody };
+export type { ChangePasswordBody, MeResponse, UpdateProfileBody };
 
 /**
  * Declaring the constants
@@ -30,6 +31,10 @@ const fetchMe = createServerFn({ method: 'GET' }).handler(() => serverFetch<MeRe
 const updateProfile = createServerFn({ method: 'POST' })
   .validator((body: UpdateProfileBody) => body)
   .handler(({ data }) => serverFetch<MeResponse>({ method: 'PATCH', path: '/me/profile', body: data }));
+
+const changePassword = createServerFn({ method: 'POST' })
+  .validator((body: ChangePasswordBody) => body)
+  .handler(({ data }) => serverFetch<ChangePasswordResponse>({ method: 'POST', path: '/me/password', body: data }));
 
 /**
  * Route-critical: the signed-in identity. A 401 here means "no session" — the portal/console guards
@@ -54,5 +59,18 @@ export function useUpdateProfileMutation(): UseMutationResult<MeResponse, ApiErr
   return useMutation<MeResponse, ApiError, UpdateProfileBody>({
     mutationFn: body => call(updateProfile({ data: body })),
     onSuccess: data => queryClient.setQueryData(meKeys.all, data),
+  });
+}
+
+/**
+ * Rotates the signed-in user's password after re-proving the current one. The server signs out every other
+ * session, so the sessions list is invalidated to drop the ones that just ended. A wrong current password
+ * surfaces as a thrown `ApiError` (401) the caller maps to a field message.
+ */
+export function useChangePasswordMutation(): UseMutationResult<ChangePasswordResponse, ApiError, ChangePasswordBody> {
+  const queryClient = useQueryClient();
+  return useMutation<ChangePasswordResponse, ApiError, ChangePasswordBody>({
+    mutationFn: body => call(changePassword({ data: body })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: sessionKeys.all }),
   });
 }

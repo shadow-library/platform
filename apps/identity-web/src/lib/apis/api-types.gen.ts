@@ -290,6 +290,23 @@ export interface paths {
     patch: operations['patch_api_v1_me_profile'];
     trace?: never;
   };
+  '/api/v1/me/password': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Change Password */
+    post: operations['post_api_v1_me_password'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/me/applications': {
     parameters: {
       query?: never;
@@ -2260,6 +2277,13 @@ export interface components {
       firstName?: string;
       lastName?: string;
     };
+    ChangePasswordBody: {
+      currentPassword: string;
+      newPassword: string;
+    };
+    ChangePasswordResponse: {
+      success: boolean;
+    };
     MyApplicationsResponse: {
       applications: components['schemas']['MyApplicationItem'][];
     };
@@ -3875,6 +3899,48 @@ export interface operations {
         };
         content: {
           'application/json': components['schemas']['MeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_me_password: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ChangePasswordBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChangePasswordResponse'];
         };
       };
       /** @description Default Response */
@@ -9427,6 +9493,8 @@ export type ApplicationSelfResponse = components['schemas']['ApplicationSelfResp
 export type ApplicationGrantItem = components['schemas']['ApplicationGrantItem'];
 export type MeResponse = components['schemas']['MeResponse'];
 export type UpdateProfileBody = components['schemas']['UpdateProfileBody'];
+export type ChangePasswordBody = components['schemas']['ChangePasswordBody'];
+export type ChangePasswordResponse = components['schemas']['ChangePasswordResponse'];
 export type MyApplicationsResponse = components['schemas']['MyApplicationsResponse'];
 export type MyApplicationItem = components['schemas']['MyApplicationItem'];
 export type CreateOrganisationBody = components['schemas']['CreateOrganisationBody'];

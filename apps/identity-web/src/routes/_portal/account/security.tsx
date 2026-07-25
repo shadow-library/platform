@@ -1,10 +1,10 @@
 /**
  * Importing npm packages
  */
-import { createFileRoute, Link } from '@tanstack/react-router';
+import { createFileRoute } from '@tanstack/react-router';
 import QRCode from 'qrcode';
 import { useEffect, useState } from 'react';
-import { Badge, Button, OtpInput, Spinner, toast } from '@shadow-library/ui';
+import { Alert, Badge, Button, Dialog, FormField, Input, OtpInput, Spinner, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -16,6 +16,7 @@ import { SecretOncePanel, useStepUpGate } from '@/features/portal';
 import {
   mfaQueryOptions,
   type TotpEnrollment,
+  useChangePasswordMutation,
   useMfaQuery,
   useRegenerateRecoveryCodesMutation,
   useRemovePasskeyMutation,
@@ -52,6 +53,7 @@ function SecurityPage(): React.JSX.Element {
   const [qr, setQr] = useState<string>('');
   const [code, setCode] = useState('');
   const [secretCodes, setSecretCodes] = useState<string[]>([]);
+  const [passwordOpen, setPasswordOpen] = useState(false);
 
   useEffect(() => {
     if (!enrollment) return;
@@ -201,10 +203,10 @@ function SecurityPage(): React.JSX.Element {
         <div className={styles.cardRow}>
           <div>
             <div className={styles.cardTitle}>Password</div>
-            <div className={styles.cardSub}>Use a password reset if you need to change it.</div>
+            <div className={styles.cardSub}>Change it any time by confirming your current password.</div>
           </div>
-          <Button variant="secondary" asChild>
-            <Link to="/recover">Change password</Link>
+          <Button variant="secondary" onClick={() => setPasswordOpen(true)}>
+            Change password
           </Button>
         </div>
       </div>
@@ -302,6 +304,82 @@ function SecurityPage(): React.JSX.Element {
       </div>
 
       {dialog}
+      <ChangePasswordDialog open={passwordOpen} onOpenChange={setPasswordOpen} />
     </div>
+  );
+}
+
+/**
+ * Collects the current password plus a new one and rotates the credential. The server re-proves the current
+ * password (a wrong one comes back as a 401) and signs out every other session, so a success toast says so.
+ */
+function ChangePasswordDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }): React.JSX.Element {
+  const changePassword = useChangePasswordMutation();
+  const [current, setCurrent] = useState('');
+  const [next, setNext] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const close = (value: boolean): void => {
+    if (!value) {
+      setCurrent('');
+      setNext('');
+      setConfirm('');
+      setError(null);
+    }
+    onOpenChange(value);
+  };
+
+  const submit = (): void => {
+    setError(null);
+    if (!current) return setError('Enter your current password.');
+    if (next.length < 8) return setError('Your new password must be at least 8 characters.');
+    if (next === current) return setError('Choose a password different from your current one.');
+    if (next !== confirm) return setError('New passwords don’t match.');
+    changePassword.mutate(
+      { currentPassword: current, newPassword: next },
+      {
+        onSuccess: () => {
+          toast.success('Password updated. Your other devices have been signed out.');
+          close(false);
+        },
+        onError: cause =>
+          setError(cause.status === 401 ? 'Your current password is incorrect.' : cause.fields?.length ? cause.fields.map(field => field.msg).join(' ') : cause.message),
+      },
+    );
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={close}>
+      <Dialog.Content size="sm">
+        <Dialog.Header title="Change password" description="Confirm your current password, then choose a new one. This signs you out on your other devices." />
+        <Dialog.Body>
+          <div className={styles.pwForm}>
+            {error && (
+              <Alert intent="danger" title="Check your password">
+                {error}
+              </Alert>
+            )}
+            <FormField label="Current password">
+              <Input type="password" revealable autoComplete="current-password" value={current} onValueChange={setCurrent} autoFocus />
+            </FormField>
+            <FormField label="New password">
+              <Input type="password" revealable autoComplete="new-password" value={next} onValueChange={setNext} />
+            </FormField>
+            <FormField label="Confirm new password">
+              <Input type="password" revealable autoComplete="new-password" value={confirm} onValueChange={setConfirm} onKeyDown={event => event.key === 'Enter' && submit()} />
+            </FormField>
+          </div>
+        </Dialog.Body>
+        <Dialog.Footer>
+          <Dialog.Close asChild>
+            <Button variant="secondary">Cancel</Button>
+          </Dialog.Close>
+          <Button variant="primary" loading={changePassword.isPending} onClick={submit}>
+            Update password
+          </Button>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
   );
 }

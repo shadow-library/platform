@@ -89,6 +89,12 @@
   color: var(--sh-text-tertiary);
 }
 
+.pwForm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
 /* enroll */
 .enrollCard {
   background: var(--sh-surface-card);
