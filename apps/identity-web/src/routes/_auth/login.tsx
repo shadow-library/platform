@@ -47,6 +47,16 @@ function LoginPage(): React.JSX.Element {
 
   useEffect(() => () => clearInterval(resendTimer.current), []);
 
+  /** Returns to the identifier step, wiping any secret typed into a prior step so a changed identifier never inherits a stale password or code. */
+  const restart = (): void => {
+    setPassword('');
+    setOtp('');
+    setResetCurrent('');
+    setResetNew('');
+    setResetConfirm('');
+    reset();
+  };
+
   const startResendCooldown = (): void => {
     setResendIn(60);
     clearInterval(resendTimer.current);
@@ -114,7 +124,7 @@ function LoginPage(): React.JSX.Element {
   if (dead && deadReason === 'locked')
     return (
       <AuthScreen footer={footer}>
-        <MfaLockedCard onRestart={reset} />
+        <MfaLockedCard onRestart={restart} />
       </AuthScreen>
     );
 
@@ -123,7 +133,7 @@ function LoginPage(): React.JSX.Element {
       <AuthScreen footer={footer}>
         <AuthCard>
           <StepHeader title="Your sign-in session expired" description="For your security we ended this attempt. Start again to continue." align="center" />
-          <Button variant="primary" fullWidth onClick={reset}>
+          <Button variant="primary" fullWidth onClick={restart}>
             Start over
           </Button>
         </AuthCard>
@@ -203,7 +213,7 @@ function LoginPage(): React.JSX.Element {
               <ExternalLinkIcon size={15} />
             </span>
           </Button>
-          <Button variant="text" size="sm" onClick={reset}>
+          <Button variant="text" size="sm" onClick={restart}>
             Use a different account
           </Button>
         </AuthCard>
@@ -264,7 +274,7 @@ function LoginPage(): React.JSX.Element {
     return (
       <AuthScreen
         footer={
-          <Link className={parts.footLink} to="/login" onClick={reset}>
+          <Link className={parts.footLink} to="/login" onClick={restart}>
             Cancel and start over
           </Link>
         }
@@ -277,7 +287,7 @@ function LoginPage(): React.JSX.Element {
           onTotp={code => advance(() => authApi.challengeVerify(flow.flowId, { code }))}
           onRecovery={code => advance(() => authApi.challengeVerify(flow.flowId, { recoveryCode: code }))}
           onPasskey={() => runPasskey(flow.flowId)}
-          onCancel={reset}
+          onCancel={restart}
         />
       </AuthScreen>
     );
@@ -332,7 +342,7 @@ function LoginPage(): React.JSX.Element {
   return (
     <AuthScreen footer={footer}>
       <AuthCard>
-        <IdentifierChip label={identifier.trim() || 'your account'} onChange={reset} />
+        <IdentifierChip label={identifier.trim() || 'your account'} onChange={restart} />
         <StepHeader title="Enter your password" description="Confirm your password to continue." />
         {error && (
           <Alert intent="danger" title="That didn’t work">
