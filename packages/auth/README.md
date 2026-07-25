@@ -10,7 +10,7 @@ The full specification lives in [`docs/sdk.md`](https://github.com/shadow-librar
 bun add @shadow-library/auth
 ```
 
-The package is Bun-first: EdDSA (Ed25519) verification runs on `crypto.subtle` and transport is native `fetch`. `@shadow-library/common` is a required peer (SDK errors are `AppError`s thrown by `AuthErrorCode` keys); the `@shadow-library/app`/`fastify` peers are only needed when you use the framework module.
+The package is Bun-first: EdDSA (Ed25519) verification runs on `crypto.subtle` and transport is native `fetch`. `@shadow-library/common` is a required peer (SDK errors are `AppError`s thrown by `AuthErrorCode` keys); the `@shadow-library/app`/`fastify`/`class-schema` peers are only needed when you use the framework module.
 
 ## Functional core
 
@@ -42,6 +42,71 @@ const auth = new AuthClient({ issuer, audience, client, timeout: 5000 }); // abo
 ```
 
 `RelyingParty` takes the same `timeout` option, bounding its discovery, JWKS, and token-exchange calls.
+
+## User login — the whole integration
+
+A service gets complete user authentication by importing one module and setting environment variables. There is no login route to write, no callback to parse, no cookie code, no token cache, no logout handler and no middleware to register.
+
+```ts
+FastifyModule.forRoot({
+  imports: [
+    AuthModule.forRoot(),
+    // ...the app's own modules
+  ],
+});
+```
+
+```sh
+AUTH_ISSUER=https://identity.shadow-apps.com
+AUTH_AUDIENCE=api://reports              # this service's own API resource
+AUTH_CLIENT_ID=svc-reports
+AUTH_CLIENT_ASSERTION_PATH=/var/run/secrets/shadow/identity-token   # or AUTH_CLIENT_SECRET
+AUTH_REDIRECT_URI=https://reports.shadow-apps.com/auth/callback     # setting this turns the browser flow on
+AUTH_SCOPES="openid reports:read"
+AUTH_SESSION_SECRET=...                  # seals the transient login-state cookie; without it, single-instance only
+AUTH_ALLOWED_REDIRECTS=https://reports.shadow-apps.com              # the `return_to` allow-list
+```
+
+That registers, wired and working:
+
+| Route | Behaviour |
+| :--- | :--- |
+| `GET /auth/login` | PKCE + `state` + `nonce` + `resource`, transient state sealed into its own cookie, redirect to identity |
+| `GET /auth/callback` | Validates `state`, redeems the code for an app-session handle, sets the session cookie, returns to `return_to` |
+| `POST /auth/logout` | Revokes the app session, clears the cookies, optionally hands on to identity's RP-initiated logout |
+| `POST /auth/backchannel-logout` | Verifies the OIDC logout token and drops that user's local sessions and cached tokens |
+| `GET /auth/session` | The current principal, or `401` — so a browser client never has to parse a token |
+| `GET /auth/step-up` | Claims a step-up grant, prompting identity only when there is nothing left to claim |
+
+Everything is overridable and nothing is required: `AuthModule.forRoot({ routes: { basePath: '/session', backchannelLogout: false } })` moves or disables any of them, and `browser: { … }` overrides any of the `AUTH_*` values in code. A service that sets no `AUTH_REDIRECT_URI` gets none of it — the API-only integration below is unchanged.
+
+### How a browser request is served
+
+The session cookie holds an **opaque app-session handle**, never a token. On each request the SDK mints (or serves from cache) an access token for this app's own audience, authenticating to identity with the service's *own* M2M credential, and verifies the result offline. Possessing a handle grants nothing on its own — that split is the security property the model rests on.
+
+The cookie defaults to `__Host-`-prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`. Because a cookie is now a credential on guarded routes, `SameSite` is what stands between you and CSRF: keep it at `Lax` or `Strict`, and if a deployment genuinely needs `None` (a cross-site iframe), the application must supply its own CSRF defence on every state-changing route — the SDK warns at startup when it sees it. `AUTH_SESSION_COOKIE_SECURE=false` exists only for plain-HTTP development; it drops the `__Host-` prefix with it and says so loudly.
+
+Both credentials land in the same principal, so a route handler never learns which the caller used:
+
+```ts
+@Get()
+@Authenticated()          // works for an Authorization: Bearer token and for the session cookie alike
+list() {
+  return this.context.getAuthPrincipal();
+}
+```
+
+### Step-up (AAL2)
+
+```ts
+@Post('/transfer')
+@RequireElevation()
+transfer() {} // principal.aal === 'AAL2', guaranteed
+```
+
+A browser is bounced to `/auth/step-up`, which claims the user's step-up into a grant scoped to **this app session and this audience**, then retries. A non-browser caller gets `403 IAM_003` instead and can drive the same cycle itself.
+
+Elevation never spreads: the elevated token is minted for the routes that ask for it, is cached under a separate key so it can never answer an ordinary request, and dies with its grant window. A user working across two applications therefore steps up in each — that is the cost of the isolation, not a bug to work around.
 
 ## Framework guards
 
@@ -101,3 +166,28 @@ await auth.verify(token);
 idp.setServiceAccess([{ callerClientId: 'svc-indexer', method: 'POST', path: '/api/v1/index' }]);
 idp.stop();
 ```
+
+The mock also stands in for the app-session endpoints, so a service can integration-test its whole browser flow without a live identity service:
+
+```ts
+idp.setSteppedUp('user-42', true); // the next elevation claim succeeds
+idp.endIdentitySession('user-42'); // every app session of that user starts answering AUTH_005
+const logoutToken = await idp.issueLogoutToken({ sub: 'user-42' });
+idp.getAppSessionCount(); // asserts a revocation actually reached identity
+```
+
+## Migration
+
+### Token requests are form-encoded (breaking)
+
+`/oauth2/*` now requires `application/x-www-form-urlencoded` bodies per RFC 6749 §2.3.1; identity accepts JSON for one more release and logs it as deprecated. `RelyingParty.exchangeCode`/`refresh` and the M2M `ServiceTokenManager` both send form-encoded bodies as of this version — **upgrading is required before that deprecation window closes**. Client secrets still travel in an HTTP Basic header, keeping them out of the body. No call sites change.
+
+### First-party clients get no refresh tokens
+
+A first-party application now exchanges its authorization code for an opaque app-session handle rather than a token pair, and is issued **no refresh token** — the handle is the renewal credential, and the SDK mints from it as needed. There is deliberately no refresh path on the app-session flow. `RelyingParty.refresh()` is unchanged and remains correct for third-party and SPA clients, whose refresh tokens are now 15-day idle and bounded by the identity session that issued them.
+
+If you were storing a token in your own session cookie, delete that code: the SDK's cookie holds a handle, and tokens live only in its in-memory cache.
+
+### Introspection is caller-scoped
+
+`introspection_endpoint` and `revocation_endpoint` are now read from discovery rather than assumed at `${issuer}/oauth2/…`. Introspection remains an explicit fallback for opaque tokens and must not be used for routine verification — and it now only answers about tokens this client owns; another client's token reads as `active: false`.

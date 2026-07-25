@@ -14,10 +14,12 @@ hand-rolling config, logging, errors, or validation.
 ## Layout
 
 - `src/index.ts` — functional core (`AuthClient`, interfaces, `AuthErrorCode`).
-- `src/lib/` — internals: discovery, JWKS, JWT verify, PDP client, token manager, transport.
+- `src/lib/` — internals: discovery, JWKS, JWT verify, PDP client, token manager, transport, and the
+  first-party app-session client plus its access-token cache.
 - `src/module/` — framework integration (`@shadow-library/auth/module`): `AuthModule`/`RelyingPartyModule`,
-  guards, decorators (`Authenticated`, `RequirePermission`, `RequireScope`), context augmentation.
-- `src/rp/` — OIDC relying party (`@shadow-library/auth/rp`): `RelyingParty`, PKCE.
+  the wired browser auth controllers, guards, decorators (`Authenticated`, `RequirePermission`,
+  `RequireScope`, `RequireElevation`), session cookie/login-state/registry, context augmentation.
+- `src/rp/` — OIDC relying party (`@shadow-library/auth/rp`): `RelyingParty`, authorization URL, PKCE.
 - `src/testing/` — test utilities (`@shadow-library/auth/testing`): `createTestIdP`.
 - `tests/` — `*.spec.ts`, driven by `bun test`; consume the package through its four public entry points only.
 
@@ -42,5 +44,7 @@ hand-rolling config, logging, errors, or validation.
   `Error`.
 - **Named exports**; each folder has a barrel `index.ts`. Public surface is the four `exports` entry points only.
 - **kebab-case** filenames with a role suffix; `bun run verify` enforces format (180-width, single quote) + lint.
-- The `@shadow-library/{app,common,fastify}` peers are dev-installed here for build/test; `common` is a required
-  runtime peer, `app`/`fastify` are optional (only needed for the framework module).
+- The `@shadow-library/{app,common,fastify,class-schema}` peers are dev-installed here for build/test; `common`
+  is a required runtime peer, the rest are optional (only needed for the framework module).
+- **Never log a token, a session handle, a cookie value, a PKCE verifier, `state`, or `nonce`.** Only a
+  `sha256` hash of a handle may be retained, and only as a cache or registry key.
