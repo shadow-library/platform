@@ -83,8 +83,8 @@ export class ServiceTokenManager {
     const document = await this.options.discovery.get();
     const scopes = [...(options.scopes ?? [])].sort();
 
-    /** The identity token endpoint accepts JSON bodies; public clients authenticate by id only */
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    /** RFC 6749 §2.3.1: the token endpoint takes form-encoded bodies; public clients authenticate by id only */
+    const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' };
     const body: Record<string, string> = { grant_type: 'client_credentials' };
     if (client.assertionPath) {
       body.client_id = client.id;
@@ -98,10 +98,10 @@ export class ServiceTokenManager {
     if (scopes.length > 0) body.scope = scopes.join(' ');
     if (options.resource) body.resource = options.resource;
 
-    /** Debug-only: the body may carry the client assertion */
-    this.logger.debug('requesting service token', { url: document.token_endpoint, body });
+    /** Never the body: it carries the client assertion, which is a live bearer credential */
+    this.logger.debug('requesting service token', { url: document.token_endpoint, clientId: client.id, resource: options.resource, scopes });
     const response = await this.options
-      .fetchFn(document.token_endpoint, { method: 'POST', headers, body: JSON.stringify(body) })
+      .fetchFn(document.token_endpoint, { method: 'POST', headers, body: new URLSearchParams(body).toString() })
       .catch((error: Error) => throwError(this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: `token request failed: ${error.message}` }))));
     if (!response.ok) throw this.logged(AuthErrorCode.TOKEN_REQUEST_FAILED.create({ reason: `token endpoint returned http ${response.status}` }));
 

@@ -143,14 +143,15 @@ export class RelyingParty {
     return this.requestTokens({ grant_type: 'refresh_token', refresh_token: refreshToken });
   }
 
+  /** RFC 6749 §2.3.1: the token endpoint takes form-encoded bodies, and Basic keeps the client secret out of the body entirely */
   private async requestTokens(body: Record<string, string>): Promise<TokenSet> {
     const document = await this.discovery.get();
-    const headers: Record<string, string> = { 'content-type': 'application/json' };
+    const headers: Record<string, string> = { 'content-type': 'application/x-www-form-urlencoded' };
     if (this.config.client.secret) headers.authorization = `Basic ${Buffer.from(`${this.config.client.id}:${this.config.client.secret}`).toString('base64')}`;
     else body.client_id = this.config.client.id;
 
     this.logger.debug('requesting tokens', { url: document.token_endpoint, grantType: body.grant_type });
-    const response = await this.transport(document.token_endpoint, { method: 'POST', headers, body: JSON.stringify(body) }).catch((error: Error) =>
+    const response = await this.transport(document.token_endpoint, { method: 'POST', headers, body: new URLSearchParams(body).toString() }).catch((error: Error) =>
       throwError(this.logged(AuthErrorCode.EXCHANGE_FAILED.create({ reason: `token request failed: ${error.message}` }))),
     );
     if (!response.ok) throw this.logged(AuthErrorCode.EXCHANGE_FAILED.create({ reason: `token endpoint returned http ${response.status}` }));
