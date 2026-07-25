@@ -22,7 +22,7 @@ import { AccessTokenService } from './access-token.service';
 import { AuthorizationCodeService } from './authorization-code.service';
 import { ConsentService } from './consent.service';
 import { OAuthClientService } from './oauth-client.service';
-import { DEFAULT_AUDIENCE } from './oauth.constants';
+import { ACCESS_TOKEN_TYPE, DEFAULT_AUDIENCE, TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { verifyPkce } from './pkce';
 import { WorkloadIdentityService } from './workload-identity.service';
 
@@ -60,6 +60,11 @@ export interface TokenParams {
   refreshToken?: string;
   scope?: string;
   resource?: string;
+  /** RFC 8693 token exchange (D-22) */
+  subjectToken?: string;
+  subjectTokenType?: string;
+  requestedTokenType?: string;
+  actorToken?: string;
 }
 
 export interface TokenResult {
@@ -69,6 +74,8 @@ export interface TokenResult {
   scope: string;
   idToken?: string;
   refreshToken?: string;
+  /** RFC 8693 requires the issued type to be stated; present on exchange responses only. */
+  issuedTokenType?: string;
 }
 
 export interface IntrospectionResult {
@@ -282,8 +289,109 @@ export class OAuthService {
     if (params.grantType === 'authorization_code') return this.exchangeCode(params, credential);
     if (params.grantType === 'refresh_token') return this.refresh(params, credential);
     if (params.grantType === 'client_credentials') return this.clientCredentials(params, credential);
+    if (params.grantType === TOKEN_EXCHANGE_GRANT) return this.tokenExchange(params, credential);
     this.logger.warn('token request rejected: unsupported grant type', { grantType: params.grantType, clientId: credential.clientId });
     throw AppErrorCode.OAU_004.create();
+  }
+
+  /**
+   * RFC 8693 token exchange (D-22): an application calls another **as the user** by presenting the
+   * user's own token, never by asserting an identity in a header. Holding the token is the whole
+   * security property — a compromised service can only act for the users currently using it, where
+   * a header assertion would let it act for the entire directory.
+   *
+   * The resulting token is bounded on every axis: the caller's own grants on the target rather than
+   * the user's consent (which was frozen to one resource at authorize time), an `exp` that can only
+   * shrink, and `aal` omitted so elevation never crosses a service boundary (D-19).
+   */
+  private async tokenExchange(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {
+    const client = await this.authenticateGrantClient(credential);
+    if (!params.subjectToken || params.subjectTokenType !== ACCESS_TOKEN_TYPE) throw AppErrorCode.OAU_001.create();
+    if (params.requestedTokenType && params.requestedTokenType !== ACCESS_TOKEN_TYPE) throw AppErrorCode.OAU_001.create();
+    /** The actor is the authenticated caller. A second delegation shape is refused rather than ignored. */
+    if (params.actorToken) throw AppErrorCode.OAU_001.create();
+    if (!params.resource) throw AppErrorCode.OAU_005.create();
+
+    const subject = this.accessTokenService.verifyAccessToken(params.subjectToken);
+    if (!subject || subject.token_type !== 'user' || typeof subject.sub !== 'string') {
+      this.logger.warn('token exchange rejected: subject token is not a valid user token', { securityEvent: 'oauth.exchange_denied', clientId: client.id });
+      throw AppErrorCode.OAU_003.create();
+    }
+
+    /** Single-hop by design: a longer chain needs its own decision recorded before it is allowed. */
+    if (subject.act) {
+      this.logger.warn('token exchange rejected: subject token is itself delegated', { securityEvent: 'oauth.exchange_denied', clientId: client.id, subject: subject.sub });
+      throw AppErrorCode.OAU_003.create();
+    }
+
+    /** A caller may only exchange a token addressed to its own API — it must already be the audience. */
+    const ownerApplicationId = await this.clientService.getResourceOwner(String(subject.aud));
+    if (ownerApplicationId === null || ownerApplicationId !== client.applicationId) {
+      this.logger.warn('token exchange rejected: caller does not own the subject token audience', {
+        securityEvent: 'oauth.exchange_denied',
+        clientId: client.id,
+        audience: String(subject.aud),
+      });
+      throw AppErrorCode.OAU_003.create();
+    }
+
+    const scope = await this.exchangeScopes(client, params.resource, params.scope);
+    /** Each hop shrinks the user's authority rather than extending it. */
+    const policyTtl = await this.policyService.resolve('auth.access_token.ttl', { ...this.tokenPolicyScope(client), clientValue: client.accessTokenTtl });
+    const ttlSeconds = Math.min(policyTtl, (subject.exp as number) - Math.floor(Date.now() / 1000));
+    if (ttlSeconds <= 0) throw AppErrorCode.OAU_003.create();
+
+    const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
+      subject: subject.sub,
+      audience: params.resource,
+      scope,
+      clientId: client.id,
+      organisationId: typeof subject.org === 'string' ? subject.org : undefined,
+      sessionId: typeof subject.sid === 'string' ? subject.sid : undefined,
+      ttlSeconds,
+      actorType: 'user',
+      actorClientId: client.id,
+    });
+
+    this.logger.info('access token issued', {
+      securityEvent: 'oauth.token_exchanged',
+      grantType: 'token-exchange',
+      clientId: client.id,
+      subject: subject.sub,
+      audience: params.resource,
+      scope,
+    });
+    return { accessToken, tokenType: 'Bearer', expiresIn, scope, issuedTokenType: ACCESS_TOKEN_TYPE };
+  }
+
+  /**
+   * The exchanged scope ceiling: the calling application's own grants on the target, never the
+   * user's consent — that was frozen to a single resource at authorize time and never covered the
+   * downstream application. Sensitive scopes are excluded outright, because they mint only into an
+   * elevated token (D-19) and an exchanged token is always AAL1.
+   */
+  private async exchangeScopes(client: OAuthClient, target: string, requestedScope?: string): Promise<string> {
+    const granted = await this.clientService.getGrantedScopes(client.id);
+    const available = new Set(granted.filter(scope => scope.resourceIdentifier === target && !scope.isSensitive).map(scope => scope.name));
+    if (available.size === 0) {
+      this.logger.warn('token exchange rejected: caller holds no scope on the target resource', { securityEvent: 'oauth.audience_denied', clientId: client.id, resource: target });
+      throw AppErrorCode.OAU_005.create();
+    }
+
+    const requested = (requestedScope ?? '').split(' ').filter(Boolean);
+    if (requested.length === 0) return [...available].join(' ');
+
+    const rejected = requested.filter(name => !available.has(name));
+    if (rejected.length > 0) {
+      this.logger.warn('token exchange rejected: requested scope exceeds the caller’s grants on the target', {
+        securityEvent: 'oauth.scope_denied',
+        clientId: client.id,
+        resource: target,
+        rejected,
+      });
+      throw AppErrorCode.OAU_004.create();
+    }
+    return requested.join(' ');
   }
 
   private async exchangeCode(params: TokenParams, credential: ClientCredential): Promise<TokenResult> {

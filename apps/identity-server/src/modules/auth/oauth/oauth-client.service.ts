@@ -228,6 +228,19 @@ export class OAuthClientService {
     return { clientId: client.id, resource: resource ?? DEFAULT_AUDIENCE };
   }
 
+  /**
+   * The application that owns an API resource, or `null` when the identifier names no active
+   * resource. Token exchange uses this to confirm a caller may exchange a token addressed to it: a
+   * service can only ever delegate onward a token that was minted for its own API (D-22).
+   */
+  async getResourceOwner(identifier: string): Promise<number | null> {
+    const resource = await this.db.query.apiResources.findFirst({
+      where: and(eq(schema.apiResources.identifier, identifier), eq(schema.apiResources.isActive, true)),
+      columns: { applicationId: true },
+    });
+    return resource?.applicationId ?? null;
+  }
+
   /** Whether an RFC 8707 `resource` value is a registered, active API resource identifier. */
   async isRegisteredResource(identifier: string): Promise<boolean> {
     const resource = await this.db.query.apiResources.findFirst({

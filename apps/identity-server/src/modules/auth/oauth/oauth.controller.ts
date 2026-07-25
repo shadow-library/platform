@@ -18,6 +18,7 @@ import { M2MBudget } from '@server/modules/infrastructure/security';
 
 import { AccessTokenService } from './access-token.service';
 import { OAuthClientService } from './oauth-client.service';
+import { TOKEN_EXCHANGE_GRANT } from './oauth.constants';
 import { AuthorizeQuery, DiscoveryResponse, IntrospectionResponseDto, RevocationResponse, TokenActionBody, TokenRequestBody, TokenResponse, UserInfoResponse } from './oauth.dto';
 import { ClientCredential, OAuthService } from './oauth.service';
 
@@ -71,7 +72,7 @@ export class OAuthController {
       token_endpoint_auth_methods_supported: ['client_secret_basic', 'client_secret_post', 'private_key_jwt', 'none'],
       scopes_supported: await this.clientService.listActiveScopeNames(),
       response_types_supported: ['code'],
-      grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials'],
+      grant_types_supported: ['authorization_code', 'refresh_token', 'client_credentials', TOKEN_EXCHANGE_GRANT],
       subject_types_supported: ['public'],
       id_token_signing_alg_values_supported: ['EdDSA'],
       code_challenge_methods_supported: ['S256'],
@@ -124,6 +125,10 @@ export class OAuthController {
         refreshToken: body.refresh_token,
         scope: body.scope,
         resource: body.resource,
+        subjectToken: body.subject_token,
+        subjectTokenType: body.subject_token_type,
+        requestedTokenType: body.requested_token_type,
+        actorToken: body.actor_token,
       },
       credential,
     );
@@ -134,6 +139,7 @@ export class OAuthController {
       scope: result.scope,
       id_token: result.idToken,
       refresh_token: result.refreshToken,
+      issued_token_type: result.issuedTokenType,
     };
   }
 

@@ -20,3 +20,7 @@
  * audience check of a grant recorded against it.
  */
 export const DEFAULT_AUDIENCE = 'shadow-identity';
+
+/** RFC 8693 grant and token-type identifiers for delegated user context across applications (D-22). */
+export const TOKEN_EXCHANGE_GRANT = 'urn:ietf:params:oauth:grant-type:token-exchange';
+export const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';

@@ -78,6 +78,20 @@ export class TokenRequestBody {
 
   @Field({ optional: true })
   client_assertion?: string;
+
+  /** RFC 8693 token exchange (D-22): the user token being delegated, and the types framing it. */
+  @Field({ optional: true })
+  subject_token?: string;
+
+  @Field({ optional: true })
+  subject_token_type?: string;
+
+  @Field({ optional: true })
+  requested_token_type?: string;
+
+  /** Accepted only so it can be refused: the actor is always the authenticated caller. */
+  @Field({ optional: true })
+  actor_token?: string;
 }
 
 @Schema()
@@ -99,6 +113,10 @@ export class TokenResponse {
 
   @Field({ optional: true })
   refresh_token?: string;
+
+  /** RFC 8693 requires the issued type to be stated; present on exchange responses only. */
+  @Field({ optional: true })
+  issued_token_type?: string;
 }
 
 @Schema()

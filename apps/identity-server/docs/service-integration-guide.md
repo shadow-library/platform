@@ -355,6 +355,29 @@ Which services may call **your** routes is configured by the platform admin in i
 
 To let `svc-poster` call `POST /api/v1/posts/reindex` on your app, the admin creates the rule; it takes effect within one rule-refresh interval (default 300 s — T-802; until that ships, rules load once at boot and you **restart**). Combine with `@RequireScope` for defense in depth.
 
+### 6.2 Calling another service **as the user** (token exchange)
+
+A service token says "pulse is calling". When the callee must know _which user_ it is acting for, exchange the user's own token instead of asserting an identity in a header (RFC 8693, D-22):
+
+```
+POST /oauth2/token                       (client_secret_basic or your SA-token assertion)
+grant_type=urn:ietf:params:oauth:grant-type:token-exchange
+subject_token=<the user's access token>
+subject_token_type=urn:ietf:params:oauth:token-type:access_token
+resource=api://novel-forge                # the target API
+scope=books:read                          # optional; narrows, never widens
+```
+
+Holding the user's token is the point: a compromised service can only act for the users currently using it, where a header assertion would let it act for the whole directory. The result is bounded on every axis:
+
+- Same `sub`, `org` and `sid`, plus a mandatory `act` claim naming your application — that chain is the audit record.
+- Scope is **your** grants on the target intersected with the target's scopes, not the user's consent (which was frozen to one resource at authorize time). `is_sensitive` scopes are never exchangeable.
+- `aal` is always absent: an exchanged token is AAL1, because elevation must not cross a service boundary (D-19). Step up in your own app instead.
+- `exp` never exceeds the subject token's, so each hop shrinks the user's authority.
+- Delegation is **single-hop**: a subject token that already carries `act` is refused with `invalid_grant`.
+
+You must already be the audience — you can only exchange a token minted for your own API. Intra-cluster calls need none of this: a call carrying no user is unauthenticated by design, and one that carries the user's own token is already accepted by the callee.
+
 ---
 
 ## 7. Logging users in (OIDC Authorization Code + PKCE)

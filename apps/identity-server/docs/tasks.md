@@ -338,10 +338,14 @@ A refund-on-success design was rejected: the refund lags the consume by an argon
 - **Fix:** `PUT /api/v1/authz/catalog` refuses a manifest that would delete more than half of the application's existing permissions or roles unless the push carries `force: true`; refusals are audited (`authz.catalog.sync_refused`) and change nothing.
 - **DoD:** a truncated manifest is refused without `force`; a forced sync proceeds and audits.
 
-### T-806 — Token exchange (D-22) · L · Sec: High
+### T-806 — Token exchange (D-22) · L · Sec: High — **done**
 
 - **Change:** implement RFC 8693 at `POST /oauth2/token`: verify the subject token, require the caller's application to own the subject token's `aud`, mint the same `sub`/`org`/`sid` with a mandatory `act` naming the caller, scope = caller's grants on the target ∩ the target's defined scopes, `aal` omitted (always AAL1), `exp` ≤ the subject token's, and refuse subject tokens that already carry `act` (single-hop delegation).
 - **DoD:** exchange yields a correctly bounded token; a chained exchange is refused; an elevated subject token yields an AAL1 result; `act` present on every exchanged token.
+
+**Landed:** `grant_type=urn:ietf:params:oauth:grant-type:token-exchange` at `POST /oauth2/token`, advertised in discovery, answering with `issued_token_type`. Ownership is checked as "the caller's **application** owns the API resource named by the subject token's `aud`" (`getResourceOwner`) rather than a bare `client_id === aud` string match — the same check before and after T-807's 1:1 provisioning. `act` is `{ sub: <caller client id> }`, the RFC's canonical actor slot, which is already how a service identifies itself in `sub`. `actor_token` is refused rather than ignored: the actor is always the authenticated caller, and silently dropping a security-relevant parameter is how delegation bugs happen.
+
+**Decision beyond the task text:** sensitive scopes are excluded from an exchanged token entirely. D-19 mints an `is_sensitive` scope only into an elevated token, and D-22 fixes an exchanged token at AAL1 — so letting one through would have been the one path where a sensitive capability reached a token that never proved a second factor.
 
 ### T-807 — Application as the unit of identity (D-21) · L
 
