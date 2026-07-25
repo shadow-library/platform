@@ -28,6 +28,7 @@ import { DiscoveryClient } from './discovery';
 import { RemoteJwks } from './jwks';
 import { type ClaimExpectations, verifyJwt } from './jwt';
 import { PdpClient } from './pdp-client';
+import { ServiceAccessClient } from './service-access';
 import { ServiceTokenManager } from './token-manager';
 import { assertValidTimeout, withTimeout } from './transport';
 
@@ -83,17 +84,17 @@ export class AuthClient {
   private readonly tokens: ServiceTokenManager;
   private readonly pdp: PdpClient;
   private readonly discovery: DiscoveryClient;
+  private readonly serviceAccess: ServiceAccessClient;
 
   /** The first-party app-session protocol client; see `AppSessionClient` for why it is M2M-only */
   readonly appSessions: AppSessionClient;
-
-  private serviceAccess: ServiceAccessRule[] | null = null;
 
   constructor(private readonly config: AuthClientConfig) {
     if (!config.issuer || !URL.canParse(config.issuer)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'issuer must be a valid url' });
     if (!config.audience) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'audience is required' });
     if (config.client && !config.client.id) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'client credentials require an id' });
     if ((config.clockSkewSeconds ?? 0) < 0) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'clock skew cannot be negative' });
+    if ((config.serviceAccess?.refreshSeconds ?? 1) <= 0) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service access refresh interval must be positive' });
     assertValidTimeout(config.timeout);
 
     this.issuer = config.issuer.replace(/\/+$/, '');
@@ -114,6 +115,12 @@ export class AuthClient {
       fetchFn: this.transport,
       getToken: () => this.identityToken(APP_SESSION_SCOPE),
       invalidateToken: () => this.tokens.invalidate(this.identityTokenOptions(APP_SESSION_SCOPE)),
+    });
+    this.serviceAccess = new ServiceAccessClient({
+      issuer: this.issuer,
+      fetchFn: this.transport,
+      getToken: () => this.identityToken(PDP_SCOPE),
+      refreshSeconds: config.serviceAccess?.refreshSeconds,
     });
     this.logger.info('auth client initialised', { issuer: this.issuer, audience: config.audience, hasClientCredentials: Boolean(config.client) });
   }
@@ -253,28 +260,34 @@ export class AuthClient {
   }
 
   /**
-   * Loads the admin-configured service-access rules for this application from identity. Called by
-   * `AuthModule` at startup; until it succeeds, every service-to-service caller is denied
-   * (deny-by-default), so a failure here should abort the boot rather than be swallowed.
+   * Loads the admin-configured service-access rules for this application from identity and schedules
+   * their periodic refresh. Called by `AuthModule` at startup; until the first load succeeds, every
+   * service-to-service caller is denied (deny-by-default), so a failure here aborts the boot rather
+   * than being swallowed.
    */
-  async loadServiceAccess(): Promise<ServiceAccessRule[]> {
+  loadServiceAccess(): Promise<ServiceAccessRule[]> {
     if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service access rules require service-account client credentials' });
-    const token = await this.identityToken(PDP_SCOPE);
-    const response = await this.transport(`${this.issuer}/api/v1/authz/service-access`, { headers: { authorization: `Bearer ${token}` } }).catch((error: Error) =>
-      throwError(this.logged(AuthErrorCode.SERVICE_ACCESS_FAILED.create({ reason: `service access fetch failed: ${error.message}` }))),
-    );
-    if (!response.ok) throw this.logged(AuthErrorCode.SERVICE_ACCESS_FAILED.create({ reason: `service access endpoint returned http ${response.status}` }));
+    return this.serviceAccess.load();
+  }
 
-    const body = (await response.json()) as { rules?: ServiceAccessRule[] };
-    this.serviceAccess = body.rules ?? [];
-    this.logger.info('service access rules loaded', { rules: this.serviceAccess.length });
-    return this.serviceAccess;
+  /**
+   * Re-fetches the rules out of band, as the scheduled refresh does. Never throws — the last good
+   * rules stay in force through an identity outage, because the alternative is every service in the
+   * fleet revoking every one of its M2M callers the moment identity blinks.
+   */
+  refreshServiceAccess(): Promise<ServiceAccessRule[]> {
+    if (!this.config.client) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'service access rules require service-account client credentials' });
+    return this.serviceAccess.refresh();
   }
 
   /** Whether an M2M caller may invoke the given route, per the rules loaded from identity */
   isServiceCallerAllowed(callerClientId: string, method: string, path: string): boolean {
-    if (!this.serviceAccess) return false;
-    return this.serviceAccess.some(rule => rule.callerClientId === callerClientId && this.matchesMethod(rule.method, method) && this.matchesPath(rule.path, path));
+    return this.serviceAccess.isAllowed(callerClientId, method, path);
+  }
+
+  /** Releases the client's background timers; `AuthModule` calls it when the application shuts down */
+  stop(): void {
+    this.serviceAccess.stopRefresh();
   }
 
   /**
@@ -325,15 +338,6 @@ export class AuthClient {
 
   private identityTokenOptions(scope: string): ServiceTokenOptions {
     return { resource: this.config.identityResource ?? DEFAULT_IDENTITY_RESOURCE, scopes: [scope] };
-  }
-
-  private matchesMethod(pattern: string, method: string): boolean {
-    return pattern === '*' || pattern.toUpperCase() === method.toUpperCase();
-  }
-
-  private matchesPath(pattern: string, path: string): boolean {
-    if (pattern.endsWith('*')) return path.startsWith(pattern.slice(0, -1));
-    return pattern === path;
   }
 
   private expectations(): ClaimExpectations {

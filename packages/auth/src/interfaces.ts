@@ -72,6 +72,15 @@ export interface AuthCacheOptions {
   jwksTtlSeconds?: number;
 }
 
+export interface ServiceAccessOptions {
+  /**
+   * How often the admin-configured M2M route allowlist is re-fetched, in seconds. Defaults to 300.
+   * This interval is the upper bound on how long a revoked caller keeps its access, so shortening it
+   * trades identity round trips for revocation latency.
+   */
+  refreshSeconds?: number;
+}
+
 /** One permission a service's application defines; the name is unique within the application */
 export interface PermissionManifest {
   name: string;
@@ -122,6 +131,8 @@ export interface AuthClientConfig {
   clockSkewSeconds?: number;
 
   cache?: AuthCacheOptions;
+
+  serviceAccess?: ServiceAccessOptions;
 
   /**
    * The application's role catalog. When set (and `client` credentials are present), `AuthModule`

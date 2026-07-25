@@ -25,6 +25,7 @@ declare module '@shadow-library/common' {
     'auth.client.secret': string;
     'auth.client.assertion-path': string;
     'auth.timeout': number;
+    'auth.service-access.refresh-seconds': number;
 
     /** First-party browser flow configs (consumed by `AuthModule.forRoot`) */
     'auth.redirect-uri': string;
@@ -121,7 +122,8 @@ export interface ResolvedBrowserAuthConfig {
  * `AUTH_AUDIENCE` identify the issuer and this service's API resource, while the client either
  * presents a static secret (`AUTH_CLIENT_SECRET`) or — preferred inside Kubernetes — a projected
  * service-account token whose file path is `AUTH_CLIENT_ASSERTION_PATH`. `AUTH_TIMEOUT` optionally
- * bounds every outbound request to a total time budget in milliseconds.
+ * bounds every outbound request to a total time budget in milliseconds, and
+ * `AUTH_SERVICE_ACCESS_REFRESH_SECONDS` sets how long a revoked M2M caller may keep its access.
  *
  * The browser flow adds `AUTH_REDIRECT_URI` and `AUTH_SCOPES`; setting those two is what turns the
  * login/callback/logout surface on. Everything else has a safe default, and the one setting that can
@@ -133,6 +135,7 @@ Config.load('auth.client.id');
 Config.load('auth.client.secret');
 Config.load('auth.client.assertion-path');
 Config.load('auth.timeout', { validateType: 'number' });
+Config.load('auth.service-access.refresh-seconds', { validateType: 'number', defaultValue: '300' });
 Config.load('auth.redirect-uri');
 Config.load('auth.scopes');
 Config.load('auth.session.cookie-name', { defaultValue: '__Host-shadow-session' });
@@ -175,8 +178,9 @@ export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthCl
   }
 
   const timeout = options.timeout ?? Config.get('auth.timeout');
+  const serviceAccess = { refreshSeconds: options.serviceAccess?.refreshSeconds ?? Config.get('auth.service-access.refresh-seconds') };
 
-  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, audience, client, timeout };
+  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, audience, client, timeout, serviceAccess };
 }
 
 export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): AuthRoutePaths {

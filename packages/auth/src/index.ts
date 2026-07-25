@@ -7,3 +7,5 @@ export type { AppSessionClientOptions } from './lib/app-session-client';
 export { AuthClient } from './lib/auth-client';
 export { decodeJwt, validateClaims, verifyJwt } from './lib/jwt';
 export type { ClaimExpectations, DecodedJwt, JwtHeader } from './lib/jwt';
+export { ServiceAccessClient } from './lib/service-access';
+export type { ServiceAccessClientOptions } from './lib/service-access';

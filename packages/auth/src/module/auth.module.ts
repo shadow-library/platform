@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { DynamicModule, Inject, Injectable, Module, type OnModuleInit } from '@shadow-library/app';
+import { DynamicModule, Inject, Injectable, Module, type OnModuleDestroy, type OnModuleInit } from '@shadow-library/app';
 import { Logger } from '@shadow-library/common';
 import { ContextService, FASTIFY_INSTANCE, FastifyModule } from '@shadow-library/fastify';
 
@@ -51,7 +51,7 @@ const BROWSER_CONFIG: unique symbol = Symbol('shadow-library:auth-browser-config
 const FORM_CONTENT_TYPE = 'application/x-www-form-urlencoded';
 
 @Injectable()
-class AuthInitializer implements OnModuleInit {
+class AuthInitializer implements OnModuleInit, OnModuleDestroy {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthInitializer.name);
 
   constructor(
@@ -73,6 +73,11 @@ class AuthInitializer implements OnModuleInit {
       serviceAccessLoaded: Boolean(this.config.client),
       browserFlow: this.browser.enabled,
     });
+  }
+
+  /** The service-access refresh runs on an interval, so it has to be handed back when the app stops */
+  onModuleDestroy(): void {
+    this.client.stop();
   }
 
   /** Left alone when the application already parses forms; the SDK is a guest in someone else's server */
