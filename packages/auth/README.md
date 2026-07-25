@@ -63,7 +63,6 @@ AUTH_CLIENT_ID=svc-reports
 AUTH_CLIENT_ASSERTION_PATH=/var/run/secrets/shadow/identity-token   # or AUTH_CLIENT_SECRET
 AUTH_REDIRECT_URI=https://reports.shadow-apps.com/auth/callback     # setting this turns the browser flow on
 AUTH_SCOPES="openid reports:read"
-AUTH_SESSION_SECRET=...                  # seals the transient login-state cookie; without it, single-instance only
 AUTH_ALLOWED_REDIRECTS=https://reports.shadow-apps.com              # the `return_to` allow-list
 ```
 
@@ -71,7 +70,7 @@ That registers, wired and working:
 
 | Route | Behaviour |
 | :--- | :--- |
-| `GET /auth/login` | PKCE + `state` + `nonce` + `resource`, transient state sealed into its own cookie, redirect to identity |
+| `GET /auth/login` | PKCE + `state` + `nonce` + `resource`, transient state into its own cookie, redirect to identity |
 | `GET /auth/callback` | Validates `state`, redeems the code for an app-session handle, sets the session cookie, returns to `return_to` |
 | `POST /auth/logout` | Revokes the app session, clears the cookies, optionally hands on to identity's RP-initiated logout |
 | `POST /auth/backchannel-logout` | Verifies the OIDC logout token and drops that user's local sessions and cached tokens |
@@ -83,6 +82,8 @@ Everything is overridable and nothing is required: `AuthModule.forRoot({ routes:
 ### How a browser request is served
 
 The session cookie holds an **opaque app-session handle**, never a token. On each request the SDK mints (or serves from cache) an access token for this app's own audience, authenticating to identity with the service's *own* M2M credential, and verifies the result offline. Possessing a handle grants nothing on its own — that split is the security property the model rests on.
+
+The transient login-state cookie (`state`, PKCE verifier, `return_to`) carries no credential and needs no key: the `__Host-` prefix — a browser-enforced promise that only this exact origin over https could have set it — is what defeats login-CSRF by cookie injection, and a leaked verifier is inert because redeeming the code requires the application's own M2M credential. There is no `AUTH_SESSION_SECRET` and no server-side store, so a login started on one replica completes on any other.
 
 The cookie defaults to `__Host-`-prefixed, `Secure`, `HttpOnly`, `SameSite=Lax`. Because a cookie is now a credential on guarded routes, `SameSite` is what stands between you and CSRF: keep it at `Lax` or `Strict`, and if a deployment genuinely needs `None` (a cross-site iframe), the application must supply its own CSRF defence on every state-changing route — the SDK warns at startup when it sees it. `AUTH_SESSION_COOKIE_SECURE=false` exists only for plain-HTTP development; it drops the `__Host-` prefix with it and says so loudly.
 

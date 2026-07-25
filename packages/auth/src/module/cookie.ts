@@ -29,8 +29,9 @@ export interface CookieAttributes {
  * Deliberately hand-rolled rather than routed through `@fastify/cookie`: that plugin is an *optional*
  * peer of `@shadow-library/fastify`, and requiring it would mean a service could no longer get a
  * working integration from `AuthModule.forRoot()` plus environment variables alone. Nothing here
- * needs signing either — the session cookie carries an opaque handle and the login-state cookie is
- * sealed with AEAD before it ever reaches this layer.
+ * needs signing or sealing either: the session cookie carries an opaque handle, and the login-state
+ * cookie carries no credential — see `login-state.ts` for why the `__Host-` prefix, not encryption,
+ * is what defends it.
  */
 
 /** The `__Host-` prefix is a browser-enforced promise: same origin, whole path, never a subdomain */

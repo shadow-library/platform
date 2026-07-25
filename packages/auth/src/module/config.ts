@@ -10,7 +10,7 @@ import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { type AuthClientConfig } from '../interfaces';
 import { assertValidCookieName, type CookieAttributes, type SameSitePolicy } from './cookie';
-import { InMemoryLoginStateStore, type LoginStateStore, SealedLoginStateStore } from './login-state';
+import { LOGIN_STATE_TTL_SECONDS } from './login-state';
 
 /**
  * Defining types
@@ -34,7 +34,6 @@ declare module '@shadow-library/common' {
     'auth.session.cookie-secure': boolean;
     'auth.session.cookie-same-site': SameSitePolicy;
     'auth.session.cookie-domain': string;
-    'auth.session.secret': string;
     'auth.post-login-redirect': string;
     'auth.post-logout-redirect': string;
     'auth.allowed-redirects': string[];
@@ -80,12 +79,6 @@ export interface BrowserAuthOptions {
    */
   cookieSecure?: boolean;
 
-  /** Seals the transient login-state cookie; without it the SDK falls back to a single-instance in-memory store */
-  sessionSecret?: string;
-
-  /** Replace the transient login-state store, e.g. with a Redis-backed one for a multi-instance deployment */
-  loginStateStore?: LoginStateStore;
-
   /** Checks the configured scopes against the issuer's published `scopes_supported` at startup; on by default */
   validateScopes?: boolean;
 }
@@ -112,7 +105,6 @@ export interface ResolvedBrowserAuthConfig {
   cookie: CookieAttributes;
   stateCookieName: string;
   stateCookie: CookieAttributes;
-  loginStateStore: LoginStateStore;
 }
 
 /**
@@ -142,7 +134,6 @@ Config.load('auth.session.cookie-name', { defaultValue: '__Host-shadow-session' 
 Config.load('auth.session.cookie-secure', { validateType: 'boolean', defaultValue: 'true' });
 Config.load('auth.session.cookie-same-site', { allowedValues: ['Lax', 'Strict', 'None'], defaultValue: 'Lax' });
 Config.load('auth.session.cookie-domain');
-Config.load('auth.session.secret');
 Config.load('auth.post-login-redirect', { defaultValue: '/' });
 Config.load('auth.post-logout-redirect');
 Config.load('auth.allowed-redirects', { isArray: true });
@@ -152,9 +143,6 @@ const logger = Logger.getLogger(NAMESPACE, 'AuthConfig');
 
 /** The login-state cookie shares the session cookie's name so both stand or fall on the same prefix rules */
 const STATE_COOKIE_SUFFIX = '-login';
-
-/** A login may stay in flight for ten minutes; the transient cookie expires with it */
-const LOGIN_STATE_TTL_SECONDS = 600;
 
 const DEFAULT_ROUTES: AuthRoutePaths = {
   basePath: '/auth',
@@ -236,7 +224,6 @@ export function resolveBrowserAuthConfig(client: AuthClientConfig, routes: AuthR
      * It is the one attribute the state cookie does not inherit.
      */
     stateCookie: { ...cookie, sameSite: sameSite === 'Strict' ? 'Lax' : sameSite, maxAge: LOGIN_STATE_TTL_SECONDS },
-    loginStateStore: enabled ? resolveLoginStateStore(options) : new InMemoryLoginStateStore(),
   };
 }
 
@@ -257,14 +244,4 @@ function warnOnRedirectUriMismatch(redirectUri: string, callbackPath: string): v
 /** `AUTH_SCOPES` is space separated, matching how a `scope` parameter travels on the wire */
 function parseScopes(value: string | undefined): string[] {
   return (value ?? '').split(/\s+/).filter(Boolean);
-}
-
-function resolveLoginStateStore(options: BrowserAuthOptions): LoginStateStore {
-  if (options.loginStateStore) return options.loginStateStore;
-
-  const secret = options.sessionSecret ?? Config.get('auth.session.secret');
-  if (secret) return new SealedLoginStateStore({ secret, ttlSeconds: LOGIN_STATE_TTL_SECONDS });
-
-  logger.warn('AUTH_SESSION_SECRET is not set; in-flight logins are held in memory and will fail across instances — set it, or supply a shared loginStateStore');
-  return new InMemoryLoginStateStore({ ttlSeconds: LOGIN_STATE_TTL_SECONDS });
 }

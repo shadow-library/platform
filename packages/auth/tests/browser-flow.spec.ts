@@ -10,7 +10,7 @@ import { ContextService, FastifyModule, Get, HttpController } from '@shadow-libr
 /**
  * Importing user defined packages
  */
-import { Authenticated, AuthModule, RequireElevation } from '@shadow-library/auth/module';
+import { Authenticated, AuthModule, decodeLoginState, RequireElevation } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -76,7 +76,7 @@ describe('first-party browser flow', () => {
               issuer: idp.issuer,
               audience: AUDIENCE,
               client: CLIENT,
-              browser: { redirectUri: REDIRECT_URI, scopes: ['openid', 'reports:read'], sessionSecret: 'a-long-enough-test-secret', allowedRedirects: ['https://reports.test'] },
+              browser: { redirectUri: REDIRECT_URI, scopes: ['openid', 'reports:read'], allowedRedirects: ['https://reports.test'] },
             }),
             ReportModule,
           ],
@@ -139,9 +139,10 @@ describe('first-party browser flow', () => {
     expect(authorize.searchParams.get('resource')).toBe(AUDIENCE);
     expect(authorize.searchParams.get('code_challenge')).toBeTruthy();
 
-    /** The verifier, state and nonce leave only inside the sealed cookie */
-    const stateCookie = readCookie(started, STATE_COOKIE) as string;
-    expect(stateCookie).not.toContain(authorize.searchParams.get('state') as string);
+    /** The cookie is the only place the callback's `state` and verifier are remembered — no server-side store */
+    const carried = decodeLoginState(readCookie(started, STATE_COOKIE)?.split('=')[1]);
+    expect(carried?.state).toBe(authorize.searchParams.get('state') as string);
+    expect(carried?.codeVerifier).toBeString();
   });
 
   it('should set a __Host- session cookie whose attributes cannot be downgraded', async () => {
@@ -176,7 +177,7 @@ describe('first-party browser flow', () => {
     expect((await get('/auth/session')).statusCode).toBe(401);
   });
 
-  it('should reject a callback whose state does not match the sealed cookie', async () => {
+  it('should reject a callback whose state does not match the state cookie', async () => {
     const started = await get('/auth/login');
     const stateCookie = readCookie(started, STATE_COOKIE) as string;
     const code = idp.createAuthorizationCode({ sub: USER });

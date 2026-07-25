@@ -15,7 +15,7 @@ import { buildAuthorizationUrl } from '../rp/authorization-url';
 import { createPkcePair, randomUrlSafeString } from '../rp/pkce';
 import { ResolvedBrowserAuthConfig } from './config';
 import { expireCookie, serializeCookie } from './cookie';
-import { LoginState, matchesState } from './login-state';
+import { decodeLoginState, encodeLoginState, LoginState, matchesState } from './login-state';
 import { SessionRegistry } from './session-registry';
 
 /**
@@ -24,7 +24,7 @@ import { SessionRegistry } from './session-registry';
 
 export interface LoginRedirect {
   url: string;
-  /** The transient login-state cookie; sealed or opaque, never readable by the browser */
+  /** The transient login-state cookie: `__Host-`-prefixed, `HttpOnly`, and cleared on first use */
   cookies: string[];
 }
 
@@ -76,7 +76,7 @@ export class AppSessionService {
     private readonly config: ResolvedBrowserAuthConfig,
   ) {}
 
-  /** Starts a login: PKCE, `state`, `nonce` and `resource` out; the transient state stays server-side or sealed */
+  /** Starts a login: PKCE, `state`, `nonce` and `resource` out; the transient state rides in its own cookie */
   async beginLogin(returnTo?: string): Promise<LoginRedirect> {
     const document = await this.client.getDiscovery();
     const pkce = await createPkcePair();
@@ -93,15 +93,13 @@ export class AppSessionService {
       resource: this.config.audience,
     });
 
-    const sealed = await this.config.loginStateStore.save(state);
     this.logger.debug('login started', { returnTo: state.returnTo });
-    return { url, cookies: [serializeCookie(this.config.stateCookieName, sealed, this.config.stateCookie)] };
+    return { url, cookies: [serializeCookie(this.config.stateCookieName, encodeLoginState(state), this.config.stateCookie)] };
   }
 
   /** Completes the callback: validates `state`, redeems the code for a handle, and sets the session cookie */
   async completeLogin(query: { code?: string; state?: string }, cookies: Record<string, string>): Promise<LoginResult> {
-    const carried = cookies[this.config.stateCookieName];
-    const pending = carried ? await this.config.loginStateStore.take(carried) : null;
+    const pending = decodeLoginState(cookies[this.config.stateCookieName]);
     if (!pending) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'no in-flight login matched this callback' }));
     if (!query.code) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'the callback carried no authorization code' }));
     if (!query.state || !matchesState(pending.state, query.state)) throw this.logged(AuthErrorCode.LOGIN_STATE_INVALID.create({ reason: 'the callback state did not match' }));

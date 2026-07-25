@@ -25,12 +25,11 @@ import { resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/aut
 const ENVIRONMENT: Record<string, string> = {
   AUTH_REDIRECT_URI: 'https://reports.test/auth/callback',
   AUTH_SCOPES: 'openid reports:read  reports:write',
-  AUTH_SESSION_SECRET: 'a-long-enough-test-secret',
   AUTH_ALLOWED_REDIRECTS: 'https://reports.test,https://admin.reports.test/ops',
 };
 
 /** Only the keys without a default can be reloaded mid-process; `Config` keeps a resolved value for good */
-const CONFIG_KEYS = ['auth.redirect-uri', 'auth.scopes', 'auth.session.secret', 'auth.allowed-redirects'] as const;
+const CONFIG_KEYS = ['auth.redirect-uri', 'auth.scopes', 'auth.allowed-redirects'] as const;
 
 const CLIENT: AuthClientConfig = { issuer: 'https://identity.test', audience: 'api://reports', client: { id: 'svc-reports', secret: 's3cr3t' } };
 
@@ -98,11 +97,10 @@ describe('environment-driven browser config', () => {
     expect(() => resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes(), { cookieDomain: 'reports.test' })).toThrow(/__Host-/);
   });
 
-  it('should seal the login state when a session secret is configured', async () => {
+  it('should need no secret and no store for the transient login state', () => {
     const browser = resolveBrowserAuthConfig(CLIENT, resolveAuthRoutes());
-    const sealed = await browser.loginStateStore.save({ state: 's', nonce: 'n', codeVerifier: 'secret-verifier', returnTo: '/' });
-    expect(sealed).not.toContain('secret-verifier');
-    expect(await browser.loginStateStore.take(sealed)).toMatchObject({ codeVerifier: 'secret-verifier' });
+    expect(browser.stateCookie).toMatchObject({ path: '/', httpOnly: true, secure: true });
+    expect(browser).not.toHaveProperty('loginStateStore');
   });
 
   it('should stay off, and register no routes, for an api-only service', () => {

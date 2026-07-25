@@ -9,15 +9,7 @@ import { AppError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AccessTokenCache, AuthClient, hashSessionHandle } from '@shadow-library/auth';
-import {
-  AppSessionService,
-  InMemoryLoginStateStore,
-  type LoginState,
-  matchesState,
-  resolveAuthRoutes,
-  resolveBrowserAuthConfig,
-  SealedLoginStateStore,
-} from '@shadow-library/auth/module';
+import { AppSessionService, decodeLoginState, encodeLoginState, type LoginState, matchesState, resolveAuthRoutes, resolveBrowserAuthConfig } from '@shadow-library/auth/module';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -219,31 +211,31 @@ describe('redirect allow-list', () => {
   });
 });
 
-describe('login state stores', () => {
+describe('login state cookie', () => {
   const state: LoginState = { state: 'st', nonce: 'no', codeVerifier: 'ver', returnTo: '/reports' };
 
-  for (const [name, store] of [
-    ['InMemoryLoginStateStore', new InMemoryLoginStateStore()],
-    ['SealedLoginStateStore', new SealedLoginStateStore({ secret: 'a-long-enough-test-secret' })],
-  ] as const) {
-    it(`should round-trip and then forget the state in ${name}`, async () => {
-      const token = await store.save(state);
-      expect(token).not.toContain(state.codeVerifier);
-      expect(await store.take(token)).toEqual(state);
+  it('should round-trip the in-flight login with no key and no store', () => {
+    expect(decodeLoginState(encodeLoginState(state))).toEqual(state);
+  });
 
-      /** Single use: a replayed callback must find nothing */
-      expect(await store.take(token)).toBeNull();
-      expect(await store.take('never-issued')).toBeNull();
-    });
-  }
+  it('should read a cookie written by another replica, since nothing is held server-side', () => {
+    /** The multi-instance caveat the sealed store carried is gone: no shared secret, no shared memory */
+    const written = encodeLoginState(state);
+    expect(decodeLoginState(written)).toEqual(state);
+    expect(decodeLoginState(written)).toEqual(decodeLoginState(written));
+  });
 
-  it('should refuse a tampered sealed cookie instead of trusting it', async () => {
-    const store = new SealedLoginStateStore({ secret: 'a-long-enough-test-secret' });
-    const token = await store.save(state);
-    const [iv, tag, sealed] = token.split('.');
+  it('should refuse an absent, junk, truncated or incomplete cookie as an unstarted login', () => {
+    expect(decodeLoginState(undefined)).toBeNull();
+    expect(decodeLoginState('')).toBeNull();
+    expect(decodeLoginState('not-base64-json')).toBeNull();
+    expect(decodeLoginState(Buffer.from('{"state":"st"}').toString('base64url'))).toBeNull();
+    expect(decodeLoginState(Buffer.from(JSON.stringify({ ...state, exp: 'soon' })).toString('base64url'))).toBeNull();
+  });
 
-    expect(await store.take(`${iv}.${tag}.${Buffer.from('forged').toString('base64url')}`)).toBeNull();
-    expect(await new SealedLoginStateStore({ secret: 'a-different-secret' }).take(`${iv}.${tag}.${sealed}`)).toBeNull();
+  it('should refuse a cookie whose deadline has passed', () => {
+    expect(decodeLoginState(encodeLoginState(state, -1))).toBeNull();
+    expect(decodeLoginState(encodeLoginState(state, 600))).toEqual(state);
   });
 
   it('should compare callback state in constant time without leaking a length mismatch', () => {
