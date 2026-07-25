@@ -31,15 +31,20 @@ export class PolicyKeyParams {
 }
 
 /**
- * Every policy in the registry is an integer duration today, so the wire value is a number. A future
- * non-numeric policy adds its own optional field here rather than widening this one.
+ * A policy is either an integer duration or a boolean switch, and class-schema has no scalar union,
+ * so each value type gets its own optional field. The key's registry entry decides which one is
+ * read; sending the wrong field, or neither, fails validation as `POL_002`.
  */
 @Schema()
 export class SetPolicyBody {
-  @Field(() => Number)
-  value: number;
+  @Field(() => Number, { optional: true })
+  value?: number;
+
+  @Field(() => Boolean, { optional: true })
+  enabled?: boolean;
 }
 
+/** Mirrors `SetPolicyBody`: the `*Value` trio describes an `integer` key, the `*Enabled` trio a `boolean` one. */
 @Schema()
 export class PolicyItem {
   @Field()
@@ -51,8 +56,8 @@ export class PolicyItem {
   @Field()
   type: string;
 
-  @Field(() => Number)
-  defaultValue: number;
+  @Field(() => Number, { optional: true })
+  defaultValue?: number;
 
   @Field(() => Number, { optional: true })
   min?: number;
@@ -60,12 +65,22 @@ export class PolicyItem {
   @Field(() => Number, { optional: true })
   max?: number;
 
-  @Field(() => Number)
-  effectiveValue: number;
+  @Field(() => Number, { optional: true })
+  effectiveValue?: number;
 
   /** Absent when the organisation inherits the platform default rather than setting its own value. */
   @Field(() => Number, { optional: true })
   configuredValue?: number;
+
+  @Field(() => Boolean, { optional: true })
+  defaultEnabled?: boolean;
+
+  @Field(() => Boolean, { optional: true })
+  effectiveEnabled?: boolean;
+
+  /** Absent when the organisation inherits the platform default rather than setting its own value. */
+  @Field(() => Boolean, { optional: true })
+  configuredEnabled?: boolean;
 }
 
 @Schema()

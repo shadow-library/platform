@@ -313,7 +313,7 @@ Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-
 - **Fix (SDK):** re-fetch `GET /api/v1/authz/service-access` on an interval (default 300 s); a failed refresh keeps the last good rules; a failed initial load still aborts boot.
 - **DoD:** revoking a rule denies the caller within one interval without a restart; a transient identity outage does not flip the guard to deny-all.
 
-### T-803 — Workload-assertion audience pinning (D-16) · S · Sec: High
+### T-803 — Workload-assertion audience pinning (D-16) · S · Sec: High — **done**
 
 - **Change:** the spec validated the assertion's `aud` without pinning the value, so any projected SA token could in principle pass.
 - **Fix:** reject client assertions whose `aud` is not the identity issuer; document the required projection (`audience: <issuer>`); regression-test with an API-server-audience token.
@@ -325,7 +325,7 @@ Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-
 - **Fix:** budget authenticated M2M calls per client id (Redis, same tier machinery); unauthenticated traffic to the same endpoints stays on the IP tier.
 - **DoD:** two clients behind one IP consume independent budgets; an unauthenticated flood is still IP-limited.
 
-### T-805 — Catalog-sync deletion guardrail (D-15) · S · Sec: Medium
+### T-805 — Catalog-sync deletion guardrail (D-15) · S · Sec: Medium — **done**
 
 - **Fix:** `PUT /api/v1/authz/catalog` refuses a manifest that would delete more than half of the application's existing permissions or roles unless the push carries `force: true`; refusals are audited (`authz.catalog.sync_refused`) and change nothing.
 - **DoD:** a truncated manifest is refused without `force`; a forced sync proceeds and audits.
@@ -340,10 +340,14 @@ Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-
 - **Change:** `GET /api/v1/apps/me` self-description; provision the client and the `api://<app>` resource 1:1 from application registration; publish `step_up_endpoint` and `app_session_endpoint` in discovery; SDK derives configuration from `AUTH_ISSUER` + `AUTH_APP_ID` and refreshes it on a TTL.
 - **DoD:** a service boots with issuer + app id + credential only; an admin scope grant propagates without a redeploy; the step-up URL comes from discovery.
 
-### T-808 — `mfa.email_otp_fallback.enabled` policy (D-20) · S · Sec: Medium
+### T-808 — `mfa.email_otp_fallback.enabled` policy (D-20) · S · Sec: Medium — **done (policy registered; exclusion has no target yet)**
 
 - **Fix:** register the boolean key (default `true`, folds `AND`); when folded `false` for a user's applicable organisations, EMAIL_OTP is excluded as an MFA second factor (first-factor OTP for passwordless accounts and recovery-flow proof of address control are unaffected).
 - **DoD:** an organisation disabling the policy removes EMAIL_OTP from its members' MFA options; passwordless sign-in and recovery still work.
+
+**Landed:** the key is registered as the registry's first `boolean` (default `true`, `AND` fold — the boolean analogue of `MIN`, so an organisation may refuse the fallback but never re-enable it over another's refusal), and boolean policies are now administrable end to end: `SetPolicyBody` carries `enabled` beside `value` and `PolicyItem` carries a `*Enabled` trio beside the `*Value` one, because class-schema cannot express a scalar union. `PolicyService.selectValue` makes the registry — not the caller — decide which field a key reads; the previous `Number(...)` mapping in the controller would have emitted `true` as `1`.
+
+**Gap recorded — the exclusion has nothing to exclude.** EMAIL_OTP is not an MFA second factor anywhere in this codebase: `MfaService.getFactors` knows only TOTP and WebAuthn, the login flow branches only to `AWAITING_TOTP`/`AWAITING_MFA_WEBAUTHN`, `getStepUpMethods` never emits it, and nothing ever writes an `EMAIL_OTP` row to `mfa_enrollments` (the `mfa_method` enum value and the `MfaEnrollmentItem` DTO entry are the only traces). Every EMAIL_OTP path that exists is a **first** factor or a proof of address control, which this policy explicitly must not affect. Architecture §8.5 lists email OTP as an MFA method, but no task ever built it — T-401/402/403 built TOTP, WebAuthn and recovery codes. So no read site was added: a gate over a factor that cannot be offered would be dead code. Wiring it is a one-line change in `getFactors`/`getStepUpMethods` **once the factor itself exists**; that work needs its own task.
 
 ---
 

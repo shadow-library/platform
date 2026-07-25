@@ -82,6 +82,19 @@ export class PolicyService {
     return Object.fromEntries(entries) as Record<K, PolicyValue<K>>;
   }
 
+  /**
+   * Picks the field a key reads from a write request. The wire carries one optional field per value
+   * type because a scalar union is not expressible, so the registry — not the caller — decides which
+   * of them is authoritative; an absent or mistyped field is a validation failure, never a default.
+   */
+  selectValue<K extends PolicyKey>(key: K, wire: { value?: number; enabled?: boolean }): PolicyValue<K> {
+    this.assertKnown(key);
+    const definition = POLICY_REGISTRY[key] as PolicyDefinition;
+    const value = definition.type === 'boolean' ? wire.enabled : wire.value;
+    if (value === undefined) throw AppErrorCode.POL_002.create();
+    return value as PolicyValue<K>;
+  }
+
   async set<K extends PolicyKey>(organisationId: bigint, key: K, value: PolicyValue<K>, updatedBy?: bigint): Promise<void> {
     this.assertValid(key, value);
     await this.db

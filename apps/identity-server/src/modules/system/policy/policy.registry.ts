@@ -15,7 +15,8 @@
  * every applicable organisation override — collapse into the single value the runtime uses.
  *
  * `MIN` is the strategy for every duration: an organisation may shorten a lifetime but never extend
- * one, so a stricter policy always wins no matter which organisation set it.
+ * one, so a stricter policy always wins no matter which organisation set it. `AND` is its analogue
+ * for a switch — any applicable organisation turning a capability off turns it off for the meeting.
  */
 export type PolicyResolution = 'MIN' | 'MAX' | 'AND' | 'OR' | 'OVERRIDE';
 
@@ -100,6 +101,17 @@ export const POLICY_REGISTRY = {
     min: DAY,
     max: 180 * DAY,
     resolution: 'MIN',
+  },
+  /**
+   * An emailed code sets the strength of AAL2 to control of the inbox, so an organisation must be
+   * able to refuse it. `AND` mirrors `MIN` for booleans: any applicable organisation disabling the
+   * fallback disables it for the meeting, so an organisation may tighten but never loosen.
+   */
+  'mfa.email_otp_fallback.enabled': {
+    description: 'Whether an emailed one-time code may serve as a second factor for this organisation’s members.',
+    type: 'boolean',
+    default: true,
+    resolution: 'AND',
   },
 } as const satisfies Record<string, PolicyDefinition>;
 
