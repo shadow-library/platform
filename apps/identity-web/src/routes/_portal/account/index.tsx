@@ -157,7 +157,7 @@ function AccountOverview(): React.JSX.Element {
           to="/account/sessions"
           icon={<MonitorIcon size={18} />}
           title="Sessions & devices"
-          description="See where you’re signed in and sign out remotely."
+          description="See where you’re signed in and end active sessions."
           cta="View sessions"
         />
         <NavCard to="/account/contacts" icon={<MailIcon size={18} />} title="Emails & phones" description="Manage contact addresses and set a primary." cta="Manage contacts" />

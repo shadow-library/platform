@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { createFileRoute } from '@tanstack/react-router';
-import { Button, toast } from '@shadow-library/ui';
+import { Alert, Button, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -54,6 +54,11 @@ function SessionsPage(): React.JSX.Element {
           )
         }
       />
+
+      <Alert intent="info" title="How signing out works">
+        Revoking a session — or signing out — ends it on Shadow Identity right away. Apps you’ve already signed into keep access until their current token expires, usually within
+        an hour, then they’re locked out at the next refresh.
+      </Alert>
 
       <QueryState isLoading={sessions.isLoading} error={sessions.error} isEmpty={list.length === 0} emptyTitle="No active sessions">
         <div className={styles.list}>
