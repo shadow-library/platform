@@ -16,7 +16,8 @@ import { TestEnvironment } from '../test-environment';
  */
 
 interface SelfDescription {
-  app: string;
+  appId: string;
+  name?: string;
   isFirstParty: boolean;
   audience?: string;
   redirectUris: string[];
@@ -57,7 +58,7 @@ describe('GET /api/v1/apps/me', () => {
     const response = await describeSelf(serviceToken());
     expect(response.statusCode).toBe(200);
     expect(response.json() as SelfDescription).toMatchObject({
-      app: 'reports',
+      appId: 'reports',
       isFirstParty: true,
       audience: 'api://reports',
       redirectUris: [`${ORIGIN}/api/auth/callback`],
@@ -123,7 +124,7 @@ describe('GET /api/v1/apps/me', () => {
   it('should publish the global first-party endpoints in discovery', async () => {
     const discovery = await env.getRouter().mockRequest().get('/.well-known/openid-configuration');
     const body = discovery.json() as { issuer: string; step_up_endpoint: string; app_session_endpoint: string };
-    expect(body.step_up_endpoint).toBe(`${body.issuer}/api/v1/me/mfa/step-up`);
+    expect(body.step_up_endpoint).toBe(`${body.issuer}/step-up`);
     expect(body.app_session_endpoint).toBe(`${body.issuer}/api/v1/app-sessions`);
   });
 });

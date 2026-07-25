@@ -31,8 +31,13 @@ export class ApplicationGrantItem {
  */
 @Schema()
 export class ApplicationSelfResponse {
+  /** Named `appId` because that is the SDK's `AppRegistration` contract — the value a consumer sets as `AUTH_APP_ID`. */
   @Field()
-  app: string;
+  appId: string;
+
+  /** Display name, so a consumer can label itself without a second lookup. */
+  @Field({ optional: true })
+  name?: string;
 
   @Field(() => Boolean)
   isFirstParty: boolean;

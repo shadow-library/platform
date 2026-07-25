@@ -57,7 +57,10 @@ export interface ProvisionedApplication {
 
 /** An application's own registration, as it reads itself back at `GET /api/v1/apps/me` (D-21 §8.6). */
 export interface ApplicationDescription {
-  app: string;
+  /** The application slug — what a consumer configures as `AUTH_APP_ID` and the SDK reads back as `appId`. */
+  appId: string;
+  /** Human label, for prompts that name the application. */
+  name?: string;
   isFirstParty: boolean;
   audience: string | null;
   redirectUris: string[];
@@ -250,6 +253,20 @@ export class OAuthClientService {
   }
 
   /**
+   * The human label a hosted step-up prompt shows for its beneficiary (D-19, T-801): the display
+   * name of the application owning a client id, or `null` when the id names no active client. Client
+   * ids already travel in browser authorize URLs, so answering reveals nothing a caller could not
+   * already observe — and the prompt renders a `null` as a neutral failure, never a probe result.
+   */
+  async resolveApplicationLabel(clientId: string): Promise<string | null> {
+    const client = await this.getClient(clientId);
+    if (!client || !client.isActive) return null;
+    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true, displayName: true } });
+    if (!application) return null;
+    return application.displayName ?? application.name;
+  }
+
+  /**
    * Provisions the identity of an application: exactly one client and exactly one API resource,
    * whose identifier is derived as `api://<app>` rather than configured (D-21). The cluster is the
    * trust boundary, so processes inside one application share its identity; splitting a product
@@ -292,7 +309,7 @@ export class OAuthClientService {
     const client = await this.getClient(clientId);
     if (!client || !client.isActive) return null;
 
-    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true } });
+    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true, displayName: true } });
     if (!application) return null;
 
     const owned = await this.db
@@ -313,7 +330,8 @@ export class OAuthClientService {
     for (const scope of foreign) byAudience.set(scope.resourceIdentifier, [...(byAudience.get(scope.resourceIdentifier) ?? []), scope.name]);
 
     return {
-      app: application.name,
+      appId: application.name,
+      name: application.displayName ?? undefined,
       isFirstParty: client.isFirstParty,
       audience: owned.find(row => row.identifier === applicationAudience(application.name))?.identifier ?? owned[0]?.identifier ?? null,
       redirectUris: redirectUris.map(row => row.uri),
