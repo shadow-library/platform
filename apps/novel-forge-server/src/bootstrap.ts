@@ -56,29 +56,17 @@ declare module '@shadow-library/common' {
     'storage.driver': 'local';
     'storage.local.dir': string;
 
-    /**
-     * Auth configs — `auth.issuer` and `auth.audience` are declared (and augmented into
-     * `ConfigRecords`) by `@shadow-library/auth/module`. The relying-party client deliberately
-     * uses its own keys instead of the package's `auth.client.*`: setting those would make
-     * `AuthModule` phone identity for M2M service-access rules at boot, which this app does not use.
-     */
-    'auth.rp.client.id': string;
-    'auth.rp.client.secret': string | undefined;
-    'auth.session.seal-secret': string;
-    'auth.redirect-uri': string;
+    /** Publishing configs — whether a publish/unpublish immediately dispatches a reader push, or waits for the janitor sweep */
+    'publishing.auto-push': boolean;
 
     /**
-     * M2M credentials of the forge's identity service client (`novel-forge-server`), used only by
-     * the reader-push client to mint `webnovel:publish` tokens addressed to `webnovel-server`.
-     * Deliberately NOT the package's `auth.client.*` keys — those would make `AuthModule` phone
-     * identity for service-access rules at boot. Unset, the app boots fine and publishing fails
-     * soft at push time with a clear ledger error. The reader's base URL resolves through the SDK's
-     * service discovery: `SERVICE_URL_WEBNOVEL_SERVER` overrides the in-cluster default
-     * (`http://webnovel-server`, shaped by `SERVICE_DISCOVERY_SCHEME`/`SERVICE_DISCOVERY_SUFFIX`).
+     * Auth configs (`auth.issuer`, `auth.app-id`, `auth.client.*`, `auth.session.*`, …) are owned by
+     * `@shadow-library/auth/module`: it declares them, augments `ConfigRecords`, and reads them in
+     * `AuthModule.forRoot()`. The app never restates them — audience, redirect URIs and granted scopes
+     * are discovered from identity's `GET /api/v1/apps/me` (D-21). The reader-push client mints its
+     * `webnovel:publish` tokens through an `AuthClient` built from the same registration; the reader's
+     * base URL resolves via service discovery (`SERVICE_URL_WEBNOVEL_SERVER`, or `http://webnovel-server`).
      */
-    'auth.m2m.client.id': string | undefined;
-    'auth.m2m.client.secret': string | undefined;
-    'auth.m2m.client.assertion-path': string | undefined;
   }
 }
 
@@ -113,14 +101,7 @@ Config.load('ai.langsmith.api.key');
 Config.load('storage.driver', { defaultValue: 'local', allowedValues: ['local'] });
 Config.load('storage.local.dir', { defaultValue: './images' });
 
-// AUTH_ISSUER and AUTH_AUDIENCE are loaded by the auth package with bare options; loading them here
-// bare too documents them without conflicting (same shared default options object).
-Config.load('auth.issuer');
-Config.load('auth.audience');
-Config.load('auth.rp.client.id', { defaultValue: 'novel-forge-web' });
-Config.load('auth.rp.client.secret');
-Config.load('auth.session.seal-secret', { defaultValue: 'novel-forge-dev-session-secret', isProdRequired: true });
-Config.load('auth.redirect-uri', { defaultValue: 'http://localhost:8080/api/auth/callback' });
-Config.load('auth.m2m.client.id');
-Config.load('auth.m2m.client.secret');
-Config.load('auth.m2m.client.assertion-path');
+Config.load('publishing.auto-push', { validateType: 'boolean', defaultValue: 'true' });
+
+// Every `auth.*` key is loaded by `@shadow-library/auth/module` (imported for its side effect when
+// `AppAuthModule` pulls in `AuthModule.forRoot()`); the app deliberately declares none of them here.

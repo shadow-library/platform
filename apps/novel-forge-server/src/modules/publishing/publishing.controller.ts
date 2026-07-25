@@ -89,10 +89,11 @@ export class PublishingController {
     return result;
   }
 
-  // Without M2M credentials every push is a guaranteed failure, so the immediate enqueue is skipped;
-  // the janitor sweep still runs and ledgers the misconfiguration where the UI can see it.
+  // Low-latency path: dispatch the reader push right away, with the janitor sweep as the fallback. A
+  // reader outage or revoked grant surfaces as a ledgered per-row failure the janitor retries. Deploys
+  // that prefer batch-only pushing (or a test with no reader) set `PUBLISHING_AUTO_PUSH=false`.
   private async enqueuePublish(projectId: bigint): Promise<void> {
-    if (!Config.get('auth.m2m.client.id')) return;
+    if (!Config.get('publishing.auto-push')) return;
     const jobId = await this.jobService.enqueue(projectId, 'publish', `publish-${projectId}`);
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
   }

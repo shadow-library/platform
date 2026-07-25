@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Backend service for an AI-powered novel generation platform: story bible, world/character/lore management, volume planning, chapter generation with judge/repair loops, human review, continuity validation, and knowledge retrieval. Built with Bun, TypeScript, Fastify via `@shadow-library/app` + `@shadow-library/fastify` (NestJS-like DI), PostgreSQL + Drizzle + pgvector, LangChain/LangGraph/LlamaIndex.TS.
 
-**Current state:** bare scaffold (health endpoint only). The entire product is built by working through the checklist below.
+**Current state:** the platform is built out — 61 of the 63 checklist tasks below are complete. The only open items are **CK5** (remaining knowledge follow-ups: web facts panel, `forRevision` sections, arc-planner reveal authoring, bible-audit spoiler check) and **PB5** (the external `novel-forge-reader` service, which lives in its own repo). Treat the checklist below as a completed build log plus those two follow-ups — not a from-scratch plan.
 
 ## Source-of-truth documents — read before implementing
 
@@ -33,16 +33,22 @@ bun run build               # shadow build: bundle to dist/main.js
 bun test                    # all tests (bunfig.toml enforces 90% coverage)
 bun test tests/foo.spec.ts  # single file
 bun test -t "pattern"       # single test by name
+bun run db:generate         # drizzle-kit generate → generated/drizzle/
+bun run db:migrate          # apply migrations (src/migrate.ts)
+bun run db:create-template  # build the template DB the test suite clones
+bun run db:seed             # seed local data
+bun run ai:smoke            # AI smoke check (scripts/ai-smoke.ts)
 ```
 
 ## Architecture & conventions
 
 - **DI framework:** `@shadow-library/app` modules (`@Module`, `ShadowFactory.create(AppModule)`), NestJS-style controllers/services. HTTP via `FastifyModule.forRoot` in `src/modules/dynamic.modules.ts`; controllers carry explicit full paths (`/api/v1/*`, `/api/auth/*`).
-- **Auth:** every HTTP controller is class-level `@Authenticated()` (`@shadow-library/auth`); browsers use the first-party session surface in `src/modules/auth/` (login/callback/session/logout, sealed `nf-session` cookie promoted to a bearer header). Tests get tokens from `tests/test-idp.ts`; `TestEnvironment.getRouter()` injects them automatically.
-- **Config:** every env key is declared in `src/bootstrap.ts` via `Config.load(...)` with a module augmentation of `ConfigRecords`. Note: the scaffold's `db.uri` default is MongoDB — Phase 2 replaces it with PostgreSQL.
-- **Layout:** `src/modules/<feature>/` for domain modules, `src/modules/ai/` per design-doc §1.4, `src/database/schemas/` for Drizzle schemas, `src/routes/` for HTTP wiring.
-- **Errors:** extend `AppErrorCode` (`src/classes/app-error-code.ts`); error code groups per migration-doc §7.6.
-- **Imports:** use the `@server/*` alias for `src/*` in tests; source files use relative imports.
+- **Auth:** every HTTP controller is class-level `@Authenticated()` (`@shadow-library/auth/module`); the principal is read via `ContextService` (`getAuthPrincipal().sub` → owner `bigint`) and ownership is enforced by `ProjectOwnershipGuard` / `project-ownership.middleware.ts` (BOLA protection). Browsers authenticate through the first-party session surface the SDK mounts via `AuthModule.forRoot({ routes: { basePath: '/api/auth' } })` in `src/modules/auth/` (login/callback/logout/session/step-up, opaque `__Host-shadow-session` app-session cookie the guard consumes directly — no bearer-promotion middleware). Audience (`api://novel-forge`), redirect URIs and scopes are discovered from identity's `GET /api/v1/apps/me`; the deploy sets only `AUTH_ISSUER` + `AUTH_APP_ID` + a client credential. Tests get tokens from `tests/test-idp.ts`; `TestEnvironment.getRouter()` injects them automatically.
+- **Config:** every env key is declared in `src/bootstrap.ts` via `Config.load(...)` with a module augmentation of `ConfigRecords`; read values with `Config.get(...)`, never `process.env`. The datastore is **PostgreSQL only** (`DATABASE_POSTGRES_URL`) — there is no MongoDB, Redis, or Memcached; the AI response cache (`llm_cache`), LangGraph checkpoints, and LlamaIndex vectors all live in Postgres/pgvector.
+- **Layout:** `src/modules/<feature>/` for domain modules, `src/modules/ai/` per design-doc §1.4, `src/database/schemas/` for Drizzle schemas. HTTP wiring lives in `src/modules/dynamic.modules.ts` (`HttpCoreModule.forRoot` + `FastifyModule.forRoot` importing every feature module) — there is no `src/routes/` directory.
+- **Errors:** extend `AppErrorCode` (`src/classes/app-error-code.ts`, which extends `ServerErrorCode`) via its `notFound`/`badRequest`/`conflict`/`unauthenticated` factories and throw with `.create()`; error-code groups (`PRJ`, `SRC`, `CHP`, `AI`, …) per migration-doc §7.6.
+- **Responses & DB:** bind status + response schema with `@RespondFor(status, Dto)` / `@HttpStatus(n)` and return the plain object (the DTO serializes it — only declared fields leak, `bigint`→string, `Date`→ISO). Services get the Drizzle client via `this.databaseService.getPostgresClient() as PrimaryDatabase` and map constraint violations by chaining `.catch(err => this.databaseService.translateError(err))` on writes.
+- **Imports:** path aliases `@server/* → src/*`, `@modules/* → src/modules/*`, `@scripts/* → scripts/*`, `@tests/* → tests/*` are used across both source and tests (mixed with relative imports) — follow the neighbouring files.
 - **File style:** every source file uses the section banner comments (`Importing packages with side effects` / `Importing npm packages` / `Importing user defined packages` / `Defining types` / `Declaring the constants`) — match the existing files. Prettier: 180 print width, single quotes.
 - **Commits:** Conventional Commits enforced by commitlint (`<type>(<scope>): <subject>`, imperative, lowercase, ≤100-char lines). One commit per completed task.
 

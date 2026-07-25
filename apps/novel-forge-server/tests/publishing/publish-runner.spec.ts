@@ -1,10 +1,10 @@
 /**
  * Importing packages with side effects
  *
- * The test IdP must be evaluated first: it seeds `auth.issuer` into the config cache before the
- * push client ever constructs its AuthClient.
+ * The test IdP must be evaluated first: it stands up the mock issuer the push client's AuthClient
+ * mints its `webnovel:publish` tokens against.
  */
-import { RP_CLIENT, testIdP } from '@tests/test-idp';
+import { APP_ID, AUTH_AUDIENCE, CLIENT_SECRET, testIdP } from '@tests/test-idp';
 
 /**
  * Importing npm packages
@@ -13,7 +13,7 @@ import { SQL } from 'bun';
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import { and, eq } from 'drizzle-orm';
 import { drizzle } from 'drizzle-orm/bun-sql';
-import { Config } from '@shadow-library/common';
+import { AuthClient } from '@shadow-library/auth';
 
 /**
  * Importing user defined packages
@@ -67,20 +67,19 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     db = drizzle(url, { schema }) as unknown as PrimaryDatabase;
     databaseService = { getPostgresClient: () => db } as never;
     publishingService = new PublishingService(databaseService);
-    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient());
+    // The shared, discovery-backed client the AuthModule would inject in a real boot — here built
+    // directly against the mock issuer with the app's own credential.
+    const authClient = new AuthClient({ issuer: testIdP.issuer, appId: APP_ID, client: { id: APP_ID, secret: CLIENT_SECRET } });
+    runner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(authClient));
 
     process.env['SERVICE_URL_WEBNOVEL_SERVER'] = reader.start();
-    Config['cache'].set('auth.m2m.client.id', RP_CLIENT.id);
-    Config['cache'].set('auth.m2m.client.secret', RP_CLIENT.secret);
   });
 
-  // Config cache and env are process-global; leaving them set would leak M2M credentials (and a dead
-  // reader URL) into every later spec file. Closing the pool keeps later suites from starving.
+  // The reader URL env is process-global; leaving it set would point a dead reader at every later
+  // spec file. Closing the pool keeps later suites from starving.
   afterAll(() => {
     reader.stop();
     delete process.env['SERVICE_URL_WEBNOVEL_SERVER'];
-    Config['cache'].delete('auth.m2m.client.id');
-    Config['cache'].delete('auth.m2m.client.secret');
     (db as unknown as { $client: SQL }).$client.close();
   });
 
@@ -122,9 +121,9 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     expect(row?.publishedAt).toBeInstanceOf(Date);
     expect(novel?.chapters.get(1)?.contentHash).toBe(row?.contentHash as string);
 
-    // The push rode an identity-issued client-credentials token scoped to the reader.
+    // The push rode an identity-issued client-credentials token scoped to the reader's audience.
     const tokenRequest = testIdP.getLastTokenRequest();
-    expect(tokenRequest?.body).toMatchObject({ grant_type: 'client_credentials', scope: 'webnovel:publish', resource: 'webnovel-server' });
+    expect(tokenRequest?.body).toMatchObject({ grant_type: 'client_credentials', scope: 'webnovel:publish', resource: 'api://webnovel' });
     expect(reader.requests.every(request => request.hasBearer)).toBe(true);
   });
 
@@ -223,19 +222,15 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     expect(reader.snapshot()[slug]).toEqual(before);
   });
 
-  it('should fail soft with an actionable ledger error when M2M credentials are unset', async () => {
+  it('should fail soft with an actionable ledger error when the client cannot mint a reader token', async () => {
     const { projectId } = await seedPublishedProject(1);
-    Config['cache'].delete('auth.m2m.client.id');
-    Config['cache'].delete('auth.m2m.client.secret');
-    const credlessRunner = new PublishRunner(databaseService, publishingService, new ReaderPushClient());
+    // A credential-less client (an id, but no secret) is refused by the token endpoint, so every mint —
+    // and therefore every push — fails; the runner ledgers it and answers PUB_004 rather than crashing.
+    const credlessClient = new AuthClient({ issuer: testIdP.issuer, audience: AUTH_AUDIENCE, client: { id: APP_ID } });
+    const credlessRunner = new PublishRunner(databaseService, publishingService, new ReaderPushClient(credlessClient));
 
-    try {
-      await expect(credlessRunner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
-      expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'failed', error: expect.stringContaining('AUTH_M2M_CLIENT_ID') });
-    } finally {
-      Config['cache'].set('auth.m2m.client.id', RP_CLIENT.id);
-      Config['cache'].set('auth.m2m.client.secret', RP_CLIENT.secret);
-    }
+    await expect(credlessRunner.converge(projectId)).rejects.toThrow(/Reader service push failed/);
+    expect(await ledgerRow(projectId, 1)).toMatchObject({ status: 'failed', error: expect.stringContaining('reader service') });
   });
 
   it('should release scheduled chapters through the janitor sweep and the publish job executor', async () => {

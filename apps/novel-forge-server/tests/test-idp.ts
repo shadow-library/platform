@@ -19,22 +19,46 @@ import { Config } from '@shadow-library/common';
 /**
  * Declaring the constants
  *
- * One in-process mock identity provider for the whole test run. This module MUST be evaluated
- * before `@server/app.module`: the auth modules resolve the issuer/audience/client configs at
- * import time, so the IdP's ephemeral URL is pre-seeded into the config cache here (a pre-seeded
- * cache entry wins over any later `Config.load`), the same trick the database URL uses.
+ * One in-process mock identity provider for the whole test run. This module MUST be evaluated before
+ * `@server/app.module`: `AuthModule.forRoot()` resolves the issuer/app-id/credential at import time
+ * and derives everything else (audience, redirect URIs, granted scopes) from the mock's
+ * `GET /api/v1/apps/me`, so the mock's ephemeral URL and the app-id + credential are pre-seeded into
+ * the config cache here (a pre-seeded cache entry wins over any later `Config.load`), the same trick
+ * the database URL uses.
  */
 
-export const AUTH_AUDIENCE = 'novel-forge-server';
-export const RP_CLIENT = { id: 'novel-forge-web', secret: 'test-rp-secret' };
-export const TEST_USER = { userId: '42', email: 'author@example.com', name: 'Test Author' };
+/** The single client that is both this app's browser-login client and its M2M identity (client id == app id) */
+export const APP_ID = 'novel-forge';
+export const CLIENT_SECRET = 'test-client-secret';
 
-export const testIdP = await createTestIdP({ clientId: RP_CLIENT.id, clientSecret: RP_CLIENT.secret });
+/** Derived from the mock registration below, and the `aud` of every token the app accepts or mints for itself */
+export const AUTH_AUDIENCE = 'api://novel-forge';
+
+/** Must carry the callback path so the SDK picks it as this deployment's redirect uri */
+export const CALLBACK_URI = 'http://localhost:8080/api/auth/callback';
+
+export const TEST_USER = { userId: '42' };
+
+export const testIdP = await createTestIdP({
+  clientId: APP_ID,
+  clientSecret: CLIENT_SECRET,
+  app: {
+    appId: APP_ID,
+    name: 'Novel Forge',
+    audience: AUTH_AUDIENCE,
+    redirectUris: [CALLBACK_URI],
+    scopes: ['authz:check', 'app-session:manage'],
+  },
+});
 
 Config['cache'].set('auth.issuer', testIdP.issuer);
-Config['cache'].set('auth.audience', AUTH_AUDIENCE);
-Config['cache'].set('auth.rp.client.id', RP_CLIENT.id);
-Config['cache'].set('auth.rp.client.secret', RP_CLIENT.secret);
+Config['cache'].set('auth.app-id', APP_ID);
+Config['cache'].set('auth.client.secret', CLIENT_SECRET);
+
+// The app-boot suites have no reader service wired, so the controller must not fire background
+// reader-push jobs that would race their ledger assertions (a boolean, so `Config.get` returns it as
+// stored — a `'false'` string would read truthy). Publish-runner drives the executor directly instead.
+Config['cache'].set('publishing.auto-push', false);
 
 /** Mints a bearer token accepted by the app's AuthGuard for the shared test user */
 export function issueTestToken(overrides: { sub?: string; scopes?: string[]; ttlSeconds?: number } = {}): Promise<string> {

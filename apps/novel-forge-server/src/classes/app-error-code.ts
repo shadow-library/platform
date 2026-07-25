@@ -181,11 +181,4 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly PUB_003 = AppErrorCode.badRequest('PUB_003', 'Chapters must be published contiguously — publish or restore every earlier chapter first');
   // A user-facing 500: the push failure detail must reach the client, so it stays out of the internal() mask
   static readonly PUB_004 = new AppErrorCode('PUB_004', 'Reader service push failed — see the publication ledger error', 500);
-
-  /*!
-   * Session Errors
-   */
-  static readonly SES_001 = AppErrorCode.unauthenticated('SES_001', 'No active session');
-  static readonly SES_002 = AppErrorCode.unauthenticated('SES_002', 'Invalid or expired login flow — restart the login');
-  static readonly SES_003 = AppErrorCode.badRequest('SES_003', 'Invalid returnTo — only relative paths are allowed');
 }
