@@ -355,6 +355,19 @@ export class OAuthClientService {
     return resource?.applicationId ?? null;
   }
 
+  /**
+   * Whether `identifier` is the client's own application's canonical audience (`api://<app>`). That
+   * audience needs no scope grant to be requested (D-21): an application's API may define no user
+   * scopes at all, because record-level authorisation there is the PDP's job. Deliberately narrow —
+   * any other resource the application owns still requires an explicit grant.
+   */
+  async isOwnAudience(client: OAuthClient, identifier: string): Promise<boolean> {
+    const ownerApplicationId = await this.getResourceOwner(identifier);
+    if (ownerApplicationId === null || ownerApplicationId !== client.applicationId) return false;
+    const application = await this.db.query.applications.findFirst({ where: eq(schema.applications.id, client.applicationId), columns: { name: true } });
+    return application !== undefined && applicationAudience(application.name) === identifier;
+  }
+
   /** Whether an RFC 8707 `resource` value is a registered, active API resource identifier. */
   async isRegisteredResource(identifier: string): Promise<boolean> {
     const resource = await this.db.query.apiResources.findFirst({

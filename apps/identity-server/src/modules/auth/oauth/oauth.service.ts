@@ -269,7 +269,11 @@ export class OAuthService {
     const audience = requestedResource ?? DEFAULT_AUDIENCE;
     const granted = await this.clientService.getGrantedScopes(client.id);
     const grantedHere = new Set(granted.filter(scope => scope.resourceIdentifier === audience).map(scope => scope.name));
-    if (requestedResource !== undefined && grantedHere.size === 0) {
+    if (requestedResource !== undefined && grantedHere.size === 0 && !(await this.clientService.isOwnAudience(client, requestedResource))) {
+      /**
+       * `isOwnAudience` carves out the one legitimate zero-grant request: an application addressing
+       * its own canonical audience (D-21). Everything else fails identically, revealing nothing.
+       */
       this.logger.warn('token request rejected: client holds no scope on the requested resource', {
         securityEvent: 'oauth.audience_denied',
         clientId: client.id,

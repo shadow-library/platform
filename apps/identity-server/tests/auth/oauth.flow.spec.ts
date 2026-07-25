@@ -434,6 +434,16 @@ describe('OAuth authorization-code flow', () => {
       expect(response.statusCode).toBe(400);
     });
 
+    it('should allow an application its own canonical audience without scope grants', async () => {
+      const application = await env.getService(ApplicationService).createApplication({ name: 'ledger', subDomain: 'ledger' });
+      const provisioned = await clientService().provisionApplicationIdentity({ applicationId: application.id, name: 'ledger', publicUrls: ['https://ledger.example.com'] });
+
+      const response = await tokenFor({ clientId: provisioned.clientId, secret: provisioned.secret }, 'api://ledger', '');
+      expect(response.statusCode).toBe(200);
+      const claims = env.getService(KeyService).verify((response.json() as { access_token: string }).access_token);
+      expect(claims?.aud).toBe('api://ledger');
+    });
+
     it('should not mint a scope granted on one resource into a token for another', async () => {
       const alpha = await clientService().ensureScope(applicationId(), 'api://alpha', 'alpha:read');
       const beta = await clientService().ensureScope(applicationId(), 'api://beta', 'beta:read');
