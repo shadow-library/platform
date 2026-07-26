@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 import { WebauthnAssertion } from '@server/modules/auth/mfa';
 
 /**
@@ -18,11 +19,8 @@ import { WebauthnAssertion } from '@server/modules/auth/mfa';
 
 @Schema()
 export class LoginInitBody {
-  /**
-   * An email address, E.164 phone number, or username — the three shapes `UserService` resolves. The shape itself is
-   * checked in the service rather than by an AJV `pattern`, so a typo gets a readable message instead of a raw regex.
-   */
-  @Field({ maxLength: 320 })
+  /** An email address, E.164 phone number, or username — the three shapes `UserService` resolves. */
+  @Field({ ...PATTERN.IDENTIFIER, maxLength: 320 })
   identifier: string;
 
   @Field({ optional: true })
@@ -228,7 +226,7 @@ export class SetPasswordBody {
 
 @Schema()
 export class RecoverInitBody {
-  @Field()
+  @Field({ ...PATTERN.IDENTIFIER, maxLength: 320 })
   identifier: string;
 
   @Field({ optional: true })

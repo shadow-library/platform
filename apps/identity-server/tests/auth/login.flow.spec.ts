@@ -68,8 +68,8 @@ describe('Login flow', () => {
       const response = await login(identifier);
       expect(response.statusCode).toBe(422);
       expect(response.json()).not.toHaveProperty('flowId');
-      /** The message has to read as guidance — an AJV `pattern` would answer with the raw regex instead. */
-      expect(response.json()).toMatchObject({ fields: [{ field: 'identifier', msg: 'must be a valid email address, phone number, or username' }] });
+      /** The message has to read as guidance — a `pattern` without an `errorMessage` answers with the raw regex instead. */
+      expect(response.json()).toMatchObject({ fields: [{ field: 'body.identifier', msg: 'must be a valid email address, phone number, or username' }] });
     }
   });
 
