@@ -29,6 +29,26 @@ test.describe('hosted auth', () => {
     await expect(page.getByRole('heading', { name: 'Enter your password' })).toBeVisible({ timeout: 15_000 });
   });
 
+  test('should keep a malformed email on the identifier step instead of advancing', async ({ page }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+    await page.getByPlaceholder('you@company.com').fill('john@doe');
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByText('Enter a valid email address.')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Sign in' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Enter your password' })).toBeHidden();
+  });
+
+  /** D-12 was retired: the identifier step now answers for the account rather than deferring to the password step. */
+  test('should tell an unknown email there is no account, at the identifier step', async ({ page }) => {
+    await page.goto('/login');
+    await page.waitForLoadState('networkidle');
+    await page.getByPlaceholder('you@company.com').fill('definitely-not-a-user@example.com');
+    await page.getByRole('button', { name: 'Continue' }).click();
+    await expect(page.getByText('We couldn’t find an account with those details.')).toBeVisible({ timeout: 15_000 });
+    await expect(page.getByRole('heading', { name: 'Enter your password' })).toBeHidden();
+  });
+
   test('should render the registration wizard', async ({ page }) => {
     await page.goto('/register');
     await expect(page.getByRole('heading', { name: 'Create your account' })).toBeVisible();

@@ -44,6 +44,18 @@ const REJECTED_MESSAGE = (attemptsLeft: number): string =>
   attemptsLeft > 0 ? `That didn’t work — ${attemptsLeft} ${attemptsLeft === 1 ? 'attempt' : 'attempts'} left.` : 'No attempts left. This attempt is locked.';
 
 /**
+ * The identifier step now answers for the account itself rather than deferring to the password step, so these codes
+ * need copy the server deliberately does not carry. Each names the state and who can lift it, because a dead end with
+ * no next step is worse than no message at all.
+ */
+const ACCOUNT_STATE_MESSAGES: Record<string, string> = {
+  AUTH_008: 'We couldn’t find an account with those details. Check them, or create an account.',
+  AUTH_009: 'This account has been blocked. Contact support if you believe this is a mistake.',
+  AUTH_010: 'This account is temporarily suspended. Contact your administrator to restore access.',
+  AUTH_011: 'This account has been deactivated. Contact your administrator to reactivate it.',
+};
+
+/**
  * Shared state-machine plumbing for the login / registration / recovery pages. Every transition runs
  * through `run`, which folds the identity API's typed non-2xx bodies (rejected proofs, rate limits,
  * expired flows) into inline step state so the pages stay declarative.
@@ -71,10 +83,12 @@ export function useFlow(): FlowUiState & FlowActions {
       // `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client
       // bundles each carry their own `ApiError` class identity.
       // AUTH_004 is a flow terminated after too many failures (a lock-out); any other 410/409 is an expiry.
+      const accountState = isApiError(cause) && cause.code ? ACCOUNT_STATE_MESSAGES[cause.code] : undefined;
       if (isApiError(cause) && (cause.status === 410 || cause.status === 409)) {
         setDead(true);
         setDeadReason(cause.code === 'AUTH_004' ? 'locked' : 'expired');
-      } else if (isApiError(cause) && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
+      } else if (accountState) setError(accountState);
+      else if (isApiError(cause) && cause.status === 429) setError(RETRY_MESSAGE(cause.retryAfterSeconds));
       else if (isApiError(cause) && cause.fields?.length) setError(cause.fields.map(field => field.msg).join(' '));
       else if (isApiError(cause)) setError(cause.message);
       else setError('Something went wrong. Please try again.');

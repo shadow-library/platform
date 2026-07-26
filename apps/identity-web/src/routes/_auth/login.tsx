@@ -22,6 +22,21 @@ interface LoginSearch {
   client?: string;
 }
 
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,32}$/;
+
+/**
+ * Branches on the same shapes the server resolves, so a mistyped identifier is caught before a flow is created rather than surfacing as a generic
+ * failure a step later. Shape-only by design — it never signals whether the identifier maps to an account (D-12).
+ */
+const validateIdentifier = (value: string): string | null => {
+  if (!value) return 'Enter your email or phone number.';
+  if (value.startsWith('+')) return PHONE_PATTERN.test(value) ? null : 'Enter a valid phone number in international format, like +14155550123.';
+  if (value.includes('@')) return EMAIL_PATTERN.test(value) ? null : 'Enter a valid email address.';
+  return USERNAME_PATTERN.test(value) ? null : 'Enter a valid email address or phone number.';
+};
+
 export const Route = createFileRoute('/_auth/login')({
   validateSearch: (search: Record<string, unknown>): LoginSearch => ({
     returnTo: typeof search.returnTo === 'string' ? search.returnTo : undefined,
@@ -81,9 +96,11 @@ function LoginPage(): React.JSX.Element {
   };
 
   const submitIdentifier = (): void => {
-    if (!identifier.trim()) return setError('Enter your email or phone number.');
+    const trimmed = identifier.trim();
+    const invalid = validateIdentifier(trimmed);
+    if (invalid) return setError(invalid);
     setOtp('');
-    void advance(() => authApi.loginInit(identifier.trim(), deviceId, search.returnTo));
+    void advance(() => authApi.loginInit(trimmed, deviceId, search.returnTo));
   };
 
   const runPasskey = async (flowId?: string): Promise<void> => {
@@ -192,7 +209,9 @@ function LoginPage(): React.JSX.Element {
               Sign in with a passkey
             </span>
           </Button>
-          <p className={parts.otpNote}>For your security, we don’t say whether an account exists.</p>
+          <p className={parts.otpNote}>
+            New here? <Link to="/register">Create an account</Link>
+          </p>
         </AuthCard>
       </AuthScreen>
     );
