@@ -79,8 +79,12 @@ export class APIRequest {
    * override host or full URL for local dev or out-of-cluster targets; an override carrying its own
    * `scheme://` is used verbatim, otherwise `SERVICE_DISCOVERY_SCHEME` (default `http`) supplies the
    * scheme — the same scheme applied to the in-cluster service host.
+   *
+   * Public because callers that cannot route through `APIRequest` still need the same resolution:
+   * `@shadow-library/auth` reaches identity with a bare `fetch` on the OIDC paths, and duplicating
+   * the `SERVICE_URL_<NAME>` convention there would let the two drift.
    */
-  private static resolveServiceUrl(url: string): string {
+  static resolveServiceUrl(url: string): string {
     if (!url.startsWith(APIRequest.SERVICE_SCHEME)) return url;
 
     const rest = url.slice(APIRequest.SERVICE_SCHEME.length);
