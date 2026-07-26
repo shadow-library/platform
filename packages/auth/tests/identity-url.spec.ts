@@ -68,15 +68,14 @@ describe('AuthClient identityUrl (back-channel split)', () => {
     expect(principal.sub).toBe('user-1');
   });
 
-  it('should resolve a svc:// identityUrl through the SERVICE_URL override', async () => {
-    process.env['SERVICE_URL_IDENTITY_SERVER'] = idp.url;
-    try {
-      const auth = new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: 'svc://identity-server', audience: AUDIENCE });
-      const document = await auth.getDiscovery();
-      expect(document.jwks_uri).toBe(`${idp.url}/.well-known/jwks.json`);
-    } finally {
-      delete process.env['SERVICE_URL_IDENTITY_SERVER'];
-    }
+  it('should tolerate a trailing slash on identityUrl', async () => {
+    const auth = new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: `${idp.url}/`, audience: AUDIENCE });
+    const document = await auth.getDiscovery();
+    expect(document.jwks_uri).toBe(`${idp.url}/.well-known/jwks.json`);
+  });
+
+  it('should refuse an identityUrl that is not an absolute url', () => {
+    expect(() => new AuthClient({ issuer: PUBLIC_ISSUER, identityUrl: 'identity-server.identity', audience: AUDIENCE })).toThrow();
   });
 
   it('should leave every endpoint untouched when identityUrl is not set', async () => {

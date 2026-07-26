@@ -132,11 +132,12 @@ export class AuthClient {
     this.issuer = config.issuer.replace(/\/+$/, '');
 
     /**
-     * Resolved through `APIRequest` so `svc://` and `SERVICE_URL_<NAME>` mean the same thing here as
-     * in every other service-to-service call, rather than this package growing its own convention.
+     * A plain absolute url. The OIDC paths are dialled with a bare `fetch` rather than `APIRequest`,
+     * because a token endpoint mandates form encoding (RFC 6749 4.1.3) and returns a `Response` the
+     * callers here read directly — so there is nothing to resolve a `svc://` scheme with.
      */
-    this.identityUrl = config.identityUrl ? APIRequest.resolveServiceUrl(config.identityUrl).replace(/\/+$/, '') : this.issuer;
-    if (!URL.canParse(this.identityUrl)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'identityUrl must resolve to a valid url' });
+    this.identityUrl = config.identityUrl ? config.identityUrl.replace(/\/+$/, '') : this.issuer;
+    if (!URL.canParse(this.identityUrl)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'identityUrl must be a valid absolute url' });
 
     this.timeout = config.timeout;
     this.transport = withTimeout(config.fetch ?? ((url, init) => fetch(url, init)), config.timeout);

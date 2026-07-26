@@ -140,8 +140,8 @@ export interface ResolvedBrowserAuthConfig {
 Config.load('auth.issuer');
 
 /**
- * Where back-channel traffic reaches identity when that is not the public issuer — in-cluster, a
- * `svc://identity-server.identity` URL. Unset outside a cluster, where the issuer is reachable
+ * Where back-channel traffic reaches identity when that is not the public issuer — in-cluster,
+ * `http://identity-server.identity`. Unset outside a cluster, where the issuer is reachable
  * directly. Browser-facing endpoints are unaffected; see `AuthClientConfig.identityUrl`.
  */
 Config.load('auth.identity-url');
