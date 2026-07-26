@@ -6,12 +6,14 @@ import assert from 'node:assert';
 import Ajv, { Options as AjvOptions, SchemaObject, ValidateFunction } from 'ajv';
 import { fastify, FastifyInstance } from 'fastify';
 import { FastifyRouteSchemaDef, FastifySchemaValidationError, FastifyValidationResult, SchemaErrorDataVar } from 'fastify/types/schema';
+import { JsonObject } from 'type-fest';
 import { JSONSchema } from '@shadow-library/class-schema';
-import { utils, ValidationError } from '@shadow-library/common';
+import { MaybeUndefined, utils, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
+import { FieldErrorMessage } from '../interfaces';
 import { ServerErrorCode } from '../server.error';
 import { FastifyConfig, FastifyModuleOptions } from './fastify-module.interface';
 
@@ -27,7 +29,7 @@ export interface AjvValidators {
 /**
  * Declaring the constants
  */
-const keywords = ['x-fastify'];
+const keywords = ['x-fastify', 'errorMessage'];
 const allowedHttpParts = ['body', 'params', 'querystring'];
 const defaultAjvOptions: AjvOptions = { allErrors: true, useDefaults: true, removeAdditional: true, strict: true, keywords };
 
@@ -46,8 +48,21 @@ function compileSchema(ajv: Ajv, schema: JSONSchema): ValidateFunction<unknown> 
 
 export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject>, validators: AjvValidators): FastifyValidationResult {
   assert(allowedHttpParts.includes(routeSchema.httpPart as string), `Invalid httpPart: ${routeSchema.httpPart}`);
-  if (routeSchema.httpPart === 'body') return compileSchema(validators.strictValidator, routeSchema.schema);
-  if (routeSchema.httpPart === 'params') return compileSchema(validators.lenientValidator, routeSchema.schema);
+
+  if (routeSchema.httpPart !== 'querystring') {
+    const ajv = routeSchema.httpPart === 'body' ? validators.strictValidator : validators.lenientValidator;
+    const validate = compileSchema(ajv, routeSchema.schema);
+    const dataVar = routeSchema.httpPart as SchemaErrorDataVar;
+
+    /**
+     * The errors are formatted here rather than by the schema error formatter because resolving a field's
+     * `errorMessage` needs the route schema, and because it keeps the raw Ajv errors from leaving this handler.
+     */
+    return data => {
+      if (validate(data)) return {};
+      return { error: formatSchemaErrors(validate.errors ?? [], dataVar, routeSchema.schema) };
+    };
+  }
 
   const validate = compileSchema(validators.lenientValidator, routeSchema.schema);
   return (data: Record<string, unknown>) => {
@@ -65,13 +80,66 @@ export function compileValidator(routeSchema: FastifyRouteSchemaDef<SchemaObject
   };
 }
 
-export function formatSchemaErrors(errors: FastifySchemaValidationError[], dataVar: SchemaErrorDataVar): ValidationError {
+/**
+ * Locates the schema that declares the failing keyword. Ajv reports `schemaPath` relative to the root schema as
+ * `#/properties/name/minLength`, or relative to the `$id` of the definition holding it as `Address/properties/street/minLength`.
+ */
+function resolveErrorSchema(schemaPath: string, rootSchema: JSONSchema): MaybeUndefined<JSONSchema> {
+  const definitions = rootSchema.definitions ?? {};
+  /** Matching the longest `$id` first keeps an id that itself contains a slash from being split at the wrong place */
+  const definitionId = Object.keys(definitions)
+    .filter(id => schemaPath.startsWith(`${id}/`))
+    .sort((idA, idB) => idB.length - idA.length)[0];
+
+  let schema: MaybeUndefined<JSONSchema>;
+  let pointer: string;
+  if (definitionId) {
+    schema = definitions[definitionId];
+    pointer = schemaPath.slice(definitionId.length + 1);
+  } else if (schemaPath.startsWith('#/')) {
+    schema = rootSchema;
+    pointer = schemaPath.slice(2);
+  } else return undefined;
+
+  /** The trailing segment is the keyword that failed, the ones before it lead to the schema declaring it */
+  const segments = pointer.split('/').slice(0, -1);
+  for (const segment of segments) {
+    schema = schema?.[segment.replaceAll('~1', '/').replaceAll('~0', '~')];
+    if (!schema) return undefined;
+  }
+
+  return schema;
+}
+
+/** Picks the message for the failing keyword, falling back to the `_` catch all */
+function resolveFieldErrorMessage(schema: MaybeUndefined<JSONSchema>, keyword: string): MaybeUndefined<string> {
+  const errorMessage = schema?.errorMessage as MaybeUndefined<FieldErrorMessage>;
+  if (!errorMessage) return undefined;
+  if (typeof errorMessage === 'string') return errorMessage;
+  return errorMessage[keyword] ?? errorMessage._;
+}
+
+export function formatSchemaErrors(errors: FastifySchemaValidationError[], dataVar: SchemaErrorDataVar, rootSchema?: JSONSchema): ValidationError {
   const validationError = new ValidationError();
   for (const error of errors) {
+    const { params } = error;
+    const missingProperty = params.missingProperty as MaybeUndefined<string>;
+
     let key = dataVar;
-    let message = error.message ?? 'Field validation failed';
     if (error.instancePath) key += error.instancePath.replaceAll('/', '.');
-    if (Array.isArray(error.params.allowedValues)) message += `: ${error.params.allowedValues.join(', ')}`;
+    /** A missing field is reported against the object holding it, so the field itself has to be appended to the path */
+    if (missingProperty) key += `.${missingProperty}`;
+
+    const errorSchema = rootSchema ? resolveErrorSchema(error.schemaPath, rootSchema) : undefined;
+    const fieldSchema = missingProperty ? errorSchema?.properties?.[missingProperty] : errorSchema;
+    const customMessage = resolveFieldErrorMessage(fieldSchema, error.keyword);
+    if (customMessage) {
+      validationError.addFieldError(key, customMessage, params as JsonObject);
+      continue;
+    }
+
+    let message = error.message ?? 'Field validation failed';
+    if (Array.isArray(params.allowedValues)) message += `: ${params.allowedValues.join(', ')}`;
     validationError.addFieldError(key, message);
   }
   return validationError;

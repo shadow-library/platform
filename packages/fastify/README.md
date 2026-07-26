@@ -6,7 +6,7 @@ A powerful TypeScript-first Fastify wrapper featuring decorator-based routing, a
 
 - 🚀 **High Performance**: Built on top of Fastify, one of the fastest Node.js web frameworks
 - 🎯 **Decorator-Based**: Clean, intuitive API using TypeScript decorators
-- ✅ **Automatic Validation**: Fast validation for body, query, and URL parameters using AJV
+- ✅ **Automatic Validation**: Fast validation for body, query, and URL parameters using AJV, with per-field custom error messages
 - 📝 **Response Serialization**: Consistent response formatting with fast-json-stringify
 - 🔒 **Authentication & Authorization**: Built-in support for guards and middleware
 - 🛡️ **Error Handling**: Comprehensive error handling with custom error types
@@ -1021,6 +1021,98 @@ class CreateProductDto {
   tags?: string[];
 }
 ```
+
+### Custom Validation Messages
+
+By default a failing field is reported with AJV's own wording, such as `must NOT have fewer than 8 characters`. Add an `errorMessage` to any field to replace it with a message meant for your users:
+
+```typescript
+@Schema()
+class RegisterDto {
+  @Field({ minLength: 8, errorMessage: 'Password must be at least 8 characters' })
+  password: string;
+}
+```
+
+A request that fails validation responds with `422` and the message against the field that caused it:
+
+```json
+{
+  "code": "VALIDATION_ERROR",
+  "message": "Validation Error",
+  "fields": [{ "field": "body.password", "msg": "Password must be at least 8 characters" }]
+}
+```
+
+The `errorMessage` option is contributed by this package, so it is available on every `@Field()` without importing anything extra.
+
+#### Messages per Validation Rule
+
+A single string covers every way the field can fail, including it being absent. When a field is validated by more than one rule, pass an object keyed by the JSON Schema keyword that failed, with `_` as the catch all:
+
+```typescript
+@Schema()
+class RegisterDto {
+  @Field({
+    minLength: 8,
+    pattern: '\\d',
+    errorMessage: {
+      required: 'Password is required',
+      minLength: 'Password must be at least 8 characters',
+      pattern: 'Password must contain a digit',
+      _: 'Password is invalid',
+    },
+  })
+  password: string;
+}
+```
+
+Resolution order is the failing keyword, then `_`, then AJV's default message. Keys are AJV keyword names, so `required`, `type`, `minLength`, `maxLength`, `pattern`, `format`, `enum`, `minimum`, `maximum`, `minItems`, and `uniqueItems` are the common ones.
+
+#### Interpolating Rule Values
+
+Messages can reference the failing rule's own values with `{placeholder}`, which keeps the message and the constraint from drifting apart:
+
+```typescript
+@Field({ minLength: 8, errorMessage: 'Password must be at least {limit} characters' })
+password: string;
+
+@Field({ maxItems: 10, errorMessage: 'Pick at most {limit} tags' })
+tags: string[];
+```
+
+The available placeholders come from AJV and depend on the keyword: `{limit}` for the length, size, and range keywords, `{pattern}` for `pattern`, `{format}` for `format`, and `{allowedValues}` for `enum` (rendered comma separated, as `male,female`). An unrecognised placeholder is left in the message untouched.
+
+#### Nested Objects and Arrays
+
+Messages are resolved wherever the field is declared, including nested schemas and array items. The reported field is the full path to the value:
+
+```typescript
+@Schema()
+class AddressDto {
+  @Field({ minLength: 3, errorMessage: 'Enter a valid street' })
+  street: string;
+}
+
+@Schema()
+class RegisterDto {
+  @Field(() => AddressDto)
+  address: AddressDto;
+}
+```
+
+```json
+{ "fields": [{ "field": "body.address.street", "msg": "Enter a valid street" }] }
+```
+
+#### Scope
+
+`errorMessage` applies to **body and path parameters**. Query parameters are validated leniently by design: an invalid value is dropped or reset to its `default` and the request continues, so no error is produced for a message to replace. Set a `default` on optional query fields, and validate in the handler when a query parameter must be rejected.
+
+Two further notes:
+
+- The key is emitted as `errorMessage` in the generated JSON Schema, which is the same keyword the [`ajv-errors`](https://github.com/ajv-validator/ajv-errors) plugin defines. Registering that plugin through `ajv.plugins` conflicts with it, so use one or the other.
+- `errorMessage` is validation-only. Adding it to a response schema has no effect on serialization.
 
 ## API Documentation Metadata
 
