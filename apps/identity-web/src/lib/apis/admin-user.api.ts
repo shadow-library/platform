@@ -44,6 +44,18 @@ export interface LockUserInput {
   until?: string;
 }
 
+/** A suspension is the only account hold that may lapse on its own, so it is the only one carrying `until`. */
+export interface SuspendUserInput {
+  userId: string;
+  reason?: string;
+  until?: string;
+}
+
+export interface BlockUserInput {
+  userId: string;
+  reason?: string;
+}
+
 /**
  * Declaring the constants
  */
@@ -81,6 +93,12 @@ const terminateSessions = createServerFn({ method: 'POST' })
 const deactivateUser = createServerFn({ method: 'POST' })
   .validator((userId: string) => userId)
   .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/deactivate`, body: {} }));
+const suspendUser = createServerFn({ method: 'POST' })
+  .validator((input: SuspendUserInput) => input)
+  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data.userId}/suspend`, body: { reason: data.reason, until: data.until } }));
+const blockUser = createServerFn({ method: 'POST' })
+  .validator((input: BlockUserInput) => input)
+  .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data.userId}/block`, body: { reason: data.reason } }));
 const reactivateUser = createServerFn({ method: 'POST' })
   .validator((userId: string) => userId)
   .handler(({ data }) => serverFetch<JsonValue>({ method: 'POST', path: `/admin/users/${data}/reactivate`, body: {} }));
@@ -154,6 +172,14 @@ export function useTerminateUserSessionsMutation(): UseMutationResult<unknown, A
 
 export function useDeactivateUserMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {
   return useUserActionMutation(({ userId }) => call(deactivateUser({ data: userId })));
+}
+
+export function useSuspendUserMutation(): UseMutationResult<unknown, ApiError, SuspendUserInput> {
+  return useUserActionMutation(input => call(suspendUser({ data: input })));
+}
+
+export function useBlockUserMutation(): UseMutationResult<unknown, ApiError, BlockUserInput> {
+  return useUserActionMutation(input => call(blockUser({ data: input })));
 }
 
 export function useReactivateUserMutation(): UseMutationResult<unknown, ApiError, { userId: string }> {

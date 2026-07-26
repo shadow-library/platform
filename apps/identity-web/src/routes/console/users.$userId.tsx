@@ -3,7 +3,7 @@
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
 import { useState } from 'react';
-import { Avatar, Button, ConfirmDialog, DescriptionList, Spinner, Timeline, type TimelineStatus, toast } from '@shadow-library/ui';
+import { Avatar, Button, ConfirmDialog, DescriptionList, Dialog, FormField, Input, Spinner, Timeline, type TimelineStatus, toast } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -13,17 +13,19 @@ import { useStepUpGate } from '@/features/portal';
 import {
   adminUserAuditQueryOptions,
   adminUserQueryOptions,
+  useBlockUserMutation,
   useDeactivateUserMutation,
   useDeleteUserMutation,
   useForcePasswordResetMutation,
   useLockUserMutation,
   useReactivateUserMutation,
+  useSuspendUserMutation,
   useTerminateUserSessionsMutation,
   useUnlockUserMutation,
   useUserAuditQuery,
   useUserQuery,
 } from '@/lib/apis';
-import { relativeTime } from '@/lib/format';
+import { formatDate, relativeTime } from '@/lib/format';
 
 import styles from './console.module.css';
 import { userStatusChip } from './users.index';
@@ -33,6 +35,14 @@ export const Route = createFileRoute('/console/users/$userId')({
     Promise.all([context.queryClient.ensureQueryData(adminUserQueryOptions(params.userId)), context.queryClient.ensureQueryData(adminUserAuditQueryOptions(params.userId))]),
   component: UserDetailPage,
 });
+
+type HoldKind = 'SUSPENDED' | 'BLOCKED';
+
+/** The two holds differ in intent rather than mechanics, so the dialog has to say which one the administrator is choosing. */
+const HOLD_COPY: Record<HoldKind, string> = {
+  SUSPENDED: 'A temporary hold. Sessions and tokens are revoked immediately, and the account is expected to come back — set a lift date, or restore it manually.',
+  BLOCKED: 'A punitive, indefinite bar for policy or security violations. Sessions and tokens are revoked immediately and only an administrator can lift it.',
+};
 
 function auditStatus(outcome: string): TimelineStatus {
   const value = outcome.toUpperCase();
@@ -54,11 +64,35 @@ function UserDetailPage(): React.JSX.Element {
   const terminate = useTerminateUserSessionsMutation();
   const deactivate = useDeactivateUserMutation();
   const reactivate = useReactivateUserMutation();
+  const suspend = useSuspendUserMutation();
+  const block = useBlockUserMutation();
   const del = useDeleteUserMutation();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [hold, setHold] = useState<HoldKind | null>(null);
+  const [reason, setReason] = useState('');
+  const [until, setUntil] = useState('');
 
   const data = user.data;
   const toastDone = (message: string) => ({ onSuccess: () => toast.success(message), onError: (error: { message: string }) => toast.danger(error.message) });
+
+  const openHold = (kind: HoldKind): void => {
+    setReason('');
+    setUntil('');
+    setHold(kind);
+  };
+
+  const applyHold = (): void => {
+    if (!hold) return;
+    const done = {
+      onSuccess: () => {
+        toast.success(hold === 'SUSPENDED' ? 'Account suspended' : 'Account blocked');
+        setHold(null);
+      },
+      onError: (error: { message: string }) => toast.danger(error.message),
+    };
+    const input = { userId, reason: reason.trim() || undefined };
+    require(() => (hold === 'SUSPENDED' ? suspend.mutate({ ...input, until: until ? new Date(until).toISOString() : undefined }, done) : block.mutate(input, done)));
+  };
 
   if (user.isLoading || !data)
     return (
@@ -111,9 +145,17 @@ function UserDetailPage(): React.JSX.Element {
           Terminate sessions
         </Button>
         {isActive ? (
-          <Button variant="secondary" size="sm" onClick={() => require(() => deactivate.mutate({ userId }, toastDone('Account deactivated')))}>
-            Deactivate
-          </Button>
+          <>
+            <Button variant="secondary" size="sm" onClick={() => openHold('SUSPENDED')}>
+              Suspend…
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => openHold('BLOCKED')}>
+              Block…
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => require(() => deactivate.mutate({ userId }, toastDone('Account deactivated')))}>
+              Deactivate
+            </Button>
+          </>
         ) : (
           <Button variant="secondary" size="sm" onClick={() => require(() => reactivate.mutate({ userId }, toastDone('Account reactivated')))}>
             Reactivate
@@ -132,6 +174,8 @@ function UserDetailPage(): React.JSX.Element {
               {data.id}
             </DescriptionList.Item>
             <DescriptionList.Item term="Status">{userStatusChip(data)}</DescriptionList.Item>
+            {data.statusReason && <DescriptionList.Item term="Reason">{data.statusReason}</DescriptionList.Item>}
+            {data.statusUntil && <DescriptionList.Item term="Lifts on">{formatDate(data.statusUntil)}</DescriptionList.Item>}
             <DescriptionList.Item term="Email">{data.emails.find(email => email.isPrimary)?.value ?? '—'}</DescriptionList.Item>
             <DescriptionList.Item term="MFA">{mfa}</DescriptionList.Item>
             <DescriptionList.Item term="Active sessions">{data.activeSessionCount}</DescriptionList.Item>
@@ -182,6 +226,29 @@ function UserDetailPage(): React.JSX.Element {
           )
         }
       />
+      <Dialog open={hold !== null} onOpenChange={open => !open && setHold(null)}>
+        <Dialog.Content size="md">
+          <Dialog.Header title={hold === 'BLOCKED' ? `Block ${label}?` : `Suspend ${label}?`} description={hold === 'BLOCKED' ? HOLD_COPY.BLOCKED : HOLD_COPY.SUSPENDED} />
+          <Dialog.Body>
+            <FormField label="Reason" helper="Shown to administrators and written to the audit trail.">
+              <Input value={reason} onValueChange={setReason} placeholder={hold === 'BLOCKED' ? 'Policy violation' : 'Payment overdue'} maxLength={256} autoFocus />
+            </FormField>
+            {hold === 'SUSPENDED' && (
+              <FormField label="Lift automatically on" helper="Leave empty to suspend until an administrator restores the account.">
+                <Input type="datetime-local" value={until} onValueChange={setUntil} />
+              </FormField>
+            )}
+          </Dialog.Body>
+          <Dialog.Footer>
+            <Dialog.Close asChild>
+              <Button variant="ghost">Cancel</Button>
+            </Dialog.Close>
+            <Button variant="danger" loading={suspend.isPending || block.isPending} onClick={applyHold}>
+              {hold === 'BLOCKED' ? 'Block account' : 'Suspend account'}
+            </Button>
+          </Dialog.Footer>
+        </Dialog.Content>
+      </Dialog>
       {dialog}
     </div>
   );
