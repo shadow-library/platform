@@ -9,7 +9,7 @@
         "@shadow-library/app": "2.0.0-alpha.0",
         "@shadow-library/class-schema": "0.5.0-alpha.0",
         "@shadow-library/common": "^2.0.0-alpha.4",
-        "@shadow-library/fastify": "2.0.0-alpha.0",
+        "@shadow-library/fastify": "^2.0.0-alpha.2",
         "@shadow-library/modules": "0.7.0-alpha.1",
         "@simplewebauthn/server": "^13.3.2",
         "ajv": "^8.17.1",
@@ -315,7 +315,7 @@
 
     "@shadow-library/common": ["@shadow-library/common@2.0.0-alpha.4", "", { "dependencies": { "@colors/colors": "^1.6.0", "chokidar": "^5.0.0", "deepmerge": "^4.3.1", "fast-redact": "^3.5.0", "type-fest": "^4.40.0", "undici": "^7.10.0", "winston": "^3.17.0", "winston-transport": "^4.9.0" }, "peerDependencies": { "reflect-metadata": "^0.2.2" } }, "sha512-Fq7k7acNVi0rXgfHdp/Xpl/ms8XmJM+NZ8+A54TmYlQs7T3WHIl+j9Q3YdyjZ91KFUupblut5rMQlxHv7BjjlQ=="],
 
-    "@shadow-library/fastify": ["@shadow-library/fastify@2.0.0-alpha.0", "", { "dependencies": { "@fastify/middie": "^9.0.3", "ajv": "^8.17.1", "fastify": "^5.6.0", "find-my-way": "^9.3.0", "json-stable-stringify": "^1.3.0", "type-fest": "^4.41.0", "uuid": "^11.1.0" }, "peerDependencies": { "@fastify/cookie": "^11.0.0", "@fastify/view": "^10.0.0", "@shadow-library/app": "^2.0.0-alpha.0", "@shadow-library/class-schema": "^0.5.0-alpha.0", "@shadow-library/common": "^2.0.0-alpha.1", "reflect-metadata": "^0.2.2" }, "optionalPeers": ["@fastify/cookie", "@fastify/view"] }, "sha512-nJJsUwA2/gI5979X3IrYuJPNRLqzBH4OdrU17k+u/+VSS9iQmnupyH5NgAUYCpJQsZYZYKvvQ1v290oZlAc80Q=="],
+    "@shadow-library/fastify": ["@shadow-library/fastify@2.0.0-alpha.2", "", { "dependencies": { "@fastify/middie": "^9.0.3", "ajv": "^8.17.1", "fastify": "^5.6.0", "find-my-way": "^9.3.0", "json-stable-stringify": "^1.3.0", "type-fest": "^4.41.0", "uuid": "^11.1.0" }, "peerDependencies": { "@fastify/cookie": "^11.0.0", "@fastify/view": "^10.0.0", "@shadow-library/app": "^2.0.0-alpha.0", "@shadow-library/class-schema": "^0.5.0-alpha.0", "@shadow-library/common": "^2.0.0-alpha.1", "reflect-metadata": "^0.2.2" }, "optionalPeers": ["@fastify/cookie", "@fastify/view"] }, "sha512-um+EFuqeGWif5z3KiWlFXYlfUbG1sZo2ITHQGLDrVG324vhmiSnUOD4lV6zYEVehLR/uWzLixcq5JajOn0bkug=="],
 
     "@shadow-library/modules": ["@shadow-library/modules@0.7.0-alpha.1", "", { "dependencies": { "@fastify/compress": "^8.1.0", "@fastify/cookie": "^11.0.2", "@fastify/helmet": "^13.0.2", "@fastify/swagger": "^9.5.2", "@scalar/fastify-api-reference": "^1.38.1", "luxon": "^3.7.2", "openapi-types": "^12.1.3", "type-fest": "^4.41.0" }, "peerDependencies": { "@shadow-library/app": "^2.0.0-alpha.0", "@shadow-library/class-schema": "^0.5.0-alpha.0", "@shadow-library/common": "^2.0.0-alpha.1", "@shadow-library/fastify": "^2.0.0-alpha.0", "drizzle-orm": "^0.45.0", "ioredis": "^5.8.2", "memcached": "^2.2.2", "reflect-metadata": "^0.2.2" }, "optionalPeers": ["drizzle-orm", "ioredis", "memcached"] }, "sha512-4NNECqTpy8JFN+x+2pz674pGTQa1GAFucugwv3CKInJTfYV4bgA0Ky+6GoKYXXK9raEz50lXeGgA+AJ5yrOdXw=="],
 
