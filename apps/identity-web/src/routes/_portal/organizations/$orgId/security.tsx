@@ -91,7 +91,7 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
 
   const isBoolean = policy.type === 'boolean';
   const configured = isBoolean ? policy.configuredEnabled !== undefined : policy.configuredValue !== undefined;
-  const hint = isBoolean ? 'Any organisation turning this off turns it off for its members everywhere.' : 'The shortest limit set by any of a member’s organisations applies.';
+  const fold = isBoolean ? 'Any organisation turning this off turns it off for its members everywhere.' : 'The shortest limit set by any of a member’s organisations applies.';
 
   const applyValue = (body: { value?: number; enabled?: boolean }): void =>
     require(() => set.mutate({ orgId, policyKey: policy.key, body }, { onSuccess: () => toast.success('Policy updated'), onError: error => toast.danger(error.message) }));
@@ -103,10 +103,13 @@ function PolicyRow({ orgId, policy, require }: { orgId: string; policy: PolicyIt
     <div className={styles.row}>
       <div className={styles.rowMain}>
         <div className={styles.rowLabelRow}>
-          <span className={styles.rowLabel}>{policy.description}</span>
+          <span className={styles.rowLabel}>{policy.label}</span>
           <Badge intent={configured ? 'info' : 'neutral'}>{configured ? 'Configured' : 'Inherited'}</Badge>
         </div>
-        <div className={styles.rowHint}>{hint}</div>
+        {/* What the setting governs, then how it combines across the organisations a member belongs to. */}
+        <div className={styles.rowHint}>
+          {policy.description} {fold}
+        </div>
       </div>
       <div className={styles.rowControl}>
         {isBoolean ? (
@@ -146,7 +149,7 @@ function DurationField({ seconds, min, max, busy, onSave }: { seconds: number; m
     <div className={styles.duration}>
       <div className={styles.durationInputs}>
         <Input size="sm" value={amount} onValueChange={setAmount} invalid={amount.trim() !== '' && !valid} />
-        <Select value={String(unitSeconds)} onValueChange={value => setUnitSeconds(Number(value))}>
+        <Select size="sm" value={String(unitSeconds)} onValueChange={value => setUnitSeconds(Number(value))}>
           {DURATION_UNITS.map(item => (
             <Select.Item key={item.seconds} value={String(item.seconds)}>
               {item.label}

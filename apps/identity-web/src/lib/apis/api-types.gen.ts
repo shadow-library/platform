@@ -2174,6 +2174,7 @@ export interface components {
     };
     PolicyItem: {
       key: string;
+      label: string;
       description: string;
       type: string;
       defaultValue?: number;
