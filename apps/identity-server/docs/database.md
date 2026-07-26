@@ -66,7 +66,10 @@ erDiagram
 | :-------------------------- | :-------------------- | :------------------------------------------------------------------------------------------------------------------------------------------ |
 | `id`                        | uuid                  | PK (UUIDv7)                                                                                                                                 |
 | `username`                  | varchar(32)           | nullable; partial unique index `WHERE username IS NOT NULL`; format per `REGEX.USERNAME`; MUST NOT be all-digits (reserved for ID literals) |
-| `status`                    | enum `user_status`    | `PENDING · ACTIVE · SUSPENDED · BLOCKED · CLOSED`; default `PENDING`                                                                        |
+| `status`                    | enum `user_status`    | `ACTIVE · INACTIVE · DISABLED · BLOCKED · SUSPENDED · CLOSED`; default `INACTIVE` — see the taxonomy below                                  |
+| `status_reason`             | varchar(256)          | nullable; why the account left `ACTIVE`, shown to administrators and audited                                                               |
+| `status_changed_at`         | timestamptz           | nullable                                                                                                                                    |
+| `status_until`              | timestamptz           | nullable; lapse time for a temporary `SUSPENDED` hold — `BLOCKED`/`DISABLED` never set it                                                   |
 | `personal_organisation_id`  | uuid                  | NOT NULL after registration transaction; FK → organisations, `ON DELETE RESTRICT`                                                           |
 | `lock_mode`                 | enum `user_lock_mode` | `NONE · OTP_ONLY · FULL`; default `NONE`                                                                                                    |
 | `locked_until`              | timestamptz           | nullable                                                                                                                                    |
@@ -75,7 +78,23 @@ erDiagram
 | `deleted_at`                | timestamptz           | soft delete; retention worker hard-deletes after 30 days                                                                                    |
 | `created_at` / `updated_at` | timestamptz           | NOT NULL                                                                                                                                    |
 
-Lifecycle: `PENDING → ACTIVE` (email verified) `→ SUSPENDED` (reversible, admin) `→ BLOCKED` (security lock, reversible) `→ CLOSED` (user-initiated, enters soft-delete window).
+**Status taxonomy.** The three administrative holds differ in intent, not mechanics — all of them revoke sessions, refresh-token families and
+fan out back-channel logout, because a status that left live sessions running would not actually stop anyone. What separates them is who
+decides, whether the account is expected back, and how it ends:
+
+| Status      | Intent                                                                                | Set by                       | Ends                                                   |
+| :---------- | :------------------------------------------------------------------------------------ | :--------------------------- | :----------------------------------------------------- |
+| `ACTIVE`    | Normal.                                                                                | Registration commit          | —                                                      |
+| `INACTIVE`  | Row created but registration never committed. Unreachable by login (no verified email). | DB default                   | Registration completing                                |
+| `SUSPENDED` | **Temporary hold** — access paused, the account is expected back (non-payment, leave, pending investigation). | Platform admin | Admin restore, or `status_until` lapsing on next read  |
+| `BLOCKED`   | **Punitive** — policy or security violation. Never lapses.                             | Platform admin               | Admin review only                                      |
+| `DISABLED`  | **Lifecycle** — no longer needed (offboarded, SCIM-deprovisioned). Carries no blame.   | SCIM automation, admin       | Reactivate                                             |
+| `CLOSED`    | Terminal soft delete; PII scrubbed, username released, audit skeleton kept.             | `softDelete`                 | Never — reports as `AUTH_008` (absent) at login        |
+
+Distinct from `lock_mode`, which is not an administrative decision at all: `OTP_ONLY`/`FULL` is the **automatic** brute-force response
+(5 failures in 15 min) and expires on its own via `locked_until`.
+
+Org-scoped holds live on `organisation_members.status` instead — a tenant administrator must never write the global column.
 
 ### `user_profiles` — 1:1 with `users`
 
@@ -137,7 +156,9 @@ Single table for every OTP/link challenge (registration email OTP, recovery OTP,
 
 ### `organisation_members`
 
-PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN · MEMBER`) — governs _org administration only_ (product permissions use `role_assignments`), `is_default` boolean, `joined_at`. Constraint: an org MUST always retain ≥ 1 `OWNER` (enforced in the service layer: demotion, removal, and leave all refuse to strip the last owner). _(The specified member `status` column is deferred until a suspend-member use case exists.)_
+PK `(organisation_id, user_id)`, both FK cascade, `role` enum (`OWNER · ADMIN · MEMBER`) — governs _org administration only_ (product permissions use `role_assignments`), `is_default` boolean, `joined_at`. Constraint: an org MUST always retain ≥ 1 `OWNER` (enforced in the service layer: demotion, removal, and leave all refuse to strip the last owner).
+
+`status` enum `organisation_member_status` (`ACTIVE · SUSPENDED · BLOCKED`, default `ACTIVE`) with `status_reason`, `status_changed_at`, `status_until` — _implemented 2026-07-26_, resolving the earlier deferral. This is the **org-scoped** hold a tenant administrator applies: `users.status` is global, so letting a tenant write it would let one organisation shut an adopted personal account out of its own workspace and every other tenant — the same ownership boundary SCIM already draws with `scim_directory.managed`. A held member is refused by `assertMember` (as `ORG_001`, indistinguishable from a non-member) and loses org-scoped role assignments and refresh-token families; their session and account are untouched. Holding an OWNER obeys last-owner protection. A `SUSPENDED` row whose `status_until` has passed restores itself on next read.
 
 ### `organisation_invitations` — _implemented (T-705)_
 

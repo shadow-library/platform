@@ -33,7 +33,7 @@ Outside production, `HttpCoreModule` serves the full OpenAPI 3.1 document at `GE
 
 ### Neutrality (decision D-12)
 
-`register/init`, `login/init`, and `recover/init` return the **same shape and status codes** whether or not the identifier maps to an account. No endpoint in this contract confirms account existence.
+`register/init` and `recover/init` return the **same shape and status codes** whether or not the identifier maps to an account. `login/init` deliberately does **not** (D-12 retired): it resolves the account and fails with `AUTH_008` (404, no such account) or `AUTH_009`/`AUTH_010`/`AUTH_011` (403 — blocked, suspended, deactivated) before any flow is created.
 
 ## 1. Registration
 
@@ -84,8 +84,10 @@ Outside production, `HttpCoreModule` serves the full OpenAPI 3.1 document at `GE
 
 ```jsonc
 { "identifier": "jane.doe@example.com", "deviceId": "uuid-v7" }
-// 200 — identical shape for unknown identifiers
+// 200 — only for an ACTIVE account
 { "flowId": "flow_auth_…", "status": "AWAITING_PASSWORD", "hasAlternativeMethods": true }
+// 404 AUTH_008 — no account. 403 AUTH_009 / AUTH_010 / AUTH_011 — blocked / suspended / deactivated.
+// `identifier` must be a well-formed email, E.164 phone, or username; anything else is 422 before lookup.
 ```
 
 ### 2.2 `GET /auth/challenge/methods?flowId=…`

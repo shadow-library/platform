@@ -34,15 +34,22 @@ Flows are state machines built on `FlowManager`/`FlowRegistry` from `@shadow-lib
 | `challengeId`                         | string? | reference to the active `verification_challenges` row — **codes are stored hashed in Postgres, never in Redis** |
 | `oidcResume`                          | object? | pending `/oauth2/authorize` request to resume after completion                                                  |
 
-## 2. Enumeration neutrality (decision D-12)
+## 2. Enumeration posture (decision D-12, retired 2026-07-26)
 
-All three `*/init` endpoints MUST be indistinguishable for known and unknown identifiers:
+`register/init` and `recover/init` MUST stay indistinguishable for known and unknown identifiers. `login/init` deliberately does not:
 
 | Endpoint        | Known identifier                                                                                                                       | Unknown identifier                                                                                             |
 | :-------------- | :------------------------------------------------------------------------------------------------------------------------------------- | :------------------------------------------------------------------------------------------------------------- |
 | `register/init` | 200, `AWAITING_EMAIL_OTP`; email sent: _"you already have an account — sign in"_ (no OTP issued; any submitted code fails generically) | 200, `AWAITING_EMAIL_OTP`; OTP email sent                                                                      |
-| `login/init`    | 200, `AWAITING_PASSWORD` (+ real method info at later states)                                                                          | 200, `AWAITING_PASSWORD`; verification always returns `INVALID_CREDENTIALS`                                    |
+| `login/init`    | 200, `AWAITING_PASSWORD` when ACTIVE; **403** `AUTH_009`/`AUTH_010`/`AUTH_011` when blocked / suspended / deactivated                  | **404** `AUTH_008`; no flow is created                                                                         |
 | `recover/init`  | 200, masked destinations, OTP sent                                                                                                     | 200, deterministically masked fake destination derived from the input; nothing sent; verification always fails |
+
+Why the split: neutrality at login made every mistyped address cost a wasted password attempt, and the state of a blocked or suspended
+account could never be explained to the person it affected. Registration and recovery keep their neutrality because it is free there —
+but note it no longer denies an attacker anything login will not confirm. Containment moved to the Tier-2 `login-init` budget (20/h).
+
+Because login now mints a session only for an ACTIVE account, **recovery applies the same gate before resetting a password** — otherwise a
+blocked account could reset its way back in.
 
 Accepted residual risks: per-account method lists differ once a real password step is passed; timing differences are minimized with constant-work lookups (always execute one argon2id verification against a static dummy hash when the user is unknown).
 
