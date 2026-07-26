@@ -40,6 +40,7 @@ describe('APIRequest', () => {
       headers: { 'x-test': '1', 'content-type': 'application/json' },
       query: { sort: 'asc' },
       body: JSON.stringify({ username: 'john-doe', name: { first: 'John', last: 'Doe' } }),
+      maxRedirections: 5,
     });
   });
 
@@ -51,6 +52,64 @@ describe('APIRequest', () => {
     const payload: Payload = { action: 'created', count: 1 };
     await APIRequest.post('/typed').body(payload);
     expect(mockRequest).toHaveBeenCalledWith('/typed', expect.objectContaining({ body: JSON.stringify(payload) }));
+  });
+
+  describe('form bodies', () => {
+    beforeEach(() => mockRequest.mockResolvedValue({ statusCode: 200, headers: {} }));
+
+    it('should encode a form body as application/x-www-form-urlencoded', async () => {
+      await APIRequest.post('/token').form({ grant_type: 'client_credentials', scope: 'read' });
+      expect(mockRequest).toHaveBeenCalledWith(
+        '/token',
+        expect.objectContaining({
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: 'grant_type=client_credentials&scope=read',
+        }),
+      );
+    });
+
+    it('should percent-encode reserved characters and coerce primitives', async () => {
+      await APIRequest.post('/token').form({ redirect_uri: 'https://app.test/cb?x=1', count: 2, active: true });
+      expect(mockRequest).toHaveBeenCalledWith('/token', expect.objectContaining({ body: 'redirect_uri=https%3A%2F%2Fapp.test%2Fcb%3Fx%3D1&count=2&active=true' }));
+    });
+
+    it('should repeat the key for an array, and skip null and undefined', async () => {
+      await APIRequest.post('/token').form({ scope: ['read', 'write'], absent: null, missing: undefined });
+      expect(mockRequest).toHaveBeenCalledWith('/token', expect.objectContaining({ body: 'scope=read&scope=write' }));
+    });
+
+    it('should throw AppError for a nested object, which has no unambiguous form encoding', async () => {
+      await expect(
+        APIRequest.post('/token')
+          .form({ nested: { a: 1 } })
+          .execute(),
+      ).rejects.toBeInstanceOf(AppError);
+    });
+
+    it('should leave body() on JSON', async () => {
+      await APIRequest.post('/json').body({ a: 1 });
+      expect(mockRequest).toHaveBeenCalledWith('/json', expect.objectContaining({ headers: { 'content-type': 'application/json' }, body: '{"a":1}' }));
+    });
+  });
+
+  describe('redirects', () => {
+    beforeEach(() => mockRequest.mockResolvedValue({ statusCode: 200, headers: {} }));
+
+    /** undici's own default is 0, which would return the 3xx with no body rather than the resource. */
+    it('should follow redirects by default', async () => {
+      await APIRequest.get('/resource');
+      expect(mockRequest).toHaveBeenCalledWith('/resource', expect.objectContaining({ maxRedirections: 5 }));
+    });
+
+    it('should not follow redirects when told not to', async () => {
+      await APIRequest.get('/authorize').followRedirects(false);
+      expect(mockRequest).toHaveBeenCalledWith('/authorize', expect.objectContaining({ maxRedirections: 0 }));
+    });
+
+    it('should follow redirects when explicitly enabled', async () => {
+      await APIRequest.get('/resource').followRedirects(true);
+      expect(mockRequest).toHaveBeenCalledWith('/resource', expect.objectContaining({ maxRedirections: 5 }));
+    });
   });
 
   it('should throw AppError when the body is not JSON-serializable', async () => {
@@ -98,13 +157,13 @@ describe('APIRequest', () => {
     it('should pass an abort signal to undici when a timeout is set', async () => {
       mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
       await APIRequest.get('/test').timeout(1000);
-      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', signal: expect.any(AbortSignal) });
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', maxRedirections: 5, signal: expect.any(AbortSignal) });
     });
 
     it('should not pass an abort signal when no timeout is set', async () => {
       mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
       await APIRequest.get('/test');
-      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET' });
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', maxRedirections: 5 });
     });
 
     it('should throw API_REQUEST_TIMEOUT when the request exceeds the timeout', async () => {
