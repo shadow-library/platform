@@ -34,10 +34,14 @@
   margin-top: 2px;
 }
 
+/* The rule is an inset shadow rather than a border so the active tab's underline can paint straight over it.
+   A real border would sit outside the content box, forcing the tabs to overlap it with a negative margin —
+   and that 1px of overflow is enough to raise a vertical scrollbar, since `overflow-x: auto` drags
+   `overflow-y` to `auto` along with it. */
 .tabs {
   display: flex;
   gap: 2px;
-  border-bottom: 1px solid var(--sh-border-default);
+  box-shadow: inset 0 -1px 0 var(--sh-border-default);
   margin-bottom: 24px;
   overflow-x: auto;
 }
@@ -49,7 +53,6 @@
   text-decoration: none;
   color: var(--sh-text-secondary);
   border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   white-space: nowrap;
 }
 .tab:hover {

@@ -393,10 +393,13 @@
   margin-top: 2px;
 }
 
+/* An inset shadow rather than a border, so the active tab paints its underline straight over the rule
+   instead of overlapping it with a negative margin — that 1px of overflow raises a vertical scrollbar,
+   because `overflow-x: auto` drags `overflow-y` to `auto` with it. */
 .appTabs {
   display: flex;
   gap: 2px;
-  border-bottom: 1px solid var(--sh-border-default);
+  box-shadow: inset 0 -1px 0 var(--sh-border-default);
   margin: 4px 0 24px;
   overflow-x: auto;
 }
@@ -411,7 +414,6 @@
   background: none;
   border: none;
   border-bottom: 2px solid transparent;
-  margin-bottom: -1px;
   color: var(--sh-text-secondary);
   white-space: nowrap;
   cursor: pointer;
