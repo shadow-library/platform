@@ -16,6 +16,7 @@ import {
   type MemberItem,
   type MemberRole,
   membersQueryOptions,
+  type MemberStatus,
   myOrganisationsQueryOptions,
   orgAccessOf,
   useInvitationsQuery,
@@ -26,6 +27,7 @@ import {
   useRemoveMemberMutation,
   useRevokeInvitationMutation,
   useUpdateMemberRoleMutation,
+  useUpdateMemberStatusMutation,
 } from '@/lib/apis';
 import { formatDate, relativeTime } from '@/lib/format';
 
@@ -44,6 +46,7 @@ export const Route = createFileRoute('/_portal/organizations/$orgId/members')({
 });
 
 const ROLE_LABEL = (role: MemberRole): string => role[0] + role.slice(1).toLowerCase();
+const STATUS_LABEL = (status: MemberStatus): string => status[0] + status.slice(1).toLowerCase();
 
 function InviteDialog({ orgId, open, onOpenChange }: { orgId: string; open: boolean; onOpenChange: (open: boolean) => void }): React.JSX.Element {
   const invite = useInviteMemberMutation(orgId);
@@ -109,6 +112,7 @@ function MembersPage(): React.JSX.Element {
   const members = useMembersQuery(orgId);
   const invitations = useInvitationsQuery(orgId, canManage);
   const updateRole = useUpdateMemberRoleMutation(orgId);
+  const updateStatus = useUpdateMemberStatusMutation(orgId);
   const removeMember = useRemoveMemberMutation(orgId);
   const invite = useInviteMemberMutation(orgId);
   const revoke = useRevokeInvitationMutation(orgId);
@@ -129,6 +133,13 @@ function MembersPage(): React.JSX.Element {
 
   const remove = (member: MemberItem): void =>
     removeMember.mutate(member.userId, { onSuccess: () => toast.success('Member removed'), onError: error => toast.danger(error.message) });
+
+  /** Org-scoped only — this pauses the person inside this organization and leaves their Shadow account untouched. */
+  const changeStatus = (member: MemberItem, status: MemberStatus): void =>
+    updateStatus.mutate(
+      { userId: member.userId, status },
+      { onSuccess: () => toast.success(status === 'ACTIVE' ? 'Access restored' : `Member ${status.toLowerCase()}`), onError: error => toast.danger(error.message) },
+    );
 
   return (
     <div className={styles.page}>
@@ -172,6 +183,18 @@ function MembersPage(): React.JSX.Element {
               ),
             },
             { id: 'role', header: 'Role', cell: member => <Badge intent={member.role === 'OWNER' ? 'info' : 'neutral'}>{ROLE_LABEL(member.role)}</Badge> },
+            {
+              id: 'status',
+              header: 'Status',
+              cell: member =>
+                member.status === 'ACTIVE' ? (
+                  <span className={styles.muted}>Active</span>
+                ) : (
+                  <Badge intent={member.status === 'BLOCKED' ? 'danger' : 'warning'} title={member.statusReason}>
+                    {STATUS_LABEL(member.status)}
+                  </Badge>
+                ),
+            },
             { id: 'joined', header: 'Joined', cell: member => <span className={styles.muted}>{formatDate(member.joinedAt)}</span> },
             {
               id: 'actions',
@@ -189,6 +212,18 @@ function MembersPage(): React.JSX.Element {
                       <DropdownMenu.Item onSelect={() => changeRole(member, 'OWNER')}>Owner</DropdownMenu.Item>
                       <DropdownMenu.Item onSelect={() => changeRole(member, 'ADMIN')}>Admin</DropdownMenu.Item>
                       <DropdownMenu.Item onSelect={() => changeRole(member, 'MEMBER')}>Member</DropdownMenu.Item>
+                      <DropdownMenu.Separator />
+                      <DropdownMenu.Label>Access</DropdownMenu.Label>
+                      {member.status === 'ACTIVE' ? (
+                        <>
+                          <DropdownMenu.Item onSelect={() => changeStatus(member, 'SUSPENDED')}>Suspend from organization</DropdownMenu.Item>
+                          <DropdownMenu.Item destructive onSelect={() => changeStatus(member, 'BLOCKED')}>
+                            Block from organization
+                          </DropdownMenu.Item>
+                        </>
+                      ) : (
+                        <DropdownMenu.Item onSelect={() => changeStatus(member, 'ACTIVE')}>Restore access</DropdownMenu.Item>
+                      )}
                       <DropdownMenu.Separator />
                       <DropdownMenu.Item destructive onSelect={() => remove(member)}>
                         Remove from organization

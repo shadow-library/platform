@@ -51,6 +51,15 @@ export type IdentityProvider = IdentityProviderResponse;
 export type OrgType = OrganisationResponse['type'];
 export type OrgStatus = OrganisationResponse['status'];
 export type MemberRole = MemberItem['role'];
+export type MemberStatus = MemberItem['status'];
+
+/** Org-scoped hold on a member. It never touches the person's global account — see the organisation controller. */
+export interface MemberStatusInput {
+  userId: string;
+  status: MemberStatus;
+  reason?: string;
+  until?: string;
+}
 export type InvitableRole = InviteMemberBody['role'];
 export type DomainStatus = DomainItem['status'];
 
@@ -108,6 +117,15 @@ const leaveOrg = createServerFn({ method: 'POST' })
 const updateMemberRole = createServerFn({ method: 'POST' })
   .validator((input: { orgId: string; userId: string; role: MemberRole }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'PATCH', path: `/organisations/${data.orgId}/members/${data.userId}`, body: { role: data.role } }));
+const updateMemberStatus = createServerFn({ method: 'POST' })
+  .validator((input: MemberStatusInput & { orgId: string }) => input)
+  .handler(({ data }) =>
+    serverFetch<undefined>({
+      method: 'PATCH',
+      path: `/organisations/${data.orgId}/members/${data.userId}/status`,
+      body: { status: data.status, reason: data.reason, until: data.until },
+    }),
+  );
 const removeMember = createServerFn({ method: 'POST' })
   .validator((input: { orgId: string; userId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data.orgId}/members/${data.userId}` }));
@@ -229,6 +247,14 @@ export function useUpdateMemberRoleMutation(orgId: string): UseMutationResult<un
   const queryClient = useQueryClient();
   return useMutation<undefined, ApiError, { userId: string; role: MemberRole }>({
     mutationFn: ({ userId, role }) => call(updateMemberRole({ data: { orgId, userId, role } })),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.members(orgId) }),
+  });
+}
+
+export function useUpdateMemberStatusMutation(orgId: string): UseMutationResult<undefined, ApiError, MemberStatusInput> {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, ApiError, MemberStatusInput>({
+    mutationFn: input => call(updateMemberStatus({ data: { ...input, orgId } })),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: orgKeys.members(orgId) }),
   });
 }
