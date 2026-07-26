@@ -19,6 +19,7 @@ declare module '@shadow-library/common' {
   export interface ConfigRecords {
     /** Auth SDK configs (consumed by `AuthModule.forRoot` / `RelyingPartyModule.forRoot`) */
     'auth.issuer': string;
+    'auth.identity-url': string;
     'auth.app-id': string;
     'auth.client.id': string;
     'auth.client.secret': string;
@@ -138,6 +139,13 @@ export interface ResolvedBrowserAuthConfig {
  */
 Config.load('auth.issuer');
 
+/**
+ * Where back-channel traffic reaches identity when that is not the public issuer — in-cluster, a
+ * `svc://identity-server.identity` URL. Unset outside a cluster, where the issuer is reachable
+ * directly. Browser-facing endpoints are unaffected; see `AuthClientConfig.identityUrl`.
+ */
+Config.load('auth.identity-url');
+
 /** Without it a production service cannot read its own registration back, and so cannot know its own audience */
 Config.load('auth.app-id', { isProdRequired: true });
 Config.load('auth.client.id');
@@ -181,6 +189,7 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
 /** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */
 export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthClientConfig {
   const issuer = options.issuer ?? Config.get('auth.issuer');
+  const identityUrl = options.identityUrl ?? Config.get('auth.identity-url') ?? undefined;
   const appId = options.appId ?? Config.get('auth.app-id') ?? undefined;
 
   /** The app id doubles as the OAuth client id, so a deploy names the application once and only once */
@@ -195,7 +204,7 @@ export function resolveAuthClientConfig(options: AuthModuleOptions = {}): AuthCl
   const serviceAccess = { refreshSeconds: options.serviceAccess?.refreshSeconds ?? Config.get('auth.service-access.refresh-seconds') };
   const strictScopes = options.strictScopes ?? Config.get('auth.strict-scopes');
 
-  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, appId, client, timeout, app, serviceAccess, strictScopes };
+  return { ...utils.object.omitKeys(options, ['browser', 'routes']), issuer, identityUrl, appId, client, timeout, app, serviceAccess, strictScopes };
 }
 
 export function resolveAuthRoutes(overrides: Partial<AuthRoutePaths> = {}): AuthRoutePaths {

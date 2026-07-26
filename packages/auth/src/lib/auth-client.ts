@@ -98,6 +98,8 @@ const ACCESS_TOKEN_TYPE = 'urn:ietf:params:oauth:token-type:access_token';
 export class AuthClient {
   private readonly logger = Logger.getLogger(NAMESPACE, AuthClient.name);
   private readonly issuer: string;
+  /** Where back-channel traffic is sent; equals `issuer` unless `identityUrl` overrides it */
+  private readonly identityUrl: string;
   private readonly transport: FetchLike;
   private readonly timeout?: number;
   private readonly clockSkewSeconds: number;
@@ -128,33 +130,41 @@ export class AuthClient {
     assertValidTimeout(config.timeout);
 
     this.issuer = config.issuer.replace(/\/+$/, '');
+
+    /**
+     * Resolved through `APIRequest` so `svc://` and `SERVICE_URL_<NAME>` mean the same thing here as
+     * in every other service-to-service call, rather than this package growing its own convention.
+     */
+    this.identityUrl = config.identityUrl ? APIRequest.resolveServiceUrl(config.identityUrl).replace(/\/+$/, '') : this.issuer;
+    if (!URL.canParse(this.identityUrl)) throw AuthErrorCode.CONFIG_INVALID.create({ reason: 'identityUrl must resolve to a valid url' });
+
     this.timeout = config.timeout;
     this.transport = withTimeout(config.fetch ?? ((url, init) => fetch(url, init)), config.timeout);
     this.clockSkewSeconds = config.clockSkewSeconds ?? DEFAULT_CLOCK_SKEW_SECONDS;
-    this.discovery = new DiscoveryClient(this.issuer, this.transport);
+    this.discovery = new DiscoveryClient(this.issuer, this.identityUrl, this.transport);
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
     this.tokens = new ServiceTokenManager({ discovery: this.discovery, fetchFn: this.transport, client: config.client });
     this.pdp = new PdpClient({
-      issuer: this.issuer,
+      baseUrl: this.identityUrl,
       fetchFn: this.transport,
       ttlSeconds: config.cache?.decisionTtlSeconds ?? DEFAULT_DECISION_TTL_SECONDS,
       getToken: config.client ? () => this.identityToken(PDP_SCOPE) : undefined,
     });
     this.appSessions = new AppSessionClient({
-      issuer: this.issuer,
+      baseUrl: this.identityUrl,
       fetchFn: this.transport,
       getToken: () => this.identityToken(APP_SESSION_SCOPE),
       invalidateToken: () => this.tokens.invalidate(this.identityTokenOptions(APP_SESSION_SCOPE)),
       strictScopes: config.strictScopes,
     });
     this.serviceAccess = new ServiceAccessClient({
-      issuer: this.issuer,
+      baseUrl: this.identityUrl,
       fetchFn: this.transport,
       getToken: () => this.identityToken(PDP_SCOPE),
       refreshSeconds: config.serviceAccess?.refreshSeconds,
     });
     this.apps = new AppRegistryClient({
-      issuer: this.issuer,
+      baseUrl: this.identityUrl,
       fetchFn: this.transport,
       getToken: () => this.tokens.getToken({ resource: this.identityResource() }),
       appId: config.appId,

@@ -125,8 +125,25 @@ export interface RoleCatalogSyncResult {
 }
 
 export interface AuthClientConfig {
-  /** Issuer base URL of the identity service; discovery is fetched from `{issuer}/.well-known/openid-configuration` */
+  /**
+   * Issuer base URL of the identity service. This is an **identity**, not an address: it is the
+   * value the discovery document must claim and the audience tokens are addressed to. Unless
+   * `identityUrl` is set, it is also where discovery is fetched from.
+   */
   issuer: string;
+
+  /**
+   * Where this process actually reaches identity, when that differs from the public issuer — a
+   * cluster-internal Service, typically. Accepts a `svc://<service>/` URL, which resolves through
+   * cluster DNS or a `SERVICE_URL_<NAME>` override exactly as `APIRequest` resolves it, so the
+   * address convention is shared with every other service-to-service call rather than restated here.
+   *
+   * Only back-channel traffic moves: discovery, JWKS, token, introspection, PDP and app-session
+   * calls. Browser-facing endpoints stay on the public issuer, because a user redirected to an
+   * in-cluster hostname cannot resolve it. The `iss` claim is still validated against `issuer`, so
+   * the RFC 8414 guarantee is unaffected — this is the split Keycloak spells `KC_HOSTNAME_BACKCHANNEL`.
+   */
+  identityUrl?: string;
 
   /**
    * This application's identifier at identity, and by default the id its credential authenticates

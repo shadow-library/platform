@@ -15,7 +15,8 @@ import { FetchLike, ServiceAccessRule } from '../interfaces';
  */
 
 export interface ServiceAccessClientOptions {
-  issuer: string;
+  /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */
+  baseUrl: string;
   fetchFn: FetchLike;
 
   /** Supplies the application's own M2M bearer, which must carry the `authz:check` scope */
@@ -106,7 +107,7 @@ export class ServiceAccessClient {
   private async request(): Promise<ServiceAccessRule[]> {
     const token = await this.options.getToken();
     const response = await this.options
-      .fetchFn(`${this.options.issuer}${SERVICE_ACCESS_PATH}`, { headers: { authorization: `Bearer ${token}` } })
+      .fetchFn(`${this.options.baseUrl}${SERVICE_ACCESS_PATH}`, { headers: { authorization: `Bearer ${token}` } })
       .catch((error: Error) => throwError(this.logged(AuthErrorCode.SERVICE_ACCESS_FAILED.create({ reason: `service access fetch failed: ${error.message}` }))));
     if (!response.ok) throw this.logged(AuthErrorCode.SERVICE_ACCESS_FAILED.create({ reason: `service access endpoint returned http ${response.status}` }));
 

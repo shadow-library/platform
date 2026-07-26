@@ -15,7 +15,8 @@ import { CheckInput, CheckOptions, FetchLike } from '../interfaces';
  */
 
 export interface PdpClientOptions {
-  issuer: string;
+  /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */
+  baseUrl: string;
   fetchFn: FetchLike;
   /** Supplies the SDK's own M2M bearer for PDP calls; a failed acquisition falls back to an unauthenticated call */
   getToken?: () => Promise<string>;
@@ -93,7 +94,7 @@ export class PdpClient {
       organisationId,
       action: input.action,
     });
-    const response = await this.options.fetchFn(`${this.options.issuer}/api/v1/authz/check`, { method: 'POST', headers, body });
+    const response = await this.options.fetchFn(`${this.options.baseUrl}/api/v1/authz/check`, { method: 'POST', headers, body });
     if (!response.ok) throw AuthErrorCode.PDP_UNAVAILABLE.create({ reason: `pdp returned http ${response.status}` });
 
     const result = (await response.json()) as PdpResponse;

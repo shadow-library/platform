@@ -15,7 +15,8 @@ import { AppSession, AppSessionCreateInput, AppSessionElevation, AppSessionToken
  */
 
 export interface AppSessionClientOptions {
-  issuer: string;
+  /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */
+  baseUrl: string;
   fetchFn: FetchLike;
 
   /** Supplies the application's own M2M bearer, which must carry the `app-session:manage` scope */
@@ -61,7 +62,7 @@ export class AppSessionClient {
   private readonly baseUrl: string;
 
   constructor(private readonly options: AppSessionClientOptions) {
-    this.baseUrl = `${options.issuer.replace(/\/+$/, '')}${SESSIONS_PATH}`;
+    this.baseUrl = `${options.baseUrl.replace(/\/+$/, '')}${SESSIONS_PATH}`;
   }
 
   /** Redeems the authorization code for an opaque session handle; the handle is returned only once */

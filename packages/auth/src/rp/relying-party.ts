@@ -109,7 +109,9 @@ export class RelyingParty {
 
     this.issuer = config.issuer.replace(/\/+$/, '');
     this.transport = withTimeout(config.fetch ?? ((url, init) => fetch(url, init)), config.timeout);
-    this.discovery = new DiscoveryClient(this.issuer, this.transport);
+    // A relying party is third-party by definition, so it has no in-cluster route to identity: the
+    // issuer is both the identity to validate and the address to dial. The split is AuthClient's.
+    this.discovery = new DiscoveryClient(this.issuer, this.issuer, this.transport);
     this.jwks = new RemoteJwks({ discovery: this.discovery, fetchFn: this.transport, ttlSeconds: config.cache?.jwksTtlSeconds ?? DEFAULT_JWKS_TTL_SECONDS });
   }
 

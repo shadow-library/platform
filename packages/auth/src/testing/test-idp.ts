@@ -93,6 +93,13 @@ export interface TestLogoutTokenInput {
 export interface TestIdP {
   issuer: string;
 
+  /**
+   * The address the mock is actually bound to. Equals `issuer` unless `options.issuer` overrides it,
+   * which is how a back-channel split is exercised: discovery claims the public issuer while the
+   * document is only reachable here.
+   */
+  url: string;
+
   /** Mints a signed token with sensible claim defaults */
   issueToken(input: TestTokenInput): Promise<string>;
 
@@ -527,12 +534,14 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   };
 
   const server = Bun.serve({ port: 0, fetch: handle });
-  issuer = options.issuer ?? `http://127.0.0.1:${server.port}`;
+  const url = `http://127.0.0.1:${server.port}`;
+  issuer = options.issuer ?? url;
 
   const grantKey = (principal: TestPrincipalRef, organisationId: string, action: string): string => `${principal.kind}:${principal.sub}:${organisationId}:${action}`;
 
   return {
     issuer,
+    url,
     issueToken,
     signToken: claims => signer.sign(claims),
     createAuthorizationCode: input => {

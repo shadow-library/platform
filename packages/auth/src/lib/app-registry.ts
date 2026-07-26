@@ -15,7 +15,8 @@ import { AppRegistration, FetchLike } from '../interfaces';
  */
 
 export interface AppRegistryClientOptions {
-  issuer: string;
+  /** Where identity is reached over the back channel; the public issuer unless `identityUrl` overrides it */
+  baseUrl: string;
   fetchFn: FetchLike;
 
   /** Supplies the application's own M2M bearer; `/apps/me` answers about whoever holds it */
@@ -78,7 +79,7 @@ export class AppRegistryClient {
   private async request(): Promise<AppRegistration> {
     const token = await this.options.getToken();
     const response = await this.options
-      .fetchFn(`${this.options.issuer}${APP_REGISTRATION_PATH}`, { headers: { authorization: `Bearer ${token}` } })
+      .fetchFn(`${this.options.baseUrl}${APP_REGISTRATION_PATH}`, { headers: { authorization: `Bearer ${token}` } })
       .catch((error: Error) => throwError(this.logged(AuthErrorCode.APP_REGISTRATION_FAILED.create({ reason: `app registration fetch failed: ${error.message}` }))));
     if (!response.ok) throw this.logged(AuthErrorCode.APP_REGISTRATION_FAILED.create({ reason: `app registration endpoint returned http ${response.status}` }));
 
