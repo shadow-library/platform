@@ -3,16 +3,17 @@
  */
 import { and, count, desc, eq, ilike, inArray, SQL } from 'drizzle-orm';
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { Logger, ValidationError } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
 import { MfaService, WebauthnService } from '@server/modules/auth/mfa';
 import { SessionService } from '@server/modules/auth/session';
 import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
+import { type StatusHold, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { AuditEvent, DatabaseService, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
 
@@ -61,6 +62,9 @@ export interface AdminActionContext {
   organisationId: string;
 }
 
+/** CLOSED is reached only through `softDelete`, and INACTIVE is a registration artefact — neither is an administrative choice. */
+export type AdministrableStatus = Extract<User.Status, 'ACTIVE' | 'DISABLED' | 'SUSPENDED' | 'BLOCKED'>;
+
 /**
  * Declaring the constants
  *
@@ -68,6 +72,13 @@ export interface AdminActionContext {
  * hostile session could still use, is attributed to the acting administrator in the audit chain,
  * and never exposes credential material.
  */
+
+const STATUS_AUDIT_ACTION: Record<AdministrableStatus, string> = {
+  ACTIVE: 'admin.user.reactivated',
+  DISABLED: 'admin.user.deactivated',
+  SUSPENDED: 'admin.user.suspended',
+  BLOCKED: 'admin.user.blocked',
+};
 
 @Injectable()
 export class AdminUserService {
@@ -82,6 +93,7 @@ export class AdminUserService {
     private readonly auditService: AuditService,
     private readonly mfaService: MfaService,
     private readonly webauthnService: WebauthnService,
+    private readonly userService: UserService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -168,12 +180,19 @@ export class AdminUserService {
     await this.record('admin.user.sessions_terminated', userId, context);
   }
 
-  async setStatus(userId: bigint, status: Extract<User.Status, 'ACTIVE' | 'DISABLED'>, context: AdminActionContext): Promise<void> {
+  /**
+   * The three ways an account leaves ACTIVE differ in intent, not mechanics: DISABLED is lifecycle (offboarded),
+   * SUSPENDED is a reversible hold that may lapse on its own, BLOCKED is punitive and indefinite. All of them cut
+   * live access immediately, because a status that leaves existing sessions running would not actually stop anyone.
+   */
+  async setStatus(userId: bigint, status: AdministrableStatus, context: AdminActionContext, hold: StatusHold = {}): Promise<void> {
     const user = await this.requireUser(userId);
     if (user.status === 'CLOSED') throw AppErrorCode.USR_001.create();
-    await this.db.update(schema.users).set({ status, updatedAt: new Date() }).where(eq(schema.users.id, userId));
-    if (status === 'DISABLED') await this.revokeAllAccess(userId);
-    await this.record(status === 'DISABLED' ? 'admin.user.deactivated' : 'admin.user.reactivated', userId, context);
+    if (status !== 'SUSPENDED' && hold.until) throw new ValidationError('until', ERROR_MESSAGES.EXPIRY_NOT_APPLICABLE);
+
+    await this.userService.setStatusHold(userId, status, hold);
+    if (status !== 'ACTIVE') await this.revokeAllAccess(userId);
+    await this.record(STATUS_AUDIT_ACTION[status], userId, context, { reason: hold.reason ?? null, until: hold.until?.toISOString() ?? null });
   }
 
   /**

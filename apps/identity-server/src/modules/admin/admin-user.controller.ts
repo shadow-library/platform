@@ -2,15 +2,27 @@
  * Importing npm packages
  */
 
+import { ValidationError } from '@shadow-library/common';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Query, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
+import { ERROR_MESSAGES } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
 
-import { AdminActionResponse, LockUserBody, UserAuditEventsResponse, UserDetailResponse, UserIdParams, UserSearchQuery, UserSearchResponse } from './admin-user.dto';
+import {
+  AdminActionResponse,
+  BlockUserBody,
+  LockUserBody,
+  SuspendUserBody,
+  UserAuditEventsResponse,
+  UserDetailResponse,
+  UserIdParams,
+  UserSearchQuery,
+  UserSearchResponse,
+} from './admin-user.dto';
 import { AdminActionContext, AdminUserService } from './admin-user.service';
 import { ADMIN_PERMISSIONS } from './admin.constants';
 
@@ -70,6 +82,15 @@ export class AdminUserController {
     };
   }
 
+  /** Shared by every endpoint taking an expiry: an unparseable or already-past instant is a client error, not a silent no-op. */
+  private parseExpiry(value: string | undefined): Date | undefined {
+    if (!value) return undefined;
+    const until = new Date(value);
+    if (Number.isNaN(until.getTime())) throw AppErrorCode.ADM_003.create();
+    if (until.getTime() <= Date.now()) throw new ValidationError('until', ERROR_MESSAGES.EXPIRY_MUST_BE_FUTURE);
+    return until;
+  }
+
   @Post('/:userId/lock')
   @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
   @HttpStatus(200)
@@ -114,6 +135,26 @@ export class AdminUserController {
   @RespondFor(200, AdminActionResponse)
   async deactivateUser(@Params() params: UserIdParams): Promise<AdminActionResponse> {
     await this.adminUserService.setStatus(params.userId, 'DISABLED', this.actionContext());
+    return { success: true };
+  }
+
+  /** A temporary hold: `until` lapses it without further administrative action, and omitting it holds indefinitely. */
+  @Post('/:userId/suspend')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
+  @HttpStatus(200)
+  @RespondFor(200, AdminActionResponse)
+  async suspendUser(@Params() params: UserIdParams, @Body() body: SuspendUserBody): Promise<AdminActionResponse> {
+    await this.adminUserService.setStatus(params.userId, 'SUSPENDED', this.actionContext(), { reason: body.reason, until: this.parseExpiry(body.until) });
+    return { success: true };
+  }
+
+  /** Punitive and indefinite — a block never lapses, so it accepts no expiry. */
+  @Post('/:userId/block')
+  @Auth({ permission: ADMIN_PERMISSIONS.usersManage, elevated: true })
+  @HttpStatus(200)
+  @RespondFor(200, AdminActionResponse)
+  async blockUser(@Params() params: UserIdParams, @Body() body: BlockUserBody): Promise<AdminActionResponse> {
+    await this.adminUserService.setStatus(params.userId, 'BLOCKED', this.actionContext(), { reason: body.reason });
     return { success: true };
   }
 

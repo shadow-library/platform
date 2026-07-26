@@ -97,6 +97,13 @@ export class UserDetailResponse {
   @Field(() => String, { enum: [...USER_STATUSES] })
   status: UserStatus;
 
+  /** Why the account left ACTIVE, and when a temporary suspension lifts itself. */
+  @Field(() => String, { optional: true })
+  statusReason?: string;
+
+  @Field(() => String, { optional: true })
+  statusUntil?: string;
+
   @Field(() => String, { enum: ['NONE', 'OTP_ONLY', 'FULL'] })
   lockMode: 'NONE' | 'OTP_ONLY' | 'FULL';
 
@@ -130,6 +137,23 @@ export class LockUserBody {
   /** ISO-8601 expiry; omitted means locked until explicitly unlocked. */
   @Field({ optional: true })
   until?: string;
+}
+
+@Schema()
+export class SuspendUserBody {
+  /** Recorded on the account and in the audit chain so a later administrator can see why the hold exists. */
+  @Field({ optional: true, maxLength: 256 })
+  reason?: string;
+
+  /** ISO-8601 instant at which the hold lapses on its own; omitted suspends until an administrator lifts it. */
+  @Field({ optional: true })
+  until?: string;
+}
+
+@Schema()
+export class BlockUserBody {
+  @Field({ optional: true, maxLength: 256 })
+  reason?: string;
 }
 
 @Schema()

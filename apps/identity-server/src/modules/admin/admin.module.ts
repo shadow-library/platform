@@ -13,6 +13,7 @@ import { SessionModule } from '@server/modules/auth/session';
 import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
 import { OrganisationModule } from '@server/modules/identity/organisation';
+import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { WebhookModule } from '@server/modules/infrastructure/webhook';
@@ -39,7 +40,20 @@ import { AdminWebhookController } from './admin-webhook.controller';
  */
 
 @Module({
-  imports: [DatabaseModule, SessionModule, AuthzModule, OrganisationModule, TokenModule, MfaModule, AuditModule, OAuthModule, SamlModule, ApplicationModule, WebhookModule],
+  imports: [
+    DatabaseModule,
+    SessionModule,
+    AuthzModule,
+    OrganisationModule,
+    UserModule,
+    TokenModule,
+    MfaModule,
+    AuditModule,
+    OAuthModule,
+    SamlModule,
+    ApplicationModule,
+    WebhookModule,
+  ],
   controllers: [
     AdminContextController,
     AdminUserController,

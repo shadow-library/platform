@@ -154,6 +154,42 @@ describe('Admin user lifecycle APIs', () => {
     expect(after.json()).toMatchObject({ status: 'ACTIVE' });
   });
 
+  it('should suspend an account, cut live access, and record the reason', async () => {
+    const { secret } = await env.getService(SessionService).create({ userId: targetUserId });
+    const until = new Date(Date.now() + 86_400_000).toISOString();
+    const suspended = await request('post', `/api/v1/admin/users/${targetId}/suspend`).body({ reason: 'payment overdue', until });
+    expect(suspended.statusCode).toBe(200);
+    expect(await env.getService(SessionService).validate(secret)).toBeNull();
+
+    const [row] = await env.getPostgresClient().select().from(schema.users).where(eq(schema.users.id, targetUserId));
+    expect(row?.status).toBe('SUSPENDED');
+    expect(row?.statusReason).toBe('payment overdue');
+    expect(row?.statusUntil?.toISOString()).toBe(until);
+
+    /** Reactivating clears the hold rather than leaving a stale reason behind. */
+    await request('post', `/api/v1/admin/users/${targetId}/reactivate`);
+    const [restored] = await env.getPostgresClient().select().from(schema.users).where(eq(schema.users.id, targetUserId));
+    expect(restored).toMatchObject({ status: 'ACTIVE', statusReason: null, statusUntil: null });
+  });
+
+  it('should block an account indefinitely and refuse an expiry', async () => {
+    const blocked = await request('post', `/api/v1/admin/users/${targetId}/block`).body({ reason: 'fraud' });
+    expect(blocked.statusCode).toBe(200);
+
+    const [row] = await env.getPostgresClient().select().from(schema.users).where(eq(schema.users.id, targetUserId));
+    expect(row).toMatchObject({ status: 'BLOCKED', statusReason: 'fraud', statusUntil: null });
+
+    /** An expiry is meaningless on a punitive block, so the suspend endpoint is the only one that accepts one. */
+    const past = await request('post', `/api/v1/admin/users/${targetId}/suspend`).body({ until: new Date(Date.now() - 1000).toISOString() });
+    expect(past.statusCode).toBe(422);
+  });
+
+  it('should refuse suspend and block without step-up', async () => {
+    const weakSecret = await createAdmin('weak-admin@example.com', 'AAL1');
+    expect((await request('post', `/api/v1/admin/users/${targetId}/suspend`, weakSecret).body({})).statusCode).toBe(403);
+    expect((await request('post', `/api/v1/admin/users/${targetId}/block`, weakSecret).body({})).statusCode).toBe(403);
+  });
+
   it('should soft-delete: scrub pii, close the account, keep the audit chain valid', async () => {
     const deleted = await request('delete', `/api/v1/admin/users/${targetId}`);
     expect(deleted.statusCode).toBe(200);
