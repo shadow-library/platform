@@ -3,12 +3,13 @@
  */
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { Avatar, DropdownMenu, Spinner } from '@shadow-library/ui';
+import { Avatar, Button, DropdownMenu, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { GridIcon, LayersIcon, LinkIcon, LogOutIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
+import { ArrowLeftIcon, GridIcon, LayersIcon, LinkIcon, LogOutIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
+import { ThemeToggle } from '@/components/si';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
@@ -91,27 +92,6 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
             </div>
           ))}
         </nav>
-        <DropdownMenu>
-          <DropdownMenu.Trigger asChild>
-            <button type="button" className={styles.userRow}>
-              <Avatar name={displayName(user)} size="sm" />
-              <span className={styles.userInfo}>
-                <span className={styles.userName}>{displayName(user)}</span>
-                <span className={styles.userTag}>Platform staff</span>
-              </span>
-              <LogOutIcon size={16} />
-            </button>
-          </DropdownMenu.Trigger>
-          <DropdownMenu.Content align="end" sideOffset={6}>
-            <DropdownMenu.Item icon={<UserIcon size={16} />} onSelect={() => navigate({ to: '/account' })}>
-              Back to your account
-            </DropdownMenu.Item>
-            <DropdownMenu.Separator />
-            <DropdownMenu.Item icon={<LogOutIcon size={16} />} destructive onSelect={() => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) })}>
-              Sign out
-            </DropdownMenu.Item>
-          </DropdownMenu.Content>
-        </DropdownMenu>
       </aside>
 
       <div className={styles.main}>
@@ -122,7 +102,29 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
               <LayersIcon size={12} />
               Privileged access
             </span>
-            <Avatar name={displayName(user)} size="sm" />
+            {/* The console is a detour out of the portal, so leaving it is a first-class action rather than a menu entry. */}
+            <Button variant="ghost" size="sm" prefix={<ArrowLeftIcon size={15} />} onClick={() => navigate({ to: '/account' })}>
+              Back to dashboard
+            </Button>
+            <ThemeToggle />
+            <DropdownMenu>
+              <DropdownMenu.Trigger asChild>
+                <button type="button" className={styles.headerAvatar} aria-label="Account menu">
+                  <Avatar name={displayName(user)} size="sm" />
+                </button>
+              </DropdownMenu.Trigger>
+              <DropdownMenu.Content align="end" sideOffset={6} className={styles.userMenu}>
+                <DropdownMenu.Label>{user.email ?? displayName(user)}</DropdownMenu.Label>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item icon={<UserIcon size={16} />} onSelect={() => navigate({ to: '/account' })}>
+                  Back to your account
+                </DropdownMenu.Item>
+                <DropdownMenu.Separator />
+                <DropdownMenu.Item icon={<LogOutIcon size={16} />} destructive onSelect={() => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) })}>
+                  Sign out
+                </DropdownMenu.Item>
+              </DropdownMenu.Content>
+            </DropdownMenu>
           </div>
         </header>
         <div className={styles.content}>{children}</div>

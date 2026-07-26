@@ -8,9 +8,9 @@
 import { type ApiError } from '@/lib/apis';
 import { type ReactElement, type ReactNode } from 'react';
 
-import { Alert, Badge, type BadgeIntent, copyText, EmptyState, IconButton, Spinner, toast } from '@shadow-library/ui';
+import { Alert, Badge, type BadgeIntent, copyText, EmptyState, IconButton, Spinner, toast, useTheme } from '@shadow-library/ui';
 
-import { CopyIcon } from '../icons';
+import { CopyIcon, MoonIcon, SunIcon } from '../icons';
 import styles from './si.module.css';
 
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
@@ -122,6 +122,25 @@ export function PaneLoader(): ReactElement {
     <div className={styles.paneLoader}>
       <Spinner size="lg" label="Loading" />
     </div>
+  );
+}
+
+/**
+ * The light/dark switch every shell carries in its top bar. `ThemeProvider` renders the default theme on
+ * the server and on the first client pass, adopting the stored choice only in a mount effect — so the icon
+ * settles a beat after hydration rather than mismatching it.
+ */
+export function ThemeToggle(): ReactElement {
+  const { theme, toggleTheme } = useTheme();
+  const dark = theme === 'dark';
+  return (
+    <IconButton
+      variant="ghost"
+      size="sm"
+      aria-label={dark ? 'Switch to light theme' : 'Switch to dark theme'}
+      icon={dark ? <SunIcon size={18} /> : <MoonIcon size={18} />}
+      onClick={toggleTheme}
+    />
   );
 }
 

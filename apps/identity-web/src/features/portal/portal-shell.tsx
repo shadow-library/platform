@@ -3,26 +3,13 @@
  */
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { Avatar, DropdownMenu, IconButton, Spinner, useTheme } from '@shadow-library/ui';
+import { Avatar, DropdownMenu, IconButton, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import {
-  BellIcon,
-  BuildingIcon,
-  ChevronDownIcon,
-  GridIcon,
-  LogOutIcon,
-  MailIcon,
-  MonitorIcon,
-  MoonIcon,
-  PlugIcon,
-  ShieldCheckIcon,
-  SunIcon,
-  TerminalIcon,
-  UserIcon,
-} from '@/components/icons';
+import { BellIcon, BuildingIcon, GridIcon, LogOutIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
+import { ThemeToggle } from '@/components/si';
 import { type MeResponse, useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
 
@@ -70,17 +57,12 @@ function BrandGlyph(): React.JSX.Element {
 
 function UserMenu({ me, children }: { me: MeResponse; children: ReactNode }): React.JSX.Element {
   const navigate = useNavigate();
-  const { theme, toggleTheme } = useTheme();
   const signout = useSignoutMutation();
   return (
     <DropdownMenu>
       <DropdownMenu.Trigger asChild>{children}</DropdownMenu.Trigger>
       <DropdownMenu.Content align="end" sideOffset={6} className={styles.userMenu}>
         <DropdownMenu.Label>{me.email ?? displayName(me)}</DropdownMenu.Label>
-        <DropdownMenu.Separator />
-        <DropdownMenu.Item icon={theme === 'dark' ? <SunIcon size={16} /> : <MoonIcon size={16} />} onSelect={toggleTheme}>
-          {theme === 'dark' ? 'Light theme' : 'Dark theme'}
-        </DropdownMenu.Item>
         <DropdownMenu.Separator />
         <DropdownMenu.Item icon={<LogOutIcon size={16} />} destructive onSelect={() => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) })}>
           Sign out
@@ -145,16 +127,6 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
             </>
           )}
         </nav>
-        <UserMenu me={user}>
-          <button type="button" className={styles.userRow}>
-            <Avatar name={displayName(user)} size="sm" />
-            <span className={styles.userInfo}>
-              <span className={styles.userName}>{displayName(user)}</span>
-              <span className={styles.userEmail}>{user.email}</span>
-            </span>
-            <ChevronDownIcon size={16} />
-          </button>
-        </UserMenu>
       </aside>
 
       <div className={styles.main}>
@@ -166,6 +138,7 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
               {elevated ? 'AAL2 · MFA' : 'AAL1'}
             </span>
             <IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />
+            <ThemeToggle />
             <UserMenu me={user}>
               <button type="button" className={styles.headerAvatar} aria-label="Account menu">
                 <Avatar name={displayName(user)} size="sm" />
