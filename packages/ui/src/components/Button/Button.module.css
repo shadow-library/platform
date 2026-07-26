@@ -8,6 +8,13 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /*
+   * A label never wraps (`white-space: nowrap` below), so shrinking a button cannot buy space — it only
+   * spills the text past the fill, and `justify-content: center` means it can spill from either edge.
+   * The button therefore holds its measured size and lets a cramped row overflow instead, which is
+   * legible. `fullWidth` is an explicit request to fill, so that variant stays shrinkable.
+   */
+  flex-shrink: 0;
   border: var(--sh-border-width) solid transparent;
   font-family: inherit;
   font-weight: 500;
@@ -39,6 +46,7 @@
 
 .root[data-full-width='true'] {
   width: 100%;
+  flex-shrink: 1;
 }
 
 /* ── Sizes ────────────────────────────────────────────────── */

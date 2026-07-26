@@ -7,6 +7,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
+  /* Square by construction — shrinking would only flatten it into a rectangle. See Button's `.root`. */
+  flex-shrink: 0;
   padding: 0;
   border: var(--sh-border-width) solid transparent;
   color: var(--sh-text-secondary);
