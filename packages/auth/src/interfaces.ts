@@ -133,9 +133,10 @@ export interface AuthClientConfig {
   issuer: string;
 
   /**
-   * Where this process actually reaches identity, when that differs from the public issuer — in a
-   * cluster, the Service: `http://identity-server.identity`. A plain absolute url, because the OIDC
-   * paths are dialled with a bare `fetch` and so have no `svc://` resolution available to them.
+   * Where this process actually reaches identity, when that differs from the public issuer. Takes a
+   * `svc://<service>` name or a plain address, resolved by `ServiceDiscovery` — so in a cluster
+   * `svc://identity-server.identity` addresses the Service, and `SERVICE_URL_IDENTITY_SERVER_IDENTITY`
+   * redirects it, by exactly the rules every other service-to-service call follows.
    *
    * Only back-channel traffic moves: discovery, JWKS, token, introspection, PDP and app-session
    * calls. Browser-facing endpoints stay on the public issuer, because a user redirected to an

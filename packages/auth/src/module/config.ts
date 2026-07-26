@@ -141,8 +141,10 @@ Config.load('auth.issuer');
 
 /**
  * Where back-channel traffic reaches identity when that is not the public issuer — in-cluster,
- * `http://identity-server.identity`. Unset outside a cluster, where the issuer is reachable
- * directly. Browser-facing endpoints are unaffected; see `AuthClientConfig.identityUrl`.
+ * `svc://identity-server.identity`. Unset outside a cluster, where the issuer is reachable directly;
+ * it is deliberately not defaulted to a service name, because a deployment that names its identity
+ * Service differently would then dial an address nobody serves and fail as a timeout rather than a
+ * config error. Browser-facing endpoints are unaffected; see `AuthClientConfig.identityUrl`.
  */
 Config.load('auth.identity-url');
 
