@@ -69,18 +69,15 @@ describe('Challenge surface', () => {
   };
 
   describe('methods', () => {
-    it('should advertise identical methods for known and unknown identifiers', async () => {
-      const knownFlow = await initLogin(EMAIL);
-      const unknownFlow = await initLogin('ghost@example.com');
-
-      const known = await env.getRouter().mockRequest().get(`/api/v1/auth/challenge/methods?flowId=${knownFlow}`);
-      const unknown = await env.getRouter().mockRequest().get(`/api/v1/auth/challenge/methods?flowId=${unknownFlow}`);
-      expect(known.statusCode).toBe(200);
-
-      const knownMethods = (known.json() as { methods: { name: string }[] }).methods.map(method => method.name);
-      const unknownMethods = (unknown.json() as { methods: { name: string }[] }).methods.map(method => method.name);
-      expect(knownMethods).toEqual(['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP']);
-      expect(unknownMethods).toEqual(knownMethods);
+    /**
+     * The list still derives from the shape of the typed identifier rather than the resolved account, so it stays
+     * stable across accounts. It is no longer an enumeration control — the identifier step refuses unknown accounts outright.
+     */
+    it('should derive the advertised methods from the identifier shape', async () => {
+      const emailFlow = await initLogin(EMAIL);
+      const response = await env.getRouter().mockRequest().get(`/api/v1/auth/challenge/methods?flowId=${emailFlow}`);
+      expect(response.statusCode).toBe(200);
+      expect((response.json() as { methods: { name: string }[] }).methods.map(method => method.name)).toEqual(['PASSWORD', 'WEBAUTHN', 'EMAIL_OTP']);
     });
   });
 
@@ -98,15 +95,11 @@ describe('Challenge surface', () => {
       expect(setCookie.some(cookie => cookie.startsWith(`${SESSION_COOKIE_NAME}=`))).toBe(true);
     });
 
-    it('should respond identically for unknown identifiers without delivering a code', async () => {
-      const flowId = await initLogin('ghost@example.com');
-      const change = await post('challenge/change', { flowId, method: 'EMAIL_OTP' });
-      expect(change.statusCode).toBe(200);
-      expect(change.json()).toMatchObject({ status: 'AWAITING_EMAIL_OTP', resendsLeft: 3 });
+    it('should refuse an unknown identifier outright and never deliver a code', async () => {
+      const response = await post('login/init', { identifier: 'ghost@example.com' });
+      expect(response.statusCode).toBe(404);
+      expect(response.json()).toMatchObject({ code: 'AUTH_008' });
       expect(await outboxCountFor('ghost@example.com')).toBe(0);
-
-      const attempt = await post('challenge/verify', { flowId, code: '123456' });
-      expect(attempt.statusCode).toBe(401);
     });
 
     it('should still demand the second factor after an otp first factor', async () => {

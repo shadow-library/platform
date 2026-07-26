@@ -63,22 +63,53 @@ describe('Login flow', () => {
     expect(afterTermination.statusCode).toBe(410);
   });
 
-  it('should be indistinguishable for an unknown identifier', async () => {
-    const known = await login('login@example.com');
-    const unknown = await login('ghost@example.com');
-    expect(unknown.statusCode).toBe(known.statusCode);
-    expect(Object.keys(unknown.json() as object).sort()).toEqual(Object.keys(known.json() as object).sort());
-
-    const { flowId } = unknown.json() as { flowId: string };
-    const attempt = await verify(flowId, 'Password@123');
-    expect(attempt.statusCode).toBe(401);
+  it('should reject a malformed identifier before creating a flow', async () => {
+    for (const identifier of ['not-an-email@', 'john@doe', 'a@@b.com', 'has space@example.com', '+0123', '']) {
+      const response = await login(identifier);
+      expect(response.statusCode).toBe(422);
+      expect(response.json()).not.toHaveProperty('flowId');
+      /** The message has to read as guidance — an AJV `pattern` would answer with the raw regex instead. */
+      expect(response.json()).toMatchObject({ fields: [{ field: 'identifier', msg: 'must be a valid email address, phone number, or username' }] });
+    }
   });
 
-  it('should not issue a session for a non-active account', async () => {
-    await env.getService(UserService).createUserWithPassword({ email: 'suspended@example.com', password: 'Password@123', status: 'SUSPENDED', emailVerified: true });
-    const { flowId } = (await login('suspended@example.com')).json() as { flowId: string };
-    const response = await verify(flowId, 'Password@123');
-    expect(response.statusCode).toBe(401);
+  it('should accept a well-formed phone or username that resolves to an account', async () => {
+    await env.getService(UserService).createUserWithPassword({ email: 'shapes@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true, username: 'johndoe' });
+    expect((await login('johndoe')).statusCode).toBe(200);
+    expect((await login('+14155550123')).statusCode).toBe(404);
+  });
+
+  /** D-12 was retired deliberately: the identifier step is now an account-existence oracle, contained by the Tier-2 rate limit. */
+  it('should report an unknown identifier at the identifier step', async () => {
+    const response = await login('ghost@example.com');
+    expect(response.statusCode).toBe(404);
+    expect(response.json()).toMatchObject({ code: 'AUTH_008' });
+    expect(response.json()).not.toHaveProperty('flowId');
+  });
+
+  it('should name the account state at the identifier step instead of advancing', async () => {
+    const cases = [
+      { email: 'blocked@example.com', status: 'BLOCKED' as const, code: 'AUTH_009' },
+      { email: 'suspended@example.com', status: 'SUSPENDED' as const, code: 'AUTH_010' },
+      { email: 'disabled@example.com', status: 'DISABLED' as const, code: 'AUTH_011' },
+    ];
+    for (const { email, status, code } of cases) {
+      await env.getService(UserService).createUserWithPassword({ email, password: 'Password@123', status, emailVerified: true });
+      const response = await login(email);
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toMatchObject({ code });
+      expect(response.json()).not.toHaveProperty('flowId');
+    }
+  });
+
+  it('should let a lapsed suspension sign in again and clear the hold', async () => {
+    const userService = env.getService(UserService);
+    const user = await userService.createUserWithPassword({ email: 'lapsed@example.com', password: 'Password@123', status: 'SUSPENDED', emailVerified: true });
+    await userService.setStatusHold(user.id, 'SUSPENDED', { reason: 'billing', until: new Date(Date.now() - 60_000) });
+
+    const { flowId } = (await login('lapsed@example.com')).json() as { flowId: string };
+    expect((await verify(flowId, 'Password@123')).json()).toMatchObject({ status: 'COMPLETED' });
+    expect((await userService.getUser('lapsed@example.com'))?.status).toBe('ACTIVE');
   });
 
   it('should replace an admin-forced password inline and complete the sign-in', async () => {

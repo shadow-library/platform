@@ -42,6 +42,13 @@ export interface CurrentUserSummary {
   elevatedUntil?: Date;
 }
 
+export interface StatusHold {
+  /** Administrator-supplied justification, surfaced in the console and the audit trail. */
+  reason?: string;
+  /** Lapse time for a temporary SUSPENDED hold; BLOCKED and DISABLED leave it unset. */
+  until?: Date;
+}
+
 export interface CreateUser {
   username?: string;
   status?: User.Status;
@@ -208,6 +215,52 @@ export class UserService {
     const condition = this.resolveUserCondition(this.buildWhereClause(identifier));
     const user = await this.db.query.users.findFirst({ where: condition });
     return user ?? null;
+  }
+
+  /**
+   * A SUSPENDED hold whose `statusUntil` has passed has served its term, so the account reads ACTIVE again and the row is
+   * repaired on the way through. BLOCKED and DISABLED carry no expiry — they end only when an administrator lifts them.
+   */
+  async resolveEffectiveStatus(user: User): Promise<User.Status> {
+    if (user.status !== 'SUSPENDED' || !user.statusUntil || user.statusUntil.getTime() > Date.now()) return user.status;
+    await this.db
+      .update(schema.users)
+      .set({ status: 'ACTIVE', statusReason: null, statusChangedAt: new Date(), statusUntil: null, updatedAt: new Date() })
+      .where(eq(schema.users.id, user.id));
+    this.logger.info('suspension lapsed, account restored', { userId: user.id.toString() });
+    return 'ACTIVE';
+  }
+
+  /**
+   * Single gate for every credential-bearing entry point (login, recovery, token exchange). CLOSED reports as absent
+   * because a soft-deleted account has already been anonymised and must not be distinguishable from one that never existed.
+   */
+  assertLoginAllowed(status: User.Status): void {
+    if (status === 'ACTIVE') return;
+    if (status === 'BLOCKED') throw AppErrorCode.AUTH_009.create();
+    if (status === 'SUSPENDED') throw AppErrorCode.AUTH_010.create();
+    if (status === 'CLOSED') throw AppErrorCode.AUTH_008.create();
+    throw AppErrorCode.AUTH_011.create();
+  }
+
+  /**
+   * Canonical writer for an account status change, carrying the reason and optional expiry that make SUSPENDED
+   * distinguishable from BLOCKED. Revoking live access is the caller's responsibility — see `AdminUserService`.
+   */
+  async setStatusHold(userId: bigint, status: User.Status, hold: StatusHold = {}): Promise<void> {
+    const restored = status === 'ACTIVE';
+    await this.db
+      .update(schema.users)
+      .set({
+        status,
+        statusReason: restored ? null : (hold.reason ?? null),
+        statusChangedAt: new Date(),
+        statusUntil: restored ? null : (hold.until ?? null),
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, userId))
+      .catch(error => this.databaseService.translateError(error));
+    this.logger.info('account status changed', { userId: userId.toString(), status, until: hold.until?.toISOString() });
   }
 
   async updateUserStatus(identifier: ID, status: User.Status): Promise<void> {

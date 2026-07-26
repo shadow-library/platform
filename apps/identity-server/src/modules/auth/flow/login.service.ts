@@ -11,7 +11,7 @@ import { Config, Logger, ValidationError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME, ERROR_MESSAGES } from '@server/constants';
+import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
 import { ADMIN_PERMISSIONS, PLATFORM_ORG_NAME } from '@server/modules/admin/admin.constants';
 import { FederatedIdentityService, IdentityProviderService, UpstreamIdentity, UpstreamOidcService } from '@server/modules/auth/federation';
 import { MfaService, RecoveryCodeService, WebauthnAssertion, WebauthnService } from '@server/modules/auth/mfa';
@@ -115,20 +115,25 @@ export class LoginService {
   ) {}
 
   /**
-   * Starts a login flow. The response is identical whether or not the identifier maps to an account
-   * (D-12): the resolved user id is kept in the server-side flow context only, never returned.
+   * Starts a login flow. The identifier step resolves the account and answers for it directly: an unknown identifier
+   * and a blocked, suspended or deactivated account each fail here rather than a step later (D-12 retired — see
+   * architecture.md §11). This makes the endpoint a deliberate account-existence oracle, which the Tier-2 rate limit
+   * on `login-init` is what now contains.
    * Home-realm discovery (T-702): an email under a VERIFIED org domain with an active IdP gets a
    * federated option; when the org enforces federation, local credential steps refuse — except for
    * platform administrators (break-glass), so a broken upstream cannot lock operators out.
    */
   async init(input: LoginInitInput): Promise<LoginInitResult> {
+    this.assertResolvableIdentifier(input.identifier);
     const user = await this.userService.getUser(input.identifier);
+    if (!user) throw AppErrorCode.AUTH_008.create();
+    this.userService.assertLoginAllowed(await this.userService.resolveEffectiveStatus(user));
     const provider = input.identifier.includes('@') ? await this.identityProviderService.routeForEmail(input.identifier.toLowerCase()) : null;
 
     let federated: FederatedFlowState | undefined;
     let status = AWAITING_PASSWORD;
     if (provider) {
-      const breakGlass = user ? await this.isPlatformAdmin(user.id) : false;
+      const breakGlass = await this.isPlatformAdmin(user.id);
       const enforced = provider.enforced && !breakGlass;
       federated = { identityProviderId: provider.id, nonce: randomBytes(16).toString('base64url'), codeVerifier: randomBytes(32).toString('base64url'), enforced };
       if (enforced) status = AWAITING_FEDERATED;
@@ -136,7 +141,7 @@ export class LoginService {
 
     const flow = await this.authFlowService.create('LOGIN', status, {
       identifier: input.identifier,
-      userId: user?.id.toString(),
+      userId: user.id.toString(),
       authMethod: 'PASSWORD',
       device: input.device,
       returnTo: this.sanitizeReturnTo(input.returnTo),
@@ -153,6 +158,15 @@ export class LoginService {
       };
     }
     return result;
+  }
+
+  /**
+   * Branches on the same shapes `UserService.buildWhereClause` resolves, so an identifier that could never match any
+   * account is rejected as a typo rather than reported as a missing account.
+   */
+  private assertResolvableIdentifier(identifier: string): void {
+    const shape = identifier.startsWith('+') ? REGEX.PHONE : identifier.includes('@') ? REGEX.EMAIL : REGEX.USERNAME;
+    if (!shape.test(identifier)) throw new ValidationError('identifier', ERROR_MESSAGES.INVALID_IDENTIFIER);
   }
 
   /** Post-login destinations must stay on this origin: a relative path or a URL under the issuer. */

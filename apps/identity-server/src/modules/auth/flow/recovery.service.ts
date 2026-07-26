@@ -128,6 +128,11 @@ export class RecoveryService {
     const flow = await this.requireFlow(flowId, AWAITING_NEW_PASSWORD);
     const userId = BigInt(flow.userId ?? '0');
 
+    /** Recovery mints a session, so it has to honour the same status gate as login — otherwise a blocked account could reset its way back in. */
+    const user = await this.userService.getUser(userId);
+    if (!user) throw AppErrorCode.AUTH_008.create();
+    this.userService.assertLoginAllowed(await this.userService.resolveEffectiveStatus(user));
+
     await this.passwordPolicyService.assertAcceptable(newPassword);
     if (await this.passwordService.isReused(userId, newPassword)) throw new ValidationError('password', ERROR_MESSAGES.REUSED_PASSWORD);
 

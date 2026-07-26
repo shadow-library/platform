@@ -18,7 +18,11 @@ import { WebauthnAssertion } from '@server/modules/auth/mfa';
 
 @Schema()
 export class LoginInitBody {
-  @Field()
+  /**
+   * An email address, E.164 phone number, or username — the three shapes `UserService` resolves. The shape itself is
+   * checked in the service rather than by an AJV `pattern`, so a typo gets a readable message instead of a raw regex.
+   */
+  @Field({ maxLength: 320 })
   identifier: string;
 
   @Field({ optional: true })

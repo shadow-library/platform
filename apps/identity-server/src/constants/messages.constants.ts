@@ -43,4 +43,7 @@ export const ERROR_MESSAGES = {
   INVALID_DATE_OF_BIRTH: 'must be a valid date in the past',
   BREACHED_PASSWORD: 'has appeared in a known data breach and must not be used',
   REUSED_PASSWORD: 'must not match a recently used password',
+  INVALID_IDENTIFIER: 'must be a valid email address, phone number, or username',
+  EXPIRY_NOT_APPLICABLE: 'may only accompany a suspension, which is the sole status that lapses on its own',
+  EXPIRY_MUST_BE_FUTURE: 'must be a point in the future',
 } as const satisfies Record<string, string>;

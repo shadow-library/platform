@@ -67,6 +67,14 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly AUTH_006 = AppErrorCode.forbidden('AUTH_006', 'Step-up authentication required');
   /** The organisation enforces federated sign-in; the local credential step is unavailable */
   static readonly AUTH_007 = AppErrorCode.forbidden('AUTH_007', 'Federated sign-in is required for this account');
+  /** No account matches the submitted identifier (D-12 was retired — login is deliberately an existence oracle) */
+  static readonly AUTH_008 = AppErrorCode.notFound('AUTH_008', 'No account matches this identifier');
+  /** The account was barred for a policy or security violation; only a platform administrator can lift it */
+  static readonly AUTH_009 = AppErrorCode.forbidden('AUTH_009', 'Account is blocked');
+  /** The account is on a temporary administrative hold and is expected to return */
+  static readonly AUTH_010 = AppErrorCode.forbidden('AUTH_010', 'Account is suspended');
+  /** The account was deactivated as part of its lifecycle (offboarding, SCIM deprovisioning) */
+  static readonly AUTH_011 = AppErrorCode.forbidden('AUTH_011', 'Account is deactivated');
 
   /*!
    * MFA Error Codes
