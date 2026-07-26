@@ -100,6 +100,13 @@ describe('Admin user lifecycle APIs', () => {
     expect(JSON.stringify(body)).not.toContain('$argon2');
   });
 
+  /** A `pattern` without an `errorMessage` answers with the raw regex, which is noise to the caller. */
+  it('should reject a malformed path parameter with a readable message', async () => {
+    const response = await request('get', '/api/v1/admin/users/not-a-number');
+    expect(response.statusCode).toBe(422);
+    expect(response.json()).toMatchObject({ fields: [{ field: 'params.userId', msg: 'must be a numeric identifier' }] });
+  });
+
   it('should lock fully, cutting live sessions, and unlock again', async () => {
     const { secret } = await env.getService(SessionService).create({ userId: targetUserId });
     const locked = await request('post', `/api/v1/admin/users/${targetId}/lock`).body({ mode: 'FULL' });

@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -20,28 +21,25 @@ type ClientKind = (typeof CLIENT_KINDS)[number];
 
 export const ALLOWED_GRANT_TYPES = ['authorization_code', 'refresh_token', 'client_credentials'] as const;
 
-/** Client id slug (lowercase letters, digits, hyphens, 3–64 chars); also matches legacy UUID ids. */
-const CLIENT_ID_PATTERN = '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$';
-
 @Schema()
 export class ClientIdParams {
-  @Field({ pattern: CLIENT_ID_PATTERN })
+  @Field({ ...PATTERN.CLIENT_ID })
   clientId: string;
 }
 
 @Schema()
 export class ClientScopeParams {
-  @Field({ pattern: CLIENT_ID_PATTERN })
+  @Field({ ...PATTERN.CLIENT_ID })
   clientId: string;
 
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  @Field({ ...PATTERN.UUID })
   scopeId: string;
 }
 
 @Schema()
 export class RegisterClientBody {
   /** Admin-chosen, immutable client id slug — lowercase letters, digits and hyphens. Embedded in tokens and configs. */
-  @Field({ pattern: CLIENT_ID_PATTERN })
+  @Field({ ...PATTERN.CLIENT_ID })
   clientId: string;
 
   @Field(() => Number)
@@ -186,7 +184,7 @@ export class RotateSecretResponse {
 
 @Schema()
 export class GrantScopeBody {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  @Field({ ...PATTERN.UUID })
   scopeId: string;
 }
 
@@ -204,7 +202,7 @@ export class CreateResourceBody {
 
 @Schema()
 export class ResourceIdParams {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  @Field({ ...PATTERN.UUID })
   resourceId: string;
 }
 

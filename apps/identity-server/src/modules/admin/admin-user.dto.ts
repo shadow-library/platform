@@ -8,6 +8,7 @@ import { Paginated, PaginationQuery } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -24,7 +25,7 @@ const USER_SORT_FIELDS = EnumType.create('UserSortBy', ['createdAt'] as const);
 
 @Schema()
 export class UserIdParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   userId: bigint;
 }

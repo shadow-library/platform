@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -26,7 +27,7 @@ export class RoleAssignmentBody {
   @Field(() => Number)
   roleId: number;
 
-  @Field({ pattern: '^\\d+$' })
+  @Field({ ...PATTERN.ID })
   organisationId: string;
 }
 
@@ -38,7 +39,7 @@ export class AssignmentListQuery {
   @Field({ optional: true })
   principalId?: string;
 
-  @Field({ optional: true, pattern: '^\\d+$' })
+  @Field({ ...PATTERN.ID, optional: true })
   organisationId?: string;
 
   @Field(() => Number, { optional: true })

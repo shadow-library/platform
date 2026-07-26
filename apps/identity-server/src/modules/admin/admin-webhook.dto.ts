@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -21,18 +22,18 @@ type DeliveryStatus = (typeof DELIVERY_STATUSES)[number];
 
 @Schema()
 export class WebhookIdParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   webhookId: bigint;
 }
 
 @Schema()
 export class WebhookDeliveryParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   webhookId: bigint;
 
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   deliveryId: bigint;
 }

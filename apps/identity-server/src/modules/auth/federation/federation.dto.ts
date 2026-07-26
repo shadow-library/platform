@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -18,7 +19,7 @@ import { Transform } from '@shadow-library/fastify';
 
 @Schema()
 export class IdentityProviderParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 
@@ -28,7 +29,7 @@ export class IdentityProviderParams {
 
 @Schema()
 export class OrganisationIdOnlyParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 }

@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -29,7 +30,7 @@ export class TotpEnrollResponse {
 
 @Schema()
 export class TotpCodeBody {
-  @Field({ pattern: '^\\d{6}$' })
+  @Field({ ...PATTERN.OTP })
   code: string;
 }
 
@@ -89,7 +90,7 @@ export class ElevationIntentFields {
 @Schema()
 export class StepUpBody extends ElevationIntentFields {
   /** A 6-digit TOTP code — required to elevate when the account holds a second factor. */
-  @Field({ optional: true, pattern: '^\\d{6}$' })
+  @Field({ ...PATTERN.OTP, optional: true })
   code?: string;
 
   /** The account password — accepted only when the account has no second factor enrolled. */

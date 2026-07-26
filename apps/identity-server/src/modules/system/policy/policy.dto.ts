@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 import { POLICY_KEYS } from './policy.registry';
 
 /**
@@ -15,14 +16,14 @@ import { POLICY_KEYS } from './policy.registry';
 
 @Schema()
 export class OrganisationPolicyParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 }
 
 @Schema()
 export class PolicyKeyParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 

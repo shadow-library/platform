@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -30,29 +31,29 @@ type MemberStatus = (typeof MEMBER_STATUSES)[number];
 
 @Schema()
 export class OrganisationIdParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 }
 
 @Schema()
 export class MemberParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   userId: bigint;
 }
 
 @Schema()
 export class InvitationParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   invitationId: bigint;
 }
@@ -62,7 +63,7 @@ export class CreateOrganisationBody {
   @Field({ minLength: 1, maxLength: 255 })
   name: string;
 
-  @Field(() => String, { optional: true, pattern: '^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$' })
+  @Field(() => String, { ...PATTERN.SLUG, optional: true })
   slug?: string;
 }
 
@@ -144,7 +145,7 @@ export class UpdateMemberStatusBody {
 
 @Schema()
 export class InviteMemberBody {
-  @Field({ pattern: '^[^@\\s]+@[^@\\s]+[.][^@\\s]+$' })
+  @Field({ ...PATTERN.EMAIL })
   email: string;
 
   @Field(() => String, { enum: [...INVITABLE_ROLES] })
@@ -222,11 +223,11 @@ export class MyOrganisationsResponse {
 
 @Schema()
 export class DomainParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   organisationId: bigint;
 
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   domainId: bigint;
 }

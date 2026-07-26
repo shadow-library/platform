@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -37,14 +38,14 @@ export class ContactListResponse {
 
 @Schema()
 export class AddEmailBody {
-  @Field({ pattern: '^[^@\\s]+@[^@\\s]+[.][^@\\s]+$' })
+  @Field({ ...PATTERN.EMAIL })
   email: string;
 }
 
 @Schema()
 export class AddPhoneBody {
   /** E.164 including the leading `+`. */
-  @Field({ pattern: '^\\+[1-9]\\d{6,14}$' })
+  @Field({ ...PATTERN.PHONE })
   phone: string;
 }
 
@@ -60,19 +61,19 @@ export class VerifyContactBody {
   @Field()
   verificationId: string;
 
-  @Field({ pattern: '^\\d{6}$' })
+  @Field({ ...PATTERN.OTP })
   code: string;
 }
 
 @Schema()
 export class RemoveEmailBody {
-  @Field({ pattern: '^[^@\\s]+@[^@\\s]+[.][^@\\s]+$' })
+  @Field({ ...PATTERN.EMAIL })
   email: string;
 }
 
 @Schema()
 export class RemovePhoneBody {
-  @Field({ pattern: '^\\+[1-9]\\d{6,14}$' })
+  @Field({ ...PATTERN.PHONE })
   phone: string;
 }
 

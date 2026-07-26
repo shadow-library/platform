@@ -7,6 +7,7 @@ import { Transform } from '@shadow-library/fastify';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -14,27 +15,25 @@ import { Transform } from '@shadow-library/fastify';
 
 /**
  * Declaring the constants
- *
- * `name` is the stable machine identifier an application is addressed by internally (cache key,
- * bootstrap lookup) — it is slug-shaped and immutable once created. Human-facing text lives on
- * `displayName`; the DNS label lives on `subDomain`.
  */
-const NAME_PATTERN = '^[a-z0-9][a-z0-9-]{1,62}$';
-const SUBDOMAIN_PATTERN = '^[a-z0-9][a-z0-9-]{0,62}$';
 
 @Schema()
 export class ApplicationIdParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('int:parse')
   applicationId: number;
 }
 
 @Schema()
 export class CreateApplicationBody {
-  @Field({ pattern: NAME_PATTERN, maxLength: 63 })
+  /**
+   * The stable machine identifier an application is addressed by internally (cache key, bootstrap lookup) — slug-shaped
+   * and immutable once created. Human-facing text lives on `displayName`; the DNS label lives on `subDomain`.
+   */
+  @Field({ ...PATTERN.APPLICATION_NAME, maxLength: 63 })
   name: string;
 
-  @Field({ pattern: SUBDOMAIN_PATTERN, maxLength: 63 })
+  @Field({ ...PATTERN.SUBDOMAIN, maxLength: 63 })
   subDomain: string;
 
   @Field({ optional: true, maxLength: 255 })
@@ -59,7 +58,7 @@ export class CreateApplicationBody {
 
 @Schema()
 export class UpdateApplicationBody {
-  @Field({ optional: true, pattern: SUBDOMAIN_PATTERN, maxLength: 63 })
+  @Field({ ...PATTERN.SUBDOMAIN, optional: true, maxLength: 63 })
   subDomain?: string;
 
   @Field({ optional: true, maxLength: 255 })
@@ -164,11 +163,11 @@ export class CreateApplicationResponse {
 
 @Schema()
 export class ApplicationMemberParams {
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('int:parse')
   applicationId: number;
 
-  @Field(() => String, { pattern: '^\\d+$' })
+  @Field(() => String, { ...PATTERN.ID })
   @Transform('bigint:parse')
   userId: bigint;
 }

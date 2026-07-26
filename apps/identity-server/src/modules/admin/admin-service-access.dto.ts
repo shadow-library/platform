@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -28,7 +29,7 @@ export class CreateServiceAccessBody {
   applicationId: number;
 
   /** The SERVICE client allowed to call (client id slug or legacy UUID) */
-  @Field({ pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$' })
+  @Field({ ...PATTERN.CLIENT_ID })
   callerClientId: string;
 
   /** HTTP method the rule covers, or `*` for all methods */
@@ -69,6 +70,6 @@ export class ServiceAccessListResponse {
 
 @Schema()
 export class ServiceAccessRuleParams {
-  @Field({ pattern: '^[0-9a-fA-F-]{36}$' })
+  @Field({ ...PATTERN.UUID })
   ruleId: string;
 }

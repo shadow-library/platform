@@ -6,6 +6,7 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
@@ -84,7 +85,7 @@ export class ConsentDecisionResponse {
 @Schema()
 export class ConsentClientParams {
   /** Client ids are admin-chosen slugs (legacy lowercase UUIDs also match). */
-  @Field({ pattern: '^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$' })
+  @Field({ ...PATTERN.CLIENT_ID })
   clientId: string;
 }
 
