@@ -13,6 +13,7 @@ import { AppError, Logger } from '@shadow-library/common';
 import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { type ValidatedSession } from '@server/modules/auth/session';
+import { RefreshTokenService } from '@server/modules/auth/token';
 import { PolicyDecisionService } from '@server/modules/authz';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
@@ -39,6 +40,9 @@ interface CallerContext {
 export interface MemberListItem {
   userId: bigint;
   role: Organisation.MemberRole;
+  status: Organisation.MemberStatus;
+  statusReason?: string;
+  statusUntil?: Date;
   email?: string;
   joinedAt: Date;
 }
@@ -59,6 +63,11 @@ export interface MemberDetail {
   email: string | null;
 }
 
+export interface MemberStatusHold {
+  reason?: string;
+  until?: Date;
+}
+
 export interface MembershipWithOrganisation {
   membership: Organisation.Member;
   organisation: Organisation;
@@ -77,6 +86,7 @@ const SLUG_PATTERN = /^[a-z0-9](?:[a-z0-9-]{1,46}[a-z0-9])?$/;
 
 const ROLE_CHANGED_TEMPLATE = 'organisation-role-changed';
 const MEMBER_REMOVED_TEMPLATE = 'organisation-member-removed';
+const MEMBER_STATUS_TEMPLATE = 'organisation-member-status-changed';
 
 @Injectable()
 export class OrganisationService {
@@ -89,6 +99,7 @@ export class OrganisationService {
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly auditService: AuditService,
     private readonly notificationService: NotificationService,
+    private readonly refreshTokenService: RefreshTokenService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -177,11 +188,28 @@ export class OrganisationService {
     return membership ?? null;
   }
 
-  /** Throws unless the user is a member of the organisation; the guard for every org-scoped read. */
+  /**
+   * Throws unless the user is a live member of the organisation; the guard for every org-scoped read. A held member
+   * reads as ORG_001 rather than a distinct code — inside the tenant they are indistinguishable from a non-member,
+   * and the hold is only ever explained to them by the administrator who applied it.
+   */
   async assertMember(userId: bigint, organisationId: bigint): Promise<Organisation.Member> {
     const membership = await this.getMembership(userId, organisationId);
     if (!membership) throw AppErrorCode.ORG_001.create();
+    if ((await this.resolveMemberStatus(membership)) !== 'ACTIVE') throw AppErrorCode.ORG_001.create();
     return membership;
+  }
+
+  /** Mirrors the account-level rule: a SUSPENDED hold past its `statusUntil` has served its term and repairs itself on read. */
+  private async resolveMemberStatus(membership: Organisation.Member): Promise<Organisation.MemberStatus> {
+    if (membership.status !== 'SUSPENDED' || !membership.statusUntil || membership.statusUntil.getTime() > Date.now()) return membership.status;
+    await this.db
+      .update(schema.organisationMembers)
+      .set({ status: 'ACTIVE', statusReason: null, statusChangedAt: new Date(), statusUntil: null })
+      .where(and(eq(schema.organisationMembers.organisationId, membership.organisationId), eq(schema.organisationMembers.userId, membership.userId)));
+    this.logger.info('membership suspension lapsed, access restored', { organisationId: membership.organisationId, userId: membership.userId });
+    membership.status = 'ACTIVE';
+    return 'ACTIVE';
   }
 
   /**
@@ -247,6 +275,9 @@ export class OrganisationService {
       members.map(async member => ({
         userId: member.userId,
         role: member.role,
+        status: await this.resolveMemberStatus(member),
+        statusReason: member.statusReason ?? undefined,
+        statusUntil: member.statusUntil ?? undefined,
         email: (await this.getPrimaryVerifiedEmail(member.userId)) ?? undefined,
         joinedAt: member.joinedAt,
       })),
@@ -273,6 +304,49 @@ export class OrganisationService {
     await this.audit(caller, organisationId, 'org.member_role_changed', 'user', targetUserId.toString());
     const email = await this.getPrimaryVerifiedEmail(targetUserId);
     if (email) await this.notificationService.enqueue({ templateKey: ROLE_CHANGED_TEMPLATE, recipients: { email }, payload: { role } });
+  }
+
+  /**
+   * Pauses or bars a member inside one organisation. This is deliberately org-scoped: `users.status` is global, so a
+   * tenant administrator setting it could shut an adopted personal account out of its own workspace and every other
+   * tenant. The same rank, owner and last-owner protections as removal apply — suspending the only owner would strand
+   * the organisation with nobody able to administer it.
+   */
+  async changeMemberStatus(
+    caller: CallerContext,
+    callerMembership: Organisation.Member,
+    organisationId: bigint,
+    targetUserId: bigint,
+    status: Organisation.MemberStatus,
+    hold: MemberStatusHold = {},
+  ): Promise<void> {
+    const target = await this.getMembership(targetUserId, organisationId);
+    if (!target) throw AppErrorCode.USR_001.create();
+    if (target.userId === caller.session.userId) throw AppErrorCode.ORG_007.create();
+    if (target.role === 'OWNER' && (callerMembership.role !== 'OWNER' || caller.session.aal !== 'AAL2'))
+      throw (callerMembership.role !== 'OWNER' ? AppErrorCode.ORG_007 : AppErrorCode.AUTH_006).create();
+    if (callerMembership.role !== 'OWNER' && ROLE_RANK[target.role] >= ROLE_RANK[callerMembership.role]) throw AppErrorCode.ORG_007.create();
+    if (status !== 'ACTIVE' && target.role === 'OWNER') await this.assertNotLastOwner(organisationId, targetUserId);
+
+    const restored = status === 'ACTIVE';
+    await this.db
+      .update(schema.organisationMembers)
+      .set({
+        status,
+        statusReason: restored ? null : (hold.reason ?? null),
+        statusChangedAt: new Date(),
+        statusUntil: restored ? null : (hold.until ?? null),
+      })
+      .where(and(eq(schema.organisationMembers.organisationId, organisationId), eq(schema.organisationMembers.userId, targetUserId)));
+
+    /** A held member keeps the account but loses this tenant: org-scoped grants and refresh families go, the session does not. */
+    if (!restored) {
+      await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: targetUserId.toString() }, organisationId.toString());
+      await this.refreshTokenService.revokeForUserOrganisation(targetUserId, organisationId);
+    }
+    await this.audit(caller, organisationId, restored ? 'org.member_reinstated' : `org.member_${status.toLowerCase()}`, 'user', targetUserId.toString());
+    const email = await this.getPrimaryVerifiedEmail(targetUserId);
+    if (email) await this.notificationService.enqueue({ templateKey: MEMBER_STATUS_TEMPLATE, recipients: { email }, payload: { status, reason: hold.reason ?? null } });
   }
 
   async removeOrganisationMember(caller: CallerContext, callerMembership: Organisation.Member, organisationId: bigint, targetUserId: bigint): Promise<void> {

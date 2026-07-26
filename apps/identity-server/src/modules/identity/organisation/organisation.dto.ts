@@ -16,11 +16,13 @@ const ORG_TYPES = ['PERSONAL', 'TEAM'] as const;
 const ORG_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETED'] as const;
 const MEMBER_ROLES = ['OWNER', 'ADMIN', 'MEMBER'] as const;
 const INVITABLE_ROLES = ['ADMIN', 'MEMBER'] as const;
+const MEMBER_STATUSES = ['ACTIVE', 'SUSPENDED', 'BLOCKED'] as const;
 
 type OrgType = (typeof ORG_TYPES)[number];
 type OrgStatus = (typeof ORG_STATUSES)[number];
 type MemberRole = (typeof MEMBER_ROLES)[number];
 type InvitableRole = (typeof INVITABLE_ROLES)[number];
+type MemberStatus = (typeof MEMBER_STATUSES)[number];
 
 /**
  * Declaring the constants
@@ -99,6 +101,15 @@ export class MemberItem {
   @Field(() => String, { enum: [...MEMBER_ROLES] })
   role: MemberRole;
 
+  @Field(() => String, { enum: [...MEMBER_STATUSES] })
+  status: MemberStatus;
+
+  @Field({ optional: true, maxLength: 256 })
+  statusReason?: string;
+
+  @Field({ optional: true })
+  statusUntil?: string;
+
   @Field(() => String, { optional: true })
   email?: string;
 
@@ -116,6 +127,19 @@ export class MembersResponse {
 export class UpdateMemberRoleBody {
   @Field(() => String, { enum: [...MEMBER_ROLES] })
   role: MemberRole;
+}
+
+@Schema()
+export class UpdateMemberStatusBody {
+  @Field(() => String, { enum: [...MEMBER_STATUSES] })
+  status: MemberStatus;
+
+  @Field({ optional: true, maxLength: 256 })
+  reason?: string;
+
+  /** ISO-8601 lapse time; accepted only alongside SUSPENDED. */
+  @Field({ optional: true })
+  until?: string;
 }
 
 @Schema()

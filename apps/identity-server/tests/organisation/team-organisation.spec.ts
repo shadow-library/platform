@@ -2,6 +2,7 @@
  * Importing npm packages
  */
 import { beforeEach, describe, expect, it } from 'bun:test';
+import { and, eq } from 'drizzle-orm';
 
 /**
  * Importing user defined packages
@@ -10,6 +11,7 @@ import { SESSION_COOKIE_NAME, SessionService } from '@server/modules/auth/sessio
 import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
+import { schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
 import { csrfPair, TestEnvironment } from '../test-environment';
@@ -67,8 +69,57 @@ describe('Team organisations', () => {
     const id = (response.json() as { id: string }).id;
     const members = await request('get', `/api/v1/organisations/${id}/members`, memberSecret);
     expect((members.json() as { members: { userId: string; role: string }[] }).members).toEqual([
-      { userId: memberId.toString(), role: 'OWNER', email: 'member@example.com', joinedAt: expect.any(String) },
+      { userId: memberId.toString(), role: 'OWNER', status: 'ACTIVE', email: 'member@example.com', joinedAt: expect.any(String) },
     ]);
+  });
+
+  describe('member holds', () => {
+    const setStatus = (target: bigint, body: Record<string, unknown>, secret = adminSecret) =>
+      request('patch', `/api/v1/organisations/${orgId}/members/${target}/status`, secret, body);
+
+    it('should suspend a member out of the organisation without touching their account', async () => {
+      const suspended = await setStatus(memberId, { status: 'SUSPENDED', reason: 'on leave' });
+      expect(suspended.statusCode).toBe(200);
+
+      /** The hold is org-scoped: the member is refused inside the tenant but their global account stays ACTIVE. */
+      const members = await request('get', `/api/v1/organisations/${orgId}/members`, memberSecret);
+      expect(members.statusCode).toBe(403);
+      expect((await env.getService(UserService).getUser(memberId))?.status).toBe('ACTIVE');
+
+      const listed = (await request('get', `/api/v1/organisations/${orgId}/members`, adminSecret)).json() as {
+        members: { userId: string; status: string; statusReason?: string }[];
+      };
+      expect(listed.members.find(entry => entry.userId === memberId.toString())).toMatchObject({ status: 'SUSPENDED', statusReason: 'on leave' });
+
+      expect((await setStatus(memberId, { status: 'ACTIVE' })).statusCode).toBe(200);
+      expect((await request('get', `/api/v1/organisations/${orgId}/members`, memberSecret)).statusCode).toBe(200);
+    });
+
+    it('should let a lapsed membership suspension restore itself', async () => {
+      await setStatus(memberId, { status: 'SUSPENDED', reason: 'brief hold' });
+      await env
+        .getPostgresClient()
+        .update(schema.organisationMembers)
+        .set({ statusUntil: new Date(Date.now() - 60_000) })
+        .where(and(eq(schema.organisationMembers.organisationId, BigInt(orgId)), eq(schema.organisationMembers.userId, memberId)));
+
+      expect((await request('get', `/api/v1/organisations/${orgId}/members`, memberSecret)).statusCode).toBe(200);
+    });
+
+    it('should block a member and refuse an expiry on the block', async () => {
+      expect((await setStatus(memberId, { status: 'BLOCKED', reason: 'abuse' })).statusCode).toBe(200);
+      expect((await request('get', `/api/v1/organisations/${orgId}/members`, memberSecret)).statusCode).toBe(403);
+      expect((await setStatus(memberId, { status: 'BLOCKED', until: new Date(Date.now() + 86_400_000).toISOString() })).statusCode).toBe(422);
+    });
+
+    it('should apply the same rank and owner protections as removal', async () => {
+      /** An ADMIN may not hold an OWNER, nor another ADMIN, nor themselves. */
+      expect((await setStatus(ownerId, { status: 'SUSPENDED' })).statusCode).toBe(403);
+      expect((await setStatus(adminId, { status: 'SUSPENDED' })).statusCode).toBe(403);
+      /** Holding the only owner would leave the organisation unadministrable. */
+      expect((await setStatus(ownerId, { status: 'SUSPENDED' }, ownerSecret)).statusCode).toBe(403);
+      expect((await setStatus(memberId, { status: 'SUSPENDED' }, memberSecret)).statusCode).toBe(403);
+    });
   });
 
   it('should reject a duplicate slug', async () => {

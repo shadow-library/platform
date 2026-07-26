@@ -2,11 +2,13 @@
  * Importing npm packages
  */
 
+import { ValidationError } from '@shadow-library/common';
 import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { ERROR_MESSAGES } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
 
@@ -22,6 +24,7 @@ import {
   OrganisationResponse,
   RenameOrganisationBody,
   UpdateMemberRoleBody,
+  UpdateMemberStatusBody,
 } from './organisation.dto';
 import { type MemberListItem, OrganisationService } from './organisation.service';
 
@@ -84,6 +87,28 @@ export class OrganisationController {
   async changeOrganisationMemberRole(@Params() params: MemberParams, @Body() body: UpdateMemberRoleBody): Promise<OrganisationActionResponse> {
     await this.organisationService.changeMemberRole(this.caller(), Context.getMembership(), params.organisationId, params.userId, body.role);
     return { success: true };
+  }
+
+  /**
+   * Org-scoped only: this pauses or bars the member inside this organisation and never touches their global account,
+   * which a tenant administrator has no standing to disable.
+   */
+  @Patch('/:organisationId/members/:userId/status')
+  @Auth({ orgRole: 'ADMIN' })
+  @RespondFor(200, OrganisationActionResponse)
+  async changeOrganisationMemberStatus(@Params() params: MemberParams, @Body() body: UpdateMemberStatusBody): Promise<OrganisationActionResponse> {
+    const until = this.parseExpiry(body.status, body.until);
+    await this.organisationService.changeMemberStatus(this.caller(), Context.getMembership(), params.organisationId, params.userId, body.status, { reason: body.reason, until });
+    return { success: true };
+  }
+
+  /** Only a suspension lapses on its own, so only a suspension may carry an expiry — and it must be in the future. */
+  private parseExpiry(status: Organisation.MemberStatus, value: string | undefined): Date | undefined {
+    if (!value) return undefined;
+    if (status !== 'SUSPENDED') throw new ValidationError('until', ERROR_MESSAGES.EXPIRY_NOT_APPLICABLE);
+    const until = new Date(value);
+    if (Number.isNaN(until.getTime()) || until.getTime() <= Date.now()) throw new ValidationError('until', ERROR_MESSAGES.EXPIRY_MUST_BE_FUTURE);
+    return until;
   }
 
   @Delete('/:organisationId/members/:userId')

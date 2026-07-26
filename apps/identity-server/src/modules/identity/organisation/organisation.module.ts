@@ -7,6 +7,7 @@ import { Module } from '@shadow-library/app';
  * Importing user defined packages
  */
 import { SessionModule } from '@server/modules/auth/session';
+import { TokenModule } from '@server/modules/auth/token';
 import { AuthzModule } from '@server/modules/authz';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
@@ -30,7 +31,7 @@ import { OrganisationService } from './organisation.service';
  */
 
 @Module({
-  imports: [DatabaseModule, SessionModule, AuthzModule, AuditModule, NotificationModule, SecurityModule],
+  imports: [DatabaseModule, SessionModule, TokenModule, AuthzModule, AuditModule, NotificationModule, SecurityModule],
   controllers: [OrganisationController, MeOrganisationController, DomainController],
   providers: [OrganisationService, InvitationService, DomainService, DnsTxtResolver],
   exports: [OrganisationService, InvitationService, DomainService, DnsTxtResolver],
