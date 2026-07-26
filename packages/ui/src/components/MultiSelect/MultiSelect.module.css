@@ -9,7 +9,10 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  /* A `button` shrink-to-fits even when block-level, so this one does need the width to fill a form row;
+     pinning the flex base to the content stops that width starving any flex row. See Select's `.trigger`. */
   width: 100%;
+  flex-basis: content;
   padding: 3px 10px 3px 4px;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-strong);

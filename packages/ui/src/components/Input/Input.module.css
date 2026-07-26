@@ -6,7 +6,13 @@
 .root {
   display: flex;
   align-items: stretch;
-  width: 100%;
+  /*
+   * Deliberately no `width: 100%`. The root is a block-level flex container, so it already fills a block
+   * or grid parent and stretches in a flex column. Declaring the width instead made it the flex base size,
+   * and a base of 100% guarantees a flex row runs a deficit — the field then shrank below whatever width
+   * the consumer asked for, and `overflow: hidden` turned that into clipped text. Leaving the width alone
+   * keeps the fill everywhere it applied before and lets an explicit consumer width survive inside a row.
+   */
   overflow: hidden;
   background: var(--sh-surface-raised);
   border: var(--sh-border-width) solid var(--sh-border-strong);

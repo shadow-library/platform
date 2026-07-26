@@ -5,8 +5,9 @@
  */
 
 .root {
+  /* No `width: 100%`: this block-level box already fills a block or grid parent, and declaring the
+     width would also make it the flex base size, starving any flex row it sits in. See Input's `.root`. */
   display: block;
-  width: 100%;
 }
 
 .field {

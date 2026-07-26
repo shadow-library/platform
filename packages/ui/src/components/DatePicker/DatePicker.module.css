@@ -4,8 +4,11 @@
  * disabled dimmed. No local values in either theme.
  */
 
+/* Anchors the calendar popover over the `Input` it wraps. No `width: 100%` on purpose: a block-level box
+   already fills a block or grid parent, and declaring the width would also make it the flex base size —
+   reintroducing one level up the deficit that Input's own `.root` exists to avoid. */
 .fieldWrap {
-  width: 100%;
+  display: block;
 }
 
 .trigger {

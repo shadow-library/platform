@@ -5,10 +5,11 @@
  */
 
 .root {
+  /* No `width: 100%`: this block-level box already fills a block or grid parent, and declaring the
+     width would also make it the flex base size, starving any flex row it sits in. See Input's `.root`. */
   display: flex;
   flex-direction: column;
   gap: 12px;
-  width: 100%;
 }
 .root[data-disabled] {
   opacity: var(--sh-disabled-opacity);
