@@ -11,7 +11,7 @@ import { JsonObject, JsonValue } from 'type-fest';
  */
 import { NAMESPACE } from '@lib/constants';
 import { AppError, ErrorCode } from '@lib/errors';
-import { Logger } from '@lib/services';
+import { Logger, ServiceDiscovery } from '@lib/services';
 import { utils } from '@lib/utils';
 
 /**
@@ -49,9 +49,6 @@ export interface CustomAPIRequest {
 
 export class APIRequest {
   private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');
-  private static readonly SERVICE_SCHEME = 'svc://';
-  private static readonly SERVICE_NAME_PATTERN = /^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)*$/;
-  private static readonly SCHEME_PATTERN = /^[a-z][a-z0-9+.-]*:\/\//i;
 
   /**
    * undici's `request` does not follow redirects — its `maxRedirections` defaults to 0, unlike
@@ -83,33 +80,6 @@ export class APIRequest {
 
   static delete(url: string): APIRequest {
     return new this({ path: url, method: 'DELETE' });
-  }
-
-  /**
-   * Resolves a `svc://<service>/<path>` URL for internal service-to-service calls; every other URL
-   * is returned untouched. In Kubernetes a Service is reachable by its own name via cluster DNS, so
-   * the service name is the host and the cluster decides where it resolves — a dotted host such as
-   * `pulse-server.<namespace>` targets another namespace. `SERVICE_URL_<NAME>` points a service at an
-   * override host or full URL for local dev or out-of-cluster targets; an override carrying its own
-   * `scheme://` is used verbatim, otherwise `SERVICE_DISCOVERY_SCHEME` (default `http`) supplies the
-   * scheme — the same scheme applied to the in-cluster service host.
-   */
-  private static resolveServiceUrl(url: string): string {
-    if (!url.startsWith(APIRequest.SERVICE_SCHEME)) return url;
-
-    const rest = url.slice(APIRequest.SERVICE_SCHEME.length);
-    const separator = rest.indexOf('/');
-    const service = separator === -1 ? rest : rest.slice(0, separator);
-    const path = separator === -1 ? '' : rest.slice(separator);
-    if (!APIRequest.SERVICE_NAME_PATTERN.test(service)) throw ErrorCode.SERVICE_UNKNOWN.create({ reason: `'${service}' is not a valid service name` });
-
-    const scheme = process.env['SERVICE_DISCOVERY_SCHEME'] ?? 'http';
-    const override = process.env[`SERVICE_URL_${service.toUpperCase().replace(/[-.]/g, '_')}`];
-    if (!override) return `${scheme}://${service}${path}`;
-
-    const base = APIRequest.SCHEME_PATTERN.test(override) ? override : `${scheme}://${override}`;
-    if (!URL.canParse(base)) throw ErrorCode.SERVICE_UNKNOWN.create({ reason: `service url override for '${service}' is not a valid url` });
-    return `${base.replace(/\/+$/, '')}${path}`;
   }
 
   child(): CustomAPIRequest {
@@ -212,7 +182,7 @@ export class APIRequest {
     const { baseURL = '', throwErrorOnFailure, data, bodyFormat, path, timeout, maxRedirections, ...requestOptions } = this.options;
 
     const query = this.options.query ? `?${qs.stringify(this.options.query)}` : '';
-    const url = APIRequest.resolveServiceUrl(baseURL + path);
+    const url = ServiceDiscovery.resolve(baseURL + path);
     const uri = url + query;
     if (data) {
       if (!requestOptions.headers) requestOptions.headers = {};
