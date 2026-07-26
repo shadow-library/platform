@@ -38,7 +38,7 @@ export class PolicyController {
 
   /** A key emits only the value trio matching its declared type, so a boolean never arrives as `1`. */
   private static toItem(policy: PolicyDescriptor): PolicyItem {
-    const item: PolicyItem = { key: policy.key, description: policy.description, type: policy.type };
+    const item: PolicyItem = { key: policy.key, label: policy.label, description: policy.description, type: policy.type };
     if (policy.type === 'boolean') {
       item.defaultEnabled = Boolean(policy.defaultValue);
       item.effectiveEnabled = Boolean(policy.effectiveValue);

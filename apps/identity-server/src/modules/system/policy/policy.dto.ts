@@ -51,6 +51,10 @@ export class PolicyItem {
   @Field()
   key: string;
 
+  /** The setting's name; `description` explains it underneath. */
+  @Field()
+  label: string;
+
   @Field()
   description: string;
 

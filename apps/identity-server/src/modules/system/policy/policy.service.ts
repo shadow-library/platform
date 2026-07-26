@@ -33,6 +33,7 @@ export interface PolicyScope {
 /** A policy as presented to an administrator: what it means, what it is now, and whether it was set here. */
 export interface PolicyDescriptor {
   key: PolicyKey;
+  label: string;
   description: string;
   type: PolicyDefinition['type'];
   defaultValue: number | boolean;
@@ -124,6 +125,7 @@ export class PolicyService {
         const definition = POLICY_REGISTRY[key] as PolicyDefinition;
         return {
           key,
+          label: definition.label,
           description: definition.description,
           type: definition.type,
           defaultValue: definition.default,
