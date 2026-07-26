@@ -23,6 +23,7 @@ export namespace Organisation {
   export type Type = InferEnum<typeof organisationType>;
   export type Status = InferEnum<typeof organisationStatus>;
   export type MemberRole = InferEnum<typeof organisationMemberRole>;
+  export type MemberStatus = InferEnum<typeof organisationMemberStatus>;
   export type DomainStatus = InferEnum<typeof organisationDomainStatus>;
 }
 
@@ -33,6 +34,7 @@ export namespace Organisation {
 export const organisationType = pgEnum('organisation_type', ['PERSONAL', 'TEAM']);
 export const organisationStatus = pgEnum('organisation_status', ['ACTIVE', 'SUSPENDED', 'DELETED']);
 export const organisationMemberRole = pgEnum('organisation_member_role', ['OWNER', 'ADMIN', 'MEMBER']);
+export const organisationMemberStatus = pgEnum('organisation_member_status', ['ACTIVE', 'SUSPENDED', 'BLOCKED']);
 export const organisationDomainStatus = pgEnum('organisation_domain_status', ['PENDING', 'VERIFIED', 'FAILED']);
 
 export const organisations = pgTable('organisations', {
@@ -57,6 +59,14 @@ export const organisationMembers = pgTable(
       .references(() => users.id, { onDelete: 'cascade' }),
     isDefault: boolean('is_default').notNull().default(false),
     role: organisationMemberRole('role').notNull().default('MEMBER'),
+    /**
+     * Org-scoped access hold. A tenant administrator may pause or bar a member here without touching `users.status`,
+     * which is global — an adopted personal account must keep working in its own workspace and in other tenants.
+     */
+    status: organisationMemberStatus('status').notNull().default('ACTIVE'),
+    statusReason: varchar('status_reason', { length: 256 }),
+    statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
+    statusUntil: timestamp('status_until', { withTimezone: true }),
     joinedAt: timestamp('joined_at', { withTimezone: true }).notNull().defaultNow(),
   },
   t => [primaryKey({ columns: [t.organisationId, t.userId] })],

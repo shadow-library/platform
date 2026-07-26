@@ -45,6 +45,13 @@ export const users = pgTable('users', {
   status: userStatus('status').notNull().default('INACTIVE'),
   /** The user's synthetic personal workspace (D-1); set in the same transaction as user creation. */
   personalOrganisationId: bigint('personal_organisation_id', { mode: 'bigint' }),
+  /**
+   * Why the account left ACTIVE, shown to administrators and recorded in the audit trail. `statusUntil` auto-expires a
+   * temporary SUSPENDED hold; BLOCKED and DISABLED leave it null because they end only by an explicit admin action.
+   */
+  statusReason: varchar('status_reason', { length: 256 }),
+  statusChangedAt: timestamp('status_changed_at', { withTimezone: true }),
+  statusUntil: timestamp('status_until', { withTimezone: true }),
   lockMode: userLockMode('lock_mode').notNull().default('NONE'),
   lockedUntil: timestamp('locked_until', { withTimezone: true }),
   /** Admin-forced credential reset (T-602): the password step refuses until recovery replaces it. */
