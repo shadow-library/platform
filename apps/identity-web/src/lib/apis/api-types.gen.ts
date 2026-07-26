@@ -395,6 +395,23 @@ export interface paths {
     patch: operations['patch_api_v1_organisations_organisationId_members_userId'];
     trace?: never;
   };
+  '/api/v1/organisations/{organisationId}/members/{userId}/status': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    /** Change Organisation Member Status */
+    patch: operations['patch_api_v1_organisations_organisationId_members_userId_status'];
+    trace?: never;
+  };
   '/api/v1/organisations/{organisationId}/invitations': {
     parameters: {
       query?: never;
@@ -1511,6 +1528,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/users/{userId}/suspend': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Suspend User */
+    post: operations['post_api_v1_admin_users_userId_suspend'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/users/{userId}/block': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Block User */
+    post: operations['post_api_v1_admin_users_userId_block'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/users/{userId}/reactivate': {
     parameters: {
       query?: never;
@@ -2323,12 +2374,22 @@ export interface components {
       userId: string;
       /** @enum {string} */
       role: 'OWNER' | 'ADMIN' | 'MEMBER';
+      /** @enum {string} */
+      status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED';
+      statusReason?: string;
+      statusUntil?: string;
       email?: string;
       joinedAt: string;
     };
     UpdateMemberRoleBody: {
       /** @enum {string} */
       role: 'OWNER' | 'ADMIN' | 'MEMBER';
+    };
+    UpdateMemberStatusBody: {
+      /** @enum {string} */
+      status: 'ACTIVE' | 'SUSPENDED' | 'BLOCKED';
+      reason?: string;
+      until?: string;
     };
     InvitationsResponse: {
       invitations: components['schemas']['InvitationItem'][];
@@ -2808,6 +2869,8 @@ export interface components {
       username?: string;
       /** @enum {string} */
       status: 'ACTIVE' | 'INACTIVE' | 'DISABLED' | 'BLOCKED' | 'SUSPENDED' | 'CLOSED';
+      statusReason?: string;
+      statusUntil?: string;
       /** @enum {string} */
       lockMode: 'NONE' | 'OTP_ONLY' | 'FULL';
       lockedUntil?: string;
@@ -2835,6 +2898,13 @@ export interface components {
     };
     AdminActionResponse: {
       success: boolean;
+    };
+    SuspendUserBody: {
+      reason?: string;
+      until?: string;
+    };
+    BlockUserBody: {
+      reason?: string;
     };
     UserAuditEventsResponse: {
       events: components['schemas']['UserAuditEventItem'][];
@@ -4261,6 +4331,51 @@ export interface operations {
     requestBody?: {
       content: {
         'application/json': components['schemas']['UpdateMemberRoleBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  patch_api_v1_organisations_organisationId_members_userId_status: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['UpdateMemberStatusBody'];
       };
     };
     responses: {
@@ -7364,6 +7479,94 @@ export interface operations {
       };
     };
   };
+  post_api_v1_admin_users_userId_suspend: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['SuspendUserBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_users_userId_block: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        userId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['BlockUserBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   post_api_v1_admin_users_userId_reactivate: {
     parameters: {
       query?: never;
@@ -9504,6 +9707,7 @@ export type OrganisationActionResponse = components['schemas']['OrganisationActi
 export type MembersResponse = components['schemas']['MembersResponse'];
 export type MemberItem = components['schemas']['MemberItem'];
 export type UpdateMemberRoleBody = components['schemas']['UpdateMemberRoleBody'];
+export type UpdateMemberStatusBody = components['schemas']['UpdateMemberStatusBody'];
 export type InvitationsResponse = components['schemas']['InvitationsResponse'];
 export type InvitationItem = components['schemas']['InvitationItem'];
 export type InviteMemberBody = components['schemas']['InviteMemberBody'];
@@ -9603,6 +9807,8 @@ export type UserContactItem = components['schemas']['UserContactItem'];
 export type UserMfaSummary = components['schemas']['UserMfaSummary'];
 export type LockUserBody = components['schemas']['LockUserBody'];
 export type AdminActionResponse = components['schemas']['AdminActionResponse'];
+export type SuspendUserBody = components['schemas']['SuspendUserBody'];
+export type BlockUserBody = components['schemas']['BlockUserBody'];
 export type UserAuditEventsResponse = components['schemas']['UserAuditEventsResponse'];
 export type UserAuditEventItem = components['schemas']['UserAuditEventItem'];
 export type ApplicationListResponse = components['schemas']['ApplicationListResponse'];
