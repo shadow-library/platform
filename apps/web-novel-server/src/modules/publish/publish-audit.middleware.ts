@@ -62,9 +62,9 @@ export class PublishAuditTrailer {
         novelSlug: params.slug ?? '-',
         outcome: this.toOutcome(error),
         ...this.extractCaller(request),
-        ordinal: params.ordinal !== undefined ? Number(params.ordinal) : undefined,
-        contentHash: typeof body.contentHash === 'string' ? body.contentHash : undefined,
-        incomingRevision: typeof body.revision === 'number' ? body.revision : undefined,
+        ordinal: this.toInt4(params.ordinal !== undefined ? Number(params.ordinal) : undefined),
+        contentHash: typeof body.contentHash === 'string' ? body.contentHash.slice(0, 128) : undefined,
+        incomingRevision: this.toInt4(body.revision),
         error: error.message,
       };
 
@@ -74,6 +74,12 @@ export class PublishAuditTrailer {
 
     /** Arity 3 marks the hook promise-style for fastify; the router's handler type models only (req, res) */
     return handler as unknown as RouteHandler;
+  }
+
+  /** The audit columns are int4 — a rejected call carrying a pathological number must not sink its own audit row (found by e2e: 3e9 revision overflowed the trailer's insert) */
+  private toInt4(value: unknown): number | undefined {
+    if (typeof value !== 'number' || !Number.isInteger(value)) return undefined;
+    return Math.abs(value) <= 2_147_483_647 ? value : undefined;
   }
 
   private toOutcome(error: Error): PublishAuditEntry['outcome'] {

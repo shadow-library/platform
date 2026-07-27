@@ -19,6 +19,9 @@ import { Field, Integer, Schema } from '@shadow-library/class-schema';
  * Declaring the constants
  */
 
+/** Every numeric field here lands in an int4 column (including the audit trail) — values beyond this must be rejected, not passed through to the database */
+export const INT4_MAX = 2_147_483_647;
+
 @Schema()
 export class NovelSlugParams {
   @Field({ pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$', maxLength: 128 })
@@ -27,7 +30,8 @@ export class NovelSlugParams {
 
 @Schema()
 export class ChapterOrdinalParams extends NovelSlugParams {
-  @Field({ pattern: '^\\d+$' })
+  /** Capped at 9 digits so the parsed ordinal always fits int4 */
+  @Field({ pattern: '^\\d{1,9}$' })
   ordinal: string;
 }
 
@@ -49,7 +53,7 @@ export class NovelUpsertBody {
   status?: 'live' | 'retired';
 
   /** Forge-assigned monotonic revision driving the optimistic-concurrency rules */
-  @Field(() => Integer, { minimum: 0 })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
   revision: number;
 }
 
@@ -68,10 +72,10 @@ export class ChapterUpsertBody {
   contentHash: string;
 
   /** Forge-assigned monotonic revision driving the optimistic-concurrency rules */
-  @Field(() => Integer, { minimum: 0 })
+  @Field(() => Integer, { minimum: 0, maximum: INT4_MAX })
   revision: number;
 
-  @Field(() => Integer, { optional: true, minimum: 0 })
+  @Field(() => Integer, { optional: true, minimum: 0, maximum: INT4_MAX })
   wordCount?: number;
 
   @Field(() => String, { optional: true })
