@@ -12,7 +12,7 @@
     "build": "shadow build",
     "dev": "bun run --watch src/main.ts",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "bun run scripts/migrate-db.ts",
     "db:create-template": "bun run scripts/create-template-db.ts"
   },
   "repository": {
