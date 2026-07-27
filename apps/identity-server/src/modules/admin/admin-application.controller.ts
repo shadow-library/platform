@@ -13,7 +13,7 @@ import { Auth, Context } from '@server/modules/access';
 import { OAUTH_CALLBACK_PATH, OAuthClientService } from '@server/modules/auth/oauth';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Application } from '@server/modules/infrastructure/datastore';
-import { ApplicationDetails, ApplicationMemberService, ApplicationService } from '@server/modules/system/application';
+import { ApplicationAccessService, ApplicationDetails, ApplicationMemberService, ApplicationService, OrganisationApplicationService } from '@server/modules/system/application';
 
 import { AdminActor } from './admin-access.service';
 import {
@@ -22,9 +22,12 @@ import {
   ApplicationListResponse,
   ApplicationMemberListResponse,
   ApplicationMemberParams,
+  ApplicationOrganisationListResponse,
+  ApplicationOrganisationParams,
   ApplicationSummaryItem,
   CreateApplicationBody,
   CreateApplicationResponse,
+  ReleaseApplicationBody,
   UpdateApplicationBody,
 } from './admin-application.dto';
 import { AdminActionResponse } from './admin-user.dto';
@@ -41,6 +44,7 @@ interface ApplicationUpdate {
   homePageUrl?: string;
   logoUrl?: string;
   isActive?: boolean;
+  visibility?: Application.Visibility;
   publicUrls?: string[];
 }
 
@@ -58,6 +62,8 @@ export class AdminApplicationController {
   constructor(
     private readonly applicationService: ApplicationService,
     private readonly memberService: ApplicationMemberService,
+    private readonly accessService: ApplicationAccessService,
+    private readonly organisationApplicationService: OrganisationApplicationService,
     private readonly clientService: OAuthClientService,
     private readonly auditService: AuditService,
   ) {}
@@ -81,6 +87,7 @@ export class AdminApplicationController {
       displayName: application.displayName ?? undefined,
       subDomain: application.subDomain,
       isActive: application.isActive,
+      visibility: application.visibility,
       createdAt: application.createdAt.toISOString(),
     };
   }
@@ -159,12 +166,22 @@ export class AdminApplicationController {
     if (body.homePageUrl !== undefined) update.homePageUrl = body.homePageUrl;
     if (body.logoUrl !== undefined) update.logoUrl = body.logoUrl;
     if (body.isActive !== undefined) update.isActive = body.isActive;
+    if (body.visibility !== undefined) update.visibility = body.visibility;
     if (body.publicUrls !== undefined) update.publicUrls = this.normaliseOrigins(body.publicUrls);
 
     const fields = Object.keys(update);
     if (fields.length) await this.applicationService.updateApplication(application.name, update);
     if (update.publicUrls !== undefined) await this.regenerateRelyingPartyRedirectUris(application.id, update.publicUrls);
     await this.record(actor, 'admin.application.updated', String(application.id), { fields });
+
+    /**
+     * Visibility is the platform-wide gate every organisation's grant set is resolved against, so a change
+     * invalidates every cached grant set (not just one org's) and is audited on its own action for the trail.
+     */
+    if (body.visibility !== undefined) {
+      await this.accessService.invalidateGlobal();
+      await this.record(actor, 'application.visibility.changed', String(application.id), { visibility: body.visibility });
+    }
     return { success: true };
   }
 
@@ -236,5 +253,43 @@ export class AdminApplicationController {
     await this.memberService.removeMembership(application.id, params.userId);
     await this.record(actor, 'admin.application.member_removed', String(application.id), { userId: params.userId.toString() });
     return { success: true };
+  }
+
+  @Get('/:applicationId/organisations')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsRead })
+  @RespondFor(200, ApplicationOrganisationListResponse)
+  async listApplicationOrganisations(@Params() params: ApplicationIdParams): Promise<ApplicationOrganisationListResponse> {
+    const rows = await this.organisationApplicationService.listApplicationOrganisations(params.applicationId);
+    return {
+      items: rows.map(row => ({
+        organisationId: row.organisationId.toString(),
+        slug: row.slug,
+        name: row.name,
+        source: row.source,
+        assignedAt: row.assignedAt.toISOString(),
+        assignedBy: row.assignedBy ?? undefined,
+      })),
+    };
+  }
+
+  @Post('/:applicationId/organisations')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsManage, elevated: true })
+  @RespondFor(200, AdminActionResponse)
+  async releaseApplication(@Params() params: ApplicationIdParams, @Body() body: ReleaseApplicationBody): Promise<AdminActionResponse> {
+    await this.organisationApplicationService.release(this.auditActor(), params.applicationId, body.organisationId);
+    return { success: true };
+  }
+
+  @Delete('/:applicationId/organisations/:organisationId')
+  @Auth({ permission: ADMIN_PERMISSIONS.appsManage, elevated: true })
+  @RespondFor(200, AdminActionResponse)
+  async revokeApplicationRelease(@Params() params: ApplicationOrganisationParams): Promise<AdminActionResponse> {
+    await this.organisationApplicationService.revoke(this.auditActor(), params.applicationId, params.organisationId);
+    return { success: true };
+  }
+
+  /** The acting platform admin, resolved from the ambient context for audit attribution of a release change. */
+  private auditActor(): { actorId: string; ip?: string } {
+    return { actorId: Context.getActor().session.userId.toString(), ip: Context.getClientInfo().ip };
   }
 }

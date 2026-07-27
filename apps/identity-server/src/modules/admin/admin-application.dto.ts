@@ -13,6 +13,12 @@ import { PATTERN } from '@server/constants';
  * Defining types
  */
 
+const APPLICATION_VISIBILITY = ['PUBLIC', 'RESTRICTED', 'INTERNAL'] as const;
+const ORGANISATION_APPLICATION_SOURCE = ['PLATFORM_RELEASE', 'ORG_ASSIGNMENT'] as const;
+
+type ApplicationVisibility = (typeof APPLICATION_VISIBILITY)[number];
+type OrganisationApplicationSource = (typeof ORGANISATION_APPLICATION_SOURCE)[number];
+
 /**
  * Declaring the constants
  */
@@ -76,9 +82,60 @@ export class UpdateApplicationBody {
   @Field(() => Boolean, { optional: true })
   isActive?: boolean;
 
+  /** How widely the app may ever be granted (T-901); changing it re-resolves every organisation's grant set. */
+  @Field(() => String, { optional: true, enum: [...APPLICATION_VISIBILITY] })
+  visibility?: ApplicationVisibility;
+
   /** Public browser origins for the app's relying-party clients; each becomes an `/api/auth/callback` redirect URI. */
   @Field(() => [String], { optional: true })
   publicUrls?: string[];
+}
+
+@Schema()
+export class ApplicationOrganisationParams {
+  @Field(() => String, { ...PATTERN.ID })
+  @Transform('int:parse')
+  applicationId: number;
+
+  @Field(() => String, { ...PATTERN.ID })
+  @Transform('bigint:parse')
+  organisationId: bigint;
+}
+
+@Schema()
+export class ReleaseApplicationBody {
+  /** The team organisation the RESTRICTED app is being released to. */
+  @Field(() => String, { ...PATTERN.ID })
+  @Transform('bigint:parse')
+  organisationId: bigint;
+}
+
+@Schema()
+export class ApplicationOrganisationItem {
+  @Field()
+  organisationId: string;
+
+  @Field()
+  slug: string;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { enum: [...ORGANISATION_APPLICATION_SOURCE] })
+  source: OrganisationApplicationSource;
+
+  @Field()
+  assignedAt: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  assignedBy?: string;
+}
+
+@Schema()
+export class ApplicationOrganisationListResponse {
+  @Field(() => [ApplicationOrganisationItem])
+  items: ApplicationOrganisationItem[];
 }
 
 @Schema()
@@ -97,6 +154,9 @@ export class ApplicationSummaryItem {
 
   @Field(() => Boolean)
   isActive: boolean;
+
+  @Field(() => String, { enum: [...APPLICATION_VISIBILITY] })
+  visibility: ApplicationVisibility;
 
   @Field()
   createdAt: string;

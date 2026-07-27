@@ -18,12 +18,16 @@ const ORG_STATUSES = ['ACTIVE', 'SUSPENDED', 'DELETED'] as const;
 const MEMBER_ROLES = ['OWNER', 'ADMIN', 'MEMBER'] as const;
 const INVITABLE_ROLES = ['ADMIN', 'MEMBER'] as const;
 const MEMBER_STATUSES = ['ACTIVE', 'SUSPENDED', 'BLOCKED'] as const;
+const APP_ACCESS_MODES = ['ALL_APPS', 'ASSIGNED_ONLY'] as const;
+const APPLICATION_VISIBILITY = ['PUBLIC', 'RESTRICTED', 'INTERNAL'] as const;
 
 type OrgType = (typeof ORG_TYPES)[number];
 type OrgStatus = (typeof ORG_STATUSES)[number];
 type MemberRole = (typeof MEMBER_ROLES)[number];
 type InvitableRole = (typeof INVITABLE_ROLES)[number];
 type MemberStatus = (typeof MEMBER_STATUSES)[number];
+type AppAccessMode = (typeof APP_ACCESS_MODES)[number];
+type ApplicationVisibility = (typeof APPLICATION_VISIBILITY)[number];
 
 /**
  * Declaring the constants
@@ -68,9 +72,13 @@ export class CreateOrganisationBody {
 }
 
 @Schema()
-export class RenameOrganisationBody {
-  @Field({ minLength: 1, maxLength: 255 })
-  name: string;
+export class UpdateOrganisationBody {
+  @Field({ optional: true, minLength: 1, maxLength: 255 })
+  name?: string;
+
+  /** Switching to `ASSIGNED_ONLY` limits members to explicitly assigned apps; owner-only and step-up-gated. */
+  @Field(() => String, { optional: true, enum: [...APP_ACCESS_MODES] })
+  appAccessMode?: AppAccessMode;
 }
 
 @Schema()
@@ -89,6 +97,9 @@ export class OrganisationResponse {
 
   @Field(() => String, { enum: [...ORG_STATUSES] })
   status: OrgStatus;
+
+  @Field(() => String, { enum: [...APP_ACCESS_MODES] })
+  appAccessMode: AppAccessMode;
 
   @Field()
   createdAt: string;
@@ -269,4 +280,63 @@ export class DomainItem {
 export class DomainsResponse {
   @Field(() => [DomainItem])
   domains: DomainItem[];
+}
+
+@Schema()
+export class OrganisationApplicationParams {
+  @Field(() => String, { ...PATTERN.ID })
+  @Transform('bigint:parse')
+  organisationId: bigint;
+
+  @Field(() => String, { ...PATTERN.ID })
+  @Transform('int:parse')
+  applicationId: number;
+}
+
+@Schema()
+export class AssignApplicationBody {
+  /** The application the organisation is adding to its allowlist; must be one its members can reach. */
+  @Field(() => String, { ...PATTERN.ID })
+  @Transform('int:parse')
+  applicationId: number;
+}
+
+@Schema()
+export class OrganisationApplicationItem {
+  @Field(() => Number)
+  id: number;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  displayName?: string;
+
+  @Field()
+  subDomain: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  logoUrl?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  homePageUrl?: string;
+
+  @Field(() => String, { enum: [...APPLICATION_VISIBILITY] })
+  visibility: ApplicationVisibility;
+
+  /** Whether this org has added the app to its allowlist; meaningful chiefly under `ASSIGNED_ONLY`. */
+  @Field(() => Boolean)
+  assigned: boolean;
+}
+
+@Schema()
+export class OrganisationApplicationsResponse {
+  @Field(() => String, { enum: [...APP_ACCESS_MODES] })
+  appAccessMode: AppAccessMode;
+
+  @Field(() => [OrganisationApplicationItem])
+  applications: OrganisationApplicationItem[];
 }

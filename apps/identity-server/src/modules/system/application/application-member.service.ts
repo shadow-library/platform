@@ -11,6 +11,8 @@ import { Logger } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 
+import { ApplicationAccessService } from './application-access.service';
+
 /**
  * Defining types
  */
@@ -34,6 +36,22 @@ export interface UserApplicationRow {
 }
 
 /**
+ * A launcher entry: an application the user may currently enter, enriched with its usage timestamps when
+ * the user has opened it before. First/last-used are null for an accessible app never yet opened.
+ */
+export interface AccessibleApplicationRow {
+  id: number;
+  name: string;
+  displayName: string | null;
+  subDomain: string;
+  isActive: boolean;
+  homePageUrl: string | null;
+  logoUrl: string | null;
+  firstUsedAt: Date | null;
+  lastUsedAt: Date | null;
+}
+
+/**
  * Declaring the constants
  *
  * Application membership is the per-user, per-application record provisioned on a user's first
@@ -47,7 +65,10 @@ export class ApplicationMemberService {
   private readonly logger = Logger.getLogger(APP_NAME, ApplicationMemberService.name);
   private readonly db: PrimaryDatabase;
 
-  constructor(private readonly databaseService: DatabaseService) {
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly accessService: ApplicationAccessService,
+  ) {
     this.db = databaseService.getPostgresClient();
   }
 
@@ -118,5 +139,45 @@ export class ApplicationMemberService {
       .innerJoin(schema.applications, eq(schema.applications.id, schema.applicationMembers.applicationId))
       .where(eq(schema.applicationMembers.userId, userId))
       .orderBy(schema.applicationMembers.lastUsedAt);
+  }
+
+  /**
+   * The launcher surface: every application the user may currently enter (per the access resolver),
+   * enriched with when they first and last used it. Keying on the accessible set — not on membership —
+   * is deliberate: it surfaces apps the user can open but has never launched, and drops apps they once
+   * used but can no longer reach (D-A4), so the launcher never advertises access the sign-in gate denies.
+   */
+  async listAccessibleApplications(userId: bigint): Promise<AccessibleApplicationRow[]> {
+    const accessibleIds = [...(await this.accessService.resolveAccessibleApplicationIds(userId))];
+    if (accessibleIds.length === 0) return [];
+
+    const applications = await this.db.query.applications.findMany({ where: inArray(schema.applications.id, accessibleIds) });
+    const usageRows = await this.db
+      .select({ applicationId: schema.applicationMembers.applicationId, firstUsedAt: schema.applicationMembers.firstUsedAt, lastUsedAt: schema.applicationMembers.lastUsedAt })
+      .from(schema.applicationMembers)
+      .where(and(eq(schema.applicationMembers.userId, userId), inArray(schema.applicationMembers.applicationId, accessibleIds)));
+    const usageByApp = new Map(usageRows.map(row => [row.applicationId, row]));
+
+    return applications
+      .map(application => {
+        const usage = usageByApp.get(application.id);
+        return {
+          id: application.id,
+          name: application.name,
+          displayName: application.displayName,
+          subDomain: application.subDomain,
+          isActive: application.isActive,
+          homePageUrl: application.homePageUrl,
+          logoUrl: application.logoUrl,
+          firstUsedAt: usage?.firstUsedAt ?? null,
+          lastUsedAt: usage?.lastUsedAt ?? null,
+        };
+      })
+      .sort((a, b) => this.launcherRank(b) - this.launcherRank(a));
+  }
+
+  /** Most-recently-used first; never-used apps (rank 0) fall to the end while keeping a stable catalogue order. */
+  private launcherRank(row: AccessibleApplicationRow): number {
+    return row.lastUsedAt?.getTime() ?? 0;
   }
 }

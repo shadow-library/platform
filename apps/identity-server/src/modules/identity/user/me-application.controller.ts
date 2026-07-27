@@ -7,7 +7,7 @@ import { Get, HttpController, RespondFor } from '@shadow-library/fastify';
  * Importing user defined packages
  */
 import { Auth, Context } from '@server/modules/access';
-import { ApplicationMemberService, type UserApplicationRow } from '@server/modules/system/application';
+import { type AccessibleApplicationRow, ApplicationMemberService } from '@server/modules/system/application';
 
 import { MyApplicationsResponse } from './me-application.dto';
 
@@ -18,8 +18,10 @@ import { MyApplicationsResponse } from './me-application.dto';
 /**
  * Declaring the constants
  *
- * Self-service: the signed-in user lists the applications they use. Membership is provisioned on
- * first consent (ConsentService), so this reflects every product the user has authorised.
+ * Self-service launcher: the signed-in user lists every application they may currently enter (per the
+ * access resolver, T-901), enriched with first/last-used where they have opened it. Keying on the
+ * accessible set rather than on membership surfaces apps they can open but never have, and drops apps
+ * they once used but can no longer reach — so the launcher never advertises access the gate would deny.
  */
 
 @HttpController('/api/v1/me')
@@ -29,7 +31,7 @@ export class MeApplicationController {
 
   @Get('/applications')
   @RespondFor(200, MyApplicationsResponse)
-  async listMyApplications(): Promise<{ applications: UserApplicationRow[] }> {
-    return { applications: await this.memberService.listApplicationsForUser(Context.getSession().userId) };
+  async listMyApplications(): Promise<{ applications: AccessibleApplicationRow[] }> {
+    return { applications: await this.memberService.listAccessibleApplications(Context.getSession().userId) };
   }
 }

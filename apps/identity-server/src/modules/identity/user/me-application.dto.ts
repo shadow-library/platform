@@ -34,11 +34,22 @@ export class MyApplicationItem {
   @Field(() => Boolean)
   isActive: boolean;
 
-  @Field()
-  firstUsedAt: string;
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  homePageUrl?: string;
 
-  @Field()
-  lastUsedAt: string;
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  logoUrl?: string;
+
+  /** Present only for an app the user has actually opened; an accessible-but-never-launched app omits it. */
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  firstUsedAt?: string;
+
+  @Field(() => String, { optional: true })
+  @Transform('strip:null')
+  lastUsedAt?: string;
 }
 
 @Schema()

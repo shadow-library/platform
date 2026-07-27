@@ -11,8 +11,10 @@ import { Body, Delete, Get, HttpController, HttpStatus, Params, Patch, Post, Res
 import { ERROR_MESSAGES } from '@server/constants';
 import { Auth, Context } from '@server/modules/access';
 import { type Organisation } from '@server/modules/infrastructure/datastore';
+import { OrganisationApplicationService, type OrganisationApplicationsView } from '@server/modules/system/application';
 
 import {
+  AssignApplicationBody,
   CreateOrganisationBody,
   InvitationParams,
   InvitationsResponse,
@@ -20,11 +22,13 @@ import {
   MemberParams,
   MembersResponse,
   OrganisationActionResponse,
+  OrganisationApplicationParams,
+  OrganisationApplicationsResponse,
   OrganisationIdParams,
   OrganisationResponse,
-  RenameOrganisationBody,
   UpdateMemberRoleBody,
   UpdateMemberStatusBody,
+  UpdateOrganisationBody,
 } from './organisation.dto';
 import { type MemberListItem, OrganisationService } from './organisation.service';
 
@@ -38,10 +42,18 @@ import { type MemberListItem, OrganisationService } from './organisation.service
 
 @HttpController('/api/v1/organisations')
 export class OrganisationController {
-  constructor(private readonly organisationService: OrganisationService) {}
+  constructor(
+    private readonly organisationService: OrganisationService,
+    private readonly organisationApplicationService: OrganisationApplicationService,
+  ) {}
 
   private caller() {
     return { session: Context.getSession(), ip: Context.getClientInfo().ip };
+  }
+
+  private auditActor(): { actorId: string; ip?: string } {
+    const caller = this.caller();
+    return { actorId: caller.session.userId.toString(), ip: caller.ip };
   }
 
   @Post()
@@ -59,11 +71,22 @@ export class OrganisationController {
     return this.organisationService.getOrganisation(params.organisationId);
   }
 
+  /**
+   * A rename is ADMIN-level (the guard), but flipping `appAccessMode` governs every member's app surface,
+   * so it demands an elevated OWNER — a field-dependent authorization enforced in the service, leaving the
+   * rename path's semantics untouched when `appAccessMode` is absent.
+   */
   @Patch('/:organisationId')
   @Auth({ orgRole: 'ADMIN' })
   @RespondFor(200, OrganisationResponse)
-  renameOrganisation(@Params() params: OrganisationIdParams, @Body() body: RenameOrganisationBody): Promise<Organisation> {
-    return this.organisationService.renameOrganisation(this.caller(), Context.getOrganisation(), body.name);
+  async updateOrganisation(@Params() params: OrganisationIdParams, @Body() body: UpdateOrganisationBody): Promise<Organisation> {
+    let organisation = Context.getOrganisation();
+    if (body.appAccessMode !== undefined) {
+      const caller = { role: Context.getMembership().role, elevated: Context.getAuth().elevated ?? false };
+      organisation = await this.organisationApplicationService.changeAppAccessMode(this.auditActor(), params.organisationId, caller, body.appAccessMode);
+    }
+    if (body.name !== undefined) organisation = await this.organisationService.renameOrganisation(this.caller(), organisation, body.name);
+    return organisation;
   }
 
   @Delete('/:organisationId')
@@ -140,6 +163,30 @@ export class OrganisationController {
   @RespondFor(200, OrganisationActionResponse)
   async revokeOrganisationInvitation(@Params() params: InvitationParams): Promise<OrganisationActionResponse> {
     await this.organisationService.revokeInvitation(this.caller(), params.organisationId, params.invitationId);
+    return { success: true };
+  }
+
+  @Get('/:organisationId/applications')
+  @Auth({ orgRole: 'ADMIN' })
+  @RespondFor(200, OrganisationApplicationsResponse)
+  listOrganisationApplications(@Params() params: OrganisationIdParams): Promise<OrganisationApplicationsView> {
+    return this.organisationApplicationService.listForOrganisation(params.organisationId);
+  }
+
+  @Post('/:organisationId/applications')
+  @Auth({ orgRole: 'ADMIN', elevated: true })
+  @HttpStatus(200)
+  @RespondFor(200, OrganisationActionResponse)
+  async assignOrganisationApplication(@Params() params: OrganisationIdParams, @Body() body: AssignApplicationBody): Promise<OrganisationActionResponse> {
+    await this.organisationApplicationService.assign(this.auditActor(), params.organisationId, body.applicationId);
+    return { success: true };
+  }
+
+  @Delete('/:organisationId/applications/:applicationId')
+  @Auth({ orgRole: 'ADMIN', elevated: true })
+  @RespondFor(200, OrganisationActionResponse)
+  async unassignOrganisationApplication(@Params() params: OrganisationApplicationParams): Promise<OrganisationActionResponse> {
+    await this.organisationApplicationService.unassign(this.auditActor(), params.organisationId, params.applicationId);
     return { success: true };
   }
 }
