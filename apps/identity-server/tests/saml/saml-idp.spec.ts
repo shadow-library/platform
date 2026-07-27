@@ -218,4 +218,41 @@ describe('SAML 2.0 IdP', () => {
       .cookies({ [SESSION_COOKIE_NAME]: sessionSecret });
     expect(denied.statusCode).toBe(403);
   });
+
+  describe('application access gate (T-902)', () => {
+    /** Redis outlives the per-test DB reset, which replays serial ids; flush so a prior test's cached grant set cannot answer for a reused application id. */
+    beforeEach(() => env.getRedisClient().flushdb());
+
+    const registerLinkedSp = async (entityId: string, visibility: 'PUBLIC' | 'RESTRICTED'): Promise<void> => {
+      const name = `saml-app-${randomUUID()}`;
+      const application = await env.getService(ApplicationService).createApplication({ name, subDomain: name, visibility });
+      await env.getService(SamlService).createServiceProvider({ entityId, name: 'Linked SP', acsUrl: `${entityId}/acs`, applicationId: application.id });
+    };
+
+    it('should issue an assertion when the linked application is reachable', async () => {
+      const entityId = 'https://linked-reachable.example.com';
+      await registerLinkedSp(entityId, 'PUBLIC');
+
+      const response = await ssoRequest(buildAuthnRequest({ issuer: entityId }).encoded, sessionSecret);
+      expect(response.statusCode).toBe(200);
+      expect(extractResponse(response.body as string)).toContain('saml-user@example.com');
+    });
+
+    it('should send a user with no access to the hosted access-denied page instead of asserting', async () => {
+      const entityId = 'https://linked-denied.example.com';
+      await registerLinkedSp(entityId, 'RESTRICTED');
+
+      const response = await ssoRequest(buildAuthnRequest({ issuer: entityId }).encoded, sessionSecret);
+      expect(response.statusCode).toBe(302);
+      const location = new URL(String(response.headers['location']));
+      expect(location.pathname).toBe('/error');
+      expect(location.searchParams.get('error')).toBe('access_denied');
+    });
+
+    it('should leave an unlinked service provider entirely unaffected', async () => {
+      const response = await ssoRequest(buildAuthnRequest().encoded, sessionSecret);
+      expect(response.statusCode).toBe(200);
+      expect(extractResponse(response.body as string)).toContain('saml-user@example.com');
+    });
+  });
 });

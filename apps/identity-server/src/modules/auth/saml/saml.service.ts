@@ -17,6 +17,7 @@ import { SessionService, ValidatedSession } from '@server/modules/auth/session';
 import { UserEmailService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, SamlServiceProvider, schema } from '@server/modules/infrastructure/datastore';
+import { ApplicationAccessService, ApplicationService } from '@server/modules/system/application';
 
 import { SamlKeyService } from './saml-key.service';
 import { AssertionAttribute, buildMetadata, buildSignedResponse, decodeSamlRequest, parseAuthnRequest } from './saml-xml';
@@ -29,6 +30,8 @@ export interface CreateServiceProvider {
   entityId: string;
   name: string;
   acsUrl: string;
+  /** Links the SP to an application so SP-initiated SSO enforces the access gate before asserting (T-902). */
+  applicationId?: number | null;
   nameIdFormat?: SamlServiceProvider.NameIdFormat;
   releasedAttributes?: string[];
   spCertificatePem?: string;
@@ -37,13 +40,18 @@ export interface CreateServiceProvider {
 export interface UpdateServiceProvider {
   name?: string;
   acsUrl?: string;
+  applicationId?: number | null;
   nameIdFormat?: SamlServiceProvider.NameIdFormat;
   releasedAttributes?: string[];
   spCertificatePem?: string | null;
   isActive?: boolean;
 }
 
-export type SsoResult = { kind: 'login'; resumeId: string } | { kind: 'post'; acsUrl: string; samlResponse: string; relayState?: string };
+export type SsoResult =
+  | { kind: 'login'; resumeId: string }
+  | { kind: 'post'; acsUrl: string; samlResponse: string; relayState?: string }
+  /** The signed-in user may not reach the linked application; the browser is sent to the hosted access-denied page. */
+  | { kind: 'denied'; applicationName: string };
 
 interface PendingSsoRequest {
   serviceProviderId: string;
@@ -77,6 +85,8 @@ export class SamlService {
     private readonly sessionService: SessionService,
     private readonly userEmailService: UserEmailService,
     private readonly auditService: AuditService,
+    private readonly applicationService: ApplicationService,
+    private readonly applicationAccessService: ApplicationAccessService,
   ) {
     this.db = databaseService.getPostgresClient();
     this.redis = databaseService.getRedisClient();
@@ -100,15 +110,22 @@ export class SamlService {
     if (invalid.length > 0) throw AppErrorCode.SML_001.create();
   }
 
+  /** A linked application must exist; an unknown id is a `APP_001`, the same not-found every admin surface answers. */
+  private assertApplicationExists(applicationId: number | null | undefined): void {
+    if (applicationId !== null && applicationId !== undefined) this.applicationService.getApplicationByIdOrThrow(applicationId);
+  }
+
   async createServiceProvider(data: CreateServiceProvider): Promise<SamlServiceProvider> {
     const releasedAttributes = data.releasedAttributes ?? ['email'];
     this.assertValidServiceProvider(data.entityId, data.acsUrl, releasedAttributes);
+    this.assertApplicationExists(data.applicationId);
     const serviceProvider = await this.db
       .insert(schema.samlServiceProviders)
       .values({
         entityId: data.entityId,
         name: data.name,
         acsUrl: data.acsUrl,
+        applicationId: data.applicationId ?? null,
         nameIdFormat: data.nameIdFormat ?? 'EMAIL',
         releasedAttributes,
         spCertificatePem: data.spCertificatePem,
@@ -124,6 +141,7 @@ export class SamlService {
     const acsUrl = patch.acsUrl ?? current.acsUrl;
     const releasedAttributes = patch.releasedAttributes ?? current.releasedAttributes;
     this.assertValidServiceProvider(current.entityId, acsUrl, releasedAttributes);
+    if (patch.applicationId !== undefined) this.assertApplicationExists(patch.applicationId);
     const [updated] = await this.db
       .update(schema.samlServiceProviders)
       .set({ ...patch, acsUrl, releasedAttributes, updatedAt: new Date() })
@@ -191,12 +209,35 @@ export class SamlService {
     return `saml_sso:${resumeId}`;
   }
 
+  /** Runs the access gate for a linked SP; returns a `denied` result to relay, or `null` when the user may proceed. */
+  private async assertApplicationAccess(userId: bigint, applicationId: number): Promise<Extract<SsoResult, { kind: 'denied' }> | null> {
+    try {
+      await this.applicationAccessService.assertUserAccess(userId, applicationId);
+      return null;
+    } catch (error) {
+      if (!AppError.is(error, AppErrorCode.APP_006) && !AppError.is(error, AppErrorCode.APP_007)) throw error;
+      const application = this.applicationService.getApplicationById(applicationId);
+      this.logger.warn('saml sso denied: the user has no access to the linked application', { securityEvent: 'saml.sso.denied', userId: userId.toString(), applicationId });
+      return { kind: 'denied', applicationName: application?.displayName ?? application?.name ?? '' };
+    }
+  }
+
   private pairwiseNameId(userId: bigint, entityId: string): string {
     const digest = createHmac('sha256', this.pairwiseKey).update(`${userId.toString()}:${entityId}`).digest('hex');
     return `sp-${digest}`;
   }
 
   private async issueResponse(serviceProvider: SamlServiceProvider, session: ValidatedSession, requestId: string, relayState?: string): Promise<SsoResult> {
+    /**
+     * A linked SP runs the same sign-in gate an OAuth authorize does (T-902); an unlinked SP keeps its
+     * pre-T-902 behaviour untouched. There is no OAuth `redirect_uri` here, so a denial — hidden or
+     * denied alike — sends the browser to the hosted access-denied page rather than the SP.
+     */
+    if (serviceProvider.applicationId !== null) {
+      const denied = await this.assertApplicationAccess(session.userId, serviceProvider.applicationId);
+      if (denied) return denied;
+    }
+
     const email = await this.userEmailService.getPrimaryEmail(session.userId);
     if (!email) throw AppErrorCode.SML_001.create();
     const profile = await this.db.query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, session.userId) });

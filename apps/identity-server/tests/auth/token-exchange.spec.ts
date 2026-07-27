@@ -8,7 +8,10 @@ import { beforeEach, describe, expect, it } from 'bun:test';
  */
 import { KeyService } from '@server/modules/auth/keys';
 import { ACCESS_TOKEN_TYPE, AccessTokenService, OAuthClientService, TOKEN_EXCHANGE_GRANT } from '@server/modules/auth/oauth';
-import { ApplicationService } from '@server/modules/system/application';
+import { UserService } from '@server/modules/identity/user';
+import { schema } from '@server/modules/infrastructure/datastore';
+import { ApplicationAccessService, ApplicationService } from '@server/modules/system/application';
+import { eq } from 'drizzle-orm';
 
 import { TestEnvironment } from '../test-environment';
 
@@ -104,7 +107,9 @@ describe('RFC 8693 token exchange', () => {
   beforeEach(async () => {
     caller = await registerApp('caller', CALLER_AUDIENCE);
     target = await registerApp('target', TARGET_AUDIENCE);
-    userId = 1234n;
+    /** The subject is a real user with a personal workspace, so a PUBLIC target is reachable and the exchange gate (T-902) passes. */
+    const user = await env.getService(UserService).createUserWithPassword({ email: 'exchange@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });
+    userId = user.id;
     await grantOnTarget('target:read');
   });
 
@@ -188,6 +193,16 @@ describe('RFC 8693 token exchange', () => {
   it('should refuse a caller holding no grant on the target', async () => {
     const response = await exchangeAsCaller({ resource: CALLER_AUDIENCE });
     expect(response.statusCode).toBe(400);
+  });
+
+  it('should refuse an exchange to an application the subject user may not reach (invalid_target)', async () => {
+    /** Making the target RESTRICTED puts it out of the personal-workspace user's reach; the delegated call may not go where the user cannot. */
+    await env.getPostgresClient().update(schema.applications).set({ visibility: 'RESTRICTED' }).where(eq(schema.applications.id, target.applicationId));
+    await env.getService(ApplicationAccessService).invalidateGlobal();
+
+    const response = await exchangeAsCaller();
+    expect(response.statusCode).toBe(400);
+    expect(response.json()).toMatchObject({ code: 'invalid_target' });
   });
 
   it('should refuse a service token as the subject', async () => {

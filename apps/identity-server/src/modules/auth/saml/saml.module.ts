@@ -11,6 +11,7 @@ import { SessionModule } from '@server/modules/auth/session';
 import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
+import { ApplicationModule } from '@server/modules/system/application';
 
 import { SamlKeyService } from './saml-key.service';
 import { SamlController } from './saml.controller';
@@ -25,7 +26,7 @@ import { SamlService } from './saml.service';
  */
 
 @Module({
-  imports: [DatabaseModule, KeyModule, SessionModule, UserModule, AuditModule],
+  imports: [DatabaseModule, KeyModule, SessionModule, UserModule, AuditModule, ApplicationModule],
   controllers: [SamlController],
   providers: [SamlKeyService, SamlService],
   exports: [SamlKeyService, SamlService],

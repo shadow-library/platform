@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Injectable } from '@shadow-library/app';
-import { Logger } from '@shadow-library/common';
+import { AppError, Config, Logger } from '@shadow-library/common';
 
 /**
  * Importing user defined packages
@@ -16,6 +16,7 @@ import { UserEmailService, UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { OAuthClient } from '@server/modules/infrastructure/datastore';
 import { RateLimiterService } from '@server/modules/infrastructure/security';
+import { ApplicationAccessService } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
 
 import { AccessTokenService } from './access-token.service';
@@ -110,6 +111,8 @@ const STANDARD_OIDC_SCOPES = new Set(['openid', 'profile', 'email', 'offline_acc
 @Injectable()
 export class OAuthService {
   private readonly logger = Logger.getLogger(APP_NAME, OAuthService.name);
+  /** identity-web's hosted pages sit at the login URL's origin; the access-denied page lives beside login. */
+  private readonly loginUrl = Config.get('oauth.login-url');
 
   constructor(
     private readonly clientService: OAuthClientService,
@@ -125,6 +128,7 @@ export class OAuthService {
     private readonly workloadIdentityService: WorkloadIdentityService,
     private readonly policyService: PolicyService,
     private readonly rateLimiterService: RateLimiterService,
+    private readonly applicationAccessService: ApplicationAccessService,
   ) {}
 
   /**
@@ -217,6 +221,20 @@ export class OAuthService {
     const session = sessionSecret ? await this.sessionService.validate(sessionSecret) : null;
     if (!session) return { kind: 'login' };
 
+    /**
+     * The sign-in gate (T-902), keyed on the application rather than the client (D-A7): a user who
+     * no longer reaches this application is turned away here, before any code is issued. A *hidden*
+     * denial (inactive or INTERNAL app) is indistinguishable from an unknown client (D-A3); a
+     * *denied* one answers openly so a refused customer becomes a sales lead rather than a leak.
+     */
+    try {
+      await this.applicationAccessService.assertUserAccess(session.userId, client.applicationId);
+    } catch (error) {
+      if (AppError.is(error, AppErrorCode.APP_006)) throw AppErrorCode.OAU_002.create();
+      if (!AppError.is(error, AppErrorCode.APP_007)) throw error;
+      return this.denyAuthorize(client, params, session.userId);
+    }
+
     const scope = grant.scopes.join(' ');
     if (client.isFirstParty) {
       await this.consentService.record(session.userId, client.id, grant.scopes, 'FIRST_PARTY_POLICY');
@@ -248,6 +266,38 @@ export class OAuthService {
       targetId: client.id,
     });
     this.logger.debug('authorization code granted', { clientId: client.id, userId: session.userId.toString(), scope });
+    return { kind: 'redirect', url: url.toString() };
+  }
+
+  /**
+   * Turns a *denied* (visible but ungranted) user away from the authorize endpoint. A first-party
+   * client — whose redirect target is not a place to surface an OAuth error to a human — is sent to
+   * identity-web's hosted access-denied page naming the application; a third-party client gets the
+   * RFC 6749 `access_denied` on its own `redirect_uri`, mirroring `ConsentService.decide`.
+   */
+  private async denyAuthorize(client: OAuthClient, params: AuthorizeParams, userId: bigint): Promise<AuthorizeResult> {
+    await this.auditService.record({
+      action: 'oauth.authorize.denied',
+      outcome: 'DENIED',
+      actorType: 'USER',
+      actorId: userId.toString(),
+      targetType: 'oauth_client',
+      targetId: client.id,
+    });
+    this.logger.debug('authorization denied: user has no access to the application', { clientId: client.id, userId: userId.toString(), applicationId: client.applicationId });
+
+    if (client.isFirstParty) {
+      const application = (await this.clientService.resolveApplicationLabel(client.id)) ?? client.id;
+      const url = new URL('/error', this.loginUrl);
+      url.searchParams.set('error', 'access_denied');
+      url.searchParams.set('application', application);
+      url.searchParams.set('client_id', client.id);
+      return { kind: 'redirect', url: url.toString() };
+    }
+
+    const url = new URL(params.redirectUri);
+    url.searchParams.set('error', 'access_denied');
+    if (params.state) url.searchParams.set('state', params.state);
     return { kind: 'redirect', url: url.toString() };
   }
 
@@ -337,6 +387,26 @@ export class OAuthService {
         audience: String(subject.aud),
       });
       throw AppErrorCode.OAU_003.create();
+    }
+
+    /**
+     * The delegated call may only reach an application the subject user themselves may reach: a
+     * service acting *as the user* can never take them somewhere their own sign-in would be refused
+     * (T-902). Both denial classes read as `invalid_target` — a delegated caller learns nothing about
+     * the target's visibility that the user's own access does not already decide.
+     */
+    const targetApplicationId = await this.clientService.getResourceOwner(params.resource);
+    if (targetApplicationId !== null) {
+      await this.applicationAccessService.assertUserAccess(BigInt(subject.sub), targetApplicationId).catch(error => {
+        if (!AppError.is(error, AppErrorCode.APP_006) && !AppError.is(error, AppErrorCode.APP_007)) throw error;
+        this.logger.warn('token exchange rejected: the subject user has no access to the target application', {
+          securityEvent: 'oauth.exchange_denied',
+          clientId: client.id,
+          subject: subject.sub,
+          targetApplicationId,
+        });
+        throw AppErrorCode.OAU_005.create();
+      });
     }
 
     const scope = await this.exchangeScopes(client, params.resource, params.scope);
@@ -502,6 +572,25 @@ export class OAuthService {
         securityEvent: 'oauth.refresh_session_inactive',
         clientId: client.id,
         familyId: rotated.familyId,
+      });
+      throw AppErrorCode.OAU_003.create();
+    }
+
+    /**
+     * The hard cut on unassignment (D-A4): a user who has lost access to the application takes no new
+     * token from this family. Revoking the family rather than merely refusing the call means the lapse
+     * is permanent — the presented secret was already consumed by rotation above.
+     */
+    try {
+      await this.applicationAccessService.assertUserAccess(rotated.context.userId, client.applicationId);
+    } catch (error) {
+      if (!AppError.is(error, AppErrorCode.APP_006) && !AppError.is(error, AppErrorCode.APP_007)) throw error;
+      await this.refreshTokenService.revokeFamily(rotated.familyId, 'ADMIN');
+      this.logger.warn('refresh rejected: the user no longer has access to the application', {
+        securityEvent: 'oauth.refresh_access_revoked',
+        clientId: client.id,
+        familyId: rotated.familyId,
+        applicationId: client.applicationId,
       });
       throw AppErrorCode.OAU_003.create();
     }

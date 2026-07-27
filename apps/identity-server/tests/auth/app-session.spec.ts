@@ -125,6 +125,8 @@ describe('First-party app sessions', () => {
   };
 
   beforeEach(async () => {
+    /** Redis outlives the per-test DB reset, which replays serial ids; flush so a prior test's cached grant set (T-902 gate) cannot answer for a reused application id. */
+    await env.getRedisClient().flushdb();
     client = await registerApp('Reports App');
     rival = await registerApp('Rival App');
     const user = await env.getService(UserService).createUserWithPassword({ email: 'app@example.com', password: 'Password@123', status: 'ACTIVE', emailVerified: true });

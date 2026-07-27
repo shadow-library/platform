@@ -34,6 +34,10 @@ export class CreateServiceProviderBody {
   @Field({ maxLength: 2048 })
   acsUrl: string;
 
+  /** Links the SP to an application; a linked SP enforces the access gate before asserting (T-902). */
+  @Field(() => Number, { optional: true })
+  applicationId?: number;
+
   @Field(() => String, { optional: true, enum: ['EMAIL', 'PERSISTENT'] })
   nameIdFormat?: SamlNameIdFormatValue;
 
@@ -51,6 +55,10 @@ export class UpdateServiceProviderBody {
 
   @Field({ optional: true, maxLength: 2048 })
   acsUrl?: string;
+
+  /** Links (or, as `null`, unlinks) the application whose access gate the SP enforces (T-902). */
+  @Field(() => Number, { optional: true, nullable: true })
+  applicationId?: number | null;
 
   @Field(() => String, { optional: true, enum: ['EMAIL', 'PERSISTENT'] })
   nameIdFormat?: SamlNameIdFormatValue;
@@ -75,6 +83,9 @@ export class ServiceProviderItem {
 
   @Field()
   acsUrl: string;
+
+  @Field(() => Number, { optional: true })
+  applicationId?: number;
 
   @Field(() => String, { enum: ['EMAIL', 'PERSISTENT'] })
   nameIdFormat: SamlNameIdFormatValue;

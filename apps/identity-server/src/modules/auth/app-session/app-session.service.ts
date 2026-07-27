@@ -16,6 +16,7 @@ import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, OAuthCl
 import { SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
 import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { ApplicationAccessService } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
 
 /**
@@ -74,6 +75,7 @@ export class AppSessionService {
     private readonly sessionService: SessionService,
     private readonly userService: UserService,
     private readonly policyService: PolicyService,
+    private readonly applicationAccessService: ApplicationAccessService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -145,6 +147,15 @@ export class AppSessionService {
    */
   async mintToken(input: MintTokenInput): Promise<MintedToken> {
     const session = await this.requireLiveSession(input.client, input.handle);
+
+    /**
+     * The revocation story (T-902, D-A4): back-channel logout never reaches an app-session client, so
+     * this per-mint gate is the only place a lost assignment takes effect. A denial — hidden or
+     * denied alike — ends the app session and reads to the SDK exactly as a stale handle does
+     * (`AUTH_005`), which is its cue to restart the login.
+     */
+    await this.assertApplicationAccess(session, input.client);
+
     const granted = await this.clientService.getGrantedScopes(input.client.id);
     const audience = input.resource ?? DEFAULT_AUDIENCE;
     const grantedHere = new Map(granted.filter(scope => scope.resourceIdentifier === audience).map(scope => [scope.name, scope]));
@@ -306,6 +317,23 @@ export class AppSessionService {
       throw AppErrorCode.AUTH_005.create();
     }
     return session;
+  }
+
+  /** Denies a mint whose user has lost access to the client's application, revoking the app session so no further mint is attempted. */
+  private async assertApplicationAccess(session: AppSession, client: OAuthClient): Promise<void> {
+    try {
+      await this.applicationAccessService.assertUserAccess(session.userId, client.applicationId);
+    } catch (error) {
+      if (!AppError.is(error, AppErrorCode.APP_006) && !AppError.is(error, AppErrorCode.APP_007)) throw error;
+      await this.db.update(schema.appSessions).set({ status: 'REVOKED', terminatedAt: new Date() }).where(eq(schema.appSessions.id, session.id));
+      this.logger.warn('app session revoked: the user no longer has access to the application', {
+        securityEvent: 'app_session.access_revoked',
+        clientId: client.id,
+        appSessionId: session.id.toString(),
+        applicationId: client.applicationId,
+      });
+      throw AppErrorCode.AUTH_005.create();
+    }
   }
 
   private async requireElevation(session: AppSession, audience: string): Promise<AppSessionElevation> {

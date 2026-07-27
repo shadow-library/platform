@@ -41,6 +41,7 @@ export class AdminSamlController {
       entityId: serviceProvider.entityId,
       name: serviceProvider.name,
       acsUrl: serviceProvider.acsUrl,
+      applicationId: serviceProvider.applicationId ?? undefined,
       nameIdFormat: serviceProvider.nameIdFormat,
       releasedAttributes: serviceProvider.releasedAttributes,
       isActive: serviceProvider.isActive,

@@ -67,6 +67,15 @@ export class SamlController {
       return;
     }
 
+    if (result.kind === 'denied') {
+      /** No OAuth `redirect_uri` exists on the SAML path, so a denied user lands on identity-web's hosted access-denied page. */
+      const url = new URL('/error', this.loginUrl);
+      url.searchParams.set('error', 'access_denied');
+      url.searchParams.set('application', result.applicationName);
+      reply.status(302).redirect(url.toString());
+      return;
+    }
+
     const relayState = result.relayState ? `<input type="hidden" name="RelayState" value="${escapeXml(result.relayState)}"/>` : '';
     const page =
       `<!doctype html><html lang="en"><head><meta charset="utf-8"><title>Signing you in…</title></head>` +
