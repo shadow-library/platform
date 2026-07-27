@@ -35,7 +35,7 @@
   },
   "dependencies": {
     "@shadow-library/app": "2.0.0-alpha.0",
-    "@shadow-library/auth": "file:vendor/shadow-library-auth-0.2.0-alpha.0.tgz",
+    "@shadow-library/auth": "0.3.0",
     "@shadow-library/class-schema": "0.5.0-alpha.0",
     "@shadow-library/common": "2.0.0-alpha.1",
     "@shadow-library/fastify": "2.0.0-alpha.0",
