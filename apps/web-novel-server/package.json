@@ -1,0 +1,47 @@
+{
+  "name": "@shadow-library/webnovel-server",
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Public webnovel reader service: serves published novels pushed one-way from novel-forge-server",
+  "scripts": {
+    "prepare": "husky",
+    "clean": "rm -rf dist logs CHANGELOG.md",
+    "verify": "shadow verify",
+    "type-check": "bun run tsc",
+    "test": "bun test",
+    "build": "shadow build",
+    "dev": "bun run --watch src/main.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:create-template": "bun run scripts/create-template-db.ts"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/webnovel.git"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shadow-library/webnovel/issues"
+  },
+  "homepage": "https://github.com/shadow-library/webnovel#readme",
+  "devDependencies": {
+    "@shadow-library/scripts": "0.2.3",
+    "@types/bun": "^1.3.1",
+    "drizzle-kit": "^0.31.6",
+    "husky": "^9.1.7",
+    "type-fest": "^4.41.0",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "@shadow-library/app": "2.0.0-alpha.0",
+    "@shadow-library/auth": "file:vendor/shadow-library-auth-0.2.0-alpha.0.tgz",
+    "@shadow-library/class-schema": "0.5.0-alpha.0",
+    "@shadow-library/common": "2.0.0-alpha.1",
+    "@shadow-library/fastify": "2.0.0-alpha.0",
+    "@shadow-library/modules": "file:vendor/shadow-library-modules-0.7.0-alpha.0.tgz",
+    "ajv": "^8.17.1",
+    "drizzle-orm": "^0.45.0",
+    "reflect-metadata": "^0.2.2"
+  }
+}

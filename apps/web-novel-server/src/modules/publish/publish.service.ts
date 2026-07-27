@@ -1,0 +1,212 @@
+/**
+ * Importing packages with side effects
+ */
+
+/**
+ * Importing npm packages
+ */
+import { and, asc, eq, type SQL } from 'drizzle-orm';
+import { Injectable } from '@shadow-library/app';
+import { Logger } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
+import { DatabaseService } from '@shadow-library/modules';
+
+/**
+ * Importing user defined packages
+ */
+import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
+import { type Novel, type PrimaryDatabase, schema } from '@server/modules/datastore';
+
+import { PublishAuditService } from './publish-audit.service';
+import { type ChapterUpsertBody, type ManifestItem, type NovelUpsertBody } from './publish.dto';
+import { type PublishAuditEntry } from './publish.types';
+
+/**
+ * Defining types
+ */
+
+export interface UpsertResult {
+  outcome: 'applied' | 'noop';
+  revision: number;
+}
+
+export interface UnpublishResult {
+  outcome: 'applied' | 'noop';
+}
+
+interface StaleMarker {
+  outcome: 'stale';
+  stored: number;
+}
+
+/**
+ * Declaring the constants
+ *
+ * Optimistic-concurrency rules (same for novels and chapters): an incoming revision behind the
+ * stored one is a 409 stale rejection; an equal revision carrying identical content is a no-op;
+ * anything else replaces the row and stores the incoming revision. Every branch — including the
+ * rejection — commits exactly one audit row atomically with its decision.
+ */
+
+@Injectable()
+export class PublishService {
+  private readonly logger = Logger.getLogger(APP_NAME, PublishService.name);
+  private readonly db: PrimaryDatabase;
+
+  constructor(
+    databaseService: DatabaseService,
+    private readonly auditService: PublishAuditService,
+    private readonly context: ContextService,
+  ) {
+    this.db = databaseService.getPostgresClient();
+  }
+
+  async upsertNovel(slug: string, body: NovelUpsertBody): Promise<UpsertResult> {
+    const caller = this.caller();
+    const result = await this.db.transaction(async tx => {
+      const [stored] = await tx.select().from(schema.novels).where(eq(schema.novels.slug, slug)).for('update');
+      const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'novel.upsert', novelSlug: slug, incomingRevision: body.revision, storedRevision: stored?.revision, ...caller };
+
+      if (stored && body.revision < stored.revision) {
+        await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
+        return { outcome: 'stale', stored: stored.revision } satisfies StaleMarker;
+      }
+      if (stored && body.revision === stored.revision && this.isNovelUnchanged(stored, body)) {
+        await this.auditService.record({ ...base, outcome: 'noop' }, tx);
+        return { outcome: 'noop', revision: stored.revision } satisfies UpsertResult;
+      }
+
+      const values = {
+        title: body.title,
+        blurb: body.blurb ?? null,
+        coverPath: body.coverPath ?? null,
+        genres: body.genres ?? [],
+        status: body.status ?? ('live' as const),
+        revision: body.revision,
+        updatedAt: new Date(),
+      };
+      if (stored) await tx.update(schema.novels).set(values).where(eq(schema.novels.id, stored.id));
+      else await tx.insert(schema.novels).values({ slug, ...values });
+      await this.auditService.record({ ...base, outcome: 'applied' }, tx);
+      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+    });
+
+    this.auditService.markRecorded();
+    if (result.outcome === 'stale') throw AppErrorCode.WBN_003.create({ incoming: body.revision, stored: result.stored });
+    this.logger.info('novel metadata push handled', { slug, outcome: result.outcome, revision: body.revision });
+    return result;
+  }
+
+  async upsertChapter(slug: string, ordinal: number, body: ChapterUpsertBody): Promise<UpsertResult> {
+    const caller = this.caller();
+    const novel = await this.getNovelBySlug(slug);
+    const result = await this.db.transaction(async tx => {
+      const [stored] = await tx.select().from(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).for('update');
+      const base: Omit<PublishAuditEntry, 'outcome'> = {
+        action: 'chapter.upsert',
+        novelSlug: slug,
+        ordinal,
+        contentHash: body.contentHash,
+        incomingRevision: body.revision,
+        storedRevision: stored?.revision,
+        ...caller,
+      };
+
+      if (stored && body.revision < stored.revision) {
+        await this.auditService.record({ ...base, outcome: 'stale_rejected' }, tx);
+        return { outcome: 'stale', stored: stored.revision } satisfies StaleMarker;
+      }
+      if (stored && body.revision === stored.revision && body.contentHash === stored.contentHash) {
+        await this.auditService.record({ ...base, outcome: 'noop' }, tx);
+        return { outcome: 'noop', revision: stored.revision } satisfies UpsertResult;
+      }
+
+      const values = {
+        title: body.title,
+        content: body.content,
+        authorNote: body.authorNote ?? null,
+        contentHash: body.contentHash,
+        revision: body.revision,
+        wordCount: body.wordCount ?? this.countWords(body.content),
+        publishedAt: body.publishedAt ? new Date(body.publishedAt) : (stored?.publishedAt ?? new Date()),
+        updatedAt: new Date(),
+      };
+      if (stored) await tx.update(schema.publishedChapters).set(values).where(eq(schema.publishedChapters.id, stored.id));
+      else await tx.insert(schema.publishedChapters).values({ novelId: novel.id, ordinal, ...values });
+      await this.auditService.record({ ...base, outcome: 'applied' }, tx);
+      return { outcome: 'applied', revision: body.revision } satisfies UpsertResult;
+    });
+
+    this.auditService.markRecorded();
+    if (result.outcome === 'stale') throw AppErrorCode.WBN_003.create({ incoming: body.revision, stored: result.stored });
+    this.logger.info('chapter push handled', { slug, ordinal, outcome: result.outcome, revision: body.revision });
+    return result;
+  }
+
+  /** Unpublish is idempotent: deleting an absent chapter (or an unknown novel) is a recorded no-op */
+  async unpublishChapter(slug: string, ordinal: number): Promise<UnpublishResult> {
+    const caller = this.caller();
+    const base: Omit<PublishAuditEntry, 'outcome'> = { action: 'chapter.unpublish', novelSlug: slug, ordinal, ...caller };
+
+    const [novel] = await this.db.select().from(schema.novels).where(eq(schema.novels.slug, slug));
+    if (!novel) {
+      await this.auditService.record({ ...base, outcome: 'noop' });
+      this.auditService.markRecorded();
+      return { outcome: 'noop' };
+    }
+
+    const result = await this.db.transaction(async tx => {
+      const deleted = await tx.delete(schema.publishedChapters).where(this.chapterFilter(novel.id, ordinal)).returning();
+      const removed = deleted[0];
+      const outcome = removed ? 'applied' : 'noop';
+      await this.auditService.record({ ...base, outcome, contentHash: removed?.contentHash, storedRevision: removed?.revision }, tx);
+      return { outcome } satisfies UnpublishResult;
+    });
+
+    this.auditService.markRecorded();
+    this.logger.info('chapter unpublish handled', { slug, ordinal, outcome: result.outcome });
+    return result;
+  }
+
+  /** The reconciliation primitive: the forge diffs this against its publication ledger. Reads are not audited */
+  async getManifest(slug: string): Promise<ManifestItem[]> {
+    const novel = await this.getNovelBySlug(slug);
+    const chapters = await this.db
+      .select({ ordinal: schema.publishedChapters.ordinal, contentHash: schema.publishedChapters.contentHash, revision: schema.publishedChapters.revision })
+      .from(schema.publishedChapters)
+      .where(eq(schema.publishedChapters.novelId, novel.id))
+      .orderBy(asc(schema.publishedChapters.ordinal));
+    return chapters;
+  }
+
+  private async getNovelBySlug(slug: string): Promise<Novel> {
+    const [novel] = await this.db.select().from(schema.novels).where(eq(schema.novels.slug, slug));
+    return novel ?? AppErrorCode.WBN_001.throw();
+  }
+
+  private chapterFilter(novelId: bigint, ordinal: number): SQL {
+    return and(eq(schema.publishedChapters.novelId, novelId), eq(schema.publishedChapters.ordinal, ordinal)) as SQL;
+  }
+
+  /** Metadata PUTs are full replacements, so absent optional fields compare as their defaults */
+  private isNovelUnchanged(stored: Novel, body: NovelUpsertBody): boolean {
+    return (
+      stored.title === body.title &&
+      stored.blurb === (body.blurb ?? null) &&
+      stored.coverPath === (body.coverPath ?? null) &&
+      stored.status === (body.status ?? 'live') &&
+      stored.genres.length === (body.genres ?? []).length &&
+      stored.genres.every((genre, index) => genre === (body.genres ?? [])[index])
+    );
+  }
+
+  private countWords(content: string): number {
+    return content.split(/\s+/).filter(Boolean).length;
+  }
+
+  private caller(): Pick<PublishAuditEntry, 'callerSub' | 'callerClientId'> {
+    const principal = this.context.getAuthPrincipalOrNull();
+    return { callerSub: principal?.sub, callerClientId: principal?.clientId };
+  }
+}
