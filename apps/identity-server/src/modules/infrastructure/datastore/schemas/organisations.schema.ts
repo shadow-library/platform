@@ -25,6 +25,7 @@ export namespace Organisation {
   export type MemberRole = InferEnum<typeof organisationMemberRole>;
   export type MemberStatus = InferEnum<typeof organisationMemberStatus>;
   export type DomainStatus = InferEnum<typeof organisationDomainStatus>;
+  export type AppAccessMode = InferEnum<typeof organisationAppAccessMode>;
 }
 
 /**
@@ -37,12 +38,20 @@ export const organisationMemberRole = pgEnum('organisation_member_role', ['OWNER
 export const organisationMemberStatus = pgEnum('organisation_member_status', ['ACTIVE', 'SUSPENDED', 'BLOCKED']);
 export const organisationDomainStatus = pgEnum('organisation_domain_status', ['PENDING', 'VERIFIED', 'FAILED']);
 
+/**
+ * Whether the org's members get every app it could reach (`ALL_APPS`) or only an explicitly assigned
+ * allowlist (`ASSIGNED_ONLY`) (T-901). A plain column, not an `organisation_policies` key: the policy
+ * registry folds a value across every applicable org, whereas this is read for one specific org.
+ */
+export const organisationAppAccessMode = pgEnum('organisation_app_access_mode', ['ALL_APPS', 'ASSIGNED_ONLY']);
+
 export const organisations = pgTable('organisations', {
   id: bigserial('id', { mode: 'bigint' }).primaryKey(),
   slug: varchar('slug', { length: 64 }).notNull().unique(),
   name: varchar('name', { length: 255 }).notNull(),
   type: organisationType('type').notNull().default('TEAM'),
   status: organisationStatus('status').notNull().default('ACTIVE'),
+  appAccessMode: organisationAppAccessMode('app_access_mode').notNull().default('ALL_APPS'),
   deletedAt: timestamp('deleted_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),

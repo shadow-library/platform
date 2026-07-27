@@ -31,6 +31,12 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly APP_004 = AppErrorCode.conflict('APP_004', 'The platform application cannot be modified or deleted', 403);
   /** The application still owns OAuth clients (FK restrict) and cannot be deleted */
   static readonly APP_005 = AppErrorCode.conflict('APP_005', 'The application still has registered OAuth clients');
+  /** The application is inactive, or INTERNAL to a caller with no qualifying platform membership — answered as an unknown application (D-A3) */
+  static readonly APP_006 = AppErrorCode.notFound('APP_006', 'Application not found');
+  /** The application is visible to the caller but not granted to them by any organisation */
+  static readonly APP_007 = AppErrorCode.forbidden('APP_007', 'Access to this application is denied');
+  /** Only a RESTRICTED application can be released to an organisation (PUBLIC is already universal, INTERNAL is staff-only) */
+  static readonly APP_008 = AppErrorCode.validation('APP_008', 'Only a restricted application can be released to an organisation', 400);
 
   /*!
    * User Error Codes
@@ -156,6 +162,8 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly ORG_009 = AppErrorCode.conflict('ORG_009', 'Domain already registered');
   /** The domain record does not exist in this organisation */
   static readonly ORG_010 = AppErrorCode.notFound('ORG_010', 'Domain not found');
+  /** The application cannot be assigned because the organisation's members could never reach it (inactive, INTERNAL, or an unreleased RESTRICTED app) */
+  static readonly ORG_011 = AppErrorCode.validation('ORG_011', 'The application cannot be assigned to this organisation', 400);
 
   /*!
    * Organisation Policy Error Codes

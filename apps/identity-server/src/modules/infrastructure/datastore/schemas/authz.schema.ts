@@ -26,7 +26,7 @@ export namespace RoleAssignment {
  * Declaring the constants
  */
 
-export const principalType = pgEnum('principal_type', ['USER', 'SERVICE_ACCOUNT']);
+export const principalType = pgEnum('principal_type', ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION']);
 
 export const permissions = pgTable(
   'permissions',

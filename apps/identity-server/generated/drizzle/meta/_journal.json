@@ -15,6 +15,20 @@
       "when": 1785071931843,
       "tag": "0001_amazing_revanche",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1785093527930,
+      "tag": "0002_slim_iron_fist",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1785125047865,
+      "tag": "0003_great_penance",
+      "breakpoints": true
     }
   ]
 }
