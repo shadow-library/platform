@@ -356,7 +356,7 @@ export interface paths {
     delete: operations['delete_api_v1_organisations_organisationId'];
     options?: never;
     head?: never;
-    /** Rename Organisation */
+    /** Update Organisation */
     patch: operations['patch_api_v1_organisations_organisationId'];
     trace?: never;
   };
@@ -442,6 +442,41 @@ export interface paths {
     post?: never;
     /** Revoke Organisation Invitation */
     delete: operations['delete_api_v1_organisations_organisationId_invitations_invitationId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/applications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Organisation Applications */
+    get: operations['get_api_v1_organisations_organisationId_applications'];
+    put?: never;
+    /** Assign Organisation Application */
+    post: operations['post_api_v1_organisations_organisationId_applications'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/organisations/{organisationId}/applications/{applicationId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Unassign Organisation Application */
+    delete: operations['delete_api_v1_organisations_organisationId_applications_applicationId'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1667,6 +1702,41 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/admin/applications/{applicationId}/organisations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Application Organisations */
+    get: operations['get_api_v1_admin_applications_applicationId_organisations'];
+    put?: never;
+    /** Release Application */
+    post: operations['post_api_v1_admin_applications_applicationId_organisations'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/applications/{applicationId}/organisations/{organisationId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Revoke Application Release */
+    delete: operations['delete_api_v1_admin_applications_applicationId_organisations_organisationId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/clients': {
     parameters: {
       query?: never;
@@ -2345,8 +2415,10 @@ export interface components {
       displayName?: string;
       subDomain: string;
       isActive: boolean;
-      firstUsedAt: string;
-      lastUsedAt: string;
+      homePageUrl?: string;
+      logoUrl?: string;
+      firstUsedAt?: string;
+      lastUsedAt?: string;
     };
     CreateOrganisationBody: {
       name: string;
@@ -2360,10 +2432,14 @@ export interface components {
       type: 'PERSONAL' | 'TEAM';
       /** @enum {string} */
       status: 'ACTIVE' | 'SUSPENDED' | 'DELETED';
+      /** @enum {string} */
+      appAccessMode: 'ALL_APPS' | 'ASSIGNED_ONLY';
       createdAt: string;
     };
-    RenameOrganisationBody: {
-      name: string;
+    UpdateOrganisationBody: {
+      name?: string;
+      /** @enum {string} */
+      appAccessMode?: 'ALL_APPS' | 'ASSIGNED_ONLY';
     };
     OrganisationActionResponse: {
       success: boolean;
@@ -2407,6 +2483,25 @@ export interface components {
       email: string;
       /** @enum {string} */
       role: 'ADMIN' | 'MEMBER';
+    };
+    OrganisationApplicationsResponse: {
+      /** @enum {string} */
+      appAccessMode: 'ALL_APPS' | 'ASSIGNED_ONLY';
+      applications: components['schemas']['OrganisationApplicationItem'][];
+    };
+    OrganisationApplicationItem: {
+      id: number;
+      name: string;
+      displayName?: string;
+      subDomain: string;
+      logoUrl?: string;
+      homePageUrl?: string;
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
+      assigned: boolean;
+    };
+    AssignApplicationBody: {
+      applicationId: string;
     };
     MyOrganisationsResponse: {
       organisations: components['schemas']['MyOrganisationItem'][];
@@ -2470,6 +2565,7 @@ export interface components {
       name: string;
       description?: string;
       permissions: string[];
+      default?: boolean;
     };
     CatalogSyncResponse: {
       permissionsUpserted: number;
@@ -2928,6 +3024,8 @@ export interface components {
       displayName?: string;
       subDomain: string;
       isActive: boolean;
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
       createdAt: string;
     };
     CreateApplicationBody: {
@@ -2952,6 +3050,8 @@ export interface components {
       displayName?: string;
       subDomain: string;
       isActive: boolean;
+      /** @enum {string} */
+      visibility: 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
       createdAt: string;
       description?: string;
       homePageUrl?: string;
@@ -2972,6 +3072,8 @@ export interface components {
       homePageUrl?: string;
       logoUrl?: string;
       isActive?: boolean;
+      /** @enum {string} */
+      visibility?: 'PUBLIC' | 'RESTRICTED' | 'INTERNAL';
       publicUrls?: string[];
     };
     ApplicationMemberListResponse: {
@@ -2983,6 +3085,21 @@ export interface components {
       primaryEmail?: string;
       firstUsedAt: string;
       lastUsedAt: string;
+    };
+    ApplicationOrganisationListResponse: {
+      items: components['schemas']['ApplicationOrganisationItem'][];
+    };
+    ApplicationOrganisationItem: {
+      organisationId: string;
+      slug: string;
+      name: string;
+      /** @enum {string} */
+      source: 'PLATFORM_RELEASE' | 'ORG_ASSIGNMENT';
+      assignedAt: string;
+      assignedBy?: string;
+    };
+    ReleaseApplicationBody: {
+      organisationId: string;
     };
     ClientListResponse: {
       items: components['schemas']['ClientSummaryItem'][];
@@ -3090,7 +3207,7 @@ export interface components {
     };
     RoleAssignmentBody: {
       /** @enum {string} */
-      principalType: 'USER' | 'SERVICE_ACCOUNT';
+      principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
       principalId: string;
       roleId: number;
       organisationId: string;
@@ -3101,7 +3218,7 @@ export interface components {
     RoleAssignmentItem: {
       id: string;
       /** @enum {string} */
-      principalType: 'USER' | 'SERVICE_ACCOUNT';
+      principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
       principalId: string;
       roleId: number;
       organisationId: string;
@@ -3116,6 +3233,7 @@ export interface components {
       entityId: string;
       name: string;
       acsUrl: string;
+      applicationId?: number;
       /** @enum {string} */
       nameIdFormat: 'EMAIL' | 'PERSISTENT';
       releasedAttributes: string[];
@@ -3126,6 +3244,7 @@ export interface components {
       entityId: string;
       name: string;
       acsUrl: string;
+      applicationId?: number;
       /** @enum {string} */
       nameIdFormat?: 'EMAIL' | 'PERSISTENT';
       releasedAttributes?: string[];
@@ -3134,6 +3253,7 @@ export interface components {
     UpdateServiceProviderBody: {
       name?: string;
       acsUrl?: string;
+      applicationId?: number | null;
       /** @enum {string} */
       nameIdFormat?: 'EMAIL' | 'PERSISTENT';
       releasedAttributes?: string[];
@@ -4205,7 +4325,7 @@ export interface operations {
     };
     requestBody?: {
       content: {
-        'application/json': components['schemas']['RenameOrganisationBody'];
+        'application/json': components['schemas']['UpdateOrganisationBody'];
       };
     };
     responses: {
@@ -4500,6 +4620,131 @@ export interface operations {
       path: {
         organisationId: string;
         invitationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_organisations_organisationId_applications: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationApplicationsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_organisations_organisationId_applications: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['AssignApplicationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['OrganisationActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_organisations_organisationId_applications_applicationId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        organisationId: string;
+        applicationId: string;
       };
       cookie?: never;
     };
@@ -7933,6 +8178,131 @@ export interface operations {
       };
     };
   };
+  get_api_v1_admin_applications_applicationId_organisations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ApplicationOrganisationListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_applications_applicationId_organisations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        applicationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: {
+      content: {
+        'application/json': components['schemas']['ReleaseApplicationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_admin_applications_applicationId_organisations_organisationId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        applicationId: string;
+        organisationId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
   get_api_v1_admin_clients: {
     parameters: {
       query?: {
@@ -8431,7 +8801,7 @@ export interface operations {
   get_api_v1_admin_role_assignments: {
     parameters: {
       query?: {
-        principalType?: 'USER' | 'SERVICE_ACCOUNT';
+        principalType?: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
         principalId?: string;
         organisationId?: string;
         roleId?: number | string;
@@ -9703,7 +10073,7 @@ export type MyApplicationsResponse = components['schemas']['MyApplicationsRespon
 export type MyApplicationItem = components['schemas']['MyApplicationItem'];
 export type CreateOrganisationBody = components['schemas']['CreateOrganisationBody'];
 export type OrganisationResponse = components['schemas']['OrganisationResponse'];
-export type RenameOrganisationBody = components['schemas']['RenameOrganisationBody'];
+export type UpdateOrganisationBody = components['schemas']['UpdateOrganisationBody'];
 export type OrganisationActionResponse = components['schemas']['OrganisationActionResponse'];
 export type MembersResponse = components['schemas']['MembersResponse'];
 export type MemberItem = components['schemas']['MemberItem'];
@@ -9712,6 +10082,9 @@ export type UpdateMemberStatusBody = components['schemas']['UpdateMemberStatusBo
 export type InvitationsResponse = components['schemas']['InvitationsResponse'];
 export type InvitationItem = components['schemas']['InvitationItem'];
 export type InviteMemberBody = components['schemas']['InviteMemberBody'];
+export type OrganisationApplicationsResponse = components['schemas']['OrganisationApplicationsResponse'];
+export type OrganisationApplicationItem = components['schemas']['OrganisationApplicationItem'];
+export type AssignApplicationBody = components['schemas']['AssignApplicationBody'];
 export type MyOrganisationsResponse = components['schemas']['MyOrganisationsResponse'];
 export type MyOrganisationItem = components['schemas']['MyOrganisationItem'];
 export type InvitationTokenBody = components['schemas']['InvitationTokenBody'];
@@ -9821,6 +10194,9 @@ export type ApplicationRoleItem = components['schemas']['ApplicationRoleItem'];
 export type UpdateApplicationBody = components['schemas']['UpdateApplicationBody'];
 export type ApplicationMemberListResponse = components['schemas']['ApplicationMemberListResponse'];
 export type ApplicationMemberItem = components['schemas']['ApplicationMemberItem'];
+export type ApplicationOrganisationListResponse = components['schemas']['ApplicationOrganisationListResponse'];
+export type ApplicationOrganisationItem = components['schemas']['ApplicationOrganisationItem'];
+export type ReleaseApplicationBody = components['schemas']['ReleaseApplicationBody'];
 export type ClientListResponse = components['schemas']['ClientListResponse'];
 export type ClientSummaryItem = components['schemas']['ClientSummaryItem'];
 export type RegisterClientBody = components['schemas']['RegisterClientBody'];
@@ -9861,6 +10237,7 @@ export type GetConsentPromptQueryParams = Exclude<paths['/api/v1/auth/consent'][
 export type GetOrganisationDetailsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}']['get']['parameters']['path'], undefined>;
 export type ListOrganisationMembersPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/members']['get']['parameters']['path'], undefined>;
 export type ListOrganisationInvitationsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/invitations']['get']['parameters']['path'], undefined>;
+export type ListOrganisationApplicationsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/applications']['get']['parameters']['path'], undefined>;
 export type ListDomainsPathParams = Exclude<paths['/api/v1/organisations/{organisationId}/domains']['get']['parameters']['path'], undefined>;
 export type HandleSamlSsoQueryParams = Exclude<paths['/saml2/sso']['get']['parameters']['query'], undefined>;
 export type ResumeSamlSsoQueryParams = Exclude<paths['/saml2/sso/resume']['get']['parameters']['query'], undefined>;
@@ -9873,6 +10250,7 @@ export type GetUserDetailPathParams = Exclude<paths['/api/v1/admin/users/{userId
 export type GetUserAuditTrailPathParams = Exclude<paths['/api/v1/admin/users/{userId}/audit']['get']['parameters']['path'], undefined>;
 export type GetApplicationDetailsPathParams = Exclude<paths['/api/v1/admin/applications/{applicationId}']['get']['parameters']['path'], undefined>;
 export type ListApplicationMembersPathParams = Exclude<paths['/api/v1/admin/applications/{applicationId}/members']['get']['parameters']['path'], undefined>;
+export type ListApplicationOrganisationsPathParams = Exclude<paths['/api/v1/admin/applications/{applicationId}/organisations']['get']['parameters']['path'], undefined>;
 export type ListClientsQueryParams = Exclude<paths['/api/v1/admin/clients']['get']['parameters']['query'], undefined>;
 export type GetClientDetailsPathParams = Exclude<paths['/api/v1/admin/clients/{clientId}']['get']['parameters']['path'], undefined>;
 export type ListApplicationPermissionsQueryParams = Exclude<paths['/api/v1/admin/permissions']['get']['parameters']['query'], undefined>;

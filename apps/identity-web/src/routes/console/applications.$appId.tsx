@@ -30,7 +30,7 @@ import {
  * Importing user defined modules
  */
 import { ArrowLeftIcon, ExternalLinkIcon } from '@/components/icons';
-import { StatusChip } from '@/components/si';
+import { type ChipIntent, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import { useStepUpGate } from '@/features/portal';
 import {
@@ -39,19 +39,24 @@ import {
   adminClientsQueryOptions,
   adminResourcesQueryOptions,
   type ApplicationMemberItem,
+  type ApplicationOrganisationItem,
+  type ApplicationVisibility,
   type ClientDetailResponse,
   type ResourceItem,
   type UpdateApplicationBody,
   type UpdateClientBody,
   useApplicationMembersQuery,
+  useApplicationOrganisationsQuery,
   useApplicationQuery,
   useClientQuery,
   useClientsQuery,
   useCreateScopeMutation,
   useDeleteApplicationMutation,
   useGrantClientScopeMutation,
+  useReleaseApplicationMutation,
   useRemoveApplicationMemberMutation,
   useResourcesQuery,
+  useRevokeApplicationReleaseMutation,
   useRevokeClientScopeMutation,
   useRootDomain,
   useRotateClientSecretMutation,
@@ -65,9 +70,15 @@ import styles from './console.module.css';
 /**
  * Defining types
  */
-type Tab = 'overview' | 'credentials' | 'api' | 'roles' | 'members';
+type Tab = 'overview' | 'credentials' | 'api' | 'roles' | 'members' | 'organisations';
 
 type Require = (action: () => void) => void;
+
+interface VisibilityMeta {
+  label: string;
+  description: string;
+  intent: ChipIntent;
+}
 
 /**
  * Declaring the constants
@@ -81,7 +92,7 @@ export const Route = createFileRoute('/console/applications/$appId')({
   /** The open tab lives in the URL (`?tab=`) so it survives refresh and is deep-linkable; absent means overview. */
   validateSearch: (search: Record<string, unknown>): { tab?: Tab } => {
     const tab = search.tab;
-    return { tab: tab === 'credentials' || tab === 'api' || tab === 'roles' || tab === 'members' ? tab : undefined };
+    return { tab: tab === 'credentials' || tab === 'api' || tab === 'roles' || tab === 'members' || tab === 'organisations' ? tab : undefined };
   },
   loader: ({ context, params }) =>
     Promise.all([
@@ -99,7 +110,18 @@ const TABS: { key: Tab; label: string }[] = [
   { key: 'api', label: 'API & scopes' },
   { key: 'roles', label: 'Roles' },
   { key: 'members', label: 'Members' },
+  { key: 'organisations', label: 'Organisations' },
 ];
+
+/**
+ * Visibility decides who could ever be granted the app (D-A1): PUBLIC to everyone, RESTRICTED only to the
+ * organisations a platform admin releases it to, INTERNAL to platform staff alone (hidden from the rest).
+ */
+const VISIBILITY: Record<ApplicationVisibility, VisibilityMeta> = {
+  PUBLIC: { label: 'Public', description: 'Generally available — every organisation and personal workspace can use it.', intent: 'success' },
+  RESTRICTED: { label: 'Restricted', description: 'Only organisations you release it to can use it. Manage releases in the Organisations tab.', intent: 'warning' },
+  INTERNAL: { label: 'Internal', description: 'Platform staff only. It is hidden from everyone else — refused as an unknown application.', intent: 'info' },
+};
 
 const AUTH_METHOD_LABEL: Record<string, string> = {
   none: 'PKCE (no secret)',
@@ -167,7 +189,11 @@ function ApplicationDetailPage(): React.JSX.Element {
     api: resource?.scopes.length,
     roles: data.roles.length,
     members: allMembers.length,
+    organisations: undefined,
   };
+  // The Organisations tab only makes sense for a RESTRICTED app — a PUBLIC/INTERNAL app has no per-org releases.
+  const visibleTabs = TABS.filter(item => item.key !== 'organisations' || data.visibility === 'RESTRICTED');
+  const visibility = VISIBILITY[data.visibility];
   const homeLabel = data.homePageUrl ? data.homePageUrl.replace(/^https?:\/\//, '') : `${data.subDomain}.${rootDomain}`;
   const homeUrl = data.homePageUrl || `https://${data.subDomain}.${rootDomain}`;
 
@@ -207,6 +233,17 @@ function ApplicationDetailPage(): React.JSX.Element {
       ),
     );
 
+  const changeVisibility = (value: string): void => {
+    const next = value as ApplicationVisibility;
+    if (next === data.visibility) return;
+    require(() =>
+      update.mutate(
+        { appId, body: { visibility: next } },
+        { onSuccess: () => toast.success(`Visibility set to ${VISIBILITY[next].label}`), onError: error => toast.danger(error.message) },
+      ),
+    );
+  };
+
   return (
     <div className={styles.page}>
       <button className={styles.backLink} onClick={() => navigate({ to: '/console/applications' })}>
@@ -223,6 +260,7 @@ function ApplicationDetailPage(): React.JSX.Element {
             <StatusChip intent={data.isActive ? 'success' : 'neutral'} dot>
               {data.isActive ? 'Active' : 'Inactive'}
             </StatusChip>
+            <StatusChip intent={visibility.intent}>{visibility.label}</StatusChip>
           </div>
           <div className={styles.detailMeta}>
             <span className={styles.detailMetaId}>{data.name}</span>
@@ -236,7 +274,7 @@ function ApplicationDetailPage(): React.JSX.Element {
       </div>
 
       <div className={styles.appTabs}>
-        {TABS.map(item => (
+        {visibleTabs.map(item => (
           <button
             key={item.key}
             className={styles.appTab}
@@ -299,8 +337,37 @@ function ApplicationDetailPage(): React.JSX.Element {
               </div>
             </div>
           </div>
+
+          <div className={styles.detailCard}>
+            <div className={styles.tabHead}>
+              <div className={styles.tabHeadMain}>
+                <h2 className={styles.tabTitle}>Visibility</h2>
+                <p className={styles.tabDesc}>{visibility.description}</p>
+              </div>
+              <div style={{ minWidth: 200 }}>
+                <Select value={data.visibility} onValueChange={changeVisibility}>
+                  <Select.Item value="PUBLIC" description={VISIBILITY.PUBLIC.description}>
+                    {VISIBILITY.PUBLIC.label}
+                  </Select.Item>
+                  <Select.Item value="RESTRICTED" description={VISIBILITY.RESTRICTED.description}>
+                    {VISIBILITY.RESTRICTED.label}
+                  </Select.Item>
+                  <Select.Item value="INTERNAL" description={VISIBILITY.INTERNAL.description}>
+                    {VISIBILITY.INTERNAL.label}
+                  </Select.Item>
+                </Select>
+              </div>
+            </div>
+            {data.visibility === 'RESTRICTED' && (
+              <Button variant="secondary" size="sm" onClick={() => navigate({ search: prev => ({ ...prev, tab: 'organisations' }), replace: true })}>
+                Manage organisations
+              </Button>
+            )}
+          </div>
         </div>
       )}
+
+      {tab === 'organisations' && <OrganisationsTab appId={appId} require={require} />}
 
       {tab === 'credentials' && (
         <CredentialsTab appId={appId} appName={data.name} publicUrls={data.publicUrls} client={clientDetail.data} loading={clientDetail.isLoading} require={require} />
@@ -465,6 +532,105 @@ function ApplicationDetailPage(): React.JSX.Element {
         }
       />
       {dialog}
+    </div>
+  );
+}
+
+const RELEASE_SOURCE: Record<ApplicationOrganisationItem['source'], { label: string; intent: ChipIntent }> = {
+  PLATFORM_RELEASE: { label: 'Released', intent: 'info' },
+  ORG_ASSIGNMENT: { label: 'Org-assigned', intent: 'neutral' },
+};
+
+/**
+ * Releases of a RESTRICTED application (D-A1). A PLATFORM_RELEASE row is one the platform admin controls
+ * here; an ORG_ASSIGNMENT row is the organisation's own downstream choice of who gets it, shown read-only.
+ */
+function OrganisationsTab(props: { appId: string; require: Require }): React.JSX.Element {
+  const { appId, require } = props;
+  const orgs = useApplicationOrganisationsQuery(appId);
+  const release = useReleaseApplicationMutation();
+  const revoke = useRevokeApplicationReleaseMutation();
+  const [orgIdInput, setOrgIdInput] = useState('');
+
+  const rows = orgs.data?.items ?? [];
+
+  const doRelease = (): void => {
+    const organisationId = orgIdInput.trim();
+    if (!organisationId) {
+      toast.danger('Enter an organisation ID to release to.');
+      return;
+    }
+    require(() =>
+      release.mutate(
+        { appId, organisationId },
+        {
+          onSuccess: () => {
+            toast.success('Application released to organisation');
+            setOrgIdInput('');
+          },
+          onError: error => toast.danger(error.message),
+        },
+      ),
+    );
+  };
+
+  const doRevoke = (organisationId: string): void =>
+    require(() => revoke.mutate({ appId, organisationId }, { onSuccess: () => toast.success('Release revoked'), onError: error => toast.danger(error.message) }));
+
+  return (
+    <div className={styles.page}>
+      <div className={styles.tabHead}>
+        <div className={styles.tabHeadMain}>
+          <h2 className={styles.tabTitle}>Organisations</h2>
+          <p className={styles.tabDesc}>
+            This application is restricted: only the organisations you release it to may use it. Each organisation then chooses which of its members get it.
+          </p>
+        </div>
+      </div>
+
+      <div className={styles.toolbar}>
+        <div className={styles.search}>
+          <Input size="sm" placeholder="Organisation ID to release…" value={orgIdInput} onValueChange={setOrgIdInput} />
+        </div>
+        <Button variant="primary" size="sm" loading={release.isPending} onClick={doRelease}>
+          Release
+        </Button>
+      </div>
+
+      <div className={styles.tableCard}>
+        <Table
+          data={rows}
+          rowKey="organisationId"
+          loading={orgs.isLoading}
+          aria-label="Organisations"
+          emptyState={<EmptyState size="inline" title="No organisations yet" description="Release this application to an organisation to let its members use it." />}
+          columns={[
+            {
+              id: 'org',
+              header: 'Organisation',
+              cell: item => (
+                <div className={styles.cellMain}>
+                  <div className={styles.cellName}>{item.name}</div>
+                  <div className={styles.cellSub}>{item.slug}</div>
+                </div>
+              ),
+            },
+            { id: 'source', header: 'Source', cell: item => <StatusChip intent={RELEASE_SOURCE[item.source].intent}>{RELEASE_SOURCE[item.source].label}</StatusChip> },
+            { id: 'assignedAt', header: 'Since', cell: item => <span className={styles.muted}>{formatDate(item.assignedAt)}</span> },
+            {
+              id: 'actions',
+              header: '',
+              align: 'end',
+              cell: item =>
+                item.source === 'PLATFORM_RELEASE' ? (
+                  <Button variant="ghost" size="sm" onClick={() => doRevoke(item.organisationId)}>
+                    Revoke
+                  </Button>
+                ) : null,
+            },
+          ]}
+        />
+      </div>
     </div>
   );
 }

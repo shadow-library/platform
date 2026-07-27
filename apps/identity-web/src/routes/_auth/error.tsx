@@ -19,6 +19,10 @@ interface ErrorSearch {
   error?: string;
   error_description?: string;
   request_id?: string;
+  /** Set by the authorize deny redirect (D-A3): the display name of the app access was refused to. */
+  application?: string;
+  /** The OAuth client that triggered the denial; absent on the SAML deny path. */
+  client_id?: string;
 }
 
 interface Variant {
@@ -66,6 +70,8 @@ export const Route = createFileRoute('/_auth/error')({
     error: typeof search.error === 'string' ? search.error : undefined,
     error_description: typeof search.error_description === 'string' ? search.error_description : undefined,
     request_id: typeof search.request_id === 'string' ? search.request_id : undefined,
+    application: typeof search.application === 'string' ? search.application : undefined,
+    client_id: typeof search.client_id === 'string' ? search.client_id : undefined,
   }),
   component: ErrorPage,
 });
@@ -73,7 +79,17 @@ export const Route = createFileRoute('/_auth/error')({
 function ErrorPage(): React.JSX.Element {
   const search = Route.useSearch();
   const code = search.error ?? 'server_error';
-  const variant = code in VARIANTS ? VARIANTS[code as keyof typeof VARIANTS] : VARIANTS.server_error;
+  const base = code in VARIANTS ? VARIANTS[code as keyof typeof VARIANTS] : VARIANTS.server_error;
+  // The authorize deny redirect names the app it refused (D-A3); when present we say which app and why,
+  // so a refused customer knows exactly whom to ask rather than seeing a generic wall.
+  const variant: Variant =
+    code === 'access_denied' && search.application
+      ? {
+          ...base,
+          title: `You don’t have access to ${search.application}`,
+          message: `Your organization hasn’t given you access to ${search.application}. Contact your organization’s administrator to request it.`,
+        }
+      : base;
 
   return (
     <AuthScreen

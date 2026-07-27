@@ -19,8 +19,9 @@ export const Route = createFileRoute('/_portal/applications')({
   component: ApplicationsPage,
 });
 
+/** Prefer the app's declared home page; fall back to its subdomain on the platform root domain. */
 function appUrl(app: MyApplication, rootDomain: string): string {
-  return `https://${app.subDomain}.${rootDomain}`;
+  return app.homePageUrl || `https://${app.subDomain}.${rootDomain}`;
 }
 
 function ApplicationsPage(): React.JSX.Element {
@@ -30,20 +31,20 @@ function ApplicationsPage(): React.JSX.Element {
 
   return (
     <div className={styles.page}>
-      <PageHeader title="My applications" subtitle="Every app you use across the Shadow ecosystem. Jump straight back in." />
+      <PageHeader title="My applications" subtitle="Every app you can access across the Shadow ecosystem. Jump straight in." />
 
       <QueryState
         isLoading={apps.isLoading}
         error={apps.error}
         isEmpty={list.length === 0}
         emptyTitle="No applications yet"
-        emptyDescription="Apps you sign in to will appear here."
+        emptyDescription="Apps you can access will appear here."
       >
         <div className={styles.grid}>
           {list.map(app => (
             <a key={app.id} href={appUrl(app, rootDomain)} target="_blank" rel="noreferrer" className={`si-cardhover ${styles.card}`}>
               <div className={styles.cardTop}>
-                <Avatar name={app.displayName ?? app.name} shape="square" size="lg" />
+                <Avatar name={app.displayName ?? app.name} src={app.logoUrl} shape="square" size="lg" />
                 <ExternalLinkIcon size={16} className={styles.extIcon} />
               </div>
               <div className={styles.cardName}>{app.displayName ?? app.name}</div>
@@ -58,7 +59,8 @@ function ApplicationsPage(): React.JSX.Element {
                 ) : (
                   <StatusChip intent="neutral">Inactive</StatusChip>
                 )}
-                <span className={styles.cardTime}>Used {relativeTime(app.lastUsedAt)}</span>
+                {/* An accessible-but-unused app has no last-used timestamp (D-A1): show it as new rather than a bogus time. */}
+                <span className={styles.cardTime}>{app.lastUsedAt ? `Used ${relativeTime(app.lastUsedAt)}` : 'Never used'}</span>
               </div>
             </a>
           ))}

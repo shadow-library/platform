@@ -73,6 +73,29 @@ can be completed end-to-end.
 - **DoD:** sign-out and session-management screens carry the corrected copy; no dead links or
   references to RP-initiated logout remain.
 
+## W-901 — Application access control, visibility & tiering UI (server T-901…T-904) · L _(server first)_ — done
+
+- **Change:** the server adds per-app visibility (`PUBLIC`/`RESTRICTED`/`INTERNAL`), per-org app
+  assignment with an `appAccessMode` (`ALL_APPS`/`ASSIGNED_ONLY`), org-wide role grants
+  (`principalType: ORGANISATION`), and turns `GET /me/applications` into all **accessible** apps.
+- **Fix:**
+  - **Denied page** — `/error?error=access_denied&application=&client_id=` now names the app and
+    explains "your organization hasn't given you access to <app>; contact your admin" (D-A3); the
+    generic variant is preserved when unnamed.
+  - **Console** — application detail gains a step-up-gated visibility selector, a header/list
+    visibility badge, and an "Organisations" tab (RESTRICTED only) to release/revoke orgs; roles gains
+    an *Organisation* principal type (id = org id) rendered sensibly in the assignments list.
+  - **Org workspace** — new admin-gated "Applications" tab: OWNER-only access-mode toggle (step-up)
+    with each mode explained, and per-app assign/unassign switches (ADMIN, step-up) with visibility
+    badges and empty/edge states, gated via `orgAccessOf`.
+  - **My applications** — consumes the extended payload: all accessible apps, "Never used" for
+    accessible-but-unused apps, `homePageUrl` preferred for the outbound link, `logoUrl` on the avatar.
+  - New API wrappers in `src/lib/apis/` (`organisation-application.api.ts` + admin-application release
+    endpoints) following the house server-fn + queryOptions + hooks + `*Keys` invalidation pattern,
+    typed off the regenerated `api-types.gen.ts`.
+- **DoD:** `bun run verify` passes; Playwright suite green (added `tests/error.spec.ts` for the denied
+  page render); API types regenerated from the running server's OpenAPI.
+
 ## Cross-cutting
 
 - Verify with `bun run verify` and the Playwright suite from inside this repo; W-1 and W-3 need a dev

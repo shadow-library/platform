@@ -30,6 +30,7 @@ interface OrgWorkspaceProps {
 const TABS = [
   { to: '/organizations/$orgId/settings', label: 'Settings', teamOnly: false, manageOnly: false },
   { to: '/organizations/$orgId/members', label: 'Members & roles', teamOnly: false, manageOnly: false },
+  { to: '/organizations/$orgId/applications', label: 'Applications', teamOnly: false, manageOnly: true },
   { to: '/organizations/$orgId/domains', label: 'Domains', teamOnly: true, manageOnly: false },
   { to: '/organizations/$orgId/providers', label: 'Identity providers', teamOnly: false, manageOnly: true },
   { to: '/organizations/$orgId/security', label: 'Security', teamOnly: false, manageOnly: true },

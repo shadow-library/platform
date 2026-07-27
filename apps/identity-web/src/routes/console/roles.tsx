@@ -8,7 +8,7 @@ import { Badge, Button, ConfirmDialog, Dialog, FormField, Input, Select, Spinner
 /**
  * Importing user defined modules
  */
-import { PlusIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
+import { BuildingIcon, PlusIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
 import { Mono, PageHeader } from '@/components/si';
 import { useStepUpGate } from '@/features/portal';
 import {
@@ -42,7 +42,14 @@ export const Route = createFileRoute('/console/roles')({
   component: RolesPage,
 });
 
-const PRINCIPAL_LABEL: Record<PrincipalType, string> = { USER: 'User', SERVICE_ACCOUNT: 'Service account' };
+const PRINCIPAL_LABEL: Record<PrincipalType, string> = { USER: 'User', SERVICE_ACCOUNT: 'Service account', ORGANISATION: 'Organisation' };
+
+/** An ORGANISATION grant is a vendor-controlled tier the whole org holds (D-A5); its principal *is* the organisation. */
+const PRINCIPAL_ICON: Record<PrincipalType, React.JSX.Element> = {
+  USER: <UserIcon size={15} />,
+  SERVICE_ACCOUNT: <TerminalIcon size={15} />,
+  ORGANISATION: <BuildingIcon size={15} />,
+};
 
 function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem; open: boolean; onOpenChange: (open: boolean) => void }): React.JSX.Element {
   const assign = useCreateRoleAssignmentMutation();
@@ -51,14 +58,20 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
   const [principalId, setPrincipalId] = useState('');
   const [organisationId, setOrganisationId] = useState('');
 
+  // An ORGANISATION grant is scoped to the org itself: its principal *is* the organisation, so the one
+  // identifier serves as both principal and scope (the server derives the scope either way — D-A5).
+  const isOrg = principalType === 'ORGANISATION';
+
   const submit = (): void => {
-    if (!principalId.trim() || !organisationId.trim()) {
-      toast.danger('Principal ID and organisation ID are required.');
+    const principal = isOrg ? organisationId.trim() : principalId.trim();
+    const orgScope = organisationId.trim();
+    if (!principal || !orgScope) {
+      toast.danger(isOrg ? 'Organisation ID is required.' : 'Principal ID and organisation ID are required.');
       return;
     }
     require(() =>
       assign.mutate(
-        { principalType, principalId: principalId.trim(), roleId: role.id, organisationId: organisationId.trim() },
+        { principalType, principalId: principal, roleId: role.id, organisationId: orgScope },
         {
           onSuccess: () => {
             toast.success('Role assigned');
@@ -76,20 +89,25 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
         <Dialog.Content size="sm">
-          <Dialog.Header title={`Assign ${role.roleName}`} description="Grant this role to a user or service account within an organisation." />
+          <Dialog.Header title={`Assign ${role.roleName}`} description="Grant this role to a user, service account, or a whole organisation (a vendor-controlled tier)." />
           <Dialog.Body>
             <div className={styles.form}>
               <FormField label="Principal type" required>
                 <Select value={principalType} onValueChange={value => setPrincipalType(value as PrincipalType)}>
                   <Select.Item value="USER">User</Select.Item>
                   <Select.Item value="SERVICE_ACCOUNT">Service account</Select.Item>
+                  <Select.Item value="ORGANISATION" description="Grants the role to every member of the organisation">
+                    Organisation
+                  </Select.Item>
                 </Select>
               </FormField>
-              <FormField label="Principal ID" required helper="The user or service-account identifier.">
-                <Input value={principalId} onValueChange={setPrincipalId} placeholder="e.g. 481723…" autoFocus />
-              </FormField>
-              <FormField label="Organisation ID" required helper="The organisation the assignment applies within.">
-                <Input value={organisationId} onValueChange={setOrganisationId} placeholder="e.g. 90210…" />
+              {!isOrg && (
+                <FormField label="Principal ID" required helper="The user or service-account identifier.">
+                  <Input value={principalId} onValueChange={setPrincipalId} placeholder="e.g. 481723…" autoFocus />
+                </FormField>
+              )}
+              <FormField label="Organisation ID" required helper={isOrg ? 'The organisation that holds this role, org-wide.' : 'The organisation the assignment applies within.'}>
+                <Input value={organisationId} onValueChange={setOrganisationId} placeholder="e.g. 90210…" autoFocus={isOrg} />
               </FormField>
             </div>
           </Dialog.Body>
@@ -152,12 +170,12 @@ function AssignmentsPanel({ role }: { role: ApplicationRoleItem }): React.JSX.El
           <div key={item.id} className={styles.accessRow}>
             <div className={styles.accessMain}>
               <div className={styles.accessName}>
-                {item.principalType === 'USER' ? <UserIcon size={15} /> : <TerminalIcon size={15} />}
+                {PRINCIPAL_ICON[item.principalType]}
                 <Mono>{item.principalId}</Mono>
                 <Badge variant="outline">{PRINCIPAL_LABEL[item.principalType]}</Badge>
               </div>
               <div className={styles.accessSub}>
-                Org {item.organisationId} · granted {relativeTime(item.grantedAt)}
+                {item.principalType === 'ORGANISATION' ? 'Org-wide' : `Org ${item.organisationId}`} · granted {relativeTime(item.grantedAt)}
                 {item.grantedBy ? ` by ${item.grantedBy}` : ''}
               </div>
             </div>

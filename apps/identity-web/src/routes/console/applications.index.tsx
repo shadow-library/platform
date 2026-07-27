@@ -12,10 +12,24 @@ import { PlusIcon } from '@/components/icons';
 import { PageHeader, StatusChip } from '@/components/si';
 import { SecretDialog } from '@/features/console';
 import { useStepUpGate } from '@/features/portal';
-import { adminApplicationsQueryOptions, type CreateApplicationResponse, useApplicationsQuery, useCreateApplicationMutation, useRootDomain } from '@/lib/apis';
+import {
+  adminApplicationsQueryOptions,
+  type ApplicationVisibility,
+  type CreateApplicationResponse,
+  useApplicationsQuery,
+  useCreateApplicationMutation,
+  useRootDomain,
+} from '@/lib/apis';
 import { formatDate } from '@/lib/format';
 
 import styles from './console.module.css';
+
+/** Platform visibility, shown at a glance in the list (details and the selector live on the application page). */
+const VISIBILITY: Record<ApplicationVisibility, { label: string; intent: 'success' | 'warning' | 'info' }> = {
+  PUBLIC: { label: 'Public', intent: 'success' },
+  RESTRICTED: { label: 'Restricted', intent: 'warning' },
+  INTERNAL: { label: 'Internal', intent: 'info' },
+};
 
 export const Route = createFileRoute('/console/applications/')({
   loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
@@ -179,6 +193,7 @@ function ApplicationsPage(): React.JSX.Element {
                 </StatusChip>
               ),
             },
+            { id: 'visibility', header: 'Visibility', cell: app => <StatusChip intent={VISIBILITY[app.visibility].intent}>{VISIBILITY[app.visibility].label}</StatusChip> },
             { id: 'created', header: 'Created', cell: app => <span className={styles.muted}>{formatDate(app.createdAt)}</span> },
           ]}
         />

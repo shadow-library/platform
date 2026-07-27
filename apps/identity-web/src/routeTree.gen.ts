@@ -43,6 +43,7 @@ import { Route as PortalOrganizationsOrgIdSecurityRouteImport } from './routes/_
 import { Route as PortalOrganizationsOrgIdProvidersRouteImport } from './routes/_portal/organizations/$orgId/providers'
 import { Route as PortalOrganizationsOrgIdMembersRouteImport } from './routes/_portal/organizations/$orgId/members'
 import { Route as PortalOrganizationsOrgIdDomainsRouteImport } from './routes/_portal/organizations/$orgId/domains'
+import { Route as PortalOrganizationsOrgIdApplicationsRouteImport } from './routes/_portal/organizations/$orgId/applications'
 
 const ConsoleRoute = ConsoleRouteImport.update({
   id: '/console',
@@ -222,6 +223,12 @@ const PortalOrganizationsOrgIdDomainsRoute =
     path: '/domains',
     getParentRoute: () => PortalOrganizationsOrgIdRoute,
   } as any)
+const PortalOrganizationsOrgIdApplicationsRoute =
+  PortalOrganizationsOrgIdApplicationsRouteImport.update({
+    id: '/applications',
+    path: '/applications',
+    getParentRoute: () => PortalOrganizationsOrgIdRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -250,6 +257,7 @@ export interface FileRoutesByFullPath {
   '/organizations/': typeof PortalOrganizationsIndexRoute
   '/console/applications/': typeof ConsoleApplicationsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
+  '/organizations/$orgId/applications': typeof PortalOrganizationsOrgIdApplicationsRoute
   '/organizations/$orgId/domains': typeof PortalOrganizationsOrgIdDomainsRoute
   '/organizations/$orgId/members': typeof PortalOrganizationsOrgIdMembersRoute
   '/organizations/$orgId/providers': typeof PortalOrganizationsOrgIdProvidersRoute
@@ -282,6 +290,7 @@ export interface FileRoutesByTo {
   '/organizations': typeof PortalOrganizationsIndexRoute
   '/console/applications': typeof ConsoleApplicationsIndexRoute
   '/console/users': typeof ConsoleUsersIndexRoute
+  '/organizations/$orgId/applications': typeof PortalOrganizationsOrgIdApplicationsRoute
   '/organizations/$orgId/domains': typeof PortalOrganizationsOrgIdDomainsRoute
   '/organizations/$orgId/members': typeof PortalOrganizationsOrgIdMembersRoute
   '/organizations/$orgId/providers': typeof PortalOrganizationsOrgIdProvidersRoute
@@ -319,6 +328,7 @@ export interface FileRoutesById {
   '/_portal/organizations/': typeof PortalOrganizationsIndexRoute
   '/console/applications/': typeof ConsoleApplicationsIndexRoute
   '/console/users/': typeof ConsoleUsersIndexRoute
+  '/_portal/organizations/$orgId/applications': typeof PortalOrganizationsOrgIdApplicationsRoute
   '/_portal/organizations/$orgId/domains': typeof PortalOrganizationsOrgIdDomainsRoute
   '/_portal/organizations/$orgId/members': typeof PortalOrganizationsOrgIdMembersRoute
   '/_portal/organizations/$orgId/providers': typeof PortalOrganizationsOrgIdProvidersRoute
@@ -355,6 +365,7 @@ export interface FileRouteTypes {
     | '/organizations/'
     | '/console/applications/'
     | '/console/users/'
+    | '/organizations/$orgId/applications'
     | '/organizations/$orgId/domains'
     | '/organizations/$orgId/members'
     | '/organizations/$orgId/providers'
@@ -387,6 +398,7 @@ export interface FileRouteTypes {
     | '/organizations'
     | '/console/applications'
     | '/console/users'
+    | '/organizations/$orgId/applications'
     | '/organizations/$orgId/domains'
     | '/organizations/$orgId/members'
     | '/organizations/$orgId/providers'
@@ -423,6 +435,7 @@ export interface FileRouteTypes {
     | '/_portal/organizations/'
     | '/console/applications/'
     | '/console/users/'
+    | '/_portal/organizations/$orgId/applications'
     | '/_portal/organizations/$orgId/domains'
     | '/_portal/organizations/$orgId/members'
     | '/_portal/organizations/$orgId/providers'
@@ -679,6 +692,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PortalOrganizationsOrgIdDomainsRouteImport
       parentRoute: typeof PortalOrganizationsOrgIdRoute
     }
+    '/_portal/organizations/$orgId/applications': {
+      id: '/_portal/organizations/$orgId/applications'
+      path: '/applications'
+      fullPath: '/organizations/$orgId/applications'
+      preLoaderRoute: typeof PortalOrganizationsOrgIdApplicationsRouteImport
+      parentRoute: typeof PortalOrganizationsOrgIdRoute
+    }
   }
 }
 
@@ -703,6 +723,7 @@ const AuthRouteChildren: AuthRouteChildren = {
 const AuthRouteWithChildren = AuthRoute._addFileChildren(AuthRouteChildren)
 
 interface PortalOrganizationsOrgIdRouteChildren {
+  PortalOrganizationsOrgIdApplicationsRoute: typeof PortalOrganizationsOrgIdApplicationsRoute
   PortalOrganizationsOrgIdDomainsRoute: typeof PortalOrganizationsOrgIdDomainsRoute
   PortalOrganizationsOrgIdMembersRoute: typeof PortalOrganizationsOrgIdMembersRoute
   PortalOrganizationsOrgIdProvidersRoute: typeof PortalOrganizationsOrgIdProvidersRoute
@@ -713,6 +734,8 @@ interface PortalOrganizationsOrgIdRouteChildren {
 
 const PortalOrganizationsOrgIdRouteChildren: PortalOrganizationsOrgIdRouteChildren =
   {
+    PortalOrganizationsOrgIdApplicationsRoute:
+      PortalOrganizationsOrgIdApplicationsRoute,
     PortalOrganizationsOrgIdDomainsRoute: PortalOrganizationsOrgIdDomainsRoute,
     PortalOrganizationsOrgIdMembersRoute: PortalOrganizationsOrgIdMembersRoute,
     PortalOrganizationsOrgIdProvidersRoute:

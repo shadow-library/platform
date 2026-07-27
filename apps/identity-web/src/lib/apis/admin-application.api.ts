@@ -13,10 +13,13 @@ import {
   type ApplicationListResponse,
   type ApplicationMemberItem,
   type ApplicationMemberListResponse,
+  type ApplicationOrganisationItem,
+  type ApplicationOrganisationListResponse,
   type ApplicationRoleItem,
   type ApplicationSummaryItem,
   type CreateApplicationBody,
   type CreateApplicationResponse,
+  type ReleaseApplicationBody,
   type UpdateApplicationBody,
 } from './api-types.gen';
 import { serverFetch } from './server-fetch';
@@ -30,12 +33,18 @@ export type {
   ApplicationListResponse,
   ApplicationMemberItem,
   ApplicationMemberListResponse,
+  ApplicationOrganisationItem,
+  ApplicationOrganisationListResponse,
   ApplicationRoleItem,
   ApplicationSummaryItem,
   CreateApplicationBody,
   CreateApplicationResponse,
+  ReleaseApplicationBody,
   UpdateApplicationBody,
 };
+
+/** An application's platform visibility: who could ever be granted it (D-A1). */
+export type ApplicationVisibility = ApplicationDetailResponse['visibility'];
 
 /**
  * Declaring the constants
@@ -45,6 +54,7 @@ export const adminApplicationKeys = {
   list: () => [...adminApplicationKeys.all, 'list'] as const,
   detail: (id: string) => [...adminApplicationKeys.all, id] as const,
   members: (id: string) => [...adminApplicationKeys.all, id, 'members'] as const,
+  organisations: (id: string) => [...adminApplicationKeys.all, id, 'organisations'] as const,
 };
 
 /* ---------- server functions ---------- */
@@ -68,6 +78,15 @@ const deleteApplication = createServerFn({ method: 'POST' })
 const removeApplicationMember = createServerFn({ method: 'POST' })
   .validator((input: { appId: string; userId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/applications/${data.appId}/members/${data.userId}` }));
+const fetchApplicationOrganisations = createServerFn({ method: 'GET' })
+  .validator((appId: string) => appId)
+  .handler(({ data }) => serverFetch<ApplicationOrganisationListResponse>({ method: 'GET', path: `/admin/applications/${data}/organisations` }));
+const releaseApplication = createServerFn({ method: 'POST' })
+  .validator((input: { appId: string; organisationId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: `/admin/applications/${data.appId}/organisations`, body: { organisationId: data.organisationId } }));
+const revokeApplicationRelease = createServerFn({ method: 'POST' })
+  .validator((input: { appId: string; organisationId: string }) => input)
+  .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/applications/${data.appId}/organisations/${data.organisationId}` }));
 
 /* ---------- queries ---------- */
 
@@ -134,5 +153,34 @@ export function useRemoveApplicationMemberMutation(): UseMutationResult<undefine
   return useMutation<undefined, ApiError, { appId: string; userId: string }>({
     mutationFn: input => call(removeApplicationMember({ data: input })),
     onSuccess: (_data, { appId }) => queryClient.invalidateQueries({ queryKey: adminApplicationKeys.members(appId) }),
+  });
+}
+
+/* ---------- releases (RESTRICTED apps) ---------- */
+
+export const adminApplicationOrganisationsQueryOptions = (appId: string, enabled = true) =>
+  queryOptions<ApplicationOrganisationListResponse, ApiError>({
+    queryKey: adminApplicationKeys.organisations(appId),
+    queryFn: () => call(fetchApplicationOrganisations({ data: appId })),
+    enabled: enabled && Boolean(appId),
+  });
+
+export function useApplicationOrganisationsQuery(appId: string, enabled = true): UseQueryResult<ApplicationOrganisationListResponse, ApiError> {
+  return useQuery(adminApplicationOrganisationsQueryOptions(appId, enabled));
+}
+
+export function useReleaseApplicationMutation(): UseMutationResult<undefined, ApiError, { appId: string; organisationId: string }> {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, ApiError, { appId: string; organisationId: string }>({
+    mutationFn: input => call(releaseApplication({ data: input })),
+    onSuccess: (_data, { appId }) => queryClient.invalidateQueries({ queryKey: adminApplicationKeys.organisations(appId) }),
+  });
+}
+
+export function useRevokeApplicationReleaseMutation(): UseMutationResult<undefined, ApiError, { appId: string; organisationId: string }> {
+  const queryClient = useQueryClient();
+  return useMutation<undefined, ApiError, { appId: string; organisationId: string }>({
+    mutationFn: input => call(revokeApplicationRelease({ data: input })),
+    onSuccess: (_data, { appId }) => queryClient.invalidateQueries({ queryKey: adminApplicationKeys.organisations(appId) }),
   });
 }
