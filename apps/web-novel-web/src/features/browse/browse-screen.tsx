@@ -34,7 +34,8 @@ export interface BrowseSearch {
  * The catalog screen from the browse mockups: toolbar (filters, count, sort, grid/list), removable filter
  * chips, poster grid or detail list, pagination, and the filter drawer with genre/status chips.
  */
-const PAGE_SIZE = 24;
+/** Shared with the route loader so the SSR prefetch lands on the exact query key the screen reads */
+export const BROWSE_PAGE_SIZE = 24;
 const SORT_LABELS: Record<CatalogSort, string> = {
   trending: 'Trending',
   popular: 'Most popular',
@@ -52,7 +53,7 @@ export function BrowseScreen(): React.JSX.Element {
   const navigate = route.useNavigate();
   const [filtersOpen, setFiltersOpen] = useState(false);
 
-  const query = { q: search.q, genre: search.genre, status: search.status, sort: search.sort ?? 'trending', page: search.page ?? 1, limit: PAGE_SIZE };
+  const query = { q: search.q, genre: search.genre, status: search.status, sort: search.sort ?? 'trending', page: search.page ?? 1, limit: BROWSE_PAGE_SIZE };
   const catalog = useQuery(catalogQueryOptions(query));
   const view = search.view ?? 'grid';
 
@@ -135,12 +136,12 @@ export function BrowseScreen(): React.JSX.Element {
         </div>
       )}
 
-      {total > PAGE_SIZE && (
+      {total > BROWSE_PAGE_SIZE && (
         <div className={styles.pager}>
           <span className={styles.count}>
-            Showing {(query.page - 1) * PAGE_SIZE + 1}–{Math.min(query.page * PAGE_SIZE, total)} of {total.toLocaleString()}
+            Showing {(query.page - 1) * BROWSE_PAGE_SIZE + 1}–{Math.min(query.page * BROWSE_PAGE_SIZE, total)} of {total.toLocaleString()}
           </span>
-          <Pagination page={query.page} pageSize={PAGE_SIZE} total={total} onPageChange={page => void navigate({ search: prev => ({ ...prev, page }) })} />
+          <Pagination page={query.page} pageSize={BROWSE_PAGE_SIZE} total={total} onPageChange={page => void navigate({ search: prev => ({ ...prev, page }) })} />
         </div>
       )}
 

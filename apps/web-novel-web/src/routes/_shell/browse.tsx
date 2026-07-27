@@ -6,7 +6,8 @@ import { createFileRoute } from '@tanstack/react-router';
 /**
  * Importing user defined packages
  */
-import { BrowseScreen, type BrowseSearch } from '@/features/browse';
+import { BROWSE_PAGE_SIZE, BrowseScreen, type BrowseSearch } from '@/features/browse';
+import { catalogQueryOptions } from '@/lib/apis';
 import { type CatalogSort, type NovelStatus } from '@/lib/apis/types';
 
 /**
@@ -32,5 +33,12 @@ function validateSearch(search: Record<string, unknown>): BrowseSearch {
 
 export const Route = createFileRoute('/_shell/browse')({
   validateSearch,
+  loaderDeps: ({ search }) => search,
+  loader: ({ context, deps }) => {
+    // Seed the catalog grid server-side on the exact key the screen reads; failures fall through to client fetch.
+    void context.queryClient.prefetchQuery(
+      catalogQueryOptions({ q: deps.q, genre: deps.genre, status: deps.status, sort: deps.sort ?? 'trending', page: deps.page ?? 1, limit: BROWSE_PAGE_SIZE }),
+    );
+  },
   component: BrowseScreen,
 });
