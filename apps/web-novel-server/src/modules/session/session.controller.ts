@@ -7,14 +7,14 @@
  */
 import { type FastifyRequest } from 'fastify';
 import { RelyingParty } from '@shadow-library/auth/rp';
-import { Logger } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
 import { Get, HttpController, type HttpResponse, HttpStatus, Post, Query, Req, Res, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, WEBNOVEL_AUDIENCE } from '@server/constants';
 
 import { LOGIN_COOKIE_NAME, SESSION_COOKIE_NAME } from './session.constants';
 import { CallbackQuery, LoginQuery, SessionResponse } from './session.dto';
@@ -44,7 +44,8 @@ export class SessionController {
   @Get('/login')
   async login(@Query() query: LoginQuery, @Res() response: HttpResponse): Promise<void> {
     const returnTo = this.sanitizeReturnTo(query.returnTo);
-    const authorization = await this.relyingParty.createAuthorizationUrl();
+    /** Resolved audience, not the raw config — without `resource` identity mints a `shadow-identity`-audience token this server's own guard rejects */
+    const authorization = await this.relyingParty.createAuthorizationUrl({ resource: Config.get('auth.audience') ?? WEBNOVEL_AUDIENCE });
     const cookie = this.sessionService.createLoginCookie({ state: authorization.state, nonce: authorization.nonce, codeVerifier: authorization.codeVerifier, returnTo });
     response.setCookie(LOGIN_COOKIE_NAME, cookie, this.sessionService.getLoginCookieOptions());
     return response.status(302).redirect(authorization.url);
