@@ -100,15 +100,11 @@ export interface LibraryEntry {
   novel: NovelSummary;
 }
 
+/** The flat body of `GET /api/auth/session` (200); signed-out is a plain 401, not a wrapped flag */
 export interface SessionUser {
-  id: string;
-  name: string;
-  email: string;
-}
-
-export interface SessionResponse {
-  authenticated: boolean;
-  user?: SessionUser;
+  userId: string;
+  email?: string;
+  name?: string;
 }
 
 /**

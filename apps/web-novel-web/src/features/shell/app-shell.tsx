@@ -66,7 +66,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const isPhone = useMediaQuery('(max-width: 767px)');
 
-  const user = session.data?.authenticated ? session.data.user : undefined;
+  const user = session.data ?? undefined;
   const activeNav = NAV_ITEMS.filter(item => isActive(location.pathname, item.to)).at(-1);
 
   const onSearch = (event: React.KeyboardEvent<HTMLInputElement>): void => {

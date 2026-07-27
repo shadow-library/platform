@@ -13,7 +13,7 @@ import {
   type ChapterMeta,
   type NovelDetail,
   type NovelStatus,
-  type SessionResponse,
+  type SessionUser,
 } from './types';
 
 /**
@@ -484,7 +484,4 @@ export function fixtureChapter(slug: string, ordinal: number): ChapterContent | 
 }
 
 /** Fixture session is authenticated so the library/progress screens render without the identity flow. */
-export const FIXTURE_SESSION: SessionResponse = {
-  authenticated: true,
-  user: { id: 'usr_demo', name: 'Demo Reader', email: 'reader@shadow.app' },
-};
+export const FIXTURE_SESSION: SessionUser = { userId: 'usr_demo', name: 'Demo Reader', email: 'reader@shadow.app' };

@@ -43,7 +43,7 @@ export function HomeScreen(): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const trending = useQuery(catalogQueryOptions({ sort: 'trending', limit: 12 }));
   const updated = useQuery(catalogQueryOptions({ sort: 'updated', limit: 6 }));
-  const progress = useQuery(progressQueryOptions(session.data?.authenticated));
+  const progress = useQuery(progressQueryOptions(Boolean(session.data)));
 
   const novels = trending.data?.items ?? [];
   const progressMap = progress.data ?? {};
@@ -57,7 +57,7 @@ export function HomeScreen(): React.JSX.Element {
 
   const featured = continueItems[0]?.novel ?? novels[0];
   const featuredProgress = featured ? progressMap[featured.slug] : undefined;
-  const signedOut = session.data ? !session.data.authenticated : false;
+  const signedOut = session.data === null;
 
   return (
     <div className={`${styles.page} wn-fade`}>

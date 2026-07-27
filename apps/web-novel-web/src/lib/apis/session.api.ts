@@ -11,7 +11,7 @@ import { requireAuth } from '@shadow-library/web/router';
  */
 import { FIXTURE_SESSION } from './fixtures';
 import { ApiError, useFixtures } from './transport';
-import { type SessionResponse, type SessionUser } from './types';
+import { type SessionUser } from './types';
 
 /**
  * Defining types
@@ -20,11 +20,11 @@ import { type SessionResponse, type SessionUser } from './types';
 /**
  * Declaring the constants
  *
- * ASSUMPTION (flagged): `@shadow-library/auth`'s `RelyingPartyModule` ships only the OIDC protocol core —
- * session-cookie routes are left to the consuming app — so webnovel-server is assumed to expose
- * `GET /api/auth/session` (200 `{ authenticated, user }`, or 401 when signed out),
- * `GET /api/auth/login?returnTo=` (full-page redirect into the identity IdP), and `POST /api/auth/logout`.
- * Adjust here if webnovel-server lands a different surface.
+ * webnovel-server's session surface (verified live): `GET /api/auth/session` answers 200 with the
+ * flat reader `{ userId, email?, name? }` — or a plain 401 when signed out — alongside
+ * `GET /api/auth/login?returnTo=` (full-page redirect into the identity IdP) and `POST /api/auth/logout`.
+ * The signed-out 401 is folded into a `null` session here: a guest browsing the public catalog is a
+ * valid state for the reader, not a failure.
  *
  * The session read goes through a TanStack Start server function (`serverFetch`) so the browser's session
  * cookie is forwarded during SSR — that is what lets `requireSession` gate the library route server-side
@@ -34,17 +34,16 @@ export const sessionKeys = {
   session: ['auth', 'session'] as const,
 };
 
-const fetchSession = createServerFn({ method: 'GET' }).handler(async (): Promise<ApiResult<SessionResponse>> => {
+const fetchSession = createServerFn({ method: 'GET' }).handler(async (): Promise<ApiResult<SessionUser | null>> => {
   if (useFixtures) return { ok: true, data: FIXTURE_SESSION };
   const { serverFetch } = await import('./server-fetch');
-  const result = await serverFetch<SessionResponse>({ method: 'GET', path: '/auth/session' });
-  // Signed-out is a valid state for a public reader, not a failure.
-  if (!result.ok && result.failure.status === 401) return { ok: true, data: { authenticated: false } };
+  const result = await serverFetch<SessionUser>({ method: 'GET', path: '/auth/session' });
+  if (!result.ok && result.failure.status === 401) return { ok: true, data: null };
   return result;
 });
 
 export const sessionQueryOptions = () =>
-  queryOptions<SessionResponse, ApiError>({
+  queryOptions<SessionUser | null, ApiError>({
     queryKey: sessionKeys.session,
     staleTime: 5 * 60_000,
     queryFn: () => call(fetchSession()),
@@ -56,8 +55,8 @@ const requiredSessionQueryOptions = () =>
     staleTime: 5 * 60_000,
     queryFn: async () => {
       const session = await call(fetchSession());
-      if (!session.authenticated || !session.user) throw new ApiError(401, { code: 'UNAUTHENTICATED', type: 'UnauthorizedError', message: 'Sign in to continue' });
-      return session.user;
+      if (!session) throw new ApiError(401, { code: 'UNAUTHENTICATED', type: 'UnauthorizedError', message: 'Sign in to continue' });
+      return session;
     },
   });
 

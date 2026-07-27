@@ -36,8 +36,8 @@ export function NovelScreen(): React.JSX.Element {
   const router = useRouter();
   const novel = useQuery(novelQueryOptions(slug));
   const session = useQuery(sessionQueryOptions());
-  const library = useQuery(libraryQueryOptions(session.data?.authenticated));
-  const toggleLibrary = useToggleLibraryMutation(session.data?.authenticated);
+  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
+  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
   const [downloadOpen, setDownloadOpen] = useState(false);
 
   if (!novel.data) return <div className={styles.content} />;

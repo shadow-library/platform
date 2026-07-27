@@ -61,8 +61,8 @@ export function ReaderScreen(): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const chapter = useQuery(chapterQueryOptions(slug, ordinal));
   const novel = useQuery(novelQueryOptions(slug));
-  const library = useQuery(libraryQueryOptions(session.data?.authenticated));
-  const toggleLibrary = useToggleLibraryMutation(session.data?.authenticated);
+  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
+  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
 
   const [settings, setSettings] = useState<ReaderSettings>(loadReaderSettings);
   const [chrome, setChrome] = useState(true);
@@ -71,7 +71,7 @@ export function ReaderScreen(): React.JSX.Element {
   const [scrollPct, setScrollPct] = useState(0);
 
   const palette = READER_PALETTES[settings.theme];
-  const authenticated = session.data?.authenticated ?? false;
+  const authenticated = Boolean(session.data);
   const inLibrary = isInLibrary(library.data, slug);
 
   const updateSettings = (updates: Partial<ReaderSettings>): void => {

@@ -30,14 +30,14 @@ export function LibraryScreen(): React.JSX.Element {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   const session = useQuery(sessionQueryOptions());
-  const library = useQuery(libraryQueryOptions(session.data?.authenticated));
-  const progress = useQuery(progressQueryOptions(session.data?.authenticated));
-  const toggleLibrary = useToggleLibraryMutation(session.data?.authenticated);
+  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
+  const progress = useQuery(progressQueryOptions(Boolean(session.data)));
+  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
 
   const entries = library.data ?? [];
   const term = query.trim().toLowerCase();
   const filtered = entries.filter(entry => !term || entry.novel.title.toLowerCase().includes(term) || entry.novel.author.toLowerCase().includes(term));
-  const signedOut = session.data ? !session.data.authenticated : false;
+  const signedOut = session.data === null;
 
   return (
     <div className={`${styles.page} wn-fade`}>
