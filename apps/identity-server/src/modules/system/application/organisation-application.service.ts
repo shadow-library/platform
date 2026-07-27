@@ -152,9 +152,7 @@ export class OrganisationApplicationService {
    * assignment can never promise access the sign-in gate would then deny. Idempotent.
    */
   async assign(actor: AppAccessActor, organisationId: bigint, applicationId: number): Promise<void> {
-    const application = this.applicationService.getApplicationByIdOrThrow(applicationId);
-    if (!application.isActive || application.visibility === 'INTERNAL') throw AppErrorCode.ORG_011.create();
-    if (application.visibility === 'RESTRICTED' && !(await this.hasRelease(organisationId, applicationId))) throw AppErrorCode.ORG_011.create();
+    await this.assertReachable(organisationId, applicationId);
 
     await this.db.insert(schema.organisationApplications).values({ applicationId, organisationId, source: 'ORG_ASSIGNMENT', assignedBy: actor.actorId }).onConflictDoNothing();
     await this.accessService.invalidateOrganisation(organisationId.toString());
@@ -194,6 +192,20 @@ export class OrganisationApplicationService {
     await this.recordForOrganisation(actor, organisationId, 'org.app_access_mode.changed', undefined, { mode });
     this.logger.info('changed organisation app access mode', { organisationId, mode });
     return organisation;
+  }
+
+  /* --------------------------- reachability --------------------------- */
+
+  /**
+   * The ORG_011 reachability rule (D-A1): an organisation may only be handed an application its members
+   * could actually reach — active, never INTERNAL, and a RESTRICTED app only once released to the org.
+   * Shared by org self-assignment (T-903) and SCIM group→role mapping (T-905), so a mapping can never
+   * promise a role on an app the sign-in gate would then refuse the group's members entry to.
+   */
+  async assertReachable(organisationId: bigint, applicationId: number): Promise<void> {
+    const application = this.applicationService.getApplicationByIdOrThrow(applicationId);
+    if (!application.isActive || application.visibility === 'INTERNAL') throw AppErrorCode.ORG_011.create();
+    if (application.visibility === 'RESTRICTED' && !(await this.hasRelease(organisationId, applicationId))) throw AppErrorCode.ORG_011.create();
   }
 
   /* --------------------------- internals --------------------------- */

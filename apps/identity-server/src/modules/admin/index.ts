@@ -10,6 +10,8 @@ export * from './admin-role.controller';
 export * from './admin-role.dto';
 export * from './admin-saml.controller';
 export * from './admin-saml.dto';
+export * from './admin-scim-mapping.controller';
+export * from './admin-scim-mapping.dto';
 export * from './admin-service-access.controller';
 export * from './admin-service-access.dto';
 export * from './admin-user.controller';

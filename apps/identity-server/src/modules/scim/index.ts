@@ -1,4 +1,5 @@
 export * from './scim-auth.service';
+export * from './scim-group-mapping.service';
 export * from './scim-group.service';
 export * from './scim-user.service';
 export * from './scim.controller';

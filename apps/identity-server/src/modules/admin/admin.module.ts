@@ -17,6 +17,7 @@ import { UserModule } from '@server/modules/identity/user';
 import { AuditModule } from '@server/modules/infrastructure/audit';
 import { DatabaseModule } from '@server/modules/infrastructure/datastore';
 import { WebhookModule } from '@server/modules/infrastructure/webhook';
+import { ScimModule } from '@server/modules/scim';
 import { ApplicationModule } from '@server/modules/system/application';
 
 import { AdminAccessService } from './admin-access.service';
@@ -26,6 +27,7 @@ import { AdminContextController } from './admin-context.controller';
 import { AdminResourceController } from './admin-resource.controller';
 import { AdminRoleController } from './admin-role.controller';
 import { AdminSamlController } from './admin-saml.controller';
+import { AdminScimMappingController } from './admin-scim-mapping.controller';
 import { AdminServiceAccessController } from './admin-service-access.controller';
 import { AdminUserController } from './admin-user.controller';
 import { AdminUserService } from './admin-user.service';
@@ -53,6 +55,7 @@ import { AdminWebhookController } from './admin-webhook.controller';
     SamlModule,
     ApplicationModule,
     WebhookModule,
+    ScimModule,
   ],
   controllers: [
     AdminContextController,
@@ -62,6 +65,7 @@ import { AdminWebhookController } from './admin-webhook.controller';
     AdminResourceController,
     AdminRoleController,
     AdminSamlController,
+    AdminScimMappingController,
     AdminServiceAccessController,
     AdminWebhookController,
   ],

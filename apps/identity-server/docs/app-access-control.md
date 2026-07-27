@@ -122,6 +122,34 @@ Rules: an org can only assign apps its members could actually reach (assigning a
 5. **"My Apps" launcher** page over `GET /api/v1/me/applications` (name, logo, home page URL, last used).
 6. Follow that repo's own conventions (its CLAUDE.md, `@shadow-library/ui` components, `--sh-*` tokens); `bun run verify` there must pass.
 
+## SCIM group → role mapping (T-905)
+
+Scope: directory group membership drives **capability** (org-scoped user role assignments), never app
+*access* — access stays org-level by design (`ASSIGNED_ONLY` governs the org; groups govern what members
+may do inside an app). Recorded decisions:
+
+- **D-A8 — Vendor-controlled mappings.** Creating/deleting a mapping rides the existing two-tier
+  `requireRoleAdmin` (+ AAL2) — never org admins. A mapping is how a sold tier reaches a tenant's
+  directory structure; letting org admins map groups onto roles would bypass D-A5.
+- **D-A9 — Provenance by marker, not schema.** Derived assignments are ordinary `role_assignments`
+  rows with `granted_by = 'scim:group:<groupId>'`. Sync revokes only rows carrying the group's marker,
+  so manual grants are never touched and no schema change is needed.
+
+Model: `scim_group_role_mappings` (id uuid PK; `group_id` uuid FK → scim_groups CASCADE; `role_id` int
+FK → application_roles CASCADE; `created_by`; `created_at`; unique(group_id, role_id)).
+
+Semantics: mapping create backfills all current group members (assign mapped role, org = the group's
+org); membership add assigns; membership remove/group delete/mapping delete revokes the marker rows —
+except when another mapped group in the same org still grants the same role (overlap check). Directory
+deprovision needs no new work: membership end already revokes org-scoped assignments. Every sync
+invalidates affected principals (`invalidatePrincipal`); bounded by group size, which is fine for
+explicit membership operations. Validation on create: group exists; the role's application is reachable
+by the group's organisation (same reachability rule as `ORG_011`).
+
+API (admin tier): `GET /api/v1/admin/scim/group-mappings?organisationId=&groupId=` ·
+`POST /api/v1/admin/scim/group-mappings` `{ groupId, roleId }` · `DELETE /api/v1/admin/scim/group-mappings/:mappingId`
+(reads `rolesManage`; mutations `requireRoleAdmin`-scoped + elevated, mirroring role assignment).
+
 ## Testing (each task lands its own specs)
 
 - Resolution matrix: personal-org user × PUBLIC/RESTRICTED/INTERNAL; ASSIGNED_ONLY with/without assignment; RESTRICTED needing release **and** assignment; platform member × INTERNAL; managed user locked to owning org (D-A2); suspended membership/org grants nothing.

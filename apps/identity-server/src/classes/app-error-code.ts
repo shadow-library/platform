@@ -210,6 +210,15 @@ export class AppErrorCode extends ServerErrorCode {
   static readonly SML_004 = AppErrorCode.notFound('SML_004', 'Service provider not found');
 
   /*!
+   * SCIM Group → Role Mapping Error Codes
+   */
+
+  /** The SCIM group referenced by a group→role mapping does not exist in this deployment */
+  static readonly SCIM_001 = AppErrorCode.notFound('SCIM_001', 'SCIM group not found');
+  /** The SCIM group→role mapping does not exist */
+  static readonly SCIM_002 = AppErrorCode.notFound('SCIM_002', 'SCIM group role mapping not found');
+
+  /*!
    * OAuth / OIDC Error Codes (mapped to RFC 6749 error identifiers)
    */
 

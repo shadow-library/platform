@@ -13,6 +13,7 @@ import { AppErrorCode } from '@server/classes';
 import { APP_NAME } from '@server/constants';
 import { SessionService } from '@server/modules/auth/session';
 import { BackChannelLogoutService, RefreshTokenService } from '@server/modules/auth/token';
+import { PolicyDecisionService } from '@server/modules/authz';
 import { OrganisationService } from '@server/modules/identity/organisation';
 import { UserService } from '@server/modules/identity/user';
 import { AuditService } from '@server/modules/infrastructure/audit';
@@ -74,6 +75,7 @@ export class ScimUserService {
     private readonly sessionService: SessionService,
     private readonly refreshTokenService: RefreshTokenService,
     private readonly backChannelLogoutService: BackChannelLogoutService,
+    private readonly policyDecisionService: PolicyDecisionService,
     private readonly auditService: AuditService,
   ) {
     this.db = databaseService.getPostgresClient();
@@ -240,6 +242,8 @@ export class ScimUserService {
       await this.revokeAccountAccess(entry.userId);
     } else {
       await this.removeMembership(entry);
+      /** Ending the membership drops every org-scoped grant with it — manual and SCIM-group-derived alike (T-905) — as the removeMember/leave paths already do; the bare removeMember does not. */
+      await this.policyDecisionService.revokeAllForPrincipalInOrganisation({ type: 'USER', id: entry.userId.toString() }, entry.organisationId.toString());
       await this.refreshTokenService.revokeForUserOrganisation(entry.userId, entry.organisationId);
     }
     await this.db.update(schema.scimDirectory).set({ active, updatedAt: new Date() }).where(eq(schema.scimDirectory.id, entry.id));

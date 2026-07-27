@@ -12,6 +12,7 @@ import { AuditService } from '@server/modules/infrastructure/audit';
 import { DatabaseService, PrimaryDatabase, schema, ScimGroup } from '@server/modules/infrastructure/datastore';
 
 import { ScimTenant } from './scim-auth.service';
+import { ScimGroupMappingService } from './scim-group-mapping.service';
 import { asRecord, asString, GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput, ScimGroupResource, ScimListResult, ScimPage, ScimPatchOperation } from './scim.types';
 
 /**
@@ -22,8 +23,9 @@ import { asRecord, asString, GROUP_SCHEMA, ScimError, ScimFilter, ScimGroupInput
  * Declaring the constants
  *
  * SCIM groups are the tenant's provisioning structure: membership references directory entries
- * (never platform user ids) and carries no authorization semantics yet — mapping groups onto
- * application roles is deferred until a tenant needs it (recorded in tasks.md).
+ * (never platform user ids). A group carries authorization semantics only where the vendor has
+ * mapped it onto an application role (T-905); every membership change is handed to the sync engine,
+ * which materialises or revokes the derived role assignments for the affected members.
  */
 
 @Injectable()
@@ -34,6 +36,7 @@ export class ScimGroupService {
   constructor(
     databaseService: DatabaseService,
     private readonly auditService: AuditService,
+    private readonly mappingService: ScimGroupMappingService,
   ) {
     this.db = databaseService.getPostgresClient();
   }
@@ -72,18 +75,21 @@ export class ScimGroupService {
 
   async replace(tenant: ScimTenant, id: string, input: ScimGroupInput): Promise<ScimGroupResource> {
     const group = await this.requireGroup(tenant, id);
+    const before = await this.memberDirectoryIds(group.id);
     await this.db
       .update(schema.scimGroups)
       .set({ displayName: input.displayName, externalId: input.externalId ?? group.externalId, updatedAt: new Date() })
       .where(eq(schema.scimGroups.id, group.id));
     await this.db.delete(schema.scimGroupMembers).where(eq(schema.scimGroupMembers.groupId, group.id));
     if (input.members.length > 0) await this.addMembers(tenant, group.id, input.members);
+    await this.syncMappings(group, before);
     await this.audit(tenant, 'scim.group.replaced', group.id);
     return this.toResource(await this.requireGroup(tenant, id));
   }
 
   async patch(tenant: ScimTenant, id: string, operations: ScimPatchOperation[]): Promise<ScimGroupResource> {
     const group = await this.requireGroup(tenant, id);
+    const before = await this.memberDirectoryIds(group.id);
     for (const operation of operations) {
       const path = operation.path?.toLowerCase() ?? '';
       /** Entra removes single members with the filter form `members[value eq "<id>"]`. */
@@ -113,14 +119,29 @@ export class ScimGroupService {
         throw new ScimError(400, `Unsupported PATCH operation '${operation.op}' at path '${operation.path ?? ''}'`, 'invalidPath');
       }
     }
+    await this.syncMappings(group, before);
     await this.audit(tenant, 'scim.group.patched', group.id);
     return this.toResource(await this.requireGroup(tenant, id));
   }
 
   async remove(tenant: ScimTenant, id: string): Promise<void> {
     const group = await this.requireGroup(tenant, id);
+    /** Capture the derived (member, role) grants before the delete cascades the group's members and mappings away, then revoke the markers left behind. */
+    const pairs = await this.mappingService.collectMemberRolePairs(group);
     await this.db.delete(schema.scimGroups).where(eq(schema.scimGroups.id, group.id));
+    await this.mappingService.reconcilePairs(group.organisationId, pairs);
     await this.audit(tenant, 'scim.group.deleted', group.id);
+  }
+
+  /** Reconciles the members touched by a membership change (the union of before and after) against the group's mapped roles. */
+  private async syncMappings(group: ScimGroup, before: string[]): Promise<void> {
+    const after = await this.memberDirectoryIds(group.id);
+    await this.mappingService.syncMembership(group, [...new Set([...before, ...after])]);
+  }
+
+  private async memberDirectoryIds(groupId: string): Promise<string[]> {
+    const rows = await this.db.select({ id: schema.scimGroupMembers.directoryId }).from(schema.scimGroupMembers).where(eq(schema.scimGroupMembers.groupId, groupId));
+    return rows.map(row => row.id);
   }
 
   private async requireGroup(tenant: ScimTenant, id: string): Promise<ScimGroup> {
