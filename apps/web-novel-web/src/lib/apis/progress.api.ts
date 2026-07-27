@@ -13,8 +13,23 @@ import { type ReadingProgress } from './types';
 
 /**
  * Defining types
+ *
+ * The live `GET /api/me/progress` wire shape (verified against the reader DTOs): a wrapped `{ items }` list
+ * whose entries carry `novelSlug`/`ordinal`/`position`/`updatedAt`. `toReadingProgress` picks the fields
+ * explicitly so future server additions never leak into the localStorage mirror.
  */
 export type ProgressMap = Record<string, ReadingProgress>;
+
+export interface ServerProgressItem {
+  novelSlug: string;
+  ordinal: number;
+  position: number;
+  updatedAt: string;
+}
+
+interface ServerProgressList {
+  items: ServerProgressItem[];
+}
 
 /**
  * Declaring the constants
@@ -38,15 +53,20 @@ export function getProgress(slug: string): ReadingProgress | undefined {
   return readProgressMap()[slug];
 }
 
+export function toReadingProgress(item: ServerProgressItem): ReadingProgress {
+  return { novelSlug: item.novelSlug, ordinal: item.ordinal, position: item.position, updatedAt: item.updatedAt };
+}
+
 export const progressQueryOptions = (authenticated = false) =>
   queryOptions<ProgressMap, ApiError>({
     queryKey: progressKeys.all,
     queryFn: async () => {
       const local = readProgressMap();
       if (useFixtures || !authenticated) return local;
-      const remote = await APIRequest.get('/api/me/progress').timeout(10_000).execute<ReadingProgress[]>();
+      const remote = await APIRequest.get('/api/me/progress').timeout(10_000).execute<ServerProgressList>();
       const merged: ProgressMap = { ...local };
-      for (const entry of remote) {
+      for (const item of remote.items) {
+        const entry = toReadingProgress(item);
         const mine = merged[entry.novelSlug];
         if (!mine || Date.parse(entry.updatedAt) > Date.parse(mine.updatedAt)) merged[entry.novelSlug] = entry;
       }

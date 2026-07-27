@@ -8,12 +8,29 @@ import { queryOptions, useMutation, type UseMutationResult, useQueryClient } fro
  */
 import { readLocal, writeLocal } from '@/lib/local-store';
 
+import { coverFor, type ServerNovelStatus, STATUS_FROM_SERVER } from './novels.api';
 import { type ApiError, APIRequest, useFixtures } from './transport';
 import { type LibraryEntry, type NovelSummary } from './types';
 
 /**
  * Defining types
+ *
+ * The live `GET /api/library` wire shape (verified against the reader DTOs): a wrapped `{ items }` list of
+ * lean shelf items — no author/rating/chapter count, `live`/`retired` status — keyed by `slug`, not the
+ * client's `novelSlug`. `toLibraryEntry` normalizes each item into the internal model at this boundary.
  */
+export interface ServerLibraryItem {
+  slug: string;
+  title: string;
+  coverPath?: string;
+  genres: string[];
+  status: ServerNovelStatus;
+  addedAt: string;
+}
+
+interface ServerLibraryList {
+  items: ServerLibraryItem[];
+}
 
 /**
  * Declaring the constants
@@ -40,6 +57,25 @@ export function isInLibrary(entries: LibraryEntry[] | undefined, slug: string): 
   return entries?.some(entry => entry.novelSlug === slug) ?? false;
 }
 
+/** The local mirror's richer catalog snapshot wins when present; a lean server item synthesizes catalog-style defaults. */
+export function toLibraryEntry(item: ServerLibraryItem, local?: LibraryEntry): LibraryEntry {
+  const novel: NovelSummary = local?.novel ?? {
+    slug: item.slug,
+    title: item.title,
+    author: 'Unknown author',
+    genres: item.genres,
+    status: STATUS_FROM_SERVER[item.status],
+    rating: 0,
+    ratingCount: 0,
+    chapterCount: 0,
+    synopsis: '',
+    updatedAt: item.addedAt,
+    views: 0,
+    cover: coverFor(item.slug),
+  };
+  return { novelSlug: item.slug, addedAt: item.addedAt, novel };
+}
+
 export const libraryQueryOptions = (authenticated = false) =>
   queryOptions<LibraryEntry[], ApiError>({
     queryKey: libraryKeys.all,
@@ -47,7 +83,9 @@ export const libraryQueryOptions = (authenticated = false) =>
       const local = readLibrary();
       if (useFixtures || !authenticated) return local;
       // Merge server truth over the local mirror; local-only entries are pushed up so guests keep their shelf.
-      const remote = await APIRequest.get('/api/library').timeout(10_000).execute<LibraryEntry[]>();
+      const response = await APIRequest.get('/api/library').timeout(10_000).execute<ServerLibraryList>();
+      const localBySlug = new Map(local.map(entry => [entry.novelSlug, entry]));
+      const remote = response.items.map(item => toLibraryEntry(item, localBySlug.get(item.slug)));
       const remoteSlugs = new Set(remote.map(entry => entry.novelSlug));
       const localOnly = local.filter(entry => !remoteSlugs.has(entry.novelSlug));
       await Promise.allSettled(localOnly.map(entry => APIRequest.post('/api/library').body({ slug: entry.novelSlug }).execute()));

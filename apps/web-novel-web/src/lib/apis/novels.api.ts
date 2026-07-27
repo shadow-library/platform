@@ -31,13 +31,15 @@ import {
  * response into the client model at this boundary and the rest of the app stays shape-agnostic.
  */
 
+export type ServerNovelStatus = 'live' | 'retired';
+
 interface ServerNovelSummary {
   slug: string;
   title: string;
   blurb?: string;
   coverPath?: string;
   genres: string[];
-  status: 'live' | 'retired';
+  status: ServerNovelStatus;
   chapterCount: number;
   updatedAt: string;
 }
@@ -96,8 +98,8 @@ const COVER_PALETTE: NovelCover[] = [
   { from: '#8b5cf6', to: '#2e1065' },
 ];
 
-const STATUS_FROM_SERVER: Record<ServerNovelSummary['status'], NovelStatus> = { live: 'ongoing', retired: 'completed' };
-const STATUS_TO_SERVER: Record<NovelStatus, ServerNovelSummary['status']> = { ongoing: 'live', hiatus: 'live', completed: 'retired' };
+export const STATUS_FROM_SERVER: Record<ServerNovelStatus, NovelStatus> = { live: 'ongoing', retired: 'completed' };
+const STATUS_TO_SERVER: Record<NovelStatus, ServerNovelStatus> = { ongoing: 'live', hiatus: 'live', completed: 'retired' };
 
 const SORT_TO_SERVER: Record<CatalogSort, { sortBy: 'updatedAt' | 'createdAt' | 'title'; sortOrder: 'asc' | 'desc' }> = {
   trending: { sortBy: 'updatedAt', sortOrder: 'desc' },
@@ -112,7 +114,7 @@ function notFound(message: string): ApiError {
   return new ApiError(404, { code: 'NOT_FOUND', type: 'NotFoundError', message });
 }
 
-function coverFor(slug: string): NovelCover {
+export function coverFor(slug: string): NovelCover {
   let hash = 0;
   for (const char of slug) hash = (hash * 31 + char.charCodeAt(0)) >>> 0;
   return COVER_PALETTE[hash % COVER_PALETTE.length] as NovelCover;
