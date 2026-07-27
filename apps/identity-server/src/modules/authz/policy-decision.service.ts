@@ -59,12 +59,36 @@ export class PolicyDecisionService {
   }
 
   private versionKey(principal: Principal): string {
-    return `authz_version:${principal.type}:${principal.id}`;
+    /**
+     * An ORGANISATION grant's invalidation lives on the per-org component every member's decision
+     * folds in — never a principal key nothing reads — so one org-wide change converges all members
+     * without enumerating them (T-904).
+     */
+    return principal.type === 'ORGANISATION' ? this.orgVersionKey(principal.id) : `authz_version:${principal.type}:${principal.id}`;
+  }
+
+  private orgVersionKey(organisationId: string): string {
+    return `authz_version:org:${organisationId}`;
   }
 
   async getAuthzVersion(principal: Principal): Promise<number> {
     const value = await this.redis.get(this.versionKey(principal));
     return value ? Number(value) : 0;
+  }
+
+  private async getOrgVersion(organisationId: string): Promise<number> {
+    const value = await this.redis.get(this.orgVersionKey(organisationId));
+    return value ? Number(value) : 0;
+  }
+
+  /**
+   * The version a decision is cached against: the principal's own component plus the organisation's,
+   * summed so that either an assignment change on the principal or an org-wide grant change converges
+   * the SDK's decision cache within one TTL (T-904).
+   */
+  private async resolveAuthzVersion(principal: Principal, organisationId: string): Promise<number> {
+    const [principalVersion, orgVersion] = await Promise.all([this.getAuthzVersion(principal), this.getOrgVersion(organisationId)]);
+    return principalVersion + orgVersion;
   }
 
   private async bumpAuthzVersion(principal: Principal): Promise<void> {
@@ -79,7 +103,7 @@ export class PolicyDecisionService {
 
   /** Resolves a permission decision: deny by default; a matching permission on any assigned role permits. */
   async check(request: CheckRequest): Promise<Decision> {
-    const authzVersion = await this.getAuthzVersion(request.principal);
+    const authzVersion = await this.resolveAuthzVersion(request.principal, request.organisationId);
     const permissions = await this.resolvePermissions(request.principal, request.organisationId);
     const decision: Decision = permissions.has(request.action)
       ? { decision: 'PERMIT', reasons: [`granted by role permission '${request.action}'`], authzVersion }
@@ -105,7 +129,7 @@ export class PolicyDecisionService {
    * `app:roles:manage`) must never leak across applications that happen to reuse the name.
    */
   async checkForApplication(request: CheckRequest, applicationId: number): Promise<Decision> {
-    const authzVersion = await this.getAuthzVersion(request.principal);
+    const authzVersion = await this.resolveAuthzVersion(request.principal, request.organisationId);
     const permissions = await this.resolvePermissions(request.principal, request.organisationId, applicationId);
     const decision: Decision = permissions.has(request.action)
       ? { decision: 'PERMIT', reasons: [`granted by application-scoped role permission '${request.action}'`], authzVersion }
@@ -122,27 +146,17 @@ export class PolicyDecisionService {
   }
 
   private async resolvePermissions(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<string>> {
-    const assignments = await this.db
-      .select({ roleId: schema.roleAssignments.roleId })
-      .from(schema.roleAssignments)
-      .where(
-        and(
-          eq(schema.roleAssignments.principalType, principal.type),
-          eq(schema.roleAssignments.principalId, principal.id),
-          eq(schema.roleAssignments.organisationId, BigInt(organisationId)),
-          or(isNull(schema.roleAssignments.expiresAt), gt(schema.roleAssignments.expiresAt, new Date())),
-        ),
-      );
-    const roleIds = assignments.map(assignment => assignment.roleId);
-    if (roleIds.length === 0) {
-      this.logger.debug('principal holds no active role assignments in organisation', { principal, organisationId, applicationId });
+    const roleIds = await this.resolveRoleIds(principal, organisationId, applicationId);
+    if (roleIds.size === 0) {
+      this.logger.debug('principal resolves no roles in organisation', { principal, organisationId, applicationId });
       return new Set();
     }
 
+    const ids = [...roleIds];
     const scope =
       applicationId === undefined
-        ? inArray(schema.rolePermissions.roleId, roleIds)
-        : and(inArray(schema.rolePermissions.roleId, roleIds), eq(schema.permissions.applicationId, applicationId));
+        ? inArray(schema.rolePermissions.roleId, ids)
+        : and(inArray(schema.rolePermissions.roleId, ids), eq(schema.permissions.applicationId, applicationId));
     const rows = await this.db
       .select({ name: schema.permissions.name })
       .from(schema.rolePermissions)
@@ -150,8 +164,82 @@ export class PolicyDecisionService {
       .where(scope);
     const permissions = new Set(rows.map(row => row.name));
     /** The full grant set is sensitive (it reveals a principal's exact capabilities) — debug-only, so it stays out of prod logs. */
-    this.logger.debug('resolved principal permissions', { principal, organisationId, applicationId, roleIds, permissions: [...permissions] });
+    this.logger.debug('resolved principal permissions', { principal, organisationId, applicationId, roleIds: ids, permissions: [...permissions] });
     return permissions;
+  }
+
+  /**
+   * The roles a principal draws permissions from, unioned across three sources (T-904): the
+   * principal's own explicit assignments; org-wide `ORGANISATION` grants, but only when a USER is a
+   * live member of a live organisation (verified here against the database, never trusted from the
+   * caller); and the application's default roles, which every signed-in user holds implicitly (D-A6).
+   * A SERVICE_ACCOUNT gets neither an org-wide tier nor a customer baseline — both are user concepts.
+   */
+  private async resolveRoleIds(principal: Principal, organisationId: string, applicationId?: number): Promise<Set<number>> {
+    const orgId = BigInt(organisationId);
+    const notExpired = or(isNull(schema.roleAssignments.expiresAt), gt(schema.roleAssignments.expiresAt, new Date()));
+    const roleIds = new Set<number>();
+
+    const explicit = await this.db
+      .select({ roleId: schema.roleAssignments.roleId })
+      .from(schema.roleAssignments)
+      .where(
+        and(
+          eq(schema.roleAssignments.principalType, principal.type),
+          eq(schema.roleAssignments.principalId, principal.id),
+          eq(schema.roleAssignments.organisationId, orgId),
+          notExpired,
+        ),
+      );
+    for (const row of explicit) roleIds.add(row.roleId);
+
+    if (principal.type !== 'USER') return roleIds;
+
+    if (await this.isActiveMember(principal.id, orgId)) {
+      const orgWide = await this.db
+        .select({ roleId: schema.roleAssignments.roleId })
+        .from(schema.roleAssignments)
+        .where(
+          and(
+            eq(schema.roleAssignments.principalType, 'ORGANISATION'),
+            eq(schema.roleAssignments.principalId, organisationId),
+            eq(schema.roleAssignments.organisationId, orgId),
+            notExpired,
+          ),
+        );
+      for (const row of orgWide) roleIds.add(row.roleId);
+    }
+
+    for (const id of await this.defaultRoleIds(applicationId)) roleIds.add(id);
+    return roleIds;
+  }
+
+  /**
+   * Whether a USER principal is a live member of a live organisation, so an org-wide grant applies to
+   * them. Read fresh on every decision so a suspension or an ended membership takes hold immediately —
+   * this join is what makes an ex-member stop receiving org-wide permissions by construction (T-904).
+   */
+  private async isActiveMember(userId: string, organisationId: bigint): Promise<boolean> {
+    /** A USER principal id is always a numeric user id; a malformed value simply matches no membership. */
+    if (!/^\d+$/.test(userId)) return false;
+    const membership = await this.db.query.organisationMembers.findFirst({
+      where: and(eq(schema.organisationMembers.userId, BigInt(userId)), eq(schema.organisationMembers.organisationId, organisationId)),
+      with: { organisation: true },
+    });
+    if (!membership || membership.organisation.status !== 'ACTIVE') return false;
+    if (membership.status === 'ACTIVE') return true;
+    /** A SUSPENDED hold past its term has lapsed and reads ACTIVE, mirroring OrganisationService.resolveMemberStatus. */
+    return membership.status === 'SUSPENDED' && membership.statusUntil !== null && membership.statusUntil.getTime() <= Date.now();
+  }
+
+  /** The application's default roles (or every application's, for an org-agnostic check); their permissions form the baseline every signed-in user holds (D-A6). */
+  private async defaultRoleIds(applicationId?: number): Promise<number[]> {
+    const scope =
+      applicationId === undefined
+        ? eq(schema.applicationRoles.isDefault, true)
+        : and(eq(schema.applicationRoles.isDefault, true), eq(schema.applicationRoles.applicationId, applicationId));
+    const rows = await this.db.select({ id: schema.applicationRoles.id }).from(schema.applicationRoles).where(scope);
+    return rows.map(row => row.id);
   }
 
   async createPermission(applicationId: number, name: string, description?: string): Promise<string> {

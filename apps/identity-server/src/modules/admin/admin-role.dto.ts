@@ -18,8 +18,9 @@ import { PATTERN } from '@server/constants';
 
 @Schema()
 export class RoleAssignmentBody {
-  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT'] })
-  principalType: 'USER' | 'SERVICE_ACCOUNT';
+  /** `ORGANISATION` mints a vendor-controlled org-wide tier grant (D-A5): principalId is the org id and the assignment is scoped to that same org. */
+  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'] })
+  principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
 
   @Field()
   principalId: string;
@@ -27,14 +28,15 @@ export class RoleAssignmentBody {
   @Field(() => Number)
   roleId: number;
 
+  /** Ignored for an `ORGANISATION` grant, whose scope is derived from principalId — the server never trusts a divergent value. */
   @Field({ ...PATTERN.ID })
   organisationId: string;
 }
 
 @Schema()
 export class AssignmentListQuery {
-  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT'], optional: true })
-  principalType?: 'USER' | 'SERVICE_ACCOUNT';
+  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'], optional: true })
+  principalType?: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
 
   @Field({ optional: true })
   principalId?: string;
@@ -51,8 +53,9 @@ export class RoleAssignmentItem {
   @Field()
   id: string;
 
-  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT'] })
-  principalType: 'USER' | 'SERVICE_ACCOUNT';
+  /** Read-only projection: it reflects any stored assignment, including the ORGANISATION principal the admin API begins minting in T-904. */
+  @Field(() => String, { enum: ['USER', 'SERVICE_ACCOUNT', 'ORGANISATION'] })
+  principalType: 'USER' | 'SERVICE_ACCOUNT' | 'ORGANISATION';
 
   @Field()
   principalId: string;

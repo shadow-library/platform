@@ -29,6 +29,8 @@ interface CatalogRole {
   name: string;
   description?: string;
   permissions: string[];
+  /** A default role's permissions are unioned into every user's PDP resolution for this application (D-A6); omitting the flag clears it. */
+  default?: boolean;
 }
 
 export interface CatalogManifest {
@@ -158,10 +160,10 @@ export class CatalogSyncService {
       for (const role of manifest.roles)
         await tx
           .insert(schema.applicationRoles)
-          .values({ applicationId, roleName: role.name, description: role.description ?? null })
+          .values({ applicationId, roleName: role.name, description: role.description ?? null, isDefault: role.default ?? false })
           .onConflictDoUpdate({
             target: [schema.applicationRoles.applicationId, schema.applicationRoles.roleName],
-            set: { description: role.description ?? null, updatedAt: new Date() },
+            set: { description: role.description ?? null, isDefault: role.default ?? false, updatedAt: new Date() },
           });
 
       const roleScope = roleNames.size

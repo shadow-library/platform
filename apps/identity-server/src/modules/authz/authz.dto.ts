@@ -62,6 +62,10 @@ export class CatalogRole {
   /** Names of permissions this role carries; every name MUST also appear in `permissions` */
   @Field(() => [String])
   permissions: string[];
+
+  /** When true, every signed-in user of this application holds the role implicitly — the customer baseline, no assignment row (D-A6) */
+  @Field(() => Boolean, { optional: true })
+  default?: boolean;
 }
 
 @Schema()

@@ -176,6 +176,20 @@ export class OrganisationService {
     return organisation ?? null;
   }
 
+  /**
+   * Validates an org-wide role-grant target (T-904, D-A5): the id must name a live TEAM organisation.
+   * A personal workspace is single-user and holds no tier; an absent, suspended, or deleted org is not
+   * a live grant target.
+   */
+  async assertActiveTeam(organisationId: string): Promise<Organisation> {
+    /** Org ids are numeric; a malformed value simply names no organisation. */
+    if (!/^\d+$/.test(organisationId)) throw AppErrorCode.ORG_002.create();
+    const organisation = await this.getById(BigInt(organisationId));
+    if (!organisation || organisation.status !== 'ACTIVE') throw AppErrorCode.ORG_002.create();
+    if (organisation.type !== 'TEAM') throw AppErrorCode.ORG_003.create();
+    return organisation;
+  }
+
   /** Idempotently adds a member; an existing membership (any role) is left untouched. */
   async ensureMember(organisationId: bigint, userId: bigint, role: Organisation.MemberRole): Promise<void> {
     await this.db.insert(schema.organisationMembers).values({ organisationId, userId, role }).onConflictDoNothing();

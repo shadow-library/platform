@@ -9,7 +9,8 @@ import { Body, Get, HttpController, HttpStatus, Post, Query, RespondFor } from '
  */
 import { AppErrorCode } from '@server/classes';
 import { Auth, Context } from '@server/modules/access';
-import { PolicyDecisionService } from '@server/modules/authz';
+import { PolicyDecisionService, type Principal } from '@server/modules/authz';
+import { OrganisationService } from '@server/modules/identity/organisation';
 import { AuditService } from '@server/modules/infrastructure/audit';
 import { Application } from '@server/modules/infrastructure/datastore';
 import { ApplicationRoleService } from '@server/modules/system/application';
@@ -39,6 +40,7 @@ export class AdminRoleController {
     private readonly access: AdminAccessService,
     private readonly policyDecisionService: PolicyDecisionService,
     private readonly applicationRoleService: ApplicationRoleService,
+    private readonly organisationService: OrganisationService,
     private readonly auditService: AuditService,
   ) {}
 
@@ -46,6 +48,19 @@ export class AdminRoleController {
     const role = await this.applicationRoleService.getRole(roleId);
     if (!role) throw AppErrorCode.APP_003.create();
     return role;
+  }
+
+  /**
+   * Resolves the principal and the organisation the assignment is scoped to. An `ORGANISATION` grant
+   * (D-A5) is always scoped to the organisation that is its own principal, so the scope is derived
+   * from principalId — and validated as a live TEAM org — never trusted from a divergent body value.
+   * When `validate` is false (revocation) the coupling is enforced without the liveness check, so a
+   * grant on a since-suspended org can still be withdrawn.
+   */
+  private async resolveAssignment(body: RoleAssignmentBody, validate: boolean): Promise<{ principal: Principal; organisationId: string }> {
+    if (body.principalType !== 'ORGANISATION') return { principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId };
+    if (validate) await this.organisationService.assertActiveTeam(body.principalId);
+    return { principal: { type: 'ORGANISATION', id: body.principalId }, organisationId: body.principalId };
   }
 
   private async record(actor: AdminActor, action: string, targetType: string, targetId: string, detail?: Record<string, unknown>): Promise<void> {
@@ -67,9 +82,9 @@ export class AdminRoleController {
   async assignRole(@Body() body: RoleAssignmentBody): Promise<AdminActionResponse> {
     const role = await this.findRoleOrThrow(body.roleId);
     const actor = await this.access.requireRoleAdmin(Context.getSession(), role.applicationId);
-    const principal = { type: body.principalType, id: body.principalId };
-    await this.policyDecisionService.assignRole(principal, role.id, body.organisationId, actor.session.userId.toString());
-    await this.record(actor, 'admin.role.assigned', 'role_assignment', `${body.principalType}:${body.principalId}`, { roleId: role.id, organisationId: body.organisationId });
+    const { principal, organisationId } = await this.resolveAssignment(body, true);
+    await this.policyDecisionService.assignRole(principal, role.id, organisationId, actor.session.userId.toString());
+    await this.record(actor, 'admin.role.assigned', 'role_assignment', `${principal.type}:${principal.id}`, { roleId: role.id, organisationId });
     return { success: true };
   }
 
@@ -80,9 +95,9 @@ export class AdminRoleController {
   async revokeRoleAssignment(@Body() body: RoleAssignmentBody): Promise<AdminActionResponse> {
     const role = await this.findRoleOrThrow(body.roleId);
     const actor = await this.access.requireRoleAdmin(Context.getSession(), role.applicationId);
-    const principal = { type: body.principalType, id: body.principalId };
-    await this.policyDecisionService.revokeRole(principal, role.id, body.organisationId);
-    await this.record(actor, 'admin.role.revoked', 'role_assignment', `${body.principalType}:${body.principalId}`, { roleId: role.id, organisationId: body.organisationId });
+    const { principal, organisationId } = await this.resolveAssignment(body, false);
+    await this.policyDecisionService.revokeRole(principal, role.id, organisationId);
+    await this.record(actor, 'admin.role.revoked', 'role_assignment', `${principal.type}:${principal.id}`, { roleId: role.id, organisationId });
     return { success: true };
   }
 
