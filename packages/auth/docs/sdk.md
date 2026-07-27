@@ -72,7 +72,10 @@ AuthModule.forRoot({
   roles: {
     // this application's role catalog, owned in code and pushed on startup (see §4.1)
     permissions: [{ name: 'posts:write', description: 'Create and edit posts' }, { name: 'posts:delete' }],
-    roles: [{ name: 'editor', description: 'Content editor', permissions: ['posts:write'] }],
+    roles: [
+      { name: 'reader', description: 'Baseline reader', permissions: [], default: true }, // granted implicitly to every user
+      { name: 'editor', description: 'Content editor', permissions: ['posts:write'] },
+    ],
   },
 });
 ```
@@ -136,6 +139,7 @@ When `roles` is set (and `client` credentials are present), `AuthModule.forRoot`
 
 - **Ownership**: the catalog for an application lives in that application's code, not in hand-run admin calls. The target application is derived from the service-account token, never from the request body — a service can only touch **its own** application's catalog.
 - **Declarative full-sync**: the manifest is the complete truth. Permissions/roles absent from it are **deleted** in identity, cascading into `role_permissions` and `role_assignments`; affected principals are cache-invalidated. A role may only reference permission names it also declares (else an `AppError` with `AuthErrorCode.ROLE_SYNC_FAILED` / HTTP 400).
+- **Default role**: a role may carry `default: true` to mark it as the application's baseline, granted implicitly to every user. The flag is optional and passed through verbatim; a manifest that omits it is unchanged.
 - **Guardrail**: because it deletes, identity refuses a manifest that would remove too much of the application's catalog — the signature of a truncated or half-generated one — and the SDK surfaces that as `AuthErrorCode.ROLE_SYNC_REFUSED` (409), deliberately distinct from the retryable `ROLE_SYNC_FAILED`. Override it with `auth.syncRoles(manifest, { force: true })` at a call site that means it; `AuthModule`'s startup sync never passes `force`.
 - **Footgun**: the manifest is production config. It is bounded to the pushing application and every sync is audited (`authz.catalog.synced`), but a deliberate forced sync still revokes grants. Assignments (which user has which role) are **not** managed here — they stay an admin operation.
 

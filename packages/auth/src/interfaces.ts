@@ -93,6 +93,11 @@ export interface RoleManifest {
   description?: string;
   /** Permission names this role grants; every name MUST also appear in the manifest's `permissions` */
   permissions: string[];
+  /**
+   * Marks this role as the application's baseline, granted implicitly to every user. Omitted unless
+   * set, so a manifest that never mentions it behaves exactly as before.
+   */
+  default?: boolean;
 }
 
 /**

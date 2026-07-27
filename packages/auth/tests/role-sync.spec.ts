@@ -8,7 +8,7 @@ import { type AppError } from '@shadow-library/common';
 /**
  * Importing user defined packages
  */
-import { AuthClient, RoleCatalogManifest } from '@shadow-library/auth';
+import { AuthClient, RoleCatalogManifest, RoleManifest } from '@shadow-library/auth';
 import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
 
 /**
@@ -42,6 +42,22 @@ describe('AuthClient.syncRoles', () => {
     expect(received?.manifest.permissions).toHaveLength(2);
     expect(received?.manifest.roles).toHaveLength(1);
     expect(received?.authorization).toMatch(/^Bearer .+/);
+  });
+
+  it('should carry a role default flag through to the wire payload verbatim', async () => {
+    const auth = new AuthClient({ issuer: idp.issuer, audience: AUDIENCE, client: CLIENT });
+    const manifest: RoleCatalogManifest = {
+      permissions: [{ name: 'posts:read' }],
+      roles: [
+        { name: 'reader', permissions: ['posts:read'], default: true },
+        { name: 'editor', permissions: ['posts:read'] },
+      ],
+    };
+    await auth.syncRoles(manifest);
+
+    const roles = idp.getLastCatalog()?.manifest.roles as RoleManifest[];
+    expect(roles).toContainEqual({ name: 'reader', permissions: ['posts:read'], default: true });
+    expect(roles.find(role => role.name === 'editor')).not.toHaveProperty('default');
   });
 
   it('should require service-account credentials', async () => {
