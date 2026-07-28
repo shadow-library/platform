@@ -17,6 +17,12 @@
  * matching the design's "saved on this device — sign in to sync" model. SSR-safe: every accessor no-ops
  * without `window`.
  */
+
+/** Partition a mirror key by the signed-in user so one account's on-device state never bleeds into another's. */
+export function namespacedKey(base: string, userId?: string): string {
+  return `${base}:${userId ?? 'guest'}`;
+}
+
 export function readLocal<T>(key: string, fallback: T): T {
   if (typeof window === 'undefined') return fallback;
   try {

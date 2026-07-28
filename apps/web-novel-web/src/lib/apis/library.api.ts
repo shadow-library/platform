@@ -6,7 +6,7 @@ import { queryOptions, useMutation, type UseMutationResult, useQueryClient } fro
 /**
  * Importing user defined packages
  */
-import { readLocal, writeLocal } from '@/lib/local-store';
+import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
 import { coverFor, type ServerNovelStatus, STATUS_FROM_SERVER } from './novels.api';
 import { type ApiError, APIRequest, useFixtures } from './transport';
@@ -37,7 +37,9 @@ interface ServerLibraryList {
  *
  * Library entries are local-first (guests get a device library, per the design), mirrored to the server's
  * `GET/POST/DELETE /api/library` when a session exists so a sign-in syncs the shelf. The local mirror keeps
- * a `NovelSummary` snapshot so the shelf renders offline without a catalog fetch.
+ * a `NovelSummary` snapshot so the shelf renders offline without a catalog fetch. The mirror is namespaced
+ * by user id (guests fall back to a `guest` namespace) so one account's device shelf never merges into
+ * another's server library.
  */
 const LIBRARY_STORAGE_KEY = 'webnovel:library';
 
@@ -45,12 +47,17 @@ export const libraryKeys = {
   all: ['library'] as const,
 };
 
-function readLibrary(): LibraryEntry[] {
-  return readLocal<LibraryEntry[]>(LIBRARY_STORAGE_KEY, []);
+function readLibrary(userId?: string): LibraryEntry[] {
+  return readLocal<LibraryEntry[]>(namespacedKey(LIBRARY_STORAGE_KEY, userId), []);
 }
 
-function writeLibrary(entries: LibraryEntry[]): void {
-  writeLocal(LIBRARY_STORAGE_KEY, entries);
+function writeLibrary(entries: LibraryEntry[], userId?: string): void {
+  writeLocal(namespacedKey(LIBRARY_STORAGE_KEY, userId), entries);
+}
+
+/** Drop the current user's device shelf — called on sign-out so the next account starts clean. */
+export function clearLibraryMirror(userId?: string): void {
+  removeLocal(namespacedKey(LIBRARY_STORAGE_KEY, userId));
 }
 
 export function isInLibrary(entries: LibraryEntry[] | undefined, slug: string): boolean {
@@ -76,13 +83,14 @@ export function toLibraryEntry(item: ServerLibraryItem, local?: LibraryEntry): L
   return { novelSlug: item.slug, addedAt: item.addedAt, novel };
 }
 
-export const libraryQueryOptions = (authenticated = false) =>
+export const libraryQueryOptions = (userId?: string) =>
   queryOptions<LibraryEntry[], ApiError>({
     queryKey: libraryKeys.all,
     queryFn: async () => {
-      const local = readLibrary();
-      if (useFixtures || !authenticated) return local;
-      // Merge server truth over the local mirror; local-only entries are pushed up so guests keep their shelf.
+      const local = readLibrary(userId);
+      if (useFixtures || !userId) return local;
+      // Merge server truth over this user's mirror; only entries added under this same namespace (e.g. offline
+      // additions) are promoted — guest entries live in a separate namespace and are never pushed to the account.
       const response = await APIRequest.get('/api/library').timeout(10_000).execute<ServerLibraryList>();
       const localBySlug = new Map(local.map(entry => [entry.novelSlug, entry]));
       const remote = response.items.map(item => toLibraryEntry(item, localBySlug.get(item.slug)));
@@ -90,20 +98,20 @@ export const libraryQueryOptions = (authenticated = false) =>
       const localOnly = local.filter(entry => !remoteSlugs.has(entry.novelSlug));
       await Promise.allSettled(localOnly.map(entry => APIRequest.post('/api/library').body({ slug: entry.novelSlug }).execute()));
       const merged = [...remote, ...localOnly];
-      writeLibrary(merged);
+      writeLibrary(merged, userId);
       return merged;
     },
   });
 
-export function useToggleLibraryMutation(authenticated = false): UseMutationResult<LibraryEntry[], ApiError, NovelSummary> {
+export function useToggleLibraryMutation(userId?: string): UseMutationResult<LibraryEntry[], ApiError, NovelSummary> {
   const queryClient = useQueryClient();
   return useMutation<LibraryEntry[], ApiError, NovelSummary>({
     mutationFn: async novel => {
-      const entries = readLibrary();
+      const entries = readLibrary(userId);
       const existing = entries.find(entry => entry.novelSlug === novel.slug);
       const next = existing ? entries.filter(entry => entry.novelSlug !== novel.slug) : [{ novelSlug: novel.slug, addedAt: new Date().toISOString(), novel }, ...entries];
-      writeLibrary(next);
-      if (!useFixtures && authenticated) {
+      writeLibrary(next, userId);
+      if (!useFixtures && userId) {
         const request = existing ? APIRequest.delete(`/api/library/${encodeURIComponent(novel.slug)}`) : APIRequest.post('/api/library').body({ slug: novel.slug });
         await request
           .timeout(10_000)

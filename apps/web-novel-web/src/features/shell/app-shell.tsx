@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { Avatar, BottomNavigation, Button, IconButton, Input, Shell, Sidebar, Tooltip, TopNavigation, useMediaQuery, useTheme } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HomeIcon, MoonIcon, SearchIcon, SunIcon, TagIcon } from '@/components/icons';
-import { loginUrl, sessionQueryOptions } from '@/lib/apis';
+import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HomeIcon, LogOutIcon, MoonIcon, SearchIcon, SunIcon, TagIcon } from '@/components/icons';
+import { loginUrl, logoutUrl, purgeOnLogout, sessionQueryOptions } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 
@@ -76,7 +76,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   };
 
   const sidebar = (
-    <Sidebar aria-label="Primary" workspace={<Brand />} footer={<AccountSlot name={user?.name} email={user?.email} pathname={location.pathname} />}>
+    <Sidebar aria-label="Primary" workspace={<Brand />} footer={<AccountSlot userId={user?.userId} name={user?.name} email={user?.email} pathname={location.pathname} />}>
       <Sidebar.Section>
         {NAV_ITEMS.map(item => (
           // Not a plain <a href>: SPA navigation must not reload, and leaving the click un-prevented lets
@@ -137,7 +137,9 @@ function TopUtility(props: { theme: string; onToggleTheme: () => void; userName?
   );
 }
 
-function AccountSlot(props: { name?: string; email?: string; pathname: string }): React.JSX.Element {
+function AccountSlot(props: { userId?: string; name?: string; email?: string; pathname: string }): React.JSX.Element {
+  const queryClient = useQueryClient();
+
   if (!props.name) {
     return (
       <div className={styles.account}>
@@ -151,13 +153,24 @@ function AccountSlot(props: { name?: string; email?: string; pathname: string })
       </div>
     );
   }
+
+  // Purge this account's on-device caches before the full-page logout redirect, so the next person on the
+  // device never inherits the previous user's cached library or reading history.
+  const onSignOut = async (): Promise<void> => {
+    await purgeOnLogout(queryClient, props.userId);
+    window.location.href = logoutUrl();
+  };
+
   return (
     <div className={styles.account}>
       <Avatar name={props.name} size="sm" />
-      <div>
+      <div style={{ flex: 1, minWidth: 0 }}>
         <div className={styles.accountName}>{props.name}</div>
         <div className={styles.accountSub}>{props.email}</div>
       </div>
+      <Tooltip content="Sign out">
+        <IconButton variant="ghost" size="sm" aria-label="Sign out" icon={<LogOutIcon size={16} />} onClick={() => void onSignOut()} />
+      </Tooltip>
     </div>
   );
 }

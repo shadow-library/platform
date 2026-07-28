@@ -43,7 +43,7 @@ export function HomeScreen(): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const trending = useQuery(catalogQueryOptions({ sort: 'trending', limit: 12 }));
   const updated = useQuery(catalogQueryOptions({ sort: 'updated', limit: 6 }));
-  const progress = useQuery(progressQueryOptions(Boolean(session.data)));
+  const progress = useQuery(progressQueryOptions(session.data?.userId));
 
   const novels = trending.data?.items ?? [];
   const progressMap = progress.data ?? {};

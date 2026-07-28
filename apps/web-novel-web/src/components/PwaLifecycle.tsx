@@ -6,13 +6,14 @@ import { persistQueryClient } from '@tanstack/react-query-persist-client';
 import { Link } from '@tanstack/react-router';
 import { useEffect, useRef } from 'react';
 import { Banner, toast } from '@shadow-library/ui';
-import { createIDBPersister } from '@shadow-library/web/offline';
 import { useOnlineStatus, useServiceWorker } from '@shadow-library/web/pwa';
 
 /**
  * Importing user defined packages
  */
-import { syncPendingProgress } from '@/lib/apis';
+import { sessionKeys, syncPendingProgress } from '@/lib/apis';
+import { type SessionUser } from '@/lib/apis/types';
+import { PERSIST_BUSTER, PERSIST_MAX_AGE, queryPersister, shouldPersistQueryKey } from '@/lib/offline';
 
 /**
  * Defining types
@@ -25,10 +26,9 @@ import { syncPendingProgress } from '@/lib/apis';
  * - service worker registration with the prompt-then-reload update UX (never a surprise refresh),
  * - offline / reconnected banners driven by `useOnlineStatus`,
  * - refetch + reading-progress re-sync when connectivity returns,
- * - whole-query-cache persistence into IndexedDB so previously-loaded screens render offline.
+ * - public-content query-cache persistence into IndexedDB so previously-loaded screens render offline
+ *   (per-user state is denylisted by `shouldPersistQueryKey`, see `@/lib/offline/query-persister`).
  */
-const persister = createIDBPersister({ dbName: 'webnovel-query-cache' });
-const PERSIST_MAX_AGE = 7 * 24 * 3_600_000;
 
 function SwUpdateBanner(): React.JSX.Element | null {
   const { updateAvailable, applyUpdate } = useServiceWorker({ url: '/sw.js' });
@@ -43,10 +43,11 @@ function QueryCachePersistence(): null {
       queryClient,
       // The ecosystem persister types `clientState` as `unknown` (no extra peer dep); the shape is the
       // stable persist-client contract, so widening here is safe.
-      persister: persister as unknown as Parameters<typeof persistQueryClient>[0]['persister'],
+      persister: queryPersister as unknown as Parameters<typeof persistQueryClient>[0]['persister'],
       maxAge: PERSIST_MAX_AGE,
-      buster: 'v1',
-      dehydrateOptions: { shouldDehydrateQuery: query => query.state.status === 'success' },
+      buster: PERSIST_BUSTER,
+      // Only public catalog/chapter content reaches disk — session, library and progress carry PII and are denylisted.
+      dehydrateOptions: { shouldDehydrateQuery: query => query.state.status === 'success' && shouldPersistQueryKey(query.queryKey) },
     });
     return unsubscribe;
   }, [queryClient]);
@@ -65,9 +66,9 @@ function ConnectivityBanners(): React.JSX.Element | null {
     }
     if (!wasOffline.current) return;
     wasOffline.current = false;
-    // Back online: revalidate everything on screen and push progress writes that queued while offline.
+    // Back online: revalidate everything on screen and push the signed-in user's progress writes that queued while offline.
     void queryClient.invalidateQueries();
-    void syncPendingProgress(true);
+    void syncPendingProgress(queryClient.getQueryData<SessionUser | null>(sessionKeys.session)?.userId);
     toast.success('Back online — syncing your library and progress.');
   }, [online, queryClient]);
 

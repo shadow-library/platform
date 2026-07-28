@@ -30,9 +30,9 @@ export function LibraryScreen(): React.JSX.Element {
   const [query, setQuery] = useState('');
   const navigate = useNavigate();
   const session = useQuery(sessionQueryOptions());
-  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
-  const progress = useQuery(progressQueryOptions(Boolean(session.data)));
-  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
+  const library = useQuery(libraryQueryOptions(session.data?.userId));
+  const progress = useQuery(progressQueryOptions(session.data?.userId));
+  const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
 
   const entries = library.data ?? [];
   const term = query.trim().toLowerCase();

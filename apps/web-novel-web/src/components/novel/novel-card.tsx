@@ -30,8 +30,8 @@ export interface NovelCardProps {
  */
 export function NovelCard({ novel, downloaded }: NovelCardProps): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
-  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
-  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
+  const library = useQuery(libraryQueryOptions(session.data?.userId));
+  const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
   const inLibrary = isInLibrary(library.data, novel.slug);
 
   const onToggle = (event: React.MouseEvent): void => {

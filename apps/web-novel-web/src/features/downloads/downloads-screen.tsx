@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { useQuery } from '@tanstack/react-query';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useCallback, useEffect, useState } from 'react';
 import { Button, EmptyState, Progress, toast } from '@shadow-library/ui';
@@ -10,7 +11,7 @@ import { Button, EmptyState, Progress, toast } from '@shadow-library/ui';
  */
 import { DownloadIcon } from '@/components/icons';
 import { Cover } from '@/components/novel';
-import { getProgress } from '@/lib/apis';
+import { getProgress, sessionQueryOptions } from '@/lib/apis';
 import { type DownloadedNovel, downloadedSize, listDownloadedNovels, offlineStore, removeDownloadedNovel } from '@/lib/offline';
 
 import styles from './downloads-screen.module.css';
@@ -39,6 +40,7 @@ export function DownloadsScreen(): React.JSX.Element {
   const [rows, setRows] = useState<DownloadRow[]>([]);
   const [usage, setUsage] = useState<{ used: number; quota: number } | null>(null);
   const navigate = useNavigate();
+  const session = useQuery(sessionQueryOptions());
 
   const refresh = useCallback(async (): Promise<void> => {
     const records = await listDownloadedNovels();
@@ -60,7 +62,7 @@ export function DownloadsScreen(): React.JSX.Element {
   };
 
   const onRead = (record: DownloadedNovel): void => {
-    const progress = getProgress(record.slug);
+    const progress = getProgress(record.slug, session.data?.userId);
     const ordinal = progress && record.ordinals.includes(progress.ordinal) ? progress.ordinal : record.ordinals[0];
     if (ordinal === undefined) return;
     void navigate({ to: '/read/$slug/$ordinal', params: { slug: record.slug, ordinal: String(ordinal) } });

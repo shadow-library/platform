@@ -6,7 +6,7 @@ import { queryOptions } from '@tanstack/react-query';
 /**
  * Importing user defined packages
  */
-import { readLocal, writeLocal } from '@/lib/local-store';
+import { namespacedKey, readLocal, removeLocal, writeLocal } from '@/lib/local-store';
 
 import { type ApiError, APIRequest, useFixtures } from './transport';
 import { type ReadingProgress } from './types';
@@ -36,7 +36,9 @@ interface ServerProgressList {
  *
  * Reading progress is local-first (written on every reader scroll, works offline) and mirrored to
  * `GET/PUT /api/novels/:slug/progress` when signed in. Writes that fail (offline) are queued as dirty slugs
- * and re-pushed by `syncPendingProgress` when connectivity returns.
+ * and re-pushed by `syncPendingProgress` when connectivity returns. The mirror and its pending queue are
+ * namespaced by user id (guests fall back to a `guest` namespace) so one account's reading history never
+ * leaks into another's.
  */
 const PROGRESS_STORAGE_KEY = 'webnovel:progress';
 const PENDING_STORAGE_KEY = 'webnovel:progress-pending';
@@ -45,24 +47,34 @@ export const progressKeys = {
   all: ['progress'] as const,
 };
 
-export function readProgressMap(): ProgressMap {
-  return readLocal<ProgressMap>(PROGRESS_STORAGE_KEY, {});
+export function readProgressMap(userId?: string): ProgressMap {
+  return readLocal<ProgressMap>(namespacedKey(PROGRESS_STORAGE_KEY, userId), {});
 }
 
-export function getProgress(slug: string): ReadingProgress | undefined {
-  return readProgressMap()[slug];
+function writeProgressMap(map: ProgressMap, userId?: string): void {
+  writeLocal(namespacedKey(PROGRESS_STORAGE_KEY, userId), map);
+}
+
+export function getProgress(slug: string, userId?: string): ReadingProgress | undefined {
+  return readProgressMap(userId)[slug];
+}
+
+/** Drop the current user's reading history and pending queue — called on sign-out. */
+export function clearProgressMirror(userId?: string): void {
+  removeLocal(namespacedKey(PROGRESS_STORAGE_KEY, userId));
+  removeLocal(namespacedKey(PENDING_STORAGE_KEY, userId));
 }
 
 export function toReadingProgress(item: ServerProgressItem): ReadingProgress {
   return { novelSlug: item.novelSlug, ordinal: item.ordinal, position: item.position, updatedAt: item.updatedAt };
 }
 
-export const progressQueryOptions = (authenticated = false) =>
+export const progressQueryOptions = (userId?: string) =>
   queryOptions<ProgressMap, ApiError>({
     queryKey: progressKeys.all,
     queryFn: async () => {
-      const local = readProgressMap();
-      if (useFixtures || !authenticated) return local;
+      const local = readProgressMap(userId);
+      if (useFixtures || !userId) return local;
       const remote = await APIRequest.get('/api/me/progress').timeout(10_000).execute<ServerProgressList>();
       const merged: ProgressMap = { ...local };
       for (const item of remote.items) {
@@ -70,36 +82,38 @@ export const progressQueryOptions = (authenticated = false) =>
         const mine = merged[entry.novelSlug];
         if (!mine || Date.parse(entry.updatedAt) > Date.parse(mine.updatedAt)) merged[entry.novelSlug] = entry;
       }
-      writeLocal(PROGRESS_STORAGE_KEY, merged);
+      writeProgressMap(merged, userId);
       return merged;
     },
   });
 
-export function saveProgress(slug: string, ordinal: number, position: number, authenticated = false): ReadingProgress {
+export function saveProgress(slug: string, ordinal: number, position: number, userId?: string): ReadingProgress {
   const entry: ReadingProgress = { novelSlug: slug, ordinal, position: Math.round(position), updatedAt: new Date().toISOString() };
-  const map = readProgressMap();
+  const map = readProgressMap(userId);
   map[slug] = entry;
-  writeLocal(PROGRESS_STORAGE_KEY, map);
+  writeProgressMap(map, userId);
 
-  if (!useFixtures && authenticated) {
+  if (!useFixtures && userId) {
+    const pendingStorageKey = namespacedKey(PENDING_STORAGE_KEY, userId);
     APIRequest.put(`/api/novels/${encodeURIComponent(slug)}/progress`)
       .body({ ordinal: entry.ordinal, position: entry.position })
       .timeout(8_000)
       .execute()
       .catch(() => {
-        const pending = readLocal<string[]>(PENDING_STORAGE_KEY, []);
-        if (!pending.includes(slug)) writeLocal(PENDING_STORAGE_KEY, [...pending, slug]);
+        const pending = readLocal<string[]>(pendingStorageKey, []);
+        if (!pending.includes(slug)) writeLocal(pendingStorageKey, [...pending, slug]);
       });
   }
   return entry;
 }
 
-/** Re-push progress writes that failed while offline — called from the reconnect handler. */
-export async function syncPendingProgress(authenticated = false): Promise<void> {
-  if (useFixtures || !authenticated) return;
-  const pending = readLocal<string[]>(PENDING_STORAGE_KEY, []);
+/** Re-push the signed-in user's progress writes that failed while offline — called from the reconnect handler. */
+export async function syncPendingProgress(userId?: string): Promise<void> {
+  if (useFixtures || !userId) return;
+  const pendingStorageKey = namespacedKey(PENDING_STORAGE_KEY, userId);
+  const pending = readLocal<string[]>(pendingStorageKey, []);
   if (pending.length === 0) return;
-  const map = readProgressMap();
+  const map = readProgressMap(userId);
   const results = await Promise.allSettled(
     pending.map(slug => {
       const entry = map[slug];
@@ -111,5 +125,5 @@ export async function syncPendingProgress(authenticated = false): Promise<void> 
     }),
   );
   const stillPending = pending.filter((_, index) => results[index]?.status === 'rejected');
-  writeLocal(PENDING_STORAGE_KEY, stillPending);
+  writeLocal(pendingStorageKey, stillPending);
 }

@@ -36,14 +36,14 @@ export function NovelScreen(): React.JSX.Element {
   const router = useRouter();
   const novel = useQuery(novelQueryOptions(slug));
   const session = useQuery(sessionQueryOptions());
-  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
-  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
+  const library = useQuery(libraryQueryOptions(session.data?.userId));
+  const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
   const [downloadOpen, setDownloadOpen] = useState(false);
 
   if (!novel.data) return <div className={styles.content} />;
   const data = novel.data;
   const inLibrary = isInLibrary(library.data, slug);
-  const progress = getProgress(slug);
+  const progress = getProgress(slug, session.data?.userId);
 
   const onShare = async (): Promise<void> => {
     const url = window.location.href;

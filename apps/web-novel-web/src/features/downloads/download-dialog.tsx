@@ -1,6 +1,7 @@
 /**
  * Importing npm packages
  */
+import { useQuery } from '@tanstack/react-query';
 import { useState } from 'react';
 import { Button, Dialog, Input, Progress, toast } from '@shadow-library/ui';
 import { useOfflineDownload } from '@shadow-library/web/offline';
@@ -8,7 +9,7 @@ import { useOfflineDownload } from '@shadow-library/web/offline';
 /**
  * Importing user defined packages
  */
-import { fetchChapter, getProgress } from '@/lib/apis';
+import { fetchChapter, getProgress, sessionQueryOptions } from '@/lib/apis';
 import { type ChapterContent, type NovelDetail } from '@/lib/apis/types';
 import { chapterKey, type DownloadedNovel, getDownloadedNovel, novelKey, offlineManager, offlineStore } from '@/lib/offline';
 
@@ -32,7 +33,8 @@ const MAX_BATCH = 200;
 const EST_BYTES_PER_CHAPTER = 8_000;
 
 export function DownloadDialog({ novel, open, onOpenChange }: DownloadDialogProps): React.JSX.Element {
-  const progress = getProgress(novel.slug);
+  const session = useQuery(sessionQueryOptions());
+  const progress = getProgress(novel.slug, session.data?.userId);
   const [from, setFrom] = useState(String(progress?.ordinal ?? 1));
   const [to, setTo] = useState(String(Math.min((progress?.ordinal ?? 1) + 49, novel.chapterCount)));
   const [completed, setCompleted] = useState(0);

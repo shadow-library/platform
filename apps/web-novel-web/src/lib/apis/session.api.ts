@@ -9,7 +9,11 @@ import { requireAuth } from '@shadow-library/web/router';
 /**
  * Importing user defined packages
  */
+import { queryPersister } from '@/lib/offline';
+
 import { FIXTURE_SESSION } from './fixtures';
+import { clearLibraryMirror } from './library.api';
+import { clearProgressMirror } from './progress.api';
 import { ApiError, useFixtures } from './transport';
 import { type SessionUser } from './types';
 
@@ -74,4 +78,16 @@ export function loginUrl(returnTo: string): string {
 
 export function logoutUrl(): string {
   return '/api/auth/logout';
+}
+
+/**
+ * Wipe every on-device trace of the session before the logout redirect: the in-memory query cache, the
+ * IndexedDB query persister, and this user's namespaced library/progress mirrors. Without this, the next
+ * person on the device would inherit the previous account's cached shelf and reading history.
+ */
+export async function purgeOnLogout(queryClient: QueryClient, userId?: string): Promise<void> {
+  clearLibraryMirror(userId);
+  clearProgressMirror(userId);
+  queryClient.clear();
+  await queryPersister.removeClient();
 }

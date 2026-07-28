@@ -61,8 +61,8 @@ export function ReaderScreen(): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const chapter = useQuery(chapterQueryOptions(slug, ordinal));
   const novel = useQuery(novelQueryOptions(slug));
-  const library = useQuery(libraryQueryOptions(Boolean(session.data)));
-  const toggleLibrary = useToggleLibraryMutation(Boolean(session.data));
+  const library = useQuery(libraryQueryOptions(session.data?.userId));
+  const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
 
   const [settings, setSettings] = useState<ReaderSettings>(loadReaderSettings);
   const [chrome, setChrome] = useState(true);
@@ -71,7 +71,7 @@ export function ReaderScreen(): React.JSX.Element {
   const [scrollPct, setScrollPct] = useState(0);
 
   const palette = READER_PALETTES[settings.theme];
-  const authenticated = Boolean(session.data);
+  const userId = session.data?.userId;
   const inLibrary = isInLibrary(library.data, slug);
 
   const updateSettings = (updates: Partial<ReaderSettings>): void => {
@@ -92,8 +92,8 @@ export function ReaderScreen(): React.JSX.Element {
       setScrollPct(pct);
       clearTimeout(saveTimer.current);
       saveTimer.current = setTimeout(() => {
-        saveProgress(slug, ordinal, pct, authenticated);
-        queryClient.setQueryData(progressKeys.all, readProgressMap());
+        saveProgress(slug, ordinal, pct, userId);
+        queryClient.setQueryData(progressKeys.all, readProgressMap(userId));
       }, 800);
     };
     window.addEventListener('scroll', onScroll, { passive: true });
@@ -102,12 +102,12 @@ export function ReaderScreen(): React.JSX.Element {
       window.removeEventListener('scroll', onScroll);
       clearTimeout(saveTimer.current);
     };
-  }, [slug, ordinal, authenticated, queryClient]);
+  }, [slug, ordinal, userId, queryClient]);
 
   // Restore the saved position once the chapter is on screen, and prefetch the next chapter.
   useEffect(() => {
     if (!chapter.data) return;
-    const saved = getProgress(slug);
+    const saved = getProgress(slug, userId);
     if (saved && saved.ordinal === ordinal && saved.position > 2) {
       const doc = document.documentElement;
       window.scrollTo({ top: ((doc.scrollHeight - doc.clientHeight) * saved.position) / 100 });
@@ -115,7 +115,7 @@ export function ReaderScreen(): React.JSX.Element {
       window.scrollTo({ top: 0 });
     }
     if (chapter.data.nextOrdinal) void queryClient.prefetchQuery(chapterQueryOptions(slug, chapter.data.nextOrdinal));
-  }, [chapter.data, slug, ordinal, queryClient]);
+  }, [chapter.data, slug, ordinal, userId, queryClient]);
 
   const goTo = (target: number): void => {
     void navigate({ to: '/read/$slug/$ordinal', params: { slug, ordinal: String(target) } });
