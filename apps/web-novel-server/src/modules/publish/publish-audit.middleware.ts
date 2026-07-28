@@ -59,7 +59,7 @@ export class PublishAuditTrailer {
       const body = typeof request.body === 'object' && request.body !== null ? (request.body as Record<string, unknown>) : {};
       const entry: PublishAuditEntry = {
         action: audit.action,
-        novelSlug: params.slug ?? '-',
+        novelSlug: (params.slug ?? '-').slice(0, 128),
         outcome: this.toOutcome(error),
         ...this.extractCaller(request),
         ordinal: this.toInt4(params.ordinal !== undefined ? Number(params.ordinal) : undefined),
@@ -94,6 +94,7 @@ export class PublishAuditTrailer {
     const decoded = tryCatch(() => decodeJwt(header.slice(7)));
     if (!decoded.success) return {};
     const { sub, client_id: clientId } = decoded.data.payload;
-    return { callerSub: typeof sub === 'string' ? sub : undefined, callerClientId: typeof clientId === 'string' ? clientId : undefined };
+    /** Truncated to the audit columns' varchar(128) so an over-long claim can't overflow the insert and sink the row (mirrors `contentHash`) */
+    return { callerSub: typeof sub === 'string' ? sub.slice(0, 128) : undefined, callerClientId: typeof clientId === 'string' ? clientId.slice(0, 128) : undefined };
   }
 }

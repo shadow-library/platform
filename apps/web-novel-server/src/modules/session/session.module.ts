@@ -8,6 +8,7 @@
 import { type DynamicModule, forwardRef, type Import, Module } from '@shadow-library/app';
 import { RelyingPartyModule } from '@shadow-library/auth/module';
 import { Config } from '@shadow-library/common';
+import { FastifyModule } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -42,7 +43,7 @@ const SessionRelyingPartyModule = forwardRef(
 ) as unknown as Import;
 
 @Module({
-  imports: [SessionRelyingPartyModule],
+  imports: [SessionRelyingPartyModule, FastifyModule],
   controllers: [SessionController],
   providers: [SessionService],
   exports: [SessionService],

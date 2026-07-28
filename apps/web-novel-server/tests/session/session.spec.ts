@@ -81,6 +81,19 @@ describe('Reader session surface', () => {
       expect(login.redirectedTo).toBe('/');
     });
 
+    it('should fall back to the root for a backslash-obfuscated returnTo', async () => {
+      const escaped = await loginAs('reader-1', { returnTo: '/\\evil.com' });
+      expect(escaped.redirectedTo).toBe('/');
+
+      const doubled = await loginAs('reader-1', { returnTo: '/\\/evil.com' });
+      expect(doubled.redirectedTo).toBe('/');
+    });
+
+    it('should preserve a same-origin absolute returnTo', async () => {
+      const login = await loginAs('reader-1', { returnTo: '/library' });
+      expect(login.redirectedTo).toBe('/library');
+    });
+
     it('should reject a callback whose state does not match the transaction', async () => {
       const loginResponse = await env.getRouter().mockRequest().get('/api/auth/login');
       const location = new URL(loginResponse.headers.location as string);

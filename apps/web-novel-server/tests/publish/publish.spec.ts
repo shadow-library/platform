@@ -297,5 +297,29 @@ describe('Internal publish API', () => {
       expect(response.statusCode).toBe(403);
       expect(await auditRows()).toHaveLength(0);
     });
+
+    it('should reject a user-kind token that carries the publish scope with 403 and audit it as unauthorized', async () => {
+      const token = await userToken('reader-1', { scopes: ['webnovel:publish'] });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1), token });
+      expect(response.statusCode).toBe(403);
+      expect(await novelRows()).toHaveLength(0);
+
+      const rows = await auditRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ action: 'novel.upsert', novelSlug: SLUG, outcome: 'unauthorized', callerSub: 'reader-1' });
+    });
+
+    it('should still record an audit row when a rejected attempt carries an over-long token sub', async () => {
+      const longSub = 'z'.repeat(200);
+      const token = await idp.issueToken({ sub: longSub, kind: 'user', audience: AUDIENCE, scopes: [] });
+      const response = await push('put', `/internal/novels/${SLUG}`, { body: novelBody(1), token });
+      expect(response.statusCode).toBe(403);
+
+      const rows = await auditRows();
+      expect(rows).toHaveLength(1);
+      expect(rows[0]).toMatchObject({ action: 'novel.upsert', novelSlug: SLUG, outcome: 'unauthorized' });
+      expect(rows[0]?.callerSub).toBe(longSub.slice(0, 128));
+      expect(rows[0]?.callerSub).toHaveLength(128);
+    });
   });
 });

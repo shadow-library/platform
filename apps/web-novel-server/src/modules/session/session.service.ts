@@ -7,17 +7,19 @@
  */
 import { createHmac, timingSafeEqual } from 'node:crypto';
 
-import { type FastifyRequest } from 'fastify';
 import { Injectable } from '@shadow-library/app';
+import { RelyingParty } from '@shadow-library/auth/rp';
 import { Config, Logger, tryCatch } from '@shadow-library/common';
+import { ContextService } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { AppErrorCode } from '@server/classes';
-import { APP_NAME } from '@server/constants';
+import { APP_NAME, WEBNOVEL_AUDIENCE } from '@server/constants';
 
 import { LOGIN_COOKIE_NAME, LOGIN_TRANSACTION_TTL_S, SESSION_COOKIE_NAME } from './session.constants';
+import { type CallbackQuery } from './session.dto';
 
 /**
  * Defining types
@@ -60,6 +62,52 @@ export interface CookieOptions {
 export class SessionService {
   private readonly logger = Logger.getLogger(APP_NAME, SessionService.name);
 
+  constructor(
+    private readonly relyingParty: RelyingParty,
+    private readonly context: ContextService,
+  ) {}
+
+  /*!
+   * OIDC login flow
+   */
+
+  /** Starts the login dance: builds the identity authorize URL and the signed transaction cookie the callback verifies */
+  async beginLogin(returnTo?: string): Promise<{ cookie: string; authorizationUrl: string }> {
+    /** Resolved audience, not the raw config — without `resource` identity mints a `shadow-identity`-audience token this server's own guard rejects */
+    const authorization = await this.relyingParty.createAuthorizationUrl({ resource: Config.get('auth.audience') ?? WEBNOVEL_AUDIENCE });
+    const cookie = this.createLoginCookie({
+      state: authorization.state,
+      nonce: authorization.nonce,
+      codeVerifier: authorization.codeVerifier,
+      returnTo: this.sanitizeReturnTo(returnTo),
+    });
+    return { cookie, authorizationUrl: authorization.url };
+  }
+
+  /** Completes the login: verifies the transaction, exchanges the code, validates the ID token, and mints the session cookie */
+  async completeLogin(query: CallbackQuery): Promise<{ cookie: string; returnTo: string }> {
+    const transaction = this.parseLoginTransaction() ?? AppErrorCode.WBN_005.throw();
+    if (query.error) this.logger.warn('identity answered the authorization request with an error', { error: query.error });
+    if (query.error || !query.code || !query.state || query.state !== transaction.state) throw AppErrorCode.WBN_005.create();
+
+    const tokens = await this.relyingParty.exchangeCode({ code: query.code, codeVerifier: transaction.codeVerifier, nonce: transaction.nonce });
+    const claims = tokens.idTokenClaims ?? AppErrorCode.WBN_005.throw();
+    const userId = typeof claims.sub === 'string' && claims.sub ? claims.sub : AppErrorCode.WBN_005.throw();
+    const email = typeof claims.email === 'string' ? claims.email : undefined;
+    const name = typeof claims.name === 'string' ? claims.name : undefined;
+
+    const cookie = this.createSessionCookie({ userId, email, name });
+    this.logger.info('reader session established', { userId });
+    return { cookie, returnTo: transaction.returnTo };
+  }
+
+  /** Only same-origin absolute paths survive; anything else falls back to the root (open-redirect guard) */
+  private sanitizeReturnTo(returnTo?: string): string {
+    /** A backslash is rejected anywhere: browsers fold it to `/`, so `/\evil.com` resolves as the protocol-relative `//evil.com` */
+    if (!returnTo || !returnTo.startsWith('/') || returnTo.startsWith('//') || returnTo.includes('\\')) return '/';
+    return returnTo;
+  }
+
   /*!
    * Reader sessions
    */
@@ -70,8 +118,8 @@ export class SessionService {
   }
 
   /** Resolves the session cookie to the reader it identifies; throws 401 when absent or invalid */
-  authenticate(request: FastifyRequest): ReaderSession {
-    const cookie = request.cookies[SESSION_COOKIE_NAME];
+  authenticate(): ReaderSession {
+    const cookie = this.context.getRequest().cookies[SESSION_COOKIE_NAME];
     const session = cookie ? this.verify<ReaderSession>(cookie) : null;
     if (!session || typeof session.userId !== 'string') {
       this.logger.debug('session authentication failed', { hasCookie: Boolean(cookie) });
@@ -92,8 +140,8 @@ export class SessionService {
     return this.sign({ ...transaction, exp: this.now() + LOGIN_TRANSACTION_TTL_S } satisfies LoginTransaction);
   }
 
-  parseLoginTransaction(request: FastifyRequest): LoginTransaction | null {
-    const cookie = request.cookies[LOGIN_COOKIE_NAME];
+  private parseLoginTransaction(): LoginTransaction | null {
+    const cookie = this.context.getRequest().cookies[LOGIN_COOKIE_NAME];
     if (!cookie) return null;
     const transaction = this.verify<LoginTransaction>(cookie);
     if (!transaction || typeof transaction.state !== 'string' || typeof transaction.codeVerifier !== 'string') return null;

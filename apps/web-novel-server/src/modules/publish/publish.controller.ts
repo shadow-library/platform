@@ -31,11 +31,11 @@ import { PublishService } from './publish.service';
  */
 
 @HttpController('/internal/novels')
+@RequireScope(PUBLISH_SCOPE)
 export class PublishController {
   constructor(private readonly publishService: PublishService) {}
 
   @Put('/:slug')
-  @RequireScope(PUBLISH_SCOPE)
   @PublishAudited('novel.upsert')
   @RespondFor(200, PublishResultResponse)
   async upsertNovel(@Params() params: NovelSlugParams, @Body() body: NovelUpsertBody, @Res() response: HttpResponse): Promise<PublishResultResponse | undefined> {
@@ -45,25 +45,22 @@ export class PublishController {
   }
 
   @Put('/:slug/chapters/:ordinal')
-  @RequireScope(PUBLISH_SCOPE)
   @PublishAudited('chapter.upsert')
   @RespondFor(200, PublishResultResponse)
   async upsertChapter(@Params() params: ChapterOrdinalParams, @Body() body: ChapterUpsertBody, @Res() response: HttpResponse): Promise<PublishResultResponse | undefined> {
-    const result = await this.publishService.upsertChapter(params.slug, Number(params.ordinal), body);
+    const result = await this.publishService.upsertChapter(params.slug, params.ordinal, body);
     if (result.outcome === 'noop') return void response.status(204).send();
     return { slug: params.slug, outcome: 'applied', revision: result.revision };
   }
 
   @Delete('/:slug/chapters/:ordinal')
-  @RequireScope(PUBLISH_SCOPE)
   @PublishAudited('chapter.unpublish')
   @HttpStatus(204)
   async unpublishChapter(@Params() params: ChapterOrdinalParams): Promise<void> {
-    await this.publishService.unpublishChapter(params.slug, Number(params.ordinal));
+    await this.publishService.unpublishChapter(params.slug, params.ordinal);
   }
 
   @Get('/:slug/manifest')
-  @RequireScope(PUBLISH_SCOPE)
   @RespondFor(200, [ManifestItem])
   getManifest(@Params() params: NovelSlugParams): Promise<ManifestItem[]> {
     return this.publishService.getManifest(params.slug);

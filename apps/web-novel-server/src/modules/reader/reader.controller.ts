@@ -5,8 +5,7 @@
 /**
  * Importing npm packages
  */
-import { type FastifyRequest } from 'fastify';
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, Req, RespondFor } from '@shadow-library/fastify';
+import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -41,22 +40,22 @@ export class ReaderController {
 
   @Get('/me/progress')
   @RespondFor(200, ProgressListResponse)
-  async listProgress(@Req() request: FastifyRequest): Promise<ProgressListResponse> {
-    const session = this.sessionService.authenticate(request);
+  async listProgress(): Promise<ProgressListResponse> {
+    const session = this.sessionService.authenticate();
     return { items: await this.readerService.listProgress(session.userId) };
   }
 
   @Get('/novels/:slug/progress')
   @RespondFor(200, ProgressResponse)
-  getProgress(@Params() params: NovelSlugParams, @Req() request: FastifyRequest): Promise<ProgressResponse> {
-    const session = this.sessionService.authenticate(request);
+  getProgress(@Params() params: NovelSlugParams): Promise<ProgressResponse> {
+    const session = this.sessionService.authenticate();
     return this.readerService.getProgress(session.userId, params.slug);
   }
 
   @Put('/novels/:slug/progress')
   @RespondFor(200, ProgressResponse)
-  saveProgress(@Params() params: NovelSlugParams, @Body() body: ProgressBody, @Req() request: FastifyRequest): Promise<ProgressResponse> {
-    const session = this.sessionService.authenticate(request);
+  saveProgress(@Params() params: NovelSlugParams, @Body() body: ProgressBody): Promise<ProgressResponse> {
+    const session = this.sessionService.authenticate();
     return this.readerService.saveProgress(session.userId, params.slug, body);
   }
 
@@ -66,22 +65,22 @@ export class ReaderController {
 
   @Get('/library')
   @RespondFor(200, LibraryListResponse)
-  async listLibrary(@Req() request: FastifyRequest): Promise<LibraryListResponse> {
-    const session = this.sessionService.authenticate(request);
+  async listLibrary(): Promise<LibraryListResponse> {
+    const session = this.sessionService.authenticate();
     return { items: await this.readerService.listLibrary(session.userId) };
   }
 
   @Post('/library')
   @HttpStatus(204)
-  async addToLibrary(@Body() body: LibraryAddBody, @Req() request: FastifyRequest): Promise<void> {
-    const session = this.sessionService.authenticate(request);
+  async addToLibrary(@Body() body: LibraryAddBody): Promise<void> {
+    const session = this.sessionService.authenticate();
     await this.readerService.addToLibrary(session.userId, body.slug);
   }
 
   @Delete('/library/:slug')
   @HttpStatus(204)
-  async removeFromLibrary(@Params() params: NovelSlugParams, @Req() request: FastifyRequest): Promise<void> {
-    const session = this.sessionService.authenticate(request);
+  async removeFromLibrary(@Params() params: NovelSlugParams): Promise<void> {
+    const session = this.sessionService.authenticate();
     await this.readerService.removeFromLibrary(session.userId, params.slug);
   }
 }

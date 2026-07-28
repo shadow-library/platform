@@ -6,6 +6,7 @@
  * Importing npm packages
  */
 import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
@@ -31,8 +32,9 @@ export class NovelSlugParams {
 @Schema()
 export class ChapterOrdinalParams extends NovelSlugParams {
   /** Capped at 9 digits so the parsed ordinal always fits int4 */
-  @Field({ pattern: '^\\d{1,9}$' })
-  ordinal: string;
+  @Field(() => String, { pattern: '^\\d{1,9}$' })
+  @Transform('int:parse')
+  ordinal: number;
 }
 
 @Schema()

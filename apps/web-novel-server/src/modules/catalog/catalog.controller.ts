@@ -54,7 +54,7 @@ export class CatalogController {
   @Get('/:slug/chapters/:ordinal')
   @RespondFor(200, ChapterContentResponse)
   async getChapter(@Params() params: ChapterOrdinalParams, @Req() request: FastifyRequest, @Res() response: HttpResponse): Promise<ChapterContentResponse | undefined> {
-    const ref = await this.catalogService.getChapterRef(params.slug, Number(params.ordinal));
+    const ref = await this.catalogService.getChapterRef(params.slug, params.ordinal);
     response.header('etag', `"${ref.contentHash}"`);
     response.header('cache-control', `public, max-age=${Config.get('catalog.cache-max-age')}`);
     if (this.matchesETag(request.headers['if-none-match'], ref.contentHash)) return void response.status(304).send();

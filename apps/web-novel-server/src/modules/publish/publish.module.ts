@@ -13,6 +13,7 @@ import { FastifyModule } from '@shadow-library/fastify';
  */
 import { DatabaseModule } from '@server/modules/datastore';
 
+import { InternalServiceGuard } from './internal-service.middleware';
 import { PublishAuditTrailer } from './publish-audit.middleware';
 import { PublishAuditService } from './publish-audit.service';
 import { PublishController } from './publish.controller';
@@ -28,7 +29,7 @@ import { PublishService } from './publish.service';
 
 @Module({
   imports: [DatabaseModule, FastifyModule],
-  controllers: [PublishController, PublishAuditTrailer],
+  controllers: [PublishController, InternalServiceGuard, PublishAuditTrailer],
   providers: [PublishService, PublishAuditService],
   exports: [PublishService],
 })
