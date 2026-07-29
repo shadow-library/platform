@@ -15,6 +15,7 @@ import { Route as ShellIndexRouteImport } from './routes/_shell/index';
 import { Route as ShellBrowseRouteImport } from './routes/_shell/browse';
 import { Route as ShellDownloadsRouteImport } from './routes/_shell/downloads';
 import { Route as ShellGenresRouteImport } from './routes/_shell/genres';
+import { Route as ShellHelpRouteImport } from './routes/_shell/help';
 import { Route as ShellLibraryRouteImport } from './routes/_shell/library';
 import { Route as ShellSettingsRouteImport } from './routes/_shell/settings';
 import { Route as ShellNovelsSlugRouteImport } from './routes/_shell/novels.$slug';
@@ -49,6 +50,11 @@ const ShellGenresRoute = ShellGenresRouteImport.update({
   path: '/genres',
   getParentRoute: () => ShellRoute,
 } as any);
+const ShellHelpRoute = ShellHelpRouteImport.update({
+  id: '/help',
+  path: '/help',
+  getParentRoute: () => ShellRoute,
+} as any);
 const ShellLibraryRoute = ShellLibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/browse': typeof ShellBrowseRoute;
   '/downloads': typeof ShellDownloadsRoute;
   '/genres': typeof ShellGenresRoute;
+  '/help': typeof ShellHelpRoute;
   '/library': typeof ShellLibraryRoute;
   '/settings': typeof ShellSettingsRoute;
   '/novels/$slug': typeof ShellNovelsSlugRoute;
@@ -86,6 +93,7 @@ export interface FileRoutesByTo {
   '/browse': typeof ShellBrowseRoute;
   '/downloads': typeof ShellDownloadsRoute;
   '/genres': typeof ShellGenresRoute;
+  '/help': typeof ShellHelpRoute;
   '/library': typeof ShellLibraryRoute;
   '/settings': typeof ShellSettingsRoute;
   '/': typeof ShellIndexRoute;
@@ -99,6 +107,7 @@ export interface FileRoutesById {
   '/_shell/browse': typeof ShellBrowseRoute;
   '/_shell/downloads': typeof ShellDownloadsRoute;
   '/_shell/genres': typeof ShellGenresRoute;
+  '/_shell/help': typeof ShellHelpRoute;
   '/_shell/library': typeof ShellLibraryRoute;
   '/_shell/settings': typeof ShellSettingsRoute;
   '/_shell/': typeof ShellIndexRoute;
@@ -107,9 +116,9 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/login' | '/browse' | '/downloads' | '/genres' | '/library' | '/settings' | '/novels/$slug' | '/read/$slug/$ordinal';
+  fullPaths: '/' | '/login' | '/browse' | '/downloads' | '/genres' | '/help' | '/library' | '/settings' | '/novels/$slug' | '/read/$slug/$ordinal';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/login' | '/browse' | '/downloads' | '/genres' | '/library' | '/settings' | '/' | '/novels/$slug' | '/read/$slug/$ordinal';
+  to: '/login' | '/browse' | '/downloads' | '/genres' | '/help' | '/library' | '/settings' | '/' | '/novels/$slug' | '/read/$slug/$ordinal';
   id:
     | '__root__'
     | '/_shell'
@@ -117,6 +126,7 @@ export interface FileRouteTypes {
     | '/_shell/browse'
     | '/_shell/downloads'
     | '/_shell/genres'
+    | '/_shell/help'
     | '/_shell/library'
     | '/_shell/settings'
     | '/_shell/'
@@ -174,6 +184,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellGenresRouteImport;
       parentRoute: typeof ShellRoute;
     };
+    '/_shell/help': {
+      id: '/_shell/help';
+      path: '/help';
+      fullPath: '/help';
+      preLoaderRoute: typeof ShellHelpRouteImport;
+      parentRoute: typeof ShellRoute;
+    };
     '/_shell/library': {
       id: '/_shell/library';
       path: '/library';
@@ -209,6 +226,7 @@ interface ShellRouteChildren {
   ShellBrowseRoute: typeof ShellBrowseRoute;
   ShellDownloadsRoute: typeof ShellDownloadsRoute;
   ShellGenresRoute: typeof ShellGenresRoute;
+  ShellHelpRoute: typeof ShellHelpRoute;
   ShellLibraryRoute: typeof ShellLibraryRoute;
   ShellSettingsRoute: typeof ShellSettingsRoute;
   ShellIndexRoute: typeof ShellIndexRoute;
@@ -219,6 +237,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellBrowseRoute: ShellBrowseRoute,
   ShellDownloadsRoute: ShellDownloadsRoute,
   ShellGenresRoute: ShellGenresRoute,
+  ShellHelpRoute: ShellHelpRoute,
   ShellLibraryRoute: ShellLibraryRoute,
   ShellSettingsRoute: ShellSettingsRoute,
   ShellIndexRoute: ShellIndexRoute,
