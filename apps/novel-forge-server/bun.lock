@@ -15,7 +15,7 @@
         "@langchain/xai": "^1.4.3",
         "@llamaindex/postgres": "^0.0.66",
         "@shadow-library/app": "2.0.0-alpha.0",
-        "@shadow-library/auth": "0.4.0-alpha.2",
+        "@shadow-library/auth": "0.4.0-alpha.4",
         "@shadow-library/class-schema": "0.5.0-alpha.0",
         "@shadow-library/common": "2.0.0-alpha.5",
         "@shadow-library/fastify": "2.0.0-alpha.0",
@@ -333,7 +333,7 @@
 
     "@shadow-library/app": ["@shadow-library/app@2.0.0-alpha.0", "", { "dependencies": { "deepmerge": "^4.3.1", "type-fest": "^4.41.0" }, "peerDependencies": { "@shadow-library/common": "^2.0.0-alpha.1", "reflect-metadata": "^0.2.2" } }, "sha512-ZCKoRtG43VEvCfZtB4C1mBlZi0DHnDIoT66ullXFIzw2SdkRHW22YmhtiNAASxFGwi4KTsVy8rZfnCEqqGJFXw=="],
 
-    "@shadow-library/auth": ["@shadow-library/auth@0.4.0-alpha.2", "", { "peerDependencies": { "@shadow-library/app": "2.0.0-alpha.0", "@shadow-library/class-schema": "0.5.0-alpha.0", "@shadow-library/common": "2.0.0-alpha.5", "@shadow-library/fastify": "2.0.0-alpha.0" }, "optionalPeers": ["@shadow-library/app", "@shadow-library/class-schema", "@shadow-library/fastify"] }, "sha512-pAUPy8q6bbslN4PCBRlOIEjbGPt32YEg40UH5IiMzkMxns5cdyIxyeLiztTPVxTaL2PZTIZh7ZpVTZ0N3BMcYw=="],
+    "@shadow-library/auth": ["@shadow-library/auth@0.4.0-alpha.4", "", { "peerDependencies": { "@shadow-library/app": "2.0.0-alpha.0", "@shadow-library/class-schema": "0.5.0-alpha.0", "@shadow-library/common": "2.0.0-alpha.5", "@shadow-library/fastify": "2.0.0-alpha.0" }, "optionalPeers": ["@shadow-library/app", "@shadow-library/class-schema", "@shadow-library/fastify"] }, "sha512-UGI8bzRFgsOMIAiQ1ZjiMIcCObIdodUMb7e1d3BIk9MOgCGY4rUZ3rxVCjIt+lnQJ92MaMvU8HRLnSHmnIMdig=="],
 
     "@shadow-library/class-schema": ["@shadow-library/class-schema@0.5.0-alpha.0", "", { "dependencies": { "deepmerge": "^4.3.1" }, "peerDependencies": { "@shadow-library/common": "^2.0.0-alpha.1", "reflect-metadata": "^0.2.2" } }, "sha512-9HWH6wNXXpCsiOlJ4ingDHZqEr7ISYAfWHlTE/FlBlXtSeaxCagNsdnBZi9WvH1cSlQPqBZEd46bjYi3UCO9cw=="],
 
