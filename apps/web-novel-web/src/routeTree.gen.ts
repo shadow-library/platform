@@ -16,6 +16,7 @@ import { Route as ShellBrowseRouteImport } from './routes/_shell/browse';
 import { Route as ShellDownloadsRouteImport } from './routes/_shell/downloads';
 import { Route as ShellGenresRouteImport } from './routes/_shell/genres';
 import { Route as ShellLibraryRouteImport } from './routes/_shell/library';
+import { Route as ShellSettingsRouteImport } from './routes/_shell/settings';
 import { Route as ShellNovelsSlugRouteImport } from './routes/_shell/novels.$slug';
 import { Route as ReadSlugOrdinalRouteImport } from './routes/read.$slug.$ordinal';
 
@@ -53,6 +54,11 @@ const ShellLibraryRoute = ShellLibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => ShellRoute,
 } as any);
+const ShellSettingsRoute = ShellSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => ShellRoute,
+} as any);
 const ShellNovelsSlugRoute = ShellNovelsSlugRouteImport.update({
   id: '/novels/$slug',
   path: '/novels/$slug',
@@ -71,6 +77,7 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof ShellDownloadsRoute;
   '/genres': typeof ShellGenresRoute;
   '/library': typeof ShellLibraryRoute;
+  '/settings': typeof ShellSettingsRoute;
   '/novels/$slug': typeof ShellNovelsSlugRoute;
   '/read/$slug/$ordinal': typeof ReadSlugOrdinalRoute;
 }
@@ -80,6 +87,7 @@ export interface FileRoutesByTo {
   '/downloads': typeof ShellDownloadsRoute;
   '/genres': typeof ShellGenresRoute;
   '/library': typeof ShellLibraryRoute;
+  '/settings': typeof ShellSettingsRoute;
   '/': typeof ShellIndexRoute;
   '/novels/$slug': typeof ShellNovelsSlugRoute;
   '/read/$slug/$ordinal': typeof ReadSlugOrdinalRoute;
@@ -92,15 +100,16 @@ export interface FileRoutesById {
   '/_shell/downloads': typeof ShellDownloadsRoute;
   '/_shell/genres': typeof ShellGenresRoute;
   '/_shell/library': typeof ShellLibraryRoute;
+  '/_shell/settings': typeof ShellSettingsRoute;
   '/_shell/': typeof ShellIndexRoute;
   '/_shell/novels/$slug': typeof ShellNovelsSlugRoute;
   '/read/$slug/$ordinal': typeof ReadSlugOrdinalRoute;
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/login' | '/browse' | '/downloads' | '/genres' | '/library' | '/novels/$slug' | '/read/$slug/$ordinal';
+  fullPaths: '/' | '/login' | '/browse' | '/downloads' | '/genres' | '/library' | '/settings' | '/novels/$slug' | '/read/$slug/$ordinal';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/login' | '/browse' | '/downloads' | '/genres' | '/library' | '/' | '/novels/$slug' | '/read/$slug/$ordinal';
+  to: '/login' | '/browse' | '/downloads' | '/genres' | '/library' | '/settings' | '/' | '/novels/$slug' | '/read/$slug/$ordinal';
   id:
     | '__root__'
     | '/_shell'
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/_shell/downloads'
     | '/_shell/genres'
     | '/_shell/library'
+    | '/_shell/settings'
     | '/_shell/'
     | '/_shell/novels/$slug'
     | '/read/$slug/$ordinal';
@@ -171,6 +181,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellLibraryRouteImport;
       parentRoute: typeof ShellRoute;
     };
+    '/_shell/settings': {
+      id: '/_shell/settings';
+      path: '/settings';
+      fullPath: '/settings';
+      preLoaderRoute: typeof ShellSettingsRouteImport;
+      parentRoute: typeof ShellRoute;
+    };
     '/_shell/novels/$slug': {
       id: '/_shell/novels/$slug';
       path: '/novels/$slug';
@@ -193,6 +210,7 @@ interface ShellRouteChildren {
   ShellDownloadsRoute: typeof ShellDownloadsRoute;
   ShellGenresRoute: typeof ShellGenresRoute;
   ShellLibraryRoute: typeof ShellLibraryRoute;
+  ShellSettingsRoute: typeof ShellSettingsRoute;
   ShellIndexRoute: typeof ShellIndexRoute;
   ShellNovelsSlugRoute: typeof ShellNovelsSlugRoute;
 }
@@ -202,6 +220,7 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellDownloadsRoute: ShellDownloadsRoute,
   ShellGenresRoute: ShellGenresRoute,
   ShellLibraryRoute: ShellLibraryRoute,
+  ShellSettingsRoute: ShellSettingsRoute,
   ShellIndexRoute: ShellIndexRoute,
   ShellNovelsSlugRoute: ShellNovelsSlugRoute,
 };
