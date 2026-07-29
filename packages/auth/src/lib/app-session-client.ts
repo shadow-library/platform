@@ -8,7 +8,16 @@ import { AppError, Logger, throwError } from '@shadow-library/common';
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
-import { AppSession, AppSessionCreateInput, AppSessionElevation, AppSessionToken, AppSessionTokenInput, FetchLike } from '../interfaces';
+import {
+  AppSession,
+  AppSessionCreateInput,
+  AppSessionElevation,
+  AppSessionOrganisation,
+  AppSessionToken,
+  AppSessionTokenInput,
+  FetchLike,
+  SwitchedOrganisation,
+} from '../interfaces';
 
 /**
  * Defining types
@@ -53,6 +62,9 @@ const ELEVATION_REQUIRED_CODE = 'AUTH_006';
 /** The step-up existed but named another beneficiary; a retry cannot fix it, only a fresh prompt can */
 const ELEVATION_INTENT_MISMATCH_CODES = ['AUTH_007', 'elevation_intent_mismatch'];
 
+/** Identity's application-access denials; on the organisation routes they mean "not reachable through that one" */
+const ACCESS_DENIED_CODES = ['APP_006', 'APP_007'];
+
 /** RFC 6749 §5.2 codes, as identity's own catalog keys and as the bare OAuth strings */
 const INVALID_TARGET_CODES = ['OAU_005', 'invalid_target'];
 const INVALID_SCOPE_CODES = ['OAU_004', 'invalid_scope'];
@@ -92,6 +104,27 @@ export class AppSessionClient {
     const elevation = await this.request<AppSessionElevation>('POST', '/elevation', { sessionHandle, resource });
     this.logger.info('elevation grant claimed', { resource, expiresAt: elevation.expiresAt });
     return elevation;
+  }
+
+  /**
+   * The organisations this session may act in. A POST because the handle is a bearer secret and must
+   * not reach a query string, an access log or a `Referer` header — the same reason every sibling
+   * route carries it in the body.
+   */
+  async listOrganisations(sessionHandle: string): Promise<AppSessionOrganisation[]> {
+    const body = await this.request<{ organisations: AppSessionOrganisation[] }>('POST', '/organisations', { sessionHandle });
+    return body.organisations;
+  }
+
+  /**
+   * Moves the session into another organisation it may act in. Identity answers with a **rotated**
+   * handle: the one passed in is dead on return, and the caller must store the new one or it will
+   * never mint again.
+   */
+  async switchOrganisation(sessionHandle: string, organisationId: string): Promise<SwitchedOrganisation> {
+    const switched = await this.request<SwitchedOrganisation>('POST', '/organisation', { sessionHandle, organisationId });
+    this.logger.info('app session switched organisation', { organisationId: switched.organisationId, expiresAt: switched.expiresAt });
+    return switched;
   }
 
   /** Ends this application's session only; the central identity session is untouched */
@@ -156,6 +189,7 @@ export class AppSessionClient {
     if (status === 401 && code === SESSION_INVALID_CODE) return this.logged(AuthErrorCode.SESSION_INVALID.create({ reason: failure.reason }));
     if (ELEVATION_INTENT_MISMATCH_CODES.includes(code)) return this.logged(AuthErrorCode.ELEVATION_INTENT_MISMATCH.create({ reason: failure.reason }));
     if (status === 403 && code === ELEVATION_REQUIRED_CODE) return this.logged(AuthErrorCode.ELEVATION_REQUIRED.create({ reason: failure.reason }));
+    if (status === 403 && ACCESS_DENIED_CODES.includes(code)) return this.logged(AuthErrorCode.ORGANISATION_NOT_PERMITTED.create({ reason: failure.reason }));
     if (INVALID_TARGET_CODES.includes(code)) return this.logged(AuthErrorCode.RESOURCE_NOT_ENTITLED.create({ reason: failure.reason }));
     if (INVALID_SCOPE_CODES.includes(code)) return this.logged(AuthErrorCode.SCOPE_NOT_GRANTED.create({ reason: failure.reason }));
     return this.logged(AuthErrorCode.APP_SESSION_FAILED.create({ reason: `${SESSIONS_PATH}${path} returned http ${status}: ${failure.reason}` }));

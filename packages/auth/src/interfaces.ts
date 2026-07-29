@@ -290,6 +290,26 @@ export interface AppSession {
   scope?: string;
 }
 
+/** One organisation an application session may act in; capability is evaluated in whichever is active */
+export interface AppSessionOrganisation {
+  id: string;
+  slug: string;
+  name: string;
+  type: 'PERSONAL' | 'TEAM';
+  /** Whether the session is acting in this organisation right now */
+  active: boolean;
+}
+
+export interface SwitchedOrganisation {
+  /**
+   * The rotated handle. Switching retires the handle that was presented, so a caller that keeps the
+   * old one will never mint again — store this before doing anything else.
+   */
+  sessionHandle: string;
+  organisationId: string;
+  expiresAt: string;
+}
+
 export interface AppSessionTokenInput {
   sessionHandle: string;
   /** Always send it: omitted, the token is addressed to the identity service rather than this app's API */

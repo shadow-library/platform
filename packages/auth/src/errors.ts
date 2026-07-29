@@ -80,6 +80,12 @@ export class AuthErrorCode extends ErrorCode {
    * from `ELEVATION_REQUIRED` because retrying the claim can never succeed — only a fresh prompt can.
    */
   static readonly ELEVATION_INTENT_MISMATCH = AuthErrorCode.forbidden('ELEVATION_INTENT_MISMATCH', 'The step-up was not granted for this application and resource');
+  /**
+   * The session may not act in the organisation it asked for. A refusal about *this user's* reach, so
+   * it answers 403 rather than the 503 an unclassified app-session failure would produce — a caller
+   * offering an organisation picker must be able to tell a denial from an outage.
+   */
+  static readonly ORGANISATION_NOT_PERMITTED = AuthErrorCode.forbidden('ORGANISATION_NOT_PERMITTED', 'The session may not act in the requested organisation');
   /** The client holds no scope on the requested resource — a registration defect, never retryable */
   static readonly RESOURCE_NOT_ENTITLED = AuthErrorCode.internal('RESOURCE_NOT_ENTITLED', 'Client is not entitled to the requested resource: {reason}');
   /** The requested scope is not granted for this audience — a configuration defect, never retryable */

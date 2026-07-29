@@ -11,7 +11,18 @@ import { Body, ContextService, Get, HttpController, type HttpResponse, Post, Que
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
 import { AppSessionService } from './app-session.service';
-import { AuthCallbackQuery, AuthLoginQuery, AuthLogoutResponse, AuthSessionResponse, AuthStepUpQuery, BackchannelLogoutBody, BackchannelLogoutResponse } from './auth.dto';
+import {
+  AuthCallbackQuery,
+  AuthLoginQuery,
+  AuthLogoutResponse,
+  AuthOrganisationsResponse,
+  AuthSessionResponse,
+  AuthStepUpQuery,
+  BackchannelLogoutBody,
+  BackchannelLogoutResponse,
+  SwitchOrganisationBody,
+  SwitchOrganisationResponse,
+} from './auth.dto';
 import { AuthRoutePaths } from './config';
 import { parseCookies } from './cookie';
 import { AuthGuardErrorCode } from './errors';
@@ -42,6 +53,8 @@ const ROUTE_HANDLERS: [RouteName, string][] = [
   ['backchannelLogout', 'backchannelLogout'],
   ['session', 'session'],
   ['stepUp', 'stepUp'],
+  ['organisations', 'organisations'],
+  ['organisation', 'switchOrganisation'],
 ];
 
 let routes: AuthRoutePaths | null = null;
@@ -129,6 +142,33 @@ export class AuthController {
 
     const principal = await this.sessions.resolvePrincipal(handle);
     return { sub: principal.sub, scopes: principal.scopes, org: principal.org, aal: principal.aal, clientId: principal.clientId };
+  }
+
+  /** The organisations this session may act in; a browser client renders a switcher only when there is more than one */
+  @Get('/organisations')
+  @EnableIf(() => isEnabled('organisations'))
+  @RespondFor(200, AuthOrganisationsResponse)
+  async organisations(): Promise<AuthOrganisationsResponse> {
+    const handle = this.sessions.readHandle(this.cookies());
+    if (!handle) throw AuthGuardErrorCode.IAM_001.create();
+
+    return { organisations: await this.sessions.listOrganisations(handle) };
+  }
+
+  /**
+   * Switches the organisation this session acts in. Identity rotates the handle, so the response
+   * carries a replacement cookie — a client that keeps the old one is logged out, by design.
+   */
+  @Post('/organisation')
+  @EnableIf(() => isEnabled('organisation'))
+  @RespondFor(200, SwitchOrganisationResponse)
+  async switchOrganisation(@Body() body: SwitchOrganisationBody): Promise<SwitchOrganisationResponse> {
+    const handle = this.sessions.readHandle(this.cookies());
+    if (!handle) throw AuthGuardErrorCode.IAM_001.create();
+
+    const switched = await this.sessions.switchOrganisation(handle, body.organisationId);
+    this.send(this.context.getResponse(), switched.cookies);
+    return { organisationId: switched.organisationId };
   }
 
   /**

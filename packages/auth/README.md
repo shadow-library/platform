@@ -88,6 +88,10 @@ That registers, wired and working:
 | `POST /auth/backchannel-logout` | Verifies the OIDC logout token and drops that user's local sessions and cached tokens |
 | `GET /auth/session` | The current principal, or `401` — so a browser client never has to parse a token |
 | `GET /auth/step-up` | Claims a step-up grant, prompting identity only when there is nothing left to claim |
+| `GET /auth/organisations` | The organisations this session may act in, active one flagged; one entry means there is nothing to switch to |
+| `POST /auth/organisation` | Switches the active organisation and replaces the session cookie — identity rotates the handle, so the previous one is dead |
+
+Permissions are always evaluated in the session's **active organisation**, so switching changes what the whole application may do. Identity rotates the session handle on a switch and the SDK evicts its cached tokens: an application caches minted tokens against the handle, and a switch served by one replica can never reach a sibling replica's cache, so a handle nobody will present again is the only thing that invalidates everywhere at once. A refused switch answers `403 ORGANISATION_NOT_PERMITTED`, distinct from a `503` outage, so a picker can tell the two apart.
 
 Everything is overridable and nothing is required: `AuthModule.forRoot({ routes: { basePath: '/session', backchannelLogout: false } })` moves or disables any of them, and `browser: { redirectUri, scopes, stepUpUrl, … }` pins in code anything the registration would otherwise supply — the escape hatch lives in code, where it is visible and reviewed, rather than in an environment variable a stale deploy can silently keep overriding. An API-only service sets `AUTH_BROWSER_LOGIN=false` (or `browser: { enabled: false }`) and gets none of it; a service with no credential at all never had a login it could complete, so the routes are not offered either.
 

@@ -76,6 +76,18 @@ export class SessionRegistry {
     this.forget(handleHash);
   }
 
+  /**
+   * Moves a live session onto a freshly issued handle. The old hash is remembered as dead rather than
+   * forgotten, and the new one inherits the subject so a back-channel logout still matches it. This is
+   * what makes handle rotation — how an organisation switch invalidates tokens cached against the
+   * previous handle — safe rather than merely a rename.
+   */
+  rotate(handleHash: string, rotatedHash: string, expiresAt: number): void {
+    const sub = this.sessions.get(handleHash)?.sub;
+    this.revoke(handleHash);
+    if (sub) this.register(rotatedHash, sub, expiresAt);
+  }
+
   forget(handleHash: string): void {
     const session = this.sessions.get(handleHash);
     if (!session) return;

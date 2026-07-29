@@ -50,6 +50,10 @@ export interface AuthRoutePaths {
   backchannelLogout: string | false;
   session: string | false;
   stepUp: string | false;
+  /** Lists the organisations this session may act in; one entry means there is nothing to switch to */
+  organisations: string | false;
+  /** Switches the active organisation, rotating the session cookie as it goes */
+  organisation: string | false;
 }
 
 export interface BrowserAuthOptions {
@@ -186,6 +190,8 @@ const DEFAULT_ROUTES: AuthRoutePaths = {
   backchannelLogout: false,
   session: '/session',
   stepUp: '/step-up',
+  organisations: '/organisations',
+  organisation: '/organisation',
 };
 
 /** Fills any option not supplied in code from the corresponding `AUTH_*` environment config */

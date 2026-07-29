@@ -18,7 +18,7 @@ import { createTestIdP, TestIdP } from '@shadow-library/auth/testing';
  */
 
 interface MockRouter {
-  mockRequest(options: { method: string; url: string; headers?: Record<string, string> }): Promise<MockResponse>;
+  mockRequest(options: { method: string; url: string; headers?: Record<string, string>; payload?: string }): Promise<MockResponse>;
 }
 
 /**
@@ -374,6 +374,70 @@ describe('first-party browser flow', () => {
       expect(body(response)).toEqual({ success: true });
       expect(readCookie(response, SESSION_COOKIE)).toBe(`${SESSION_COOKIE}=`);
       expect(idp.getAppSessionCount()).toBe(before - 1);
+    });
+  });
+
+  describe('organisation switching', () => {
+    const MEMBER = 'user-multi-org';
+    const PERSONAL = { id: '10', slug: 'personal', name: 'Personal Workspace', type: 'PERSONAL' as const };
+    const TEAM = { id: '11', slug: 'acme', name: 'Acme', type: 'TEAM' as const };
+
+    const switchTo = (organisationId: string, cookie: string) =>
+      router.mockRequest({
+        method: 'POST',
+        url: '/auth/organisation',
+        headers: { cookie, 'content-type': 'application/json' },
+        payload: JSON.stringify({ organisationId }),
+      });
+
+    beforeAll(() => idp.setOrganisations(MEMBER, [PERSONAL, TEAM]));
+
+    it('should list the organisations the session may act in and flag the active one', async () => {
+      const cookie = await login(MEMBER);
+
+      const response = await get('/auth/organisations', cookie);
+      expect(response.statusCode).toBe(200);
+      const { organisations } = body(response) as { organisations: { id: string; active: boolean }[] };
+      expect(organisations.map(organisation => organisation.id)).toEqual([PERSONAL.id, TEAM.id]);
+      expect(organisations.find(organisation => organisation.active)?.id).toBe(PERSONAL.id);
+    });
+
+    it('should switch the active organisation and report it on the session', async () => {
+      const cookie = await login(MEMBER);
+      expect(body(await get('/auth/session', cookie)).org).toBe(PERSONAL.id);
+
+      const switched = await switchTo(TEAM.id, cookie);
+      expect(switched.statusCode).toBe(200);
+      const rotated = readCookie(switched, SESSION_COOKIE) as string;
+
+      expect(body(await get('/auth/session', rotated)).org).toBe(TEAM.id);
+    });
+
+    /**
+     * Rotation is the invalidation mechanism, not hygiene: tokens are cached against the handle, and a
+     * switch served by one replica can never reach a sibling's cache. A handle no client will present
+     * again is unreachable everywhere at once.
+     */
+    it('should retire the previous cookie so no cached token survives the switch', async () => {
+      const cookie = await login(MEMBER);
+
+      const rotated = readCookie(await switchTo(TEAM.id, cookie), SESSION_COOKIE) as string;
+      expect(rotated).not.toBe(cookie);
+
+      expect((await get('/reports', cookie)).statusCode).toBe(401);
+      expect((await get('/reports', rotated)).statusCode).toBe(200);
+    });
+
+    it('should refuse a switch into an organisation the session may not act in', async () => {
+      const cookie = await login(MEMBER);
+      expect((await switchTo('999', cookie)).statusCode).toBe(403);
+    });
+
+    it('should refuse both organisation routes without a session cookie', async () => {
+      expect((await get('/auth/organisations')).statusCode).toBe(401);
+      expect(
+        (await router.mockRequest({ method: 'POST', url: '/auth/organisation', headers: { 'content-type': 'application/json' }, payload: '{"organisationId":"11"}' })).statusCode,
+      ).toBe(401);
     });
   });
 });

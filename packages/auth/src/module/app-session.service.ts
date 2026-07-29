@@ -8,7 +8,7 @@ import { AppError, Logger } from '@shadow-library/common';
  */
 import { NAMESPACE } from '../constants';
 import { AuthErrorCode } from '../errors';
-import { AppRegistration, AppSessionToken, AuthPrincipal } from '../interfaces';
+import { AppRegistration, AppSessionOrganisation, AppSessionToken, AuthPrincipal } from '../interfaces';
 import { AccessTokenCache, hashSessionHandle } from '../lib/access-token-cache';
 import { AuthClient } from '../lib/auth-client';
 import { buildAuthorizationUrl } from '../rp/authorization-url';
@@ -202,6 +202,33 @@ export class AppSessionService {
 
     /** Anything cached before the grant opened predates the elevation and must not be reused across it */
     this.tokens.evictElevated(handleHash);
+  }
+
+  /** The organisations this session may act in, with the active one flagged; a single-entry list means there is nothing to switch to */
+  async listOrganisations(handle: string): Promise<AppSessionOrganisation[]> {
+    const handleHash = hashSessionHandle(handle);
+    return this.client.appSessions.listOrganisations(handle).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
+  }
+
+  /**
+   * Moves the session into another organisation and returns the cookie carrying its rotated handle.
+   *
+   * Identity retires the old handle, and that is precisely what makes the switch safe: tokens are
+   * cached against the handle, so a sibling replica — which never saw this request — would otherwise
+   * keep serving the previous organisation's authority until the token expired. A hash no client will
+   * present again is unreachable everywhere at once, which no local eviction could achieve. The local
+   * eviction below is merely the cheap half.
+   */
+  async switchOrganisation(handle: string, organisationId: string): Promise<{ cookies: string[]; organisationId: string }> {
+    const handleHash = hashSessionHandle(handle);
+    const switched = await this.client.appSessions.switchOrganisation(handle, organisationId).catch((error: unknown) => this.forgetOnInvalidSession(handleHash, error));
+
+    const rotatedHash = hashSessionHandle(switched.sessionHandle);
+    this.registry.rotate(handleHash, rotatedHash, parseExpiry(switched.expiresAt, Date.now() + FALLBACK_SESSION_TTL_MS));
+    this.evictTokens(handleHash);
+
+    this.logger.info('app session organisation switched', { organisationId: switched.organisationId });
+    return { cookies: [serializeCookie(this.config.cookieName, switched.sessionHandle, this.config.cookie)], organisationId: switched.organisationId };
   }
 
   /**

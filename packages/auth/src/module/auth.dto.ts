@@ -97,3 +97,40 @@ export class BackchannelLogoutResponse {
   @Field()
   success: boolean;
 }
+
+@Schema()
+export class AuthOrganisationItem {
+  @Field()
+  id: string;
+
+  @Field()
+  slug: string;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { enum: ['PERSONAL', 'TEAM'] })
+  type: 'PERSONAL' | 'TEAM';
+
+  /** Whether the session is acting in this organisation right now */
+  @Field()
+  active: boolean;
+}
+
+@Schema()
+export class AuthOrganisationsResponse {
+  @Field(() => [AuthOrganisationItem])
+  organisations: AuthOrganisationItem[];
+}
+
+@Schema()
+export class SwitchOrganisationBody {
+  @Field()
+  organisationId: string;
+}
+
+@Schema()
+export class SwitchOrganisationResponse {
+  @Field()
+  organisationId: string;
+}

@@ -63,6 +63,16 @@ interface AppSessionRecord {
   userId: string;
   scope: string;
   expiresAt: number;
+  /** Absent until a test declares organisations for the user, so the default mint carries no `org` claim */
+  organisationId?: string;
+}
+
+/** One organisation a test user reaches the application through */
+export interface TestOrganisation {
+  id: string;
+  slug: string;
+  name: string;
+  type: 'PERSONAL' | 'TEAM';
 }
 
 export interface CapturedCatalog {
@@ -166,6 +176,16 @@ export interface TestIdP {
    */
   setSteppedUp(userId: string, intent: TestStepUpIntent | boolean): void;
 
+  /**
+   * Declares the organisations a user reaches the application through. A session opens in the first
+   * one, and only these may be switched into. Left unset the user has none, so the mint carries no
+   * `org` claim — which is what every test that never mentions organisations relies on.
+   */
+  setOrganisations(userId: string, organisations: TestOrganisation[]): void;
+
+  /** The organisation a live app session is currently acting in */
+  getSessionOrganisation(sessionHandle: string): string | undefined;
+
   /** Ends the central identity session: every app session of that user starts answering `AUTH_005` */
   endIdentitySession(userId: string): void;
 
@@ -235,6 +255,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
   const authorizationCodes = new Map<string, TestTokenInput & { nonce?: string }>();
   const refreshTokens = new Map<string, TestTokenInput>();
   const grants = new Set<string>();
+  const organisationsByUser = new Map<string, TestOrganisation[]>();
   const appSessions = new Map<string, AppSessionRecord>();
   const elevationGrants = new Map<string, number>();
   const steppedUp = new Map<string, TestStepUpIntent>();
@@ -409,8 +430,37 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const handle = crypto.randomUUID();
     const scope = (stored.scopes ?? []).join(' ');
     const expiresAt = Date.now() + sessionTtl * 1000;
-    appSessions.set(handle, { userId: stored.sub, scope, expiresAt });
+    appSessions.set(handle, { userId: stored.sub, scope, expiresAt, organisationId: organisationsByUser.get(stored.sub)?.[0]?.id });
     return json({ sessionHandle: handle, userId: stored.sub, expiresAt: new Date(expiresAt).toISOString(), scope }, 201);
+  };
+
+  const handleAppSessionOrganisations = async (request: Request): Promise<Response> => {
+    if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+    const session = liveSession(body.sessionHandle);
+    if (!session) return sessionInvalid();
+
+    const organisations = (organisationsByUser.get(session.userId) ?? []).map(organisation => ({ ...organisation, active: organisation.id === session.organisationId }));
+    return json({ organisations });
+  };
+
+  /** Mirrors identity: the handle is rotated, so the one presented is dead the moment this answers */
+  const handleAppSessionOrganisation = async (request: Request): Promise<Response> => {
+    if (!isAppSessionCaller(request)) return json({ code: 'AUTH_002', message: 'Service token missing the app-session:manage scope' }, 401);
+    const body = (await request.json().catch(() => ({}))) as Record<string, unknown>;
+
+    const session = liveSession(body.sessionHandle);
+    if (!session) return sessionInvalid();
+
+    const organisationId = String(body.organisationId);
+    const reachable = (organisationsByUser.get(session.userId) ?? []).some(organisation => organisation.id === organisationId);
+    if (!reachable) return json({ code: 'APP_007', message: 'Application access denied' }, 403);
+
+    appSessions.delete(String(body.sessionHandle));
+    const rotated = crypto.randomUUID();
+    appSessions.set(rotated, { ...session, organisationId });
+    return json({ sessionHandle: rotated, organisationId, expiresAt: new Date(session.expiresAt).toISOString() });
   };
 
   const handleAppSessionToken = async (request: Request): Promise<Response> => {
@@ -431,7 +481,7 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     const granted = requested.filter(entry => consented.includes(entry));
     const scope = granted.join(' ');
     const aal: AssuranceLevel = elevated ? 'AAL2' : 'AAL1';
-    const accessToken = await issueToken({ sub: session.userId, audience, scopes: granted, claims: { aal } });
+    const accessToken = await issueToken({ sub: session.userId, audience, scopes: granted, org: session.organisationId, claims: { aal } });
     return json({ accessToken, tokenType: 'Bearer', expiresIn: ttl, scope, audience, aal });
   };
 
@@ -520,6 +570,10 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
         return handleAppSessionToken(request);
       case '/api/v1/app-sessions/elevation':
         return handleAppSessionElevation(request);
+      case '/api/v1/app-sessions/organisations':
+        return handleAppSessionOrganisations(request);
+      case '/api/v1/app-sessions/organisation':
+        return handleAppSessionOrganisation(request);
       case '/api/v1/authz/check':
         return handleAuthzCheck(request);
       case '/api/v1/authz/catalog':
@@ -585,6 +639,8 @@ export async function createTestIdP(options: TestIdPOptions = {}): Promise<TestI
     setAppRegistration: registration => void (appRegistration = { ...appRegistration, ...registration }),
     getLastTokenRequest: () => lastTokenRequest,
     setSteppedUp: (userId, intent) => void (intent === false ? steppedUp.delete(userId) : steppedUp.set(userId, intent === true ? {} : intent)),
+    setOrganisations: (userId, organisations) => void organisationsByUser.set(userId, organisations),
+    getSessionOrganisation: sessionHandle => appSessions.get(sessionHandle)?.organisationId,
     endIdentitySession: userId => {
       for (const [handle, session] of appSessions) {
         if (session.userId !== userId) continue;
