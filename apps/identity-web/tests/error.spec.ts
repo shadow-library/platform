@@ -11,7 +11,7 @@ import { expect, test } from '@playwright/test';
 test.describe('hosted error page', () => {
   test('should name the application in the access-denied page from the deny redirect', async ({ page }) => {
     const response = await page.goto('/error?error=access_denied&application=Novel%20Forge&client_id=app_client_123');
-    // Assert the app-specific copy is in the SSR HTML (present before any client JS runs).
+    /** Assert the app-specific copy is in the SSR HTML (present before any client JS runs). */
     const html = await response?.text();
     expect(html).toContain('You don’t have access to Novel Forge');
     expect(html).toContain('Your organization hasn’t given you access to Novel Forge');

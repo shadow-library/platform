@@ -39,7 +39,7 @@ test.describe('hosted step-up prompt', () => {
 
   test('should send an unauthenticated app-initiated step-up to sign-in, preserving the intent params', async ({ page }) => {
     await page.goto(APP_STEP_UP);
-    // The whole prompt URL — client_id included — round-trips as the returnTo, so the intent survives the login bounce.
+    /** The whole prompt URL — client_id included — round-trips as the returnTo, so the intent survives the login bounce. */
     await expect(page).toHaveURL(/\/login\?returnTo=.*step-up.*client_id/, { timeout: 15_000 });
   });
 
@@ -47,12 +47,12 @@ test.describe('hosted step-up prompt', () => {
     const signedIn = await signInAsAdmin(page);
     test.skip(!signedIn, 'scripted admin sign-in unavailable (forced password reset / MFA / SSO on the seeded admin)');
 
-    // Console-initiated: an ordinary prompt whose window no application can claim — no grantee named.
+    /** Console-initiated: an ordinary prompt whose window no application can claim — no grantee named. */
     await page.goto('/step-up');
     await expect(page.getByRole('heading', { name: /confirm it.s you/i })).toBeVisible({ timeout: 15_000 });
     await expect(page.getByText(/approving elevated access for/i)).toHaveCount(0);
 
-    // App-initiated: the grantee is named against the resource it is being elevated for.
+    /** App-initiated: the grantee is named against the resource it is being elevated for. */
     await page.goto(APP_STEP_UP);
     await expect(page.getByText(/approving elevated access for/i)).toBeVisible({ timeout: 15_000 });
   });

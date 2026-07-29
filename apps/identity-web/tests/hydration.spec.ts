@@ -27,7 +27,7 @@ for (const { path, heading, ssrText } of CASES) {
     });
     page.on('pageerror', err => pageErrors.push(err.message));
 
-    // The content must be in the SSR HTML (present before any client JS runs), not painted post-hydration.
+    /** The content must be in the SSR HTML (present before any client JS runs), not painted post-hydration. */
     const response = await page.goto(path);
     expect(await response?.text(), `SSR HTML for ${path} should contain "${ssrText}"`).toContain(ssrText);
 
