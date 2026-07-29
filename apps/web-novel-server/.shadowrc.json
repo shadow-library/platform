@@ -2,6 +2,7 @@
   "type": "backend",
   "build": {
     "entry": "src/main.ts",
+    "entries": ["src/migrate.ts"],
     "assets": ["generated/drizzle"]
   },
   "verify": {
