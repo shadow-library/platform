@@ -14,6 +14,7 @@ import { AppError, Config, Logger, throwError } from '@shadow-library/common';
 import { APP_NAME } from '@server/constants';
 import { applicationAudience, OAuthClientService, RegisterClient } from '@server/modules/auth/oauth';
 import { PolicyDecisionService, ServiceAccessService } from '@server/modules/authz';
+import { type Application } from '@server/modules/infrastructure/datastore';
 import { ApplicationRoleService, ApplicationService } from '@server/modules/system/application';
 
 /**
@@ -23,6 +24,16 @@ import { ApplicationRoleService, ApplicationService } from '@server/modules/syst
 interface SeededClient extends RegisterClient {
   /** Human label used only in the first-boot credential log line. */
   label: string;
+}
+
+/**
+ * The bootstrap administrator and the organisation their platform roles are scoped to. Pulse capability
+ * has to be granted somewhere concrete: a role assignment is always an (principal, role, organisation)
+ * triple, and pulse is only ever reached through the platform organisation.
+ */
+export interface EcosystemOperator {
+  adminUserId: bigint;
+  platformOrganisationId: bigint;
 }
 
 /** The identity-side scope ids the ecosystem apps' clients are granted on identity's own platform API. */
@@ -41,6 +52,12 @@ interface SeededApplication {
   resourceName: string;
   /** Whether the application carries the pulse-style logo asset. */
   logo?: boolean;
+  /**
+   * The release surface a fresh deployment starts on. Applied at creation only: `visibility` is a
+   * platform-admin decision thereafter (`PATCH /api/v1/admin/applications/:id`), and a seed that
+   * re-converged it on every boot would silently revert them.
+   */
+  visibility?: Application.Visibility;
 }
 
 /**
@@ -73,6 +90,8 @@ const SEEDED_APPLICATIONS: Record<string, SeededApplication> = {
     description: 'Centralised multi-channel notification platform for the Shadow ecosystem',
     resourceName: 'Pulse notification API',
     logo: true,
+    /** Pulse is the ecosystem's own operations console — platform staff only, and invisible to everyone else (D-A3). */
+    visibility: 'INTERNAL',
   },
   [NOVEL_FORGE_APP]: { displayName: 'Novel Forge', description: 'Long-form fiction authoring platform for the Shadow ecosystem', resourceName: 'Novel Forge API' },
   [WEBNOVEL_APP]: { displayName: 'Webnovel Reader', description: 'Reader-facing web novel catalogue for the Shadow ecosystem', resourceName: 'Webnovel Reader API' },
@@ -153,10 +172,10 @@ export class EcosystemSeedService {
     private readonly serviceAccessService: ServiceAccessService,
   ) {}
 
-  async seed(): Promise<void> {
+  async seed(operator: EcosystemOperator): Promise<void> {
     const pulseApplicationId = await this.ensureApplication(PULSE_APP);
     const scopes = await this.ensureScopes(pulseApplicationId);
-    await this.ensurePulseRbac(pulseApplicationId);
+    await this.ensurePulseRbac(pulseApplicationId, operator);
     /** pulse alone keeps `authz:roles:sync`: its RBAC catalogue is seeded identity-side, not pushed by the SDK. */
     await this.ensureAppClient(pulseApplicationId, PULSE_APP, [scopes.authzCheck, scopes.authzRolesSync, scopes.appSession]);
     await this.ensureIdentityNotificationAccess(pulseApplicationId, scopes.notificationsSend);
@@ -189,6 +208,7 @@ export class EcosystemSeedService {
       description: meta.description,
       homePageUrl: primary,
       ...(meta.logo ? { logoUrl: `${primary}/logo192.png` } : {}),
+      ...(meta.visibility ? { visibility: meta.visibility } : {}),
       publicUrls: origins,
     });
     this.logger.info(`Seeded ecosystem application '${app}'`, { applicationId: application.id });
@@ -208,19 +228,33 @@ export class EcosystemSeedService {
     return { notificationsSend, authzCheck, authzRolesSync, appSession };
   }
 
-  private async ensurePulseRbac(pulseApplicationId: number): Promise<void> {
+  private async ensurePulseRbac(pulseApplicationId: number, operator: EcosystemOperator): Promise<void> {
     const permissionIds = new Map<string, string>();
     for (const [name, description] of Object.entries(PULSE_PERMISSION_DESCRIPTIONS)) {
       permissionIds.set(name, await this.policyDecisionService.ensurePermission(pulseApplicationId, name, description));
     }
 
+    const roleIds = new Map<string, number>();
     for (const grant of PULSE_ROLE_GRANTS) {
       const roleId = await this.ensureRole(grant.role, grant.description);
+      roleIds.set(grant.role, roleId);
       for (const permission of grant.permissions) {
         const permissionId = permissionIds.get(permission);
         if (permissionId) await this.policyDecisionService.grantPermissionToRole(roleId, permissionId);
       }
     }
+
+    /**
+     * Seeding the catalogue is not enough to make pulse usable: a role nobody holds grants nobody
+     * anything, and the console would answer every request with a permission denial. The bootstrap
+     * administrator therefore gets `PulseAdmin` in the platform organisation — the one organisation an
+     * INTERNAL application is reachable through. Every other operator is granted explicitly through
+     * `POST /api/v1/admin/role-assignments`; no pulse role is a default, so reaching the application
+     * confers nothing on its own.
+     */
+    const adminRoleId = roleIds.get(PULSE_ROLES.admin);
+    if (adminRoleId === undefined) throw AppError.internal(`Role '${PULSE_ROLES.admin}' is missing from the pulse application`);
+    await this.policyDecisionService.assignRole({ type: 'USER', id: operator.adminUserId.toString() }, adminRoleId, operator.platformOrganisationId.toString());
   }
 
   /** Returns the role id, creating the role on the pulse application only if it is missing. */

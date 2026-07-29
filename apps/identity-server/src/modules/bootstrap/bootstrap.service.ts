@@ -74,9 +74,9 @@ export class BootstrapService implements OnModuleInit {
     await this.ensurePlatformScopes();
     const organisationId = await this.ensurePlatformOrganisation();
     await this.ensureAdminAuthorization();
-    await this.ensureBootstrapAdmin(organisationId);
+    const adminUserId = await this.ensureBootstrapAdmin(organisationId);
     /** Runs last: the ecosystem seed provisions the product applications and identity's outbound client on top of the platform records above. */
-    await this.ecosystemSeedService.seed();
+    await this.ecosystemSeedService.seed({ adminUserId, platformOrganisationId: organisationId });
   }
 
   /**
@@ -117,7 +117,7 @@ export class BootstrapService implements OnModuleInit {
     }
   }
 
-  private async ensureBootstrapAdmin(organisationId: bigint): Promise<void> {
+  private async ensureBootstrapAdmin(organisationId: bigint): Promise<bigint> {
     const email = Config.get('auth.bootstrap.admin-email');
     let admin = await this.userService.getUser(email);
 
@@ -149,6 +149,7 @@ export class BootstrapService implements OnModuleInit {
       throwError(AppError.internal(`Role '${IAM_ADMIN_ROLE}' is missing from the platform application`));
     await this.organisationService.ensureMember(organisationId, admin.id, 'OWNER');
     await this.policyDecisionService.assignRole({ type: 'USER', id: admin.id.toString() }, role.id, organisationId.toString());
+    return admin.id;
   }
 
   /** Generates a password that satisfies the strong-password policy without a static literal. */

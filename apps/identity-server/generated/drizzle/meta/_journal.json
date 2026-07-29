@@ -36,6 +36,13 @@
       "when": 1785157079989,
       "tag": "0004_last_whiplash",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1785347533893,
+      "tag": "0005_pulse_internal_visibility",
+      "breakpoints": true
     }
   ]
 }

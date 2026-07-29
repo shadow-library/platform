@@ -139,6 +139,37 @@ describe('BootstrapService', () => {
     expect(webnovelGrant?.scopes).toContain('webnovel:publish');
   });
 
+  /**
+   * Pulse is the ecosystem's own operations console. INTERNAL keeps it reachable only through the
+   * platform organisation and, to everyone else, indistinguishable from an unknown client (D-A3).
+   */
+  it('should seed pulse as an INTERNAL application', async () => {
+    const applications = await env.getPostgresClient().select().from(schema.applications);
+    expect(applications.find(application => application.name === 'pulse')?.visibility).toBe('INTERNAL');
+
+    /** The product applications stay generally available; only pulse is staff-only. */
+    expect(applications.find(application => application.name === 'webnovel')?.visibility).toBe('PUBLIC');
+  });
+
+  /**
+   * Seeding the catalogue is not enough to make pulse usable — a role nobody holds grants nobody
+   * anything, and every request would answer with a permission denial. The grant is scoped to the
+   * platform organisation because that is the only one an INTERNAL application is reached through.
+   */
+  it('should grant the bootstrap administrator PulseAdmin in the platform organisation', async () => {
+    const admin = await env.getService(UserService).getUser(ADMIN_EMAIL);
+    const platform = await env.getService(OrganisationService).ensureTeamOrganisation(PLATFORM_ORG_NAME);
+    const pulse = env.getService(ApplicationService).getApplicationOrThrow('pulse');
+    const adminRole = pulse.roles.find(role => role.roleName === 'PulseAdmin');
+
+    const assignments = await env.getPostgresClient().select().from(schema.roleAssignments);
+    const granted = assignments.find(assignment => assignment.principalType === 'USER' && assignment.principalId === admin?.id.toString() && assignment.roleId === adminRole?.id);
+    expect(granted?.organisationId).toBe(platform.id);
+
+    /** No pulse role is a default: reaching the application confers nothing on its own. */
+    expect(pulse.roles.every(role => !role.isDefault)).toBe(true);
+  });
+
   it('should bind each app client to its in-cluster workload subject and drop the legacy publisher client', async () => {
     const clients = await env.getPostgresClient().select().from(schema.oauthClients);
     const subjectOf = (id: string) => clients.find(client => client.id === id)?.workloadSubjects ?? [];
