@@ -199,6 +199,39 @@
   font-weight: 600;
 }
 
+.filterTitle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.filterTitle .filterCount {
+  margin-left: 0;
+}
+
+.filterHeaderRow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.filterHeaderRow .filterLabel {
+  margin-bottom: 0;
+}
+
+.filterRangeValue {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  font-variant-numeric: tabular-nums;
+}
+
+.switchList {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 .skeletonGrid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(148px, 1fr));
