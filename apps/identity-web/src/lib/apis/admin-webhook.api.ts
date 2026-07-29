@@ -35,7 +35,7 @@ export const adminWebhookKeys = {
   deliveries: (id: string, status?: DeliveryStatus) => [...adminWebhookKeys.all, id, 'deliveries', status] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchWebhooks = createServerFn({ method: 'GET' }).handler(() => serverFetch<WebhookListResponse>({ method: 'GET', path: '/admin/webhooks' }));
 const fetchWebhook = createServerFn({ method: 'GET' })
@@ -60,7 +60,7 @@ const redeliverWebhook = createServerFn({ method: 'POST' })
   .validator((input: { webhookId: string; deliveryId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: `/admin/webhooks/${data.webhookId}/deliveries/${data.deliveryId}/redeliver`, body: {} }));
 
-/* ---------- queries ---------- */
+/** ---------- queries ---------- */
 
 export const webhooksQueryOptions = () => queryOptions<WebhookListResponse, ApiError>({ queryKey: adminWebhookKeys.all, queryFn: () => call(fetchWebhooks()) });
 
@@ -90,7 +90,7 @@ export function useWebhookDeliveriesQuery(id: string, status?: DeliveryStatus, e
   return useQuery(webhookDeliveriesQueryOptions(id, status, enabled));
 }
 
-/* ---------- mutations ---------- */
+/** ---------- mutations ---------- */
 
 export function useCreateWebhookMutation(): UseMutationResult<CreatedWebhookResponse, ApiError, CreateWebhookBody> {
   const queryClient = useQueryClient();

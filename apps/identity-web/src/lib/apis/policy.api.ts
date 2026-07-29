@@ -25,7 +25,7 @@ export const policyKeys = {
   list: (orgId: string) => [...policyKeys.all, orgId, 'policies'] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchPolicies = createServerFn({ method: 'GET' })
   .validator((orgId: string) => orgId)
@@ -37,7 +37,7 @@ const clearPolicy = createServerFn({ method: 'POST' })
   .validator((input: { orgId: string; policyKey: string }) => input)
   .handler(({ data }) => serverFetch<PolicyActionResponse>({ method: 'DELETE', path: `/organisations/${data.orgId}/policies/${data.policyKey}` }));
 
-/* ---------- queries ---------- */
+/** ---------- queries ---------- */
 
 export const organisationPoliciesQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<PolicyListResponse, ApiError>({
@@ -50,7 +50,7 @@ export function usePoliciesQuery(orgId: string, enabled = true): UseQueryResult<
   return useQuery(organisationPoliciesQueryOptions(orgId, enabled));
 }
 
-/* ---------- mutations ---------- */
+/** ---------- mutations ---------- */
 
 /** Set an organisation's override for one policy key — `value` for an integer key, `enabled` for a boolean one (step-up required server-side). */
 export function useSetPolicyMutation(): UseMutationResult<PolicyActionResponse, ApiError, { orgId: string; policyKey: string; body: SetPolicyBody }> {

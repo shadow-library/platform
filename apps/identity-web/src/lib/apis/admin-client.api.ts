@@ -28,7 +28,7 @@ export const adminClientKeys = {
   detail: (clientId: string) => [...adminClientKeys.all, clientId] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchClients = createServerFn({ method: 'GET' }).handler(() => serverFetch<ClientListResponse>({ method: 'GET', path: '/admin/clients' }));
 const fetchClient = createServerFn({ method: 'GET' })
@@ -47,7 +47,7 @@ const revokeClientScope = createServerFn({ method: 'POST' })
   .validator((input: { clientId: string; scopeId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/clients/${data.clientId}/scopes/${data.scopeId}` }));
 
-/* ---------- queries ---------- */
+/** ---------- queries ---------- */
 
 export const adminClientsQueryOptions = () => queryOptions<ClientListResponse, ApiError>({ queryKey: adminClientKeys.list(), queryFn: () => call(fetchClients()) });
 
@@ -66,7 +66,7 @@ export function useClientQuery(clientId: string, enabled = true): UseQueryResult
   return useQuery(adminClientQueryOptions(clientId, enabled));
 }
 
-/* ---------- mutations ---------- */
+/** ---------- mutations ---------- */
 
 export function useUpdateClientMutation(): UseMutationResult<ClientDetailResponse, ApiError, { clientId: string; body: UpdateClientBody }> {
   const queryClient = useQueryClient();

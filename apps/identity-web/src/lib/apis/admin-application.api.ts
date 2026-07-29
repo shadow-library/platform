@@ -57,7 +57,7 @@ export const adminApplicationKeys = {
   organisations: (id: string) => [...adminApplicationKeys.all, id, 'organisations'] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchApplications = createServerFn({ method: 'GET' }).handler(() => serverFetch<ApplicationListResponse>({ method: 'GET', path: '/admin/applications' }));
 const fetchApplication = createServerFn({ method: 'GET' })
@@ -88,7 +88,7 @@ const revokeApplicationRelease = createServerFn({ method: 'POST' })
   .validator((input: { appId: string; organisationId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/admin/applications/${data.appId}/organisations/${data.organisationId}` }));
 
-/* ---------- queries ---------- */
+/** ---------- queries ---------- */
 
 export const adminApplicationsQueryOptions = () =>
   queryOptions<ApplicationListResponse, ApiError>({ queryKey: adminApplicationKeys.list(), queryFn: () => call(fetchApplications()) });
@@ -119,7 +119,7 @@ export function useApplicationMembersQuery(appId: string, enabled = true): UseQu
   return useQuery(adminApplicationMembersQueryOptions(appId, enabled));
 }
 
-/* ---------- mutations ---------- */
+/** ---------- mutations ---------- */
 
 export function useCreateApplicationMutation(): UseMutationResult<CreateApplicationResponse, ApiError, CreateApplicationBody> {
   const queryClient = useQueryClient();
@@ -156,7 +156,7 @@ export function useRemoveApplicationMemberMutation(): UseMutationResult<undefine
   });
 }
 
-/* ---------- releases (RESTRICTED apps) ---------- */
+/** ---------- releases (RESTRICTED apps) ---------- */
 
 export const adminApplicationOrganisationsQueryOptions = (appId: string, enabled = true) =>
   queryOptions<ApplicationOrganisationListResponse, ApiError>({

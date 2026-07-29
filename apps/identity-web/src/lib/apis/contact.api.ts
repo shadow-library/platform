@@ -33,7 +33,7 @@ export const contactKeys = {
   phones: ['contacts', 'phones'] as const,
 };
 
-/* ---------- emails ---------- */
+/** ---------- emails ---------- */
 
 const fetchEmails = createServerFn({ method: 'GET' }).handler(() => serverFetch<ContactListResponse>({ method: 'GET', path: '/me/emails' }));
 const addEmail = createServerFn({ method: 'POST' })
@@ -83,7 +83,7 @@ export function useRemoveEmailMutation(): UseMutationResult<undefined, ApiError,
   });
 }
 
-/* ---------- phones ---------- */
+/** ---------- phones ---------- */
 
 const fetchPhones = createServerFn({ method: 'GET' }).handler(() => serverFetch<ContactListResponse>({ method: 'GET', path: '/me/phones' }));
 const addPhone = createServerFn({ method: 'POST' })

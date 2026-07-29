@@ -66,7 +66,7 @@ export const adminUserKeys = {
   audit: (userId: string) => [...adminUserKeys.all, userId, 'audit'] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchUsers = createServerFn({ method: 'GET' })
   .validator((params: UserSearchParams) => params)
@@ -106,7 +106,7 @@ const deleteUser = createServerFn({ method: 'POST' })
   .validator((userId: string) => userId)
   .handler(({ data }) => serverFetch<JsonValue>({ method: 'DELETE', path: `/admin/users/${data}` }));
 
-/* ---------- queries ---------- */
+/** ---------- queries ---------- */
 
 export const adminUsersQueryOptions = (params?: UserSearchParams) =>
   queryOptions<UserSearchResponse, ApiError>({
@@ -140,7 +140,7 @@ export function useUserAuditQuery(userId: string, enabled = true): UseQueryResul
   return useQuery(adminUserAuditQueryOptions(userId, enabled));
 }
 
-/* ---------- lifecycle mutations ---------- */
+/** ---------- lifecycle mutations ---------- */
 
 /** Refreshes both the searched list and the affected user's detail after a lifecycle action (AAL2). */
 function useUserActionMutation<V extends { userId: string }>(action: (vars: V) => Promise<unknown>): UseMutationResult<unknown, ApiError, V> {

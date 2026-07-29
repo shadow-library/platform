@@ -37,7 +37,7 @@ export const adminRoleKeys = {
   assignments: (params?: AssignmentListParams) => ['admin', 'role-assignments', params] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchPermissions = createServerFn({ method: 'GET' })
   .validator((applicationId: number) => applicationId)
@@ -52,7 +52,7 @@ const revokeRoleAssignment = createServerFn({ method: 'POST' })
   .validator((body: RoleAssignmentBody) => body)
   .handler(({ data }) => serverFetch<undefined>({ method: 'POST', path: '/admin/role-assignments/revoke', body: data }));
 
-/* ---------- queries + mutations ---------- */
+/** ---------- queries + mutations ---------- */
 
 export const permissionsQueryOptions = (applicationId: number, enabled = true) =>
   queryOptions<PermissionListResponse, ApiError>({

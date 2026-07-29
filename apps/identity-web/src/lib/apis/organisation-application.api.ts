@@ -32,7 +32,7 @@ export const orgApplicationKeys = {
   list: (orgId: string) => [...orgKeys.detail(orgId), 'applications'] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchOrgApplications = createServerFn({ method: 'GET' })
   .validator((orgId: string) => orgId)
@@ -49,7 +49,7 @@ const setAppAccessMode = createServerFn({ method: 'POST' })
     serverFetch<undefined>({ method: 'PATCH', path: `/organisations/${data.orgId}`, body: { appAccessMode: data.appAccessMode } satisfies UpdateOrganisationBody }),
   );
 
-/* ---------- queries + mutations ---------- */
+/** ---------- queries + mutations ---------- */
 
 export const orgApplicationsQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<OrganisationApplicationsResponse, ApiError>({

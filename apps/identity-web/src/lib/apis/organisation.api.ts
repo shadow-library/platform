@@ -82,7 +82,7 @@ export const orgKeys = {
   idps: (id: string) => [...orgKeys.all, id, 'identity-providers'] as const,
 };
 
-/* ---------- server functions ---------- */
+/** ---------- server functions ---------- */
 
 const fetchMyOrgs = createServerFn({ method: 'GET' }).handler(() => serverFetch<MyOrganisationsResponse>({ method: 'GET', path: '/me/organisations' }));
 const fetchOrg = createServerFn({ method: 'GET' })
@@ -163,7 +163,7 @@ const deleteIdp = createServerFn({ method: 'POST' })
   .validator((input: { orgId: string; idpId: string }) => input)
   .handler(({ data }) => serverFetch<undefined>({ method: 'DELETE', path: `/organisations/${data.orgId}/identity-providers/${data.idpId}` }));
 
-/* ---------- my organisations ---------- */
+/** ---------- my organisations ---------- */
 
 export const myOrganisationsQueryOptions = () => queryOptions<MyOrganisationsResponse, ApiError>({ queryKey: orgKeys.mine(), queryFn: () => call(fetchMyOrgs()) });
 
@@ -230,7 +230,7 @@ export function useLeaveOrganisationMutation(): UseMutationResult<undefined, Api
   });
 }
 
-/* ---------- members ---------- */
+/** ---------- members ---------- */
 
 export const membersQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<MembersResponse, ApiError>({
@@ -267,7 +267,7 @@ export function useRemoveMemberMutation(orgId: string): UseMutationResult<undefi
   });
 }
 
-/* ---------- invitations ---------- */
+/** ---------- invitations ---------- */
 
 export const invitationsQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<InvitationsResponse, ApiError>({
@@ -309,7 +309,7 @@ export function useDeclineInvitationMutation(): UseMutationResult<undefined, Api
   return useMutation<undefined, ApiError, string>({ mutationFn: token => call(declineInvitation({ data: token })) });
 }
 
-/* ---------- domains ---------- */
+/** ---------- domains ---------- */
 
 export const domainsQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<DomainsResponse, ApiError>({
@@ -346,7 +346,7 @@ export function useRemoveDomainMutation(orgId: string): UseMutationResult<undefi
   });
 }
 
-/* ---------- identity providers ---------- */
+/** ---------- identity providers ---------- */
 
 export const identityProvidersQueryOptions = (orgId: string, enabled = true) =>
   queryOptions<IdentityProviderListResponse, ApiError>({

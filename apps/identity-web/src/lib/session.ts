@@ -23,7 +23,9 @@ import { meQueryOptions, type MeResponse } from '@/lib/apis';
  * a 403 surfaced by the route error boundary, never silent access).
  */
 export function requireSession(queryClient: QueryClient, returnTo: string): Promise<MeResponse> {
-  // `requireAuth` (web 0.2) mirrors `ensureQueryData`'s generics, so `meQueryOptions()` flows through
-  // and `MeResponse` is inferred — no widening cast needed anymore.
+  /**
+   * `requireAuth` (web 0.2) mirrors `ensureQueryData`'s generics, so `meQueryOptions()` flows through
+   * and `MeResponse` is inferred — no widening cast needed anymore.
+   */
   return requireAuth(queryClient, meQueryOptions(), { loginTo: '/login', returnTo });
 }
