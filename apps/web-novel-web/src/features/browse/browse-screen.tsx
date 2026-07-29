@@ -71,7 +71,8 @@ export function BrowseScreen(): React.JSX.Element {
 
       <div className={styles.toolbar}>
         <Button variant="secondary" prefix={<SettingsSlidersIcon size={16} />} onClick={() => setFiltersOpen(true)}>
-          Filters{activeFilterCount > 0 ? ` · ${activeFilterCount}` : ''}
+          Filters
+          {activeFilterCount > 0 && <span className={styles.filterCount}>{activeFilterCount}</span>}
         </Button>
         <div className={styles.spacer} />
         <span className={styles.count}>
@@ -173,9 +174,10 @@ function ListRow({ novel }: { novel: NovelSummary }): React.JSX.Element {
         <p className={`${styles.listSynopsis} wn-clamp2`}>{novel.synopsis}</p>
         <div className={styles.listMeta}>
           <RatingRow rating={novel.rating} suffix={`${novel.ratingCount.toLocaleString()} reviews`} />
+          <span className={styles.metaDot} aria-hidden="true" />
           <span>{novel.chapterCount.toLocaleString()} ch</span>
           <StatusBadge status={novel.status} />
-          {novel.genres[0] && <span>{novel.genres[0]}</span>}
+          {novel.genres[0] && <span className={styles.genrePill}>{novel.genres[0]}</span>}
         </div>
       </div>
     </Link>
