@@ -11,8 +11,16 @@ import {
   type ChapterContent,
   type ChapterListResponse,
   type ChapterMeta,
+  type CommentState,
+  type NovelCharacter,
+  type NovelComment,
+  type NovelCommentReply,
   type NovelDetail,
+  type NovelIllustration,
+  type NovelReview,
   type NovelStatus,
+  type NovelSummary,
+  type RatingDistribution,
   type SessionUser,
 } from './types';
 
@@ -394,6 +402,157 @@ function hoursAgoIso(hours: number): string {
   return new Date(Date.now() - hours * 3_600_000).toISOString();
 }
 
+/**
+ * Enrichment pools — the overview/reviews/comments blocks are synthesized deterministically per slug so
+ * every novel carries some, and the same slug always yields the same cast, art, ratings, and threads.
+ */
+const CHARACTER_NAMES = [
+  'Kaelen Vurst',
+  'Seraphine Ardal',
+  'Ryu Kang',
+  'Lysandra Vale',
+  'Corvin Ashfall',
+  'Isolde Wren',
+  'Thorne Blackwood',
+  'Mira Sunhollow',
+  'Aldric Thorne',
+  'Nyx Everdark',
+  'Elara Dawnsong',
+  'Draven Mireheart',
+];
+
+const CHARACTER_ROLES = ['Protagonist', 'Deuteragonist', 'Rival', 'Mentor', 'Antagonist', 'Love Interest', 'Loyal Ally', 'Comic Relief'];
+
+const GRADIENTS: [string, string][] = [
+  ['#6366f1', '#312e81'],
+  ['#f43f5e', '#4c0519'],
+  ['#0ea5e9', '#0c4a6e'],
+  ['#10b981', '#064e3b'],
+  ['#f59e0b', '#451a03'],
+  ['#a855f7', '#3b0764'],
+  ['#14b8a6', '#134e4a'],
+  ['#e11d48', '#4c0519'],
+];
+
+const ILLUSTRATION_CAPTIONS = ['Cover illustration', 'Key visual', 'Character sheet', 'The confrontation', 'Volume 1 art', 'Concept art', 'Splash page', 'World map'];
+
+const REVIEW_USERS = ['aria_reads', 'frostbite', 'LordFluff', 'pageturner', 'melancholic_moth', 'vX_reader', 'SolarFlare', 'quietstorm'];
+
+const RELATIVE_WHENS = ['yesterday', '2 days ago', '1 week ago', '3 weeks ago', 'last month', '2 months ago'];
+
+const REVIEW_BODIES = [
+  'Easily one of the most gripping opening arcs I have read this year. The worldbuilding never info-dumps — it trusts you to keep up.',
+  'The pacing sags in the middle act, but the payoff is worth it. Side characters carry more weight than the blurb suggests.',
+  'A slow burn done right. If you bounced off chapter three, push to ten — that is where it clicks.',
+  'The prose is gorgeous but the plot occasionally forgets its own rules. Still, I could not put it down.',
+  'This is comfort reading with teeth. Cozy until it very much is not.',
+  'Late-game turn ahead: the mentor’s betrayal reframes the entire first volume and I am not okay.',
+];
+
+const COMMENT_BODIES = [
+  'That last chapter broke me. Anyone else need a moment after that reveal?',
+  'The translation quality jumped up around the second arc — much smoother now.',
+  'Underrated take: the antagonist is right and nobody in the comments wants to admit it.',
+  'Started this on a whim and now I am 400 chapters deep at 3am. Send help.',
+  'Wish the release schedule were faster, but honestly the quality is worth the wait.',
+];
+
+const REPLY_BODIES = [
+  'Hard agree, that chapter lived in my head for a week.',
+  'Same, the cliffhanger was brutal.',
+  'Counterpoint: it was foreshadowed all the way back in volume one.',
+];
+
+function buildCharacters(slug: string): NovelCharacter[] {
+  const count = 4 + (seedIndex(`${slug}:charcount`) % 3);
+  return Array.from({ length: count }, (_, index) => {
+    const hash = seedIndex(`${slug}:char:${index}`);
+    return {
+      name: CHARACTER_NAMES[(hash + index) % CHARACTER_NAMES.length] as string,
+      role: CHARACTER_ROLES[index < CHARACTER_ROLES.length ? index : hash % CHARACTER_ROLES.length] as string,
+      color: GRADIENTS[(hash >>> 5) % GRADIENTS.length] as [string, string],
+    };
+  });
+}
+
+function buildIllustrations(slug: string): NovelIllustration[] {
+  const count = 4 + (seedIndex(`${slug}:illcount`) % 5);
+  return Array.from({ length: count }, (_, index) => {
+    const hash = seedIndex(`${slug}:ill:${index}`);
+    return {
+      id: `${slug}-ill-${index}`,
+      caption: index % 2 === 0 ? (ILLUSTRATION_CAPTIONS[hash % ILLUSTRATION_CAPTIONS.length] as string) : undefined,
+      color: GRADIENTS[(hash >>> 4) % GRADIENTS.length] as [string, string],
+    };
+  });
+}
+
+function buildRelated(slug: string, summaries: NovelSummary[]): NovelSummary[] {
+  const others = summaries.filter(summary => summary.slug !== slug);
+  if (others.length === 0) return [];
+  const start = seedIndex(`${slug}:rel`) % others.length;
+  return [...others.slice(start), ...others.slice(0, start)].slice(0, 6);
+}
+
+/** A soft gaussian around the mean rating — plausible skew that always peaks at the star nearest `rating`. */
+function buildDistribution(rating: number, total: number): RatingDistribution {
+  const raw = [5, 4, 3, 2, 1].map(star => Math.exp(-((star - rating) ** 2) / 0.6));
+  const sum = raw.reduce((accumulator, value) => accumulator + value, 0);
+  const counts = raw.map(value => Math.round((value / sum) * total));
+  return [counts[0] as number, counts[1] as number, counts[2] as number, counts[3] as number, counts[4] as number];
+}
+
+function buildReviews(slug: string): NovelReview[] {
+  const count = 3 + (seedIndex(`${slug}:revcount`) % 3);
+  return Array.from({ length: count }, (_, index) => {
+    const hash = seedIndex(`${slug}:rev:${index}`);
+    return {
+      id: `${slug}-rev-${index}`,
+      user: REVIEW_USERS[(hash + index) % REVIEW_USERS.length] as string,
+      when: RELATIVE_WHENS[(hash >>> 3) % RELATIVE_WHENS.length] as string,
+      rating: 3 + ((hash >>> 2) % 3),
+      body: REVIEW_BODIES[(hash >>> 5) % REVIEW_BODIES.length] as string,
+      spoiler: index === 2,
+      helpful: (hash >>> 7) % 240,
+    };
+  });
+}
+
+function buildComments(slug: string): NovelComment[] {
+  const states: CommentState[] = ['normal', 'normal', 'deleted', 'moderated'];
+  return states.map((state, index) => {
+    const hash = seedIndex(`${slug}:com:${index}`);
+    const replies: NovelCommentReply[] | undefined =
+      index === 0
+        ? Array.from({ length: 2 }, (_, replyIndex) => {
+            const replyHash = seedIndex(`${slug}:com:${index}:rep:${replyIndex}`);
+            return {
+              id: `${slug}-com-${index}-rep-${replyIndex}`,
+              user: REVIEW_USERS[(replyHash + replyIndex) % REVIEW_USERS.length] as string,
+              when: RELATIVE_WHENS[(replyHash >>> 2) % RELATIVE_WHENS.length] as string,
+              body: REPLY_BODIES[(replyHash >>> 4) % REPLY_BODIES.length] as string,
+              likes: (replyHash >>> 6) % 40,
+            };
+          })
+        : undefined;
+    return {
+      id: `${slug}-com-${index}`,
+      user: REVIEW_USERS[(hash + index) % REVIEW_USERS.length] as string,
+      when: RELATIVE_WHENS[(hash >>> 2) % RELATIVE_WHENS.length] as string,
+      body: COMMENT_BODIES[(hash >>> 4) % COMMENT_BODIES.length] as string,
+      likes: (hash >>> 6) % 120,
+      spoiler: index === 1,
+      state,
+      replies,
+    };
+  });
+}
+
+function toSummary(detail: NovelDetail): NovelSummary {
+  const { slug, title, author, genres, status, rating, ratingCount, chapterCount, synopsis, updatedAt, views, cover } = detail;
+  return { slug, title, author, genres, status, rating, ratingCount, chapterCount, synopsis, updatedAt, views, cover };
+}
+
 function toDetail(seed: SeedNovel): NovelDetail {
   return {
     slug: seed.slug,
@@ -416,7 +575,18 @@ function toDetail(seed: SeedNovel): NovelDetail {
   };
 }
 
-export const FIXTURE_NOVELS: NovelDetail[] = SEEDS.map(toDetail);
+const BASE_NOVELS: NovelDetail[] = SEEDS.map(toDetail);
+const NOVEL_SUMMARIES: NovelSummary[] = BASE_NOVELS.map(toSummary);
+
+export const FIXTURE_NOVELS: NovelDetail[] = BASE_NOVELS.map(novel => ({
+  ...novel,
+  characters: buildCharacters(novel.slug),
+  illustrations: buildIllustrations(novel.slug),
+  related: buildRelated(novel.slug, NOVEL_SUMMARIES),
+  reviews: buildReviews(novel.slug),
+  ratingDistribution: buildDistribution(novel.rating, novel.ratingCount),
+  comments: buildComments(novel.slug),
+}));
 
 function chapterTitle(slug: string, ordinal: number): string {
   return CHAPTER_TITLES[(seedIndex(slug) + ordinal) % CHAPTER_TITLES.length] as string;

@@ -38,12 +38,67 @@ export interface NovelSummary {
   cover: NovelCover;
 }
 
+/** A cast member on the overview panel; `color` is a gradient tuple for the glyph tile. */
+export interface NovelCharacter {
+  name: string;
+  role: string;
+  color?: [string, string];
+}
+
+/** A gradient placeholder illustration until the server hosts real art. */
+export interface NovelIllustration {
+  id: string;
+  caption?: string;
+  color: [string, string];
+}
+
+/** A reader review. `when` is a pre-humanized relative label from the server. */
+export interface NovelReview {
+  id: string;
+  user: string;
+  when: string;
+  rating: number;
+  body: string;
+  spoiler?: boolean;
+  helpful: number;
+}
+
+/** Counts of 5★→1★ ratings, index 0 = 5★. */
+export type RatingDistribution = [number, number, number, number, number];
+
+export type CommentState = 'normal' | 'deleted' | 'moderated';
+
+/** A reply carries no further nesting — one level deep only. */
+export interface NovelCommentReply {
+  id: string;
+  user: string;
+  when: string;
+  body: string;
+  likes: number;
+  spoiler?: boolean;
+  state?: CommentState;
+}
+
+export interface NovelComment extends NovelCommentReply {
+  replies?: NovelCommentReply[];
+}
+
 export interface NovelDetail extends NovelSummary {
   alternativeTitles: string[];
   tags: string[];
   language: string;
   translator?: string;
   mature: boolean;
+  /**
+   * Enrichment blocks — every field is optional so the detail screen renders unchanged when the live
+   * server omits them (the fixture layer populates them deterministically per slug).
+   */
+  characters?: NovelCharacter[];
+  illustrations?: NovelIllustration[];
+  related?: NovelSummary[];
+  reviews?: NovelReview[];
+  ratingDistribution?: RatingDistribution;
+  comments?: NovelComment[];
 }
 
 export interface ChapterMeta {

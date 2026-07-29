@@ -81,12 +81,34 @@
   text-underline-offset: 2px;
 }
 
-.ratingBlock {
+.ratingWrap {
   display: flex;
   align-items: center;
   gap: 18px;
   flex-wrap: wrap;
   margin-bottom: 16px;
+}
+
+.ratingBlock {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: #fff;
+  cursor: pointer;
+}
+
+.reviewLink {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
 .ratingBig {
@@ -111,6 +133,10 @@
 
 .starDim {
   color: rgba(255, 255, 255, 0.35);
+}
+
+.starEmpty {
+  color: var(--sh-border-strong);
 }
 
 .statusRow {
@@ -415,4 +441,589 @@
   gap: 10px;
   padding: 12px 4px;
   flex-wrap: wrap;
+}
+
+/* ── Overview sections ─────────────────────────────────────── */
+.section {
+  margin-bottom: 26px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sectionHead .sectionTitle {
+  margin: 0;
+}
+
+.sectionMeta {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.chevronUp {
+  transform: rotate(180deg);
+}
+
+.tagChip:hover {
+  color: var(--sh-text-primary);
+  border-color: var(--sh-border-strong);
+}
+
+.hscroll {
+  display: flex;
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.emptyBox {
+  padding: 28px;
+  border-radius: 14px;
+  border: 1px dashed var(--sh-border-default);
+  text-align: center;
+  color: var(--sh-text-tertiary);
+  font-size: 13.5px;
+}
+
+.emptyBoxIcon {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+/* ── Characters ────────────────────────────────────────────── */
+.charCard {
+  flex: none;
+  width: 118px;
+  text-align: center;
+}
+
+.charTile {
+  width: 118px;
+  height: 150px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.charGlyph {
+  font-size: 52px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.92);
+}
+
+.charName {
+  font-size: 13px;
+  font-weight: 600;
+  margin-top: 8px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.charRole {
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
+}
+
+/* ── Illustrations ─────────────────────────────────────────── */
+.illGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 12px;
+}
+
+.illTile {
+  position: relative;
+  aspect-ratio: 3 / 4;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: var(--sh-shadow-e1);
+  display: flex;
+  align-items: flex-end;
+}
+
+.illGlyph {
+  position: absolute;
+  inset: 0;
+  margin: auto;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.illCaption {
+  position: relative;
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(to top, rgba(9, 9, 11, 0.72), transparent);
+}
+
+/* ── Related ───────────────────────────────────────────────── */
+.relatedCard {
+  flex: none;
+  width: 130px;
+}
+
+/* ── Chapters tools ────────────────────────────────────────── */
+.chaptersActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.matchCount {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.toolBtn {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 9px;
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-card);
+  color: var(--sh-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.toolBtn:hover {
+  border-color: var(--sh-border-strong);
+}
+
+.toolBtnActive {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+}
+
+/* ── Chapter row extras ────────────────────────────────────── */
+.chapterRowButton {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  border-left: 3px solid transparent;
+  background: transparent;
+  text-align: left;
+  font: inherit;
+}
+
+.checkBox {
+  flex: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 6px;
+  border: 2px solid var(--sh-border-default);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+}
+
+.checkBoxOn {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent);
+}
+
+.newBadge {
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: var(--sh-accent);
+  color: #fff;
+  font-size: 9.5px;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+}
+
+.readingBadge {
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--sh-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.noMatch {
+  padding: 44px 20px;
+  text-align: center;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 12px;
+  color: var(--sh-text-tertiary);
+  font-size: 13px;
+}
+
+.noMatchTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  margin-bottom: 4px;
+}
+
+/* ── Select-to-download bar ────────────────────────────────── */
+.selectBar {
+  position: sticky;
+  bottom: 12px;
+  margin-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: var(--sh-surface-tooltip);
+  color: var(--sh-text-on-tooltip);
+  box-shadow: var(--sh-shadow-e3);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.selectCancel {
+  border: 0;
+  background: transparent;
+  color: var(--sh-indigo-300);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.selectDownload {
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 8px;
+  border: 0;
+  background: var(--sh-accent);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── Reviews ───────────────────────────────────────────────── */
+.reviewSummary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  gap: 20px;
+  padding: 18px;
+  border-radius: 14px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  margin-bottom: 18px;
+}
+
+.reviewScore {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 6px;
+}
+
+.reviewBig {
+  font-size: 46px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1;
+}
+
+.reviewCount {
+  font-size: 13px;
+  color: var(--sh-text-tertiary);
+}
+
+.distList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+}
+
+.distRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.distStar {
+  width: 10px;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  text-align: right;
+}
+
+.distStarIcon {
+  color: var(--sh-amber-500);
+  flex: none;
+}
+
+.distTrack {
+  flex: 1;
+  height: 7px;
+  border-radius: 9999px;
+  background: var(--sh-surface-well);
+  overflow: hidden;
+}
+
+.distFill {
+  display: block;
+  height: 100%;
+  background: var(--sh-amber-400);
+  border-radius: 9999px;
+}
+
+.distPct {
+  width: 34px;
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
+  text-align: right;
+}
+
+.reviewToolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.chipRow {
+  display: flex;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.chip {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: 9999px;
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-card);
+  color: var(--sh-text-secondary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.chip:hover {
+  border-color: var(--sh-border-strong);
+}
+
+.chipActive {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}
+
+/* ── Cards (reviews + comments shared) ─────────────────────── */
+.card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-card);
+  margin-bottom: 12px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.cardUser {
+  font-size: 13.5px;
+  font-weight: 600;
+}
+
+.cardWhen {
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.cardBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--sh-text-secondary);
+}
+
+.cardActions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 12px;
+}
+
+.cardAction {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 0;
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.cardAction:hover {
+  color: var(--sh-text-secondary);
+}
+
+.cardActionOn {
+  color: var(--sh-accent);
+}
+
+.spoilerButton {
+  width: 100%;
+  padding: 12px;
+  border-radius: 9px;
+  border: 1px dashed var(--sh-warning-border);
+  background: var(--sh-warning-bg-subtle);
+  color: var(--sh-warning-text-on-subtle);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.spoilerInline {
+  width: auto;
+  padding: 7px 12px;
+  font-size: 12.5px;
+  justify-content: flex-start;
+}
+
+/* ── Comments ──────────────────────────────────────────────── */
+.composer {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+
+.composerFoot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.signInHint {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.commentsHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.commentsTitle {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+.commentRow {
+  padding: 14px 0;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.commentRemoved {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--sh-text-placeholder);
+  font-size: 13px;
+  font-style: italic;
+  padding: 6px 0;
+}
+
+.commentMain {
+  display: flex;
+  gap: 11px;
+}
+
+.commentMeta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.commentBody {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--sh-text-secondary);
+}
+
+.replyList {
+  margin-top: 12px;
+  padding-left: 14px;
+  border-left: 2px solid var(--sh-border-subtle);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.replyRow {
+  display: flex;
+  gap: 10px;
+}
+
+.replyUser {
+  font-size: 12.5px;
+  font-weight: 600;
+}
+
+.replyBody {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--sh-text-secondary);
+}
+
+/* ── Empty states (reviews + comments) ─────────────────────── */
+.emptyState {
+  padding: 44px;
+  text-align: center;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 12px;
+  color: var(--sh-text-tertiary);
+  font-size: 13px;
+}
+
+.emptyTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  margin-bottom: 4px;
 }
