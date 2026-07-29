@@ -22,7 +22,7 @@ import styles from './boundary.module.css';
  */
 export function DefaultCatchBoundary({ error, reset }: ErrorComponentProps): React.JSX.Element {
   const router = useRouter();
-  // `isApiError` (web 0.2) instead of `instanceof` — holds across the SSR/client dual-bundle class split.
+  /** `isApiError` (web 0.2) instead of `instanceof` — holds across the SSR/client dual-bundle class split. */
   const sessionExpired = isApiError(error) && error.status === 401;
   const message = isApiError(error) ? error.message : 'Something went wrong on our end. Please try again.';
 

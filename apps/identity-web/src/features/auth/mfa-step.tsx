@@ -130,7 +130,7 @@ export function MfaStep({ error, busy, attemptsLeft, canPasskey, onTotp, onRecov
  * plain "try again later"; the way out is a recovery code when the flow survives, else a fresh start.
  */
 export function MfaLockedCard({ lockedUntil, onRecovery, onRestart }: MfaLockedCardProps): React.JSX.Element {
-  // Computed on the client only so the SSR pass and first hydration agree (no server/client clock skew).
+  /** Computed on the client only so the SSR pass and first hydration agree (no server/client clock skew). */
   const [remaining, setRemaining] = useState<number | null>(null);
 
   useEffect(() => {

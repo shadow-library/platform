@@ -15,7 +15,7 @@ import styles from './si.module.css';
 
 export type ChipIntent = 'neutral' | 'info' | 'success' | 'warning' | 'danger' | 'accent';
 
-// The DS accent is indigo, and its `info` intent is also indigo — so an "accent" chip is an info Badge.
+/** The DS accent is indigo, and its `info` intent is also indigo — so an "accent" chip is an info Badge. */
 const CHIP_INTENT: Record<ChipIntent, BadgeIntent> = { neutral: 'neutral', info: 'info', success: 'success', warning: 'warning', danger: 'danger', accent: 'info' };
 
 interface StatusChipProps {

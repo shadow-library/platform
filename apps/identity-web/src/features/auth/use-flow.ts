@@ -76,13 +76,15 @@ export function useFlow(): FlowUiState & FlowActions {
       const previous = previousFlow.current;
       previousFlow.current = next;
       setFlow(next);
-      // A same-status answer carrying an attempts budget is a rejected proof, not a transition.
+      /** A same-status answer carrying an attempts budget is a rejected proof, not a transition. */
       if (previous && previous.status === next.status && next.attemptsLeft !== undefined) setError(REJECTED_MESSAGE(next.attemptsLeft));
       return next;
     } catch (cause) {
-      // `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client
-      // bundles each carry their own `ApiError` class identity.
-      // AUTH_004 is a flow terminated after too many failures (a lock-out); any other 410/409 is an expiry.
+      /**
+       * `isApiError` (web 0.2) instead of `instanceof` — the guard still holds when the SSR and client
+       * bundles each carry their own `ApiError` class identity. AUTH_004 is a flow terminated after too
+       * many failures (a lock-out); any other 410/409 is an expiry.
+       */
       const accountState = isApiError(cause) && cause.code ? ACCOUNT_STATE_MESSAGES[cause.code] : undefined;
       if (isApiError(cause) && (cause.status === 410 || cause.status === 409)) {
         setDead(true);
