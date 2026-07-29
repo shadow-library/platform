@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { type EnsureQueryDataOptions } from '@tanstack/react-query';
-import { APIRequest } from '@shadow-library/web';
+import { type EnsureQueryDataOptions, type UseQueryOptions } from '@tanstack/react-query';
+import { type ApiError, APIRequest } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
@@ -21,10 +21,20 @@ import { APIRequest } from '@shadow-library/web';
 export interface SessionResponse {
   sub: string;
   scopes: string[];
+  /** The organisation this session acts in; every permission on every request is evaluated there */
   org?: string;
   /** `AAL2` only while a step-up grant for pulse's audience is live */
   aal?: string;
   clientId?: string;
+}
+
+/** One organisation the signed-in operator reaches pulse through */
+export interface OrganisationResponse {
+  id: string;
+  slug: string;
+  name: string;
+  type: 'PERSONAL' | 'TEAM';
+  active: boolean;
 }
 
 /**
@@ -33,6 +43,7 @@ export interface SessionResponse {
 
 const sessionKeys = {
   session: ['session'],
+  organisations: ['session', 'organisations'],
 } as const;
 
 export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse> {
@@ -56,4 +67,30 @@ export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse> {
  */
 export function logout(): Promise<{ success: boolean }> {
   return APIRequest.post('/api/auth/logout').execute<{ success: boolean }>();
+}
+
+/**
+ * The organisations this operator may act in. Pulse is INTERNAL, so in practice this is the platform
+ * organisation alone — the switcher exists for the day that stops being true and renders nothing
+ * until then.
+ */
+export function organisationsQueryOptions(): UseQueryOptions<OrganisationResponse[], ApiError> {
+  return {
+    queryKey: sessionKeys.organisations,
+    queryFn: ({ signal }) =>
+      APIRequest.get('/api/auth/organisations')
+        .signal(signal)
+        .execute<{ organisations: OrganisationResponse[] }>()
+        .then(body => body.organisations),
+    retry: false,
+  };
+}
+
+/**
+ * Switches the organisation this session acts in. Identity rotates the session handle, so the reply
+ * carries a replacement cookie and the handle the browser held a moment ago is dead — which is
+ * precisely what stops a token minted for the previous organisation from outliving the switch.
+ */
+export function switchOrganisation(organisationId: string): Promise<{ organisationId: string }> {
+  return APIRequest.post('/api/auth/organisation').body({ organisationId }).execute<{ organisationId: string }>();
 }

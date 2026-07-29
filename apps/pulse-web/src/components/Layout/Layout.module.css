@@ -52,6 +52,12 @@
   flex: 1;
 }
 
+/* Wide enough for an organisation name without letting a long one crowd out the header actions. */
+.orgSwitcher {
+  min-width: 180px;
+  max-width: 260px;
+}
+
 .envPill {
   display: flex;
   align-items: center;

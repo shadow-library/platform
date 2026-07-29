@@ -11,6 +11,7 @@ import { Button } from '@shadow-library/ui';
 import { logout } from '@/lib/apis';
 
 import styles from './Layout.module.css';
+import OrgSwitcher from './OrgSwitcher';
 
 export default function Header(): ReactElement {
   const navigate = useNavigate();
@@ -35,6 +36,7 @@ export default function Header(): ReactElement {
         <span className={styles.headerName}>Multi-channel notification service</span>
       </div>
       <div className={styles.spacer} />
+      <OrgSwitcher />
       <div className={styles.envPill} title="Environment stage (set via env variable)">
         <span className={styles.envDot} />
         <span className={styles.envLabel}>env</span>
