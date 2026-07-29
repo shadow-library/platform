@@ -171,6 +171,20 @@
   white-space: nowrap;
 }
 
+/* Pin the shell to the viewport so its main region scrolls internally and the sidebar fills full height.
+   Shadow UI's Shell only sets `min-height: 100dvh`, which otherwise lets the whole page grow + scroll. */
+.shellRoot {
+  height: 100dvh;
+  max-height: 100dvh;
+}
+
+/* Shadow UI's top-bar children slot is content-width, which pins the search box to the left. Let it grow
+   so the centered search field sits between the menu and utility clusters, as in the design. */
+.shellRoot :global([class*='sh-links']) {
+  flex: 1;
+  justify-content: center;
+}
+
 .content {
   min-height: 100%;
 }

@@ -185,7 +185,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   );
 
   return (
-    <Shell sidebar={sidebar} topbar={topbar}>
+    <Shell sidebar={sidebar} topbar={topbar} className={styles.shellRoot}>
       <div className={`${styles.content} ${isPhone ? styles.contentWithBottomNav : ''}`}>{children}</div>
       {isPhone && (
         <BottomNavigation value={activeNav?.to ?? '/'} onValueChange={to => void navigate({ to })}>
