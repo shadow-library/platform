@@ -22,8 +22,14 @@ import styles from './genres-screen.module.css';
  * tag cloud, per the genres mockup.
  */
 export function GenresScreen(): React.JSX.Element {
-  const catalog = useQuery(catalogQueryOptions({ limit: 1 }));
+  const catalog = useQuery(catalogQueryOptions({ limit: 100 }));
   const genres = catalog.data?.genres ?? [];
+
+  // Per-genre counts are derived from the catalog until the server exposes them directly.
+  const counts = new Map<string, number>();
+  for (const novel of catalog.data?.items ?? []) {
+    for (const genre of novel.genres) counts.set(genre, (counts.get(genre) ?? 0) + 1);
+  }
 
   return (
     <div className={`${styles.page} wn-fade`}>
@@ -31,12 +37,17 @@ export function GenresScreen(): React.JSX.Element {
       <p className={styles.subtitle}>Browse the catalog by what you’re in the mood for</p>
 
       <div className={styles.grid}>
-        {genres.map(genre => (
-          <Link key={genre} to="/browse" search={{ genre }} className={styles.genreCard}>
-            <span className={styles.genreName}>{genre}</span>
-            <span className={styles.genreCount}>Explore novels</span>
-          </Link>
-        ))}
+        {genres.map(genre => {
+          const count = counts.get(genre) ?? 0;
+          return (
+            <Link key={genre} to="/browse" search={{ genre }} className={styles.genreCard}>
+              <span className={styles.genreName}>{genre}</span>
+              <span className={styles.genreCount}>
+                {count} {count === 1 ? 'novel' : 'novels'}
+              </span>
+            </Link>
+          );
+        })}
       </div>
 
       <h2 className={styles.tagsTitle}>Popular tags</h2>
