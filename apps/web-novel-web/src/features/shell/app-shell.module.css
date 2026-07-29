@@ -40,15 +40,112 @@
   white-space: nowrap;
 }
 
-.search {
+.searchEntry {
   flex: 0 1 520px;
   min-width: 0;
+  margin: 0 auto;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 12px;
+  border-radius: var(--sh-radius-lg);
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-placeholder);
+  cursor: text;
+  font-size: 13.5px;
+  text-align: left;
+}
+
+.searchEntry:hover {
+  border-color: var(--sh-border-strong);
+}
+
+.searchEntryText {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.searchKbd {
+  flex: none;
 }
 
 .utility {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+.bell {
+  position: relative;
+  display: inline-flex;
+}
+
+.bellDot {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--sh-danger-solid);
+  border: 2px solid var(--sh-surface-card);
+  pointer-events: none;
+}
+
+.desktopOnly {
+  display: inline-flex;
+}
+
+@media (max-width: 767px) {
+  .searchKbd,
+  .desktopOnly {
+    display: none;
+  }
+}
+
+.navDivider {
+  height: 1px;
+  background: var(--sh-border-subtle);
+  margin: 10px 8px;
+}
+
+.footer {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.writeNovel {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: var(--sh-radius-md);
+  border: 1px dashed var(--sh-border-strong);
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.writeNovel:hover {
+  color: var(--sh-text-primary);
+  border-color: var(--sh-text-tertiary);
+}
+
+.writeNovelLabel {
+  flex: 1;
+  text-align: left;
+}
+
+.writeNovel > svg:last-child {
+  opacity: 0.55;
 }
 
 .account {

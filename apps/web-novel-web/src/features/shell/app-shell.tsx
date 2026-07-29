@@ -3,13 +3,29 @@
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
-import { Avatar, BottomNavigation, Button, IconButton, Input, Shell, Sidebar, Tooltip, TopNavigation, useMediaQuery, useTheme } from '@shadow-library/ui';
+import { useEffect, useState } from 'react';
+import { Avatar, BottomNavigation, Button, IconButton, Kbd, Shell, Sidebar, Tooltip, TopNavigation, useMediaQuery, useTheme } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
-import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HomeIcon, LogOutIcon, MoonIcon, SearchIcon, SunIcon, TagIcon } from '@/components/icons';
-import { loginUrl, purgeOnLogout, sessionQueryOptions, signOut } from '@/lib/apis';
+import {
+  BookIcon,
+  BookmarkIcon,
+  CompassIcon,
+  DownloadIcon,
+  ExternalIcon,
+  HistoryIcon,
+  HomeIcon,
+  LogOutIcon,
+  MoonIcon,
+  SearchIcon,
+  SettingsSlidersIcon,
+  SunIcon,
+  TagIcon,
+} from '@/components/icons';
+import { SearchOverlay } from '@/features/search';
+import { loginUrl, notificationsQueryOptions, purgeOnLogout, sessionQueryOptions, signOut } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 
@@ -26,19 +42,65 @@ interface NavItem {
   icon: React.JSX.Element;
 }
 
+type NavigateFn = ReturnType<typeof useNavigate>;
+
 /**
  * Declaring the constants
  *
- * The app scaffold from the mockups: persistent sidebar + top search bar on desktop, automatic
- * sidebar→drawer swap below md (built into `Shell`), and a `BottomNavigation` on phones. Reading is
- * public; the account slot shows Sign in until a session exists.
+ * The app scaffold from the mockups: persistent sidebar (a primary section plus a divider-separated
+ * secondary section) + a top bar whose inline field is now a button that opens the full-screen search
+ * overlay. Below md the `Shell` swaps the sidebar for a hamburger drawer automatically — reusing this
+ * same `Sidebar`, so the drawer carries both nav groups and the footer for free — and phones also get a
+ * `BottomNavigation`. Reading is public; the account slot shows Sign in until a session exists.
  */
-const NAV_ITEMS: NavItem[] = [
+
+/** Glyphs the shared icon set doesn't ship — kept local so `icons.tsx` stays the design's canonical set. */
+function glyph(paths: React.ReactNode): (props: { size?: number }) => React.JSX.Element {
+  return function Glyph({ size = 18 }: { size?: number }): React.JSX.Element {
+    return (
+      <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        {paths}
+      </svg>
+    );
+  };
+}
+
+const BellIcon = glyph(
+  <>
+    <path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" />
+    <path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" />
+  </>,
+);
+const PencilIcon = glyph(
+  <>
+    <path d="M12 20h9" />
+    <path d="M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4Z" />
+  </>,
+);
+const HelpIcon = glyph(
+  <>
+    <circle cx="12" cy="12" r="10" />
+    <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+    <path d="M12 17h.01" />
+  </>,
+);
+
+/** The same external writing studio the home PromoSection links to (`NOVEL_FORGE_URL` in `home-screen.tsx`). */
+const NOVEL_FORGE_URL = 'https://forge.shadow.app';
+
+const MAIN_NAV: NavItem[] = [
   { to: '/', label: 'Home', icon: <HomeIcon size={16} /> },
   { to: '/browse', label: 'Browse', icon: <CompassIcon size={16} /> },
   { to: '/genres', label: 'Genres', icon: <TagIcon size={16} /> },
   { to: '/library', label: 'Library', icon: <BookmarkIcon size={16} /> },
   { to: '/downloads', label: 'Offline', icon: <DownloadIcon size={16} /> },
+];
+
+const SECONDARY_NAV: NavItem[] = [
+  { to: '/history', label: 'History', icon: <HistoryIcon size={16} /> },
+  { to: '/notifications', label: 'Notifications', icon: <BellIcon size={16} /> },
+  { to: '/settings', label: 'Settings', icon: <SettingsSlidersIcon size={16} /> },
+  { to: '/help', label: 'Help', icon: <HelpIcon size={16} /> },
 ];
 
 function isActive(pathname: string, to: string): boolean {
@@ -65,44 +127,60 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   const { theme, toggleTheme } = useTheme();
   const session = useQuery(sessionQueryOptions());
   const isPhone = useMediaQuery('(max-width: 767px)');
+  const [searchOpen, setSearchOpen] = useState(false);
 
   const user = session.data ?? undefined;
-  const activeNav = NAV_ITEMS.filter(item => isActive(location.pathname, item.to)).at(-1);
+  const notifications = useQuery(notificationsQueryOptions(user?.userId));
+  const hasUnread = (notifications.data ?? []).some(notification => !notification.read);
+  const activeNav = MAIN_NAV.filter(item => isActive(location.pathname, item.to)).at(-1);
 
-  const onSearch = (event: React.KeyboardEvent<HTMLInputElement>): void => {
-    if (event.key !== 'Enter') return;
-    const q = event.currentTarget.value.trim();
-    void navigate({ to: '/browse', search: prev => ({ ...prev, q: q || undefined, page: undefined }) });
-  };
+  // A global "/" opens search from anywhere — but stay out of the way while the reader is typing.
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent): void => {
+      if (event.key !== '/' || event.metaKey || event.ctrlKey || event.altKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) return;
+      event.preventDefault();
+      setSearchOpen(true);
+    };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, []);
 
   const sidebar = (
-    <Sidebar aria-label="Primary" workspace={<Brand />} footer={<AccountSlot userId={user?.userId} name={user?.name} email={user?.email} pathname={location.pathname} />}>
+    <Sidebar aria-label="Primary" workspace={<Brand />} footer={<SidebarFooter userId={user?.userId} name={user?.name} email={user?.email} pathname={location.pathname} />}>
       <Sidebar.Section>
-        {NAV_ITEMS.map(item => (
-          // Not a plain <a href>: SPA navigation must not reload, and leaving the click un-prevented lets
-          // the Shell's mobile drawer auto-close on item navigation (it closes only on unprevented clicks).
-          <Sidebar.Item
-            key={item.to}
-            icon={item.icon}
-            active={isActive(location.pathname, item.to)}
-            label={item.label}
-            role="link"
-            tabIndex={0}
-            onClick={() => void navigate({ to: item.to })}
-            onKeyDown={event => event.key === 'Enter' && void navigate({ to: item.to })}
-          >
-            {item.label}
-          </Sidebar.Item>
-        ))}
+        <NavItems items={MAIN_NAV} pathname={location.pathname} navigate={navigate} />
+      </Sidebar.Section>
+      <div className={styles.navDivider} role="separator" />
+      <Sidebar.Section>
+        <NavItems items={SECONDARY_NAV} pathname={location.pathname} navigate={navigate} />
       </Sidebar.Section>
     </Sidebar>
   );
 
   const topbar = (
-    <TopNavigation aria-label="Top" utility={<TopUtility theme={theme} onToggleTheme={toggleTheme} userId={user?.userId} userName={user?.name} pathname={location.pathname} />}>
-      <div className={styles.search}>
-        <Input size="md" prefix={<SearchIcon size={16} />} placeholder="Search novels, authors, genres…" aria-label="Search novels" onKeyDown={onSearch} />
-      </div>
+    <TopNavigation
+      aria-label="Top"
+      utility={
+        <TopUtility
+          theme={theme}
+          onToggleTheme={toggleTheme}
+          hasUnread={hasUnread}
+          onNotifications={() => void navigate({ to: '/notifications' })}
+          userId={user?.userId}
+          userName={user?.name}
+          pathname={location.pathname}
+        />
+      }
+    >
+      <button type="button" className={styles.searchEntry} onClick={() => setSearchOpen(true)} aria-label="Search novels, authors, genres">
+        <SearchIcon size={16} />
+        <span className={styles.searchEntryText}>Search novels, authors…</span>
+        <Kbd className={styles.searchKbd} aria-hidden>
+          /
+        </Kbd>
+      </button>
     </TopNavigation>
   );
 
@@ -111,21 +189,60 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
       <div className={`${styles.content} ${isPhone ? styles.contentWithBottomNav : ''}`}>{children}</div>
       {isPhone && (
         <BottomNavigation value={activeNav?.to ?? '/'} onValueChange={to => void navigate({ to })}>
-          {NAV_ITEMS.map(item => (
+          {MAIN_NAV.map(item => (
             <BottomNavigation.Item key={item.to} value={item.to} icon={item.icon} label={item.label} />
           ))}
         </BottomNavigation>
       )}
+      <SearchOverlay open={searchOpen} onOpenChange={setSearchOpen} />
     </Shell>
   );
 }
 
-function TopUtility(props: { theme: string; onToggleTheme: () => void; userId?: string; userName?: string; pathname: string }): React.JSX.Element {
+/** SPA nav from the sidebar/drawer: `navigate` (not `<a href>`) so clicks don't reload — the Shell drawer still auto-closes. */
+function NavItems(props: { items: NavItem[]; pathname: string; navigate: NavigateFn }): React.JSX.Element {
+  return (
+    <>
+      {props.items.map(item => (
+        <Sidebar.Item
+          key={item.to}
+          icon={item.icon}
+          active={isActive(props.pathname, item.to)}
+          label={item.label}
+          role="link"
+          tabIndex={0}
+          onClick={() => void props.navigate({ to: item.to })}
+          onKeyDown={event => event.key === 'Enter' && void props.navigate({ to: item.to })}
+        >
+          {item.label}
+        </Sidebar.Item>
+      ))}
+    </>
+  );
+}
+
+function TopUtility(props: {
+  theme: string;
+  onToggleTheme: () => void;
+  hasUnread: boolean;
+  onNotifications: () => void;
+  userId?: string;
+  userName?: string;
+  pathname: string;
+}): React.JSX.Element {
   return (
     <div className={styles.utility}>
-      <Tooltip content="Toggle theme">
-        <IconButton variant="ghost" aria-label="Toggle theme" icon={props.theme === 'dark' ? <SunIcon size={18} /> : <MoonIcon size={18} />} onClick={props.onToggleTheme} />
-      </Tooltip>
+      <span className={styles.bell}>
+        <Tooltip content="Notifications">
+          <IconButton variant="ghost" aria-label="Notifications" icon={<BellIcon size={18} />} onClick={props.onNotifications} />
+        </Tooltip>
+        {props.hasUnread && <span className={styles.bellDot} aria-hidden />}
+      </span>
+      <span className={styles.desktopOnly}>
+        <Tooltip content="Toggle theme">
+          <IconButton variant="ghost" aria-label="Toggle theme" icon={props.theme === 'dark' ? <SunIcon size={18} /> : <MoonIcon size={18} />} onClick={props.onToggleTheme} />
+        </Tooltip>
+      </span>
       {props.userId ? (
         <Avatar name={props.userName ?? 'Reader'} size="sm" />
       ) : (
@@ -133,6 +250,20 @@ function TopUtility(props: { theme: string; onToggleTheme: () => void; userId?: 
           <a href={loginUrl(props.pathname)}>Sign in</a>
         </Button>
       )}
+    </div>
+  );
+}
+
+function SidebarFooter(props: { userId?: string; name?: string; email?: string; pathname: string }): React.JSX.Element {
+  return (
+    <div className={styles.footer}>
+      {/* Novel Forge is a separate service, so this is a real external link, not SPA nav. */}
+      <a className={styles.writeNovel} href={NOVEL_FORGE_URL} target="_blank" rel="noreferrer">
+        <PencilIcon size={15} />
+        <span className={styles.writeNovelLabel}>Write a novel</span>
+        <ExternalIcon size={13} />
+      </a>
+      <AccountSlot userId={props.userId} name={props.name} email={props.email} pathname={props.pathname} />
     </div>
   );
 }
