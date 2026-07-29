@@ -1,0 +1,31 @@
+/*
+ * Access Denied — a full-page state, so it centres itself in whatever region it is dropped into
+ * rather than assuming an app shell. EmptyState supplies the text block; only the diagnostics strip
+ * is owned here, styled as a well so it reads as machine detail rather than part of the message.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 100%;
+  padding: 24px;
+}
+
+.diagnostics {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 320px;
+  padding: 11px 13px;
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: 10px;
+  background: var(--sh-surface-well);
+  font-family: var(--sh-font-mono);
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.7;
+  color: var(--sh-text-tertiary);
+  overflow-wrap: anywhere;
+}

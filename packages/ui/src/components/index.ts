@@ -1,3 +1,4 @@
+export * from './AccessDenied';
 export * from './Accordion';
 export * from './ActionSheet';
 export * from './Alert';
