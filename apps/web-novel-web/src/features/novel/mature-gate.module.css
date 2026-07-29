@@ -1,0 +1,70 @@
+.gate {
+  min-height: 70vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+}
+
+.inner {
+  text-align: center;
+  max-width: 420px;
+}
+
+.iconTile {
+  width: 60px;
+  height: 60px;
+  border-radius: 16px;
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto 18px;
+}
+
+.eyebrow {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--sh-danger-text);
+  margin-bottom: 8px;
+}
+
+.title {
+  margin: 0 0 8px;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.body {
+  margin: 0 0 24px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--sh-text-tertiary);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+
+.manageLink {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--sh-text-tertiary);
+  font-size: 12.5px;
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.manageLink:hover {
+  color: var(--sh-text-secondary);
+}

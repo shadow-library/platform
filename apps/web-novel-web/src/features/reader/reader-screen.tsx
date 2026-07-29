@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { getRouteApi, Link, useNavigate } from '@tanstack/react-router';
+import { getRouteApi, Link, useNavigate, useRouter } from '@tanstack/react-router';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Badge, Button, cn, Drawer, Input, Slider, toast, useMediaQuery } from '@shadow-library/ui';
 import { useOnlineStatus } from '@shadow-library/web/pwa';
@@ -11,6 +11,7 @@ import { useOnlineStatus } from '@shadow-library/web/pwa';
  * Importing user defined packages
  */
 import { BackIcon, BookmarkFilledIcon, BookmarkIcon, ChevronRightIcon, ListIcon, PlayIcon, SettingsSlidersIcon, StarIcon, WifiOffIcon } from '@/components/icons';
+import { MatureGate, useMatureGate } from '@/features/novel/mature-gate';
 import {
   chapterListQueryOptions,
   chapterQueryOptions,
@@ -67,6 +68,7 @@ export function ReaderScreen(): React.JSX.Element {
   const { slug, ordinal: ordinalParam } = route.useParams();
   const ordinal = Number.parseInt(ordinalParam, 10) || 1;
   const navigate = useNavigate();
+  const router = useRouter();
   const queryClient = useQueryClient();
   const online = useOnlineStatus();
   const isPhone = useMediaQuery('(max-width: 767px)');
@@ -85,6 +87,7 @@ export function ReaderScreen(): React.JSX.Element {
   const [scrollPct, setScrollPct] = useState(0);
   const [rating, setRating] = useState(0);
   const [hoverStar, setHoverStar] = useState(0);
+  const { gateVisible, reveal } = useMatureGate(novel.data?.mature ?? false);
 
   const palette = READER_PALETTES[settings.theme];
   const userId = session.data?.userId;
@@ -121,6 +124,7 @@ export function ReaderScreen(): React.JSX.Element {
   // Track scroll → progress hairline + persisted reading position (debounced, local-first).
   const saveTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   useEffect(() => {
+    if (gateVisible) return;
     const onScroll = (): void => {
       const doc = document.documentElement;
       const max = doc.scrollHeight - doc.clientHeight;
@@ -138,11 +142,11 @@ export function ReaderScreen(): React.JSX.Element {
       window.removeEventListener('scroll', onScroll);
       clearTimeout(saveTimer.current);
     };
-  }, [slug, ordinal, userId, queryClient]);
+  }, [slug, ordinal, userId, queryClient, gateVisible]);
 
   // Restore the saved position once the chapter is on screen, and prefetch the next chapter.
   useEffect(() => {
-    if (!chapter.data) return;
+    if (gateVisible || !chapter.data) return;
     const saved = getProgress(slug, userId);
     if (saved && saved.ordinal === ordinal && saved.position > 2) {
       const doc = document.documentElement;
@@ -151,13 +155,23 @@ export function ReaderScreen(): React.JSX.Element {
       window.scrollTo({ top: 0 });
     }
     if (chapter.data.nextOrdinal) void queryClient.prefetchQuery(chapterQueryOptions(slug, chapter.data.nextOrdinal));
-  }, [chapter.data, slug, ordinal, userId, queryClient]);
+  }, [chapter.data, slug, ordinal, userId, queryClient, gateVisible]);
 
   const goTo = (target: number): void => {
     void navigate({ to: '/read/$slug/$ordinal', params: { slug, ordinal: String(target) } });
   };
 
   const offlineBlocked = chapter.isError && !online;
+
+  // Gate mature chapters before any chapter text renders — on the server, at hydration, and until consent.
+  if (gateVisible) {
+    const gateTitle = novel.data?.title ?? chapter.data?.novelTitle ?? 'This novel';
+    return (
+      <div className={styles.matureSurface}>
+        <MatureGate novelTitle={gateTitle} onContinue={reveal} onBack={() => router.history.back()} />
+      </div>
+    );
+  }
 
   return (
     <div className={styles.surface} style={{ background: palette.bg, color: palette.fg }}>
@@ -219,7 +233,9 @@ export function ReaderScreen(): React.JSX.Element {
         </div>
       )}
 
-      {chapter.data && (
+      {chapter.data && novel.data && (
+        // Gate on `novel.data` too: maturity lives on the novel, so the chapter body must wait until it is
+        // known — otherwise a mature chapter could flash if its query wins the race against the novel's.
         // Tap-anywhere chrome toggle — a redundant pointer affordance (the chrome buttons remain the
         // accessible path), so the wrapper is presentational rather than a focusable control.
         <div role="presentation" style={{ filter: `brightness(${brightness / 100})` }} onClick={() => setChrome(value => !value)}>

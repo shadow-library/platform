@@ -39,6 +39,7 @@ import {
 } from '@/lib/apis/types';
 import { getDownloadedNovel } from '@/lib/offline';
 
+import { MatureGate, useMatureGate } from './mature-gate';
 import styles from './novel-screen.module.css';
 
 /**
@@ -134,6 +135,7 @@ export function NovelScreen(): React.JSX.Element {
   const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
   const [downloadOpen, setDownloadOpen] = useState(false);
   const [tab, setTab] = useState('overview');
+  const { gateVisible, reveal } = useMatureGate(novel.data?.mature ?? false);
 
   if (!novel.data) return <div className={styles.content} />;
   const data = novel.data;
@@ -234,32 +236,36 @@ export function NovelScreen(): React.JSX.Element {
         </div>
       </div>
 
-      <Tabs value={tab} onValueChange={setTab}>
-        <div className={styles.tabsWrap}>
-          <div className={styles.tabsInner}>
-            <Tabs.List aria-label="Novel sections">
-              <Tabs.Tab value="overview">Overview</Tabs.Tab>
-              <Tabs.Tab value="chapters">Chapters</Tabs.Tab>
-              <Tabs.Tab value="reviews">Reviews</Tabs.Tab>
-              <Tabs.Tab value="comments">Comments</Tabs.Tab>
-            </Tabs.List>
+      {gateVisible ? (
+        <MatureGate novelTitle={data.title} onContinue={reveal} onBack={() => router.history.back()} />
+      ) : (
+        <Tabs value={tab} onValueChange={setTab}>
+          <div className={styles.tabsWrap}>
+            <div className={styles.tabsInner}>
+              <Tabs.List aria-label="Novel sections">
+                <Tabs.Tab value="overview">Overview</Tabs.Tab>
+                <Tabs.Tab value="chapters">Chapters</Tabs.Tab>
+                <Tabs.Tab value="reviews">Reviews</Tabs.Tab>
+                <Tabs.Tab value="comments">Comments</Tabs.Tab>
+              </Tabs.List>
+            </div>
           </div>
-        </div>
-        <div className={styles.content}>
-          <Tabs.Panel value="overview">
-            <OverviewPanel novel={data} />
-          </Tabs.Panel>
-          <Tabs.Panel value="chapters">
-            <ChaptersPanel novel={data} currentOrdinal={progress?.ordinal} />
-          </Tabs.Panel>
-          <Tabs.Panel value="reviews">
-            <ReviewsPanel novel={data} />
-          </Tabs.Panel>
-          <Tabs.Panel value="comments">
-            <CommentsPanel novel={data} signedIn={!!session.data?.userId} accountName={session.data?.name ?? 'You'} />
-          </Tabs.Panel>
-        </div>
-      </Tabs>
+          <div className={styles.content}>
+            <Tabs.Panel value="overview">
+              <OverviewPanel novel={data} />
+            </Tabs.Panel>
+            <Tabs.Panel value="chapters">
+              <ChaptersPanel novel={data} currentOrdinal={progress?.ordinal} />
+            </Tabs.Panel>
+            <Tabs.Panel value="reviews">
+              <ReviewsPanel novel={data} />
+            </Tabs.Panel>
+            <Tabs.Panel value="comments">
+              <CommentsPanel novel={data} signedIn={!!session.data?.userId} accountName={session.data?.name ?? 'You'} />
+            </Tabs.Panel>
+          </div>
+        </Tabs>
+      )}
 
       <DownloadDialog novel={data} open={downloadOpen} onOpenChange={setDownloadOpen} />
     </div>

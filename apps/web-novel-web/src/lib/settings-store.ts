@@ -40,6 +40,14 @@ export type ToggleKey = { [K in keyof WebnovelSettings]: WebnovelSettings[K] ext
  */
 const SETTINGS_STORAGE_KEY = 'webnovel:settings';
 
+/**
+ * Per-device confirmation that the reader is an adult. Distinct from the `showMatureContent` preference: that
+ * toggle opts mature titles into browse/search, while this records the one-tap "I'm 18+" consent taken at the
+ * gate. Either being set lets mature content through. Shares the `webnovel` prefix, so "Clear all local data"
+ * (and clearing it by hand) resets the gate.
+ */
+const MATURE_CONSENT_STORAGE_KEY = 'webnovel:mature-consent';
+
 /** Every localStorage key this app writes shares the `webnovel` prefix; "Clear all local data" wipes exactly those. */
 const APP_STORAGE_PREFIX = 'webnovel';
 
@@ -67,6 +75,16 @@ export function loadSettings(): WebnovelSettings {
 
 export function saveSettings(settings: WebnovelSettings): void {
   writeLocal(SETTINGS_STORAGE_KEY, settings);
+}
+
+/** Whether this device has confirmed adult access at the mature gate. SSR-safe: no `window` yields `false`. */
+export function hasMatureConsent(): boolean {
+  return readLocal<boolean>(MATURE_CONSENT_STORAGE_KEY, false);
+}
+
+/** Record the one-tap "I'm 18+" consent from the mature gate so it never blocks this device again. */
+export function grantMatureConsent(): void {
+  writeLocal<boolean>(MATURE_CONSENT_STORAGE_KEY, true);
 }
 
 /** Wipe every device-local key this app owns — settings, library, reading progress, reader prefs and theme. */
