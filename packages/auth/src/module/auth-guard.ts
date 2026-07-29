@@ -114,10 +114,22 @@ export class AuthGuard {
     if (auth.elevated && principal.aal !== 'AAL2') throw AuthErrorCode.ELEVATION_REQUIRED.create({ reason: 'the presented credential is not elevated' });
   }
 
+  /**
+   * A permission is always evaluated in an organisation, so a credential that names none — a service
+   * token, or a user token minted before the organisation could be resolved — has no question to ask
+   * and is refused outright.
+   *
+   * `failOpen` deliberately does not apply here. It means "the policy decision point was unreachable,
+   * prefer availability", not "there was nothing to ask, assume yes"; letting it cover a missing claim
+   * would turn every `failOpen` route into an unguarded one for exactly the callers least entitled to
+   * it.
+   */
   private async checkPermission(principal: AuthPrincipal, auth: AuthRouteMetadata): Promise<void> {
     const permission = auth.permission as string;
+    if (!principal.org) throw this.denied('permission denied: the credential names no organisation to evaluate it in', { sub: principal.sub, permission });
+
     const options = { failOpen: auth.failOpen, highRisk: auth.highRisk };
-    const permitted = principal.org ? await this.client.check({ action: permission, organisationId: principal.org, principal }, options) : (auth.failOpen ?? false);
+    const permitted = await this.client.check({ action: permission, organisationId: principal.org, principal }, options);
     if (!permitted) throw this.denied('permission denied', { sub: principal.sub, permission });
   }
 

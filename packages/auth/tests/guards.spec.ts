@@ -175,6 +175,24 @@ describe('AuthGuard', () => {
     await expectStatus(handler, request(await idp.issueToken({ sub: '42', audience: AUDIENCE })), 403);
   });
 
+  /**
+   * `failOpen` means "the decision point was unreachable, prefer availability" — never "there was
+   * nothing to ask, assume yes". Letting it cover a missing organisation would quietly unguard every
+   * `failOpen` route for exactly the credentials least entitled to pass it.
+   */
+  it('should deny an organisation-less token on a fail-open permission route', async () => {
+    const handler = generate({ shadowAuth: { authenticated: true, permission: 'posts:write', failOpen: true } });
+    await expectStatus(handler, request(await idp.issueToken({ sub: 'orgless', audience: AUDIENCE })), 403);
+
+    /** The same route does fail open once the token names an organisation — which is what the flag is actually for. */
+    idp.setEndpointFailure('/api/v1/authz/check', true);
+    const named = request(await idp.issueToken({ sub: 'named', audience: AUDIENCE, org: ORG }));
+    await runGuarded(handler, named, () => {
+      expect(context.getAuthPrincipal().sub).toBe('named');
+    });
+    idp.setEndpointFailure('/api/v1/authz/check', false);
+  });
+
   it('should throw 401 from getAuthPrincipal when the guard never ran', async () => {
     await new Promise<void>((resolve, reject) => {
       runInContext('bare-rid', () => {
