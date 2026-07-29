@@ -14,8 +14,8 @@
     "generate:api-types": "shadow gen-api-types https://pulse.shadow-apps.com/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts"
   },
   "dependencies": {
-    "@shadow-library/ui": "^3.2.0",
-    "@shadow-library/web": "^0.2.0",
+    "@shadow-library/ui": "3.3.0-alpha.1",
+    "@shadow-library/web": "0.2.2-alpha.0",
     "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query": "^5.100.0",
     "@tanstack/react-query-devtools": "^5.100.0",
