@@ -5,6 +5,10 @@ FROM oven/bun:1.3
 ENV PORT=8080
 ENV NODE_ENV=production
 
+# Build-time version stamp, surfaced to the running process (defaults to `local` for ad-hoc builds)
+ARG APP_VERSION=local
+ENV APP_VERSION=${APP_VERSION}
+
 # Setting the working directory and user
 USER bun
 WORKDIR /app
