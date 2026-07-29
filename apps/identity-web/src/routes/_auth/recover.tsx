@@ -69,7 +69,6 @@ function RecoverPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- request ---------- */
   if (!flow)
     return (
       <AuthScreen footer={footer}>
@@ -98,7 +97,6 @@ function RecoverPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- verify code ---------- */
   if (status === 'AWAITING_EMAIL_OTP' || status === 'AWAITING_SMS_OTP') {
     const isEmail = status === 'AWAITING_EMAIL_OTP';
     return (
@@ -118,7 +116,6 @@ function RecoverPage(): React.JSX.Element {
     );
   }
 
-  /* ---------- second factor (MFA-enrolled accounts) ---------- */
   if (status === 'AWAITING_TOTP')
     return (
       <AuthScreen footer={footer}>
@@ -133,7 +130,6 @@ function RecoverPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- set a new password ---------- */
   const submitReset = (): void => {
     if (password.length < 8) return setError('Choose a longer password.');
     if (password !== confirm) return setError('Passwords don’t match.');

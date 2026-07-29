@@ -77,7 +77,7 @@ function ConsentPage(): React.JSX.Element {
     mutationFn: (decision: 'APPROVE' | 'DENY') =>
       authApi.consentDecide({ clientId: clientId ?? '', scopeNames: prompt.data?.scopes.map(item => item.name) ?? [], decision, redirectUri, state }),
     onSuccess: result => {
-      // Denials pause on a confirmation screen; the effect below fires the validated access_denied redirect.
+      /** Denials pause on a confirmation screen; the effect below fires the validated access_denied redirect. */
       if (result.decision === 'DENY') return setPhase({ step: 'denied', redirectTo: result.redirectTo });
       if (result.redirectTo) window.location.assign(result.redirectTo);
       else navigate({ to: '/account' });
@@ -86,7 +86,7 @@ function ConsentPage(): React.JSX.Element {
 
   const data = prompt.data;
 
-  // First-party apps (and already-granted scopes) skip the prompt: approve silently and hand back.
+  /** First-party apps (and already-granted scopes) skip the prompt: approve silently and hand back. */
   useEffect(() => {
     if (data && (data.isFirstParty || data.alreadyGranted) && !autoApproved.current) {
       autoApproved.current = true;
@@ -94,7 +94,6 @@ function ConsentPage(): React.JSX.Element {
     }
   }, [data, decide]);
 
-  // Hand control back to the client (or home) once the denied confirmation has had its beat on screen.
   useEffect(() => {
     if (phase.step !== 'denied') return;
     const redirectTo = phase.redirectTo;
@@ -152,7 +151,7 @@ function ConsentPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  // Sensitive scopes must be re-authenticated to AAL2 before the grant is recorded; an already-elevated session skips it.
+  /** Sensitive scopes must be re-authenticated to AAL2 before the grant is recorded; an already-elevated session skips it. */
   const requiresStepUp = data.scopes.some(item => item.isSensitive) && !me.data?.elevated;
 
   if (phase.step === 'stepup')

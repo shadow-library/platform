@@ -36,7 +36,6 @@ interface StepUpSearch {
  * console's own step-up), it opens a window no application can claim.
  */
 export const Route = createFileRoute('/_auth/step-up')({
-  /** The SDK sends OAuth-style snake_case params; the console may send none. */
   validateSearch: (search: Record<string, unknown>): StepUpSearch => ({
     client_id: typeof search.client_id === 'string' ? search.client_id : undefined,
     resource: typeof search.resource === 'string' ? search.resource : undefined,
@@ -101,7 +100,7 @@ function StepUpPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  // A tampered or unknown client id resolves to no name: fail neutrally, never confirming the id or offering the prompt.
+  /** A tampered or unknown client id resolves to no name: fail neutrally, never confirming the id or offering the prompt. */
   if (appInitiated && (intent.isError || !intent.data?.applicationName)) return <UnverifiedRequest />;
 
   const applicationName = intent.data?.applicationName;

@@ -19,13 +19,15 @@ import { displayName } from '@/lib/format';
  * the page adapts purely to whether a session exists for the invited address.
  */
 export const Route = createFileRoute('/invite/$token')({
-  // Prefetch the session so the invite SSRs its signed-in / signed-out branch directly; a missing session
-  // is a valid state here (the recipient signs in first), so a 401 is swallowed rather than redirected.
+  /**
+   * Prefetch the session so the invite SSRs its signed-in / signed-out branch directly; a missing session
+   * is a valid state here (the recipient signs in first), so a 401 is swallowed rather than redirected.
+   */
   loader: async ({ context }) => {
     try {
       await context.queryClient.ensureQueryData(meQueryOptions());
     } catch {
-      /* signed-out invite landing is expected */
+      /** signed-out invite landing is expected */
     }
   },
   component: InvitePage,
@@ -94,7 +96,7 @@ function InvitePage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  // Signed out — the recipient must hold the invited address verified, so route them through auth first.
+  /** Signed out — the recipient must hold the invited address verified, so route them through auth first. */
   if (me.isError || (!me.isLoading && !me.data))
     return (
       <AuthScreen footer={footer}>
@@ -124,7 +126,6 @@ function InvitePage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  // Signed in — offer to accept or decline the invitation bound to this address.
   return (
     <AuthScreen footer={footer}>
       <AuthCard>

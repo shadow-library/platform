@@ -82,7 +82,6 @@ function RegisterPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- step 1: email ---------- */
   if (!flow)
     return (
       <AuthScreen footer={footer}>
@@ -139,7 +138,6 @@ function RegisterPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- step 2: verify email ---------- */
   if (status === 'AWAITING_EMAIL_OTP')
     return (
       <AuthScreen footer={footer}>
@@ -158,7 +156,6 @@ function RegisterPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- step 3: profile ---------- */
   if (status === 'AWAITING_DEMOGRAPHICS' || status === 'AWAITING_PROFILE') {
     const submitProfile = (): void => {
       if (!firstName.trim() || !lastName.trim()) return setError('Enter your first and last name.');
@@ -205,7 +202,6 @@ function RegisterPage(): React.JSX.Element {
     );
   }
 
-  /* ---------- step 4: password ---------- */
   return (
     <AuthScreen footer={footer}>
       <AuthCard>

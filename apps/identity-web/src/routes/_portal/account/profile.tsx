@@ -30,7 +30,7 @@ function ProfilePage(): React.JSX.Element {
   const [lastName, setLastName] = useState('');
   const [seeded, setSeeded] = useState(false);
 
-  // Seed the inline form once the warm session lands; the form then owns its state until save/cancel.
+  /** Seed the inline form once the warm session lands; the form then owns its state until save/cancel. */
   useEffect(() => {
     if (!user || seeded) return;
     setFirstName(user.firstName ?? '');

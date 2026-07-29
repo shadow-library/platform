@@ -143,8 +143,10 @@ function ApplicationsPage(): React.JSX.Element {
 
   const goToApp = (id: number): void => void navigate({ to: '/console/applications/$appId', params: { appId: String(id) } });
 
-  // The provisioned client's secret is shown once; only then do we open the new application. A client
-  // without a secret (there shouldn't be one here) skips straight through.
+  /**
+   * The provisioned client's secret is shown once; only then do we open the new application. A client
+   * without a secret (there shouldn't be one here) skips straight through.
+   */
   const onCreated = (result: CreateApplicationResponse): void => {
     if (result.clientSecret) setCreated(result);
     else goToApp(result.id);

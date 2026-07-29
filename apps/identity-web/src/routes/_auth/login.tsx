@@ -89,7 +89,6 @@ function LoginPage(): React.JSX.Element {
     navigate({ to: '/account' });
   };
 
-  /** Runs a flow transition and follows through to the redirect once the flow completes. */
   const advance = async (action: () => Promise<FlowState>): Promise<void> => {
     const next = await run(action);
     if (next?.status === 'COMPLETED') complete(next);
@@ -135,9 +134,7 @@ function LoginPage(): React.JSX.Element {
     </span>
   );
 
-  /* ---------- terminal + transient states ---------- */
-
-  // A flow terminated after too many failed second-factor attempts surfaces as a lock-out, not a plain expiry.
+  /** A flow terminated after too many failed second-factor attempts surfaces as a lock-out, not a plain expiry. */
   if (dead && deadReason === 'locked')
     return (
       <AuthScreen footer={footer}>
@@ -170,8 +167,6 @@ function LoginPage(): React.JSX.Element {
         </AuthCard>
       </AuthScreen>
     );
-
-  /* ---------- identifier ---------- */
 
   if (!flow)
     return (
@@ -219,8 +214,6 @@ function LoginPage(): React.JSX.Element {
   const maskedEmail = flow.metadata?.maskedEmail;
   const maskedPhone = flow.metadata?.maskedPhone;
 
-  /* ---------- federated (enterprise SSO) ---------- */
-
   if (status === 'AWAITING_FEDERATED' || (flow.federated?.enforced && status === 'AWAITING_PASSWORD'))
     return (
       <AuthScreen footer={footer}>
@@ -238,8 +231,6 @@ function LoginPage(): React.JSX.Element {
         </AuthCard>
       </AuthScreen>
     );
-
-  /* ---------- passkey factor ---------- */
 
   if (status === 'AWAITING_WEBAUTHN')
     return (
@@ -264,8 +255,6 @@ function LoginPage(): React.JSX.Element {
       </AuthScreen>
     );
 
-  /* ---------- one-time code ---------- */
-
   if (status === 'AWAITING_EMAIL_OTP' || status === 'AWAITING_SMS_OTP') {
     const isEmail = status === 'AWAITING_EMAIL_OTP';
     return (
@@ -286,8 +275,6 @@ function LoginPage(): React.JSX.Element {
       </AuthScreen>
     );
   }
-
-  /* ---------- second factor (authenticator, passkey, or recovery) ---------- */
 
   if (status === 'AWAITING_TOTP' || status === 'AWAITING_MFA_WEBAUTHN')
     return (
@@ -310,8 +297,6 @@ function LoginPage(): React.JSX.Element {
         />
       </AuthScreen>
     );
-
-  /* ---------- admin-forced reset (inline current + new password) ---------- */
 
   if (status === 'AWAITING_PASSWORD_RESET') {
     const submitPasswordReset = (): void => {
@@ -355,8 +340,6 @@ function LoginPage(): React.JSX.Element {
       </AuthScreen>
     );
   }
-
-  /* ---------- password (default first factor) ---------- */
 
   return (
     <AuthScreen footer={footer}>

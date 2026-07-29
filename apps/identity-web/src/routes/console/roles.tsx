@@ -37,7 +37,7 @@ export const Route = createFileRoute('/console/roles')({
     const role = typeof roleRaw === 'number' ? roleRaw : typeof roleRaw === 'string' && /^\d+$/.test(roleRaw) ? Number(roleRaw) : undefined;
     return { app: typeof search.app === 'string' ? search.app : undefined, role };
   },
-  // The application list feeds the picker; permissions and assignments load once an application/role is chosen.
+  /** The application list feeds the picker; permissions and assignments load once an application/role is chosen. */
   loader: ({ context }) => context.queryClient.ensureQueryData(adminApplicationsQueryOptions()),
   component: RolesPage,
 });
@@ -58,8 +58,10 @@ function AssignDialog({ role, open, onOpenChange }: { role: ApplicationRoleItem;
   const [principalId, setPrincipalId] = useState('');
   const [organisationId, setOrganisationId] = useState('');
 
-  // An ORGANISATION grant is scoped to the org itself: its principal *is* the organisation, so the one
-  // identifier serves as both principal and scope (the server derives the scope either way — D-A5).
+  /**
+   * An ORGANISATION grant is scoped to the org itself: its principal *is* the organisation, so the one
+   * identifier serves as both principal and scope (the server derives the scope either way — D-A5).
+   */
   const isOrg = principalType === 'ORGANISATION';
 
   const submit = (): void => {
@@ -211,7 +213,7 @@ function RolesPage(): React.JSX.Element {
   const navigate = Route.useNavigate();
   const { app: appParam, role: selectedRoleId } = Route.useSearch();
   const firstAppId = apps.data?.items[0]?.id;
-  // Default to the first application until the operator picks another — derived, so no effect is needed.
+  /** Default to the first application until the operator picks another — derived, so no effect is needed. */
   const effectiveAppId = appParam || (firstAppId === undefined ? '' : String(firstAppId));
 
   const app = useApplicationQuery(effectiveAppId, Boolean(effectiveAppId));
@@ -219,7 +221,7 @@ function RolesPage(): React.JSX.Element {
 
   const roles = app.data?.roles ?? [];
   const perms = permissions.data?.items ?? [];
-  // Selection survives only while the chosen role still belongs to the current application.
+  /** Selection survives only while the chosen role still belongs to the current application. */
   const selectedRole = roles.find(role => role.id === selectedRoleId) ?? null;
 
   return (

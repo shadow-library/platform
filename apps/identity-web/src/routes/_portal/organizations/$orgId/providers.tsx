@@ -62,7 +62,7 @@ function IdpDialog({
   const [form, setForm] = useState<IdpForm>(EMPTY_FORM);
   const [ready, setReady] = useState(false);
 
-  // Seed the form the first render the dialog opens, from the provider being edited (secret never echoed).
+  /** Seed the form the first render the dialog opens, from the provider being edited (secret never echoed). */
   if (open && !ready) {
     setForm(
       editing

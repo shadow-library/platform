@@ -163,8 +163,10 @@ function ApplicationDetailPage(): React.JSX.Element {
   const [membersPage, setMembersPage] = useState(1);
 
   const data = app.data;
-  // Under D-21 an application owns exactly one provisioned client and one resource; we resolve them by
-  // ownership rather than by id so the page never has to know the derived client-id/audience convention.
+  /**
+   * Under D-21 an application owns exactly one provisioned client and one resource; we resolve them by
+   * ownership rather than by id so the page never has to know the derived client-id/audience convention.
+   */
   const clientSummary = useMemo(() => (clientsQuery.data?.items ?? []).find(client => client.applicationId === data?.id), [clientsQuery.data, data?.id]);
   const clientDetail = useClientQuery(clientSummary?.id ?? '', Boolean(clientSummary));
   const resource = useMemo(() => (resourcesQuery.data?.items ?? []).find(item => item.applicationId === data?.id), [resourcesQuery.data, data?.id]);
@@ -191,7 +193,7 @@ function ApplicationDetailPage(): React.JSX.Element {
     members: allMembers.length,
     organisations: undefined,
   };
-  // The Organisations tab only makes sense for a RESTRICTED app — a PUBLIC/INTERNAL app has no per-org releases.
+  /** The Organisations tab only makes sense for a RESTRICTED app — a PUBLIC/INTERNAL app has no per-org releases. */
   const visibleTabs = TABS.filter(item => item.key !== 'organisations' || data.visibility === 'RESTRICTED');
   const visibility = VISIBILITY[data.visibility];
   const homeLabel = data.homePageUrl ? data.homePageUrl.replace(/^https?:\/\//, '') : `${data.subDomain}.${rootDomain}`;
@@ -673,7 +675,7 @@ function CredentialsTab(props: { appId: string; appName: string; publicUrls: str
     const nextOrigins = origins.filter(token => token.valid).map(token => token.value);
     const clientBody: UpdateClientBody = { backchannelLogoutUri: backchannel.trim() };
     if (isWorkload) clientBody.workloadSubjects = workloadTokens.filter(token => token.valid).map(token => token.value);
-    // Public URLs live on the application (their redirect URIs derive from them); the rest live on the client.
+    /** Public URLs live on the application (their redirect URIs derive from them); the rest live on the client. */
     updateApp.mutate(
       { appId, body: { publicUrls: nextOrigins } },
       {
@@ -835,7 +837,7 @@ function ApiScopesTab(props: { appName: string; resource?: ResourceItem; resourc
   const [addScopeOpen, setAddScopeOpen] = useState(false);
   const [grantScopeId, setGrantScopeId] = useState('');
 
-  // Every scope on another application's resource, tagged with its owning API — the pool this application may be granted.
+  /** Every scope on another application's resource, tagged with its owning API — the pool this application may be granted. */
   const foreignScopes = useMemo(
     () => resources.filter(item => item.id !== resource?.id).flatMap(item => item.scopes.map(scope => ({ ...scope, resource: item.displayName ?? item.identifier }))),
     [resources, resource?.id],
