@@ -46,7 +46,15 @@ export const TEST_APP_ID = 'pulse';
 export const TEST_AUDIENCE = 'api://pulse';
 /** The platform scopes an admin has granted the pulse client; the SDK's `apps/me` publishes exactly these */
 export const TEST_GRANTED_SCOPES = ['authz:check', 'authz:roles:sync', 'app-session:manage'] as const;
-/** The single platform organisation operator permissions are evaluated in (pulse is single-tenant) */
+/**
+ * The single platform organisation operator permissions are evaluated in (pulse is single-tenant).
+ *
+ * Keep this as the *platform* organisation, not a personal workspace. Identity resolves an app
+ * session's organisation from the ones that actually grant the application, and pulse is INTERNAL —
+ * reachable only through the platform organisation. A fixture that minted a personal workspace here
+ * would diverge from production and let this suite pass green over a console that answered every
+ * request with a permission denial, which is exactly what happened before that resolution existed.
+ */
 export const TEST_ORG = '1';
 /** The client id the identity server calls pulse with — the in-cluster M2M compatibility contract */
 export const IDENTITY_CLIENT_ID = 'identity-server';
