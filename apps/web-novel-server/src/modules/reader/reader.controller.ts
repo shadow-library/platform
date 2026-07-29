@@ -5,13 +5,13 @@
 /**
  * Importing npm packages
  */
-import { Body, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
+import { Authenticated } from '@shadow-library/auth/module';
+import { Body, ContextService, Delete, Get, HttpController, HttpStatus, Params, Post, Put, RespondFor } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { NovelSlugParams } from '@server/modules/publish';
-import { SessionService } from '@server/modules/session';
 
 import { LibraryAddBody, LibraryListResponse, ProgressBody, ProgressListResponse, ProgressResponse } from './reader.dto';
 import { ReaderService } from './reader.service';
@@ -23,15 +23,17 @@ import { ReaderService } from './reader.service';
 /**
  * Declaring the constants
  *
- * The small authenticated surface: every route resolves the reader from the session cookie and
- * scopes queries to that identity subject. There are no cross-user reads by construction.
+ * The small authenticated surface: the SDK's guard resolves the reader from the app-session cookie
+ * (or a bearer token) and exposes the principal on the ambient context, and every route scopes its
+ * queries to that identity subject. There are no cross-user reads by construction.
  */
 
 @HttpController('/api')
+@Authenticated()
 export class ReaderController {
   constructor(
     private readonly readerService: ReaderService,
-    private readonly sessionService: SessionService,
+    private readonly context: ContextService,
   ) {}
 
   /*!
@@ -41,22 +43,19 @@ export class ReaderController {
   @Get('/me/progress')
   @RespondFor(200, ProgressListResponse)
   async listProgress(): Promise<ProgressListResponse> {
-    const session = this.sessionService.authenticate();
-    return { items: await this.readerService.listProgress(session.userId) };
+    return { items: await this.readerService.listProgress(this.userId()) };
   }
 
   @Get('/novels/:slug/progress')
   @RespondFor(200, ProgressResponse)
   getProgress(@Params() params: NovelSlugParams): Promise<ProgressResponse> {
-    const session = this.sessionService.authenticate();
-    return this.readerService.getProgress(session.userId, params.slug);
+    return this.readerService.getProgress(this.userId(), params.slug);
   }
 
   @Put('/novels/:slug/progress')
   @RespondFor(200, ProgressResponse)
   saveProgress(@Params() params: NovelSlugParams, @Body() body: ProgressBody): Promise<ProgressResponse> {
-    const session = this.sessionService.authenticate();
-    return this.readerService.saveProgress(session.userId, params.slug, body);
+    return this.readerService.saveProgress(this.userId(), params.slug, body);
   }
 
   /*!
@@ -66,21 +65,23 @@ export class ReaderController {
   @Get('/library')
   @RespondFor(200, LibraryListResponse)
   async listLibrary(): Promise<LibraryListResponse> {
-    const session = this.sessionService.authenticate();
-    return { items: await this.readerService.listLibrary(session.userId) };
+    return { items: await this.readerService.listLibrary(this.userId()) };
   }
 
   @Post('/library')
   @HttpStatus(204)
   async addToLibrary(@Body() body: LibraryAddBody): Promise<void> {
-    const session = this.sessionService.authenticate();
-    await this.readerService.addToLibrary(session.userId, body.slug);
+    await this.readerService.addToLibrary(this.userId(), body.slug);
   }
 
   @Delete('/library/:slug')
   @HttpStatus(204)
   async removeFromLibrary(@Params() params: NovelSlugParams): Promise<void> {
-    const session = this.sessionService.authenticate();
-    await this.readerService.removeFromLibrary(session.userId, params.slug);
+    await this.readerService.removeFromLibrary(this.userId(), params.slug);
+  }
+
+  /** The identity subject behind the request, guaranteed present because every route is `@Authenticated()` */
+  private userId(): string {
+    return this.context.getAuthPrincipal().sub;
   }
 }

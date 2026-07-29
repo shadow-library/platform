@@ -18,7 +18,6 @@ import { CatalogModule } from '@server/modules/catalog';
 import { HealthModule } from '@server/modules/health';
 import { PublishModule } from '@server/modules/publish';
 import { ReaderModule } from '@server/modules/reader';
-import { SessionModule } from '@server/modules/session';
 
 /**
  * Defining types
@@ -29,8 +28,9 @@ import { SessionModule } from '@server/modules/session';
  *
  * Routes carry explicit full paths at the controller level: the public surface lives under
  * `/api/*`, the forge-facing push surface under `/internal/*` (never exposed publicly), and
- * health probes at the root. `AuthModule` registers the bearer guard for the internal routes;
- * reader endpoints authenticate via the session cookie inside their controllers.
+ * health probes at the root. `AuthModule` owns the whole first-party auth surface — it registers
+ * the bearer/session guard AND the browser login/callback/logout/session/step-up routes under
+ * `/api/auth`, so the reader endpoints authenticate declaratively via `@Authenticated()`.
  */
 
 export const AppHttpCoreModule = HttpCoreModule.forRoot({
@@ -45,10 +45,10 @@ export const AppHttpCoreModule = HttpCoreModule.forRoot({
  * resolution never mints a second client.
  */
 let authModule: DynamicModule | undefined;
-const DeferredAuthModule = forwardRef(() => (authModule ??= AuthModule.forRoot())) as unknown as Import;
+const DeferredAuthModule = forwardRef(() => (authModule ??= AuthModule.forRoot({ routes: { basePath: '/api/auth' } }))) as unknown as Import;
 
 export const HttpRouteModule = FastifyModule.forRoot({
-  imports: [AppHttpCoreModule, DeferredAuthModule, HealthModule, SessionModule, PublishModule, CatalogModule, ReaderModule],
+  imports: [AppHttpCoreModule, DeferredAuthModule, HealthModule, PublishModule, CatalogModule, ReaderModule],
 
   host: Config.get('server.host'),
   port: Config.get('server.port'),

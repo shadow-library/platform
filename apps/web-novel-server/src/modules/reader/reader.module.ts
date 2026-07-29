@@ -6,13 +6,13 @@
  * Importing npm packages
  */
 import { Module } from '@shadow-library/app';
+import { FastifyModule } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
 import { CatalogModule } from '@server/modules/catalog';
 import { DatabaseModule } from '@server/modules/datastore';
-import { SessionModule } from '@server/modules/session';
 
 import { ReaderController } from './reader.controller';
 import { ReaderService } from './reader.service';
@@ -26,7 +26,7 @@ import { ReaderService } from './reader.service';
  */
 
 @Module({
-  imports: [DatabaseModule, CatalogModule, SessionModule],
+  imports: [DatabaseModule, CatalogModule, FastifyModule],
   controllers: [ReaderController],
   providers: [ReaderService],
   exports: [ReaderService],

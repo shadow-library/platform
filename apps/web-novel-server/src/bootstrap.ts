@@ -21,17 +21,6 @@ declare module '@shadow-library/common' {
     'server.port': number;
     'server.host': string;
 
-    /**
-     * Reader session configs. The OIDC issuer/audience keys (`AUTH_ISSUER`/`AUTH_AUDIENCE`) are
-     * owned and loaded by `@shadow-library/auth` (`auth.issuer`/`auth.audience`); re-loading them
-     * here would double-register the keys, so this app only declares its own session surface.
-     */
-    'session.client-id': string;
-    'session.client-secret': string;
-    'session.redirect-uri': string;
-    'session.secret': string;
-    'session.ttl': number;
-
     /** Public chapter delivery */
     'catalog.cache-max-age': number;
   }
@@ -46,17 +35,12 @@ declare module '@shadow-library/common' {
 Config.load('server.port', { defaultValue: '8080', validateType: 'number' });
 Config.load('server.host', { defaultValue: '0.0.0.0' });
 
-/** OAuth client identity-side registration for the reader web app's login flow */
-Config.load('session.client-id', { defaultValue: 'webnovel-web' });
-Config.load('session.client-secret', { isProdRequired: true, defaultValue: 'dev-only-webnovel-web-secret' });
-Config.load('session.redirect-uri', { defaultValue: 'http://localhost:8080/api/auth/callback' });
-
 /**
- * The session secret signs the stateless reader-session cookie. It must never fall back to a
- * default in production: a predictable HMAC key lets anyone mint arbitrary reader sessions.
+ * The first-party reader login flow is owned end to end by `@shadow-library/auth`: it loads its own
+ * `auth.*` keys (`AUTH_ISSUER`, `AUTH_APP_ID`, the credential, and the session-cookie tuning) and
+ * derives audience, redirect URIs and scopes from the app registration, so nothing about it is
+ * declared here.
  */
-Config.load('session.secret', { isProdRequired: true, defaultValue: 'dev-only-insecure-webnovel-session-secret-do-not-use-in-production' });
-Config.load('session.ttl', { defaultValue: String(30 * 24 * 60 * 60), validateType: 'number' });
 
 /** Public chapter responses advertise this max-age; ETag revalidation covers the rest */
 Config.load('catalog.cache-max-age', { defaultValue: '300', validateType: 'number' });
