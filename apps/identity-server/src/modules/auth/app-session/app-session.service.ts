@@ -15,7 +15,7 @@ import { APP_NAME } from '@server/constants';
 import { AccessTokenService, AuthorizationCodeService, DEFAULT_AUDIENCE, OAuthClientService, verifyPkce } from '@server/modules/auth/oauth';
 import { SessionService } from '@server/modules/auth/session';
 import { UserService } from '@server/modules/identity/user';
-import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+import { AppSession, AppSessionElevation, DatabaseService, OAuthClient, Organisation, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
 import { ApplicationAccessService } from '@server/modules/system/application';
 import { PolicyService } from '@server/modules/system/policy';
 
@@ -55,6 +55,17 @@ export interface MintedToken {
   scope: string;
   audience: string;
   aal: 'AAL1' | 'AAL2';
+}
+
+export interface SessionOrganisations {
+  organisations: Organisation[];
+  activeId: bigint | null;
+}
+
+export interface SwitchedOrganisation {
+  /** The rotated handle; the one the caller presented is dead. */
+  handle: string;
+  expiresAt: Date;
 }
 
 /**
@@ -111,8 +122,18 @@ export class AppSessionService {
     const identitySessionId = BigInt(payload.sessionId);
     if (!(await this.sessionService.validateById(identitySessionId))) throw AppErrorCode.OAU_003.create();
 
+    /**
+     * The session's organisation is where its capability is evaluated, so it has to be one the user
+     * actually reaches this application through (D-A1) — not their personal workspace, which grants
+     * only PUBLIC applications and never carries the role assignments a team application depends on.
+     */
+    await this.applicationAccessService.assertUserAccess(user.id, input.client.applicationId);
+    const organisationId =
+      (await this.applicationAccessService.resolveActiveOrganisationId(user.id, input.client.applicationId)) ??
+      throwError(AppError.internal('Application access granted a user no organisation to act in'));
+
     const handle = randomBytes(32).toString('base64url');
-    const organisationIds = [user.personalOrganisationId, input.client.organisationId];
+    const organisationIds = [organisationId, input.client.organisationId];
     const absoluteTtl = await this.policyService.resolve('auth.app_session.absolute_ttl', { organisationIds });
     const expiresAt = new Date(Date.now() + absoluteTtl * 1000);
 
@@ -123,7 +144,7 @@ export class AppSessionService {
         clientId: input.client.id,
         identitySessionId,
         userId: user.id,
-        organisationId: user.personalOrganisationId,
+        organisationId,
         grantedScope: payload.scope,
         expiresAt,
         ipAddress: input.ipAddress ?? null,
@@ -146,7 +167,7 @@ export class AppSessionService {
    * call, so a sign-out at the identity service stops token issuance everywhere immediately.
    */
   async mintToken(input: MintTokenInput): Promise<MintedToken> {
-    const session = await this.requireLiveSession(input.client, input.handle);
+    const live = await this.requireLiveSession(input.client, input.handle);
 
     /**
      * The revocation story (T-902, D-A4): back-channel logout never reaches an app-session client, so
@@ -154,7 +175,8 @@ export class AppSessionService {
      * denied alike — ends the app session and reads to the SDK exactly as a stale handle does
      * (`AUTH_005`), which is its cue to restart the login.
      */
-    await this.assertApplicationAccess(session, input.client);
+    await this.assertApplicationAccess(live, input.client);
+    const session = await this.realignOrganisation(live, input.client);
 
     const granted = await this.clientService.getGrantedScopes(input.client.id);
     const audience = input.resource ?? DEFAULT_AUDIENCE;
@@ -276,6 +298,54 @@ export class AppSessionService {
     return expiresAt;
   }
 
+  /** The organisations this session may act in, with the one it currently acts in flagged. */
+  async listOrganisations(client: OAuthClient, handle: string): Promise<SessionOrganisations> {
+    const session = await this.requireLiveSession(client, handle);
+    const organisations = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
+    return { organisations, activeId: session.organisationId };
+  }
+
+  /**
+   * Moves an application session into another organisation the user reaches this application through.
+   *
+   * The handle is rotated, and that rotation is the invalidation mechanism rather than mere hygiene.
+   * Applications cache minted tokens against the handle they hold, so a switch served by one replica
+   * can never reach a sibling replica's cache — the old organisation's authority would otherwise stay
+   * live for the remainder of the token's lifetime. Retiring the handle makes every such entry
+   * unreachable by construction, and matches the rule that a session identifier is rotated whenever
+   * the context it authorises changes.
+   */
+  async switchOrganisation(client: OAuthClient, handle: string, organisationId: bigint): Promise<SwitchedOrganisation> {
+    const session = await this.requireLiveSession(client, handle);
+    await this.assertApplicationAccess(session, client);
+
+    const granting = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
+    if (!granting.some(organisation => organisation.id === organisationId)) {
+      this.logger.warn('organisation switch refused: the user does not reach this application through the requested organisation', {
+        securityEvent: 'app_session.organisation_denied',
+        clientId: client.id,
+        appSessionId: session.id.toString(),
+        organisationId: organisationId.toString(),
+      });
+      throw AppErrorCode.APP_007.create();
+    }
+
+    const rotated = randomBytes(32).toString('base64url');
+    await this.db
+      .update(schema.appSessions)
+      .set({ sessionHash: this.hash(rotated), organisationId, lastUsedAt: new Date() })
+      .where(eq(schema.appSessions.id, session.id));
+
+    this.logger.info('app session switched organisation', {
+      securityEvent: 'app_session.organisation_switched',
+      clientId: client.id,
+      appSessionId: session.id.toString(),
+      previousOrganisationId: session.organisationId?.toString() ?? null,
+      organisationId: organisationId.toString(),
+    });
+    return { handle: rotated, expiresAt: session.expiresAt };
+  }
+
   /** Ends one application session without touching the central session or any sibling application. */
   async revoke(client: OAuthClient, handle: string): Promise<void> {
     const [session] = await this.db
@@ -334,6 +404,32 @@ export class AppSessionService {
       });
       throw AppErrorCode.AUTH_005.create();
     }
+  }
+
+  /**
+   * Re-points a session whose organisation no longer grants the application — a membership ended, an
+   * assignment moved, or the session predates organisations being resolved from reachability at all.
+   * Access was asserted a moment ago, so a granting organisation exists; ending the session over a
+   * stale pointer would be gratuitous. A still-granting organisation is left untouched, which is what
+   * makes a deliberate switch (D3) survive every subsequent mint.
+   */
+  private async realignOrganisation(session: AppSession, client: OAuthClient): Promise<AppSession> {
+    const granting = await this.applicationAccessService.listGrantingOrganisations(session.userId, client.applicationId);
+    if (session.organisationId !== null && granting.some(organisation => organisation.id === session.organisationId)) return session;
+
+    const organisationId =
+      (await this.applicationAccessService.resolveActiveOrganisationId(session.userId, client.applicationId)) ??
+      throwError(AppError.internal('Application access granted a session no organisation to act in'));
+
+    await this.db.update(schema.appSessions).set({ organisationId }).where(eq(schema.appSessions.id, session.id));
+    this.logger.info('app session realigned onto a granting organisation', {
+      securityEvent: 'app_session.organisation_realigned',
+      clientId: client.id,
+      appSessionId: session.id.toString(),
+      previousOrganisationId: session.organisationId?.toString() ?? null,
+      organisationId: organisationId.toString(),
+    });
+    return { ...session, organisationId };
   }
 
   private async requireElevation(session: AppSession, audience: string): Promise<AppSessionElevation> {

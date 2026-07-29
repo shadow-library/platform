@@ -492,8 +492,19 @@ export class OAuthService {
     /** Re-resolved rather than replayed: a grant revoked between authorization and exchange must not survive into the token. */
     const grant = await this.resolveGrant(client, payload.resource, payload.scope, 'user');
     const scope = grant.scopes.join(' ');
-    const org = user.personalOrganisationId?.toString();
-    const policyScope = this.tokenPolicyScope(client, user.personalOrganisationId);
+    /**
+     * The organisation the token acts in is the one the user reaches this application through, not
+     * their personal workspace — capability is evaluated there, and the two coincide only for PUBLIC
+     * applications. The authorize gate already proved access; this closes the race where it lapsed
+     * between authorization and exchange.
+     */
+    const organisationId = await this.applicationAccessService.resolveActiveOrganisationId(userId, client.applicationId);
+    if (!organisationId) {
+      this.logger.warn('authorization code exchange rejected: the user reaches the application through no organisation', { clientId: client.id, userId: payload.userId });
+      throw AppErrorCode.OAU_003.create();
+    }
+    const org = organisationId.toString();
+    const policyScope = this.tokenPolicyScope(client, organisationId);
     const ttlSeconds = await this.policyService.resolve('auth.access_token.ttl', { ...policyScope, clientValue: client.accessTokenTtl });
     const { token: accessToken, expiresIn } = this.accessTokenService.mintAccessToken({
       subject: payload.userId,
@@ -523,7 +534,7 @@ export class OAuthService {
         clientId: client.id,
         scope,
         audience: grant.audience,
-        organisationId: user.personalOrganisationId,
+        organisationId,
         clientOrganisationId: client.organisationId,
         clientTtlSeconds: client.refreshTokenTtl,
       });
@@ -591,6 +602,24 @@ export class OAuthService {
         clientId: client.id,
         familyId: rotated.familyId,
         applicationId: client.applicationId,
+      });
+      throw AppErrorCode.OAU_003.create();
+    }
+
+    /**
+     * The family is pinned to the organisation it was opened in, and a refresh must not silently move
+     * it: a long-lived credential quietly re-pointed at another organisation would widen its authority
+     * without the client ever asking. Losing that one organisation is the same hard cut as losing the
+     * application, so the family ends rather than migrating.
+     */
+    const granting = await this.applicationAccessService.listGrantingOrganisations(rotated.context.userId, client.applicationId);
+    if (rotated.context.organisationId !== null && !granting.some(organisation => organisation.id === rotated.context.organisationId)) {
+      await this.refreshTokenService.revokeFamily(rotated.familyId, 'ADMIN');
+      this.logger.warn('refresh rejected: the organisation this family was opened in no longer grants the application', {
+        securityEvent: 'oauth.refresh_access_revoked',
+        clientId: client.id,
+        familyId: rotated.familyId,
+        organisationId: rotated.context.organisationId?.toString() ?? null,
       });
       throw AppErrorCode.OAU_003.create();
     }

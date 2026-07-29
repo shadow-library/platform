@@ -16,12 +16,15 @@ import { APP_SESSION_SCOPE } from './app-session.constants';
 import {
   AppSessionActionResponse,
   AppSessionHandleBody,
+  AppSessionOrganisationsResponse,
   AppSessionResponse,
   AppTokenResponse,
   ClaimElevationBody,
   CreateAppSessionBody,
   ElevationResponse,
   MintAppTokenBody,
+  SwitchOrganisationBody,
+  SwitchOrganisationResponse,
 } from './app-session.dto';
 import { AppSessionService } from './app-session.service';
 
@@ -87,6 +90,36 @@ export class AppSessionController {
     const client = await this.callingClient();
     const expiresAt = await this.appSessionService.claimElevation(client, body.sessionHandle, body.resource);
     return { expiresAt: expiresAt.toISOString() };
+  }
+
+  /**
+   * A read, but a POST: the handle is a bearer secret and must never reach a query string, an access
+   * log or a `Referer` header. Every sibling route carries it in the body for the same reason.
+   */
+  @Post('/organisations')
+  @HttpStatus(200)
+  @RespondFor(200, AppSessionOrganisationsResponse)
+  async listOrganisations(@Body() body: AppSessionHandleBody): Promise<AppSessionOrganisationsResponse> {
+    const client = await this.callingClient();
+    const { organisations, activeId } = await this.appSessionService.listOrganisations(client, body.sessionHandle);
+    return {
+      organisations: organisations.map(organisation => ({
+        id: organisation.id,
+        slug: organisation.slug,
+        name: organisation.name,
+        type: organisation.type,
+        active: organisation.id === activeId,
+      })),
+    };
+  }
+
+  @Post('/organisation')
+  @HttpStatus(200)
+  @RespondFor(200, SwitchOrganisationResponse)
+  async switchOrganisation(@Body() body: SwitchOrganisationBody): Promise<SwitchOrganisationResponse> {
+    const client = await this.callingClient();
+    const switched = await this.appSessionService.switchOrganisation(client, body.sessionHandle, BigInt(body.organisationId));
+    return { sessionHandle: switched.handle, organisationId: body.organisationId, expiresAt: switched.expiresAt.toISOString() };
   }
 
   @Delete()

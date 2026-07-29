@@ -18,6 +18,12 @@ import { Application, DatabaseService, Organisation, PrimaryDatabase, schema } f
  * Defining types
  */
 
+interface QualifyingMembership {
+  organisation: Organisation;
+  /** The membership the user nominated as their default landing context, not an organisation-level flag. */
+  isDefault: boolean;
+}
+
 /**
  * Declaring the constants
  *
@@ -93,20 +99,58 @@ export class ApplicationAccessService {
     throw AppErrorCode.APP_007.create();
   }
 
+  /** The organisations a user reaches one application through — the candidate set a session may act in, ordered by id so callers are stable. */
+  async listGrantingOrganisations(userId: bigint, applicationId: number): Promise<Organisation[]> {
+    const granting = await this.filterGranting(await this.getQualifyingMemberships(userId), applicationId);
+    return granting.map(membership => membership.organisation).sort((left, right) => (left.id < right.id ? -1 : left.id > right.id ? 1 : 0));
+  }
+
+  /**
+   * The organisation an application session acts in. Capability is evaluated in exactly this
+   * organisation, so it must be one the user genuinely reaches the application through — a role granted
+   * in a team organisation is invisible to a session pinned to the personal workspace.
+   *
+   * Preference is deliberately conservative: the membership the user marked default, then the personal
+   * workspace, then the lowest-numbered candidate. Every user's personal workspace grants every PUBLIC
+   * application, so this resolves exactly as pinning to the personal workspace always did; it diverges
+   * only where the personal workspace never granted the application to begin with.
+   */
+  async resolveActiveOrganisationId(userId: bigint, applicationId: number): Promise<bigint | null> {
+    const granting = await this.filterGranting(await this.getQualifyingMemberships(userId), applicationId);
+    if (granting.length === 0) return null;
+
+    const preferred = granting.find(membership => membership.isDefault) ?? granting.find(membership => membership.organisation.type === 'PERSONAL');
+    if (preferred) return preferred.organisation.id;
+    return granting.reduce((lowest, membership) => (membership.organisation.id < lowest.organisation.id ? membership : lowest)).organisation.id;
+  }
+
+  private async filterGranting(memberships: QualifyingMembership[], applicationId: number): Promise<QualifyingMembership[]> {
+    const granting: QualifyingMembership[] = [];
+    for (const membership of memberships) {
+      const grants = await this.resolveOrganisationGrants(membership.organisation);
+      if (grants.has(applicationId)) granting.push(membership);
+    }
+    return granting;
+  }
+
   /**
    * The organisations whose grants apply to the user: ACTIVE memberships of ACTIVE organisations,
    * narrowed to the managing organisation(s) when the account is SCIM-managed (D-A2). Membership and
    * SCIM rows are read fresh so a suspension or deprovisioning is honoured on the next request.
    */
-  private async getQualifyingOrganisations(userId: bigint): Promise<Organisation[]> {
+  private async getQualifyingMemberships(userId: bigint): Promise<QualifyingMembership[]> {
     const memberships = await this.db.query.organisationMembers.findMany({ where: eq(schema.organisationMembers.userId, userId), with: { organisation: true } });
     const active = memberships.filter(membership => membership.organisation.status === 'ACTIVE' && this.isMemberActive(membership));
 
     const managed = await this.db.query.scimDirectory.findMany({ where: and(eq(schema.scimDirectory.userId, userId), eq(schema.scimDirectory.managed, true)) });
-    if (managed.length === 0) return active.map(membership => membership.organisation);
-
     const managedOrgIds = new Set(managed.map(entry => entry.organisationId));
-    return active.filter(membership => managedOrgIds.has(membership.organisation.id)).map(membership => membership.organisation);
+    const qualifying = managed.length === 0 ? active : active.filter(membership => managedOrgIds.has(membership.organisation.id));
+    return qualifying.map(membership => ({ organisation: membership.organisation, isDefault: membership.isDefault }));
+  }
+
+  private async getQualifyingOrganisations(userId: bigint): Promise<Organisation[]> {
+    const memberships = await this.getQualifyingMemberships(userId);
+    return memberships.map(membership => membership.organisation);
   }
 
   /** Mirrors OrganisationService: a SUSPENDED hold past its `statusUntil` has lapsed and reads ACTIVE; only ACTIVE grants anything. */

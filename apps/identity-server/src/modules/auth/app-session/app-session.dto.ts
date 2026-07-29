@@ -6,10 +6,15 @@ import { Field, Schema } from '@shadow-library/class-schema';
 /**
  * Importing user defined packages
  */
+import { PATTERN } from '@server/constants';
 
 /**
  * Defining types
  */
+
+const ORGANISATION_TYPES = ['PERSONAL', 'TEAM'] as const;
+
+type OrganisationType = (typeof ORGANISATION_TYPES)[number];
 
 @Schema()
 export class CreateAppSessionBody {
@@ -103,6 +108,56 @@ export class ElevationResponse {
 export class AppSessionActionResponse {
   @Field(() => Boolean)
   success: boolean;
+}
+
+@Schema()
+export class AppSessionOrganisationItem {
+  @Field(() => String)
+  id: bigint;
+
+  @Field()
+  slug: string;
+
+  @Field()
+  name: string;
+
+  @Field(() => String, { enum: [...ORGANISATION_TYPES] })
+  type: OrganisationType;
+
+  /** Whether the session is acting in this organisation right now. */
+  @Field(() => Boolean)
+  active: boolean;
+}
+
+@Schema()
+export class AppSessionOrganisationsResponse {
+  @Field(() => [AppSessionOrganisationItem])
+  organisations: AppSessionOrganisationItem[];
+}
+
+@Schema()
+export class SwitchOrganisationBody {
+  @Field()
+  sessionHandle: string;
+
+  @Field({ ...PATTERN.ID })
+  organisationId: string;
+}
+
+@Schema()
+export class SwitchOrganisationResponse {
+  /**
+   * The rotated handle. Switching organisation issues a new one and retires the old, so the caller must
+   * replace its stored handle — the previous value is dead the moment this returns.
+   */
+  @Field()
+  sessionHandle: string;
+
+  @Field()
+  organisationId: string;
+
+  @Field()
+  expiresAt: string;
 }
 
 /**
