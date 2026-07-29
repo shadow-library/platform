@@ -113,7 +113,7 @@ function Brand(): React.JSX.Element {
       <span className={styles.logoMark}>
         <BookIcon size={18} />
       </span>
-      <span>
+      <span className={styles.logoText}>
         <span className={styles.logoName}>Shadow</span>
         <span className={styles.logoSub}>Webnovel</span>
       </span>

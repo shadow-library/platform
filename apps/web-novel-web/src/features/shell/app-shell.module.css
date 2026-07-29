@@ -19,7 +19,15 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 2px 10px -2px var(--sh-indigo-600);
+  box-shadow: 0 2px 10px -2px var(--sh-indigo-600), inset 0 1px 0 rgb(255 255 255 / 0.25);
+}
+
+/* Two stacked lines — "Shadow" over "WEBNOVEL" — as in the design, not inline side-by-side. */
+.logoText {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .logoName {
@@ -178,10 +186,12 @@
   max-height: 100dvh;
 }
 
-/* Shadow UI's top-bar children slot is content-width, which pins the search box to the left. Let it grow
-   so the centered search field sits between the menu and utility clusters, as in the design. */
+/* Shadow UI's top-bar children slot is content-width and `align-items: stretch`, which pins the search box to
+   the left and, because the 38px button won't stretch, floats it to the top of the 56px bar. Let the slot grow
+   and center its child both ways so the search field sits centered between the menu and utility clusters. */
 .shellRoot :global([class*='sh-links']) {
   flex: 1;
+  align-items: center;
   justify-content: center;
 }
 
