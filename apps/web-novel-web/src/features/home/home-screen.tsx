@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useQuery } from '@tanstack/react-query';
-import { Link } from '@tanstack/react-router';
+import { Link, useNavigate } from '@tanstack/react-router';
 import { Button, toast } from '@shadow-library/ui';
 import { usePwaInstall } from '@shadow-library/web/pwa';
 
@@ -10,7 +10,7 @@ import { usePwaInstall } from '@shadow-library/web/pwa';
  * Importing user defined packages
  */
 import { ChevronRightIcon, DownloadIcon, ExternalIcon, PlayIcon, ShieldIcon, StarIcon } from '@/components/icons';
-import { Cover, NovelCard } from '@/components/novel';
+import { Cover, formatCount, NovelCard } from '@/components/novel';
 import styles from '@/features/home/home-screen.module.css';
 import { catalogQueryOptions, progressQueryOptions, sessionQueryOptions } from '@/lib/apis';
 import { type NovelSummary, type ReadingProgress } from '@/lib/apis/types';
@@ -43,7 +43,9 @@ export function HomeScreen(): React.JSX.Element {
   const session = useQuery(sessionQueryOptions());
   const trending = useQuery(catalogQueryOptions({ sort: 'trending', limit: 12 }));
   const updated = useQuery(catalogQueryOptions({ sort: 'updated', limit: 6 }));
+  const ranked = useQuery(catalogQueryOptions({ sort: 'popular', limit: 8 }));
   const progress = useQuery(progressQueryOptions(session.data?.userId));
+  const navigate = useNavigate();
 
   const novels = trending.data?.items ?? [];
   const progressMap = progress.data ?? {};
@@ -77,7 +79,10 @@ export function HomeScreen(): React.JSX.Element {
                   {featured.rating.toFixed(1)}
                 </span>
                 <span>{featured.chapterCount.toLocaleString()} chapters</span>
-                <span>{featured.status === 'ongoing' ? 'Ongoing' : featured.status === 'completed' ? 'Completed' : 'Hiatus'}</span>
+                <span className={styles.heroStatus}>
+                  <span className={styles.statusDot} data-status={featured.status} />
+                  {featured.status === 'ongoing' ? 'Ongoing' : featured.status === 'completed' ? 'Completed' : 'Hiatus'}
+                </span>
               </div>
               <p className={`${styles.heroSynopsis} wn-clamp2`}>{featured.synopsis}</p>
               <div className={styles.heroActions}>
@@ -145,6 +150,25 @@ export function HomeScreen(): React.JSX.Element {
         </div>
       </section>
 
+      {(ranked.data?.items?.length ?? 0) > 0 && (
+        <section className={styles.section}>
+          <div className={styles.sectionHead}>
+            <div>
+              <h2 className={styles.sectionTitle}>Top ranked</h2>
+              <p className={styles.sectionSub}>Most read on Shadow this month</p>
+            </div>
+            <Link to="/browse" search={{ sort: 'popular' }} className={styles.seeAll}>
+              See all <ChevronRightIcon size={15} />
+            </Link>
+          </div>
+          <div className={`${styles.hRow} ${styles.hRowTight} wn-hscroll`}>
+            {(ranked.data?.items ?? []).slice(0, 8).map((novel, index) => (
+              <RankedCard key={novel.slug} novel={novel} rank={index + 1} />
+            ))}
+          </div>
+        </section>
+      )}
+
       <section className={styles.section}>
         <div className={styles.sectionHead}>
           <div>
@@ -166,7 +190,21 @@ export function HomeScreen(): React.JSX.Element {
                   {novel.author} · <strong>Ch. {novel.chapterCount.toLocaleString()}</strong>
                 </div>
               </div>
-              <span className={styles.updatedWhen}>{timeAgo(novel.updatedAt)}</span>
+              <div className={styles.updatedRight}>
+                <span className={styles.updatedWhen}>{timeAgo(novel.updatedAt)}</span>
+                <button
+                  type="button"
+                  className={styles.readLatestBtn}
+                  aria-label={`Read the latest chapter of ${novel.title}`}
+                  onClick={event => {
+                    event.preventDefault();
+                    event.stopPropagation();
+                    void navigate({ to: '/read/$slug/$ordinal', params: { slug: novel.slug, ordinal: String(novel.chapterCount) } });
+                  }}
+                >
+                  <PlayIcon size={15} />
+                </button>
+              </div>
             </Link>
           ))}
         </div>
@@ -214,6 +252,26 @@ function ContinueCard({ item }: { item: ContinueItem }): React.JSX.Element {
               Resume <PlayIcon size={13} />
             </span>
           </div>
+        </div>
+      </div>
+    </Link>
+  );
+}
+
+function RankedCard({ novel, rank }: { novel: NovelSummary; rank: number }): React.JSX.Element {
+  return (
+    <Link to="/novels/$slug" params={{ slug: novel.slug }} className={styles.rankedCard}>
+      <span className={styles.rankNum} aria-hidden="true">
+        {rank}
+      </span>
+      <div className={styles.rankedBody}>
+        <Cover cover={novel.cover} title={novel.title} showTitle={false} />
+        <div className={styles.rankedMeta}>
+          <span className={styles.rankedRating}>
+            <StarIcon size={11} />
+            {novel.rating.toFixed(1)}
+          </span>
+          <span>· {formatCount(novel.views)} reads</span>
         </div>
       </div>
     </Link>
