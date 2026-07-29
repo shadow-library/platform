@@ -1,0 +1,151 @@
+.page {
+  max-width: var(--wn-page-max);
+  margin: 0 auto;
+  width: 100%;
+  padding: 22px 20px 30px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 5px 0 0;
+  font-size: 14px;
+  color: var(--sh-text-tertiary);
+}
+
+.clearBtn {
+  height: 36px;
+  padding: 0 14px;
+  border-radius: 9px;
+  border: 1px solid var(--sh-border-default);
+  background: transparent;
+  color: var(--sh-danger-text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.clearBtn:hover {
+  background: var(--sh-surface-well);
+}
+
+.search {
+  max-width: 340px;
+  margin-bottom: 18px;
+}
+
+.group {
+  margin-bottom: 22px;
+}
+
+.dayLabel {
+  margin: 0 0 10px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  padding: 11px 12px;
+  border-radius: 12px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  color: inherit;
+  cursor: pointer;
+}
+
+.row:hover {
+  color: inherit;
+  border-color: var(--sh-border-default);
+}
+
+.thumb {
+  position: relative;
+  flex: none;
+  width: 42px;
+  height: 60px;
+  border-radius: 7px;
+  overflow: hidden;
+}
+
+/* Constrain the shared Cover to a compact list thumbnail — a child selector beats Cover's own single-class rules regardless of stylesheet order */
+.thumb > div {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  aspect-ratio: auto;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+.thumb span {
+  font-size: 22px;
+}
+
+.rowBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+}
+
+.rowTitle {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowChapter {
+  font-size: 12.5px;
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowMeta {
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.playBtn {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}

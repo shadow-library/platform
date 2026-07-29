@@ -16,7 +16,9 @@ import { Route as ShellBrowseRouteImport } from './routes/_shell/browse';
 import { Route as ShellDownloadsRouteImport } from './routes/_shell/downloads';
 import { Route as ShellGenresRouteImport } from './routes/_shell/genres';
 import { Route as ShellHelpRouteImport } from './routes/_shell/help';
+import { Route as ShellHistoryRouteImport } from './routes/_shell/history';
 import { Route as ShellLibraryRouteImport } from './routes/_shell/library';
+import { Route as ShellNotificationsRouteImport } from './routes/_shell/notifications';
 import { Route as ShellSettingsRouteImport } from './routes/_shell/settings';
 import { Route as ShellNovelsSlugRouteImport } from './routes/_shell/novels.$slug';
 import { Route as ReadSlugOrdinalRouteImport } from './routes/read.$slug.$ordinal';
@@ -55,9 +57,19 @@ const ShellHelpRoute = ShellHelpRouteImport.update({
   path: '/help',
   getParentRoute: () => ShellRoute,
 } as any);
+const ShellHistoryRoute = ShellHistoryRouteImport.update({
+  id: '/history',
+  path: '/history',
+  getParentRoute: () => ShellRoute,
+} as any);
 const ShellLibraryRoute = ShellLibraryRouteImport.update({
   id: '/library',
   path: '/library',
+  getParentRoute: () => ShellRoute,
+} as any);
+const ShellNotificationsRoute = ShellNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
   getParentRoute: () => ShellRoute,
 } as any);
 const ShellSettingsRoute = ShellSettingsRouteImport.update({
@@ -83,7 +95,9 @@ export interface FileRoutesByFullPath {
   '/downloads': typeof ShellDownloadsRoute;
   '/genres': typeof ShellGenresRoute;
   '/help': typeof ShellHelpRoute;
+  '/history': typeof ShellHistoryRoute;
   '/library': typeof ShellLibraryRoute;
+  '/notifications': typeof ShellNotificationsRoute;
   '/settings': typeof ShellSettingsRoute;
   '/novels/$slug': typeof ShellNovelsSlugRoute;
   '/read/$slug/$ordinal': typeof ReadSlugOrdinalRoute;
@@ -94,7 +108,9 @@ export interface FileRoutesByTo {
   '/downloads': typeof ShellDownloadsRoute;
   '/genres': typeof ShellGenresRoute;
   '/help': typeof ShellHelpRoute;
+  '/history': typeof ShellHistoryRoute;
   '/library': typeof ShellLibraryRoute;
+  '/notifications': typeof ShellNotificationsRoute;
   '/settings': typeof ShellSettingsRoute;
   '/': typeof ShellIndexRoute;
   '/novels/$slug': typeof ShellNovelsSlugRoute;
@@ -108,7 +124,9 @@ export interface FileRoutesById {
   '/_shell/downloads': typeof ShellDownloadsRoute;
   '/_shell/genres': typeof ShellGenresRoute;
   '/_shell/help': typeof ShellHelpRoute;
+  '/_shell/history': typeof ShellHistoryRoute;
   '/_shell/library': typeof ShellLibraryRoute;
+  '/_shell/notifications': typeof ShellNotificationsRoute;
   '/_shell/settings': typeof ShellSettingsRoute;
   '/_shell/': typeof ShellIndexRoute;
   '/_shell/novels/$slug': typeof ShellNovelsSlugRoute;
@@ -116,9 +134,9 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath;
-  fullPaths: '/' | '/login' | '/browse' | '/downloads' | '/genres' | '/help' | '/library' | '/settings' | '/novels/$slug' | '/read/$slug/$ordinal';
+  fullPaths: '/' | '/login' | '/browse' | '/downloads' | '/genres' | '/help' | '/history' | '/library' | '/notifications' | '/settings' | '/novels/$slug' | '/read/$slug/$ordinal';
   fileRoutesByTo: FileRoutesByTo;
-  to: '/login' | '/browse' | '/downloads' | '/genres' | '/help' | '/library' | '/settings' | '/' | '/novels/$slug' | '/read/$slug/$ordinal';
+  to: '/login' | '/browse' | '/downloads' | '/genres' | '/help' | '/history' | '/library' | '/notifications' | '/settings' | '/' | '/novels/$slug' | '/read/$slug/$ordinal';
   id:
     | '__root__'
     | '/_shell'
@@ -127,7 +145,9 @@ export interface FileRouteTypes {
     | '/_shell/downloads'
     | '/_shell/genres'
     | '/_shell/help'
+    | '/_shell/history'
     | '/_shell/library'
+    | '/_shell/notifications'
     | '/_shell/settings'
     | '/_shell/'
     | '/_shell/novels/$slug'
@@ -191,11 +211,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShellHelpRouteImport;
       parentRoute: typeof ShellRoute;
     };
+    '/_shell/history': {
+      id: '/_shell/history';
+      path: '/history';
+      fullPath: '/history';
+      preLoaderRoute: typeof ShellHistoryRouteImport;
+      parentRoute: typeof ShellRoute;
+    };
     '/_shell/library': {
       id: '/_shell/library';
       path: '/library';
       fullPath: '/library';
       preLoaderRoute: typeof ShellLibraryRouteImport;
+      parentRoute: typeof ShellRoute;
+    };
+    '/_shell/notifications': {
+      id: '/_shell/notifications';
+      path: '/notifications';
+      fullPath: '/notifications';
+      preLoaderRoute: typeof ShellNotificationsRouteImport;
       parentRoute: typeof ShellRoute;
     };
     '/_shell/settings': {
@@ -227,7 +261,9 @@ interface ShellRouteChildren {
   ShellDownloadsRoute: typeof ShellDownloadsRoute;
   ShellGenresRoute: typeof ShellGenresRoute;
   ShellHelpRoute: typeof ShellHelpRoute;
+  ShellHistoryRoute: typeof ShellHistoryRoute;
   ShellLibraryRoute: typeof ShellLibraryRoute;
+  ShellNotificationsRoute: typeof ShellNotificationsRoute;
   ShellSettingsRoute: typeof ShellSettingsRoute;
   ShellIndexRoute: typeof ShellIndexRoute;
   ShellNovelsSlugRoute: typeof ShellNovelsSlugRoute;
@@ -238,7 +274,9 @@ const ShellRouteChildren: ShellRouteChildren = {
   ShellDownloadsRoute: ShellDownloadsRoute,
   ShellGenresRoute: ShellGenresRoute,
   ShellHelpRoute: ShellHelpRoute,
+  ShellHistoryRoute: ShellHistoryRoute,
   ShellLibraryRoute: ShellLibraryRoute,
+  ShellNotificationsRoute: ShellNotificationsRoute,
   ShellSettingsRoute: ShellSettingsRoute,
   ShellIndexRoute: ShellIndexRoute,
   ShellNovelsSlugRoute: ShellNovelsSlugRoute,
