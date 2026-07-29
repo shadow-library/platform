@@ -148,8 +148,8 @@ function DurationField({ seconds, min, max, busy, onSave }: { seconds: number; m
   return (
     <div className={styles.duration}>
       <div className={styles.durationInputs}>
-        <Input size="sm" value={amount} onValueChange={setAmount} invalid={amount.trim() !== '' && !valid} />
-        <Select size="sm" value={String(unitSeconds)} onValueChange={value => setUnitSeconds(Number(value))}>
+        <Input className={styles.durationAmount} size="sm" value={amount} onValueChange={setAmount} invalid={amount.trim() !== '' && !valid} />
+        <Select className={styles.durationUnit} size="sm" value={String(unitSeconds)} onValueChange={value => setUnitSeconds(Number(value))}>
           {DURATION_UNITS.map(item => (
             <Select.Item key={item.seconds} value={String(item.seconds)}>
               {item.label}
