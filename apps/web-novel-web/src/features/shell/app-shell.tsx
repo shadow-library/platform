@@ -9,7 +9,7 @@ import { Avatar, BottomNavigation, Button, IconButton, Input, Shell, Sidebar, To
  * Importing user defined packages
  */
 import { BookIcon, BookmarkIcon, CompassIcon, DownloadIcon, HomeIcon, LogOutIcon, MoonIcon, SearchIcon, SunIcon, TagIcon } from '@/components/icons';
-import { loginUrl, logoutUrl, purgeOnLogout, sessionQueryOptions } from '@/lib/apis';
+import { loginUrl, purgeOnLogout, sessionQueryOptions, signOut } from '@/lib/apis';
 
 import styles from './app-shell.module.css';
 
@@ -99,7 +99,7 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   );
 
   const topbar = (
-    <TopNavigation aria-label="Top" utility={<TopUtility theme={theme} onToggleTheme={toggleTheme} userName={user?.name} pathname={location.pathname} />}>
+    <TopNavigation aria-label="Top" utility={<TopUtility theme={theme} onToggleTheme={toggleTheme} userId={user?.userId} userName={user?.name} pathname={location.pathname} />}>
       <div className={styles.search}>
         <Input size="md" prefix={<SearchIcon size={16} />} placeholder="Search novels, authors, genres…" aria-label="Search novels" onKeyDown={onSearch} />
       </div>
@@ -120,14 +120,14 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
   );
 }
 
-function TopUtility(props: { theme: string; onToggleTheme: () => void; userName?: string; pathname: string }): React.JSX.Element {
+function TopUtility(props: { theme: string; onToggleTheme: () => void; userId?: string; userName?: string; pathname: string }): React.JSX.Element {
   return (
     <div className={styles.utility}>
       <Tooltip content="Toggle theme">
         <IconButton variant="ghost" aria-label="Toggle theme" icon={props.theme === 'dark' ? <SunIcon size={18} /> : <MoonIcon size={18} />} onClick={props.onToggleTheme} />
       </Tooltip>
-      {props.userName ? (
-        <Avatar name={props.userName} size="sm" />
+      {props.userId ? (
+        <Avatar name={props.userName ?? 'Reader'} size="sm" />
       ) : (
         <Button variant="primary" size="sm" asChild>
           <a href={loginUrl(props.pathname)}>Sign in</a>
@@ -140,7 +140,9 @@ function TopUtility(props: { theme: string; onToggleTheme: () => void; userName?
 function AccountSlot(props: { userId?: string; name?: string; email?: string; pathname: string }): React.JSX.Element {
   const queryClient = useQueryClient();
 
-  if (!props.name) {
+  // Signed-in state hinges on the identity subject, not a display name: the SDK's session gives `sub` but
+  // no profile, so `name`/`email` only appear under fixtures and cannot gate the account slot.
+  if (!props.userId) {
     return (
       <div className={styles.account}>
         <Avatar name="Guest" size="sm" />
@@ -154,19 +156,22 @@ function AccountSlot(props: { userId?: string; name?: string; email?: string; pa
     );
   }
 
-  // Purge this account's on-device caches before the full-page logout redirect, so the next person on the
-  // device never inherits the previous user's cached library or reading history.
+  const displayName = props.name ?? 'Reader';
+
+  // End the server session, then purge this account's on-device caches so the next person on the device
+  // never inherits the previous user's cached library or reading history, and finally reset the app.
   const onSignOut = async (): Promise<void> => {
+    await signOut();
     await purgeOnLogout(queryClient, props.userId);
-    window.location.href = logoutUrl();
+    window.location.href = '/';
   };
 
   return (
     <div className={styles.account}>
-      <Avatar name={props.name} size="sm" />
+      <Avatar name={displayName} size="sm" />
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div className={styles.accountName}>{props.name}</div>
-        <div className={styles.accountSub}>{props.email}</div>
+        <div className={styles.accountName}>{displayName}</div>
+        <div className={styles.accountSub}>{props.email ?? 'Signed in'}</div>
       </div>
       <Tooltip content="Sign out">
         <IconButton variant="ghost" size="sm" aria-label="Sign out" icon={<LogOutIcon size={16} />} onClick={() => void onSignOut()} />

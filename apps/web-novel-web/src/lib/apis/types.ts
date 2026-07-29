@@ -100,7 +100,11 @@ export interface LibraryEntry {
   novel: NovelSummary;
 }
 
-/** The flat body of `GET /api/auth/session` (200); signed-out is a plain 401, not a wrapped flag */
+/**
+ * The reader the UI keys everything off. `userId` is mapped from the auth SDK principal's `sub`
+ * (`GET /api/auth/session`, 200; signed-out is a plain 401). `email`/`name` are not carried by the SDK
+ * session — they are populated only by fixtures — so treat them as optional presentation extras.
+ */
 export interface SessionUser {
   userId: string;
   email?: string;
