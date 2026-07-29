@@ -7,10 +7,9 @@ import { beforeAll, describe, expect, it } from 'bun:test';
  * Importing user defined packages
  */
 import { schema } from '@server/modules/datastore';
-import { SESSION_COOKIE_NAME } from '@server/modules/session';
 
 import { csrfPair, TEST_REGEX, TestEnvironment } from '../test-environment';
-import { idp, RP_CLIENT_ID } from '../test-idp';
+import { idp, LOGIN_COOKIE_NAME, LOGIN_SCOPES, SESSION_COOKIE_NAME } from '../test-idp';
 
 /**
  * Defining types
@@ -47,18 +46,13 @@ const request = (method: 'get' | 'put' | 'post' | 'delete', path: string, cookie
 beforeAll(async () => {
   const loginResponse = await env.getRouter().mockRequest().get('/api/auth/login');
   const location = new URL(loginResponse.headers.location as string);
-  const loginCookie = loginResponse.cookies.find(cookie => cookie.name === 'wn_login') as { value: string };
-  const code = idp.createAuthorizationCode({
-    sub: 'reader-1',
-    clientId: RP_CLIENT_ID,
-    nonce: location.searchParams.get('nonce') as string,
-    claims: { email: 'reader@example.com', name: 'Reader One' },
-  });
+  const loginCookie = loginResponse.cookies.find(cookie => cookie.name === LOGIN_COOKIE_NAME) as { value: string };
+  const code = idp.createAuthorizationCode({ sub: 'reader-1', scopes: LOGIN_SCOPES });
   const callback = await env
     .getRouter()
     .mockRequest()
     .get(`/api/auth/callback?code=${code}&state=${location.searchParams.get('state')}`)
-    .cookies({ wn_login: loginCookie.value });
+    .cookies({ [LOGIN_COOKIE_NAME]: loginCookie.value });
   sessionCookie = (callback.cookies.find(cookie => cookie.name === SESSION_COOKIE_NAME) as { value: string }).value;
 });
 
@@ -99,7 +93,7 @@ describe('Reader progress and library', () => {
     it('should require authentication', async () => {
       const response = await env.getRouter().mockRequest().get('/api/me/progress');
       expect(response.statusCode).toBe(401);
-      expect(response.json()).toMatchObject({ code: 'WBN_004' });
+      expect(response.json()).toMatchObject({ code: 'IAM_001' });
     });
   });
 

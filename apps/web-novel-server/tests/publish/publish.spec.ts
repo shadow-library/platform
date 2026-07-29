@@ -77,8 +77,8 @@ describe('Internal publish API', () => {
       expect(rows[0]).toMatchObject({
         action: 'novel.upsert',
         novelSlug: SLUG,
-        callerSub: 'novel-forge-server',
-        callerClientId: 'novel-forge-server',
+        callerSub: 'novel-forge',
+        callerClientId: 'novel-forge',
         incomingRevision: 1,
         storedRevision: null,
         outcome: 'applied',
@@ -193,7 +193,7 @@ describe('Internal publish API', () => {
 
       const rows = await auditRows();
       expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ action: 'chapter.upsert', novelSlug: 'unknown-novel', ordinal: 1, outcome: 'error', callerSub: 'novel-forge-server' });
+      expect(rows[0]).toMatchObject({ action: 'chapter.upsert', novelSlug: 'unknown-novel', ordinal: 1, outcome: 'error', callerSub: 'novel-forge' });
       expect(rows[0]?.error).toBeString();
     });
   });
@@ -278,7 +278,7 @@ describe('Internal publish API', () => {
 
       const rows = await auditRows();
       expect(rows).toHaveLength(1);
-      expect(rows[0]).toMatchObject({ outcome: 'unauthorized', callerClientId: 'novel-forge-server' });
+      expect(rows[0]).toMatchObject({ outcome: 'unauthorized', callerClientId: 'novel-forge' });
     });
 
     it('should reject a scoped service token whose client has no service-access rule', async () => {
