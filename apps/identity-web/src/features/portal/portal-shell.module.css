@@ -144,8 +144,9 @@
 }
 
 /* One standard content width for every portal page (pages no longer set their own), centered so the
-   column stays put as you move between sections instead of resizing per page. */
+   column stays put as you move between sections instead of resizing per page. The console shell draws
+   the same token, so the two halves of the product share a column. */
 .content > * {
-  max-width: 1040px;
+  max-width: var(--si-page-max);
   margin-inline: auto;
 }

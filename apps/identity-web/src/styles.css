@@ -7,11 +7,11 @@
      dropdowns to the popover layer (already above modals) so they work inside dialogs. */
   --sh-z-dropdown: 1300;
 
-  /* Shared layout dimensions — the fixed sidebar rail and the centered content column. Screens draw
-     from these so navigation never shifts the layout. */
+  /* Shared layout dimensions — the fixed sidebar rail and the centered content column. Both shells
+     draw the column from `--si-page-max` so the portal and the console read as one product and the
+     two can't drift apart. */
   --si-sidebar-width: 256px;
-  --si-page-max: 1120px;
-  --si-page-wide: 1280px;
+  --si-page-max: 1040px;
 }
 
 /* ========================================
@@ -68,17 +68,6 @@ a:hover {
    ======================================== */
 .si-scroll {
   overflow-y: auto;
-}
-
-/* Centered content column shared by the portal/console screens (each screen sets its own padding). */
-.si-page {
-  max-width: var(--si-page-max);
-  margin: 0 auto;
-}
-
-.si-page-wide {
-  max-width: var(--si-page-wide);
-  margin: 0 auto;
 }
 
 /* A small uppercase eyebrow label (callers set their own margin). */

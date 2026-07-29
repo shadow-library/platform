@@ -144,3 +144,10 @@
   overflow: auto;
   padding: 30px 34px;
 }
+
+/* Same centered column as the portal shell — the console is the same product, so a page must not
+   change width when an operator crosses between the two. */
+.content > * {
+  max-width: var(--si-page-max);
+  margin-inline: auto;
+}
