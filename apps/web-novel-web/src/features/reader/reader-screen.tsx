@@ -10,7 +10,7 @@ import { useOnlineStatus } from '@shadow-library/web/pwa';
 /**
  * Importing user defined packages
  */
-import { BackIcon, BookmarkFilledIcon, BookmarkIcon, ChevronRightIcon, ListIcon, SettingsSlidersIcon, WifiOffIcon } from '@/components/icons';
+import { BackIcon, BookmarkFilledIcon, BookmarkIcon, ChevronRightIcon, ListIcon, PlayIcon, SettingsSlidersIcon, StarIcon, WifiOffIcon } from '@/components/icons';
 import {
   chapterListQueryOptions,
   chapterQueryOptions,
@@ -24,6 +24,7 @@ import {
   sessionQueryOptions,
   useToggleLibraryMutation,
 } from '@/lib/apis';
+import { readLocal, writeLocal } from '@/lib/local-store';
 import {
   FONT_SIZE_MAX,
   FONT_SIZE_MIN,
@@ -50,6 +51,18 @@ const route = getRouteApi('/read/$slug/$ordinal');
  * that hide on tap, live typography settings, a chapter drawer, and end-of-chapter navigation. Progress is
  * written on scroll (debounced) and the next chapter is prefetched so it stays readable offline.
  */
+
+// Brightness is a device-local reading dim, persisted through the same local-store primitive as the other
+// reader settings but under its own key so it never rides the synced settings object.
+const BRIGHTNESS_KEY = 'webnovel:reader-brightness';
+const BRIGHTNESS_MIN = 50;
+const BRIGHTNESS_MAX = 100;
+const BRIGHTNESS_DEFAULT = 100;
+
+function loadBrightness(): number {
+  return readLocal<number>(BRIGHTNESS_KEY, BRIGHTNESS_DEFAULT);
+}
+
 export function ReaderScreen(): React.JSX.Element {
   const { slug, ordinal: ordinalParam } = route.useParams();
   const ordinal = Number.parseInt(ordinalParam, 10) || 1;
@@ -65,14 +78,23 @@ export function ReaderScreen(): React.JSX.Element {
   const toggleLibrary = useToggleLibraryMutation(session.data?.userId);
 
   const [settings, setSettings] = useState<ReaderSettings>(loadReaderSettings);
+  const [brightness, setBrightness] = useState<number>(loadBrightness);
   const [chrome, setChrome] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [chaptersOpen, setChaptersOpen] = useState(false);
   const [scrollPct, setScrollPct] = useState(0);
+  const [rating, setRating] = useState(0);
+  const [hoverStar, setHoverStar] = useState(0);
 
   const palette = READER_PALETTES[settings.theme];
   const userId = session.data?.userId;
   const inLibrary = isInLibrary(library.data, slug);
+
+  // The chapter body carries `nextOrdinal` but not the next chapter's title, so read it off the shared
+  // chapter-list query (the drawer already caches it) rather than widening the chapter contract.
+  const nextOrdinal = chapter.data?.nextOrdinal;
+  const nextChapters = useQuery({ ...chapterListQueryOptions(slug, nextOrdinal ? Math.ceil(nextOrdinal / 100) : 1, 100), enabled: !!nextOrdinal });
+  const nextTitle = nextOrdinal ? nextChapters.data?.items.find(item => item.ordinal === nextOrdinal)?.title : undefined;
 
   const updateSettings = (updates: Partial<ReaderSettings>): void => {
     setSettings(current => {
@@ -80,6 +102,20 @@ export function ReaderScreen(): React.JSX.Element {
       saveReaderSettings(next);
       return next;
     });
+  };
+
+  const updateBrightness = (value: number): void => {
+    setBrightness(value);
+    writeLocal(BRIGHTNESS_KEY, value);
+  };
+
+  const submitRating = (value: number): void => {
+    setRating(value);
+    toast.success(`Thanks for rating — ${value} star${value === 1 ? '' : 's'}.`);
+  };
+
+  const downloadOffline = (): void => {
+    toast.warning('You’re offline. Reconnect to download this chapter for offline reading.');
   };
 
   // Track scroll → progress hairline + persisted reading position (debounced, local-first).
@@ -125,7 +161,7 @@ export function ReaderScreen(): React.JSX.Element {
 
   return (
     <div className={styles.surface} style={{ background: palette.bg, color: palette.fg }}>
-      <div className={styles.progressTrack}>
+      <div className={styles.progressTrack} style={{ background: palette.hairline }}>
         <div className={styles.progressFill} style={{ width: `${scrollPct}%` }} />
       </div>
 
@@ -173,17 +209,20 @@ export function ReaderScreen(): React.JSX.Element {
             <Button variant="primary" onClick={() => void chapter.refetch()}>
               Try to reconnect
             </Button>
-            <Button variant="secondary" asChild>
-              <Link to="/downloads">Go to offline library</Link>
+            <Button variant="secondary" onClick={downloadOffline}>
+              Download
             </Button>
           </div>
+          <Link to="/downloads" className={styles.blockedLink}>
+            Go to offline library
+          </Link>
         </div>
       )}
 
       {chapter.data && (
         // Tap-anywhere chrome toggle — a redundant pointer affordance (the chrome buttons remain the
         // accessible path), so the wrapper is presentational rather than a focusable control.
-        <div role="presentation" onClick={() => setChrome(value => !value)}>
+        <div role="presentation" style={{ filter: `brightness(${brightness / 100})` }} onClick={() => setChrome(value => !value)}>
           <article
             className={styles.article}
             style={{
@@ -199,7 +238,7 @@ export function ReaderScreen(): React.JSX.Element {
               <h1 className={styles.chapterTitle}>{chapter.data.title}</h1>
             </header>
             {chapter.data.paragraphs.map((paragraph, index) => (
-              <p key={index} style={{ margin: `0 0 ${Math.round(settings.fontSize * 1.1)}px` }}>
+              <p key={index} style={{ margin: `0 0 ${settings.fontSize}px` }}>
                 {paragraph}
               </p>
             ))}
@@ -207,7 +246,27 @@ export function ReaderScreen(): React.JSX.Element {
 
           <div role="presentation" className={styles.footer} style={{ maxWidth: READER_WIDTHS[settings.width] }} onClick={event => event.stopPropagation()}>
             <div className={styles.endMark} style={{ borderTop: `1px solid ${palette.hairline}`, borderBottom: `1px solid ${palette.hairline}` }}>
-              End of Chapter {ordinal.toLocaleString()}
+              <div className={styles.endMarkLabel}>End of Chapter {ordinal.toLocaleString()}</div>
+              <div className={styles.reviewPrompt}>
+                <span className={styles.reviewPromptText}>Enjoying this?</span>
+                <div className={styles.reviewStars} role="radiogroup" aria-label="Rate this novel">
+                  {[1, 2, 3, 4, 5].map(star => (
+                    <button
+                      key={star}
+                      type="button"
+                      role="radio"
+                      aria-checked={rating === star}
+                      aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
+                      className={cn(styles.reviewStar, star <= (hoverStar || rating) && styles.reviewStarOn)}
+                      onMouseEnter={() => setHoverStar(star)}
+                      onMouseLeave={() => setHoverStar(0)}
+                      onClick={() => submitRating(star)}
+                    >
+                      <StarIcon size={20} />
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
             {chapter.data.nextOrdinal ? (
               <button
@@ -220,11 +279,11 @@ export function ReaderScreen(): React.JSX.Element {
                   className={styles.nextCardCoverBox}
                   style={{ background: novel.data ? `linear-gradient(158deg, ${novel.data.cover.from}, ${novel.data.cover.to})` : 'var(--sh-accent)' }}
                 >
-                  <ChevronRightIcon size={18} />
+                  <PlayIcon size={18} />
                 </span>
                 <span className={styles.nextCardBody}>
                   <span className={styles.nextCardKicker}>Up next · Chapter {chapter.data.nextOrdinal.toLocaleString()}</span>
-                  <span className={styles.nextCardTitle}>Continue reading</span>
+                  <span className={styles.nextCardTitle}>{nextTitle ?? 'Continue reading'}</span>
                 </span>
                 <ChevronRightIcon size={20} />
               </button>
@@ -244,8 +303,19 @@ export function ReaderScreen(): React.JSX.Element {
               >
                 <BackIcon size={15} /> Previous
               </button>
-              <button type="button" className={styles.footBtn} style={{ border: `1px solid ${palette.hairline}` }} onClick={() => setChaptersOpen(true)}>
+              <button type="button" className={cn(styles.footBtn, styles.footBtnFixed)} style={{ border: `1px solid ${palette.hairline}` }} onClick={() => setChaptersOpen(true)}>
                 Chapters
+              </button>
+              <button
+                type="button"
+                className={cn(styles.footBtn, styles.footBtnFixed)}
+                style={{ border: `1px solid ${palette.hairline}` }}
+                onClick={() => void navigate({ to: '/novels/$slug', params: { slug } })}
+              >
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                </svg>
+                Comments
               </button>
             </div>
           </div>
@@ -297,7 +367,15 @@ export function ReaderScreen(): React.JSX.Element {
         </div>
       )}
 
-      <ReaderSettingsSheet open={settingsOpen} onOpenChange={setSettingsOpen} settings={settings} onChange={updateSettings} isPhone={isPhone} />
+      <ReaderSettingsSheet
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        settings={settings}
+        onChange={updateSettings}
+        brightness={brightness}
+        onBrightnessChange={updateBrightness}
+        isPhone={isPhone}
+      />
       <ChapterDrawer
         open={chaptersOpen}
         onOpenChange={setChaptersOpen}
@@ -315,6 +393,8 @@ interface ReaderSettingsSheetProps {
   onOpenChange: (open: boolean) => void;
   settings: ReaderSettings;
   onChange: (updates: Partial<ReaderSettings>) => void;
+  brightness: number;
+  onBrightnessChange: (value: number) => void;
   isPhone: boolean;
 }
 
@@ -415,6 +495,19 @@ function ReaderSettingsSheet(props: ReaderSettingsSheetProps): React.JSX.Element
               Justified
             </button>
           </div>
+        </div>
+
+        <div className={styles.settingsGroup}>
+          <Slider
+            label="Brightness"
+            value={props.brightness}
+            min={BRIGHTNESS_MIN}
+            max={BRIGHTNESS_MAX}
+            step={5}
+            formatValue={value => `${Math.round(value)}%`}
+            onValueChange={value => props.onBrightnessChange(Array.isArray(value) ? (value[0] ?? props.brightness) : value)}
+            aria-label="Brightness"
+          />
         </div>
       </Drawer.Body>
     </Drawer>

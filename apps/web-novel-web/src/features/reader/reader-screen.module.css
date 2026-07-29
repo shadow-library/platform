@@ -105,6 +105,9 @@
   padding: 24px 0;
   margin-bottom: 20px;
   font-family: var(--sh-font-sans);
+}
+
+.endMarkLabel {
   font-size: 12px;
   font-weight: 600;
   letter-spacing: 0.05em;
@@ -112,9 +115,45 @@
   opacity: 0.5;
 }
 
+.reviewPrompt {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.reviewPromptText {
+  font-size: 13px;
+  opacity: 0.7;
+}
+
+.reviewStars {
+  display: inline-flex;
+  gap: 2px;
+}
+
+.reviewStar {
+  border: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  padding: 2px;
+  line-height: 0;
+  opacity: 0.4;
+}
+
+.reviewStar:hover {
+  opacity: 0.75;
+}
+
+.reviewStarOn {
+  opacity: 1;
+  color: var(--sh-accent);
+}
+
 .footer {
   margin: 0 auto;
-  padding: 8px 24px 80px;
+  padding: 8px 24px 60px;
   font-family: var(--sh-font-sans);
 }
 
@@ -200,6 +239,11 @@
   align-items: center;
   justify-content: center;
   gap: 6px;
+}
+
+.footBtnFixed {
+  flex: none;
+  padding: 0 16px;
 }
 
 .bottomChrome {
@@ -295,6 +339,15 @@
   gap: 10px;
   justify-content: center;
   flex-wrap: wrap;
+}
+
+.blockedLink {
+  display: inline-block;
+  margin-top: 16px;
+  color: var(--sh-accent);
+  font-size: 13px;
+  font-weight: 600;
+  text-decoration: none;
 }
 
 .settingsGroup {
