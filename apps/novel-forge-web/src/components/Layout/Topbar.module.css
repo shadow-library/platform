@@ -82,10 +82,18 @@
   background: var(--sh-surface-card);
 }
 
+/* Only below md (--sh-breakpoint-md 768), where the shell has swapped the rail for its nav drawer. */
 .hamburger {
+  display: none;
   width: 34px;
   height: 34px;
   margin-left: -6px;
+}
+
+@media (max-width: 767px) {
+  .hamburger {
+    display: inline-flex;
+  }
 }
 
 .breadcrumb {

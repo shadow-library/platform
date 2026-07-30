@@ -3,7 +3,7 @@
  */
 import { useLocation, useNavigate, useParams } from '@tanstack/react-router';
 import { type ReactNode, useMemo, useState } from 'react';
-import { Avatar, type CommandItem, CommandPalette, DropdownMenu, Kbd, Popover, Spinner, toast } from '@shadow-library/ui';
+import { Avatar, type CommandItem, CommandPalette, DropdownMenu, Kbd, Popover, Spinner, toast, useShellNav } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -102,11 +102,8 @@ function JobsTray({ novelId }: NovelParams): React.JSX.Element {
  * The application top bar: breadcrumb, the ⌘K command palette, the background-job
  * tray, and the user avatar.
  */
-interface TopbarProps {
-  onMenuClick?: () => void;
-}
-
-export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element {
+export default function Topbar(): React.JSX.Element {
+  const nav = useShellNav();
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { novelId } = useParams({ strict: false }) as NovelParams;
@@ -161,9 +158,18 @@ export default function Topbar({ onMenuClick }: TopbarProps): React.JSX.Element 
 
   return (
     <header className={styles.topbar}>
-      <button className={`nf-ib nf-hamburger ${styles.hamburger}`} aria-label="Open navigation" onClick={onMenuClick}>
-        <MenuIcon size={19} />
-      </button>
+      {nav.hasSidebar && (
+        <button
+          type="button"
+          className={`nf-ib ${styles.hamburger}`}
+          aria-label="Open navigation"
+          aria-haspopup="dialog"
+          aria-expanded={nav.open}
+          onClick={() => nav.setOpen(true)}
+        >
+          <MenuIcon size={19} />
+        </button>
+      )}
 
       <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
         <span className={styles.crumbRoot}>{crumbRoot}</span>

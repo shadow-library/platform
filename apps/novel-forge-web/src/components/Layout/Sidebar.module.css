@@ -27,7 +27,10 @@
   letter-spacing: -0.01em;
 }
 
+/* Width lives here now rather than in a global class — the shell places the rail and drives the drawer. */
 .sidebar {
+  width: 250px;
+  flex-shrink: 0;
   background: var(--sh-surface-card);
   border-right: 1px solid var(--sh-border-subtle);
   display: flex;

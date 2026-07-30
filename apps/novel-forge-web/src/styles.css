@@ -64,43 +64,9 @@ a:hover {
 }
 
 /* ========================================
-   Responsive shell — sidebar collapses to an off-canvas drawer under the tablet breakpoint
+   Responsive shell — the rail, its drawer, and the scrim belong to the design system Shell now
    ======================================== */
-.nf-sidebar {
-  width: 250px;
-  flex-shrink: 0;
-}
-.nf-hamburger {
-  display: none;
-}
-.nf-shell-scrim {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .nf-hamburger {
-    display: inline-flex;
-  }
-  .nf-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: var(--sh-z-modal);
-    transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    box-shadow: var(--sh-shadow-e3);
-  }
-  .nf-sidebar[data-open='true'] {
-    transform: translateX(0);
-  }
-  .nf-shell-scrim[data-open='true'] {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: var(--sh-z-scrim);
-    background: rgba(0, 0, 0, 0.42);
-  }
+@media (max-width: 767px) {
   /* Let the command-palette trigger shrink instead of overflowing the bar (!important beats the inline min-width). */
   .nf-search {
     min-width: 0 !important;

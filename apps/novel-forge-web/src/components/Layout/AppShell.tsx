@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { useLocation } from '@tanstack/react-router';
-import { type PropsWithChildren, useEffect, useState } from 'react';
+import { type PropsWithChildren } from 'react';
+import { Shell } from '@shadow-library/ui';
 
 /**
  * Importing user defined modules
@@ -12,27 +12,18 @@ import Sidebar from './Sidebar';
 import Topbar from './Topbar';
 
 /**
- * The application chrome shared by every screen: a mode-aware sidebar, the top
- * bar, and a single scrolling content region. The content region is a
- * positioning context so full-bleed screens (the editor, chat, bible) can fill
- * it edge to edge. Under the tablet breakpoint the sidebar collapses to an
- * off-canvas drawer toggled from the top bar (see `.nf-sidebar` in styles.css).
+ * The application chrome shared by every screen. Shell places the sidebar, pins the chrome, and below
+ * md swaps the sidebar for its nav drawer.
+ *
+ * The content region is handed over whole (`fluid` + no gutters) because screens here disagree about
+ * what it is: document screens opt into the 1120px `nf-page` column, while the editor, chat, and bible
+ * fill it edge to edge off `.content`'s positioning context (see `.nf-splitpane` in styles.css). A
+ * shell-imposed column would box the latter in.
  */
 export default function AppShell({ children }: PropsWithChildren): React.JSX.Element {
-  const { pathname } = useLocation();
-  const [navOpen, setNavOpen] = useState(false);
-
-  // Navigating always closes the mobile drawer so a tapped nav item doesn't leave it hanging open.
-  useEffect(() => setNavOpen(false), [pathname]);
-
   return (
-    <div className={styles.shell}>
-      <Sidebar open={navOpen} />
-      <div className="nf-shell-scrim" data-open={navOpen} onClick={() => setNavOpen(false)} aria-hidden="true" />
-      <main className={styles.main}>
-        <Topbar onMenuClick={() => setNavOpen(true)} />
-        <div className={`nf-scroll ${styles.content}`}>{children}</div>
-      </main>
-    </div>
+    <Shell sidebar={<Sidebar />} topbar={<Topbar />} contentWidth="fluid" contentPadding="none" className={styles.shellRoot}>
+      <div className={`nf-scroll ${styles.content}`}>{children}</div>
+    </Shell>
   );
 }

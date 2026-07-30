@@ -71,11 +71,7 @@ function Brand(): React.JSX.Element {
  * project mode (a single novel's workspace), matching the design's `inProject`
  * toggle, and owns the project switcher, lifecycle bar, and user footer.
  */
-interface SidebarProps {
-  open?: boolean;
-}
-
-export default function Sidebar({ open = false }: SidebarProps): React.JSX.Element {
+export default function Sidebar(): React.JSX.Element {
   const { pathname } = useLocation();
   const navigate = useNavigate();
   const { novelId } = useParams({ strict: false }) as NovelParams;
@@ -120,7 +116,7 @@ export default function Sidebar({ open = false }: SidebarProps): React.JSX.Eleme
   ];
 
   return (
-    <aside className={`nf-sidebar ${styles.sidebar}`} data-open={open}>
+    <aside className={styles.sidebar}>
       <Brand />
 
       {/* project switcher */}
