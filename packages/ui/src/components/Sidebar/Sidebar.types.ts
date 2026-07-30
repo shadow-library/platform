@@ -11,9 +11,17 @@ export interface SidebarProps extends Omit<ComponentPropsWithoutRef<'nav'>, 'tit
   workspace?: ReactNode;
   /** Pinned footer slot (account, settings). */
   footer?: ReactNode;
-  /** Rail mode (56px, icons only). @default false */
+  /** Controlled rail mode (56px, icons only) — pair with `onCollapsedChange`, or it is a fixed rail. */
   collapsed?: boolean;
-  /** Fires when the collapse toggle is pressed. Omit to hide the toggle. */
+  /** Starting rail state when uncontrolled. Passing it opts the sidebar into showing a collapse toggle. */
+  defaultCollapsed?: boolean;
+  /**
+   * Persist the uncontrolled rail choice under this localStorage key, so collapse survives reloads
+   * without every product owning the state. Read after mount, never during render, so server-rendered
+   * apps hydrate cleanly — the first paint shows `defaultCollapsed`.
+   */
+  storageKey?: string;
+  /** Fires with the next rail state, in both controlled and uncontrolled modes. */
   onCollapsedChange?: (collapsed: boolean) => void;
   /** Landmark name. @default 'Main' */
   'aria-label'?: string;

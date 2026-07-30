@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Slot, Slottable } from '@radix-ui/react-slot';
-import { Children, forwardRef, type MouseEvent, type ReactNode, useContext, useId } from 'react';
+import { Children, forwardRef, type MouseEvent, type ReactNode, useContext, useEffect, useId, useRef } from 'react';
 
 /**
  * Importing user defined packages
@@ -23,6 +23,24 @@ import { type SidebarGroupProps, type SidebarItemProps, type SidebarProps, type 
 /** Read the sidebar's collapsed state — lets a custom header/footer mark render icon-only in rail. */
 export function useSidebar(): { collapsed: boolean } {
   return useContext(SidebarContext);
+}
+
+/** The persisted rail choice, or null when there is none / storage is unavailable (private mode). */
+function readStoredCollapsed(storageKey: string): boolean | null {
+  try {
+    const stored = localStorage.getItem(storageKey);
+    return stored === 'true' ? true : stored === 'false' ? false : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredCollapsed(storageKey: string, collapsed: boolean): void {
+  try {
+    localStorage.setItem(storageKey, String(collapsed));
+  } catch {
+    /* the choice still applies for this session even when storage rejects the write */
+  }
 }
 
 function ChevronDown() {
@@ -49,14 +67,43 @@ function CollapseChevron({ collapsed }: { collapsed: boolean }) {
  * are the existing components — the Sidebar contributes the state machine. Chrome is surface-app.
  */
 const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
-  { workspace, footer, collapsed: collapsedProp = false, onCollapsedChange, className, children, 'aria-label': ariaLabel = 'Main', ...props },
+  { workspace, footer, collapsed: collapsedProp, defaultCollapsed, storageKey, onCollapsedChange, className, children, 'aria-label': ariaLabel = 'Main', ...props },
   ref,
 ) {
   // Inside the shell's mobile nav drawer the sidebar is always expanded — rail mode and its toggle
   // are desktop furniture; the drawer's own dismissal replaces them.
   const mobileNav = useContext(ShellMobileNavAreaContext);
-  const collapsed = mobileNav != null ? false : collapsedProp;
-  const showCollapseToggle = onCollapsedChange != null && mobileNav == null;
+  const [collapsedState, setCollapsedState] = useControllableState({
+    value: collapsedProp,
+    defaultValue: defaultCollapsed ?? false,
+    onChange: onCollapsedChange,
+  });
+  const restored = useRef(false);
+
+  // The persisted choice is adopted in a mount effect, never resolved during render: the server has no
+  // localStorage, so reading it inline would make the first client render disagree with the server
+  // markup. Same contract as ThemeProvider. Guarded by a ref so a fresh onChange identity can't re-apply
+  // the stored value over a toggle the user just made.
+  useEffect(() => {
+    if (restored.current || storageKey == null || collapsedProp !== undefined) return;
+    restored.current = true;
+    const stored = readStoredCollapsed(storageKey);
+    if (stored != null) setCollapsedState(stored);
+  }, [storageKey, collapsedProp, setCollapsedState]);
+
+  const collapsed = mobileNav != null ? false : collapsedState;
+  // Opting in means asking for collapse: a handler, a persisted key, or an explicit starting state. A
+  // bare <Sidebar> stays toggle-free, and a controlled `collapsed` with no handler is a fixed rail by
+  // construction — React's own semantics, not a special case.
+  const collapsible = onCollapsedChange != null || storageKey != null || defaultCollapsed !== undefined;
+  const showCollapseToggle = collapsible && mobileNav == null;
+
+  function toggleCollapsed(): void {
+    const next = !collapsed;
+    setCollapsedState(next);
+    if (storageKey != null) writeStoredCollapsed(storageKey, next);
+  }
+
   return (
     <TooltipProvider>
       <SidebarContext.Provider value={{ collapsed }}>
@@ -70,7 +117,7 @@ const SidebarRoot = forwardRef<HTMLElement, SidebarProps>(function Sidebar(
                   className={styles.collapseToggle}
                   data-direction={collapsed ? 'right' : 'left'}
                   aria-label={collapsed ? 'Expand navigation' : 'Collapse navigation'}
-                  onClick={() => onCollapsedChange(!collapsed)}
+                  onClick={toggleCollapsed}
                 >
                   <CollapseChevron collapsed={collapsed} />
                 </button>

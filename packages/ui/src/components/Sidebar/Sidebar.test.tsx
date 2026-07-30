@@ -4,7 +4,8 @@
 
 import { render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { renderToStaticMarkup } from 'react-dom/server';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 /**
  * Importing user defined packages
@@ -14,6 +15,19 @@ import { Sidebar, useSidebar } from './Sidebar';
 /**
  * Declaring the constants
  */
+function makeStorage(): Storage {
+  const map = new Map<string, string>();
+  return {
+    getItem: key => map.get(key) ?? null,
+    setItem: (key, value) => void map.set(key, String(value)),
+    removeItem: key => void map.delete(key),
+    clear: () => map.clear(),
+    key: index => [...map.keys()][index] ?? null,
+    get length() {
+      return map.size;
+    },
+  };
+}
 
 describe('Sidebar', () => {
   it('renders a Main nav landmark with links and marks the active item', () => {
@@ -40,6 +54,42 @@ describe('Sidebar', () => {
     render(<Sidebar workspace="acme-prod" onCollapsedChange={onCollapsedChange} />);
     await user.click(screen.getByRole('button', { name: 'Collapse navigation' }));
     expect(onCollapsedChange).toHaveBeenCalledWith(true);
+  });
+
+  it('keeps a sidebar that asked for nothing toggle-free', () => {
+    render(<Sidebar workspace="acme-prod" />);
+    expect(screen.queryByRole('button', { name: /navigation$/ })).not.toBeInTheDocument();
+  });
+
+  it('owns the rail state when uncontrolled', async () => {
+    const user = userEvent.setup();
+    render(<Sidebar workspace="acme-prod" defaultCollapsed={false} />);
+    await user.click(screen.getByRole('button', { name: 'Collapse navigation' }));
+    expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument();
+  });
+
+  describe('collapse persistence', () => {
+    beforeEach(() => vi.stubGlobal('localStorage', makeStorage()));
+    afterEach(() => vi.unstubAllGlobals());
+
+    it('persists and restores the rail choice through storageKey', async () => {
+      const user = userEvent.setup();
+      const { unmount } = render(<Sidebar workspace="acme-prod" storageKey="sh-rail" />);
+      await user.click(screen.getByRole('button', { name: 'Collapse navigation' }));
+      expect(localStorage.getItem('sh-rail')).toBe('true');
+
+      unmount();
+      render(<Sidebar workspace="acme-prod" storageKey="sh-rail" />);
+      expect(await screen.findByRole('button', { name: 'Expand navigation' })).toBeInTheDocument();
+    });
+
+    it('server-renders defaultCollapsed rather than the stored choice', () => {
+      localStorage.setItem('sh-rail', 'true');
+      // Resolving storage during render would emit markup the client could not hydrate to.
+      const html = renderToStaticMarkup(<Sidebar workspace="acme-prod" storageKey="sh-rail" defaultCollapsed={false} />);
+      expect(html).toContain('Collapse navigation');
+      expect(html).not.toContain('Expand navigation');
+    });
   });
 
   it('points the collapse chevron the right way for each mode', () => {
