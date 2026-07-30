@@ -3,15 +3,16 @@
  */
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { Avatar, Button, DropdownMenu, Spinner } from '@shadow-library/ui';
+import { Avatar, Button, DropdownMenu, Shell, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
 import { ArrowLeftIcon, GridIcon, LayersIcon, LinkIcon, LogOutIcon, ShieldCheckIcon, UserIcon, UsersIcon, WebhookIcon } from '@/components/icons';
-import { ThemeToggle } from '@/components/si';
+import { NavMenuButton, ThemeToggle } from '@/components/si';
 import { useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
+import { PAGE_WIDTH } from '@/lib/layout';
 
 import styles from './console-shell.module.css';
 
@@ -64,71 +65,79 @@ export function ConsoleShell({ children }: { children: ReactNode }): React.JSX.E
 
   const user = me.data;
 
-  return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <svg width={24} height={24} viewBox="0 0 28 28" fill="none" aria-hidden="true">
-            <rect x="7" y="7" width="17" height="17" rx="5" fill="var(--sh-accent-soft)" />
-            <rect x="3" y="3" width="17" height="17" rx="5" fill="var(--sh-accent)" />
-            <circle cx="11.5" cy="10.2" r="2.5" fill="var(--sh-on-accent)" />
-            <path d="M10.4 11.8 12.6 11.8 13.4 16 9.6 16 Z" fill="var(--sh-on-accent)" />
-          </svg>
-          <div className={styles.brandText}>
-            <span className={styles.brandName}>Shadow Identity</span>
-            <span className={styles.brandTag}>Operator console</span>
-          </div>
+  const sidebar = (
+    <aside className={styles.sidebar}>
+      <div className={styles.brand}>
+        <svg width={24} height={24} viewBox="0 0 28 28" fill="none" aria-hidden="true">
+          <rect x="7" y="7" width="17" height="17" rx="5" fill="var(--sh-accent-soft)" />
+          <rect x="3" y="3" width="17" height="17" rx="5" fill="var(--sh-accent)" />
+          <circle cx="11.5" cy="10.2" r="2.5" fill="var(--sh-on-accent)" />
+          <path d="M10.4 11.8 12.6 11.8 13.4 16 9.6 16 Z" fill="var(--sh-on-accent)" />
+        </svg>
+        <div className={styles.brandText}>
+          <span className={styles.brandName}>Shadow Identity</span>
+          <span className={styles.brandTag}>Operator console</span>
         </div>
-        <nav className={styles.nav} aria-label="Console">
-          {NAV.map(group => (
-            <div key={group.label}>
-              <div className={styles.navLabel}>{group.label}</div>
-              {group.items.map(item => (
-                <Link key={item.to} to={item.to} className="si-nav" activeProps={{ 'data-active': 'true' }}>
-                  {item.icon}
-                  <span>{item.label}</span>
-                </Link>
-              ))}
-            </div>
-          ))}
-        </nav>
-      </aside>
-
-      <div className={styles.main}>
-        <header className={styles.header}>
-          <div className={styles.crumb}>{pathname.replace('/console/', 'Console / ').replace('/console', 'Operator console').replace(/\//g, ' / ')}</div>
-          <div className={styles.headerRight}>
-            <span className={styles.privileged}>
-              <LayersIcon size={12} />
-              Privileged access
-            </span>
-            {/* The console is a detour out of the portal, so leaving it is a first-class action rather than a menu entry. */}
-            <Button variant="ghost" size="sm" prefix={<ArrowLeftIcon size={15} />} onClick={() => navigate({ to: '/account' })}>
-              Back to dashboard
-            </Button>
-            <ThemeToggle />
-            <DropdownMenu>
-              <DropdownMenu.Trigger asChild>
-                <button type="button" className={styles.headerAvatar} aria-label="Account menu">
-                  <Avatar name={displayName(user)} size="sm" />
-                </button>
-              </DropdownMenu.Trigger>
-              <DropdownMenu.Content align="end" sideOffset={6} className={styles.userMenu}>
-                <DropdownMenu.Label>{user.email ?? displayName(user)}</DropdownMenu.Label>
-                <DropdownMenu.Separator />
-                <DropdownMenu.Item icon={<UserIcon size={16} />} onSelect={() => navigate({ to: '/account' })}>
-                  Back to your account
-                </DropdownMenu.Item>
-                <DropdownMenu.Separator />
-                <DropdownMenu.Item icon={<LogOutIcon size={16} />} destructive onSelect={() => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) })}>
-                  Sign out
-                </DropdownMenu.Item>
-              </DropdownMenu.Content>
-            </DropdownMenu>
-          </div>
-        </header>
-        <div className={styles.content}>{children}</div>
       </div>
-    </div>
+      <nav className={styles.nav} aria-label="Console">
+        {NAV.map(group => (
+          <div key={group.label}>
+            <div className={styles.navLabel}>{group.label}</div>
+            {group.items.map(item => (
+              <Link key={item.to} to={item.to} className="si-nav" activeProps={{ 'data-active': 'true' }}>
+                {item.icon}
+                <span>{item.label}</span>
+              </Link>
+            ))}
+          </div>
+        ))}
+      </nav>
+    </aside>
+  );
+
+  const topbar = (
+    <header className={styles.header}>
+      <NavMenuButton />
+      <div className={styles.crumb}>{pathname.replace('/console/', 'Console / ').replace('/console', 'Operator console').replace(/\//g, ' / ')}</div>
+      <div className={styles.headerRight}>
+        <span className={styles.privileged}>
+          <LayersIcon size={12} />
+          Privileged access
+        </span>
+        {/* The console is a detour out of the portal, so leaving it is a first-class action rather than a menu entry.
+            On a phone the bar has no room for it and the account menu's own "Back to your account" carries the exit. */}
+        <span className={styles.backAction}>
+          <Button variant="ghost" size="sm" prefix={<ArrowLeftIcon size={15} />} onClick={() => navigate({ to: '/account' })}>
+            Back to dashboard
+          </Button>
+        </span>
+        <ThemeToggle />
+        <DropdownMenu>
+          <DropdownMenu.Trigger asChild>
+            <button type="button" className={styles.headerAvatar} aria-label="Account menu">
+              <Avatar name={displayName(user)} size="sm" />
+            </button>
+          </DropdownMenu.Trigger>
+          <DropdownMenu.Content align="end" sideOffset={6} className={styles.userMenu}>
+            <DropdownMenu.Label>{user.email ?? displayName(user)}</DropdownMenu.Label>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item icon={<UserIcon size={16} />} onSelect={() => navigate({ to: '/account' })}>
+              Back to your account
+            </DropdownMenu.Item>
+            <DropdownMenu.Separator />
+            <DropdownMenu.Item icon={<LogOutIcon size={16} />} destructive onSelect={() => signout.mutate(undefined, { onSuccess: () => navigate({ to: '/login' }) })}>
+              Sign out
+            </DropdownMenu.Item>
+          </DropdownMenu.Content>
+        </DropdownMenu>
+      </div>
+    </header>
+  );
+
+  // Same shell, same column as the portal — only the chrome differs, so the console can't drift.
+  return (
+    <Shell sidebar={sidebar} topbar={topbar} contentWidth={PAGE_WIDTH}>
+      {children}
+    </Shell>
   );
 }

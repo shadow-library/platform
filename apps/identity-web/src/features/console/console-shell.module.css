@@ -5,14 +5,8 @@
   min-height: 100vh;
 }
 
-.shell {
-  display: flex;
-  width: 100%;
-  min-height: 100vh;
-  background: var(--sh-surface-app);
-  color: var(--sh-text-primary);
-}
-
+/* The rail keeps its own width and skin; the shell places it, holds it full-height, and swaps it for
+   the nav drawer below md. */
 .sidebar {
   flex: none;
   width: 254px;
@@ -22,9 +16,6 @@
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
 }
 
 .brand {
@@ -72,13 +63,6 @@
   padding: 14px 10px 6px;
 }
 
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .header {
   flex: none;
   height: 60px;
@@ -88,11 +72,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 26px;
+  padding: 0 clamp(14px, 3vw, 26px);
   gap: 16px;
-  position: sticky;
-  top: 0;
-  z-index: var(--sh-z-sticky);
 }
 
 .crumb {
@@ -138,16 +119,12 @@
   border-radius: 999px;
 }
 
-.content {
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
-  padding: 30px 34px;
-}
 
-/* Same centered column as the portal shell — the console is the same product, so a page must not
-   change width when an operator crosses between the two. */
-.content > * {
-  max-width: var(--si-page-max);
-  margin-inline: auto;
+/* Below the sm breakpoint (--sh-breakpoint-sm 640) the bar keeps only the crumb and the account menu —
+   the badge and the exit action are what push it past the viewport on a phone. */
+@media (max-width: 639px) {
+  .privileged,
+  .backAction {
+    display: none;
+  }
 }

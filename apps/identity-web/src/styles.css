@@ -6,12 +6,6 @@
      opened inside a Dialog renders behind the dialog scrim and its options become unclickable. Lift
      dropdowns to the popover layer (already above modals) so they work inside dialogs. */
   --sh-z-dropdown: 1300;
-
-  /* Shared layout dimensions — the fixed sidebar rail and the centered content column. Both shells
-     draw the column from `--si-page-max` so the portal and the console read as one product and the
-     two can't drift apart. */
-  --si-sidebar-width: 256px;
-  --si-page-max: 1040px;
 }
 
 /* ========================================
@@ -293,46 +287,6 @@ a:hover {
 .si-menuitem[data-active='true'] {
   background: var(--sh-accent-soft);
   color: var(--sh-accent);
-}
-
-/* ========================================
-   Responsive shell — sidebar collapses to an off-canvas drawer under the tablet breakpoint
-   ======================================== */
-.si-sidebar {
-  width: var(--si-sidebar-width);
-  flex-shrink: 0;
-}
-.si-hamburger {
-  display: none;
-}
-.si-shell-scrim {
-  display: none;
-}
-
-@media (max-width: 900px) {
-  .si-hamburger {
-    display: inline-flex;
-  }
-  .si-sidebar {
-    position: fixed;
-    top: 0;
-    bottom: 0;
-    left: 0;
-    z-index: var(--sh-z-modal);
-    transform: translateX(-100%);
-    transition: transform 0.22s ease;
-    box-shadow: var(--sh-shadow-e3);
-  }
-  .si-sidebar[data-open='true'] {
-    transform: translateX(0);
-  }
-  .si-shell-scrim[data-open='true'] {
-    display: block;
-    position: fixed;
-    inset: 0;
-    z-index: var(--sh-z-scrim);
-    background: var(--sh-scrim);
-  }
 }
 
 /* ========================================

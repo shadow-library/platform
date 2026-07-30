@@ -4,9 +4,11 @@
   gap: 24px;
 }
 
+/* Wraps rather than overlaps once the name, the assurance chip, and the action can't share a line. */
 .profile {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 18px;
   padding: 20px 22px;
   background: var(--sh-surface-card);

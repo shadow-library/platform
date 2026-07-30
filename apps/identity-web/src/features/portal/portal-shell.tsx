@@ -3,15 +3,16 @@
  */
 import { Link, useLocation, useNavigate } from '@tanstack/react-router';
 import { type ReactNode, useEffect } from 'react';
-import { Avatar, DropdownMenu, IconButton, Spinner } from '@shadow-library/ui';
+import { Avatar, DropdownMenu, IconButton, Shell, Spinner } from '@shadow-library/ui';
 
 /**
  * Importing user defined packages
  */
 import { BellIcon, BuildingIcon, GridIcon, LogOutIcon, MailIcon, MonitorIcon, PlugIcon, ShieldCheckIcon, TerminalIcon, UserIcon } from '@/components/icons';
-import { ThemeToggle } from '@/components/si';
+import { NavMenuButton, ThemeToggle } from '@/components/si';
 import { type MeResponse, useAdminContextQuery, useMeQuery, useSignoutMutation } from '@/lib/apis';
 import { displayName } from '@/lib/format';
+import { PAGE_WIDTH } from '@/lib/layout';
 
 import styles from './portal-shell.module.css';
 
@@ -106,48 +107,54 @@ export function PortalShell({ children }: { children: ReactNode }): React.JSX.El
     </Link>
   );
 
-  return (
-    <div className={styles.shell}>
-      <aside className={styles.sidebar}>
-        <div className={styles.brand}>
-          <BrandGlyph />
-          <span className={styles.brandName}>
-            Shadow <span className={styles.brandSub}>Identity</span>
-          </span>
-        </div>
-        <nav className={styles.nav} aria-label="Account">
-          <div className={styles.navLabel}>Account</div>
-          {ACCOUNT_NAV.map(renderNav)}
-          <div className={styles.navLabel}>Organizations</div>
-          {ORG_NAV.map(renderNav)}
-          {isStaff && (
-            <>
-              <div className={styles.navLabel}>Platform</div>
-              {PLATFORM_NAV.map(renderNav)}
-            </>
-          )}
-        </nav>
-      </aside>
-
-      <div className={styles.main}>
-        <header className={styles.header}>
-          <div className={styles.crumb}>Account / {activeLabel}</div>
-          <div className={styles.headerRight}>
-            <span className={styles.aalBadge} data-elevated={elevated || undefined}>
-              <ShieldCheckIcon size={12} />
-              {elevated ? 'AAL2 · MFA' : 'AAL1'}
-            </span>
-            <IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />
-            <ThemeToggle />
-            <UserMenu me={user}>
-              <button type="button" className={styles.headerAvatar} aria-label="Account menu">
-                <Avatar name={displayName(user)} size="sm" />
-              </button>
-            </UserMenu>
-          </div>
-        </header>
-        <div className={styles.content}>{children}</div>
+  const sidebar = (
+    <aside className={styles.sidebar}>
+      <div className={styles.brand}>
+        <BrandGlyph />
+        <span className={styles.brandName}>
+          Shadow <span className={styles.brandSub}>Identity</span>
+        </span>
       </div>
-    </div>
+      <nav className={styles.nav} aria-label="Account">
+        <div className={styles.navLabel}>Account</div>
+        {ACCOUNT_NAV.map(renderNav)}
+        <div className={styles.navLabel}>Organizations</div>
+        {ORG_NAV.map(renderNav)}
+        {isStaff && (
+          <>
+            <div className={styles.navLabel}>Platform</div>
+            {PLATFORM_NAV.map(renderNav)}
+          </>
+        )}
+      </nav>
+    </aside>
+  );
+
+  const topbar = (
+    <header className={styles.header}>
+      <NavMenuButton />
+      <div className={styles.crumb}>Account / {activeLabel}</div>
+      <div className={styles.headerRight}>
+        <span className={styles.aalBadge} data-elevated={elevated || undefined}>
+          <ShieldCheckIcon size={12} />
+          {elevated ? 'AAL2 · MFA' : 'AAL1'}
+        </span>
+        <IconButton variant="ghost" size="sm" aria-label="Notifications" icon={<BellIcon size={18} />} />
+        <ThemeToggle />
+        <UserMenu me={user}>
+          <button type="button" className={styles.headerAvatar} aria-label="Account menu">
+            <Avatar name={displayName(user)} size="sm" />
+          </button>
+        </UserMenu>
+      </div>
+    </header>
+  );
+
+  // The shell owns the gutters, the centred column, and the sub-md nav drawer — the portal only supplies
+  // the chrome. `contentWidth` is the one column the portal and the console share.
+  return (
+    <Shell sidebar={sidebar} topbar={topbar} contentWidth={PAGE_WIDTH}>
+      {children}
+    </Shell>
   );
 }

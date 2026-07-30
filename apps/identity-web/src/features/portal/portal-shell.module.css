@@ -5,14 +5,8 @@
   min-height: 100vh;
 }
 
-.shell {
-  display: flex;
-  width: 100%;
-  min-height: 100vh;
-  background: var(--sh-surface-app);
-  color: var(--sh-text-primary);
-}
-
+/* The rail keeps its own width and skin; the shell places it, holds it full-height, and swaps it for
+   the nav drawer below md. */
 .sidebar {
   flex: none;
   width: 254px;
@@ -22,9 +16,6 @@
   display: flex;
   flex-direction: column;
   padding: 18px 14px;
-  position: sticky;
-  top: 0;
-  height: 100vh;
 }
 
 .brand {
@@ -69,13 +60,6 @@
   min-width: 220px;
 }
 
-.main {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-}
-
 .header {
   flex: none;
   height: 60px;
@@ -85,11 +69,8 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 0 26px;
+  padding: 0 clamp(14px, 3vw, 26px);
   gap: 16px;
-  position: sticky;
-  top: 0;
-  z-index: var(--sh-z-sticky);
 }
 
 .crumb {
@@ -136,17 +117,3 @@
   border-radius: var(--sh-radius-full);
 }
 
-.content {
-  flex: 1;
-  min-width: 0;
-  overflow: auto;
-  padding: 30px 34px;
-}
-
-/* One standard content width for every portal page (pages no longer set their own), centered so the
-   column stays put as you move between sections instead of resizing per page. The console shell draws
-   the same token, so the two halves of the product share a column. */
-.content > * {
-  max-width: var(--si-page-max);
-  margin-inline: auto;
-}
