@@ -114,6 +114,28 @@ describe('Shell · content region', () => {
 describe('Shell · mobile navigation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
+  it('renders the bottom nav into the markup rather than gating it on a media query', () => {
+    render(
+      <Shell topbar={<div>bar</div>} bottomNav={<nav aria-label="Primary">phone nav</nav>}>
+        content
+      </Shell>,
+    );
+    // useMediaQuery reports false on the server and on the first hydration render, so a JS gate would
+    // leave the phone's primary navigation out of the first paint entirely.
+    expect(screen.getByRole('navigation', { name: 'Primary' })).toBeInTheDocument();
+  });
+
+  it('reserves room for the bottom nav only when one is passed', () => {
+    const { container, rerender } = render(<Shell topbar={<div>bar</div>}>content</Shell>);
+    expect(container.querySelector('[data-bottom-nav]')).toBeNull();
+    rerender(
+      <Shell topbar={<div>bar</div>} bottomNav={<nav aria-label="Primary">phone nav</nav>}>
+        content
+      </Shell>,
+    );
+    expect(container.querySelector('[data-bottom-nav]')).not.toBeNull();
+  });
+
   it('surfaces the hamburger only when the top bar sits inside a shell with a sidebar', () => {
     stubMatchMedia(false);
     const { unmount } = render(<MobileShell />);

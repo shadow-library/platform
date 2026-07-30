@@ -7,6 +7,7 @@ import { type Meta, type StoryObj } from '@storybook/react-vite';
 /**
  * Importing user defined packages
  */
+import { BottomNavigation } from '../BottomNavigation';
 import { Button } from '../Button';
 import { Sidebar } from '../Sidebar';
 import { TopNavigation } from '../TopNavigation';
@@ -15,6 +16,14 @@ import { Page, Shell } from './Shell';
 /**
  * Declaring the constants
  */
+function Dot() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+      <circle cx="8" cy="8" r="4" />
+    </svg>
+  );
+}
+
 const meta = {
   title: 'Components/Shell',
   component: Shell,
@@ -175,6 +184,30 @@ export const Dark: Story = {
         >
           Page content
         </div>
+      </Page>
+    </Shell>
+  ),
+};
+
+/**
+ * Phone-only primary navigation. The bar is always in the markup and CSS alone removes it from md up,
+ * so the server render already carries it — narrow the viewport to see it, and note the content region
+ * reserves exactly the bar's height plus one safe-area inset.
+ */
+export const WithBottomNavigation: Story = {
+  render: () => (
+    <Shell
+      topbar={<TopNavigation brand="Shadow" utility={<Button size="sm">New</Button>} />}
+      bottomNav={
+        <BottomNavigation defaultValue="/">
+          <BottomNavigation.Item value="/" icon={<Dot />} label="Home" />
+          <BottomNavigation.Item value="/browse" icon={<Dot />} label="Browse" />
+          <BottomNavigation.Item value="/library" icon={<Dot />} label="Library" />
+        </BottomNavigation>
+      }
+    >
+      <Page title="Home" description="Resize below 768px to reveal the bottom bar.">
+        <p>Content region.</p>
       </Page>
     </Shell>
   ),

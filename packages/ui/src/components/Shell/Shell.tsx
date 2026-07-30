@@ -37,7 +37,7 @@ const NO_SHELL_NAV: ShellNav = { hasSidebar: false, open: false, setOpen: () => 
  * scrolls so mobile browsers keep their URL-bar auto-hide.
  */
 export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
-  { sidebar, topbar, theme = 'light', density = 'comfortable', contentWidth = 1200, contentPadding = 'md', className, children, ...props },
+  { sidebar, topbar, bottomNav, theme = 'light', density = 'comfortable', contentWidth = 1200, contentPadding = 'md', className, children, ...props },
   ref,
 ) {
   const [navOpen, setNavOpen] = useState(false);
@@ -59,7 +59,13 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
 
   return (
     <ShellMobileNavContext.Provider value={mobileNav}>
-      <div ref={shellRef} className={cn(styles.shell, theme === 'dark' && 'dark', className)} data-density={density === 'compact' ? 'compact' : undefined} {...props}>
+      <div
+        ref={shellRef}
+        className={cn(styles.shell, theme === 'dark' && 'dark', className)}
+        data-density={density === 'compact' ? 'compact' : undefined}
+        data-bottom-nav={bottomNav != null || undefined}
+        {...props}
+      >
         <a href="#sh-main-content" className={styles.skipLink}>
           Skip to content
         </a>
@@ -72,6 +78,10 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
             </div>
           </main>
         </div>
+        {/* Rendered unconditionally and hidden by CSS from md up: gating it on a media-query hook would
+            leave it out of the server render and pop it in after hydration, on the one layout that needs
+            it most. */}
+        {bottomNav != null ? <div className={styles.bottomNav}>{bottomNav}</div> : null}
         {hasSidebar ? (
           <DialogPrimitive.Root open={navOpen} onOpenChange={setNavOpen}>
             <DialogPrimitive.Portal container={shellElement ?? undefined}>

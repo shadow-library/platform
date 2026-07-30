@@ -10,6 +10,8 @@
   min-height: 100dvh;
   background: var(--sh-surface-app);
   color: var(--sh-text-primary);
+  /* Room the content region reserves for a bottom nav — override to match a taller custom bar. */
+  --sh-shell-bottom-nav-height: 56px;
 }
 
 .body {
@@ -133,7 +135,8 @@
   flex-direction: column;
   --sh-shell-gutter-inline: 16px;
   --sh-shell-gutter-block: 20px;
-  padding-block: var(--sh-shell-gutter-block) calc(var(--sh-shell-gutter-block) + var(--sh-safe-bottom));
+  --sh-shell-bottom-inset: var(--sh-safe-bottom);
+  padding-block: var(--sh-shell-gutter-block) calc(var(--sh-shell-gutter-block) + var(--sh-shell-bottom-inset));
   padding-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
 }
 .main[data-padding='sm'] {
@@ -191,6 +194,26 @@
   flex: 1 0 auto;
   width: 100%;
   margin-inline: auto;
+}
+
+/* ── Bottom navigation (phones only) ─────────────────────
+   Always rendered so the server HTML already carries it; CSS alone takes it away from md up, where the
+   persistent sidebar is back. The bar pads itself past the safe-area inset, so the content region
+   reserves the bar's own height plus that inset counted once — never twice.
+   Breakpoint token --sh-breakpoint-md 768. */
+@media (max-width: 767px) {
+  .shell[data-bottom-nav] .main {
+    --sh-shell-bottom-inset: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom));
+  }
+  /* Full-bleed pages zero every padding, so the reservation has to be restated for them. */
+  .shell[data-bottom-nav] .main[data-padding='none'] {
+    padding-bottom: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom));
+  }
+}
+@media (min-width: 768px) {
+  .bottomNav {
+    display: none;
+  }
 }
 
 /* ── Skip link (first tab stop) ──────────────────────────── */

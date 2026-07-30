@@ -13,6 +13,11 @@ export interface ShellProps extends ComponentPropsWithoutRef<'div'> {
   sidebar?: ReactNode;
   /** The top bar landmark (e.g. `TopNavigation`), pinned above the content. */
   topbar?: ReactNode;
+  /**
+   * Phone-only primary navigation (e.g. `BottomNavigation`), pinned to the viewport bottom and hidden
+   * from md up. Opt-in: the content region only reserves room for it when it is passed.
+   */
+  bottomNav?: ReactNode;
   /** Mount the dark theme app-wide from the shell root. */
   theme?: 'light' | 'dark';
   /** Mount compact density app-wide from the shell root. */
