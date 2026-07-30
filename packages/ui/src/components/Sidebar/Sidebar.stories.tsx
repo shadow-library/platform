@@ -100,3 +100,26 @@ export const Default: Story = {
     );
   },
 };
+
+/**
+ * `asChild` renders the caller's own element — a router `Link` in a real app — as the item, so navigation
+ * keeps the router's client-side handling, prefetch and `aria-current`. The caller's children are rewrapped
+ * in the label span, so the markup is identical to the plain-anchor branch.
+ */
+export const RouterLinks: Story = {
+  render: () => (
+    <div style={{ display: 'flex', height: 320 }}>
+      <Sidebar workspace={<WorkspaceMark />}>
+        <Sidebar.Section label="Platform">
+          <Sidebar.Item asChild icon={<Dot />} active>
+            <a href="#services">Services</a>
+          </Sidebar.Item>
+          <Sidebar.Item asChild icon={<Dot />}>
+            <a href="#deploys">Deploys</a>
+          </Sidebar.Item>
+        </Sidebar.Section>
+      </Sidebar>
+      <div style={{ flex: 1, padding: 24, color: 'var(--sh-text-tertiary)' }}>Content region</div>
+    </div>
+  ),
+};

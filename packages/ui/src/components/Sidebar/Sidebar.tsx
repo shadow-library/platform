@@ -1,8 +1,8 @@
 /**
  * Importing npm packages
  */
-import { Slot } from '@radix-ui/react-slot';
-import { forwardRef, type MouseEvent, useContext, useId, useState } from 'react';
+import { Slot, Slottable } from '@radix-ui/react-slot';
+import { forwardRef, type MouseEvent, type ReactNode, useContext, useId, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -110,6 +110,10 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
     if (!event.defaultPrevented) mobileNav?.close();
   }
 
+  function renderLabel(content: ReactNode): ReactNode {
+    return collapsed ? null : <span className={styles.label}>{content}</span>;
+  }
+
   const item = (
     <Comp
       ref={ref}
@@ -121,7 +125,9 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
       {...props}
     >
       {icon != null ? <span className={styles.icon}>{icon}</span> : null}
-      {!collapsed ? <span className={styles.label}>{children}</span> : null}
+      {/* asChild renders the caller's element (a router link) as the item; Slottable rewraps that element's
+          own children in the label span, so both branches emit identical markup. */}
+      {asChild ? <Slottable child={children}>{renderLabel}</Slottable> : renderLabel(children)}
       {badge != null && !collapsed ? <span className={styles.badge}>{badge}</span> : null}
     </Comp>
   );

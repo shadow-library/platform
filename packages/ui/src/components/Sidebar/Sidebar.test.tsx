@@ -87,4 +87,58 @@ describe('Sidebar', () => {
     );
     expect(screen.getByRole('link', { name: 'Services' })).toBeInTheDocument();
   });
+
+  it('slots onto a router-style link with asChild, icon and all', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Item asChild icon={<svg aria-hidden="true" />} badge={3} active>
+          <a href="/services">Services</a>
+        </Sidebar.Item>
+      </Sidebar>,
+    );
+    const link = screen.getByRole('link', { name: 'Services 3' });
+    expect(link).toHaveAttribute('href', '/services');
+    expect(link).toHaveAttribute('aria-current', 'page');
+    expect(link).toHaveAttribute('data-active');
+    // The caller's own children are rewrapped in the label span, so both branches emit the same markup.
+    expect(link.querySelector('svg')).toBeInTheDocument();
+  });
+
+  it('slots onto a link with asChild when no icon is given', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Item asChild>
+          <a href="/deploys">Deploys</a>
+        </Sidebar.Item>
+      </Sidebar>,
+    );
+    expect(screen.getByRole('link', { name: 'Deploys' })).toHaveAttribute('href', '/deploys');
+  });
+
+  it('drops the label but keeps the accessible name for an asChild item in rail mode', () => {
+    render(
+      <Sidebar collapsed>
+        <Sidebar.Item asChild icon={<svg aria-hidden="true" />} label="Services">
+          <a href="/services">Services</a>
+        </Sidebar.Item>
+      </Sidebar>,
+    );
+    const link = screen.getByRole('link', { name: 'Services' });
+    expect(link).toHaveAttribute('href', '/services');
+    expect(link).toHaveTextContent('');
+  });
+
+  it('chains the caller onClick through an asChild item', async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Sidebar>
+        <Sidebar.Item asChild onClick={onClick}>
+          <a href="/services">Services</a>
+        </Sidebar.Item>
+      </Sidebar>,
+    );
+    await user.click(screen.getByRole('link', { name: 'Services' }));
+    expect(onClick).toHaveBeenCalled();
+  });
 });
