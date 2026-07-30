@@ -18,7 +18,10 @@ export interface TopNavigationProps extends Omit<ComponentPropsWithoutRef<'heade
 }
 
 export interface TopNavigationItemProps extends ComponentPropsWithoutRef<'a'> {
-  /** The current destination — sets aria-current and the active underline. */
+  /**
+   * The current destination — sets aria-current and the active underline. Omit it under `asChild` when the
+   * slotted router link already marks itself active: the same treatment keys off `data-status="active"`.
+   */
   active?: boolean;
   /** Render as the single child (router link) via Slot. */
   asChild?: boolean;

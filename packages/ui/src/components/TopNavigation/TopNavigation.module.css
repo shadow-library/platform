@@ -70,7 +70,10 @@
 .link:hover {
   color: var(--sh-text-primary);
 }
-.link[data-active] {
+/* data-status is what a router link stamps on itself when it matches the current route, so an asChild
+   item needs no `active` prop to light up. */
+.link[data-active],
+.link[data-status='active'] {
   color: var(--sh-text-primary);
   font-weight: 500;
   border-bottom-color: var(--sh-accent);
@@ -108,7 +111,8 @@
 .moreItem:hover {
   background: var(--sh-bg-hover);
 }
-.moreItem[data-active] {
+.moreItem[data-active],
+.moreItem[data-status='active'] {
   color: var(--sh-accent);
   font-weight: 500;
 }

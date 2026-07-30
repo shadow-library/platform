@@ -111,8 +111,11 @@ export const RouterLinks: Story = {
     <div style={{ display: 'flex', height: 320 }}>
       <Sidebar workspace={<WorkspaceMark />}>
         <Sidebar.Section label="Platform">
-          <Sidebar.Item asChild icon={<Dot />} active>
-            <a href="#services">Services</a>
+          {/* No `active` prop — the link marks itself, exactly as a router link does when it matches. */}
+          <Sidebar.Item asChild icon={<Dot />}>
+            <a href="#services" data-status="active">
+              Services
+            </a>
           </Sidebar.Item>
           <Sidebar.Item asChild icon={<Dot />}>
             <a href="#deploys">Deploys</a>

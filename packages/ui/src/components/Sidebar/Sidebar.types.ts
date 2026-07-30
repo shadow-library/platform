@@ -29,9 +29,12 @@ export interface SidebarItemProps extends ComponentPropsWithoutRef<'a'> {
   icon?: ReactNode;
   /** Trailing badge/count (joined to the accessible name). */
   badge?: ReactNode;
-  /** The current destination — sets aria-current and the active edge bar. */
+  /**
+   * The current destination — sets aria-current and the active edge bar. Omit it under `asChild` when the
+   * slotted router link already marks itself active: the same treatment keys off `data-status="active"`.
+   */
   active?: boolean;
-  /** Render as the single child (router link) via Slot. */
+  /** Render as the single child (router link) via Slot; the link keeps its own children as the label. */
   asChild?: boolean;
   /** Explicit label for rail tooltip / aria-label when children aren't a plain string. */
   label?: string;

@@ -140,12 +140,16 @@
   outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
   outline-offset: -1px;
 }
-.item[data-active] {
+/* data-status is what a router link stamps on itself when it matches the current route (TanStack sets
+   data-status="active" plus aria-current), so an asChild item needs no `active` prop to light up. */
+.item[data-active],
+.item[data-status='active'] {
   background: var(--sh-accent-soft);
   color: var(--sh-accent);
   font-weight: 500;
 }
-.item[data-active]::before {
+.item[data-active]::before,
+.item[data-status='active']::before {
   content: '';
   position: absolute;
   left: -8px;
@@ -167,7 +171,8 @@
   width: 16px;
   height: 16px;
 }
-.item[data-active] .icon {
+.item[data-active] .icon,
+.item[data-status='active'] .icon {
   color: var(--sh-accent);
 }
 .label {
