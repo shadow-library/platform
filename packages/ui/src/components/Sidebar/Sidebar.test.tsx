@@ -66,6 +66,49 @@ describe('Sidebar', () => {
     expect(screen.getByRole('link', { name: 'General' })).toBeInTheDocument();
   });
 
+  it('wraps group items in list items', () => {
+    render(
+      <Sidebar>
+        <Sidebar.Group label="Settings" defaultOpen>
+          <Sidebar.Item href="/a">Alpha</Sidebar.Item>
+          <Sidebar.Item href="/b">Bravo</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    expect(screen.getAllByRole('listitem')).toHaveLength(2);
+  });
+
+  it('supports a controlled group', async () => {
+    const user = userEvent.setup();
+    const onOpenChange = vi.fn();
+    render(
+      <Sidebar>
+        <Sidebar.Group label="Settings" open={false} onOpenChange={onOpenChange}>
+          <Sidebar.Item href="/a">Alpha</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Settings' }));
+    expect(onOpenChange).toHaveBeenCalledWith(true);
+    // The caller owns the state, so nothing opens until it says so.
+    expect(screen.queryByRole('link', { name: 'Alpha' })).not.toBeInTheDocument();
+  });
+
+  it('names the group trigger and reaches its items through a flyout in rail mode', async () => {
+    const user = userEvent.setup();
+    render(
+      <Sidebar collapsed>
+        <Sidebar.Group label="Settings" icon={<svg aria-hidden="true" />}>
+          <Sidebar.Item href="/settings/general">General</Sidebar.Item>
+        </Sidebar.Group>
+      </Sidebar>,
+    );
+    const trigger = screen.getByRole('button', { name: 'Settings' });
+    expect(screen.queryByRole('link', { name: 'General' })).not.toBeInTheDocument();
+    await user.click(trigger);
+    expect(screen.getByRole('link', { name: 'General' })).toHaveAttribute('href', '/settings/general');
+  });
+
   it('keeps the header identity mark visible in rail mode', () => {
     function Mark() {
       const { collapsed } = useSidebar();

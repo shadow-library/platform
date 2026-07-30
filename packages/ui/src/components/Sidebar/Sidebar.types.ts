@@ -45,8 +45,12 @@ export interface SidebarGroupProps extends ComponentPropsWithoutRef<'div'> {
   label: ReactNode;
   /** Leading 16px icon. */
   icon?: ReactNode;
-  /** Start expanded. @default false */
+  /** Start expanded, uncontrolled. @default false */
   defaultOpen?: boolean;
+  /** Controlled disclosure state — pair with `onOpenChange`. */
+  open?: boolean;
+  /** Fires with the next disclosure state, in both controlled and uncontrolled modes. */
+  onOpenChange?: (open: boolean) => void;
   /** The group contains the active item (shows the edge bar while collapsed). */
   active?: boolean;
 }

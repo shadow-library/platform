@@ -2,13 +2,15 @@
  * Importing npm packages
  */
 import { Slot, Slottable } from '@radix-ui/react-slot';
-import { forwardRef, type MouseEvent, type ReactNode, useContext, useId, useState } from 'react';
+import { Children, forwardRef, type MouseEvent, type ReactNode, useContext, useId } from 'react';
 
 /**
  * Importing user defined packages
  */
+import { useControllableState } from '@/hooks';
 import { cn } from '@/lib';
 
+import { Popover } from '../Popover';
 import { ShellMobileNavAreaContext } from '../Shell/Shell.context';
 import { Tooltip, TooltipProvider } from '../Tooltip';
 import { SidebarContext } from './Sidebar.context';
@@ -140,35 +142,55 @@ const SidebarItem = forwardRef<HTMLAnchorElement, SidebarItemProps>(function Sid
   );
 });
 
-/** A collapsible group — a disclosure button over a nested list of items. */
-const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function SidebarGroup({ label, icon, defaultOpen = false, active = false, className, children, ...props }, ref) {
+/**
+ * A collapsible group — a disclosure button over a nested list of items. In rail mode the same trigger
+ * opens that list in a side flyout instead: collapsing the sidebar must not strand a destination, and a
+ * disclosure whose panel can never render is a dead control.
+ */
+const SidebarGroup = forwardRef<HTMLDivElement, SidebarGroupProps>(function SidebarGroup(
+  { label, icon, open: openProp, defaultOpen = false, onOpenChange, active = false, className, children, ...props },
+  ref,
+) {
   const { collapsed } = useContext(SidebarContext);
-  const [open, setOpen] = useState(defaultOpen);
+  // Controlled support matters because the shell mounts the sidebar twice while the mobile drawer is
+  // open; uncontrolled state would drift between the two copies.
+  const [open, setOpen] = useControllableState({ value: openProp, defaultValue: defaultOpen, onChange: onOpenChange });
   const listId = useId();
+  const name = typeof label === 'string' ? label : undefined;
+
+  // Items are anchors, so they need the li wrapper to make the list valid — and to keep list semantics.
+  const list = (
+    <ul id={collapsed ? undefined : listId} className={styles.groupList} data-rail={collapsed || undefined}>
+      {Children.map(children, child => (child != null ? <li>{child}</li> : null))}
+    </ul>
+  );
+
+  if (collapsed) {
+    return (
+      <div ref={ref} className={cn(styles.group, className)} {...props}>
+        <Popover>
+          <Popover.Trigger asChild>
+            <button type="button" className={styles.item} data-active={active || undefined} aria-label={name}>
+              {icon != null ? <span className={styles.icon}>{icon}</span> : null}
+            </button>
+          </Popover.Trigger>
+          <Popover.Content className={styles.railGroup} side="right" align="start" style={{ padding: 4, minWidth: 180 }} aria-label={name}>
+            {/* The flyout has room for labels even though the rail behind it does not. */}
+            <SidebarContext.Provider value={{ collapsed: false }}>{list}</SidebarContext.Provider>
+          </Popover.Content>
+        </Popover>
+      </div>
+    );
+  }
 
   return (
     <div ref={ref} className={cn(styles.group, className)} {...props}>
-      <button
-        type="button"
-        className={styles.item}
-        data-active={active && (collapsed || !open) ? '' : undefined}
-        aria-expanded={collapsed ? undefined : open}
-        aria-controls={collapsed ? undefined : listId}
-        onClick={() => setOpen(value => !value)}
-      >
+      <button type="button" className={styles.item} data-active={active && !open ? '' : undefined} aria-expanded={open} aria-controls={listId} onClick={() => setOpen(!open)}>
         {icon != null ? <span className={styles.icon}>{icon}</span> : null}
-        {!collapsed ? (
-          <>
-            <span className={styles.label}>{label}</span>
-            <ChevronDown />
-          </>
-        ) : null}
+        <span className={styles.label}>{label}</span>
+        <ChevronDown />
       </button>
-      {!collapsed && open ? (
-        <ul id={listId} className={styles.groupList}>
-          {children}
-        </ul>
-      ) : null}
+      {open ? list : null}
     </div>
   );
 });

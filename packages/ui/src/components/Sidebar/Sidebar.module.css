@@ -213,6 +213,25 @@
   height: 26px;
 }
 
+/* In the rail flyout the list is the whole surface, so it drops the inline indent guide and the items
+   go back to full height — there is no rail to align against. */
+.groupList[data-rail] {
+  margin: 0;
+  padding: 0;
+  border-left: none;
+}
+.groupList[data-rail] .item {
+  height: 32px;
+}
+[data-density='compact'] .groupList[data-rail] .item {
+  height: 28px;
+}
+
+.railGroup {
+  display: flex;
+  flex-direction: column;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .root,
   .chevron {
