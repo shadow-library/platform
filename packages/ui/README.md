@@ -116,8 +116,27 @@ Every component exposes props for `variant`/`size`/`intent` (where applicable), 
 | --- | --- |
 | `contentWidth` | Reading-column cap, centered once the region outgrows it. `'fluid'` fills. Default `1200` |
 | `contentPadding` | Gutter scale: `'none' \| 'sm' \| 'md' \| 'lg'`. Each step is responsive. Default `'md'` |
+| `bottomNav` | Phone-only bar (e.g. `BottomNavigation`), pinned bottom and hidden from `768px` up |
 
 Below `768px` the persistent sidebar becomes a modal nav drawer. `TopNavigation` surfaces the hamburger automatically; a bespoke top bar wires its own trigger with the `useShellNav()` hook. From `768px` up the chrome is pinned and only the content region scrolls; below it the document scrolls so mobile browsers keep their URL-bar auto-hide.
+
+`bottomNav` is always rendered and removed by CSS alone, so it is present in server-rendered HTML instead of appearing after hydration. The content region reserves `--sh-shell-bottom-nav-height` (56px, overridable) plus one safe-area inset — the bar already pads itself past that inset, so don't add it again.
+
+`TopNavigation` is the `banner` landmark; only its destinations sit inside the `nav` landmark, so the brand and the utility cluster stay out of it. Its `search` slot takes the space between the two.
+
+### Router links
+
+Nav items take the router's own link through `asChild`, keeping the link's children as the label:
+
+```tsx
+<Sidebar.Item asChild icon={<Icon />}>
+  <Link to="/services">Services</Link>
+</Sidebar.Item>
+```
+
+No `active` prop is needed when the router marks its own links — the active treatment also keys off `data-status="active"`, which TanStack Router sets alongside `aria-current="page"`. Where a *parent* has to know which child is current (a bottom bar's `value`, an overflow menu), use `matchPath(pathname, to)` rather than a hand-rolled `startsWith`.
+
+`Sidebar` can own its rail state: pass `defaultCollapsed` and/or `storageKey` to get a working collapse toggle that survives reloads. The stored value is adopted after mount, so server-rendered apps hydrate against `defaultCollapsed`.
 
 A `Page` inside a shell contributes only its header — the shell already supplied the gutters and column. Pass `Page`'s `maxWidth` to narrow a single page (a settings form inside a wide shell); standalone, a `Page` still frames itself.
 
