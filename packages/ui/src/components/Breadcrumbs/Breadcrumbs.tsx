@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { Slot } from '@radix-ui/react-slot';
-import { Children, forwardRef, isValidElement, type ReactElement } from 'react';
+import { Children, forwardRef, isValidElement, type ReactElement, useContext } from 'react';
 
 /**
  * Importing user defined packages
@@ -10,6 +10,7 @@ import { Children, forwardRef, isValidElement, type ReactElement } from 'react';
 import { cn } from '@/lib';
 
 import { Popover } from '../Popover';
+import { BreadcrumbsOverflowContext } from './Breadcrumbs.context';
 import styles from './Breadcrumbs.module.css';
 import { type BreadcrumbsItemProps, type BreadcrumbsProps } from './Breadcrumbs.types';
 
@@ -26,6 +27,9 @@ function SeparatorIcon() {
 
 /** A single crumb — a ghost-pill link, or plain text with aria-current when `current`. */
 const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(function BreadcrumbsItem({ current = false, asChild = false, className, children, ...props }, ref) {
+  // Inside the "…" popover the same crumb skins itself as a menu row, so collapsing an ancestor never
+  // rebuilds it — asChild router links keep their href and client-side navigation.
+  const overflowed = useContext(BreadcrumbsOverflowContext);
   if (current) {
     return (
       <span className={cn(styles.current, className)} aria-current="page">
@@ -35,7 +39,7 @@ const BreadcrumbsItem = forwardRef<HTMLAnchorElement, BreadcrumbsItemProps>(func
   }
   const Comp = asChild ? Slot : 'a';
   return (
-    <Comp ref={ref} className={cn(styles.link, className)} {...props}>
+    <Comp ref={ref} className={cn(overflowed ? styles.overflowItem : styles.link, className)} {...props}>
       {children}
     </Comp>
   );
@@ -69,11 +73,7 @@ const BreadcrumbsRoot = forwardRef<HTMLElement, BreadcrumbsProps>(function Bread
                   </button>
                 </Popover.Trigger>
                 <Popover.Content className={styles.overflowMenu} style={{ padding: 4, minWidth: 180 }} align="start" aria-label="Hidden levels">
-                  {hidden.map((crumb, hiddenIndex) => (
-                    <a key={`hidden-${hiddenIndex}`} href={crumb.props.href} className={styles.overflowItem}>
-                      {crumb.props.children}
-                    </a>
-                  ))}
+                  <BreadcrumbsOverflowContext.Provider value={true}>{hidden}</BreadcrumbsOverflowContext.Provider>
                 </Popover.Content>
               </Popover>
             ) : (

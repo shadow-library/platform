@@ -53,6 +53,25 @@ describe('Breadcrumbs', () => {
     expect(screen.getByRole('link', { name: 'Charlie' })).toBeInTheDocument();
   });
 
+  it('keeps asChild router links intact when they collapse into the overflow', async () => {
+    const user = userEvent.setup();
+    render(
+      <Breadcrumbs maxVisible={4}>
+        <Breadcrumbs.Item href="/a">Alpha</Breadcrumbs.Item>
+        <Breadcrumbs.Item asChild>
+          <a href="/b">Bravo</a>
+        </Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/c">Charlie</Breadcrumbs.Item>
+        <Breadcrumbs.Item href="/d">Delta</Breadcrumbs.Item>
+        <Breadcrumbs.Item current>Echo</Breadcrumbs.Item>
+      </Breadcrumbs>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Show 2 hidden levels' }));
+    // Rebuilding the anchor from crumb.props.href dropped the href for asChild crumbs, taking the link
+    // role with it.
+    expect(screen.getByRole('link', { name: 'Bravo' })).toHaveAttribute('href', '/b');
+  });
+
   it('does not collapse at or under maxVisible', () => {
     render(
       <Breadcrumbs maxVisible={4}>
