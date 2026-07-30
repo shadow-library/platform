@@ -84,6 +84,16 @@
   border-radius: var(--sh-radius-md);
 }
 
+/* Claims the space between the destinations and the utility cluster and centres its child, so a search
+   field sits mid-bar without the destination row having to stretch to hold it. */
+.search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
 .utility {
   display: flex;
   align-items: center;

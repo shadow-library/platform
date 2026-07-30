@@ -55,7 +55,7 @@ const TopNavigationItem = forwardRef<HTMLAnchorElement, TopNavigationItemProps>(
  * recipe).
  */
 const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function TopNavigation(
-  { brand, utility, maxVisible, className, children, 'aria-label': ariaLabel = 'Top', ...props },
+  { brand, search, utility, maxVisible, className, children, 'aria-label': ariaLabel = 'Top', ...props },
   ref,
 ) {
   const items = Children.toArray(children).filter(isValidElement) as ReactElement<TopNavigationItemProps>[];
@@ -99,6 +99,7 @@ const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function T
           ) : null}
         </nav>
       ) : null}
+      {search != null ? <div className={styles.search}>{search}</div> : null}
       {utility != null ? <div className={styles.utility}>{utility}</div> : null}
     </header>
   );

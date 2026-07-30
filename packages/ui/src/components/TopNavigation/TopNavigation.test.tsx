@@ -80,6 +80,17 @@ describe('TopNavigation', () => {
     expect(overflowed).toHaveAttribute('aria-current', 'page');
   });
 
+  it('renders the search slot outside the nav landmark', () => {
+    render(
+      <TopNavigation brand="Shadow" search={<button type="button">Search</button>}>
+        <TopNavigation.Item href="/overview">Overview</TopNavigation.Item>
+      </TopNavigation>,
+    );
+    const search = screen.getByRole('button', { name: 'Search' });
+    expect(screen.getByRole('banner')).toContainElement(search);
+    expect(screen.getByRole('navigation', { name: 'Top' })).not.toContainElement(search);
+  });
+
   it('omits the nav landmark when the bar carries no destinations', () => {
     render(<TopNavigation brand="Shadow" utility={<button type="button">Account</button>} />);
     expect(screen.getByRole('banner')).toBeInTheDocument();

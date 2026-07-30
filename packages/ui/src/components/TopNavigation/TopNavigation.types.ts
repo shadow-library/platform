@@ -9,7 +9,12 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 export interface TopNavigationProps extends Omit<ComponentPropsWithoutRef<'header'>, 'title'> {
   /** Brand / product identity at the left. */
   brand?: ReactNode;
-  /** Right-aligned utility cluster (search, notifications, account). */
+  /**
+   * Search or command-palette trigger. Takes the space left between the destinations and the utility
+   * cluster and centres its child, so it doesn't have to fight the destinations' layout.
+   */
+  search?: ReactNode;
+  /** Right-aligned utility cluster (notifications, theme, account). */
   utility?: ReactNode;
   /** Collapse links past this count into a "More" menu (order preserved). Omit to show all. */
   maxVisible?: number;
