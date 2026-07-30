@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
  */
 import { Sidebar } from '../Sidebar';
 import { TopNavigation } from '../TopNavigation';
-import { Page, Shell } from './Shell';
+import { Page, Shell, useShellNav } from './Shell';
 
 /**
  * Declaring the constants
@@ -81,6 +81,36 @@ describe('Shell', () => {
   });
 });
 
+describe('Shell · content region', () => {
+  it('frames raw children in a centered column with default gutters', () => {
+    render(<Shell>content</Shell>);
+    const main = screen.getByRole('main');
+    expect(main).toHaveAttribute('data-padding', 'md');
+    expect(screen.getByText('content')).toHaveStyle({ maxWidth: '1200px' });
+  });
+
+  it('caps the column at contentWidth and releases it when fluid', () => {
+    const { rerender } = render(<Shell contentWidth={960}>content</Shell>);
+    expect(screen.getByText('content')).toHaveStyle({ maxWidth: '960px' });
+    rerender(<Shell contentWidth="fluid">content</Shell>);
+    expect(screen.getByText('content')).not.toHaveStyle({ maxWidth: '960px' });
+  });
+
+  it('honours the requested gutter scale', () => {
+    render(<Shell contentPadding="none">content</Shell>);
+    expect(screen.getByRole('main')).toHaveAttribute('data-padding', 'none');
+  });
+
+  it('drops a nested Page frame so the shell gutters are not doubled', () => {
+    render(
+      <Shell>
+        <Page title="Services">body</Page>
+      </Shell>,
+    );
+    expect(screen.getByRole('heading', { name: 'Services' }).closest('[data-framed]')).toBeInTheDocument();
+  });
+});
+
 describe('Shell · mobile navigation', () => {
   afterEach(() => vi.unstubAllGlobals());
 
@@ -137,6 +167,35 @@ describe('Shell · mobile navigation', () => {
     await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
   });
 
+  it('opens the drawer from a product’s own trigger via useShellNav', async () => {
+    stubMatchMedia(false);
+    const user = userEvent.setup();
+    function CustomBar() {
+      const nav = useShellNav();
+      return nav.hasSidebar ? (
+        <button type="button" aria-expanded={nav.open} onClick={() => nav.setOpen(true)}>
+          Menu
+        </button>
+      ) : null;
+    }
+    render(
+      <Shell sidebar={<Sidebar workspace="acme-prod">{<Sidebar.Item href="#deploys">Deploys</Sidebar.Item>}</Sidebar>} topbar={<CustomBar />}>
+        content
+      </Shell>,
+    );
+    await user.click(screen.getByRole('button', { name: 'Menu' }));
+    expect(within(screen.getByRole('dialog', { name: 'Navigation' })).getByRole('link', { name: 'Deploys' })).toBeInTheDocument();
+  });
+
+  it('leaves a useShellNav trigger inert outside a shell', () => {
+    function CustomBar() {
+      const nav = useShellNav();
+      return <span>{String(nav.hasSidebar)}</span>;
+    }
+    render(<CustomBar />);
+    expect(screen.getByText('false')).toBeInTheDocument();
+  });
+
   it('dismisses the drawer when the viewport grows back to desktop', async () => {
     const media = stubMatchMedia(false);
     const user = userEvent.setup();
@@ -165,5 +224,17 @@ describe('Page', () => {
     render(<Page>just content</Page>);
     expect(screen.queryByRole('banner')).not.toBeInTheDocument();
     expect(screen.getByText('just content')).toBeInTheDocument();
+  });
+
+  it('frames itself outside a shell and narrows to maxWidth inside one', () => {
+    const { container, rerender } = render(<Page>standalone</Page>);
+    expect(container.firstElementChild).not.toHaveAttribute('data-framed');
+    expect(screen.getByText('standalone')).toHaveStyle({ maxWidth: '1200px' });
+    rerender(
+      <Shell contentWidth={1200}>
+        <Page maxWidth={720}>narrow</Page>
+      </Shell>,
+    );
+    expect(screen.getByText('narrow')).toHaveStyle({ maxWidth: '720px' });
   });
 });

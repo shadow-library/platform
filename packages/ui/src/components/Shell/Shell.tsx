@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import * as DialogPrimitive from '@radix-ui/react-dialog';
-import { forwardRef, useEffect, useMemo, useState } from 'react';
+import { forwardRef, useContext, useEffect, useMemo, useState } from 'react';
 
 /**
  * Importing user defined packages
@@ -10,9 +10,14 @@ import { forwardRef, useEffect, useMemo, useState } from 'react';
 import { useMediaQuery } from '@/hooks';
 import { cn, mergeRefs } from '@/lib';
 
-import { ShellMobileNavAreaContext, ShellMobileNavContext } from './Shell.context';
+import { ShellContentContext, ShellMobileNavAreaContext, ShellMobileNavContext } from './Shell.context';
 import styles from './Shell.module.css';
-import { type PageProps, type ShellProps } from './Shell.types';
+import { type PageProps, type ShellNav, type ShellProps } from './Shell.types';
+
+/**
+ * Declaring the constants
+ */
+const NO_SHELL_NAV: ShellNav = { hasSidebar: false, open: false, setOpen: () => undefined };
 
 /**
  * The application scaffold: a sidebar landmark, a top bar, and the `main` content region, with the
@@ -22,10 +27,19 @@ import { type PageProps, type ShellProps } from './Shell.types';
  *
  * Below the md breakpoint the persistent sidebar yields automatically to a modal nav drawer: the same
  * `sidebar` element is projected into a left-edge Radix Dialog, opened by the hamburger TopNavigation
- * surfaces (via ShellMobileNavContext), closed by scrim tap, Esc, item navigation, or growing back to
- * desktop. The drawer portals into the shell root so theme and density cascade into it.
+ * surfaces (via ShellMobileNavContext) or by any custom trigger wired to `useShellNav`, closed by scrim
+ * tap, Esc, item navigation, or growing back to desktop. The drawer portals into the shell root so
+ * theme and density cascade into it.
+ *
+ * The shell also owns the content region beside the sidebar so products never re-implement it: gutters
+ * that step up with the viewport and clear display cutouts, and a centered reading column capped at
+ * `contentWidth`. From md up the chrome is pinned and only that region scrolls; below it the document
+ * scrolls so mobile browsers keep their URL-bar auto-hide.
  */
-export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell({ sidebar, topbar, theme = 'light', density = 'comfortable', className, children, ...props }, ref) {
+export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell(
+  { sidebar, topbar, theme = 'light', density = 'comfortable', contentWidth = 1200, contentPadding = 'md', className, children, ...props },
+  ref,
+) {
   const [navOpen, setNavOpen] = useState(false);
   const [shellElement, setShellElement] = useState<HTMLDivElement | null>(null);
   // Breakpoint token --sh-breakpoint-md (768px) — the same edge the CSS uses to swap sidebar for drawer.
@@ -52,8 +66,10 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell({ sid
         {hasSidebar ? <div className={styles.sidebarSlot}>{sidebar}</div> : null}
         <div className={styles.body}>
           {topbar}
-          <main id="sh-main-content" className={styles.main}>
-            {children}
+          <main id="sh-main-content" className={styles.main} data-padding={contentPadding}>
+            <div className={styles.content} style={{ maxWidth: contentWidth === 'fluid' ? undefined : contentWidth }}>
+              <ShellContentContext.Provider value={true}>{children}</ShellContentContext.Provider>
+            </div>
           </main>
         </div>
         {hasSidebar ? (
@@ -73,14 +89,19 @@ export const Shell = forwardRef<HTMLDivElement, ShellProps>(function Shell({ sid
 });
 
 /**
- * The page header + content region: breadcrumbs, title, description, and actions above a padded,
- * max-width content column. Sits inside the shell's `main`.
+ * The page header + content region: breadcrumbs, title, description, and actions above the page body.
+ *
+ * Inside a shell the gutters and the reading column come from the shell, so a page only adds its
+ * header — passing `maxWidth` narrows this one page below the shell's column. Standalone (no shell)
+ * the page still frames itself, so a bare `<Page>` keeps its own padding and 1200px column.
  */
-export const Page = forwardRef<HTMLDivElement, PageProps>(function Page({ title, description, breadcrumbs, actions, maxWidth = 1200, className, children, ...props }, ref) {
+export const Page = forwardRef<HTMLDivElement, PageProps>(function Page({ title, description, breadcrumbs, actions, maxWidth, className, children, ...props }, ref) {
+  const framed = useContext(ShellContentContext);
   const hasHeader = title != null || description != null || breadcrumbs != null || actions != null;
-  const width = maxWidth === 'fluid' ? undefined : maxWidth;
+  const resolved = maxWidth ?? (framed ? 'fluid' : 1200);
+  const width = resolved === 'fluid' ? undefined : resolved;
   return (
-    <div ref={ref} className={cn(styles.page, className)} {...props}>
+    <div ref={ref} className={cn(styles.page, className)} data-framed={framed || undefined} {...props}>
       <div className={styles.pageInner} style={{ maxWidth: width }}>
         {hasHeader ? (
           <header className={styles.pageHeader}>
@@ -99,3 +120,12 @@ export const Page = forwardRef<HTMLDivElement, PageProps>(function Page({ title,
     </div>
   );
 });
+
+/**
+ * Drives the shell's mobile nav drawer from a product's own top bar — `TopNavigation` uses it for its
+ * hamburger, and an app that renders a bespoke header wires the same state to its own trigger. Safe
+ * outside a shell, where `hasSidebar` is false and there is nothing to open.
+ */
+export function useShellNav(): ShellNav {
+  return useContext(ShellMobileNavContext) ?? NO_SHELL_NAV;
+}

@@ -17,6 +17,22 @@
   flex-direction: column;
   flex: 1;
   min-width: 0;
+  /* Lets `main` scroll instead of pushing the pinned chrome off-screen when the shell is height-bound. */
+  min-height: 0;
+}
+
+/* From md up the chrome is pinned and the content region is the scroll container (breakpoint token
+   --sh-breakpoint-md 768). Below it the document scrolls, so mobile browsers keep their URL-bar
+   auto-hide and 100dvh never fights the collapsing viewport. */
+@media (min-width: 768px) {
+  .shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .main {
+    overflow-y: auto;
+  }
 }
 
 /* ── Sidebar slot / mobile nav drawer ────────────────────── */
@@ -106,10 +122,75 @@
   }
 }
 
+/* ── Content region ──────────────────────────────────────
+   The shell owns the gutters and the reading column so no product has to rebuild them per page.
+   Gutters step up with the viewport — phones give the content its width back — and never fall inside
+   a display cutout. Override --sh-shell-gutter-* to retune a product without forking the component. */
 .main {
   flex: 1;
   min-width: 0;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  --sh-shell-gutter-inline: 16px;
+  --sh-shell-gutter-block: 20px;
+  padding-block: var(--sh-shell-gutter-block) calc(var(--sh-shell-gutter-block) + var(--sh-safe-bottom));
+  padding-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
+}
+.main[data-padding='sm'] {
+  --sh-shell-gutter-inline: 12px;
+  --sh-shell-gutter-block: 12px;
+}
+.main[data-padding='lg'] {
+  --sh-shell-gutter-inline: 24px;
+  --sh-shell-gutter-block: 24px;
+}
+/* Full-bleed: the shorthand outranks the longhands above at every breakpoint, so one rule is enough. */
+.main[data-padding='none'] {
+  padding: 0;
+}
+
+/* Breakpoint token --sh-breakpoint-sm 640 */
+@media (min-width: 640px) {
+  .main {
+    --sh-shell-gutter-inline: 24px;
+    --sh-shell-gutter-block: 24px;
+  }
+  .main[data-padding='sm'] {
+    --sh-shell-gutter-inline: 16px;
+    --sh-shell-gutter-block: 16px;
+  }
+  .main[data-padding='lg'] {
+    --sh-shell-gutter-inline: 32px;
+    --sh-shell-gutter-block: 32px;
+  }
+}
+
+/* Breakpoint token --sh-breakpoint-lg 1024 */
+@media (min-width: 1024px) {
+  .main {
+    --sh-shell-gutter-inline: 32px;
+    --sh-shell-gutter-block: 32px;
+  }
+  .main[data-padding='sm'] {
+    --sh-shell-gutter-inline: 20px;
+    --sh-shell-gutter-block: 20px;
+  }
+  .main[data-padding='lg'] {
+    --sh-shell-gutter-inline: 48px;
+    --sh-shell-gutter-block: 40px;
+  }
+  [data-density='compact'] .main {
+    --sh-shell-gutter-inline: 24px;
+    --sh-shell-gutter-block: 24px;
+  }
+}
+
+/* The reading column: centered once the region outgrows it, full width until then. Grows to fill the
+   region's height so a page can center an empty state against the whole viewport. */
+.content {
+  flex: 1 0 auto;
+  width: 100%;
+  margin-inline: auto;
 }
 
 /* ── Skip link (first tab stop) ──────────────────────────── */
@@ -140,6 +221,10 @@
 }
 [data-density='compact'] .page {
   padding: 24px;
+}
+/* Inside a shell the gutters already came from `main` — repeating them here would double them. */
+.page[data-framed] {
+  padding: 0;
 }
 .pageInner {
   margin: 0 auto;

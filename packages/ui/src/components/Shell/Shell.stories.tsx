@@ -132,6 +132,32 @@ export const ResponsiveNavigation: Story = {
   ),
 };
 
+/**
+ * The shell frames whatever it is given — no `Page` required. Raw children land in the same centered
+ * column with the same responsive gutters, so an app never re-implements content spacing. Resize the
+ * viewport: gutters step 16 → 24 → 32px and the column centers once the region outgrows `contentWidth`.
+ */
+export const ContentFraming: Story = {
+  render: () => (
+    <Shell contentWidth={880} sidebar={SidebarDemo} topbar={TopBarDemo}>
+      <div style={{ border: '1px dashed var(--sh-border-default)', borderRadius: 8, padding: 24, color: 'var(--sh-text-secondary)' }}>
+        Plain children — centered at 880px, gutters follow the viewport.
+      </div>
+    </Shell>
+  ),
+};
+
+/** `contentPadding="none"` with a fluid column hands the whole region to the page — full-bleed tables, maps, canvases. */
+export const FullBleed: Story = {
+  render: () => (
+    <Shell contentWidth="fluid" contentPadding="none" sidebar={SidebarDemo} topbar={TopBarDemo}>
+      <div style={{ height: 400, background: 'var(--sh-surface-well)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--sh-text-tertiary)' }}>
+        Edge-to-edge content
+      </div>
+    </Shell>
+  ),
+};
+
 export const Dark: Story = {
   render: () => (
     <Shell theme="dark" sidebar={SidebarDemo} topbar={TopBarDemo}>

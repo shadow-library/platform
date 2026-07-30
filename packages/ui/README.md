@@ -102,6 +102,25 @@ import { Button, Dialog, Select } from '@shadow-library/ui';
 
 Every component exposes props for `variant`/`size`/`intent` (where applicable), controlled and uncontrolled state, and `asChild` composition where the design calls for it. Full prop tables, usage examples, and visual previews are in Storybook (see *Full Documentation* below).
 
+### App Shell
+
+`Shell` owns the whole frame — not just the sidebar. The content region beside it comes with responsive gutters (16 → 24 → 32px as the viewport grows, clearing display cutouts and the home indicator) and a centered reading column, so pages render their content and nothing else:
+
+```tsx
+<Shell sidebar={<Sidebar>…</Sidebar>} topbar={<TopNavigation>…</TopNavigation>} contentWidth={1040}>
+  <Outlet />
+</Shell>
+```
+
+| Prop | Effect |
+| --- | --- |
+| `contentWidth` | Reading-column cap, centered once the region outgrows it. `'fluid'` fills. Default `1200` |
+| `contentPadding` | Gutter scale: `'none' \| 'sm' \| 'md' \| 'lg'`. Each step is responsive. Default `'md'` |
+
+Below `768px` the persistent sidebar becomes a modal nav drawer. `TopNavigation` surfaces the hamburger automatically; a bespoke top bar wires its own trigger with the `useShellNav()` hook. From `768px` up the chrome is pinned and only the content region scrolls; below it the document scrolls so mobile browsers keep their URL-bar auto-hide.
+
+A `Page` inside a shell contributes only its header — the shell already supplied the gutters and column. Pass `Page`'s `maxWidth` to narrow a single page (a settings form inside a wide shell); standalone, a `Page` still frames itself.
+
 ## Utility Classes
 
 Alongside components, Shadow UI ships a small, hand-authored set of utility classes for composing layout in your **own** markup around library components (e.g. spacing a `Card` and a `Button` apart, or laying out a form grid). Every value is drawn from the same `--sh-*` design tokens as the components themselves — no ad hoc pixel values.
