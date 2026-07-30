@@ -6,14 +6,14 @@ import { type ComponentPropsWithoutRef, type ReactNode } from 'react';
 /**
  * Defining types
  */
-export interface TopNavigationProps extends Omit<ComponentPropsWithoutRef<'nav'>, 'title'> {
+export interface TopNavigationProps extends Omit<ComponentPropsWithoutRef<'header'>, 'title'> {
   /** Brand / product identity at the left. */
   brand?: ReactNode;
   /** Right-aligned utility cluster (search, notifications, account). */
   utility?: ReactNode;
   /** Collapse links past this count into a "More" menu (order preserved). Omit to show all. */
   maxVisible?: number;
-  /** Landmark name. @default 'Main' */
+  /** Name for the inner nav landmark — distinct from Sidebar's so the two don't collide. @default 'Top' */
   'aria-label'?: string;
 }
 

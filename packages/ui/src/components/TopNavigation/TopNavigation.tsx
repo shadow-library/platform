@@ -12,6 +12,7 @@ import { cn } from '@/lib';
 import { IconButton } from '../IconButton';
 import { Popover } from '../Popover';
 import { ShellMobileNavContext } from '../Shell/Shell.context';
+import { TopNavigationOverflowContext } from './TopNavigation.context';
 import styles from './TopNavigation.module.css';
 import { type TopNavigationItemProps, type TopNavigationProps } from './TopNavigation.types';
 
@@ -35,8 +36,11 @@ const TopNavigationItem = forwardRef<HTMLAnchorElement, TopNavigationItemProps>(
   ref,
 ) {
   const Comp = asChild ? Slot : 'a';
+  // In the "More" popover the same item skins itself as a menu row, so overflowing a destination never
+  // rebuilds it — asChild router links keep their href, prefetch and client-side navigation.
+  const overflowed = useContext(TopNavigationOverflowContext);
   return (
-    <Comp ref={ref} className={cn(styles.link, className)} data-active={active || undefined} aria-current={active ? 'page' : undefined} {...props}>
+    <Comp ref={ref} className={cn(overflowed ? styles.moreItem : styles.link, className)} data-active={active || undefined} aria-current={active ? 'page' : undefined} {...props}>
       {children}
     </Comp>
   );
@@ -44,12 +48,14 @@ const TopNavigationItem = forwardRef<HTMLAnchorElement, TopNavigationItemProps>(
 
 /**
  * A flat top navigation bar for shallow IA (≤ 7 destinations, no groups — use Sidebar when nesting
- * appears). A nav landmark of links with a single active underline; links past `maxVisible` collapse,
- * order preserved, into a "More" menu that keeps every destination in the accessibility tree. Bar is
- * surface-card with a border-default bottom edge (App Shell's header recipe).
+ * appears). The bar itself is the banner landmark and only the destinations sit in the nav landmark, so
+ * the brand and the utility cluster (account, theme, notifications) stay out of it. One active underline;
+ * links past `maxVisible` collapse, order preserved, into a "More" menu that keeps every destination in
+ * the accessibility tree. Bar is surface-card with a border-default bottom edge (App Shell's header
+ * recipe).
  */
 const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function TopNavigation(
-  { brand, utility, maxVisible, className, children, 'aria-label': ariaLabel = 'Main', ...props },
+  { brand, utility, maxVisible, className, children, 'aria-label': ariaLabel = 'Top', ...props },
   ref,
 ) {
   const items = Children.toArray(children).filter(isValidElement) as ReactElement<TopNavigationItemProps>[];
@@ -61,7 +67,7 @@ const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function T
   const mobileNav = useContext(ShellMobileNavContext);
 
   return (
-    <nav ref={ref} className={cn(styles.bar, className)} aria-label={ariaLabel} {...props}>
+    <header ref={ref} className={cn(styles.bar, className)} {...props}>
       {mobileNav?.hasSidebar ? (
         <span className={styles.menuSlot}>
           <IconButton
@@ -75,33 +81,26 @@ const TopNavigationRoot = forwardRef<HTMLElement, TopNavigationProps>(function T
         </span>
       ) : null}
       {brand != null ? <div className={styles.brand}>{brand}</div> : null}
-      <div className={styles.links}>
-        {visible}
-        {overflow.length > 0 ? (
-          <Popover>
-            <Popover.Trigger asChild>
-              <button type="button" className={styles.link} data-active={overflowActive || undefined} aria-label="More links">
-                More
-              </button>
-            </Popover.Trigger>
-            <Popover.Content className={styles.moreMenu} style={{ padding: 4, minWidth: 180 }} align="end" aria-label="More links">
-              {overflow.map(item => (
-                <a
-                  key={item.key}
-                  href={item.props.href}
-                  className={styles.moreItem}
-                  data-active={item.props.active || undefined}
-                  aria-current={item.props.active ? 'page' : undefined}
-                >
-                  {item.props.children}
-                </a>
-              ))}
-            </Popover.Content>
-          </Popover>
-        ) : null}
-      </div>
+      {/* A bar carrying only a brand and a utility cluster shouldn't publish an empty nav landmark. */}
+      {items.length > 0 ? (
+        <nav className={styles.links} aria-label={ariaLabel}>
+          {visible}
+          {overflow.length > 0 ? (
+            <Popover>
+              <Popover.Trigger asChild>
+                <button type="button" className={styles.link} data-active={overflowActive || undefined} aria-label="More links">
+                  More
+                </button>
+              </Popover.Trigger>
+              <Popover.Content className={styles.moreMenu} style={{ padding: 4, minWidth: 180 }} align="end" aria-label="More links">
+                <TopNavigationOverflowContext.Provider value={true}>{overflow}</TopNavigationOverflowContext.Provider>
+              </Popover.Content>
+            </Popover>
+          ) : null}
+        </nav>
+      ) : null}
       {utility != null ? <div className={styles.utility}>{utility}</div> : null}
-    </nav>
+    </header>
   );
 });
 
