@@ -62,6 +62,10 @@
   border-radius: var(--sh-radius-sm);
   cursor: pointer;
 }
+[data-density='touch'] .collapseToggle {
+  width: var(--sh-tap-target);
+  height: var(--sh-tap-target);
+}
 .collapseToggle:hover {
   background: var(--sh-bg-hover);
   color: var(--sh-text-primary);
@@ -125,12 +129,23 @@
 [data-density='compact'] .item {
   height: 28px;
 }
+/* Touch density is a whole-app choice for phone/PWA shells, and below md the drawer is the only
+   navigation there is — so nav rows have to clear the 44px tap target (--sh-tap-target) outright.
+   Scoped to the attribute deliberately: keying off `pointer: coarse` instead would grow the rows on
+   every touch laptop and tablet, in products that never asked for finger-first metrics. */
+[data-density='touch'] .item {
+  height: var(--sh-tap-target);
+}
 .root[data-collapsed] .item {
   justify-content: center;
   gap: 0;
   width: 40px;
   height: 36px;
   margin: 0 auto;
+}
+[data-density='touch'] .root[data-collapsed] .item {
+  width: var(--sh-tap-target);
+  height: var(--sh-tap-target);
 }
 .item:hover {
   background: var(--sh-bg-hover);
@@ -212,6 +227,9 @@
 [data-density='compact'] .groupList .item {
   height: 26px;
 }
+[data-density='touch'] .groupList .item {
+  height: var(--sh-tap-target);
+}
 
 /* In the rail flyout the list is the whole surface, so it drops the inline indent guide and the items
    go back to full height — there is no rail to align against. */
@@ -225,6 +243,9 @@
 }
 [data-density='compact'] .groupList[data-rail] .item {
   height: 28px;
+}
+[data-density='touch'] .groupList[data-rail] .item {
+  height: var(--sh-tap-target);
 }
 
 .railGroup {
