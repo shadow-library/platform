@@ -1,23 +1,5 @@
-.shell {
-  display: flex;
-  height: 100vh;
-  width: 100%;
-  overflow: hidden;
-  color: var(--sh-text-primary);
-}
-
-.main {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-}
-
-.content {
-  flex: 1;
-  overflow-y: auto;
-  padding: 28px 32px 64px;
-}
+/* The flex root, the rail placement, and the scrolling gutter-and-column content region all come from
+   the design system's Shell now. What is left here is the header and the sidebar footer toggle. */
 
 /* ── Header ── */
 .header {
@@ -26,9 +8,24 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  padding: 0 28px;
+  padding: 0 clamp(14px, 3vw, 28px);
   background: var(--sh-surface-card);
   border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+/* The nav-drawer trigger exists only below md (--sh-breakpoint-md 768), where the shell has swapped
+   the persistent rail for the drawer. */
+.navMenu {
+  display: none;
+  align-items: center;
+  flex-shrink: 0;
+  margin-left: -4px;
+}
+
+@media (max-width: 767px) {
+  .navMenu {
+    display: inline-flex;
+  }
 }
 
 .headerTitle {
@@ -106,4 +103,18 @@
 .themeToggle:hover {
   background: var(--sh-bg-hover);
   color: var(--sh-text-primary);
+}
+
+/* Below sm (--sh-breakpoint-sm 640) the bar keeps the org switcher and sign-out; the product title, the
+   env pill, and the send shortcut are what push it past a phone viewport. The drawer reaches /send. */
+@media (max-width: 639px) {
+  .headerTitle,
+  .envPill,
+  .sendAction {
+    display: none;
+  }
+
+  .orgSwitcher {
+    min-width: 0;
+  }
 }

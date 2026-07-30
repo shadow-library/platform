@@ -18,6 +18,10 @@ function StrokeIcon({ paths, size = 18, strokeWidth = 1.8 }: { paths: string[]; 
   );
 }
 
+export function MenuIcon(): ReactElement {
+  return <StrokeIcon paths={['M4 7h16', 'M4 12h16', 'M4 17h16']} />;
+}
+
 export function DashboardIcon(): ReactElement {
   return <StrokeIcon paths={['M4 13h6V4H4z', 'M14 20h6V4h-6z', 'M4 20h6v-4H4z']} />;
 }
