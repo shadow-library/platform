@@ -138,10 +138,14 @@ jobs:
           {
             "apps/identity-server": { "needsPostgres": true, "needsRedis": true, "createTemplateDb": false, "checkMigrations": true },
             "apps/novel-forge-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true },
-            "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true },
+            "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": false },
             "apps/web-novel-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": false, "checkMigrations": true }
           }
           JSON
+          # pulse-server has no "db:generate" script (its migrations are hand-managed via
+          # scripts/migrate-db.ts, not drizzle-kit generate) -- check-migrations requires one and
+          # errors without it. The old mined workflow never ran check-migrations for pulse-server
+          # either; standardizing it across every backend was over-reaching for this one.
 
           # ---------------------------------------------------------------
           # 5. Build matrix.include directly (one fully-specified object per
@@ -216,7 +220,20 @@ jobs:
           ''
         }}
       LOG_LEVEL: ${{ matrix.workspace == 'apps/pulse-server' && 'http' || '' }}
-      DATABASE_POSTGRES_MAX_CONNECTIONS: ${{ matrix.workspace == 'apps/pulse-server' && '1' || '' }}
+      # Capped to 1 for every backend, not just pulse-server (whose old mined workflow was the only
+      # one that already had this). `DatabaseService` does not close its postgres pool on shutdown
+      # (see the comment in each backend's scripts/create-template-db.ts) and `TestEnvironment` boots
+      # a fresh `ShadowApplication` per test, with `bun test`'s default --max-concurrency of 20 tests
+      # at once -- leaked pools stack up fast. Left unset (whatever the driver's own pool-size default
+      # is), that blew through Postgres's default max_connections=100 ("sorry, too many clients
+      # already") on identity-server, and drove a Bun bun:sql internal assertion ("connection must be
+      # a PostgresSQLConnection") under the same pool contention on web-novel-server. One connection
+      # per leaked pool instead of several buys enough headroom for a full test run.
+      DATABASE_POSTGRES_MAX_CONNECTIONS: >-
+        ${{
+          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/novel-forge-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/web-novel-server') && '1' ||
+          ''
+        }}
 
     services:
       postgres:
