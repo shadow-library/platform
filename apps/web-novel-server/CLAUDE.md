@@ -1,13 +1,13 @@
-# webnovel-server
+# web-novel-server
 
 The backend of the **webnovel** project: the public webnovel reader service. It owns API routes, business
 logic, authentication, authorization, database access, integrations, and background work, and **returns JSON
 only** — no frontend rendering or presentation logic.
 
-Its sibling is **`webnovel-web`** (the React SSR frontend, a separate independent repository). The two meet
+Its sibling is **`web-novel-web`** (the React SSR frontend, a separate independent repository). The two meet
 only at this service's **JSON HTTP API**; the web app consumes that API and must never reach this database or
 duplicate this business logic. When both are checked out together they live side by side as
-`../webnovel-server` and `../webnovel-web`.
+`../web-novel-server` and `../web-novel-web`.
 
 ---
 
@@ -27,9 +27,9 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 
 ## 1. Know where you are, work here only
 
-- **Check the current working directory first.** Confirm you are inside `webnovel-server/` before running
+- **Check the current working directory first.** Confirm you are inside `web-novel-server/` before running
   anything. Every command — `bun install`, `bun run …`, `shadow …`, `drizzle-kit …`, `bun test` — runs from
-  this repo's root, never from the parent folder and never against `webnovel-web`.
+  this repo's root, never from the parent folder and never against `web-novel-web`.
 - **Change dependencies only in this repo**, using the existing package manager (**Bun**), and only when
   nothing already installed solves the problem. Never add a dependency here to serve the web app.
 
@@ -38,7 +38,7 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 - **Yes (server):** data model, business rules, validation of persisted data, authentication/authorization,
   DB schema or queries, the JSON shape/status codes an endpoint returns, integrations, background work.
 - **No (web):** pages, layouts, components, styling, client interaction, SSR/hydration, how a response is
-  displayed. If you are tempted to render HTML or shape presentation here, it belongs in `webnovel-web`.
+  displayed. If you are tempted to render HTML or shape presentation here, it belongs in `web-novel-web`.
 - **Both:** any change to the **API contract** (path, request/response shape, status code, query param,
   header, auth). This service defines and validates it; the web app consumes it — see §6.
 
@@ -68,7 +68,7 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 
 ## 4. Commands
 
-Run from `webnovel-server/`. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** (dev DSN
+Run from `web-novel-server/`. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** (dev DSN
 `postgresql://postgres:postgres@localhost:5432/shadow_webnovel`, see `.env`).
 
 | Purpose | Command | Notes |
@@ -132,7 +132,7 @@ thin adapters; **all business logic lives in services.**
 ## 6. API contract changes span both repos
 
 Any change to an endpoint's path, request shape, response shape, status code, query params, headers, or auth
-is a **contract change** shared with `webnovel-web`. Land it deliberately:
+is a **contract change** shared with `web-novel-web`. Land it deliberately:
 
 1. **Server first (here).** Update the route/controller, DTOs/schemas, service logic, domain errors/status
    codes, and the server tests and fixtures.
@@ -140,7 +140,7 @@ is a **contract change** shared with `webnovel-web`. Land it deliberately:
    (new optional fields, new endpoints). If a change is breaking, say so explicitly and account for who
    produces/consumes the surface: the forge (`novel-forge-server`) pushes content in one direction; the reader
    web app and clients read. Understand those callers before altering the surface.
-3. **Then update `webnovel-web`** (in its own repo): regenerate its API types, then update its callers,
+3. **Then update `web-novel-web`** (in its own repo): regenerate its API types, then update its callers,
    query options, route loaders, components, client-model mapping, **fixtures**, and frontend validation.
 4. **Update everything the change touches** here: routes, callers, DTOs/schemas, tests, fixtures, and any
    docs/README affected. Do not leave the contract half-changed.
@@ -153,7 +153,7 @@ is a **contract change** shared with `webnovel-web`. Land it deliberately:
 - **Verify before done:** run `bun run verify` (format + lint + type-check + test) from this repo's root.
   While iterating you may narrow to `bun run test` / `bun run type-check`, but the full gate must pass.
 - **Cross-repo change → verify in both repos.** A green server does not imply a green web app; run the web
-  app's gate in `webnovel-web` too.
+  app's gate in `web-novel-web` too.
 - **Report per repo, separately.** When you finish, state — for **each** repo you changed — what you changed
   and the exact verification commands you ran there and their result. Do not merge the two, and do not claim a
   repo passed a check you did not run there.

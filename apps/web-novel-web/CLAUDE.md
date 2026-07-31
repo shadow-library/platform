@@ -1,13 +1,13 @@
-# webnovel-web
+# web-novel-web
 
 The frontend of the **webnovel** project: a React SSR application on **TanStack Start**. It owns routes,
 pages, layouts, components, SSR, client interaction, frontend validation, and API consumption. It talks to the
 backend **only** through its JSON HTTP API — it never reaches backend storage and never duplicates backend
 business logic.
 
-Its sibling is **`webnovel-server`** (the JSON API backend, a separate independent repository). The two meet
+Its sibling is **`web-novel-server`** (the JSON API backend, a separate independent repository). The two meet
 only at that service's HTTP API. When both are checked out together they live side by side as
-`../webnovel-web` and `../webnovel-server`.
+`../web-novel-web` and `../web-novel-server`.
 
 ---
 
@@ -27,9 +27,9 @@ provides, and do not begin work before the skill is loaded.
 
 ## 1. Know where you are, work here only
 
-- **Check the current working directory first.** Confirm you are inside `webnovel-web/` before running
+- **Check the current working directory first.** Confirm you are inside `web-novel-web/` before running
   anything. Every command — `bun install`, `bun run …`, `shadow …`, `vite …`, `vitest …` — runs from this
-  repo's root, never from the parent folder and never against `webnovel-server`.
+  repo's root, never from the parent folder and never against `web-novel-server`.
 - **Change dependencies only in this repo**, using the existing package manager (**Bun**), and only when
   nothing already installed solves the problem. Never add a dependency here to serve the backend.
 
@@ -39,7 +39,7 @@ provides, and do not begin work before the skill is loaded.
   frontend form validation and UX, how a response is displayed, PWA/offline behavior.
 - **No (server):** data model, business rules, validation of persisted data, authentication/authorization, DB
   access, the JSON shape/status codes an endpoint returns. If you are tempted to re-implement a business rule
-  or reach a database here, it belongs in `webnovel-server`; call the API instead.
+  or reach a database here, it belongs in `web-novel-server`; call the API instead.
 - **Both:** any change to the **API contract** (path, request/response shape, status code, query param,
   header, auth). The server defines and validates it; this app consumes it — see §6.
 
@@ -69,7 +69,7 @@ provides, and do not begin work before the skill is loaded.
 
 ## 4. Commands
 
-Run from `webnovel-web/`. Prerequisite: **Bun**.
+Run from `web-novel-web/`. Prerequisite: **Bun**.
 
 | Purpose | Command | Notes |
 | --- | --- | --- |
@@ -127,9 +127,9 @@ React 19 + TanStack Start/Router/Query on `@shadow-library/{ui,web}`. Routes are
 ## 6. API contract changes span both repos
 
 Any change to an endpoint's path, request shape, response shape, status code, query params, headers, or auth
-is a **contract change** shared with `webnovel-server`. Land it deliberately:
+is a **contract change** shared with `web-novel-server`. Land it deliberately:
 
-1. **Server first** (in `webnovel-server`): route/controller, DTOs/schemas, service logic, domain
+1. **Server first** (in `web-novel-server`): route/controller, DTOs/schemas, service logic, domain
    errors/status codes, and its tests/fixtures — and **evaluate backward compatibility** there before changing
    a live contract (prefer additive, non-breaking changes; if breaking, account for all callers).
 2. **Then here:** regenerate types with `bun run generate:api-types` (server running), then update the affected
@@ -148,7 +148,7 @@ is a **contract change** shared with `webnovel-server`. Land it deliberately:
 - **Verify before done:** run `bun run verify` (format + lint + type-check + test) from this repo's root.
   While iterating you may narrow to `bun run test` / `bun run type-check`, but the full gate must pass.
 - **Cross-repo change → verify in both repos.** A green web app does not imply a green server; run the
-  server's gate in `webnovel-server` too.
+  server's gate in `web-novel-server` too.
 - **Report per repo, separately.** When you finish, state — for **each** repo you changed — what you changed
   and the exact verification commands you ran there and their result. Do not merge the two, and do not claim a
   repo passed a check you did not run there.

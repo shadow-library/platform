@@ -1,4 +1,4 @@
-# webnovel-server
+# web-novel-server
 
 The public webnovel reader backend: the authoritative **serving copy** of a projection owned by
 `novel-forge-server`. The forge pushes published novels and chapters one way over the internal
@@ -52,7 +52,7 @@ in-process and serves discovery/JWKS/token/service-access, so no identity deploy
 ```bash
 bun run build            # shadow build → single-file dist/main.js (+ generated/drizzle assets)
 bun dist/main.js         # run the production bundle
-docker build -t webnovel-server .
+docker build -t web-novel-server .
 ```
 
 Ports: `8080` app (`/health`, `/health/ready`), `8081` HttpCoreModule health server

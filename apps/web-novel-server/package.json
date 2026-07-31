@@ -1,5 +1,5 @@
 {
-  "name": "@shadow-library/webnovel-server",
+  "name": "@shadow-library/web-novel-server",
   "type": "module",
   "version": "0.0.0",
   "description": "Public webnovel reader service: serves published novels pushed one-way from novel-forge-server",
@@ -17,14 +17,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+ssh://git@github.com/shadow-library/webnovel.git"
+    "url": "git+ssh://git@github.com/shadow-library/platform.git",
+    "directory": "apps/web-novel-server"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/shadow-library/webnovel/issues"
+    "url": "https://github.com/shadow-library/platform/issues"
   },
-  "homepage": "https://github.com/shadow-library/webnovel#readme",
+  "homepage": "https://github.com/shadow-library/platform#readme",
   "devDependencies": {
     "@shadow-library/scripts": "0.3.0",
     "@types/bun": "^1.3.1",
