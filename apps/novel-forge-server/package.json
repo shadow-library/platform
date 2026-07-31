@@ -36,6 +36,7 @@
   "devDependencies": {
     "@types/bun": "catalog:",
     "drizzle-kit": "catalog:",
+    "fastify": "catalog:",
     "type-fest": "catalog:",
     "typescript": "catalog:"
   },
@@ -58,8 +59,10 @@
     "ajv": "catalog:",
     "drizzle-orm": "catalog:",
     "fflate": "^0.8.3",
+    "js-tiktoken": "^1.0.12",
     "langchain": "^0.3.29",
     "llamaindex": "^0.9.4",
+    "ollama": "^0.6.3",
     "reflect-metadata": "catalog:",
     "zod": "^3.25.76"
   }

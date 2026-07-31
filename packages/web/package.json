@@ -5,6 +5,38 @@
   "type": "module",
   "description": "Frontend application framework for the Shadow Apps ecosystem — the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
   "sideEffects": false,
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./router": {
+      "types": "./dist/router/index.d.ts",
+      "default": "./dist/router/index.js"
+    },
+    "./server": {
+      "types": "./dist/server/index.d.ts",
+      "default": "./dist/server/index.js"
+    },
+    "./server-entry": {
+      "types": "./dist/server-entry.d.ts",
+      "default": "./dist/server-entry.js"
+    },
+    "./pwa": {
+      "types": "./dist/pwa/index.d.ts",
+      "default": "./dist/pwa/index.js"
+    },
+    "./service-worker": {
+      "types": "./dist/service-worker/index.d.ts",
+      "default": "./dist/service-worker/index.js"
+    },
+    "./offline": {
+      "types": "./dist/offline/index.d.ts",
+      "default": "./dist/offline/index.js"
+    }
+  },
   "scripts": {
     "clean": "rm -rf dist",
     "verify": "bun ../../scripts/src/bin/shadow.ts verify",
@@ -55,7 +87,6 @@
     }
   },
   "devDependencies": {
-    "@shadow-library/common": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-router": "catalog:",
     "@tanstack/react-router-ssr-query": "catalog:",
@@ -64,5 +95,8 @@
     "@types/node": "catalog:",
     "@types/react": "catalog:",
     "react": "catalog:"
+  },
+  "dependencies": {
+    "@shadow-library/common": "workspace:*"
   }
 }

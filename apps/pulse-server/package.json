@@ -40,7 +40,7 @@
     "@shadow-library/common": "workspace:*",
     "@shadow-library/fastify": "workspace:*",
     "@shadow-library/modules": "workspace:*",
-    "drizzle-orm": "^0.44.7",
+    "drizzle-orm": "catalog:",
     "juice": "^12.1.1",
     "libphonenumber-js": "^1.12.33",
     "liquidjs": "^10.27.2",

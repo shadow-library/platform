@@ -3,7 +3,10 @@
   "compilerOptions": {
     "baseUrl": ".",
     "module": "ES2022",
-    "moduleResolution": "node",
+    // "node" (classic) resolution can't see package.json "exports" -- needed to resolve the
+    // workspace:* @shadow-library/* dependencies' entry points. Bundler mode (the base default)
+    // understands it; kept as an explicit override here as a reminder of the departure.
+    "moduleResolution": "bundler",
     "paths": {
       "@lib/*": ["src/*"],
       "@shadow-library/modules": ["src/index.ts"],

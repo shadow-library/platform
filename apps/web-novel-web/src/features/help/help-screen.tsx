@@ -136,7 +136,7 @@ export function HelpScreen(): React.JSX.Element {
         </Link>
       )}
 
-      <h1 className={styles.title}>{TAB_TITLES[tab]}</h1>
+      <h1 className={styles.title}>{TAB_TITLES[tab as HelpTab]}</h1>
 
       {tab === 'hub' && (
         <div className={styles.hubGrid}>

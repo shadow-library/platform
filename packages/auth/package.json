@@ -3,13 +3,27 @@
   "private": true,
   "type": "module",
   "version": "0.4.0-alpha.4",
-  "description": "Shadow Apps consumer auth SDK — Bun-native EdDSA token verification, PDP client, M2M tokens, OIDC relying-party helper, and framework guards",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./src/index.ts",
-    "./module": "./src/module/index.ts",
-    "./rp": "./src/rp/index.ts",
-    "./testing": "./src/testing/index.ts"
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./module": {
+      "types": "./dist/module/index.d.ts",
+      "default": "./dist/module/index.js"
+    },
+    "./rp": {
+      "types": "./dist/rp/index.d.ts",
+      "default": "./dist/rp/index.js"
+    },
+    "./testing": {
+      "types": "./dist/testing/index.d.ts",
+      "default": "./dist/testing/index.js"
+    }
   },
+  "description": "Shadow Apps consumer auth SDK — Bun-native EdDSA token verification, PDP client, M2M tokens, OIDC relying-party helper, and framework guards",
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
     "verify": "bun ../../scripts/src/bin/shadow.ts verify",
@@ -49,13 +63,16 @@
     }
   },
   "devDependencies": {
+    "@types/bun": "catalog:",
+    "@types/node": "24.9.2",
+    "light-my-request": "catalog:",
+    "reflect-metadata": "catalog:",
+    "typescript": "catalog:"
+  },
+  "dependencies": {
     "@shadow-library/app": "workspace:*",
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",
-    "@shadow-library/fastify": "workspace:*",
-    "@types/bun": "catalog:",
-    "@types/node": "24.9.2",
-    "reflect-metadata": "catalog:",
-    "typescript": "catalog:"
+    "@shadow-library/fastify": "workspace:*"
   }
 }

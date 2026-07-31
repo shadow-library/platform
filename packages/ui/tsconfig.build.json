@@ -6,7 +6,10 @@
     "noEmit": false,
     "declaration": true,
     "emitDeclarationOnly": true,
-    "outDir": "dist"
+    "outDir": "dist",
+    // tsc-alias needs this whenever baseUrl is implicit (unlike fastify/modules, ui doesn't set one) --
+    // newer tsc-alias enforces it; the other library packages already declare it for the same reason.
+    "rootDir": "src"
   },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["src/**/*.stories.ts", "src/**/*.stories.tsx", "src/**/*.test.ts", "src/**/*.test.tsx"]

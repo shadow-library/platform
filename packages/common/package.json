@@ -8,6 +8,46 @@
     "**/index.js",
     "**/reflector.service.js"
   ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./errors": {
+      "types": "./dist/errors/index.d.ts",
+      "default": "./dist/errors/index.js"
+    },
+    "./utils": {
+      "types": "./dist/utils/index.d.ts",
+      "default": "./dist/utils/index.js"
+    },
+    "./interfaces": {
+      "types": "./dist/interfaces/index.d.ts",
+      "default": "./dist/interfaces/index.js"
+    },
+    "./cache": {
+      "types": "./dist/services/cache/index.d.ts",
+      "default": "./dist/services/cache/index.js"
+    },
+    "./config": {
+      "types": "./dist/services/config.service.d.ts",
+      "default": "./dist/services/config.service.js"
+    },
+    "./logger": {
+      "types": "./dist/services/logger/index.d.ts",
+      "default": "./dist/services/logger/index.js"
+    },
+    "./http": {
+      "types": "./dist/classes/api-request.d.ts",
+      "default": "./dist/classes/api-request.js"
+    },
+    "./reflect": {
+      "types": "./dist/services/reflector.service.d.ts",
+      "default": "./dist/services/reflector.service.js"
+    }
+  },
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
     "verify": "bun ../../scripts/src/bin/shadow.ts verify",
@@ -43,7 +83,7 @@
     "deepmerge": "^4.3.1",
     "fast-redact": "^3.5.0",
     "type-fest": "catalog:",
-    "undici": "^7.10.0",
+    "undici": "7.10.0",
     "winston": "^3.17.0",
     "winston-transport": "^4.9.0"
   }

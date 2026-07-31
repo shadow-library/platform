@@ -6,6 +6,20 @@
   "sideEffects": [
     "*.css"
   ],
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./router": {
+      "types": "./dist/router.d.ts",
+      "default": "./dist/router.js"
+    },
+    "./styles.css": "./dist/styles.css",
+    "./styles.layer.css": "./dist/styles.layer.css"
+  },
   "description": "Shadow UI — enterprise React component library for the Shadow Apps ecosystem, styled with CSS Modules and CSS-variable design tokens, documented in Storybook, with full TypeScript support",
   "scripts": {
     "build": "bun ../../scripts/src/bin/shadow.ts build",
@@ -38,6 +52,7 @@
     "@storybook/react": "^10.4.6",
     "@storybook/react-vite": "^10.4.6",
     "@tanstack/react-router": "catalog:",
+    "@testing-library/jest-dom": "^6.10.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",
     "@types/bun": "catalog:",
@@ -60,6 +75,7 @@
     "storybook": "^10.4.6",
     "tsc-alias": "^1.8.16",
     "typescript": "^5.9.3",
+    "vite": "catalog:",
     "vitest": "^4.1.0"
   },
   "peerDependencies": {
