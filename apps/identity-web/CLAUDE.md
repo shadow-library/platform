@@ -54,8 +54,9 @@ secret, or reused by more than one client belongs in the **server**, not here.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
-5. **Package manager is `bun`** (`bun.lock`, no `packageManager` field). Use `bun`/`bunx`. Add/upgrade/remove
-   deps with `bun add`/`bun remove` **in this repo only** — never edit the sibling repo's `package.json`.
+5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
+   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this repo only** —
+   never edit the sibling repo's `package.json`.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
    deletion unless the user **explicitly** requests it. This repo has its own independent history.
 
@@ -71,7 +72,7 @@ secret, or reused by more than one client belongs in the **server**, not here.
 | Production start | `bun run start` |
 | Preview a build | `bun run preview` |
 | Verify — **format + lint + type-check** | `bun run verify` |
-| Verify with autofix | `bunx shadow verify --fix` |
+| Verify with autofix | `bun run verify --fix` |
 | Type-check only | `bun run type-check` |
 | E2E tests (Playwright — **needs the server running**) | `bun run test` |
 | Install Playwright browser | `bun run test:setup` |

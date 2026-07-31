@@ -53,8 +53,9 @@ one client belongs **here**, not in the web app.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
-5. **Package manager is `bun`** (`bun.lock`, no `packageManager` field). Use `bun`/`bunx`. Add/upgrade/remove
-   deps with `bun add`/`bun remove` **in this repo only** — never edit the sibling repo's `package.json`.
+5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
+   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this repo only** —
+   never edit the sibling repo's `package.json`.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
    deletion unless the user **explicitly** requests it. This repo has its own independent history.
 
@@ -69,16 +70,16 @@ one client belongs **here**, not in the web app.
 | Dev worker (watch)                             | `bun run dev:worker`           |
 | Build                                          | `bun run build`                |
 | Verify — **format + lint + type-check + test** | `bun run verify`               |
-| Verify with autofix                            | `bunx shadow verify --fix`     |
+| Verify with autofix                            | `bun run verify --fix`         |
 | Type-check only                                | `bun run type-check`           |
 | Test                                           | `bun test`                     |
 | Generate a migration                           | `bun run db:generate`          |
 | Apply migrations                               | `bun run db:migrate`           |
 | Create test template DB                        | `bun run db:create-template`   |
-| Check for uncommitted migration drift          | `bunx shadow check-migrations` |
+| Check for uncommitted migration drift          | `bun run check-migrations`     |
 
 Lint and format have **no standalone scripts** — they run through `bun run verify` (`shadow verify`); use
-`bunx shadow verify --fix` to auto-apply. Copy `.env.example` → `.env` before first run.
+`bun run verify --fix` to auto-apply. Copy `.env.example` → `.env` before first run.
 
 ---
 

@@ -2,8 +2,9 @@
 
 The **consumer auth SDK** for the Shadow Apps identity platform: Bun-native EdDSA (Ed25519) token verification,
 PDP client, M2M service tokens, an OIDC relying-party helper, and framework guards. It is the
-**policy-enforcement-point (PEP)** half of the platform; the identity server (a separate repo) is the decision
-half. This is a published library (`type: library`, ESM-only) — **JSON/token protocols only, no server state.**
+**policy-enforcement-point (PEP)** half of the platform; the identity server (`apps/identity-server`) is the
+decision half. `type: library`, ESM-only, private — nothing in this monorepo is published —
+**JSON/token protocols only, no server state.**
 
 ## ⚠️ ALWAYS load the `shadow-library-ecosystem` skill first
 
@@ -31,11 +32,11 @@ hand-rolling config, logging, errors, or validation.
 |---|---|
 | Install | `bun install` |
 | Verify — format + lint + type-check + test | `bun run verify` |
-| Verify with autofix | `bunx shadow verify --fix` |
+| Verify with autofix | `bun run verify --fix` |
 | Type-check only | `bun run type-check` |
 | Test | `bun test` |
 | Build | `bun run build` |
-| Release (npm + changelog) | `bunx shadow release <level>` |
+| Release | Retired — this package is private and not published; `shadow commit-msg` + root Husky still enforce the commit-message format |
 
 ## Conventions
 
