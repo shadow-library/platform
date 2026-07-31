@@ -1,0 +1,253 @@
+/**
+ * Importing npm packages
+ */
+import qs from 'node:querystring';
+import { Dispatcher, request } from 'undici';
+import deepmerge from 'deepmerge';
+import { JsonObject, JsonValue } from 'type-fest';
+
+/**
+ * Importing user defined packages
+ */
+import { NAMESPACE } from '@lib/constants';
+import { AppError, ErrorCode } from '@lib/errors';
+import { Logger, ServiceDiscovery } from '@lib/services';
+import { utils } from '@lib/utils';
+
+/**
+ * Defining types
+ */
+
+export type BodyFormat = 'json' | 'form';
+
+export interface APIRequestOptions extends Partial<Dispatcher.DispatchOptions> {
+  baseURL?: string;
+  throwErrorOnFailure?: boolean;
+  /** Total time budget in milliseconds for the whole request — dispatch, response headers and body read — unlike undici's per-phase `headersTimeout`/`bodyTimeout` */
+  timeout?: number;
+  data?: JsonObject;
+  /** How `data` is encoded on the wire — set by `body()` (json) and `form()` (form). Defaults to json. */
+  bodyFormat?: BodyFormat;
+  /** Lives on undici's `RequestOptions` rather than `DispatchOptions`, so it is declared here to reach `request()` */
+  maxRedirections?: number;
+}
+
+export interface APIResponse<T = any> {
+  statusCode: number;
+  headers: Record<string, string>;
+  data: T | null;
+}
+
+export interface CustomAPIRequest {
+  new (options?: APIRequestOptions): APIRequest;
+  setOptions(options: Omit<APIRequestOptions, 'baseURL' | 'path' | 'method'>): void;
+}
+
+/**
+ * Declaring the constants
+ */
+
+export class APIRequest {
+  private static readonly logger = Logger.getLogger(NAMESPACE, 'APIRequest');
+
+  /**
+   * undici's `request` does not follow redirects — its `maxRedirections` defaults to 0, unlike
+   * `fetch`, whose behaviour callers reasonably expect. Left at that default a 3xx arrives as a
+   * response with no body rather than the resource, which reads as an empty answer instead of a
+   * move. The cap is what stops a redirect loop becoming an infinite one.
+   */
+  private static readonly DEFAULT_MAX_REDIRECTIONS = 5;
+
+  private constructor(private readonly options: APIRequestOptions = {}) {
+    if (typeof options.throwErrorOnFailure === 'undefined') options.throwErrorOnFailure = true;
+  }
+
+  static get(url: string): APIRequest {
+    return new APIRequest({ path: url, method: 'GET' });
+  }
+
+  static post(url: string): APIRequest {
+    return new this({ path: url, method: 'POST' });
+  }
+
+  static put(url: string): APIRequest {
+    return new this({ path: url, method: 'PUT' });
+  }
+
+  static patch(url: string): APIRequest {
+    return new this({ path: url, method: 'PATCH' });
+  }
+
+  static delete(url: string): APIRequest {
+    return new this({ path: url, method: 'DELETE' });
+  }
+
+  child(): CustomAPIRequest {
+    let options = utils.object.omitKeys(this.options, ['path', 'baseURL', 'method']);
+    const baseURL = this.options.path;
+    return class extends APIRequest {
+      constructor() {
+        super({ baseURL, ...options });
+      }
+
+      static setOptions(newOptions: Omit<APIRequestOptions, 'baseURL' | 'path' | 'method'>): void {
+        options = deepmerge(options, newOptions);
+      }
+    };
+  }
+
+  suppressErrors(): this {
+    this.options.throwErrorOnFailure = false;
+    return this;
+  }
+
+  /** Bounds the entire request to `ms` milliseconds; on expiry the request is aborted and `ErrorCode.API_REQUEST_TIMEOUT` is thrown regardless of `suppressErrors()` */
+  timeout(ms: number): this {
+    if (!Number.isFinite(ms) || ms <= 0) throw AppError.internal(`API request timeout must be a positive number of milliseconds, received ${ms}`);
+    this.options.timeout = ms;
+    return this;
+  }
+
+  header(key: string, value: string): this {
+    if (!this.options.headers) this.options.headers = {};
+    (this.options.headers as Record<string, string>)[key] = value;
+    return this;
+  }
+
+  query(key: string, value: string): this {
+    if (!this.options.query) this.options.query = {};
+    this.options.query[key] = value;
+    return this;
+  }
+
+  field(key: string, value: JsonValue): this {
+    if (!this.options.data) this.options.data = {};
+
+    const keys = key.split('.');
+    let pointer = this.options.data;
+    for (let index = 0; index < keys.length - 1; index++) {
+      const key = keys[index] as string;
+      if (!pointer[key]) pointer[key] = {};
+      pointer = pointer[key] as JsonObject;
+    }
+    const lastKey = keys[keys.length - 1] as string;
+    pointer[lastKey] = value;
+
+    return this;
+  }
+
+  /** Accepts any JSON-serializable object: `JsonObject` rejects `interface` types (no index signature), which would force `as unknown as JsonObject` casts on callers. */
+  body(data: object): this {
+    this.options.data = data as JsonObject;
+    this.options.bodyFormat = 'json';
+    return this;
+  }
+
+  /**
+   * Sends `data` as `application/x-www-form-urlencoded`. Required by specifications that mandate it
+   * rather than merely accept it — an OAuth 2.0 token endpoint (RFC 6749 §4.1.3) rejects JSON.
+   *
+   * Form bodies are flat by definition, so a nested object is a mistake rather than something to
+   * encode a guess for; an array becomes repeated keys, which is how form encoding spells a list.
+   */
+  form(data: object): this {
+    this.options.data = data as JsonObject;
+    this.options.bodyFormat = 'form';
+    return this;
+  }
+
+  /** Pass `false` when the 3xx *is* the result — an OAuth authorize response is read from `location`, not followed. */
+  followRedirects(follow: boolean): this {
+    this.options.maxRedirections = follow ? APIRequest.DEFAULT_MAX_REDIRECTIONS : 0;
+    return this;
+  }
+
+  /** Flat by construction: a nested object has no unambiguous form encoding, so it is a caller mistake rather than something to guess at. */
+  private static encodeForm(data: JsonObject): string {
+    const params = new URLSearchParams();
+    const append = (key: string, value: JsonValue): void => {
+      if (value === null || value === undefined) return;
+      if (typeof value === 'object') throw AppError.internal(`API request form field '${key}' must be a primitive, received ${Array.isArray(value) ? 'an array' : 'an object'}`);
+      params.append(key, String(value));
+    };
+
+    for (const [key, value] of Object.entries(data)) {
+      if (Array.isArray(value)) value.forEach(item => append(key, item));
+      else append(key, value);
+    }
+    return params.toString();
+  }
+
+  async execute<T = any>(): Promise<APIResponse<T>> {
+    const { baseURL = '', throwErrorOnFailure, data, bodyFormat, path, timeout, maxRedirections, ...requestOptions } = this.options;
+
+    const query = this.options.query ? `?${qs.stringify(this.options.query)}` : '';
+    const url = ServiceDiscovery.resolve(baseURL + path);
+    const uri = url + query;
+    if (data) {
+      if (!requestOptions.headers) requestOptions.headers = {};
+      const isForm = bodyFormat === 'form';
+      (requestOptions.headers as Record<string, string>)['content-type'] = isForm ? 'application/x-www-form-urlencoded' : 'application/json';
+      /** `body(data: object)` cannot prove serializability at compile time, so a top-level function/symbol must fail loudly instead of sending an empty body. */
+      const body = isForm ? APIRequest.encodeForm(data) : JSON.stringify(data);
+      if (body === undefined) throw AppError.internal('API request body is not JSON-serializable');
+      requestOptions.body = body;
+    }
+    const redirections = maxRedirections ?? APIRequest.DEFAULT_MAX_REDIRECTIONS;
+
+    /** Log the request. Read the level per request so a runtime level change is honoured. */
+    const isDebug = Logger.isDebugEnabled();
+    const reqLog = `${this.options.method} ${uri}`;
+    if (isDebug) APIRequest.logger.debug(reqLog, requestOptions);
+    else APIRequest.logger.info(reqLog);
+
+    /** Execute the request. One signal bounds dispatch and body read together, so the timeout is a total budget rather than undici's per-phase ones. */
+    const signal = timeout === undefined ? undefined : AbortSignal.timeout(timeout);
+    const startTime = process.hrtime();
+    const perform = async (): Promise<{ response: Dispatcher.ResponseData; resData: unknown }> => {
+      const response = await request(url, { ...requestOptions, maxRedirections: redirections, ...(signal ? { signal } : {}) });
+      const resData = response.headers['content-type']?.includes('application/json') ? await response.body.json() : null;
+      return { response, resData };
+    };
+    const { response, resData } = await perform().catch((error: unknown) => {
+      if (signal?.aborted) {
+        APIRequest.logger.error(`${reqLog} - timed out after ${timeout}ms`);
+        throw ErrorCode.API_REQUEST_TIMEOUT.create({ timeout }, error);
+      }
+      const reason = error instanceof Error ? error.message : String(error);
+      APIRequest.logger.error(`${reqLog} - failed`, { reason });
+      throw ErrorCode.API_REQUEST_NETWORK_ERROR.create({ reason }, error);
+    });
+    const endTime = process.hrtime(startTime);
+    const timeTaken = (endTime[0] * 1e3 + endTime[1] * 1e-6).toFixed(3);
+
+    /** Log the response */
+    const resLog = `${this.options.method} ${uri} - ${response.statusCode} - ${timeTaken}ms`;
+    if (isDebug) APIRequest.logger.debug(resLog, { statusCode: response.statusCode, data: resData, headers: response.headers });
+    else APIRequest.logger.info(resLog, { contentLength: response.headers['content-length'] ?? 0, statusCode: response.statusCode });
+
+    /** Handle errors */
+    if (throwErrorOnFailure && response.statusCode >= 400) {
+      APIRequest.logger.error(`Request failed with status code ${response.statusCode}`, { data: resData, headers: response.headers });
+      ErrorCode.API_REQUEST_FAILED.throw({ status: response.statusCode, response: resData });
+    }
+
+    return {
+      data: resData as T | null,
+      statusCode: response.statusCode,
+      headers: response.headers as Record<string, string>,
+    };
+  }
+
+  then<T>(resolve: (value: APIResponse<T>) => void, reject?: (reason?: Error) => any): Promise<APIResponse<T>> {
+    return this.execute().then(resolve, reject);
+  }
+
+  catch<T>(reject: (reason?: Error) => any): Promise<APIResponse<T>> {
+    return this.execute().catch(reject);
+  }
+
+  finally(callback: () => void): Promise<APIResponse<any>> {
+    return this.execute().finally(callback);
+  }
+}

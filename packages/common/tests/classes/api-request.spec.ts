@@ -1,0 +1,282 @@
+/**
+ * Importing npm packages
+ */
+import { beforeEach, describe, expect, it, Mock, mock } from 'bun:test';
+import { request } from 'undici';
+
+/**
+ * Importing user defined packages
+ */
+import { APIRequest, AppError, ErrorCode } from '@shadow-library/common';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+mock.module('undici', () => ({ request: mock(() => Promise.resolve({ statusCode: 200, headers: {} })) }));
+
+describe('APIRequest', () => {
+  const mockRequest = request as Mock<any>;
+
+  beforeEach(() => mock.restore());
+
+  it('should create GET, POST, PUT, PATCH, DELETE instances', () => {
+    expect(APIRequest.get('/test')).toBeInstanceOf(APIRequest);
+    expect(APIRequest.post('/test')).toBeInstanceOf(APIRequest);
+    expect(APIRequest.put('/test')).toBeInstanceOf(APIRequest);
+    expect(APIRequest.patch('/test')).toBeInstanceOf(APIRequest);
+    expect(APIRequest.delete('/test')).toBeInstanceOf(APIRequest);
+  });
+
+  it('should set headers, query, field, and body', async () => {
+    const response = await APIRequest.post('/test').header('x-test', '1').query('sort', 'asc').body({ username: 'john-doe' }).field('name.first', 'John').field('name.last', 'Doe');
+    expect(response).toStrictEqual({ statusCode: 200, headers: {}, data: null });
+    expect(mockRequest).toHaveBeenCalledWith('/test', {
+      method: 'POST',
+      headers: { 'x-test': '1', 'content-type': 'application/json' },
+      query: { sort: 'asc' },
+      body: JSON.stringify({ username: 'john-doe', name: { first: 'John', last: 'Doe' } }),
+      maxRedirections: 5,
+    });
+  });
+
+  it('should accept an interface-typed body without casts', async () => {
+    interface Payload {
+      action: string;
+      count: number;
+    }
+    const payload: Payload = { action: 'created', count: 1 };
+    await APIRequest.post('/typed').body(payload);
+    expect(mockRequest).toHaveBeenCalledWith('/typed', expect.objectContaining({ body: JSON.stringify(payload) }));
+  });
+
+  describe('form bodies', () => {
+    beforeEach(() => mockRequest.mockResolvedValue({ statusCode: 200, headers: {} }));
+
+    it('should encode a form body as application/x-www-form-urlencoded', async () => {
+      await APIRequest.post('/token').form({ grant_type: 'client_credentials', scope: 'read' });
+      expect(mockRequest).toHaveBeenCalledWith(
+        '/token',
+        expect.objectContaining({
+          headers: { 'content-type': 'application/x-www-form-urlencoded' },
+          body: 'grant_type=client_credentials&scope=read',
+        }),
+      );
+    });
+
+    it('should percent-encode reserved characters and coerce primitives', async () => {
+      await APIRequest.post('/token').form({ redirect_uri: 'https://app.test/cb?x=1', count: 2, active: true });
+      expect(mockRequest).toHaveBeenCalledWith('/token', expect.objectContaining({ body: 'redirect_uri=https%3A%2F%2Fapp.test%2Fcb%3Fx%3D1&count=2&active=true' }));
+    });
+
+    it('should repeat the key for an array, and skip null and undefined', async () => {
+      await APIRequest.post('/token').form({ scope: ['read', 'write'], absent: null, missing: undefined });
+      expect(mockRequest).toHaveBeenCalledWith('/token', expect.objectContaining({ body: 'scope=read&scope=write' }));
+    });
+
+    it('should throw AppError for a nested object, which has no unambiguous form encoding', async () => {
+      await expect(
+        APIRequest.post('/token')
+          .form({ nested: { a: 1 } })
+          .execute(),
+      ).rejects.toBeInstanceOf(AppError);
+    });
+
+    it('should leave body() on JSON', async () => {
+      await APIRequest.post('/json').body({ a: 1 });
+      expect(mockRequest).toHaveBeenCalledWith('/json', expect.objectContaining({ headers: { 'content-type': 'application/json' }, body: '{"a":1}' }));
+    });
+  });
+
+  describe('redirects', () => {
+    beforeEach(() => mockRequest.mockResolvedValue({ statusCode: 200, headers: {} }));
+
+    /** undici's own default is 0, which would return the 3xx with no body rather than the resource. */
+    it('should follow redirects by default', async () => {
+      await APIRequest.get('/resource');
+      expect(mockRequest).toHaveBeenCalledWith('/resource', expect.objectContaining({ maxRedirections: 5 }));
+    });
+
+    it('should not follow redirects when told not to', async () => {
+      await APIRequest.get('/authorize').followRedirects(false);
+      expect(mockRequest).toHaveBeenCalledWith('/authorize', expect.objectContaining({ maxRedirections: 0 }));
+    });
+
+    it('should follow redirects when explicitly enabled', async () => {
+      await APIRequest.get('/resource').followRedirects(true);
+      expect(mockRequest).toHaveBeenCalledWith('/resource', expect.objectContaining({ maxRedirections: 5 }));
+    });
+  });
+
+  it('should throw AppError when the body is not JSON-serializable', async () => {
+    await expect(
+      APIRequest.post('/test')
+        .body(() => 'not-json')
+        .execute(),
+    ).rejects.toBeInstanceOf(AppError);
+  });
+
+  it('should suppress errors', async () => {
+    mockRequest.mockResolvedValue({ statusCode: 400, headers: { 'content-type': 'application/json' }, body: { json: async () => ({ error: 'fail' }) } });
+    const response = await APIRequest.get('/test').suppressErrors();
+    expect(response).toStrictEqual({ statusCode: 400, headers: { 'content-type': 'application/json' }, data: { error: 'fail' } });
+  });
+
+  it('should throw API_REQUEST_FAILED on failure if throwErrorOnFailure is true', async () => {
+    mockRequest.mockResolvedValue({ statusCode: 400, headers: { 'content-type': 'application/json' }, body: { json: async () => ({ error: 'fail' }) } });
+    const failure = await APIRequest.get('/fail')
+      .header('x', 'y')
+      .body({})
+      .execute()
+      .catch((error: unknown) => error);
+    expect(AppError.is(failure, ErrorCode.API_REQUEST_FAILED)).toBe(true);
+    expect((failure as AppError).data).toStrictEqual({ status: 400, response: { error: 'fail' } });
+  });
+
+  it('should create a child class with setOptions', () => {
+    const Parent = APIRequest.get('/parent');
+    const Child = Parent.child();
+    Child.setOptions({ throwErrorOnFailure: false });
+    const childInstance = new Child();
+    expect(childInstance).toBeInstanceOf(APIRequest);
+  });
+
+  describe('timeout', () => {
+    const abortable = (signal: AbortSignal): Promise<never> => new Promise((_resolve, reject) => signal.addEventListener('abort', () => reject(signal.reason)));
+
+    it('should reject a non-positive or non-finite timeout', () => {
+      expect(() => APIRequest.get('/test').timeout(0)).toThrow(AppError);
+      expect(() => APIRequest.get('/test').timeout(-100)).toThrow(AppError);
+      expect(() => APIRequest.get('/test').timeout(NaN)).toThrow(AppError);
+    });
+
+    it('should pass an abort signal to undici when a timeout is set', async () => {
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
+      await APIRequest.get('/test').timeout(1000);
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', maxRedirections: 5, signal: expect.any(AbortSignal) });
+    });
+
+    it('should not pass an abort signal when no timeout is set', async () => {
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
+      await APIRequest.get('/test');
+      expect(mockRequest).toHaveBeenCalledWith('/test', { method: 'GET', maxRedirections: 5 });
+    });
+
+    it('should throw API_REQUEST_TIMEOUT when the request exceeds the timeout', async () => {
+      mockRequest.mockImplementation((_url: string, options: { signal: AbortSignal }) => abortable(options.signal));
+      const failure = await APIRequest.get('/slow')
+        .timeout(10)
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);
+      expect((failure as AppError).status).toBe(504);
+      expect((failure as AppError).message).toBe('API request timed out after 10ms');
+      expect(((failure as AppError).cause as Error).name).toBe('TimeoutError');
+    });
+
+    it('should throw API_REQUEST_TIMEOUT when the body read exceeds the timeout', async () => {
+      mockRequest.mockImplementation((_url: string, options: { signal: AbortSignal }) =>
+        Promise.resolve({ statusCode: 200, headers: { 'content-type': 'application/json' }, body: { json: () => abortable(options.signal) } }),
+      );
+      const failure = await APIRequest.get('/slow-body')
+        .timeout(10)
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(true);
+    });
+
+    it('should wrap a non-timeout failure as a network error even when a timeout is set', async () => {
+      mockRequest.mockRejectedValue(new Error('getaddrinfo ENOTFOUND nowhere.invalid'));
+      const failure = await APIRequest.get('/down')
+        .timeout(1000)
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_NETWORK_ERROR)).toBe(true);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_TIMEOUT)).toBe(false);
+    });
+  });
+
+  describe('network errors', () => {
+    it('should wrap a dispatch failure in API_REQUEST_NETWORK_ERROR with the cause preserved', async () => {
+      const networkError = new Error('connect ECONNREFUSED 127.0.0.1:80');
+      mockRequest.mockRejectedValue(networkError);
+      const failure = await APIRequest.get('/down')
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_NETWORK_ERROR)).toBe(true);
+      expect((failure as AppError).status).toBe(503);
+      expect((failure as AppError).message).toBe('API request failed due to a network or protocol error');
+      expect((failure as AppError).cause).toBe(networkError);
+      expect((failure as AppError).data).toStrictEqual({ reason: 'connect ECONNREFUSED 127.0.0.1:80' });
+    });
+
+    it('should wrap a body read failure in API_REQUEST_NETWORK_ERROR', async () => {
+      mockRequest.mockResolvedValue({
+        statusCode: 200,
+        headers: { 'content-type': 'application/json' },
+        body: { json: () => Promise.reject(new SyntaxError('Unexpected token')) },
+      });
+      const failure = await APIRequest.get('/garbage')
+        .execute()
+        .catch((error: unknown) => error);
+      expect(AppError.is(failure, ErrorCode.API_REQUEST_NETWORK_ERROR)).toBe(true);
+      expect((failure as AppError).data).toStrictEqual({ reason: 'Unexpected token' });
+    });
+  });
+
+  describe('svc:// service resolution', () => {
+    const SERVICE_ENV = ['SERVICE_URL_PULSE_SERVER', 'SERVICE_DISCOVERY_SCHEME'];
+    beforeEach(() => {
+      SERVICE_ENV.forEach(key => delete process.env[key]);
+      mockRequest.mockResolvedValue({ statusCode: 200, headers: {} });
+    });
+
+    it('should resolve a svc:// url to in-cluster service DNS by default', async () => {
+      await APIRequest.get('svc://pulse-server/api/v1/notifications');
+      expect(mockRequest).toHaveBeenCalledWith('http://pulse-server/api/v1/notifications', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should honour a SERVICE_URL_<NAME> override and its trailing slash', async () => {
+      process.env['SERVICE_URL_PULSE_SERVER'] = 'https://localhost:3000/';
+      await APIRequest.post('svc://pulse-server/api/v1/notifications');
+      expect(mockRequest).toHaveBeenCalledWith('https://localhost:3000/api/v1/notifications', expect.objectContaining({ method: 'POST' }));
+    });
+
+    it('should apply the discovery scheme to a schemeless SERVICE_URL_<NAME> override', async () => {
+      process.env['SERVICE_URL_PULSE_SERVER'] = 'localhost:3000';
+      await APIRequest.get('svc://pulse-server/api/v1/notifications');
+      expect(mockRequest).toHaveBeenCalledWith('http://localhost:3000/api/v1/notifications', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should apply SERVICE_DISCOVERY_SCHEME to a schemeless override', async () => {
+      process.env['SERVICE_DISCOVERY_SCHEME'] = 'https';
+      process.env['SERVICE_URL_PULSE_SERVER'] = 'localhost:3000';
+      await APIRequest.get('svc://pulse-server/health');
+      expect(mockRequest).toHaveBeenCalledWith('https://localhost:3000/health', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should apply SERVICE_DISCOVERY_SCHEME to the in-cluster default', async () => {
+      process.env['SERVICE_DISCOVERY_SCHEME'] = 'https';
+      await APIRequest.get('svc://pulse-server/health');
+      expect(mockRequest).toHaveBeenCalledWith('https://pulse-server/health', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should accept a dotted service host for a cross-namespace target', async () => {
+      await APIRequest.get('svc://pulse-server.prod/health');
+      expect(mockRequest).toHaveBeenCalledWith('http://pulse-server.prod/health', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should leave an absolute url untouched', async () => {
+      await APIRequest.get('https://api.pwnedpasswords.com/range/ABCDE');
+      expect(mockRequest).toHaveBeenCalledWith('https://api.pwnedpasswords.com/range/ABCDE', expect.objectContaining({ method: 'GET' }));
+    });
+
+    it('should reject an invalid service name', async () => {
+      await expect(APIRequest.get('svc://Bad_Name/x').execute()).rejects.toBeInstanceOf(AppError);
+    });
+  });
+});

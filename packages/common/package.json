@@ -1,0 +1,51 @@
+{
+  "name": "@shadow-library/common",
+  "type": "module",
+  "version": "2.0.0-alpha.5",
+  "description": "Essential TypeScript utilities for task management, HTTP clients, caching, logging, configuration, and error handling in the Shadow Library ecosystem",
+  "sideEffects": [
+    "**/index.js",
+    "**/reflector.service.js"
+  ],
+  "scripts": {
+    "prepare": "husky",
+    "clean": "rm -rf dist logs CHANGELOG.md",
+    "verify": "shadow verify",
+    "type-check": "tsc",
+    "test": "bun test",
+    "build": "shadow build"
+  },
+  "engines": {
+    "node": ">=23.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/common.git"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shadow-library/common/issues"
+  },
+  "homepage": "https://github.com/shadow-library/common#readme",
+  "devDependencies": {
+    "@shadow-library/scripts": "^0.2.1",
+    "@types/bun": "^1.1.13",
+    "@types/fast-redact": "^3.0.4",
+    "husky": "^9.1.6",
+    "reflect-metadata": "^0.2.2"
+  },
+  "peerDependencies": {
+    "reflect-metadata": "^0.2.2"
+  },
+  "dependencies": {
+    "@colors/colors": "^1.6.0",
+    "chokidar": "^5.0.0",
+    "deepmerge": "^4.3.1",
+    "fast-redact": "^3.5.0",
+    "type-fest": "^4.40.0",
+    "undici": "^7.10.0",
+    "winston": "^3.17.0",
+    "winston-transport": "^4.9.0"
+  }
+}
