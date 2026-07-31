@@ -6,15 +6,15 @@
 # Why one Dockerfile instead of eight: every app builds the same way (bun install at the repo
 # root, `--filter './packages/*' build` for the shared packages, then the app's own `bun run
 # build` — mirroring .github/workflows/ci.yml's `verify` job), and every app's runtime falls into
-# exactly one of three shapes shared across the platform:
+# exactly one of two shapes shared across the platform:
 #   - backend  (identity-server, novel-forge-server, pulse-server, web-novel-server): `shadow
 #     build` tree-shakes each entrypoint into a single self-contained Bun.build bundle — the
 #     runtime image needs nothing but dist/, not even node_modules.
-#   - ssr      (identity-web, novel-forge-web, web-novel-web): a TanStack Start server whose SSR
-#     bundle externalizes its runtime deps — the runtime image needs dist/ + a production-only
-#     node_modules + the app's own serve entry.
-#   - spa      (pulse-web): a static Vite build served by a tiny Bun static file server (serve.ts)
-#     that imports only Bun built-ins — the runtime image needs dist/ + serve.ts, no node_modules.
+#   - ssr      (identity-web, novel-forge-web, pulse-web, web-novel-web): a TanStack Start server
+#     whose SSR bundle externalizes its runtime deps — the runtime image needs dist/ + a
+#     production-only node_modules + the app's own serve entry. (pulse-web converted from a
+#     `runtime-spa` static build to this shape; the now-unused `runtime-spa` target was removed —
+#     no app builds it.)
 # ARG APP selects the workspace; `--target runtime-<type>` selects the runtime shape; ARG
 # SSR_ENTRY (ssr only) selects the app's production entry filename (main.ts vs serve.ts). This is
 # option (a) from the task's D6 choice: one parameterized Dockerfile beats eight per-app ones or
@@ -186,27 +186,7 @@ ENTRYPOINT ["bun", "run"]
 CMD ["main.js"]
 
 # ---------------------------------------------------------------------------------------------
-# runtime-spa — pulse-web. serve.ts imports only Bun built-ins (no npm deps), so the runtime
-# image needs no node_modules at all: dist/ + serve.ts + package.json (for "type": "module").
-# ---------------------------------------------------------------------------------------------
-FROM oven/bun:${BUN_VERSION}-slim AS runtime-spa
-ARG APP
-ENV NODE_ENV=production \
-    PORT=3000 \
-    HEALTH_PORT=3001
-
-WORKDIR /app
-COPY --from=build --chown=bun:bun /workspace/apps/${APP}/dist ./dist
-COPY --from=build --chown=bun:bun /workspace/apps/${APP}/serve.ts /workspace/apps/${APP}/package.json ./
-USER bun
-
-EXPOSE 3000 3001
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD bun -e "fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||3001)+'/healthz').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-CMD ["bun", "run", "serve.ts"]
-
-# ---------------------------------------------------------------------------------------------
-# runtime-ssr — identity-web, novel-forge-web, web-novel-web. Ships the production-only
+# runtime-ssr — identity-web, novel-forge-web, pulse-web, web-novel-web. Ships the production-only
 # node_modules from prod-deps *with the monorepo's relative directory layout intact*
 # (/workspace/node_modules + /workspace/packages/*/dist + /workspace/apps/<app>) rather than a
 # flattened copy: bun's linker resolves workspace packages via relative symlinks four directories

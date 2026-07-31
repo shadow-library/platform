@@ -14,6 +14,9 @@ import { NavProgress } from '@shadow-library/ui/router';
  *  Importing user defined modules
  */
 import AppProvider from '@/components/AppProvider';
+import NotFound from '@/components/NotFound';
+import RouteError from '@/components/RouteError';
+import appCss from '@/styles.css?url';
 
 /**
  * Declaring types
@@ -37,10 +40,24 @@ export const Route = createRootRouteWithContext<RouterContext>()({
       { name: 'description', content: 'Shadow Pulse - Notification service for Shadow applications' },
     ],
     links: [
+      { rel: 'stylesheet', href: appCss },
       { rel: 'icon', href: '/favicon.svg' },
       { rel: 'manifest', href: '/manifest.json' },
     ],
   }),
+  /**
+   * Fires only when ROOT's own render path fails (its own loader, or something above every route's own
+   * boundary) — the normal `component` below never runs, so the document shell has to be rebuilt here by
+   * hand. A route-level throw is caught by the nearer `defaultErrorComponent` (`router.tsx`) instead,
+   * which mounts inside the shell this component already built and needs no such wrap.
+   */
+  errorComponent: props => (
+    <RootDocument>
+      <RouteError {...props} />
+    </RootDocument>
+  ),
+  /** Root always matches, so `component` still runs for a genuinely unmatched path — no shell rewrap needed. */
+  notFoundComponent: () => <NotFound />,
   component: RootComponent,
 });
 
