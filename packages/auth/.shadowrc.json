@@ -7,9 +7,5 @@
       "./rp": "rp/index",
       "./testing": "testing/index"
     }
-  },
-  "release": {
-    "npm": true,
-    "changelog": true
   }
 }

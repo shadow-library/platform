@@ -1,5 +1,6 @@
 {
   "name": "@shadow-library/app",
+  "private": true,
   "type": "module",
   "version": "2.0.0-alpha.0",
   "sideEffects": false,
@@ -19,7 +20,7 @@
     "url": "git+ssh://git@github.com/shadow-library/app.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/shadow-library/app/issues"
   },
@@ -28,14 +29,13 @@
     "node": ">=23.0.0"
   },
   "devDependencies": {
-    "@shadow-library/common": "^2.0.0-alpha.1",
-    "@shadow-library/scripts": "^0.2.1",
+    "@shadow-library/common": "workspace:*",
     "@types/bun": "^1.2.17",
     "husky": "^9.1.7",
     "reflect-metadata": "^0.2.2"
   },
   "peerDependencies": {
-    "@shadow-library/common": "^2.0.0-alpha.1",
+    "@shadow-library/common": "workspace:*",
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {

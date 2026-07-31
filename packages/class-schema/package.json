@@ -1,5 +1,6 @@
 {
   "name": "@shadow-library/class-schema",
+  "private": true,
   "type": "module",
   "version": "0.5.0-alpha.0",
   "sideEffects": false,
@@ -21,18 +22,17 @@
     "JSON Schema Generator"
   ],
   "author": "Leander Paul <leanderpaul97@outlook.com>",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/shadow-library/class-schema/issues"
   },
   "homepage": "https://github.com/shadow-library/class-schema#readme",
   "devDependencies": {
-    "@shadow-library/scripts": "^0.2.1",
     "@types/bun": "^1.3.3",
     "type-fest": "^4.41.0"
   },
   "peerDependencies": {
-    "@shadow-library/common": "^2.0.0-alpha.1",
+    "@shadow-library/common": "workspace:*",
     "reflect-metadata": "^0.2.2"
   },
   "dependencies": {

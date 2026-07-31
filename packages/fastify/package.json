@@ -1,5 +1,6 @@
 {
   "name": "@shadow-library/fastify",
+  "private": true,
   "type": "module",
   "version": "2.0.0-alpha.2",
   "sideEffects": [
@@ -19,7 +20,7 @@
     "url": "git+ssh://git@github.com/shadow-library/fastify.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/shadow-library/fastify/issues"
   },
@@ -36,10 +37,9 @@
   "devDependencies": {
     "@fastify/cookie": "^11.1.2",
     "@fastify/view": "^10.0.2",
-    "@shadow-library/app": "2.0.0-alpha.0",
-    "@shadow-library/class-schema": "0.5.0-alpha.0",
-    "@shadow-library/common": "2.0.0-alpha.1",
-    "@shadow-library/scripts": "^0.2.3",
+    "@shadow-library/app": "workspace:*",
+    "@shadow-library/class-schema": "workspace:*",
+    "@shadow-library/common": "workspace:*",
     "@types/bun": "^1.2.20",
     "husky": "^9.1.7",
     "reflect-metadata": "^0.2.2",
@@ -48,9 +48,9 @@
   "peerDependencies": {
     "@fastify/cookie": "^11.0.0",
     "@fastify/view": "^10.0.0",
-    "@shadow-library/app": "^2.0.0-alpha.0",
-    "@shadow-library/class-schema": "^0.5.0-alpha.0",
-    "@shadow-library/common": "^2.0.0-alpha.1",
+    "@shadow-library/app": "workspace:*",
+    "@shadow-library/class-schema": "workspace:*",
+    "@shadow-library/common": "workspace:*",
     "reflect-metadata": "^0.2.2"
   },
   "peerDependenciesMeta": {

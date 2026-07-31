@@ -1,5 +1,6 @@
 {
   "name": "@shadow-library/web",
+  "private": true,
   "version": "0.2.2-alpha.0",
   "type": "module",
   "description": "Frontend application framework for the Shadow Apps ecosystem — the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
@@ -20,13 +21,13 @@
     "url": "git+ssh://git@github.com/shadow-library/web.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/shadow-library/web/issues"
   },
   "homepage": "https://github.com/shadow-library/web#readme",
   "peerDependencies": {
-    "@shadow-library/common": "^2.0.0-alpha.1",
+    "@shadow-library/common": "workspace:*",
     "@tanstack/react-query": "^5.100.0",
     "@tanstack/react-router": "^1.168.0",
     "@tanstack/react-router-ssr-query": "^1.167.0",
@@ -55,8 +56,7 @@
     }
   },
   "devDependencies": {
-    "@shadow-library/common": "2.0.0-alpha.3",
-    "@shadow-library/scripts": "^0.2.2",
+    "@shadow-library/common": "workspace:*",
     "@tanstack/react-query": "^5.101.2",
     "@tanstack/react-router": "^1.170.17",
     "@tanstack/react-router-ssr-query": "^1.167.1",

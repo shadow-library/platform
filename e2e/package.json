@@ -1,0 +1,10 @@
+{
+  "name": "e2e",
+  "private": true,
+  "type": "module",
+  "version": "0.0.0",
+  "description": "Whole-platform Playwright suite — cross-app flows against the local compose deployment. Stub only; a later phase fills this in.",
+  "scripts": {
+    "test": "bun test"
+  }
+}

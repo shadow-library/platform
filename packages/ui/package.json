@@ -1,5 +1,6 @@
 {
   "name": "@shadow-library/ui",
+  "private": true,
   "version": "3.3.0-alpha.2",
   "type": "module",
   "sideEffects": [
@@ -22,13 +23,12 @@
     "url": "git+ssh://git@github.com/shadow-library/ui.git"
   },
   "author": "Leander Paul <leanderpaul97@outlook.com>",
-  "license": "MIT",
+  "license": "UNLICENSED",
   "bugs": {
     "url": "https://github.com/shadow-library/ui/issues"
   },
   "homepage": "https://github.com/shadow-library/ui#readme",
   "devDependencies": {
-    "@shadow-library/scripts": "^0.2.3",
     "@rollup/plugin-alias": "^6.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",
     "@storybook/addon-a11y": "^10.4.6",
