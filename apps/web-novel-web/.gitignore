@@ -1,0 +1,7 @@
+node_modules
+dist
+logs
+*.log
+.DS_Store
+.env.local
+public/manifest.webmanifest

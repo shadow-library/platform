@@ -1,0 +1,166 @@
+.page {
+  max-width: 900px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 22px 20px 30px;
+}
+
+.title {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 0 0 18px;
+  font-size: 14px;
+  color: var(--sh-text-tertiary);
+}
+
+.storageCard {
+  padding: 16px 18px;
+  border-radius: 14px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  margin-bottom: 20px;
+}
+
+.storageHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 10px;
+  font-size: 13.5px;
+}
+
+.storageLabel {
+  font-weight: 600;
+}
+
+.storageValue {
+  color: var(--sh-text-secondary);
+}
+
+.storageValue strong {
+  color: var(--sh-text-primary);
+}
+
+.storageHint {
+  font-size: 11.5px;
+  color: var(--sh-text-tertiary);
+  margin-top: 8px;
+}
+
+.entries {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.entry {
+  padding: 14px;
+  border-radius: 14px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  display: flex;
+  gap: 14px;
+}
+
+.entryCover {
+  flex: none;
+  width: 52px;
+  cursor: pointer;
+}
+
+.entryBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.entryHead {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.entryHeadText {
+  min-width: 0;
+}
+
+.entryTitle {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.entryMeta {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+  margin-top: 2px;
+}
+
+.pill {
+  flex: none;
+}
+
+.entryActions {
+  margin-top: 12px;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progressBlock {
+  margin-top: 10px;
+}
+
+.progressTrack {
+  height: 6px;
+  border-radius: 9999px;
+  background: var(--sh-surface-well);
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+
+.progressFill {
+  height: 100%;
+  background: var(--sh-info-solid);
+  border-radius: 9999px;
+  transition: width 0.2s ease;
+}
+
+.progressRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.progressText {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.errorRow {
+  margin-top: 10px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.errorText {
+  font-size: 12px;
+  color: var(--sh-danger-text);
+}
+
+/* Accent-soft tint for the update affordance — the design's bordered accent pill, not covered by a Button variant. */
+.updateAction {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+}

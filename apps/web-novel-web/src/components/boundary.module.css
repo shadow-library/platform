@@ -1,0 +1,57 @@
+.wrap {
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 40px 24px;
+  text-align: center;
+}
+
+.code {
+  font-size: 72px;
+  font-weight: 700;
+  color: var(--sh-border-strong);
+  line-height: 1;
+  margin-bottom: 6px;
+}
+
+.mark {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--sh-radius-xl);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-secondary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 10px;
+}
+
+.markDanger {
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text);
+}
+
+.title {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--sh-text-primary);
+}
+
+.text {
+  margin: 0 0 14px;
+  max-width: 400px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--sh-text-tertiary);
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

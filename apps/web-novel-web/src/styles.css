@@ -1,0 +1,87 @@
+/* Shadow UI design system: tokens, reset, utilities, and component styles. */
+@import '@shadow-library/ui/styles.css';
+
+:root {
+  /* Shared layout dimensions the screens draw from so navigation never shifts the layout. */
+  --wn-page-max: 1200px;
+  --wn-page-wide: 1280px;
+}
+
+/* ========================================
+   App base
+   ======================================== */
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+body {
+  font-family: var(--sh-font-sans);
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+a {
+  color: var(--sh-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--sh-accent-hover);
+}
+
+/* ========================================
+   Shared helpers (mirrors the design handoff's utility surface)
+   ======================================== */
+.wn-clamp2 {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wn-clamp3 {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.wn-hscroll {
+  scrollbar-width: none;
+}
+
+.wn-hscroll::-webkit-scrollbar {
+  display: none;
+}
+
+@keyframes wn-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+.wn-fade {
+  animation: wn-fade 0.3s ease both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

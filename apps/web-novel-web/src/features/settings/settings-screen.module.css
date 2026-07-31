@@ -1,0 +1,203 @@
+.page {
+  max-width: 1000px;
+  margin: 0 auto;
+  width: 100%;
+  padding: 22px 20px 30px;
+}
+
+.title {
+  margin: 0 0 18px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.layout {
+  display: flex;
+  gap: 24px;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+
+.nav {
+  flex: 1 1 190px;
+  max-width: 220px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  position: sticky;
+  top: 12px;
+  align-self: flex-start;
+}
+
+.navItem {
+  text-align: left;
+  height: 40px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.12s ease, color 0.12s ease;
+}
+
+.navItem:hover {
+  background: var(--sh-surface-well);
+  color: var(--sh-text-primary);
+}
+
+.navItemActive,
+.navItemActive:hover {
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+}
+
+.pane {
+  flex: 2 1 300px;
+  min-width: 260px;
+}
+
+.sectionTitle {
+  margin: 0 0 4px;
+  font-size: 17px;
+  font-weight: 700;
+}
+
+.sectionDesc {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--sh-text-tertiary);
+  line-height: 1.5;
+}
+
+.fieldLabel {
+  font-size: 13px;
+  font-weight: 600;
+  margin-bottom: 10px;
+}
+
+.segmented {
+  max-width: 360px;
+}
+
+.rows {
+  display: flex;
+  flex-direction: column;
+}
+
+.row {
+  width: 100%;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.actions {
+  margin-top: 16px;
+}
+
+.infoCard {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cardIcon {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardIconBrand {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border-radius: 11px;
+  background: linear-gradient(140deg, var(--sh-indigo-500), var(--sh-indigo-800));
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.cardMeta {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+  margin-top: 2px;
+}
+
+.aboutCard {
+  margin-bottom: 16px;
+}
+
+.linkList {
+  display: flex;
+  flex-direction: column;
+}
+
+.linkRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  color: var(--sh-text-primary);
+  font-size: 14px;
+  text-decoration: none;
+}
+
+.linkRow:hover {
+  color: var(--sh-accent);
+}
+
+.linkChevron {
+  color: var(--sh-text-tertiary);
+}
+
+.selectField {
+  margin-top: 18px;
+  max-width: 280px;
+}
+
+.guestNote {
+  margin: 16px 0 0;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  line-height: 1.5;
+}
+
+.dangerButton {
+  margin-top: 16px;
+  height: 40px;
+  padding: 0 16px;
+  border-radius: 10px;
+  border: 1px solid var(--sh-danger-border);
+  background: var(--sh-danger-bg-subtle);
+  color: var(--sh-danger-text-on-subtle);
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter 0.12s ease;
+}
+
+.dangerButton:hover {
+  filter: brightness(0.97);
+}

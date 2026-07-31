@@ -1,0 +1,266 @@
+.page {
+  max-width: var(--wn-page-max);
+  margin: 0 auto;
+  width: 100%;
+  padding: 22px 20px 30px;
+}
+
+.head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.title {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.subtitle {
+  margin: 5px 0 0;
+  font-size: 14px;
+  color: var(--sh-text-tertiary);
+}
+
+.guestNote {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--sh-accent-soft);
+  margin-bottom: 14px;
+  font-size: 12.5px;
+  color: var(--sh-text-secondary);
+}
+
+.tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  margin-bottom: 14px;
+  padding-bottom: 2px;
+}
+
+.tab {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 9999px;
+  border: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-card);
+  color: var(--sh-text-secondary);
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.tabOn {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-weight: 600;
+}
+
+.tabCount {
+  font-size: 11px;
+  opacity: 0.7;
+}
+
+.search {
+  max-width: 340px;
+  margin-bottom: 18px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 20px 16px;
+}
+
+.gridCard {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  color: inherit;
+}
+
+.gridCard:hover {
+  color: inherit;
+}
+
+.gridMeta {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.gridProgress {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 9px;
+  background: linear-gradient(to top, rgba(9, 9, 11, 0.78), transparent);
+}
+
+.gridTrack {
+  height: 4px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.32);
+  overflow: hidden;
+}
+
+.gridFill {
+  height: 100%;
+  background: var(--sh-accent);
+}
+
+.removeBtn {
+  position: absolute;
+  top: 8px;
+  left: 8px;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 0;
+  background: rgba(9, 9, 11, 0.45);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1;
+}
+
+.newBadge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  background: var(--sh-accent);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  z-index: 1;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.listRow {
+  display: flex;
+  gap: 14px;
+  padding: 12px;
+  border-radius: 14px;
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  box-shadow: var(--sh-shadow-e1);
+  color: inherit;
+}
+
+.listRow:hover {
+  color: inherit;
+  border-color: var(--sh-border-default);
+}
+
+.listThumb {
+  flex: none;
+  width: 52px;
+  border-radius: 8px;
+  box-shadow: none;
+}
+
+.listBody {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 5px;
+}
+
+.listTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.listTitle {
+  font-size: 15px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listNew {
+  flex: none;
+  padding: 1px 7px;
+  border-radius: 9999px;
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.listMeta {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+}
+
+.listTrack {
+  height: 4px;
+  max-width: 240px;
+  border-radius: 9999px;
+  background: var(--sh-surface-well);
+  overflow: hidden;
+}
+
+.listFill {
+  height: 100%;
+  background: var(--sh-accent);
+}
+
+.listActions {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.playBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  background: var(--sh-accent);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.rowRemoveBtn {
+  width: 36px;
+  height: 36px;
+  border-radius: 9px;
+  border: 1px solid var(--sh-border-default);
+  background: transparent;
+  color: var(--sh-text-tertiary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
