@@ -142,8 +142,8 @@ return the result. All business logic lives in the service.
    `context.extend()`) with typed accessors and bind that instance to a module-level `Context` through a
    **root-module** provider (the ALS-bound instance is only DI-visible at the root). Handlers and
    services then call `Context.getSession()` etc. directly — MUST NOT inject the request/context as a
-   handler parameter for this purpose. (The legacy `@Ctx` param decorator was removed from `fastify` in
-   `2.0.0-alpha.1` — it no longer exists; migrate any remaining usage to the ambient pattern.)
+   handler parameter for this purpose. (The legacy `@Ctx` param decorator was removed from `fastify`'s
+   v2 line — it no longer exists; migrate any remaining usage to the ambient pattern.)
    Caveat: do NOT globally augment the shared `ContextExtension` interface — the `@shadow-library/auth`
    SDK augments it too (`getAuthPrincipal()`/`getAuthPrincipalOrNull()`) and `extend`'s signature would
    force every extender to satisfy the union; type the bound instance locally instead.

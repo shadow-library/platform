@@ -10,9 +10,16 @@ the `version` field in each package's `package.json`; those are frozen leftovers
 history and don't move.
 
 Conventions: **`Exports:`** lines are the exhaustive public symbol list (types included). If a symbol
-isn't listed, it isn't public — don't deep-import it. Packages have **no hand-written `exports`
-map** in source `package.json` for the `library`/`component` packages here — `shadow build` synthesizes
-it into `dist/package.json` from `.shadowrc.json` `build.exports`.
+isn't listed, it isn't public — don't deep-import it. Every package here **does** carry a hand-written
+`exports` map in its source `package.json`, pointing each subpath at `./dist/...` — that's what a
+workspace consumer's module resolution actually reads (bun/Node resolve `@shadow-library/x/<subpath>`
+through the symlinked package's own `package.json`, not a nested `dist/package.json`). It only lists
+subpaths, not symbols, and it's maintained by hand, separately from `.shadowrc.json` `build.exports` (the
+source-relative map `shadow build` reads to know what to compile into each subpath's `dist/` output).
+**The rule that matters:** adding a new public subpath means editing both files — `.shadowrc.json`
+`build.exports` (so the build emits it) and the source `package.json` `exports` map (so consumers can
+resolve it at all) — one without the other leaves either a subpath nothing compiles into, or one nothing
+can import.
 
 ---
 
@@ -112,7 +119,7 @@ Single root entry. `FastifyRouter extends Dispatcher` and is bound to app's `Dis
 Peers: `app`/`class-schema`/`common`/`reflect-metadata` required; `@fastify/cookie`, `@fastify/view` **optional** (lazily imported).
 
 Exports: `FastifyModule`, `FastifyRouter`, `FastifyModuleOptions`, `FastifyModuleAsyncOptions`, `FastifyConfig`, `FASTIFY_INSTANCE`, `HttpController`, `HttpRoute`, `HttpInput`, `Get`, `Post`, `Put`, `Patch`, `Delete`, `Options`, `Head`, `All`, `Version`, `Body`, `Params`, `Query`, `Headers`, `Cookie`, `RawBody`, `Req`, `Request`, `Res`, `Response`, `RespondFor`, `HttpStatus`, `Header`, `Redirect`, `Render`, `ApiOperation`, `Transform`, `Sensitive`, `Middleware`, `ContextService`, `ContextExtension`, `ServerErrorCode`, `DefaultErrorHandler`, `ErrorHandler`, `ErrorResponseDto`, `ErrorFieldDto`, `DevErrorResponseDto`, `CustomTransformers`, `InbuiltTransformers`, `TransformOptions`, `TransformerFn`, `TransformTypes`, `SensitiveDataType`, `HttpMethod` (enum), `RouteInputType` (enum), `HttpRequest`, `HttpResponse`, `HttpCallback`, `RouteHandler`, `AsyncRouteHandler`, `CallbackRouteHandler`, `RouteOptions`, `RouteInputSchemas`, `ApiOperationMetadata`, `MiddlewareType`, `MiddlewareOptions`, `MiddlewareMetadata`, `MiddlewareGenerator`, `AsyncHttpMiddleware`, `CallbackHttpMiddleware`, `RequestContext`, `CookieValues`, `RequestMetadata`, `ChildRouteRequest`, `DynamicRender`, `ParsedFastifyError`, `ServerInstance`, `ServerMetadata`, `FieldErrorMessage`.
-(The `Ctx` param decorator was **removed in `fastify@2.0.0-alpha.1`** — it no longer exists; use the ambient `Context` pattern instead. There is no `ServerError` class — confirmed absent from source.)
+(The `Ctx` param decorator was **removed from `fastify`'s v2 line** — it no longer exists; use the ambient `Context` pattern instead. There is no `ServerError` class — confirmed absent from source.)
 
 - Module: `FastifyModule.forRoot(opts)` / `forRootAsync({useFactory,inject,imports})`. `FastifyModuleOptions`: `controllers`, `providers`, `imports`, `exports`, `fastifyFactory` + `FastifyConfig`: `host`, `port`, `errorHandler`, `maskSensitiveData` (default `Config.isProd()`), `routePrefix`, `prefixVersioning`, `responseSchema`, `enableChildRoutes`, `childRouteHeaders`, `transformers`, `cookie` (forwarded to `@fastify/cookie`, e.g. `secret`); plus everything inherited from Fastify's `FastifyServerOptions` (`requestIdLogLabel`, `genReqId`, `routerOptions`, `ajv`, …). Dev config keys: `app.dev.delay` (int), `app.dev.stack-trace` (bool, default dev).
 - Route decorators: `@Get/@Post/@Put/@Patch/@Delete/@Options/@Head/@All(path?)`, `@Version(n)`; low-level `@HttpRoute`/`@HttpInput`.
@@ -145,10 +152,10 @@ Exports: `AuthClient`, `AppSessionClient` (+ `AppSessionClientOptions`), `AppReg
 
 ### `./module` (fastify/app integration)
 Exports: `AuthModule` (`forRoot(options?)`; `AuthModuleOptions`, `BrowserAuthOptions`, `AuthRoutePaths`, `ResolvedBrowserAuthConfig`, `resolveAuthClientConfig`, `resolveAuthRoutes`, `resolveBrowserAuthConfig`), `RelyingPartyModule` (`forRoot(options)`; `RelyingPartyModuleOptions`), `AppSessionService`, `AuthController` (+ `configureAuthRoutes`), the auth DTOs (including org-switching: `AuthOrganisationItem`, `AuthOrganisationsResponse`, `SwitchOrganisationBody`, `SwitchOrganisationResponse`), `AuthGuard` (+ `GuardedRequest`, `GuardedResponse`, `AuthGuardHandler`), `Authenticated`, `RequireScope`, `RequirePermission`, `RequireElevation` (+ `AuthRouteMetadata`, `RequirePermissionOptions`), cookie helpers (`parseCookies`, `serializeCookie`, `expireCookie`, `assertValidCookieName`, `CookieAttributes`, `SameSitePolicy`), login-state encoding (`encodeLoginState`, `decodeLoginState`, `LOGIN_STATE_TTL_SECONDS`, `LoginState`, `matchesState`), `SessionRegistry`, `LoginRedirect`, `LoginResult`, `TokenRequest`, `BrowserAuthRuntime`, `AUTH_PRINCIPAL` (symbol), `extendContextWithAuth`, `AUTH_ROUTE_METADATA`, `AuthGuardErrorCode`.
-- **`LoginStateStore`/`InMemoryLoginStateStore`/`SealedLoginStateStore` are GONE** — the login-state design moved from a store abstraction to stateless sealed encoding (`encodeLoginState`/`decodeLoginState`). `LoginState` and `matchesState` are unchanged.
+- **`LoginStateStore`/`InMemoryLoginStateStore`/`SealedLoginStateStore` are GONE** — the login-state design moved from a store abstraction to a stateless, deliberately **unsealed** `base64url` encoding (`encodeLoginState`/`decodeLoginState`; no sealing key, no server-side store — see `references/auth.md` §11.14 for why that's safe). `LoginState` and `matchesState` are unchanged.
 - **Decorators are `@Authenticated()`, `@RequireScope(...scopes)`, `@RequirePermission(permission, options?)`, `@RequireElevation(...scopes)`** — there is **no `@Auth` and no `@Public`** in the SDK (confirmed absent). They work class- or method-level; class-level metadata deep-merges into each handler (via app's handler-metadata merge).
 - **Protection is opt-in, not default-deny:** `AuthGuard` (a `@Middleware({type:'preHandler', weight:100})` generating class) skips routes without auth metadata. An app wanting default-deny + a `@Public()` escape hatch builds that in its own auth module on top (some apps do — follow the repo).
-- **`AuthModule.forRoot()` also registers the browser auth routes** (login, callback, logout, back-channel logout, session, step-up, and now organisation-switch) whenever a redirect URI and client credentials are configured. Paths are overridable via `routes`; any route may be set to `false`.
+- **`AuthModule.forRoot()` also registers the browser auth routes** (login, callback, logout, session, step-up, organisations/organisation-switch) whenever `AUTH_BROWSER_LOGIN` (default on) is not turned off **and** client credentials are configured — not gated by any redirect-URI condition. Back-channel logout is the one route **off by default** (`DEFAULT_ROUTES.backchannelLogout = false`) — see `references/auth.md` §5. Paths are overridable via `routes`; any route may be set to `false`.
 - A guarded route resolves its principal from **either** an `Authorization: Bearer` token **or** the app-session cookie, into one `AuthPrincipal`. M2M/service principals are deny-by-default (must match an admin-loaded `ServiceAccessRule`); PDP `check` fails closed unless `failOpen`.
 - Context: `extendContextWithAuth(context)` (called on module init) augments fastify's `ContextExtension` with `getAuthPrincipal()` (throws 401 if absent) and `getAuthPrincipalOrNull()`. `AuthGuardErrorCode`: `IAM_001` (unauthenticated), `IAM_002` (forbidden), `IAM_003` (step-up required — the one deliberately actionable code).
 

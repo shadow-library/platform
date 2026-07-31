@@ -1,8 +1,8 @@
 # Auth reference — integrating a Shadow app with Shadow Identity
 
 Load this whenever a task touches login, route protection, service-to-service calls, permissions, or
-step-up. Facts here are verified against `apps/identity-server` source, not its docs — several identity
-docs are stale and are called out in §11.
+step-up. Facts here are verified against `apps/identity-server` and `packages/auth` source, not their
+docs — several identity docs are stale and are called out in §11.
 
 **Every application in this ecosystem is a first-party application.** There is exactly one supported
 way to log a user in, and it is not the textbook OIDC flow.
@@ -47,81 +47,104 @@ Consequences that drive the design:
 
 ## 3. Identity-side registration (do this before any code)
 
-The SDK cannot work until an admin registers the app in identity. `POST /api/v1/admin/clients` (needs
-`iam:clients:manage` + AAL2). Two clients are normally needed:
+**One client per application, not two.** `OAuthClientService.provisionApplicationIdentity` (
+`apps/identity-server/src/modules/auth/oauth/oauth-client.service.ts:279`) provisions "exactly one
+client and exactly one API resource" per application, with the client id equal to the application name
+and the resource identifier derived as `api://<app>` — never configured separately. The method's own
+comment states why the old model is gone: "splitting a product into an `<app>` and an `<app>-server`
+client only ever created ambiguity about which of the two an id referred to." The single client is
+registered `kind: 'WEB_CONFIDENTIAL'` with `grantTypes: ['authorization_code', 'client_credentials',
+<token-exchange grant>]` — it runs both the browser code flow and the server-to-server calls, because
+they're one deployment and therefore one identity. `tasks.md:363` documents the migration concretely:
+"Pulse holds one client (`pulse`, `authorization_code` + `client_credentials` + token-exchange, granted
+`authz:check`, `authz:roles:sync` and `app-session:manage`) instead of the `pulse` / `pulse-server`
+pair." If you see admin docs describing two separate clients (a `WEB_CONFIDENTIAL` `<app>` plus a
+`SERVICE` `<app>-server`), that's the retired model — don't propagate it.
 
-| Client | `kind` | Purpose |
-| --- | --- | --- |
-| `<app>` | `WEB_CONFIDENTIAL` | The browser login client. Needs `isFirstParty: true`, `redirectUris`, grant types `authorization_code` (+ `refresh_token` only if a third-party surface also exists). |
-| `<app>-server` | `SERVICE` | The M2M identity of the backend. `client_credentials`. This is the one the SDK authenticates with. |
-
-A single confidential client can play both roles if it holds both grants — that is what `AUTH_CLIENT_ID`
-points at.
+This is provisioned by `POST /api/v1/admin/applications` (creating the application also provisions its
+client+resource in the same call — see `admin-application.controller.ts`'s `createApplication`), not a
+separate `POST /api/v1/admin/clients` step.
 
 Also required, all admin operations:
 
-- `clientId` is an **admin-chosen slug** (`^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$`), not a generated UUID.
-- An **API resource** whose `identifier` is this service's audience (e.g. `api://reports`). That string is
-  `AUTH_AUDIENCE` and the `aud` the service accepts.
-- **Scopes** created on that resource, and **granted to the client** (`POST /api/v1/admin/clients/:id/scopes`).
-  Mark a scope `is_sensitive` when it must only ever be mintable into an elevated token.
-- The scope **`app-session:manage` granted to the service client** — without it every mint fails. No seeded
-  client has it; it is always an explicit grant.
+- The client id **is** the application `name` — it must match `CLIENT_ID_PATTERN`
+  (`/^[a-z0-9]([a-z0-9-]{1,62}[a-z0-9])?$/`, `oauth-client.service.ts:112`), not a generated UUID.
+- **Scopes** created on the application's `api://<app>` resource, and **granted to its client**. Mark a
+  scope `is_sensitive` when it must only ever be mintable into an elevated token.
+- The scope **`app-session:manage` granted to the client** — without it every mint fails. For the three
+  ecosystem apps this is already done: `EcosystemSeedService.ensureAppClient` grants `scopes.appSession`
+  to pulse (`ecosystem-seed.service.ts:180`), novel-forge (`:296`), and web-novel (`:301`) as part of
+  their seed. A newly registered app still needs it granted explicitly by an admin.
 - `authz:check` (PDP + service-access rules) and `authz:roles:sync` (role-catalog push) if used. Method-level
   scope **replaces** class-level on identity's side, so the catalog push needs `authz:roles:sync` *only*.
-- `redirect_uris` are matched **exactly** — absolute, no fragment.
+- `redirect_uris` are matched **exactly** — absolute, no fragment. Derived from the application's
+  registered public origins (`${origin}/auth/callback`), not hand-entered.
 - Service-access rules (`/api/v1/admin/service-access`) for every M2M caller allowed to reach this service.
   Deny-by-default; granting a caller needs an admin change **plus a restart** of the target service.
 
-In-cluster the preferred credential is **workload identity**: register `workloadSubjects`
-(`system:serviceaccount:<ns>:<name>`) and set `AUTH_CLIENT_ASSERTION_PATH` to the projected SA token. No
-long-lived secret then exists on either side. `client_secret_basic` is for workloads outside the cluster.
+In-cluster the preferred credential is **workload identity**: `EcosystemSeedService` binds the seeded
+client's `workloadSubjects` to `system:serviceaccount:<ns>:<name>` and the app sets
+`AUTH_CLIENT_ASSERTION_PATH` to the projected SA token. No long-lived secret then exists on either side.
+`client_secret_basic` (`AUTH_CLIENT_SECRET`) is for workloads outside the cluster.
 
 ## 4. Configuration
 
-| Env | Meaning |
-| --- | --- |
-| `AUTH_ISSUER` | Identity base URL. MUST match identity's `OAUTH_ISSUER` **exactly** — a trailing-slash mismatch is a blanket 401. |
-| `AUTH_AUDIENCE` | This service's API resource identifier; the `aud` it accepts and mints for. |
-| `AUTH_CLIENT_ID` | Service-account client slug. |
-| `AUTH_CLIENT_ASSERTION_PATH` | Projected k8s SA token — preferred in-cluster. |
-| `AUTH_CLIENT_SECRET` | Static secret — outside the cluster only. |
-| `AUTH_REDIRECT_URI` | Registered callback. **Setting this is what turns the browser flow on.** |
-| `AUTH_SCOPES` | Space-separated scopes requested at login. |
-| `AUTH_SESSION_SECRET` | Seals the transient login-state cookie. Without it the store is in-memory — correct, but single-instance only. Set it in any multi-replica deploy. |
-| `AUTH_ALLOWED_REDIRECTS` | Comma-separated `return_to` allow-list. Same-origin paths are always allowed. |
-| `AUTH_POST_LOGIN_REDIRECT` | Default landing path (`/`). |
-| `AUTH_STEP_UP_URL` | The identity **UI** page that performs a step-up. See §7 — there is no standard endpoint, so this must be set for elevation to work. |
-| `AUTH_SESSION_COOKIE_NAME` | Defaults to `__Host-shadow-session`. |
-| `AUTH_SESSION_COOKIE_SECURE` | Escape hatch for plain-HTTP dev only; drops the `__Host-` prefix and warns. |
-| `AUTH_TIMEOUT` | Total ms budget per outbound request. |
+The SDK's config keys and their env-var mapping live in `packages/auth/src/module/config.ts` (`Config.load`
+calls at lines 144–171). A steady-state deploy sets three things plus one credential — everything else
+identity already knows about the application and the SDK reads it back at runtime (D-21):
+
+| Env | Config key | Meaning |
+| --- | --- | --- |
+| `AUTH_ISSUER` | `auth.issuer` | Identity base URL. MUST match identity's own issuer **exactly** — a trailing-slash mismatch is a blanket 401. |
+| `AUTH_APP_ID` | `auth.app-id` (`isProdRequired: true`) | This application's registered name at identity; doubles as the OAuth client id. **The one required-in-prod key** — without it a service can't read its own registration back and so can't know its own audience. |
+| `AUTH_CLIENT_SECRET` | `auth.client.secret` | Static client secret — outside the cluster only. |
+| `AUTH_CLIENT_ASSERTION_PATH` | `auth.client.assertion-path` | Projected k8s SA token — preferred in-cluster. |
+| `AUTH_CLIENT_ID` | `auth.client.id` | Rare override — the client id defaults to `AUTH_APP_ID`; only needed if the two must differ. |
+| `AUTH_IDENTITY_URL` | `auth.identity-url` | Back-channel base URL when it differs from the public issuer (e.g. in-cluster `svc://identity-server.identity`). Unset outside a cluster. |
+| `AUTH_TIMEOUT` | `auth.timeout` | Total ms budget per outbound request. |
+| `AUTH_APP_REFRESH_SECONDS` | `auth.app.refresh-seconds` (default 300) | How often the cached app registration (audience/redirects/scopes/step-up endpoint) refreshes from identity. |
+| `AUTH_SERVICE_ACCESS_REFRESH_SECONDS` | `auth.service-access.refresh-seconds` (default 300) | Same, for the service-access rule cache. |
+| `AUTH_STRICT_SCOPES` | `auth.strict-scopes` (default `false`) | — |
+| `AUTH_BROWSER_LOGIN` | `auth.browser-login` (default `true`) | Gates the browser routes — see below; this env var is the override, not a redirect-URI condition. |
+| `AUTH_SESSION_COOKIE_NAME` | `auth.session.cookie-name` | Defaults to `__Host-shadow-session`. |
+| `AUTH_SESSION_COOKIE_SECURE` | `auth.session.cookie-secure` (default `true`) | Escape hatch for plain-HTTP dev only; drops the `Secure` attribute and therefore the `__Host-` prefix, and warns loudly. |
+| `AUTH_SESSION_COOKIE_SAME_SITE` | `auth.session.cookie-same-site` | `Lax` (default) / `Strict` / `None`. |
+| `AUTH_SESSION_COOKIE_DOMAIN` | `auth.session.cookie-domain` | — |
+| `AUTH_POST_LOGIN_REDIRECT` | `auth.post-login-redirect` | Default landing path (`/`). |
+| `AUTH_POST_LOGOUT_REDIRECT` | `auth.post-logout-redirect` | Where identity sends the browser after an RP-initiated logout. |
+| `AUTH_ALLOWED_REDIRECTS` | `auth.allowed-redirects` (CSV) | Comma-separated `return_to` allow-list. Same-origin paths are always allowed. |
+
+**`AUTH_AUDIENCE`, `AUTH_REDIRECT_URI`, `AUTH_SCOPES`, and `AUTH_STEP_UP_URL` do not exist.** They are
+retired, not deprecated (`config.ts:128–139`, its own block comment): the audience, redirect URIs,
+granted scopes, and step-up endpoint are read back from identity — `GET /api/v1/apps/me`, fetched by the
+SDK's own `AppRegistryClient` (`AuthClient.getAppRegistration()`, `auth-client.ts:184`) — rather than
+restated in env vars, because "a stale value in a deploy silently overriding what identity says is worse
+than having no override at all." **`AUTH_SESSION_SECRET` does not exist either** — the login-state cookie
+needs no sealing key; see §11.14. The escape hatch for all four is `browser: { redirectUri, scopes,
+stepUpUrl }` in code (`AuthModule.forRoot({ browser: {...} })`), visible and reviewed, not an env var.
 
 Anything settable by env is overridable in code via `AuthModule.forRoot({ browser: { … }, routes: { … } })`
-— code wins. Some apps lean on this: `pulse-server` and `novel-forge-server` each declare their **own**
-app-owned env var (`AUTH_APP_ID` — not an SDK-recognized name, just the app's own `bootstrap.ts` `Config.load`
-key) holding their identity client slug, then resolve audience/redirect/scopes from
-`GET {AUTH_ISSUER}/api/v1/apps/me` at boot and pass the result into `AuthModule.forRoot()` explicitly —
-so their steady-state deploy only sets `AUTH_ISSUER` + `AUTH_APP_ID` + a credential, none of the other
-rows in the table above. See their own `CLAUDE.md` before assuming the table above is what a given app
-actually reads — this is a per-app choice, not a second SDK config surface. Config MUST be read through
-`Config` — never `process.env`.
+— code wins. Config MUST be read through `Config` — never `process.env`.
 
 ## 5. What gets registered
 
 | Route | Behaviour |
 | --- | --- |
-| `GET /auth/login` | PKCE + `state` + `nonce` + `resource`; transient state sealed into its own cookie; redirect to identity. |
+| `GET /auth/login` | PKCE + `state` + `nonce` + `resource`; transient state cookie set (see §11.14); redirect to identity. |
 | `GET /auth/callback` | Validates `state`, redeems the code for a handle, sets the session cookie, returns to `return_to`. |
 | `POST /auth/logout` | Revokes the app session and clears the cookies. |
-| `POST /auth/backchannel-logout` | Verifies an OIDC logout token and drops matching local sessions. **See §11 — this does not fire for app-session clients.** |
+| `POST /auth/backchannel-logout` | Verifies an OIDC logout token and drops matching local sessions. **Off by default** (`DEFAULT_ROUTES.backchannelLogout = false`, `config.ts:190`) — see §11.1 for why: first-party revocation is pull, not push, so the route would sit there accepting nothing; it stays available (`routes: { backchannelLogout: '/backchannel-logout' }`) for the third-party `RelyingParty` path only. |
 | `GET /auth/session` | The current principal, or 401. |
 | `GET /auth/step-up` | Claims an elevation grant, prompting identity only when there is nothing to claim. |
+| `GET /auth/organisations`, `POST /auth/organisation` | Lists the organisations this session may act in, and switches the active one (rotating the session cookie). |
 
-Override paths or disable any route with `routes: { basePath: '/session', backchannelLogout: false }`.
-`AuthModule.forRoot()` now also wires organisation-switch routes/DTOs when the app has multi-org
-principals — see `references/api-catalog.md` → `@shadow-library/auth` → `./module` for the current
-`AuthOrganisationItem`/`SwitchOrganisationBody` symbols; this file doesn't enumerate every field since
-the exact route paths are per-app configurable like the rest of this table.
+Override any path or turn a route off with `routes: { basePath: '/session', stepUp: false }`.
+
+**The browser routes are gated by `AUTH_BROWSER_LOGIN` (default `true`) AND having client credentials
+configured** (`resolveBrowserAuthConfig`, `config.ts:228`: `enabled = (options.enabled ??
+Config.get('auth.browser-login')) && Boolean(client.client)`) — not by any redirect-URI condition. An
+API-only service with no client credential gets no browser routes automatically; one with credentials
+gets them unless explicitly turned off.
 
 ## 6. Guards and the principal
 
@@ -162,10 +185,14 @@ The SDK drives claim → prompt → retry for browsers and answers `IAM_003` to 
 token is minted only for the routes that require it, cached under a separate key, and dies with its grant.
 A user working across two apps steps up in each — that is the isolation, not a bug.
 
-**There is no step-up endpoint on identity that an app can redirect to.** Identity performs step-up on its
-own domain via session-cookie-authenticated API calls made by the identity UI (`POST /api/v1/me/mfa/step-up`,
-`.../webauthn/step-up`). So `AUTH_STEP_UP_URL` MUST be set to whatever identity-domain **page** hosts that
-flow, with the SDK appending `return_to`. Do not assume a default works.
+**Identity's discovery document advertises `step_up_endpoint`, and the SDK reads it — no manual URL
+config needed.** Identity returns `step_up_endpoint: ${issuer}/step-up` (`oauth.controller.ts:87`);
+`AuthClient.getStepUpEndpoint()` (`auth-client.ts:493`) uses that value directly, falling back to
+`${issuer}/auth/step-up` only if discovery omits it (a warning-logged degraded path that identity's own
+discovery never actually triggers). `BrowserAuthOptions.stepUpUrl` is still available as an override for
+a non-standard deployment, but it is not required — the doc comment on the option itself says so
+verbatim: "Overrides discovery's `step_up_endpoint`; the endpoint is derived, not configured"
+(`config.ts:76`).
 
 The grant is consumed on claim: identity clears the central `elevated_until` while leaving `aal = AAL2`.
 
@@ -199,7 +226,7 @@ exercised. Drivers: `setSteppedUp`, `endIdentitySession`, `issueLogoutToken`, `g
 Integration specs boot a real graph (`ShadowFactory.create`) and drive the router via
 `app.get(Dispatcher).mockRequest()`.
 
-## 11. Landmines (verified against identity source)
+## 11. Landmines (verified against identity/auth source)
 
 1. **Back-channel logout does not reach app-session clients.** Identity derives its recipient set from
    `refresh_token_families` bound to the session, and the app-session flow never creates one. Revocation is
@@ -232,14 +259,22 @@ Integration specs boot a real graph (`ShadowFactory.create`) and drive the route
     `invalid_scope`, `invalid_grant`, `invalid_client`. `AUTH_005`/`AUTH_006` do appear verbatim.
 13. **Token requests are form-encoded.** Identity still accepts JSON but logs it as deprecated; the SDK sends
     form-encoded already.
-14. **The login-state cookie is now stateless.** `@shadow-library/auth/module`'s old `LoginStateStore`/
-    `InMemoryLoginStateStore`/`SealedLoginStateStore` abstraction is gone — login state is sealed directly
-    into the transient cookie via `encodeLoginState`/`decodeLoginState` (`AUTH_SESSION_SECRET` still seals
-    it; still single-instance-only without it). If you see the old store classes referenced anywhere,
-    that's stale.
+14. **The login-state cookie is deliberately unsealed, with no server-side store.** `login-state.ts`'s own
+    block comment: it travels as a plain `__Host-`-prefixed, `HttpOnly`, `Secure`, `SameSite=Lax` cookie —
+    "no sealing key, no server-side store, and therefore no shared secret to distribute and no
+    single-instance caveat." That's a deliberate downgrade from an earlier sealed-cookie design, and it
+    holds because login-CSRF is defeated by the `__Host-` prefix (not encryption), a leaked PKCE verifier
+    is inert without the app's own M2M credential, and `state` is compared in constant time
+    (`matchesState`, `timingSafeEqual`). There is nothing here that needs `AUTH_SESSION_SECRET` — that
+    env var doesn't exist (see §4). If you see the old sealed/store-backed design (`LoginStateStore`,
+    `InMemoryLoginStateStore`, `SealedLoginStateStore`, or a caveat about needing a shared secret in a
+    multi-replica deploy) referenced anywhere, that's stale.
 15. **Stale identity docs — do not propagate:** `service-integration-guide.md` (seeded novel-forge/webnovel
-    clients, UUID client ids, `ECOSYSTEM_*` env vars, lowercase `aal1`/`aal2`, `checkAll` batch PDP);
-    `auth/api-contract.md` (`POST /auth/step-up`); `architecture.md` (`acr`/`amr` on access tokens,
-    `GET /oauth2/logout`, batch PDP, BCL destroying app sessions); `sdk.md` (claims the SDK is a workspace
-    package of identity-server — it's `packages/auth`, a sibling workspace in this same monorepo, but its
-    own independent package with its own `.shadowrc.json`, not physically inside identity-server).
+    clients as a `<app>`/`<app>-server` pair — see §3 for the current one-client model; UUID client ids,
+    `ECOSYSTEM_*` env vars, lowercase `aal1`/`aal2`, `checkAll` batch PDP — note its `app-session:manage`
+    grant description at line 73 is otherwise consistent with current source); `auth/api-contract.md`
+    (`POST /auth/step-up`); `architecture.md` (`acr`/`amr` on access tokens, `GET /oauth2/logout`, batch
+    PDP, BCL destroying app sessions). `packages/auth/docs/sdk.md` is **not** stale on this point — it
+    correctly documents the SDK's history: "this repository — originally developed inside
+    `identity-server` as the workspace package `packages/auth`, since extracted so consumers version the
+    SDK independently" (`sdk.md:8`).

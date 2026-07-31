@@ -86,6 +86,14 @@ via `workspace:*` — never independently deployed, and nothing in this monorepo
 `version` fields in `packages/*/package.json` are frozen leftovers from the pre-monorepo repos and
 carry no meaning; do not bump them.
 
+**External deps shared across workspaces come from the root `catalog:` block** (root `package.json`
+`catalog`, e.g. `typescript`, `react`, `react-dom`, `fastify`, `drizzle-orm`, `@tanstack/react-*`,
+`@types/bun`, `@types/node`, `@types/react*`, `vite`, `@playwright/test`, `ajv`, `light-my-request`,
+`type-fest`, `reflect-metadata`). A workspace depending on one of these declares it as `"<pkg>":
+"catalog:"` instead of a version string, so every workspace stays on the one pinned version Bun
+resolves from the root — check the catalog before adding a version-pinned dep for anything already
+listed there.
+
 Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `modules` (a server typically
 uses all five, plus `auth` when it verifies tokens or guards routes — every backend does except
 `identity-server`, which *is* the identity provider `auth` talks to). A web app uses `ui` (always) and
@@ -115,7 +123,7 @@ workspace's `build`/`verify`/`check-migrations`/`generate:api-types` script invo
 | 1 | MUST read env/config via `Config` (`common`); MUST NOT read `process.env` in app code | Only exception: infra scripts that run outside the app (e.g. `drizzle.config.ts`) |
 | 2 | MUST log via `Logger.getLogger(namespace, label)`; MUST NOT use `console.*` | winston/pino/bare console |
 | 3 | MUST throw catalog errors: domain → `ErrorCode` subclass `.create()`/`.throw()`; invariant/infra → `AppError.internal(reason, cause)`; field validation → `ValidationError`; generic HTTP → `ServerErrorCode` (`fastify`) | `new Error(...)`, ad-hoc error objects |
-| 4 | MUST NOT import legacy/nonexistent symbols: `InternalError`, `NeverError`, `ServerError`, `APIError`, `HttpErrorCode`, `CloudWatchTransport`, `@Ctx` (removed in `fastify@2.0.0-alpha.1`) — none of these exist in current packages | — |
+| 4 | MUST NOT import legacy/nonexistent symbols: `InternalError`, `NeverError`, `ServerError`, `APIError`, `HttpErrorCode`, `CloudWatchTransport`, `@Ctx` (removed from `fastify` in its v2 line) — none of these exist in current packages | — |
 | 5 | MUST wire services via `@Injectable` + `@Module`; MUST NOT `new` a service (outside DI factories) | manual singletons |
 | 6 | MUST define request/response shapes as `@Schema`/`@Field` classes in `*.dto.ts` | Zod/Joi/Yup/hand-written JSON Schema, inline DTOs |
 | 7 | MUST let `@RespondFor(status, Dto)` serialize responses; MUST NOT hand-build response objects or add `toResponse()` mappers | — |
@@ -126,7 +134,7 @@ workspace's `build`/`verify`/`check-migrations`/`generate:api-types` script invo
 | 12 | MUST check `references/api-catalog.md` before adding any utility; MUST NOT duplicate an existing public export | — |
 | 13 | File/naming/style conventions (banners, kebab-case + role suffix, named exports + barrels, import grouping) MUST match the workspace — see `references/backend.md` §Style | — |
 | 14 | User login MUST come from `AuthModule.forRoot()` + `AUTH_*` env vars. Every Shadow app is **first-party**: MUST NOT hand-write a login/callback/logout route, a session cookie, a token cache, or use `RelyingParty` directly. MUST NOT put a token in a cookie — the cookie carries an opaque app-session handle | hand-rolled OIDC, `RelyingParty` in a Shadow app, JWT-in-cookie |
-| 15 | Internal dependencies on other `packages/*` MUST use `workspace:*`; MUST NOT add a pinned version or reach for an npm-published copy — nothing in this monorepo is published | `bun add @shadow-library/x@<version>` |
+| 15 | Internal dependencies on other `packages/*` MUST use `workspace:*`; MUST NOT add a pinned version or reach for an npm-published copy — nothing in this monorepo is published | a version-pinned or registry-installed internal package dependency |
 
 ## Which package solves my problem?
 

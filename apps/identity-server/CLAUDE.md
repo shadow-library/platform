@@ -54,10 +54,11 @@ one client belongs **here**, not in the web app.
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
 5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
-   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this repo only** —
-   never edit the sibling repo's `package.json`.
+   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
+   only** — never edit another workspace's `package.json` to solve a problem here.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
-   deletion unless the user **explicitly** requests it. This repo has its own independent history.
+   deletion unless the user **explicitly** requests it. This monorepo's history is shared across every
+   workspace — a destructive operation here isn't scoped to just this workspace.
 
 ---
 
