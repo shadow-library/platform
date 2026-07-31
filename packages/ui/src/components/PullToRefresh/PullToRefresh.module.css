@@ -1,0 +1,101 @@
+/*
+ * Pull To Refresh — the root is the scroll container; content translates with the resisted pull
+ * while a spinner fades/rotates in with progress (--ptr-progress) and spins while refreshing.
+ * overscroll-behavior keeps the browser's own pull-to-refresh from hijacking the gesture.
+ */
+
+.root {
+  position: relative;
+  overflow-y: auto;
+  overscroll-behavior-y: contain;
+}
+
+.content {
+  transform: translateY(var(--ptr-distance, 0px));
+  transition: transform var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.root[data-status='pulling'] .content,
+.root[data-status='armed'] .content {
+  transition: none;
+}
+
+.indicator {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-surface-raised);
+  box-shadow: var(--sh-shadow-e2);
+  opacity: var(--ptr-progress, 0);
+  transform: translateX(-50%) rotate(calc(var(--ptr-progress, 0) * 180deg));
+  pointer-events: none;
+}
+
+.spinner {
+  width: 16px;
+  height: 16px;
+  border: 2px solid color-mix(in srgb, var(--sh-accent) 30%, transparent);
+  border-top-color: var(--sh-accent);
+  border-radius: var(--sh-radius-full);
+}
+.root[data-status='refreshing'] .spinner {
+  animation: sh-ptr-spin 800ms linear infinite;
+}
+
+/* ── Keyboard affordance (skip-link treatment) ───────────── */
+.refreshAffordance {
+  position: absolute;
+  left: 50%;
+  top: -100px;
+  z-index: var(--sh-z-sticky);
+  padding: 8px 12px;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-card);
+  box-shadow: var(--sh-shadow-e2);
+  color: var(--sh-text-primary);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  cursor: pointer;
+  transform: translateX(-50%);
+  transition: top var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.refreshAffordance:focus-visible {
+  top: 8px;
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Live region ─────────────────────────────────────────── */
+.status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes sh-ptr-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    transition: none;
+  }
+  .indicator {
+    transform: translateX(-50%);
+  }
+}

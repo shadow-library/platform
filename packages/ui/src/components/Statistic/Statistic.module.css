@@ -1,0 +1,164 @@
+.root {
+  display: inline-block;
+  text-align: left;
+  color: inherit;
+}
+
+/* Interactive block resets native button/anchor chrome */
+.root[data-interactive] {
+  appearance: none;
+  margin: 0;
+  padding: 8px;
+  border: none;
+  border-radius: var(--sh-radius-md);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+  text-decoration: none;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root[data-interactive]:hover {
+  background-color: var(--sh-bg-hover);
+}
+.root[data-interactive]:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: var(--sh-focus-ring-offset);
+}
+
+.visual {
+  display: flex;
+  flex-direction: column;
+}
+
+.label {
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+}
+
+.valueRow {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.value {
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  animation: sh-stat-fade var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.unit {
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+}
+
+.spark {
+  display: inline-flex;
+  align-items: center;
+  width: 48px;
+  height: 20px;
+  margin-left: 4px;
+  align-self: center;
+}
+
+/* Sizes — value / line-height / unit tucked to ~55% */
+.root[data-size='sm'] .value {
+  font-size: 20px;
+  line-height: 26px;
+}
+.root[data-size='sm'] .unit {
+  font-size: 13px;
+}
+.root[data-size='md'] .value {
+  font-size: 28px;
+  line-height: 34px;
+}
+.root[data-size='md'] .unit {
+  font-size: 15px;
+}
+.root[data-size='lg'] .value {
+  font-size: 36px;
+  line-height: 44px;
+}
+.root[data-size='lg'] .unit {
+  font-size: 20px;
+}
+
+.valueSkeleton {
+  width: 80px;
+  height: 1em;
+  font-size: inherit;
+}
+.root[data-size='sm'] .valueSkeleton {
+  height: 20px;
+}
+.root[data-size='md'] .valueSkeleton {
+  height: 28px;
+}
+.root[data-size='lg'] .valueSkeleton {
+  height: 36px;
+}
+
+.deltaRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+
+.delta {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  transition: color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.delta[data-sentiment='good'] {
+  color: var(--sh-success-text);
+}
+.delta[data-sentiment='bad'] {
+  color: var(--sh-danger-text);
+}
+.delta[data-sentiment='neutral'] {
+  color: var(--sh-text-secondary);
+}
+
+.comparison {
+  font-size: var(--sh-text-caption);
+  font-weight: 400;
+  color: var(--sh-text-tertiary);
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes sh-stat-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .value {
+    animation: none;
+  }
+}

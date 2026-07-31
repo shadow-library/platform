@@ -1,0 +1,54 @@
+/*
+ * Spinner — a border-ring trick: a 2px track in border-default with the top edge in accent, rotated
+ * at the tokenized spin speed. Reduced motion freezes it to a static ring.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--sh-accent);
+}
+
+.ring {
+  border-radius: var(--sh-radius-full);
+  border: 2px solid var(--sh-border-default);
+  border-top-color: currentColor;
+  animation: sh-spinner-spin 800ms linear infinite;
+}
+.root[data-size='sm'] .ring {
+  width: 14px;
+  height: 14px;
+}
+.root[data-size='md'] .ring {
+  width: 20px;
+  height: 20px;
+}
+.root[data-size='lg'] .ring {
+  width: 24px;
+  height: 24px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes sh-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ring {
+    animation: none;
+  }
+}

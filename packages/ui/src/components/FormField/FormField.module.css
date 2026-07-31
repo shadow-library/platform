@@ -1,0 +1,70 @@
+/*
+ * Form Field — no surface of its own; purely typographic layout that wraps a control. Label above,
+ * helper/error below in a single slot. Tokens only.
+ */
+
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.root[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+}
+
+.labelRow {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.label {
+  font-size: var(--sh-text-body-sm);
+  line-height: 20px;
+  font-weight: 500;
+  color: var(--sh-text-primary);
+}
+.marker {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.helper {
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-text-tertiary);
+}
+
+.error {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 0;
+  font-size: var(--sh-text-caption);
+  line-height: 18px;
+  color: var(--sh-danger-text-on-subtle);
+  animation: sh-field-error-in var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.errorIcon {
+  display: inline-flex;
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--sh-danger-text-on-subtle);
+}
+.errorIcon svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+@keyframes sh-field-error-in {
+  from {
+    opacity: 0;
+    transform: translateY(-2px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}

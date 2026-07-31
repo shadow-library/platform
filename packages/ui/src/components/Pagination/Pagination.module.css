@@ -1,0 +1,89 @@
+/*
+ * Pagination — existing tokens only. Ghost page/arrow buttons hover to bg-hover; the current page is
+ * a marker (accent-soft fill + accent text + 600), never a disabled or pressed look. Sits in Table's
+ * footer.
+ */
+
+.root {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.summary {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.controls {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+
+.page,
+.arrow {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--sh-control-height-md);
+  height: var(--sh-control-height-md);
+  padding: 0 6px;
+  border: none;
+  background: transparent;
+  border-radius: var(--sh-radius-md);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.page:hover:not([data-current]),
+.arrow:not(:disabled):hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.page[data-current] {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-weight: 600;
+  cursor: default;
+}
+.page:focus-visible,
+.arrow:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+.arrow:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+.arrow svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.ellipsis {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: var(--sh-control-height-md);
+  height: var(--sh-control-height-md);
+  color: var(--sh-text-tertiary);
+}
+
+.compact {
+  padding: 0 8px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.pageSize {
+  width: auto;
+}

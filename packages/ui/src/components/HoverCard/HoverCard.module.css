@@ -1,0 +1,46 @@
+.card {
+  width: var(--hovercard-width, 300px);
+  max-height: 240px;
+  overflow: hidden auto;
+  padding: 16px;
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-xl);
+  background: var(--sh-surface-raised);
+  box-shadow: var(--sh-shadow-e2);
+  color: var(--sh-text-primary);
+  z-index: var(--sh-z-popover);
+  transform-origin: var(--radix-hover-card-content-transform-origin);
+  animation: sh-hovercard-in var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.card[data-state='closed'] {
+  animation: sh-hovercard-out var(--sh-duration-fast-exit, var(--sh-duration-fast)) var(--sh-ease-standard);
+}
+
+.fallback {
+  display: block;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+@keyframes sh-hovercard-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes sh-hovercard-out {
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card {
+    animation-name: sh-hovercard-fade;
+  }
+}
+@keyframes sh-hovercard-fade {
+  from {
+    opacity: 0;
+  }
+}

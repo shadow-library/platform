@@ -1,0 +1,110 @@
+.container {
+  display: flex;
+  height: 100%;
+  min-height: 0;
+  min-width: 0;
+}
+.container[data-direction='vertical'] {
+  flex-direction: column;
+}
+
+.pane {
+  min-width: 0;
+  min-height: 0;
+  overflow: auto;
+}
+
+/* Handle — 8px hit area over a 1px line that thickens to accent on approach */
+.handle {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  touch-action: none;
+}
+.container[data-direction='horizontal'] .handle {
+  width: 8px;
+  margin: 0 -3px;
+  cursor: col-resize;
+}
+.container[data-direction='vertical'] .handle {
+  height: 8px;
+  margin: -3px 0;
+  cursor: row-resize;
+}
+
+.handleLine {
+  background: var(--sh-border-subtle);
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    width var(--sh-duration-fast) var(--sh-ease-standard),
+    height var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.container[data-direction='horizontal'] .handleLine {
+  width: 1px;
+  height: 100%;
+}
+.container[data-direction='vertical'] .handleLine {
+  width: 100%;
+  height: 1px;
+}
+
+.handle:hover .handleLine,
+.container[data-dragging] .handleLine {
+  background: var(--sh-accent);
+}
+.container[data-direction='horizontal'] .handle:hover .handleLine,
+.container[data-direction='horizontal'][data-dragging] .handleLine {
+  width: 2px;
+}
+.container[data-direction='vertical'] .handle:hover .handleLine,
+.container[data-direction='vertical'][data-dragging] .handleLine {
+  height: 2px;
+}
+
+.handle:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -1px;
+  border-radius: var(--sh-radius-sm);
+}
+.handle:focus-visible .handleLine {
+  background: var(--sh-accent);
+}
+
+/* Restore rail for a collapsed pane */
+.rail {
+  flex: 0 0 auto;
+  align-self: stretch;
+  padding: 6px 8px;
+  border: none;
+  border-right: var(--sh-border-width) solid var(--sh-border-subtle);
+  background: var(--sh-surface-well);
+  color: var(--sh-text-secondary);
+  font: inherit;
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  cursor: pointer;
+  writing-mode: vertical-rl;
+}
+.container[data-direction='vertical'] .rail {
+  writing-mode: horizontal-tb;
+  align-self: stretch;
+  border-right: none;
+  border-bottom: var(--sh-border-width) solid var(--sh-border-subtle);
+  text-align: center;
+}
+.rail:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.rail:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .handleLine {
+    transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+  }
+}

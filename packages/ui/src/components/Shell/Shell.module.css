@@ -1,0 +1,291 @@
+/*
+ * Shell — the app scaffold. Chrome reads surface-app (no contrasting panels). The shell root carries
+ * theme (.dark) and density (data-density) so the token layer cascades app-wide from one place.
+ */
+
+.shell {
+  display: flex;
+  min-height: 100vh;
+  /* dvh tracks mobile browser chrome; the vh line above is the no-dvh fallback */
+  min-height: 100dvh;
+  background: var(--sh-surface-app);
+  color: var(--sh-text-primary);
+  /* Room the content region reserves for a bottom nav — override to match a taller custom bar. */
+  --sh-shell-bottom-nav-height: 56px;
+}
+
+.body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
+  /* Lets `main` scroll instead of pushing the pinned chrome off-screen when the shell is height-bound. */
+  min-height: 0;
+}
+
+/* From md up the chrome is pinned and the content region is the scroll container (breakpoint token
+   --sh-breakpoint-md 768). Below it the document scrolls, so mobile browsers keep their URL-bar
+   auto-hide and 100dvh never fights the collapsing viewport. */
+@media (min-width: 768px) {
+  .shell {
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+  }
+  .main {
+    overflow-y: auto;
+  }
+}
+
+/* ── Sidebar slot / mobile nav drawer ────────────────────── */
+.sidebarSlot {
+  display: contents;
+}
+/* Below md the persistent sidebar yields to the hamburger-driven nav drawer (breakpoint token --sh-breakpoint-md 768) */
+@media (max-width: 767px) {
+  .sidebarSlot {
+    display: none;
+  }
+}
+
+.navScrim {
+  position: fixed;
+  inset: 0;
+  z-index: var(--sh-z-scrim);
+  background: var(--sh-scrim);
+  animation: sh-shell-scrim-in var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.navScrim[data-state='closed'] {
+  animation: sh-shell-scrim-out var(--sh-duration-normal-exit) var(--sh-ease-standard);
+}
+
+.navDrawer {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  z-index: var(--sh-z-modal);
+  display: flex;
+  max-width: 85vw;
+  padding-left: var(--sh-safe-left);
+  background: var(--sh-surface-app);
+  box-shadow: var(--sh-shadow-e3);
+  animation: sh-shell-nav-in var(--sh-duration-slow) var(--sh-ease-emphasized);
+  outline: none;
+}
+.navDrawer[data-state='closed'] {
+  animation: sh-shell-nav-out var(--sh-duration-slow-exit) var(--sh-ease-standard);
+}
+/* At and above md the persistent sidebar is back; the drawer never shows there. */
+@media (min-width: 768px) {
+  .navScrim,
+  .navDrawer {
+    display: none;
+  }
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+@keyframes sh-shell-scrim-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sh-shell-scrim-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes sh-shell-nav-in {
+  from {
+    transform: translateX(-100%);
+  }
+}
+@keyframes sh-shell-nav-out {
+  to {
+    transform: translateX(-100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .navScrim,
+  .navDrawer {
+    animation: none;
+  }
+}
+
+/* ── Content region ──────────────────────────────────────
+   The shell owns the gutters and the reading column so no product has to rebuild them per page.
+   Gutters step up with the viewport — phones give the content its width back — and never fall inside
+   a display cutout. Override --sh-shell-gutter-* to retune a product without forking the component. */
+.main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  --sh-shell-gutter-inline: 16px;
+  --sh-shell-gutter-block: 20px;
+  --sh-shell-bottom-inset: var(--sh-safe-bottom);
+  padding-block: var(--sh-shell-gutter-block) calc(var(--sh-shell-gutter-block) + var(--sh-shell-bottom-inset));
+  padding-inline: max(var(--sh-shell-gutter-inline), var(--sh-safe-left)) max(var(--sh-shell-gutter-inline), var(--sh-safe-right));
+}
+.main[data-padding='sm'] {
+  --sh-shell-gutter-inline: 12px;
+  --sh-shell-gutter-block: 12px;
+}
+.main[data-padding='lg'] {
+  --sh-shell-gutter-inline: 24px;
+  --sh-shell-gutter-block: 24px;
+}
+/* Full-bleed: the shorthand outranks the longhands above at every breakpoint, so one rule is enough. */
+.main[data-padding='none'] {
+  padding: 0;
+}
+
+/* Breakpoint token --sh-breakpoint-sm 640 */
+@media (min-width: 640px) {
+  .main {
+    --sh-shell-gutter-inline: 24px;
+    --sh-shell-gutter-block: 24px;
+  }
+  .main[data-padding='sm'] {
+    --sh-shell-gutter-inline: 16px;
+    --sh-shell-gutter-block: 16px;
+  }
+  .main[data-padding='lg'] {
+    --sh-shell-gutter-inline: 32px;
+    --sh-shell-gutter-block: 32px;
+  }
+}
+
+/* Breakpoint token --sh-breakpoint-lg 1024 */
+@media (min-width: 1024px) {
+  .main {
+    --sh-shell-gutter-inline: 32px;
+    --sh-shell-gutter-block: 32px;
+  }
+  .main[data-padding='sm'] {
+    --sh-shell-gutter-inline: 20px;
+    --sh-shell-gutter-block: 20px;
+  }
+  .main[data-padding='lg'] {
+    --sh-shell-gutter-inline: 48px;
+    --sh-shell-gutter-block: 40px;
+  }
+  [data-density='compact'] .main {
+    --sh-shell-gutter-inline: 24px;
+    --sh-shell-gutter-block: 24px;
+  }
+}
+
+/* The reading column: centered once the region outgrows it, full width until then. Grows to fill the
+   region's height so a page can center an empty state against the whole viewport. */
+.content {
+  flex: 1 0 auto;
+  width: 100%;
+  margin-inline: auto;
+}
+
+/* ── Bottom navigation (phones only) ─────────────────────
+   Always rendered so the server HTML already carries it; CSS alone takes it away from md up, where the
+   persistent sidebar is back. The bar pads itself past the safe-area inset, so the content region
+   reserves the bar's own height plus that inset counted once — never twice.
+   Breakpoint token --sh-breakpoint-md 768. */
+@media (max-width: 767px) {
+  .shell[data-bottom-nav] .main {
+    --sh-shell-bottom-inset: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom));
+  }
+  /* Full-bleed pages zero every padding, so the reservation has to be restated for them. */
+  .shell[data-bottom-nav] .main[data-padding='none'] {
+    padding-bottom: calc(var(--sh-shell-bottom-nav-height) + var(--sh-safe-bottom));
+  }
+}
+@media (min-width: 768px) {
+  .bottomNav {
+    display: none;
+  }
+}
+
+/* ── Skip link (first tab stop) ──────────────────────────── */
+.skipLink {
+  position: absolute;
+  left: 8px;
+  top: -100px;
+  z-index: var(--sh-z-tooltip);
+  padding: 8px 12px;
+  background: var(--sh-surface-card);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-md);
+  box-shadow: var(--sh-shadow-e2);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  text-decoration: none;
+  transition: top var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.skipLink:focus-visible {
+  top: 8px;
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Page ────────────────────────────────────────────────── */
+.page {
+  padding: 32px;
+}
+[data-density='compact'] .page {
+  padding: 24px;
+}
+/* Inside a shell the gutters already came from `main` — repeating them here would double them. */
+.page[data-framed] {
+  padding: 0;
+}
+.pageInner {
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 24px;
+}
+.breadcrumbs {
+  margin-bottom: 12px;
+}
+.titleRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.titleGroup {
+  min-width: 0;
+}
+.title {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  line-height: var(--sh-text-h1--line-height);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+.description {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-secondary);
+  max-width: 640px;
+}
+.actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}

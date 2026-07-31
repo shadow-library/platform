@@ -1,0 +1,58 @@
+/*
+ * Tooltip — the one inverted surface. Reads the tooltip surface/text tokens (which invert in dark),
+ * radius-md, e2 shadow in light only, no border, no arrow. Enters with a short fade + 4px rise from
+ * the trigger side using Radix's data-side/data-state hooks; opacity + transform only.
+ */
+
+.content {
+  max-width: 240px;
+  padding: 6px 10px;
+  border-radius: var(--sh-radius-md);
+  background: var(--sh-surface-tooltip);
+  color: var(--sh-text-on-tooltip);
+  box-shadow: var(--sh-shadow-e2);
+  font-size: var(--sh-text-caption);
+  line-height: 16px;
+  font-weight: 500;
+  z-index: var(--sh-z-tooltip);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  animation: sh-tooltip-in var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.content[data-state='closed'] {
+  animation: sh-tooltip-out var(--sh-duration-fast-exit) var(--sh-ease-standard);
+}
+
+.shortcut {
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--sh-text-tertiary);
+}
+
+@keyframes sh-tooltip-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@keyframes sh-tooltip-out {
+  from {
+    opacity: 1;
+  }
+  to {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content,
+  .content[data-state='closed'] {
+    animation: none;
+  }
+}

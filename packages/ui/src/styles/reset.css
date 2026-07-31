@@ -1,0 +1,68 @@
+/*
+ * Shadow UI — minimal, opinionated reset.
+ *
+ * Scoped to what the component library actually needs (box-sizing, margin collapse,
+ * inheritable typography on form controls, media defaults). It intentionally does not
+ * restyle every element the way a full reset would, to avoid clobbering a host app.
+ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--sh-font-sans);
+  font-size: var(--sh-text-body);
+  line-height: var(--sh-text-body--line-height);
+  color: var(--sh-text-primary);
+  background-color: var(--sh-surface-app);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+  color: inherit;
+}
+
+img,
+svg,
+video,
+canvas {
+  display: block;
+  max-width: 100%;
+}
+
+/* Collapse all non-opacity motion when the user prefers reduced motion (Foundations §09). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

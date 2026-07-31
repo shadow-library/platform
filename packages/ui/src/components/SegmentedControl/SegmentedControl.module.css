@@ -1,0 +1,74 @@
+/*
+ * Segmented Control — track reads surface-well; the selected segment becomes the thumb (surface-thumb
+ * + e1 in light, a lighter surface with no shadow in dark, since e1 is none in dark). Selection is
+ * thumb + shadow + text-color together, never color alone. The thumb slides via Radix's checked state.
+ */
+
+.track {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: var(--sh-control-height-md);
+  padding: 2px;
+  background: var(--sh-surface-well);
+  border-radius: var(--sh-radius-md);
+}
+.track[data-size='sm'] {
+  height: var(--sh-control-height-sm);
+}
+.track[data-full-width] {
+  display: flex;
+  width: 100%;
+}
+.track[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.item {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: 100%;
+  padding: 0 12px;
+  border: none;
+  background: transparent;
+  border-radius: var(--sh-radius-sm);
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  transition:
+    color var(--sh-duration-fast) var(--sh-ease-standard),
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.track[data-full-width] .item {
+  flex: 1;
+}
+.item:hover:not([data-state='checked']) {
+  color: var(--sh-text-primary);
+}
+.item[data-state='checked'] {
+  background: var(--sh-surface-thumb);
+  color: var(--sh-text-primary);
+  box-shadow: var(--sh-shadow-e1);
+}
+.item:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+.item svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    transition: none;
+  }
+}

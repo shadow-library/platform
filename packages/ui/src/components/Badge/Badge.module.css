@@ -1,0 +1,105 @@
+/*
+ * Badge — calm status marker. Each intent binds a set of local custom properties from the semantic
+ * token layer; the variants (soft/outline/count/dot) consume those, so intent and theme both flow
+ * from tokens with no per-intent variant rules.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  flex-shrink: 0;
+  height: 20px;
+  padding: 0 8px;
+  border: var(--sh-border-width) solid transparent;
+  border-radius: var(--sh-radius-full);
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+}
+.root[data-size='sm'] {
+  height: 16px;
+  padding: 0 6px;
+}
+
+/* ── Intent → local tokens ───────────────────────────────── */
+.root[data-intent='neutral'] {
+  --badge-subtle: var(--sh-neutral-bg-subtle);
+  --badge-text: var(--sh-neutral-text-on-subtle);
+  --badge-border: var(--sh-neutral-border);
+  --badge-solid: var(--sh-neutral-solid);
+  --badge-on-solid: var(--sh-neutral-on-solid);
+}
+.root[data-intent='info'] {
+  --badge-subtle: var(--sh-info-bg-subtle);
+  --badge-text: var(--sh-info-text-on-subtle);
+  --badge-border: var(--sh-info-border);
+  --badge-solid: var(--sh-info-solid);
+  --badge-on-solid: var(--sh-info-on-solid);
+}
+.root[data-intent='success'] {
+  --badge-subtle: var(--sh-success-bg-subtle);
+  --badge-text: var(--sh-success-text-on-subtle);
+  --badge-border: var(--sh-success-border);
+  --badge-solid: var(--sh-success-solid);
+  --badge-on-solid: var(--sh-success-on-solid);
+}
+.root[data-intent='warning'] {
+  --badge-subtle: var(--sh-warning-bg-subtle);
+  --badge-text: var(--sh-warning-text-on-subtle);
+  --badge-border: var(--sh-warning-border);
+  --badge-solid: var(--sh-warning-solid);
+  --badge-on-solid: var(--sh-warning-on-solid);
+}
+.root[data-intent='danger'] {
+  --badge-subtle: var(--sh-danger-bg-subtle);
+  --badge-text: var(--sh-danger-text-on-subtle);
+  --badge-border: var(--sh-danger-border);
+  --badge-solid: var(--sh-danger-solid);
+  --badge-on-solid: var(--sh-danger-on-solid);
+}
+
+/* ── Variants ────────────────────────────────────────────── */
+.root[data-variant='soft'] {
+  background: var(--badge-subtle);
+  color: var(--badge-text);
+}
+.root[data-variant='outline'] {
+  border-color: var(--badge-border);
+  color: var(--badge-text);
+}
+.root[data-variant='count'] {
+  min-width: 20px;
+  padding: 0 6px;
+  background: var(--badge-solid);
+  color: var(--badge-on-solid);
+  font-size: 11px; /* count-only step below caption */
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.root[data-variant='count'][data-size='sm'] {
+  min-width: 16px;
+}
+/* Passive counts read as a quiet neutral chip, not the dark neutral-solid. */
+.root[data-variant='count'][data-intent='neutral'] {
+  background: var(--sh-bg-pressed);
+  color: var(--sh-neutral-text-on-subtle);
+}
+.root[data-variant='dot'] {
+  height: auto;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+}
+
+/* ── Leading dot ─────────────────────────────────────────── */
+.dot {
+  width: 6px;
+  height: 6px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-full);
+  background: var(--badge-solid);
+}

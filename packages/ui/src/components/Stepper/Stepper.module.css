@@ -1,0 +1,210 @@
+.root {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+.root[data-orientation='vertical'] {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-areas:
+    'nav content'
+    'nav footer';
+  gap: 24px 32px;
+}
+.root[data-orientation='vertical'] .indicator {
+  grid-area: nav;
+}
+.root[data-orientation='vertical'] .content {
+  grid-area: content;
+}
+.root[data-orientation='vertical'] .footer {
+  grid-area: footer;
+}
+
+.list {
+  display: flex;
+  align-items: flex-start;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.stepItem {
+  display: flex;
+  align-items: flex-start;
+  flex: 1;
+}
+.stepItem:last-child {
+  flex: 0;
+}
+
+.connector {
+  flex: 1;
+  height: 2px;
+  margin-top: 12px;
+  min-width: 24px;
+  background: var(--sh-border-default);
+  transition: background-color var(--sh-duration-normal) var(--sh-ease-standard);
+}
+.connector[data-done] {
+  background: var(--sh-accent);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 4px;
+  border: none;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+  border-radius: var(--sh-radius-md);
+}
+.step[aria-disabled='true'] {
+  cursor: not-allowed;
+}
+.step:not([aria-disabled='true']):hover .label {
+  color: var(--sh-text-primary);
+}
+.step:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: 2px;
+}
+
+.dot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  border-radius: var(--sh-radius-full);
+  border: 2px solid var(--sh-border-strong);
+  background: var(--sh-surface-card);
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-caption);
+  font-weight: 600;
+  box-sizing: border-box;
+  transition:
+    background-color var(--sh-duration-fast) var(--sh-ease-standard),
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.dot[data-state='current'] {
+  border-color: var(--sh-accent);
+  color: var(--sh-accent);
+}
+.dot[data-state='completed'] {
+  border-color: var(--sh-accent);
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+}
+.dot[data-state='error'] {
+  border-color: var(--sh-danger-solid);
+  background: var(--sh-danger-solid);
+  color: var(--sh-danger-on-solid);
+}
+.dot[data-state='skipped'] {
+  color: var(--sh-text-tertiary);
+}
+
+.labels {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  text-align: center;
+}
+
+.label {
+  font-size: var(--sh-text-caption);
+  font-weight: 500;
+  color: var(--sh-text-secondary);
+}
+.step[data-state='current'] .label,
+.step[data-state='completed'] .label,
+.step[data-state='error'] .label {
+  color: var(--sh-text-primary);
+}
+.step[data-state='current'] .label {
+  font-weight: 600;
+}
+
+.hint {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+/* Vertical rail */
+.root[data-orientation='vertical'] .list {
+  flex-direction: column;
+}
+.root[data-orientation='vertical'] .stepItem {
+  flex-direction: column;
+  align-items: flex-start;
+}
+.root[data-orientation='vertical'] .connector {
+  width: 2px;
+  height: 16px;
+  min-width: 0;
+  margin: 0 0 0 12px;
+}
+.root[data-orientation='vertical'] .step {
+  flex-direction: row;
+  align-items: center;
+  gap: 10px;
+}
+.root[data-orientation='vertical'] .labels {
+  align-items: flex-start;
+  text-align: left;
+}
+
+.content {
+  min-height: 0;
+  outline: none;
+  animation: sh-step-in var(--sh-duration-fast) var(--sh-ease-standard);
+}
+
+.footer {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding-top: 16px;
+  border-top: var(--sh-border-width) solid var(--sh-border-subtle);
+}
+
+.status {
+  flex: 1;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+  text-align: center;
+}
+
+.footerActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@keyframes sh-step-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    animation-name: sh-step-fade;
+  }
+  .connector {
+    transition: none;
+  }
+}
+@keyframes sh-step-fade {
+  from {
+    opacity: 0;
+  }
+}

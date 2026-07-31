@@ -1,0 +1,134 @@
+/*
+ * Number Stepper — Input's field surface with step buttons inside the border. Split places − / + on
+ * the edges separated by hairlines; chevrons stack up/down in the right padding. Magnitude-hinting
+ * width, never full-width. All Input tokens.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: stretch;
+  width: 112px;
+  overflow: hidden;
+  background: var(--sh-surface-raised);
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  color: var(--sh-text-primary);
+  transition:
+    border-color var(--sh-duration-fast) var(--sh-ease-standard),
+    box-shadow var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.root[data-has-unit] {
+  width: 128px;
+}
+.root[data-size='sm'] {
+  height: var(--sh-control-height-sm);
+  border-radius: var(--sh-radius-sm);
+}
+.root[data-size='md'] {
+  height: var(--sh-control-height-md);
+  border-radius: var(--sh-radius-md);
+}
+.root[data-size='lg'] {
+  height: var(--sh-control-height-lg);
+  border-radius: var(--sh-radius-md);
+}
+.root:not([data-disabled]):not([data-readonly]):hover {
+  border-color: var(--sh-border-interactive);
+}
+.root:focus-within {
+  border-color: var(--sh-border-focus);
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring);
+}
+.root[data-invalid] {
+  border-color: var(--sh-danger-solid);
+}
+.root[data-invalid]:focus-within {
+  box-shadow: 0 0 0 3px var(--sh-focus-field-ring-error);
+}
+.root[data-disabled] {
+  opacity: var(--sh-disabled-opacity);
+}
+.root[data-readonly] {
+  background: var(--sh-surface-well);
+  border-color: transparent;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 8px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: inherit;
+  text-align: center;
+  outline: none;
+  font-variant-numeric: tabular-nums;
+}
+.root[data-buttons='chevrons'] .input {
+  text-align: left;
+  padding-left: 10px;
+}
+.root[data-size='lg'] .input {
+  font-size: var(--sh-text-body);
+}
+
+.unit {
+  display: inline-flex;
+  align-items: center;
+  padding-right: 6px;
+  color: var(--sh-text-tertiary);
+  font-size: var(--sh-text-body-sm);
+}
+
+/* ── Step buttons ────────────────────────────────────────── */
+.step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  transition: background-color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.step:hover:not(:disabled) {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.step:disabled {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+.step svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.root[data-buttons='split'] .step:first-child {
+  border-right: var(--sh-border-width) solid var(--sh-border-default);
+}
+.root[data-buttons='split'] .step:last-child {
+  border-left: var(--sh-border-width) solid var(--sh-border-default);
+}
+
+/* ── Chevron stack ───────────────────────────────────────── */
+.chevrons {
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  border-left: var(--sh-border-width) solid var(--sh-border-default);
+}
+.chevrons .step {
+  width: 24px;
+  height: 50%;
+}
+.chevrons .step svg {
+  width: 12px;
+  height: 12px;
+}

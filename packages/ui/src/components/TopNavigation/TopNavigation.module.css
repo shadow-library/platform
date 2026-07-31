@@ -1,0 +1,128 @@
+/*
+ * Top Navigation — surface-card bar with a border-default bottom edge (App Shell's header recipe).
+ * Full-height links; the active one draws a 2px accent underline over the bottom border. No background
+ * wash on links — the underline zone stays clean.
+ */
+
+.bar {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  /* The bar extends under the status bar / notch in standalone PWAs: safe-area padding
+     grows the box while the 56px content row stays centered (insets are 0 on desktop). */
+  height: calc(56px + var(--sh-safe-top));
+  padding: var(--sh-safe-top) calc(24px + var(--sh-safe-right)) 0 calc(24px + var(--sh-safe-left));
+  background: var(--sh-surface-card);
+  border-bottom: var(--sh-border-width) solid var(--sh-border-default);
+}
+[data-density='compact'] .bar {
+  height: calc(48px + var(--sh-safe-top));
+}
+
+/* Hamburger — only below md, where the shell swaps the persistent sidebar for the nav drawer
+   (breakpoint token --sh-breakpoint-md 768). The wrapper owns the media query so the IconButton
+   inside keeps its own display rules. */
+.menuSlot {
+  display: none;
+  align-items: center;
+  flex-shrink: 0;
+  margin-right: -8px;
+}
+@media (max-width: 767px) {
+  .menuSlot {
+    display: inline-flex;
+  }
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.links {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  height: 100%;
+}
+
+.link {
+  display: inline-flex;
+  align-items: center;
+  height: 100%;
+  padding: 0 10px;
+  border: none;
+  background: transparent;
+  font: inherit;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -1px;
+  transition: color var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.link:hover {
+  color: var(--sh-text-primary);
+}
+/* data-status is what a router link stamps on itself when it matches the current route, so an asChild
+   item needs no `active` prop to light up. */
+.link[data-active],
+.link[data-status='active'] {
+  color: var(--sh-text-primary);
+  font-weight: 500;
+  border-bottom-color: var(--sh-accent);
+}
+.link:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -4px;
+  border-radius: var(--sh-radius-md);
+}
+
+/* Claims the space between the destinations and the utility cluster and centres its child, so a search
+   field sits mid-bar without the destination row having to stretch to hold it. */
+.search {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.utility {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+/* ── More menu (inside a Popover surface; padding/min-width set inline) ── */
+.moreMenu {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.moreItem {
+  display: flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 8px;
+  border-radius: var(--sh-radius-sm);
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-primary);
+  text-decoration: none;
+}
+.moreItem:hover {
+  background: var(--sh-bg-hover);
+}
+.moreItem[data-active],
+.moreItem[data-status='active'] {
+  color: var(--sh-accent);
+  font-weight: 500;
+}

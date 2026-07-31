@@ -1,0 +1,81 @@
+/*
+ * Skeleton — a low-contrast base with a single slow sweep highlight (the sanctioned looping motion).
+ * Base reads bg-pressed, sweep reads bg-hover; both flip in dark. Reduced motion freezes to the flat
+ * base tone. Shapes set only their radius; dimensions come from the caller to match real content.
+ */
+
+.skeleton {
+  display: block;
+  position: relative;
+  overflow: hidden;
+  background: var(--sh-bg-pressed);
+  pointer-events: none;
+}
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, var(--sh-bg-hover), transparent);
+  transform: translateX(-100%);
+  animation: sh-skeleton-shimmer 1.6s linear infinite;
+}
+
+.skeleton[data-shape='line'] {
+  height: 10px;
+  border-radius: var(--sh-radius-sm);
+}
+.skeleton[data-shape='rect'] {
+  height: 100%;
+  border-radius: var(--sh-radius-md);
+}
+.skeleton[data-shape='circle'] {
+  border-radius: var(--sh-radius-full);
+}
+
+/* ── Presets ─────────────────────────────────────────────── */
+.table {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.tableRow {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 24px;
+}
+.card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+.listRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.listText {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+@keyframes sh-skeleton-shimmer {
+  to {
+    transform: translateX(100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+    display: none;
+  }
+}

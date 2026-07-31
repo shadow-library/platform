@@ -1,0 +1,36 @@
+/*
+ * Kbd — one keycap size (20px, mono 11) in both densities. Boxed reads surface-well + border-default
+ * + text-secondary; bare drops the box to text-placeholder on the host surface. Caps sit 4px apart
+ * with no "+" separator. No states, no motion.
+ */
+
+.root {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  line-height: 1;
+}
+
+.cap {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 20px;
+  min-width: 20px;
+  padding: 0 6px;
+  background: var(--sh-surface-well);
+  border: var(--sh-border-width) solid var(--sh-border-default);
+  border-radius: var(--sh-radius-sm);
+  color: var(--sh-text-secondary);
+}
+
+.root[data-bare] .cap {
+  height: auto;
+  min-width: 0;
+  padding: 0;
+  background: transparent;
+  border: none;
+  color: var(--sh-text-placeholder);
+}

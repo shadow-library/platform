@@ -1,0 +1,107 @@
+/*
+ * Swipe Actions — the row surface translates over absolutely-positioned action rails (surface-card
+ * covers them when closed). Rail actions are solid intent fills, ≥64px wide columns for finger use.
+ * touch-action: pan-y leaves vertical list scrolling to the browser; the component owns horizontal.
+ */
+
+.root {
+  position: relative;
+  overflow: hidden;
+}
+
+.actions {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  align-items: stretch;
+}
+.actions[data-side='leading'] {
+  left: 0;
+}
+.actions[data-side='trailing'] {
+  right: 0;
+}
+
+.content {
+  position: relative;
+  background: var(--sh-surface-card);
+  transform: translateX(var(--swipe-offset, 0px));
+  transition: transform var(--sh-duration-normal) var(--sh-ease-standard);
+  touch-action: pan-y;
+}
+.root[data-dragging] .content {
+  transition: none;
+}
+.content:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+
+.action {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  min-width: 64px;
+  padding: 0 16px;
+  border: none;
+  font: inherit;
+  font-size: var(--sh-text-caption);
+  line-height: var(--sh-text-caption--line-height);
+  font-weight: 500;
+  cursor: pointer;
+}
+.action:focus-visible {
+  outline: var(--sh-focus-ring-width) solid var(--sh-focus-ring);
+  outline-offset: -2px;
+}
+.action svg {
+  display: block;
+  width: 20px;
+  height: 20px;
+}
+
+/* ── Intent fills (solid + on-solid pairs) ───────────────── */
+.action[data-intent='neutral'] {
+  background: var(--sh-neutral-solid);
+  color: var(--sh-neutral-on-solid);
+}
+.action[data-intent='neutral']:hover {
+  background: var(--sh-neutral-solid-hover);
+}
+.action[data-intent='info'] {
+  background: var(--sh-info-solid);
+  color: var(--sh-info-on-solid);
+}
+.action[data-intent='info']:hover {
+  background: var(--sh-info-solid-hover);
+}
+.action[data-intent='success'] {
+  background: var(--sh-success-solid);
+  color: var(--sh-success-on-solid);
+}
+.action[data-intent='success']:hover {
+  background: var(--sh-success-solid-hover);
+}
+.action[data-intent='warning'] {
+  background: var(--sh-warning-solid);
+  color: var(--sh-warning-on-solid);
+}
+.action[data-intent='warning']:hover {
+  background: var(--sh-warning-solid-hover);
+}
+.action[data-intent='danger'] {
+  background: var(--sh-danger-solid);
+  color: var(--sh-danger-on-solid);
+}
+.action[data-intent='danger']:hover {
+  background: var(--sh-danger-solid-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .content {
+    transition: none;
+  }
+}

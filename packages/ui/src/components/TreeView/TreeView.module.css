@@ -1,0 +1,137 @@
+/*
+ * Tree View — dense working surface. Rest/hover text-secondary + bg-hover; selected accent-soft +
+ * 3px accent edge bar; the focus cursor is a 2px accent inset outline (distinct from selection, same
+ * grammar as Data Grid cell focus). Guides border-subtle. Zero tree-specific tokens.
+ */
+
+.root {
+  font-size: var(--sh-text-body-sm);
+}
+.group {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.item {
+  position: relative;
+  outline: none;
+}
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding-right: 8px;
+  color: var(--sh-text-secondary);
+  cursor: pointer;
+  border-radius: var(--sh-radius-sm);
+}
+[data-density='compact'] .row {
+  height: 24px;
+}
+.item > .row:hover {
+  background: var(--sh-bg-hover);
+  color: var(--sh-text-primary);
+}
+.item[data-selected] > .row {
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  font-weight: 500;
+}
+.item[data-selected] > .row::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 4px;
+  bottom: 4px;
+  width: 3px;
+  border-radius: 0 var(--sh-radius-sm) var(--sh-radius-sm) 0;
+  background: var(--sh-accent);
+}
+.item[data-focused] > .row {
+  outline: 2px solid var(--sh-accent);
+  outline-offset: -2px;
+}
+.item[data-disabled] > .row {
+  opacity: var(--sh-disabled-opacity);
+  cursor: not-allowed;
+}
+
+.chevron,
+.chevronSpacer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  color: var(--sh-text-tertiary);
+}
+.chevron {
+  cursor: pointer;
+  transition: transform var(--sh-duration-fast) var(--sh-ease-standard);
+}
+.chevron[data-expanded] {
+  transform: rotate(90deg);
+}
+.chevron svg {
+  display: block;
+  width: 14px;
+  height: 14px;
+}
+
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  border: var(--sh-border-width) solid var(--sh-border-strong);
+  border-radius: var(--sh-radius-sm);
+  background: var(--sh-surface-raised);
+  color: var(--sh-on-accent);
+}
+.checkbox[data-checked],
+.checkbox[data-indeterminate] {
+  background: var(--sh-accent);
+  border-color: var(--sh-accent);
+}
+.checkbox svg {
+  display: block;
+  width: 12px;
+  height: 12px;
+}
+.dash {
+  width: 8px;
+  height: 2px;
+  border-radius: var(--sh-radius-full);
+  background: var(--sh-on-accent);
+}
+
+.icon {
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+  color: var(--sh-text-tertiary);
+}
+.icon svg {
+  display: block;
+  width: 16px;
+  height: 16px;
+}
+
+.label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .chevron {
+    transition: none;
+  }
+}
