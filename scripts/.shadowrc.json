@@ -1,0 +1,10 @@
+{
+  "build": {
+    "exports": {
+      ".": "index"
+    },
+    "bin": {
+      "shadow": "bin/shadow"
+    }
+  }
+}
