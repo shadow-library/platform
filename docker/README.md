@@ -29,19 +29,13 @@ worker: `docker run platform/identity-server:local worker.js`; any backend's mig
 
 SSR apps (`--target runtime-ssr`) need a production-only `node_modules` (`ARG SSR_ENTRY` selects
 the app's production entry file — `main.ts` for identity-web and web-novel-web, `serve.ts` for
-novel-forge-web):
+novel-forge-web and pulse-web):
 
 ```sh
 docker build -f docker/Dockerfile --target runtime-ssr --build-arg APP=identity-web                                             -t platform/identity-web:local     .
 docker build -f docker/Dockerfile --target runtime-ssr --build-arg APP=novel-forge-web --build-arg SSR_ENTRY=serve.ts           -t platform/novel-forge-web:local   .
+docker build -f docker/Dockerfile --target runtime-ssr --build-arg APP=pulse-web       --build-arg SSR_ENTRY=serve.ts           -t platform/pulse-web:local         .
 docker build -f docker/Dockerfile --target runtime-ssr --build-arg APP=web-novel-web                                            -t platform/web-novel-web:local     .
-```
-
-pulse-web is a static SPA served by its own `serve.ts` (`--target runtime-spa`, no
-`node_modules`):
-
-```sh
-docker build -f docker/Dockerfile --target runtime-spa --build-arg APP=pulse-web -t platform/pulse-web:local .
 ```
 
 ## Runtime contract
@@ -57,8 +51,8 @@ No image bakes in secrets or environment-specific URLs — everything below is s
 | web-novel-server | runtime-backend | 8080, 8081 | `GET :8081/health/live`, `:8081/health/ready`, also `GET :8080/health` | `DATABASE_POSTGRES_URL`, `AUTH_ISSUER`, `AUTH_APP_ID` |
 | identity-web | runtime-ssr | 3000 (app), 3001 (health) | `GET :3001/healthz` | `SERVER_URL` (identity-server origin) |
 | novel-forge-web | runtime-ssr | 3000, 3001 | `GET :3001/healthz` | `API_ORIGIN` (novel-forge-server origin); ingress must route `/api/auth/*` to novel-forge-server directly |
+| pulse-web | runtime-ssr | 3000, 3001 | `GET :3001/healthz` | `API_ORIGIN` (pulse-server origin); ingress must route `/api/auth/*` to pulse-server directly |
 | web-novel-web | runtime-ssr | 3000, 3001 | `GET :3001/healthz` | `SERVER_URL` (web-novel-server origin); reverse proxy routes `/api` to web-novel-server |
-| pulse-web | runtime-spa | 3000, 3001 | `GET :3001/healthz` | none — API is same-origin `/api`, routed to pulse-server by the ingress |
 
 The platform's backends bind their main port through two different, mutually exclusive config
 keys, and no backend reads a bare `PORT` at all (that env var is dead weight — some `.env.example`

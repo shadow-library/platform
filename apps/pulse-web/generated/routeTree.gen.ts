@@ -8,143 +8,143 @@
 // You should NOT make any changes in this file as it will be overwritten.
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
-import { Route as rootRouteImport } from './../src/routes/__root';
-import { Route as AppRouteImport } from './../src/routes/_app';
-import { Route as LoginRouteImport } from './../src/routes/login';
-import { Route as AppIndexRouteImport } from './../src/routes/_app/index';
-import { Route as AppLogsIndexRouteImport } from './../src/routes/_app/logs/index';
-import { Route as AppRoutingIndexRouteImport } from './../src/routes/_app/routing/index';
-import { Route as AppSendIndexRouteImport } from './../src/routes/_app/send/index';
-import { Route as AppSendersIndexRouteImport } from './../src/routes/_app/senders/index';
-import { Route as AppSendersProfileIdRouteImport } from './../src/routes/_app/senders/$profileId';
-import { Route as AppTemplatesIndexRouteImport } from './../src/routes/_app/templates/index';
-import { Route as AppTemplatesTemplateIdRouteImport } from './../src/routes/_app/templates/$templateId';
-import { Route as AppDesignLayoutsIndexRouteImport } from './../src/routes/_app/design/layouts/index';
-import { Route as AppDesignLayoutsLayoutIdRouteImport } from './../src/routes/_app/design/layouts/$layoutId';
-import { Route as AppDesignPartialsIndexRouteImport } from './../src/routes/_app/design/partials/index';
-import { Route as AppDesignPartialsPartialIdRouteImport } from './../src/routes/_app/design/partials/$partialId';
+import { Route as rootRouteImport } from './../src/routes/__root'
+import { Route as LoginRouteImport } from './../src/routes/login'
+import { Route as AppRouteImport } from './../src/routes/_app'
+import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
+import { Route as AppTemplatesIndexRouteImport } from './../src/routes/_app/templates/index'
+import { Route as AppSendersIndexRouteImport } from './../src/routes/_app/senders/index'
+import { Route as AppSendIndexRouteImport } from './../src/routes/_app/send/index'
+import { Route as AppRoutingIndexRouteImport } from './../src/routes/_app/routing/index'
+import { Route as AppLogsIndexRouteImport } from './../src/routes/_app/logs/index'
+import { Route as AppTemplatesTemplateIdRouteImport } from './../src/routes/_app/templates/$templateId'
+import { Route as AppSendersProfileIdRouteImport } from './../src/routes/_app/senders/$profileId'
+import { Route as AppDesignPartialsIndexRouteImport } from './../src/routes/_app/design/partials/index'
+import { Route as AppDesignLayoutsIndexRouteImport } from './../src/routes/_app/design/layouts/index'
+import { Route as AppDesignPartialsPartialIdRouteImport } from './../src/routes/_app/design/partials/$partialId'
+import { Route as AppDesignLayoutsLayoutIdRouteImport } from './../src/routes/_app/design/layouts/$layoutId'
 
-const AppRoute = AppRouteImport.update({
-  id: '/_app',
-  getParentRoute: () => rootRouteImport,
-} as any);
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
   getParentRoute: () => rootRouteImport,
-} as any);
+} as any)
+const AppRoute = AppRouteImport.update({
+  id: '/_app',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRoute,
-} as any);
-const AppLogsIndexRoute = AppLogsIndexRouteImport.update({
-  id: '/logs/',
-  path: '/logs/',
-  getParentRoute: () => AppRoute,
-} as any);
-const AppRoutingIndexRoute = AppRoutingIndexRouteImport.update({
-  id: '/routing/',
-  path: '/routing/',
-  getParentRoute: () => AppRoute,
-} as any);
-const AppSendIndexRoute = AppSendIndexRouteImport.update({
-  id: '/send/',
-  path: '/send/',
-  getParentRoute: () => AppRoute,
-} as any);
-const AppSendersIndexRoute = AppSendersIndexRouteImport.update({
-  id: '/senders/',
-  path: '/senders/',
-  getParentRoute: () => AppRoute,
-} as any);
-const AppSendersProfileIdRoute = AppSendersProfileIdRouteImport.update({
-  id: '/senders/$profileId',
-  path: '/senders/$profileId',
-  getParentRoute: () => AppRoute,
-} as any);
+} as any)
 const AppTemplatesIndexRoute = AppTemplatesIndexRouteImport.update({
   id: '/templates/',
   path: '/templates/',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
+const AppSendersIndexRoute = AppSendersIndexRouteImport.update({
+  id: '/senders/',
+  path: '/senders/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppSendIndexRoute = AppSendIndexRouteImport.update({
+  id: '/send/',
+  path: '/send/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppRoutingIndexRoute = AppRoutingIndexRouteImport.update({
+  id: '/routing/',
+  path: '/routing/',
+  getParentRoute: () => AppRoute,
+} as any)
+const AppLogsIndexRoute = AppLogsIndexRouteImport.update({
+  id: '/logs/',
+  path: '/logs/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppTemplatesTemplateIdRoute = AppTemplatesTemplateIdRouteImport.update({
   id: '/templates/$templateId',
   path: '/templates/$templateId',
   getParentRoute: () => AppRoute,
-} as any);
-const AppDesignLayoutsIndexRoute = AppDesignLayoutsIndexRouteImport.update({
-  id: '/design/layouts/',
-  path: '/design/layouts/',
+} as any)
+const AppSendersProfileIdRoute = AppSendersProfileIdRouteImport.update({
+  id: '/senders/$profileId',
+  path: '/senders/$profileId',
   getParentRoute: () => AppRoute,
-} as any);
-const AppDesignLayoutsLayoutIdRoute =
-  AppDesignLayoutsLayoutIdRouteImport.update({
-    id: '/design/layouts/$layoutId',
-    path: '/design/layouts/$layoutId',
-    getParentRoute: () => AppRoute,
-  } as any);
+} as any)
 const AppDesignPartialsIndexRoute = AppDesignPartialsIndexRouteImport.update({
   id: '/design/partials/',
   path: '/design/partials/',
   getParentRoute: () => AppRoute,
-} as any);
+} as any)
+const AppDesignLayoutsIndexRoute = AppDesignLayoutsIndexRouteImport.update({
+  id: '/design/layouts/',
+  path: '/design/layouts/',
+  getParentRoute: () => AppRoute,
+} as any)
 const AppDesignPartialsPartialIdRoute =
   AppDesignPartialsPartialIdRouteImport.update({
     id: '/design/partials/$partialId',
     path: '/design/partials/$partialId',
     getParentRoute: () => AppRoute,
-  } as any);
+  } as any)
+const AppDesignLayoutsLayoutIdRoute =
+  AppDesignLayoutsLayoutIdRouteImport.update({
+    id: '/design/layouts/$layoutId',
+    path: '/design/layouts/$layoutId',
+    getParentRoute: () => AppRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
-  '/': typeof AppIndexRoute;
-  '/login': typeof LoginRoute;
-  '/senders/$profileId': typeof AppSendersProfileIdRoute;
-  '/templates/$templateId': typeof AppTemplatesTemplateIdRoute;
-  '/logs/': typeof AppLogsIndexRoute;
-  '/routing/': typeof AppRoutingIndexRoute;
-  '/send/': typeof AppSendIndexRoute;
-  '/senders/': typeof AppSendersIndexRoute;
-  '/templates/': typeof AppTemplatesIndexRoute;
-  '/design/layouts/$layoutId': typeof AppDesignLayoutsLayoutIdRoute;
-  '/design/partials/$partialId': typeof AppDesignPartialsPartialIdRoute;
-  '/design/layouts/': typeof AppDesignLayoutsIndexRoute;
-  '/design/partials/': typeof AppDesignPartialsIndexRoute;
+  '/': typeof AppIndexRoute
+  '/login': typeof LoginRoute
+  '/senders/$profileId': typeof AppSendersProfileIdRoute
+  '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
+  '/logs/': typeof AppLogsIndexRoute
+  '/routing/': typeof AppRoutingIndexRoute
+  '/send/': typeof AppSendIndexRoute
+  '/senders/': typeof AppSendersIndexRoute
+  '/templates/': typeof AppTemplatesIndexRoute
+  '/design/layouts/$layoutId': typeof AppDesignLayoutsLayoutIdRoute
+  '/design/partials/$partialId': typeof AppDesignPartialsPartialIdRoute
+  '/design/layouts/': typeof AppDesignLayoutsIndexRoute
+  '/design/partials/': typeof AppDesignPartialsIndexRoute
 }
 export interface FileRoutesByTo {
-  '/login': typeof LoginRoute;
-  '/': typeof AppIndexRoute;
-  '/senders/$profileId': typeof AppSendersProfileIdRoute;
-  '/templates/$templateId': typeof AppTemplatesTemplateIdRoute;
-  '/logs': typeof AppLogsIndexRoute;
-  '/routing': typeof AppRoutingIndexRoute;
-  '/send': typeof AppSendIndexRoute;
-  '/senders': typeof AppSendersIndexRoute;
-  '/templates': typeof AppTemplatesIndexRoute;
-  '/design/layouts/$layoutId': typeof AppDesignLayoutsLayoutIdRoute;
-  '/design/partials/$partialId': typeof AppDesignPartialsPartialIdRoute;
-  '/design/layouts': typeof AppDesignLayoutsIndexRoute;
-  '/design/partials': typeof AppDesignPartialsIndexRoute;
+  '/login': typeof LoginRoute
+  '/': typeof AppIndexRoute
+  '/senders/$profileId': typeof AppSendersProfileIdRoute
+  '/templates/$templateId': typeof AppTemplatesTemplateIdRoute
+  '/logs': typeof AppLogsIndexRoute
+  '/routing': typeof AppRoutingIndexRoute
+  '/send': typeof AppSendIndexRoute
+  '/senders': typeof AppSendersIndexRoute
+  '/templates': typeof AppTemplatesIndexRoute
+  '/design/layouts/$layoutId': typeof AppDesignLayoutsLayoutIdRoute
+  '/design/partials/$partialId': typeof AppDesignPartialsPartialIdRoute
+  '/design/layouts': typeof AppDesignLayoutsIndexRoute
+  '/design/partials': typeof AppDesignPartialsIndexRoute
 }
 export interface FileRoutesById {
-  __root__: typeof rootRouteImport;
-  '/_app': typeof AppRouteWithChildren;
-  '/login': typeof LoginRoute;
-  '/_app/': typeof AppIndexRoute;
-  '/_app/senders/$profileId': typeof AppSendersProfileIdRoute;
-  '/_app/templates/$templateId': typeof AppTemplatesTemplateIdRoute;
-  '/_app/logs/': typeof AppLogsIndexRoute;
-  '/_app/routing/': typeof AppRoutingIndexRoute;
-  '/_app/send/': typeof AppSendIndexRoute;
-  '/_app/senders/': typeof AppSendersIndexRoute;
-  '/_app/templates/': typeof AppTemplatesIndexRoute;
-  '/_app/design/layouts/$layoutId': typeof AppDesignLayoutsLayoutIdRoute;
-  '/_app/design/partials/$partialId': typeof AppDesignPartialsPartialIdRoute;
-  '/_app/design/layouts/': typeof AppDesignLayoutsIndexRoute;
-  '/_app/design/partials/': typeof AppDesignPartialsIndexRoute;
+  __root__: typeof rootRouteImport
+  '/_app': typeof AppRouteWithChildren
+  '/login': typeof LoginRoute
+  '/_app/': typeof AppIndexRoute
+  '/_app/senders/$profileId': typeof AppSendersProfileIdRoute
+  '/_app/templates/$templateId': typeof AppTemplatesTemplateIdRoute
+  '/_app/logs/': typeof AppLogsIndexRoute
+  '/_app/routing/': typeof AppRoutingIndexRoute
+  '/_app/send/': typeof AppSendIndexRoute
+  '/_app/senders/': typeof AppSendersIndexRoute
+  '/_app/templates/': typeof AppTemplatesIndexRoute
+  '/_app/design/layouts/$layoutId': typeof AppDesignLayoutsLayoutIdRoute
+  '/_app/design/partials/$partialId': typeof AppDesignPartialsPartialIdRoute
+  '/_app/design/layouts/': typeof AppDesignLayoutsIndexRoute
+  '/_app/design/partials/': typeof AppDesignPartialsIndexRoute
 }
 export interface FileRouteTypes {
-  fileRoutesByFullPath: FileRoutesByFullPath;
+  fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
     | '/login'
@@ -158,8 +158,8 @@ export interface FileRouteTypes {
     | '/design/layouts/$layoutId'
     | '/design/partials/$partialId'
     | '/design/layouts/'
-    | '/design/partials/';
-  fileRoutesByTo: FileRoutesByTo;
+    | '/design/partials/'
+  fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
     | '/'
@@ -173,7 +173,7 @@ export interface FileRouteTypes {
     | '/design/layouts/$layoutId'
     | '/design/partials/$partialId'
     | '/design/layouts'
-    | '/design/partials';
+    | '/design/partials'
   id:
     | '__root__'
     | '/_app'
@@ -189,130 +189,130 @@ export interface FileRouteTypes {
     | '/_app/design/layouts/$layoutId'
     | '/_app/design/partials/$partialId'
     | '/_app/design/layouts/'
-    | '/_app/design/partials/';
-  fileRoutesById: FileRoutesById;
+    | '/_app/design/partials/'
+  fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
-  AppRoute: typeof AppRouteWithChildren;
-  LoginRoute: typeof LoginRoute;
+  AppRoute: typeof AppRouteWithChildren
+  LoginRoute: typeof LoginRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/_app': {
-      id: '/_app';
-      path: '';
-      fullPath: '/';
-      preLoaderRoute: typeof AppRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
     '/login': {
-      id: '/login';
-      path: '/login';
-      fullPath: '/login';
-      preLoaderRoute: typeof LoginRouteImport;
-      parentRoute: typeof rootRouteImport;
-    };
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_app': {
+      id: '/_app'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AppRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_app/': {
-      id: '/_app/';
-      path: '/';
-      fullPath: '/';
-      preLoaderRoute: typeof AppIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/logs/': {
-      id: '/_app/logs/';
-      path: '/logs';
-      fullPath: '/logs/';
-      preLoaderRoute: typeof AppLogsIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/routing/': {
-      id: '/_app/routing/';
-      path: '/routing';
-      fullPath: '/routing/';
-      preLoaderRoute: typeof AppRoutingIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/send/': {
-      id: '/_app/send/';
-      path: '/send';
-      fullPath: '/send/';
-      preLoaderRoute: typeof AppSendIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/senders/': {
-      id: '/_app/senders/';
-      path: '/senders';
-      fullPath: '/senders/';
-      preLoaderRoute: typeof AppSendersIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/senders/$profileId': {
-      id: '/_app/senders/$profileId';
-      path: '/senders/$profileId';
-      fullPath: '/senders/$profileId';
-      preLoaderRoute: typeof AppSendersProfileIdRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof AppIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/templates/': {
-      id: '/_app/templates/';
-      path: '/templates';
-      fullPath: '/templates/';
-      preLoaderRoute: typeof AppTemplatesIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/templates/'
+      path: '/templates'
+      fullPath: '/templates/'
+      preLoaderRoute: typeof AppTemplatesIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/senders/': {
+      id: '/_app/senders/'
+      path: '/senders'
+      fullPath: '/senders/'
+      preLoaderRoute: typeof AppSendersIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/send/': {
+      id: '/_app/send/'
+      path: '/send'
+      fullPath: '/send/'
+      preLoaderRoute: typeof AppSendIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/routing/': {
+      id: '/_app/routing/'
+      path: '/routing'
+      fullPath: '/routing/'
+      preLoaderRoute: typeof AppRoutingIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/logs/': {
+      id: '/_app/logs/'
+      path: '/logs'
+      fullPath: '/logs/'
+      preLoaderRoute: typeof AppLogsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/templates/$templateId': {
-      id: '/_app/templates/$templateId';
-      path: '/templates/$templateId';
-      fullPath: '/templates/$templateId';
-      preLoaderRoute: typeof AppTemplatesTemplateIdRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/design/layouts/': {
-      id: '/_app/design/layouts/';
-      path: '/design/layouts';
-      fullPath: '/design/layouts/';
-      preLoaderRoute: typeof AppDesignLayoutsIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
-    '/_app/design/layouts/$layoutId': {
-      id: '/_app/design/layouts/$layoutId';
-      path: '/design/layouts/$layoutId';
-      fullPath: '/design/layouts/$layoutId';
-      preLoaderRoute: typeof AppDesignLayoutsLayoutIdRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/templates/$templateId'
+      path: '/templates/$templateId'
+      fullPath: '/templates/$templateId'
+      preLoaderRoute: typeof AppTemplatesTemplateIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/senders/$profileId': {
+      id: '/_app/senders/$profileId'
+      path: '/senders/$profileId'
+      fullPath: '/senders/$profileId'
+      preLoaderRoute: typeof AppSendersProfileIdRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/design/partials/': {
-      id: '/_app/design/partials/';
-      path: '/design/partials';
-      fullPath: '/design/partials/';
-      preLoaderRoute: typeof AppDesignPartialsIndexRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/design/partials/'
+      path: '/design/partials'
+      fullPath: '/design/partials/'
+      preLoaderRoute: typeof AppDesignPartialsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/design/layouts/': {
+      id: '/_app/design/layouts/'
+      path: '/design/layouts'
+      fullPath: '/design/layouts/'
+      preLoaderRoute: typeof AppDesignLayoutsIndexRouteImport
+      parentRoute: typeof AppRoute
+    }
     '/_app/design/partials/$partialId': {
-      id: '/_app/design/partials/$partialId';
-      path: '/design/partials/$partialId';
-      fullPath: '/design/partials/$partialId';
-      preLoaderRoute: typeof AppDesignPartialsPartialIdRouteImport;
-      parentRoute: typeof AppRoute;
-    };
+      id: '/_app/design/partials/$partialId'
+      path: '/design/partials/$partialId'
+      fullPath: '/design/partials/$partialId'
+      preLoaderRoute: typeof AppDesignPartialsPartialIdRouteImport
+      parentRoute: typeof AppRoute
+    }
+    '/_app/design/layouts/$layoutId': {
+      id: '/_app/design/layouts/$layoutId'
+      path: '/design/layouts/$layoutId'
+      fullPath: '/design/layouts/$layoutId'
+      preLoaderRoute: typeof AppDesignLayoutsLayoutIdRouteImport
+      parentRoute: typeof AppRoute
+    }
   }
 }
 
 interface AppRouteChildren {
-  AppIndexRoute: typeof AppIndexRoute;
-  AppSendersProfileIdRoute: typeof AppSendersProfileIdRoute;
-  AppTemplatesTemplateIdRoute: typeof AppTemplatesTemplateIdRoute;
-  AppLogsIndexRoute: typeof AppLogsIndexRoute;
-  AppRoutingIndexRoute: typeof AppRoutingIndexRoute;
-  AppSendIndexRoute: typeof AppSendIndexRoute;
-  AppSendersIndexRoute: typeof AppSendersIndexRoute;
-  AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute;
-  AppDesignLayoutsLayoutIdRoute: typeof AppDesignLayoutsLayoutIdRoute;
-  AppDesignPartialsPartialIdRoute: typeof AppDesignPartialsPartialIdRoute;
-  AppDesignLayoutsIndexRoute: typeof AppDesignLayoutsIndexRoute;
-  AppDesignPartialsIndexRoute: typeof AppDesignPartialsIndexRoute;
+  AppIndexRoute: typeof AppIndexRoute
+  AppSendersProfileIdRoute: typeof AppSendersProfileIdRoute
+  AppTemplatesTemplateIdRoute: typeof AppTemplatesTemplateIdRoute
+  AppLogsIndexRoute: typeof AppLogsIndexRoute
+  AppRoutingIndexRoute: typeof AppRoutingIndexRoute
+  AppSendIndexRoute: typeof AppSendIndexRoute
+  AppSendersIndexRoute: typeof AppSendersIndexRoute
+  AppTemplatesIndexRoute: typeof AppTemplatesIndexRoute
+  AppDesignLayoutsLayoutIdRoute: typeof AppDesignLayoutsLayoutIdRoute
+  AppDesignPartialsPartialIdRoute: typeof AppDesignPartialsPartialIdRoute
+  AppDesignLayoutsIndexRoute: typeof AppDesignLayoutsIndexRoute
+  AppDesignPartialsIndexRoute: typeof AppDesignPartialsIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
@@ -328,14 +328,23 @@ const AppRouteChildren: AppRouteChildren = {
   AppDesignPartialsPartialIdRoute: AppDesignPartialsPartialIdRoute,
   AppDesignLayoutsIndexRoute: AppDesignLayoutsIndexRoute,
   AppDesignPartialsIndexRoute: AppDesignPartialsIndexRoute,
-};
+}
 
-const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren);
+const AppRouteWithChildren = AppRoute._addFileChildren(AppRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   AppRoute: AppRouteWithChildren,
   LoginRoute: LoginRoute,
-};
+}
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
-  ._addFileTypes<FileRouteTypes>();
+  ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from '../src/router.tsx'
+import type { createStart } from '@tanstack/react-start'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+  }
+}

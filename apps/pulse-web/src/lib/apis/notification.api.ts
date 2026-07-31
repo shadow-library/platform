@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from '@shadow-library/web';
+import { type ApiError, APIRequest } from './api-request';
 
 /**
  * Importing user defined packages/modules
@@ -26,14 +26,14 @@ const notificationKeys = {
 export function useListNotificationMessagesQuery(params: ListMessagesQueryParams = {}): UseQueryResult<ListNotificationMessagesResponse, ApiError> {
   return useQuery<ListNotificationMessagesResponse, ApiError>({
     queryKey: notificationKeys.messageList(params),
-    queryFn: ({ signal }) => APIRequest.get('/api/v1/notifications/messages').query(params).signal(signal).execute(),
+    queryFn: () => APIRequest.get('/notifications/messages').query(params).execute(),
   });
 }
 
 export function useCreateNotificationMutation(): UseMutationResult<CreateNotificationResponse, ApiError, CreateNotificationBody> {
   const queryClient = useQueryClient();
   return useMutation<CreateNotificationResponse, ApiError, CreateNotificationBody>({
-    mutationFn: data => APIRequest.post('/api/v1/notifications').body(data).execute(),
+    mutationFn: data => APIRequest.post('/notifications').body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: notificationKeys.messageLists() }),
   });
 }

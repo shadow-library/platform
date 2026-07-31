@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useQuery, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from '@shadow-library/web';
+import { type ApiError, APIRequest } from './api-request';
 
 /**
  * Importing user defined packages
@@ -24,6 +24,6 @@ const dashboardKeys = {
 export function useStatsQuery(): UseQueryResult<DashboardStats, ApiError> {
   return useQuery<DashboardStats, ApiError>({
     queryKey: dashboardKeys.stats,
-    queryFn: ({ signal }) => APIRequest.get('/api/v1/dashboard/stats').signal(signal).execute(),
+    queryFn: () => APIRequest.get('/dashboard/stats').execute(),
   });
 }

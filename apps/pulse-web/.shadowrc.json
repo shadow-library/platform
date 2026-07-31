@@ -1,6 +1,9 @@
 {
-  "type": "spa",
+  "type": "ssr",
   "verify": {
+    "lint": {
+      "ignores": ["**/*.gen.ts"]
+    },
     "test": false
   }
 }

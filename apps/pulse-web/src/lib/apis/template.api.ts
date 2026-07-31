@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useMutation, type UseMutationOptions, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from '@shadow-library/web';
+import { type ApiError, APIRequest } from './api-request';
 
 /**
  * Importing user defined packages
@@ -47,10 +47,9 @@ const templateKeys = {
 export function useListTemplatesQuery(params: ListTemplatesQueryParams = {}): UseQueryResult<ListTemplateResponse, ApiError> {
   return useQuery<ListTemplateResponse, ApiError>({
     queryKey: templateKeys.list(params),
-    queryFn: ({ signal }) =>
-      APIRequest.get('/api/v1/templates')
+    queryFn: () =>
+      APIRequest.get('/templates')
         .query(params as Record<string, string | number | boolean | undefined>)
-        .signal(signal)
         .execute(),
   });
 }
@@ -58,14 +57,14 @@ export function useListTemplatesQuery(params: ListTemplatesQueryParams = {}): Us
 export function useTemplateQuery(templateId: string): UseQueryResult<TemplateDetailResponse, ApiError> {
   return useQuery<TemplateDetailResponse, ApiError>({
     queryKey: templateKeys.detail(templateId),
-    queryFn: ({ signal }) => APIRequest.get(`/api/v1/templates/${templateId}`).signal(signal).execute(),
+    queryFn: () => APIRequest.get(`/templates/${templateId}`).execute(),
   });
 }
 
 export function useCreateTemplateMutation(): UseMutationResult<TemplateResponse, ApiError, CreateTemplateBody> {
   const queryClient = useQueryClient();
   return useMutation<TemplateResponse, ApiError, CreateTemplateBody>({
-    mutationFn: data => APIRequest.post('/api/v1/templates').body(data).execute(),
+    mutationFn: data => APIRequest.post('/templates').body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.lists() }),
   });
 }
@@ -73,7 +72,7 @@ export function useCreateTemplateMutation(): UseMutationResult<TemplateResponse,
 export function useUpdateTemplateMutation(templateId: string): UseMutationResult<TemplateResponse, ApiError, UpdateTemplateBody> {
   const queryClient = useQueryClient();
   return useMutation<TemplateResponse, ApiError, UpdateTemplateBody>({
-    mutationFn: data => APIRequest.patch(`/api/v1/templates/${templateId}`).body(data).execute(),
+    mutationFn: data => APIRequest.patch(`/templates/${templateId}`).body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templateKeys.detail(templateId) });
       queryClient.invalidateQueries({ queryKey: templateKeys.lists() });
@@ -84,7 +83,7 @@ export function useUpdateTemplateMutation(templateId: string): UseMutationResult
 export function useUpdateChannelSettingMutation(templateId: string): UseMutationResult<ChannelSettingResponse, ApiError, UpdateChannelSettingVariables> {
   const queryClient = useQueryClient();
   return useMutation<ChannelSettingResponse, ApiError, UpdateChannelSettingVariables>({
-    mutationFn: ({ channel, isEnabled }) => APIRequest.put(`/api/v1/templates/${templateId}/channels/${channel}`).body({ isEnabled }).execute(),
+    mutationFn: ({ channel, isEnabled }) => APIRequest.put(`/templates/${templateId}/channels/${channel}`).body({ isEnabled }).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.detail(templateId) }),
   });
 }
@@ -92,14 +91,14 @@ export function useUpdateChannelSettingMutation(templateId: string): UseMutation
 export function useListVersionsQuery(templateId: string): UseQueryResult<ListVersionResponse, ApiError> {
   return useQuery<ListVersionResponse, ApiError>({
     queryKey: templateKeys.versions(templateId),
-    queryFn: ({ signal }) => APIRequest.get(`/api/v1/templates/${templateId}/versions`).signal(signal).execute(),
+    queryFn: () => APIRequest.get(`/templates/${templateId}/versions`).execute(),
   });
 }
 
 export function useVersionQuery(templateId: string, version: number | undefined): UseQueryResult<VersionDetailResponse, ApiError> {
   return useQuery<VersionDetailResponse, ApiError>({
     queryKey: templateKeys.version(templateId, version ?? 0),
-    queryFn: ({ signal }) => APIRequest.get(`/api/v1/templates/${templateId}/versions/${version}`).signal(signal).execute(),
+    queryFn: () => APIRequest.get(`/templates/${templateId}/versions/${version}`).execute(),
     enabled: version != null,
   });
 }
@@ -107,7 +106,7 @@ export function useVersionQuery(templateId: string, version: number | undefined)
 export function useOpenDraftMutation(templateId: string): UseMutationResult<VersionResponse, ApiError, void> {
   const queryClient = useQueryClient();
   const options: UseMutationOptions<VersionResponse, ApiError, void> = {
-    mutationFn: () => APIRequest.post(`/api/v1/templates/${templateId}/versions/draft`).body({}).execute(),
+    mutationFn: () => APIRequest.post(`/templates/${templateId}/versions/draft`).body({}).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.versions(templateId) }),
   };
   return useMutation(options);
@@ -116,7 +115,7 @@ export function useOpenDraftMutation(templateId: string): UseMutationResult<Vers
 export function useUpsertContentMutation(templateId: string): UseMutationResult<ContentResponse, ApiError, UpsertContentBody> {
   const queryClient = useQueryClient();
   return useMutation<ContentResponse, ApiError, UpsertContentBody>({
-    mutationFn: data => APIRequest.put(`/api/v1/templates/${templateId}/versions/draft/contents`).body(data).execute(),
+    mutationFn: data => APIRequest.put(`/templates/${templateId}/versions/draft/contents`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.versions(templateId) }),
   });
 }
@@ -124,7 +123,7 @@ export function useUpsertContentMutation(templateId: string): UseMutationResult<
 export function useDeleteContentMutation(templateId: string): UseMutationResult<void, ApiError, DeleteContentVariables> {
   const queryClient = useQueryClient();
   const options: UseMutationOptions<void, ApiError, DeleteContentVariables> = {
-    mutationFn: ({ channel, locale }) => APIRequest.delete(`/api/v1/templates/${templateId}/versions/draft/contents/${channel}/${locale}`).execute(),
+    mutationFn: ({ channel, locale }) => APIRequest.delete(`/templates/${templateId}/versions/draft/contents/${channel}/${locale}`).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.versions(templateId) }),
   };
   return useMutation(options);
@@ -133,7 +132,7 @@ export function useDeleteContentMutation(templateId: string): UseMutationResult<
 export function usePublishDraftMutation(templateId: string): UseMutationResult<VersionResponse, ApiError, PublishVersionBody> {
   const queryClient = useQueryClient();
   return useMutation<VersionResponse, ApiError, PublishVersionBody>({
-    mutationFn: data => APIRequest.post(`/api/v1/templates/${templateId}/versions/draft/publish`).body(data).execute(),
+    mutationFn: data => APIRequest.post(`/templates/${templateId}/versions/draft/publish`).body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: templateKeys.versions(templateId) });
       queryClient.invalidateQueries({ queryKey: templateKeys.detail(templateId) });
@@ -144,13 +143,13 @@ export function usePublishDraftMutation(templateId: string): UseMutationResult<V
 export function useRollbackVersionMutation(templateId: string): UseMutationResult<VersionResponse, ApiError, { version: number } & RollbackVersionBody> {
   const queryClient = useQueryClient();
   return useMutation<VersionResponse, ApiError, { version: number } & RollbackVersionBody>({
-    mutationFn: ({ version, notes }) => APIRequest.post(`/api/v1/templates/${templateId}/versions/${version}/rollback`).body({ notes }).execute(),
+    mutationFn: ({ version, notes }) => APIRequest.post(`/templates/${templateId}/versions/${version}/rollback`).body({ notes }).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: templateKeys.versions(templateId) }),
   });
 }
 
 export function usePreviewMutation(templateId: string): UseMutationResult<PreviewResponse, ApiError, PreviewBody> {
   return useMutation<PreviewResponse, ApiError, PreviewBody>({
-    mutationFn: data => APIRequest.post(`/api/v1/templates/${templateId}/versions/preview`).body(data).execute(),
+    mutationFn: data => APIRequest.post(`/templates/${templateId}/versions/preview`).body(data).execute(),
   });
 }

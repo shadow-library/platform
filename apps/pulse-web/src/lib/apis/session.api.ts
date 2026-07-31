@@ -2,11 +2,14 @@
  * Importing npm packages
  */
 import { type EnsureQueryDataOptions, type UseQueryOptions } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from '@shadow-library/web';
+import { createServerFn } from '@tanstack/react-start';
+import { call } from '@shadow-library/web';
 
 /**
  * Importing user defined packages
  */
+import { type ApiError } from './api-request';
+import { serverAuthFetch } from './server-fetch';
 
 /**
  * Defining types
@@ -39,6 +42,12 @@ export interface OrganisationResponse {
 
 /**
  * Declaring the constants
+ *
+ * Every `/api/auth/*` call now travels through a TanStack Start server function whose handler goes
+ * through `serverAuthFetch` — the same session-cookie forwarding, CSRF double-submit, and `Set-Cookie`
+ * relay every other backend call gets, just against the SDK's un-versioned auth surface instead of the
+ * versioned API. `serverAuthFetch` has no client-abortable `signal` (the RPC is a server-function call,
+ * not a direct browser fetch), so these query functions no longer accept one.
  */
 
 const sessionKeys = {
@@ -46,10 +55,17 @@ const sessionKeys = {
   organisations: ['session', 'organisations'],
 } as const;
 
-export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse> {
+const fetchSession = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<SessionResponse>({ method: 'GET', path: '/session' }));
+const requestLogout = createServerFn({ method: 'POST' }).handler(() => serverAuthFetch<{ success: boolean }>({ method: 'POST', path: '/logout' }));
+const fetchOrganisations = createServerFn({ method: 'GET' }).handler(() => serverAuthFetch<{ organisations: OrganisationResponse[] }>({ method: 'GET', path: '/organisations' }));
+const requestSwitchOrganisation = createServerFn({ method: 'POST' })
+  .validator((organisationId: string) => organisationId)
+  .handler(({ data }) => serverAuthFetch<{ organisationId: string }>({ method: 'POST', path: '/organisation', body: { organisationId: data } }));
+
+export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse, ApiError> {
   return {
     queryKey: sessionKeys.session,
-    queryFn: ({ signal }) => APIRequest.get('/api/auth/session').signal(signal).execute<SessionResponse>(),
+    queryFn: () => call(fetchSession()),
     /** A 401 means "no session" — retrying would only re-confirm it before the login bounce. */
     retry: false,
     /**
@@ -66,7 +82,7 @@ export function sessionQueryOptions(): EnsureQueryDataOptions<SessionResponse> {
  * clears the `__Host-shadow-session` cookie; the central identity session is deliberately untouched.
  */
 export function logout(): Promise<{ success: boolean }> {
-  return APIRequest.post('/api/auth/logout').execute<{ success: boolean }>();
+  return call(requestLogout());
 }
 
 /**
@@ -77,11 +93,7 @@ export function logout(): Promise<{ success: boolean }> {
 export function organisationsQueryOptions(): UseQueryOptions<OrganisationResponse[], ApiError> {
   return {
     queryKey: sessionKeys.organisations,
-    queryFn: ({ signal }) =>
-      APIRequest.get('/api/auth/organisations')
-        .signal(signal)
-        .execute<{ organisations: OrganisationResponse[] }>()
-        .then(body => body.organisations),
+    queryFn: () => call(fetchOrganisations()).then(body => body.organisations),
     retry: false,
   };
 }
@@ -92,5 +104,5 @@ export function organisationsQueryOptions(): UseQueryOptions<OrganisationRespons
  * precisely what stops a token minted for the previous organisation from outliving the switch.
  */
 export function switchOrganisation(organisationId: string): Promise<{ organisationId: string }> {
-  return APIRequest.post('/api/auth/organisation').body({ organisationId }).execute<{ organisationId: string }>();
+  return call(requestSwitchOrganisation({ data: organisationId }));
 }
