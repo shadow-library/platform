@@ -11,7 +11,7 @@
     "preview": "vite preview --port 3000",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",
-    "generate:api-types": "shadow gen-api-types https://pulse.shadow-apps.com/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts"
+    "generate:api-types": "shadow gen-api-types http://localhost:8080/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts"
   },
   "dependencies": {
     "@shadow-library/ui": "3.3.0-alpha.2",
