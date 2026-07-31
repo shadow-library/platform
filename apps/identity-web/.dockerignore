@@ -1,0 +1,20 @@
+# Build context hygiene: never ship host artifacts, deps, or secrets into the image.
+node_modules
+dist
+.git
+.tanstack
+
+# Secrets — provide SERVER_URL and friends at run time, not baked into a layer.
+.env
+.env.*
+!.env.example
+
+# Test / tooling output
+playwright-report
+test-results
+*.log
+
+# Editor / OS cruft
+.vscode
+.idea
+.DS_Store

@@ -1,0 +1,70 @@
+.workspace {
+  width: 100%;
+}
+
+.head {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding-bottom: 18px;
+}
+
+.headMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.headTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.headTitle {
+  margin: 0;
+  font-size: 22px;
+  font-weight: 680;
+  letter-spacing: -0.02em;
+  color: var(--sh-text-primary);
+}
+
+.headMeta {
+  font-size: 12.5px;
+  color: var(--sh-text-tertiary);
+  margin-top: 2px;
+}
+
+/* The rule is an inset shadow rather than a border so the active tab's underline can paint straight over it.
+   A real border would sit outside the content box, forcing the tabs to overlap it with a negative margin —
+   and that 1px of overflow is enough to raise a vertical scrollbar, since `overflow-x: auto` drags
+   `overflow-y` to `auto` along with it. */
+.tabs {
+  display: flex;
+  gap: 2px;
+  box-shadow: inset 0 -1px 0 var(--sh-border-default);
+  margin-bottom: 24px;
+  overflow-x: auto;
+}
+
+.tab {
+  padding: 9px 14px;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  color: var(--sh-text-secondary);
+  border-bottom: 2px solid transparent;
+  white-space: nowrap;
+}
+.tab:hover {
+  color: var(--sh-text-primary);
+  text-decoration: none;
+}
+.tab[data-active='true'] {
+  color: var(--sh-accent);
+  border-bottom-color: var(--sh-accent);
+  font-weight: 600;
+}
+
+.tabBody {
+  width: 100%;
+}

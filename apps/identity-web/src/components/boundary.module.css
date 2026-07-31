@@ -1,0 +1,47 @@
+.wrap {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 48px 24px;
+  text-align: center;
+}
+
+.mark {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  background: var(--sh-accent-soft);
+  color: var(--sh-accent);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.markDanger {
+  background: var(--sh-danger-soft, var(--sh-accent-soft));
+  color: var(--sh-danger, var(--sh-accent));
+}
+
+.title {
+  margin: 6px 0 0;
+  font-size: var(--sh-text-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.text {
+  margin: 0 0 6px;
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-secondary);
+  max-width: 420px;
+}
+
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}

@@ -1,0 +1,44 @@
+{
+  "name": "identity-web",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "shadow prepare",
+    "dev": "vite dev --port 3000",
+    "build": "shadow build",
+    "start": "bun main.ts",
+    "preview": "vite preview --port 3000",
+    "verify": "shadow verify",
+    "type-check": "tsc",
+    "test": "bunx playwright test",
+    "test:setup": "bunx playwright install --with-deps chromium",
+    "generate:api-types": "shadow gen-api-types http://localhost:8080/dev/api-docs/openapi.json"
+  },
+  "dependencies": {
+    "@shadow-library/common": "^2.0.0-alpha.3",
+    "@shadow-library/ui": "3.3.0-alpha.2",
+    "@shadow-library/web": "^0.2.1",
+    "@simplewebauthn/browser": "^13.3.0",
+    "@tanstack/react-query": "^5.101.2",
+    "@tanstack/react-query-devtools": "^5.101.2",
+    "@tanstack/react-router": "^1.170.17",
+    "@tanstack/react-router-devtools": "^1.167.0",
+    "@tanstack/react-router-ssr-query": "^1.167.1",
+    "@tanstack/react-start": "^1.168.27",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.57.0",
+    "@shadow-library/scripts": "0.3.0",
+    "@types/bun": "^1.3.9",
+    "@types/node": "^22.10.2",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.0",
+    "@types/react-dom": "^19.2.0",
+    "@vitejs/plugin-react": "^5.0.4",
+    "typescript": "^6.0.3",
+    "vite": "^7.3.1"
+  }
+}

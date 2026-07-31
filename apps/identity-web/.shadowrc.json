@@ -1,0 +1,19 @@
+{
+  "type": "ssr",
+  "verify": {
+    "files": {
+      "format": "{src,tests}/**/{*.tsx,*[!n].ts,*[!e]n.ts,*[!g]en.ts}"
+    },
+    "test": false,
+    "lint": {
+      "rules": { "jsx-a11y/no-autofocus": "off" },
+      "overrides": [
+        {
+          "files": ["src/lib/apis/**/*.ts", "src/router.tsx"],
+          "rules": { "@typescript-eslint/explicit-module-boundary-types": "off" }
+        }
+      ]
+    }
+  },
+  "genApiTypes": { "outputPath": "src/lib/apis/api-types.gen.ts" }
+}

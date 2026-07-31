@@ -1,0 +1,390 @@
+/**
+ * Importing npm packages
+ */
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router';
+import { useEffect, useRef, useState } from 'react';
+import { Alert, Button, FormField, Input, Spinner } from '@shadow-library/ui';
+
+/**
+ * Importing user defined modules
+ */
+import { ExternalLinkIcon, KeyIcon } from '@/components/icons';
+import { assertPasskey, AuthCard, AuthMedallion, AuthScreen, IdentifierChip, MfaLockedCard, MfaStep, OtpEntry, StepHeader, useFlow } from '@/features/auth';
+import parts from '@/features/auth/auth-parts.module.css';
+import { authApi, type FlowState } from '@/lib/apis';
+import { useDeviceId } from '@/lib/hooks';
+
+/**
+ * Declaring the constants
+ */
+interface LoginSearch {
+  returnTo?: string;
+  client?: string;
+}
+
+const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
+const PHONE_PATTERN = /^\+[1-9]\d{6,14}$/;
+const USERNAME_PATTERN = /^[a-zA-Z0-9._-]{3,32}$/;
+
+/**
+ * Branches on the same shapes the server resolves, so a mistyped identifier is caught before a flow is created rather than surfacing as a generic
+ * failure a step later. Shape-only by design — it never signals whether the identifier maps to an account (D-12).
+ */
+const validateIdentifier = (value: string): string | null => {
+  if (!value) return 'Enter your email or phone number.';
+  if (value.startsWith('+')) return PHONE_PATTERN.test(value) ? null : 'Enter a valid phone number in international format, like +14155550123.';
+  if (value.includes('@')) return EMAIL_PATTERN.test(value) ? null : 'Enter a valid email address.';
+  return USERNAME_PATTERN.test(value) ? null : 'Enter a valid email address or phone number.';
+};
+
+export const Route = createFileRoute('/_auth/login')({
+  validateSearch: (search: Record<string, unknown>): LoginSearch => ({
+    returnTo: typeof search.returnTo === 'string' ? search.returnTo : undefined,
+    client: typeof search.client === 'string' ? search.client : undefined,
+  }),
+  component: LoginPage,
+});
+
+function LoginPage(): React.JSX.Element {
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  const deviceId = useDeviceId();
+  const { flow, busy, error, dead, deadReason, run, reset, setError } = useFlow();
+
+  const [identifier, setIdentifier] = useState('');
+  const [password, setPassword] = useState('');
+  const [otp, setOtp] = useState('');
+  const [resetCurrent, setResetCurrent] = useState('');
+  const [resetNew, setResetNew] = useState('');
+  const [resetConfirm, setResetConfirm] = useState('');
+  const [resendIn, setResendIn] = useState(0);
+  const resendTimer = useRef<ReturnType<typeof setInterval>>(undefined);
+
+  useEffect(() => () => clearInterval(resendTimer.current), []);
+
+  /** Returns to the identifier step, wiping any secret typed into a prior step so a changed identifier never inherits a stale password or code. */
+  const restart = (): void => {
+    setPassword('');
+    setOtp('');
+    setResetCurrent('');
+    setResetNew('');
+    setResetConfirm('');
+    reset();
+  };
+
+  const startResendCooldown = (): void => {
+    setResendIn(60);
+    clearInterval(resendTimer.current);
+    resendTimer.current = setInterval(() => {
+      setResendIn(seconds => {
+        if (seconds <= 1) clearInterval(resendTimer.current);
+        return Math.max(0, seconds - 1);
+      });
+    }, 1000);
+  };
+
+  const complete = (next: FlowState): void => {
+    if (next.resumeUrl) return window.location.assign(next.resumeUrl);
+    if (search.returnTo && search.returnTo.startsWith('/')) return window.location.assign(search.returnTo);
+    navigate({ to: '/account' });
+  };
+
+  const advance = async (action: () => Promise<FlowState>): Promise<void> => {
+    const next = await run(action);
+    if (next?.status === 'COMPLETED') complete(next);
+  };
+
+  const submitIdentifier = (): void => {
+    const trimmed = identifier.trim();
+    const invalid = validateIdentifier(trimmed);
+    if (invalid) return setError(invalid);
+    setOtp('');
+    void advance(() => authApi.loginInit(trimmed, deviceId, search.returnTo));
+  };
+
+  const runPasskey = async (flowId?: string): Promise<void> => {
+    setError(null);
+    try {
+      const challenge = await authApi.webauthnOptions(flowId, deviceId);
+      const result = await assertPasskey(challenge.options);
+      if (result.outcome === 'UNSUPPORTED') return setError('This device doesn’t support passkeys. Try another method.');
+      if (result.outcome === 'CANCELLED') return;
+      const resolvedFlowId = flowId ?? challenge.flowId;
+      if (!resolvedFlowId) return setError('Couldn’t start passkey sign-in. Try another method.');
+      await advance(() => authApi.challengeVerify(resolvedFlowId, { webauthn: result.response }));
+    } catch {
+      setError('Passkey sign-in failed. Try another method.');
+    }
+  };
+
+  const changeMethod = (flowId: string, method: 'WEBAUTHN' | 'EMAIL_OTP' | 'SMS_OTP' | 'PASSWORD'): void => {
+    setOtp('');
+    if (method === 'EMAIL_OTP' || method === 'SMS_OTP') startResendCooldown();
+    void run(() => authApi.challengeChange(flowId, method));
+  };
+
+  const resend = async (flowId: string, method: 'EMAIL_OTP' | 'SMS_OTP'): Promise<void> => {
+    startResendCooldown();
+    await authApi.challengeResend(flowId, method).catch(() => undefined);
+  };
+
+  const footer = (
+    <span>
+      New to Shadow? <Link to="/register">Create an account</Link>
+    </span>
+  );
+
+  /** A flow terminated after too many failed second-factor attempts surfaces as a lock-out, not a plain expiry. */
+  if (dead && deadReason === 'locked')
+    return (
+      <AuthScreen footer={footer}>
+        <MfaLockedCard onRestart={restart} />
+      </AuthScreen>
+    );
+
+  if (dead)
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          <StepHeader title="Your sign-in session expired" description="For your security we ended this attempt. Start again to continue." align="center" />
+          <Button variant="primary" fullWidth onClick={restart}>
+            Start over
+          </Button>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  const status = flow?.status;
+
+  if (status === 'COMPLETED')
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          <div className={parts.stepHeader} data-align="center" style={{ alignItems: 'center', gap: 16, padding: '20px 0' }}>
+            <Spinner size="lg" />
+            <StepHeader title="Signing you in…" description="Taking you to your destination." align="center" />
+          </div>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  if (!flow)
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          {search.client && (
+            <div className={parts.clientChip}>
+              Continuing to <span className={parts.clientChipName}>{search.client}</span>
+            </div>
+          )}
+          <StepHeader title="Sign in" description="Enter your email or phone number to continue." />
+          {error && (
+            <Alert intent="danger" title="We couldn’t continue">
+              {error}
+            </Alert>
+          )}
+          <FormField label="Email or phone">
+            <Input
+              type="text"
+              placeholder="you@company.com"
+              autoComplete="username"
+              value={identifier}
+              onValueChange={setIdentifier}
+              onKeyDown={event => event.key === 'Enter' && submitIdentifier()}
+              autoFocus
+            />
+          </FormField>
+          <Button variant="primary" fullWidth loading={busy} onClick={submitIdentifier}>
+            Continue
+          </Button>
+          <div className={parts.orDivider}>OR</div>
+          <Button variant="secondary" fullWidth onClick={() => runPasskey()}>
+            <span className={parts.btnIcon}>
+              <KeyIcon size={17} />
+              Sign in with a passkey
+            </span>
+          </Button>
+          <p className={parts.otpNote}>
+            New here? <Link to="/register">Create an account</Link>
+          </p>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  const maskedEmail = flow.metadata?.maskedEmail;
+  const maskedPhone = flow.metadata?.maskedPhone;
+
+  if (status === 'AWAITING_FEDERATED' || (flow.federated?.enforced && status === 'AWAITING_PASSWORD'))
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          <StepHeader title="Your organization uses single sign-on" description="You’ll continue to your identity provider to verify who you are." align="center" />
+          <Button variant="primary" fullWidth onClick={() => flow.federated && window.location.assign(flow.federated.authorizationUrl)}>
+            <span className={parts.btnIcon}>
+              Continue to your provider
+              <ExternalLinkIcon size={15} />
+            </span>
+          </Button>
+          <Button variant="text" size="sm" onClick={restart}>
+            Use a different account
+          </Button>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  if (status === 'AWAITING_WEBAUTHN')
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          <AuthMedallion>
+            <KeyIcon size={30} />
+          </AuthMedallion>
+          <StepHeader title="Use your passkey" description="Confirm it’s you with your device’s fingerprint, face, or screen lock." align="center" />
+          {error && (
+            <Alert intent="danger" title="Passkey failed">
+              {error}
+            </Alert>
+          )}
+          <Button variant="primary" fullWidth loading={busy} onClick={() => runPasskey(flow.flowId)}>
+            Continue with passkey
+          </Button>
+          <Button variant="ghost" fullWidth onClick={() => changeMethod(flow.flowId, 'PASSWORD')}>
+            Use password instead
+          </Button>
+        </AuthCard>
+      </AuthScreen>
+    );
+
+  if (status === 'AWAITING_EMAIL_OTP' || status === 'AWAITING_SMS_OTP') {
+    const isEmail = status === 'AWAITING_EMAIL_OTP';
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          <OtpEntry
+            title={isEmail ? 'Check your email' : 'Check your phone'}
+            sentTo={isEmail ? maskedEmail : maskedPhone}
+            value={otp}
+            error={error}
+            resendIn={resendIn}
+            onValueChange={setOtp}
+            onComplete={code => advance(() => authApi.challengeVerify(flow.flowId, { code }))}
+            onResend={() => void resend(flow.flowId, isEmail ? 'EMAIL_OTP' : 'SMS_OTP')}
+            onAlt={() => changeMethod(flow.flowId, 'PASSWORD')}
+          />
+        </AuthCard>
+      </AuthScreen>
+    );
+  }
+
+  if (status === 'AWAITING_TOTP' || status === 'AWAITING_MFA_WEBAUTHN')
+    return (
+      <AuthScreen
+        footer={
+          <Link className={parts.footLink} to="/login" onClick={restart}>
+            Cancel and start over
+          </Link>
+        }
+      >
+        <MfaStep
+          error={error}
+          busy={busy}
+          attemptsLeft={flow.attemptsLeft}
+          canPasskey
+          onTotp={code => advance(() => authApi.challengeVerify(flow.flowId, { code }))}
+          onRecovery={code => advance(() => authApi.challengeVerify(flow.flowId, { recoveryCode: code }))}
+          onPasskey={() => runPasskey(flow.flowId)}
+          onCancel={restart}
+        />
+      </AuthScreen>
+    );
+
+  if (status === 'AWAITING_PASSWORD_RESET') {
+    const submitPasswordReset = (): void => {
+      if (!resetCurrent) return setError('Enter your current password.');
+      if (resetNew.length < 8) return setError('Choose a longer password.');
+      if (resetNew !== resetConfirm) return setError('New passwords don’t match.');
+      void advance(() => authApi.loginResetPassword(flow.flowId, resetCurrent, resetNew));
+    };
+    return (
+      <AuthScreen footer={footer}>
+        <AuthCard>
+          <StepHeader
+            title="Set a new password"
+            description="An administrator requires a new password before you continue. Confirm your current password, then choose a new one."
+          />
+          {error && (
+            <Alert intent="danger" title="Check your password">
+              {error}
+            </Alert>
+          )}
+          <FormField label="Current password">
+            <Input type="password" revealable autoComplete="current-password" value={resetCurrent} onValueChange={setResetCurrent} autoFocus />
+          </FormField>
+          <FormField label="New password">
+            <Input type="password" revealable autoComplete="new-password" value={resetNew} onValueChange={setResetNew} />
+          </FormField>
+          <FormField label="Confirm new password">
+            <Input
+              type="password"
+              revealable
+              autoComplete="new-password"
+              value={resetConfirm}
+              onValueChange={setResetConfirm}
+              onKeyDown={event => event.key === 'Enter' && submitPasswordReset()}
+            />
+          </FormField>
+          <Button variant="primary" fullWidth loading={busy} onClick={submitPasswordReset}>
+            Update password and sign in
+          </Button>
+        </AuthCard>
+      </AuthScreen>
+    );
+  }
+
+  return (
+    <AuthScreen footer={footer}>
+      <AuthCard>
+        <IdentifierChip label={identifier.trim() || 'your account'} onChange={restart} />
+        <StepHeader title="Enter your password" description="Confirm your password to continue." />
+        {error && (
+          <Alert intent="danger" title="That didn’t work">
+            {error}
+          </Alert>
+        )}
+        <FormField label="Password">
+          <Input
+            type="password"
+            revealable
+            autoComplete="current-password"
+            value={password}
+            onValueChange={setPassword}
+            onKeyDown={event => event.key === 'Enter' && advance(() => authApi.challengeVerify(flow.flowId, { password }))}
+            autoFocus
+          />
+        </FormField>
+        <div className={parts.forgotRow}>
+          <Link to="/recover" search={{ identifier: identifier.trim() || undefined }} style={{ fontSize: 12 }}>
+            Forgot password?
+          </Link>
+        </div>
+        <Button variant="primary" fullWidth loading={busy} onClick={() => advance(() => authApi.challengeVerify(flow.flowId, { password }))}>
+          Sign in
+        </Button>
+        <div className={parts.altStack}>
+          <Button variant="ghost" fullWidth onClick={() => changeMethod(flow.flowId, 'WEBAUTHN')}>
+            Use a passkey instead
+          </Button>
+          {maskedEmail !== undefined || !maskedPhone ? (
+            <Button variant="ghost" fullWidth onClick={() => changeMethod(flow.flowId, 'EMAIL_OTP')}>
+              Email me a one-time code
+            </Button>
+          ) : (
+            <Button variant="ghost" fullWidth onClick={() => changeMethod(flow.flowId, 'SMS_OTP')}>
+              Text me a one-time code
+            </Button>
+          )}
+        </div>
+      </AuthCard>
+    </AuthScreen>
+  );
+}

@@ -1,0 +1,130 @@
+.gate {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+/* The rail keeps its own width and skin; the shell places it, holds it full-height, and swaps it for
+   the nav drawer below md. */
+.sidebar {
+  flex: none;
+  width: 254px;
+  box-sizing: border-box;
+  background: var(--sh-surface-raised);
+  border-right: 1px solid var(--sh-border-default);
+  display: flex;
+  flex-direction: column;
+  padding: 18px 14px;
+}
+
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 8px 14px;
+}
+
+.brandText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.15;
+}
+
+.brandName {
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--sh-text-primary);
+}
+
+.brandTag {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-warning-text);
+}
+
+.nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  overflow-y: auto;
+}
+
+.navLabel {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+  padding: 14px 10px 6px;
+}
+
+.header {
+  flex: none;
+  height: 60px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--sh-border-default);
+  background: var(--sh-surface-card);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 clamp(14px, 3vw, 26px);
+  gap: 16px;
+}
+
+.crumb {
+  font-size: 13px;
+  color: var(--sh-text-secondary);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-transform: capitalize;
+}
+
+.headerRight {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: none;
+}
+
+.headerAvatar {
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  display: inline-flex;
+  border-radius: var(--sh-radius-full);
+}
+
+.userMenu {
+  min-width: 220px;
+}
+
+.privileged {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--sh-warning-text);
+  background: var(--sh-warning-bg-subtle);
+  border: 1px solid var(--sh-warning-border);
+  padding: 4px 10px;
+  border-radius: 999px;
+}
+
+
+/* Below the sm breakpoint (--sh-breakpoint-sm 640) the bar keeps only the crumb and the account menu —
+   the badge and the exit action are what push it past the viewport on a phone. */
+@media (max-width: 639px) {
+  .privileged,
+  .backAction {
+    display: none;
+  }
+}
