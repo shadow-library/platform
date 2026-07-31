@@ -1,0 +1,327 @@
+/**
+ * Importing npm packages
+ */
+import assert from 'node:assert';
+
+import { and, eq, inArray, isNotNull, SQL } from 'drizzle-orm';
+import { DateTime } from 'luxon';
+import validator from 'validator';
+import { Injectable } from '@shadow-library/app';
+import { AppError, Logger, MaybeNull, ValidationError } from '@shadow-library/common';
+
+/**
+ * Importing user defined packages
+ */
+import { AppErrorCode } from '@server/classes';
+import { APP_NAME, ERROR_MESSAGES, REGEX } from '@server/constants';
+import { SessionService, type ValidatedSession } from '@server/modules/auth/session';
+import { PasswordPolicyService, PasswordService } from '@server/modules/identity/credentials';
+import { OrganisationService } from '@server/modules/identity/organisation';
+import { AuditService } from '@server/modules/infrastructure/audit';
+import { DatabaseService, ID, PrimaryDatabase, schema, User } from '@server/modules/infrastructure/datastore';
+import { NotificationService } from '@server/modules/infrastructure/notification';
+
+import { UserEmailService } from './user-email.service';
+
+/**
+ * Defining types
+ */
+
+export interface ProfileUpdate {
+  firstName?: string;
+  lastName?: string;
+}
+
+export interface CurrentUserSummary {
+  userId: bigint;
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  aal: 'AAL1' | 'AAL2';
+  elevated: boolean;
+  elevatedUntil?: Date;
+}
+
+export interface StatusHold {
+  /** Administrator-supplied justification, surfaced in the console and the audit trail. */
+  reason?: string;
+  /** Lapse time for a temporary SUSPENDED hold; BLOCKED and DISABLED leave it unset. */
+  until?: Date;
+}
+
+export interface CreateUser {
+  username?: string;
+  status?: User.Status;
+  /** Seeds the account so the first successful password login is refused until recovery replaces it (T-602). */
+  passwordResetRequired?: boolean;
+  password: string;
+
+  email: string;
+  emailVerified?: boolean;
+
+  phoneNumber?: string;
+  phoneVerified?: boolean;
+
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
+  gender?: User.Gender;
+  dateOfBirth?: Date;
+  avatarUrl?: string;
+}
+
+export interface UserDetails extends User {
+  emails: User.Email[];
+  phones: User.Phone[];
+  profile: MaybeNull<User.Profile>;
+  authIdentities: User.AuthIdentity[];
+}
+
+interface FindUserFilter {
+  table: 'users' | 'userEmails' | 'userPhones';
+  sql: SQL;
+}
+
+/**
+ * Declaring the constants
+ */
+
+/** pulse-server template that emails the account owner when their password is rotated (shared with the flow-based reset paths). */
+const PASSWORD_CHANGED_TEMPLATE = 'auth.password.changed';
+
+@Injectable()
+export class UserService {
+  private readonly logger = Logger.getLogger(APP_NAME, UserService.name);
+  private readonly db: PrimaryDatabase;
+
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly passwordService: PasswordService,
+    private readonly passwordPolicyService: PasswordPolicyService,
+    private readonly organisationService: OrganisationService,
+    private readonly userEmailService: UserEmailService,
+    private readonly sessionService: SessionService,
+    private readonly auditService: AuditService,
+    private readonly notificationService: NotificationService,
+  ) {
+    this.db = databaseService.getPostgresClient();
+  }
+
+  /**
+   * Email/phone lookups match only verified rows: with verified-only uniqueness (DB §2), an
+   * unverified claim by another account must never capture a login or recovery identifier.
+   */
+  private buildWhereClause(identifier: ID): FindUserFilter {
+    if (typeof identifier === 'bigint' || /^\d{12,}$/.test(identifier)) return { table: 'users', sql: eq(schema.users.id, BigInt(identifier)) };
+    else if (identifier.startsWith('+')) return { table: 'userPhones', sql: and(eq(schema.userPhones.phoneNumber, identifier), isNotNull(schema.userPhones.verifiedAt)) as SQL };
+    else if (identifier.includes('@'))
+      return { table: 'userEmails', sql: and(eq(schema.userEmails.emailId, identifier.toLowerCase()), isNotNull(schema.userEmails.verifiedAt)) as SQL };
+    else return { table: 'users', sql: eq(schema.users.username, identifier) };
+  }
+
+  /**
+   * Resolves an identifier filter to a condition on `users.id`. For email/phone lookups the
+   * predicate must select the matching user id from the child table: a Drizzle relational
+   * `with.where` filters the joined child rows, not the parent, so it would silently match the
+   * first user in the table.
+   */
+  private resolveUserCondition(filter: FindUserFilter): SQL {
+    if (filter.table === 'users') return filter.sql;
+    const table = filter.table === 'userEmails' ? schema.userEmails : schema.userPhones;
+    return inArray(schema.users.id, this.db.select({ id: table.userId }).from(table).where(filter.sql));
+  }
+
+  async createUserWithPassword(data: CreateUser): Promise<UserDetails> {
+    return this.createUser(data);
+  }
+
+  /** Creates an account with no local credential — SCIM provisioning and federated JIT sign-up. */
+  async createProvisionedUser(data: Omit<CreateUser, 'password'>): Promise<UserDetails> {
+    return this.createUser(data);
+  }
+
+  private async createUser(data: Omit<CreateUser, 'password'> & { password?: string }): Promise<UserDetails> {
+    if (!validator.isEmail(data.email)) throw new ValidationError('email', ERROR_MESSAGES.INVALID_EMAIL);
+    if (data.password !== undefined) this.passwordPolicyService.assertStrong(data.password);
+    if (data.phoneNumber && !validator.isMobilePhone(data.phoneNumber, 'any', { strictMode: true })) throw new ValidationError('phoneNumber', ERROR_MESSAGES.INVALID_PHONE_NUMBER);
+    if (data.username && !REGEX.USERNAME.test(data.username)) throw new ValidationError('username', ERROR_MESSAGES.INVALID_USERNAME);
+    if (data.dateOfBirth) {
+      const since = DateTime.fromJSDate(data.dateOfBirth).diffNow('years');
+      const age = Math.floor(-since.years);
+      if (age < 13 || age > 120) throw new ValidationError('dateOfBirth', ERROR_MESSAGES.INVALID_DATE_OF_BIRTH);
+    }
+
+    const user = await this.db
+      .transaction(async tx => {
+        const [user] = await tx.insert(schema.users).values({ username: data.username, status: data.status, passwordResetRequired: data.passwordResetRequired }).returning();
+        assert(user, 'User creation failed');
+        this.logger.debug('user created', { userId: user.id });
+        const userDetails: UserDetails = { ...user, emails: [], phones: [], profile: null, authIdentities: [] };
+
+        const profileData = { userId: user.id, ...data, dateOfBirth: data.dateOfBirth?.toISOString() };
+        const [profile] = await tx.insert(schema.userProfiles).values(profileData).returning();
+        assert(profile, 'User profile creation failed');
+        this.logger.debug('user profile created', { userId: user.id });
+        userDetails.profile = profile;
+
+        const emailId = data.email.toLowerCase();
+        const [email] = await tx
+          .insert(schema.userEmails)
+          .values({ userId: user.id, emailId, isPrimary: true, verifiedAt: data.emailVerified ? new Date() : null })
+          .returning();
+        assert(email, 'User email creation failed');
+        this.logger.debug('user email created', { userId: user.id, emailId });
+        userDetails.emails.push(email);
+
+        if (data.phoneNumber) {
+          const [phone] = await tx
+            .insert(schema.userPhones)
+            .values({ userId: user.id, phoneNumber: data.phoneNumber, isPrimary: true, verifiedAt: data.phoneVerified ? new Date() : null })
+            .returning();
+          assert(phone, 'User phone creation failed');
+          this.logger.debug('user phone created', { userId: user.id, phoneNumber: data.phoneNumber });
+          userDetails.phones.push(phone);
+        }
+
+        if (data.password !== undefined) {
+          const [authIdentity] = await tx.insert(schema.userAuthIdentities).values({ userId: user.id, provider: 'PASSWORD', providerKey: email.emailId }).returning();
+          assert(authIdentity, 'User auth identity creation failed');
+          this.logger.debug('user auth identity created', { userId: user.id, authIdentityId: authIdentity.id });
+          userDetails.authIdentities.push(authIdentity);
+
+          const { hash: passwordHash, version } = await this.passwordService.hash(data.password);
+          const [password] = await tx.insert(schema.userPasswords).values({ userAuthIdentityId: authIdentity.id, algorithm: 'ARGON2ID', hash: passwordHash, version }).returning();
+          assert(password, 'User password creation failed');
+          await tx.insert(schema.passwordHistory).values({ userId: user.id, hash: passwordHash });
+          this.logger.debug('user password created', { userId: user.id, authIdentityId: password.userAuthIdentityId });
+        }
+
+        const workspaceName = [profile.firstName, profile.lastName].filter(Boolean).join(' ').trim() || 'Personal';
+        const organisation = await this.organisationService.createPersonalWorkspace(user.id, `${workspaceName} Workspace`, tx);
+        await tx.update(schema.users).set({ personalOrganisationId: organisation.id }).where(eq(schema.users.id, user.id));
+        userDetails.personalOrganisationId = organisation.id;
+        this.logger.debug('personal workspace created', { userId: user.id, organisationId: organisation.id });
+
+        return userDetails;
+      })
+      .catch(error => this.databaseService.translateError(error));
+
+    this.logger.info('new user created', { userId: user.id });
+    this.logger.debug('created user details', { user });
+    return user;
+  }
+
+  async getUser(identifier: ID): Promise<User | null> {
+    const condition = this.resolveUserCondition(this.buildWhereClause(identifier));
+    const user = await this.db.query.users.findFirst({ where: condition });
+    return user ?? null;
+  }
+
+  /**
+   * A SUSPENDED hold whose `statusUntil` has passed has served its term, so the account reads ACTIVE again and the row is
+   * repaired on the way through. BLOCKED and DISABLED carry no expiry — they end only when an administrator lifts them.
+   */
+  async resolveEffectiveStatus(user: User): Promise<User.Status> {
+    if (user.status !== 'SUSPENDED' || !user.statusUntil || user.statusUntil.getTime() > Date.now()) return user.status;
+    await this.db
+      .update(schema.users)
+      .set({ status: 'ACTIVE', statusReason: null, statusChangedAt: new Date(), statusUntil: null, updatedAt: new Date() })
+      .where(eq(schema.users.id, user.id));
+    this.logger.info('suspension lapsed, account restored', { userId: user.id.toString() });
+    return 'ACTIVE';
+  }
+
+  /**
+   * Single gate for every credential-bearing entry point (login, recovery, token exchange). CLOSED reports as absent
+   * because a soft-deleted account has already been anonymised and must not be distinguishable from one that never existed.
+   */
+  assertLoginAllowed(status: User.Status): void {
+    if (status === 'ACTIVE') return;
+    if (status === 'BLOCKED') throw AppErrorCode.AUTH_009.create();
+    if (status === 'SUSPENDED') throw AppErrorCode.AUTH_010.create();
+    if (status === 'CLOSED') throw AppErrorCode.AUTH_008.create();
+    throw AppErrorCode.AUTH_011.create();
+  }
+
+  /**
+   * Canonical writer for an account status change, carrying the reason and optional expiry that make SUSPENDED
+   * distinguishable from BLOCKED. Revoking live access is the caller's responsibility — see `AdminUserService`.
+   */
+  async setStatusHold(userId: bigint, status: User.Status, hold: StatusHold = {}): Promise<void> {
+    const restored = status === 'ACTIVE';
+    await this.db
+      .update(schema.users)
+      .set({
+        status,
+        statusReason: restored ? null : (hold.reason ?? null),
+        statusChangedAt: new Date(),
+        statusUntil: restored ? null : (hold.until ?? null),
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.users.id, userId))
+      .catch(error => this.databaseService.translateError(error));
+    this.logger.info('account status changed', { userId: userId.toString(), status, until: hold.until?.toISOString() });
+  }
+
+  async updateUserStatus(identifier: ID, status: User.Status): Promise<void> {
+    const condition = this.resolveUserCondition(this.buildWhereClause(identifier));
+    const result = await this.db
+      .update(schema.users)
+      .set({ status, updatedAt: new Date() })
+      .where(condition)
+      .returning({ id: schema.users.id })
+      .catch(error => this.databaseService.translateError(error));
+    if (result.length === 0) throw AppErrorCode.USR_001.create();
+    this.logger.debug('user status updated', { identifier, status, count: result.length });
+  }
+
+  /** Updates the signed-in user's own profile fields; a no-op when nothing changed. */
+  /** Identity summary for first-party surfaces: profile basics plus session assurance. */
+  async getCurrentUserSummary(session: ValidatedSession, elevated: boolean): Promise<CurrentUserSummary> {
+    const profile = await this.databaseService.getPostgresClient().query.userProfiles.findFirst({ where: eq(schema.userProfiles.userId, session.userId) });
+    const email = await this.userEmailService.getPrimaryEmail(session.userId);
+    return {
+      userId: session.userId,
+      firstName: profile?.firstName ?? undefined,
+      lastName: profile?.lastName ?? undefined,
+      email: email ?? undefined,
+      aal: session.aal,
+      elevated,
+      elevatedUntil: session.elevatedUntil ? new Date(session.elevatedUntil) : undefined,
+    };
+  }
+
+  async updateProfile(userId: bigint, data: ProfileUpdate): Promise<void> {
+    const update: ProfileUpdate = {};
+    if (data.firstName !== undefined) update.firstName = data.firstName;
+    if (data.lastName !== undefined) update.lastName = data.lastName;
+    if (Object.keys(update).length === 0) return;
+    await this.db.update(schema.userProfiles).set(update).where(eq(schema.userProfiles.userId, userId));
+    this.logger.debug('user profile updated', { userId });
+  }
+
+  /**
+   * Self-service password change for a signed-in user. Re-proves the current credential, enforces the
+   * password policy and reuse guard, rotates the credential, then signs every *other* session out — the
+   * caller's own session is spared so they stay logged in. Mirrors the recovery and admin-forced reset
+   * paths (audit + owner notification), minus the flow machinery. A wrong current password answers with
+   * the same opaque `AUTH_003` the authenticated step-up check uses — it never reveals whether the
+   * account even has a local password.
+   */
+  async changePassword(session: ValidatedSession, currentPassword: string, newPassword: string, ipAddress: string): Promise<void> {
+    const { userId } = session;
+    if (!(await this.passwordService.verifyForUser(userId, currentPassword))) throw AppErrorCode.AUTH_003.create();
+
+    await this.passwordPolicyService.assertAcceptable(newPassword);
+    if (await this.passwordService.isReused(userId, newPassword)) throw new ValidationError('password', ERROR_MESSAGES.REUSED_PASSWORD);
+
+    const email = await this.userEmailService.getPrimaryEmail(userId);
+    if (!email) throw AppError.internal('cannot change the password of a user without a primary email');
+
+    await this.passwordService.changePassword(userId, newPassword, email);
+    await this.sessionService.terminateAllForUser(userId, session.id);
+    await this.auditService.record({ action: 'auth.password.changed', outcome: 'SUCCESS', actorType: 'USER', actorId: userId.toString(), ipAddress });
+    await this.notificationService.enqueue({ templateKey: PASSWORD_CHANGED_TEMPLATE, recipients: { email }, payload: { ipAddress } });
+    this.logger.info('user password changed', { userId });
+  }
+}

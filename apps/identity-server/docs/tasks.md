@@ -1,0 +1,463 @@
+# Shadow Identity — Development Backlog
+
+|                  |                          |
+| :--------------- | :----------------------- |
+| **Status**       | Approved for development |
+| **Version**      | 1.1.0                    |
+| **Last updated** | 2026-07-25               |
+
+This is the authoritative build plan to take Shadow Identity from its current state (schema + design + DI skeleton, no working auth) to a secure, scalable production platform, then to enterprise readiness. It implements `docs/architecture.md`, `docs/database.md`, `docs/auth/*`, and the SDK spec (`docs/sdk.md`, now in the `@shadow-library/auth` repository).
+
+## How to read this
+
+- Milestones **M0–M9** are ordered; a milestone SHOULD NOT start until its predecessor's exit criteria pass. Within a milestone, tasks may parallelise unless a dependency is stated.
+- **Effort**: S (≤1 day), M (2–4 days), L (1–2 weeks), XL (>2 weeks). Estimates assume one engineer familiar with the `@shadow-library` framework.
+- Every task's **Definition of Done** includes: code + unit/integration tests + migration (if schema) in the same PR, lint/type-check/`drizzle-kit generate` clean, and docs updated if behaviour diverges from spec.
+- **Security impact** and **blocks-production** flags carry over from the architecture review.
+
+---
+
+## M0 — Immediate remediation (correctness & safety)
+
+**Goal:** eliminate the dangerous defects in the existing code and repair the build/migration pipeline before anything is layered on top. Nothing here is optional.
+
+### T-001 — Fix `getUser` wrong-user lookup · S · Sec: Critical · Blocks prod
+
+- **Change:** `src/modules/identity/user/user.service.ts:135-142`. The `db.query.users.findFirst({ with: { emails: { where } } })` pattern filters child rows, not parents, so an email/phone lookup returns the first user in the table.
+- **Fix:** resolve via subquery on the child table:
+  `where: inArray(users.id, db.select({ id: userEmails.userId }).from(userEmails).where(filter.sql))` (and the phone equivalent). Route username/id through the direct predicate as today.
+- **DoD:** test proving a lookup for user B's email returns B (not A); lookup for a nonexistent identifier returns `null`.
+
+### T-002 — Fix `updateUserStatus` mass-update · S · Sec: Critical · Blocks prod
+
+- **Change:** `user.service.ts:144-164`. `update(users).set(...).from(table).where(...)` has no join predicate → updates every `users` row.
+- **Fix:** `update(users).set({ status }).where(inArray(users.id, <subquery over child table>))`; assert affected-row count ≤ 1.
+- **DoD:** test seeding 3 users proving `updateUserStatus(<one email>, 'BLOCKED')` changes exactly one row.
+
+### T-003 — Remove hardcoded super-admin credentials · S · Sec: Critical · Blocks prod
+
+- **Change:** `src/modules/identity/user/user.module.ts:34-53` seeds `super-admin@shadow-apps.com` / `Password@123`.
+- **Fix:** replace with a one-time bootstrap: on first boot with no platform admin, generate a random password, print it once to stdout, create the user in `PENDING` state requiring password reset on first login; OR gate on `AUTH_BOOTSTRAP_ADMIN_EMAIL` + a `SECURITY_MASTER_ENCRYPTION_KEY`-derived one-time token. No literal secret in source, ever.
+- **DoD:** grep for `Password@123` returns nothing; boot on a fresh DB yields no known-credential account.
+
+### T-004 — Repair migration pipeline & reset baseline · S · Blocks prod
+
+- **Change:** `drizzle.config.ts:23` points at `./src/modules/database/schemas/index.ts` (removed in PR #17). The only migration predates half the schema.
+- **Fix:** correct path to `./src/modules/infrastructure/datastore/schemas/index.ts`; delete stale journal + `0000_burly_punisher.sql`; regenerate a clean `0000` baseline; add CI step failing if `drizzle-kit generate` produces a diff.
+- **DoD:** fresh DB builds from migrations; CI drift check green.
+
+### T-005 — Correct audit schema so audit survives · S · Sec: High
+
+- **Change:** `auth-tokens.schemas.ts:79-100` (`user_sign_in_events`): `user_id NOT NULL` + implicit coupling defeats the stated audit purpose.
+- **Fix:** `user_id` nullable, no cascade (app-level `SET NULL`); keep `identifier`; add `(identifier, created_at)` and `(ip_address, created_at)` indexes for Tier-4/abuse queries; rename toward `sign_in_events` per target model.
+- **DoD:** a failed attempt for an unknown identifier is recordable; deleting a user does not delete their sign-in history.
+
+### T-006 — Fail-closed configuration · S · Sec: High · Blocks prod
+
+- **Change:** `src/bootstrap.ts` defaults production secrets (DB URL, Redis) to localhost values.
+- **Fix:** in `Config.isProd()`, require `PRIMARY_DATABASE_URL`, `REDIS_URL`, `SECURITY_MASTER_ENCRYPTION_KEY` — abort boot if absent. Keep dev defaults behind `isDev()`. Expand `.env.example` to list every variable actually read.
+- **DoD:** prod boot without the three secrets exits non-zero with a clear message.
+
+### T-007 — Wire modules into the app · S · Blocks prod
+
+- **Change:** `src/app.module.ts` imports only `HttpRouteModule`; `UserModule`/`ApplicationModule` are dead code. `application.service.ts:75,90` also call `loadApplications()` without `await`.
+- **Fix:** compose modules under a top-level `IdentityModule`/`SystemModule`; `await` cache reloads; confirm `onModuleInit` ordering (applications before the admin-user seed that references them).
+- **DoD:** app boots with all modules; existing health test still green; no unhandled promise warnings.
+
+**M0 exit criteria:** all tests green in CI _with a real Postgres_ (see T-008); no Critical review findings remain; reproducible DB from migrations.
+
+---
+
+## M1 — Production foundation (make it a real service)
+
+**Goal:** the infrastructure and primitives every later milestone needs.
+
+### T-008 — DB-backed integration test harness · M · Sec: High
+
+- **Change:** `.github/workflows/code-test.yml` runs `bun test` with no database.
+- **Fix:** add an ephemeral Postgres (+ Redis) service to CI; provide a test bootstrap that migrates a scratch DB and truncates between tests; port the existing single health test onto it. This is the harness that would have caught T-001/T-002.
+- **DoD:** integration tests run in CI against real Postgres/Redis.
+
+### T-009 — Adopt `DatabaseModule` + `CacheModule`, drop local datastore · M · Sec: Medium
+
+- **Change:** replace `DatastoreService` (`infrastructure/datastore/datastore.service.ts`) — which hand-manages Drizzle/ioredis/Memcached and has an unsafe SQL-param-interpolating debug logger — with `@shadow-library/modules` `DatabaseModule` (≥0.5) and `CacheModule` (D-6, D-14). Remove Memcached entirely.
+- **Fix:** keep the Drizzle schemas; register `DatabaseModule.forRoot({ postgres, redis })`; expose typed repositories. Delete `datastore.constants.ts` param-interpolation logger; rely on the module's `renderPostgresQuery` (debug-gated).
+- **DoD:** no direct `new Redis()`/`drizzle()` in app code; Memcached dependency removed from `package.json`; secrets never interpolated into logged SQL.
+
+### T-010 — UUIDv7 keys + prefixed external IDs · M · Blocks later work
+
+- **Change:** migrate all PKs from `bigserial`/`serial` to `uuid` (D-8) generated by `Bun.randomUUIDv7()`; add an ID codec (`usr_`, `org_`, `sess_`, `cli_`, `app_` per `docs/standards.md`) at the API boundary.
+- **Fix:** schema migration (fresh baseline, so mechanical); central `IdService` for generate/encode/decode/validate.
+- **DoD:** all new rows get UUIDv7; API emits/accepts prefixed IDs; internal storage is bare `uuid`.
+
+### T-011 — Key management + JWKS + rotation · L · Sec: Critical · Blocks tokens
+
+- **Change:** implement `auth/keys` module and `signing_keys` table (D-9, DB §8). `KeyProvider` interface (env-KEK impl now, KMS later) doing AES-256-GCM envelope encryption of Ed25519 private keys.
+- **Fix:** generate/activate/rotate/retire state machine; exactly one `ACTIVE`; pre-publish `PENDING`; `GET /.well-known/jwks.json` (current + previous, `max-age=300`); signing service used by all token issuance; worker job for 90-day rotation + emergency rotate admin action.
+- **DoD:** tokens sign under `kid`; JWKS verifies them; rotation test proves tokens signed by key N verify after activating N+1 and rejecting retired keys.
+
+### T-012 — Session subsystem + harden CSRF · L · Sec: High
+
+- **Change:** `auth/session` module + `user_sessions`/`devices` tables (DB §7). Opaque `__Host-sid` (SHA-256 stored), Redis-cached lookup (60 s) with explicit invalidation, idle/absolute timeouts, fixation prevention, `elevated_until` step-up (D-10, overview §6).
+- **Fix (framework):** the `HttpCoreModule` CSRF token is a plain, non-constant-time double-submit (`csrf-token.service.ts`); make it HMAC-signed and `crypto.timingSafeEqual`-compared. Coordinate in the `modules` repo; pin the new version here.
+- **DoD:** login issues a session; validation is cache-fast; revocation is immediate; CSRF compare is constant-time and signed; session-fixation test passes.
+
+### T-013 — Pinned argon2id + password policy + history · M · Sec: High
+
+- **Change:** `user.service.ts:121` uses `Bun.password.hash` with implicit params.
+- **Fix:** pin `argon2id` (`memoryCost: 65536`, `timeCost: 3`), record `params_version` (DB §2); `password_history` table (last 5); verify-time rehash on param change; policy module (length, breach check via HIBP k-anonymity with soft-fail + async re-check job).
+- **DoD:** params recorded per credential; reused password rejected; breached password rejected (mockable in tests).
+
+### T-014 — Notifications (outbox) + jobs runtime + worker process · L · Sec: Medium
+
+- **Change:** `infrastructure/notification` (templated email via `notification_outbox`) and `infrastructure/jobs` (Postgres `FOR UPDATE SKIP LOCKED` queue) + a second `worker` entrypoint (D-13, arch §13.4–13.5).
+- **Fix:** outbox written inside domain transactions; worker drains with backoff/DLQ/idempotency; jobs: notification dispatch, expiry sweeps (sessions/tokens/challenges/flows), lockout release, HIBP re-check.
+- **DoD:** email send never blocks/rolls back a request; worker processes and retries; dead-letter observable.
+
+### T-015 — Auth flow engine: registration, login, recovery · L · Sec: High · Blocks product
+
+- **Change:** `auth/flow` module using `FlowManager`/`FlowRegistry`; `verification_challenges` table; Redis flow context (overview §1); the corrected flows (overview §3–5) and API (api-contract §1–3), including the **new dedicated password-set step** and enumeration neutrality (D-12).
+- **Fix:** tiered rate limiting (overview §8) in Redis; personal-workspace creation in the registration commit (T-018 dependency); `sign_in_events` writes; masked-destination metadata.
+- **DoD:** end-to-end register/login/recover integration tests; neutrality test (known vs unknown identifier responses identical); Tier-3/Tier-4 lockout tests.
+
+### T-016 — Refresh-token families + rotation · M · Sec: High · Blocks OAuth
+
+- **Change:** `refresh_token_families`/`refresh_tokens` tables (DB §7); unconditional rotation with reuse detection (D-11, arch §17.3). Fix the v1 defects: drop `unique(session_id, application_id)`, make `previous_token_id` a self-uuid-FK.
+- **Fix:** rotate on every use; presenting a `ROTATED`/`REVOKED` member revokes the family + session and emits `security.token_reuse`.
+- **DoD:** rotation test; reuse-detection test (revoked member ⇒ family+session dead); concurrency test (parallel refresh of one token ⇒ exactly one succeeds).
+
+### T-017 — Audit pipeline (hash-chained) · M · Sec: High
+
+- **Change:** `infrastructure/audit` + `audit_events` (DB §9): append-only, no FKs, per-org SHA-256 chain, monthly partitions, `request.cid` correlation.
+- **Fix:** audit emit points across auth/admin/client/key/consent/grant/session events; worker chain-verification job; redaction of PII/secrets in `detail`.
+- **DoD:** privileged actions produce chained rows; tamper (row edit) fails verification; no secret/PII in payloads.
+
+### T-018 — Tenancy: synthetic personal workspace + isolation harness · L · Sec: Critical
+
+- **Change:** `identity/organisation` module; `organisations`/`organisation_members` per target model; personal-workspace creation (D-1) wired into registration; `organisation_id` added to every tenant-owned table.
+- **Fix:** repository layer requiring an org context on tenant tables; **isolation harness** — a test suite attempting cross-tenant read/write on every tenant repository method, failing the build on any leak (arch §7.3).
+- **DoD:** every user has exactly one personal org from registration; isolation harness green and wired into CI.
+
+**M1 exit criteria:** password login → session → refresh works end-to-end with tests; keys rotate safely; audit + tenancy isolation enforced; worker operational; CI runs against real datastores.
+
+---
+
+## M2 — OAuth 2.1 / OIDC authorization server
+
+**Goal:** standards-based application login and M2M, replacing the withdrawn bespoke SSO.
+
+### T-201 — Client & resource model + admin registration · L · Sec: High
+
+- `applications` (extended), `oauth_clients`, `oauth_client_secrets` (argon2id, dual-secret rotation), `oauth_client_redirect_uris` (exact match), `oauth_client_origins`, `api_resources`, `scopes`, `oauth_client_scope_grants`, `application_keys` repurposed for `private_key_jwt` (DB §5). Admin APIs to register/rotate.
+- **DoD:** register a first-party client; rotate a secret with overlap; redirect URIs exact-match validated (wildcard rejected).
+
+### T-202 — Authorization Code + PKCE + discovery · L · Sec: Critical · Blocks first-party SSO
+
+- `GET /.well-known/openid-configuration`, `GET /oauth2/authorize` (mandatory PKCE S256, exact redirect match, Redis-stored single-use 60 s codes bound to client/redirect/PKCE/nonce/session), `oidcResume` handoff to the login flow (arch §8.3, §17.1). First-party consent bypass with recorded consent (D-4).
+- **DoD:** full code+PKCE login for a first-party app; tampered `redirect_uri`/`code_verifier`/reused code all rejected.
+
+### T-203 — Token, refresh, client-credentials, UserInfo · L · Sec: Critical
+
+- `POST /oauth2/token` (`authorization_code`, `refresh_token` via T-016, `client_credentials` via D-2/arch §8.4 with `resource` RFC 8707 + scope-grant checks), `GET /oauth2/userinfo`, ID token minting (nonce, acr/amr). Client auth: `client_secret_basic` + `private_key_jwt` (RFC 7523).
+- **DoD:** all three grants issue correct tokens; `aud`/scope enforcement; algorithm allowlist honoured.
+
+### T-204 — Revocation, introspection, logout, back-channel · M · Sec: High
+
+- `POST /oauth2/revoke` (RFC 7009), `POST /oauth2/introspect` (RFC 7662, confidential only), OIDC back-channel logout tokens to registered clients (arch §17.5). _Update 2026-07-25:_ `GET /oauth2/logout` (RP-initiated) is **descoped** — there is no end-session endpoint; first-party sign-out is app-session termination (D-18) and global sign-out lives on the identity domain. Revisit with M8.
+- **DoD:** revoke kills a family; global sign-out triggers back-channel logout received by a test RP.
+
+### T-205 — Consent records + withdrawal · M · Sec: Medium
+
+- `consents` table; first-party `FIRST_PARTY_POLICY` records; `GET/DELETE /me/consents`. (Consent _screen_ deferred to third-party enablement, M8, but records exist now — D-4.)
+- **DoD:** consent recorded on first authorize; withdrawal revokes grants + tokens.
+
+**M2 exit criteria:** a first-party Bun app logs users in via OIDC through the SDK RP helper; services obtain M2M tokens; OIDC conformance suite (OP Basic + Config) passes (T-309).
+
+---
+
+## M3 — Authorization (PDP) + SDK
+
+**Goal:** central permission decisions and the consumer package.
+
+### T-301 — RBAC model + PDP API · L · Sec: High
+
+- `permissions`, `application_roles` (extended), `role_permissions`, `role_assignments` (org-scoped, principal = user|service) per DB §6 — **this fills the gap where roles cannot currently be assigned to anyone.** `POST /api/v1/authz/check` (batch deferred — the SDK's `checkAll` composes parallel single checks), deny-by-default, `authz_version` invalidation (arch §11, §17.4).
+- **DoD:** assign a role; PDP returns PERMIT/DENY correctly; grant change bumps version and invalidates cached decisions; authorization-matrix tests pass.
+
+### T-302 — `@shadow-library/auth` SDK v1 · XL · Sec: Critical
+
+- Build the package per `docs/sdk.md` as the **in-repo workspace package `packages/auth`** (decision: same repo as the identity server because the two share protocol logic and the SDK is integration-tested against the real server; _update 2026-07-25:_ since extracted into its own repository together with its spec — its `docs/sdk.md` §11): Bun-native Ed25519 verify (JWKS cache + unknown-`kid` refetch), `AuthModule` guards (`@Authenticated`, `@RequirePermission`, `@RequireScope`, `@AllowService`), PDP client (60 s cache), M2M token manager (singleflight), RP helper (PKCE/state/nonce), `createTestIdP` utilities. Session-cookie adapters and back-channel logout ship with T-303 when the first consumer integrates.
+- **DoD:** a reference consumer service verifies tokens with no network on the hot path, enforces a permission via PDP, and calls another service M2M — all through the SDK; fail-closed behaviour tested.
+
+### T-303 — Migrate one real service (`pulse-server`) as reference · L
+
+- Integrate the SDK into an existing sibling app end-to-end (user login via RP helper + one M2M call + one permission-guarded route) to validate the contract against reality before broad rollout.
+- **DoD:** `pulse-server` authenticates users and services solely through Shadow Identity + SDK.
+
+### T-309 — OIDC conformance run · M · Sec: High
+
+- Run the OpenID Foundation OP Basic + Config conformance profiles against a staging deployment; fix findings.
+- **DoD:** conformance profiles pass; results archived.
+
+**M3 exit criteria:** end-to-end user + service auth and authorization working through the SDK for at least one real service; conformance passed.
+
+---
+
+## M4 — MFA & credential hardening ✅ _(implemented; api-contract §4.5–4.7)_
+
+### T-401 — TOTP enrollment + step-up · M · Sec: High — **done**
+
+`mfa_enrollments` (AES-GCM seed + `last_used_counter` replay pin), enroll/activate/disable (step-up gated), login MFA state (`AWAITING_TOTP`), `AAL2` on sessions with a bounded elevation window. _(`acr`/`amr` token claims deferred to the OIDC surface as a follow-up.)_
+
+### T-402 — WebAuthn / passkeys · L · Sec: High — **done**
+
+`webauthn_credentials`; registration + assertion via `@simplewebauthn/server` (login MFA step `AWAITING_MFA_WEBAUTHN` and usernameless first factor at AAL2), sign-count regression → reject + `security.webauthn.counter_regression` audit, backup-eligibility recorded. Tests drive real ceremonies with a software authenticator.
+
+### T-403 — Recovery codes + MFA-aware recovery · M · Sec: High — **done**
+
+`recovery_codes` (argon2id, generations, single-use, consumption alerts the user); recovery flow requires TOTP or a recovery code for MFA accounts (overview §5) — closes the MFA-downgrade takeover.
+
+### T-404 — Multiple verified emails/phones + management APIs · M · Sec: Medium — **done**
+
+Verified-only uniqueness (DB §2, partial unique indexes), primary switching (verified-only), `/me` email/phone add/verify/remove, 7-day purge of stale claims (worker), login/recovery resolve verified identifiers only.
+**M4 exit criteria:** users enroll TOTP + passkeys, generate recovery codes; recovery cannot bypass MFA. ✅
+
+---
+
+## M5 — Security intelligence & operational maturity
+
+### T-501 — Rate-limit + abuse hardening pass · M · Sec: High — **done**
+
+`SecurityModule`: Redis-backed Tier-1 middleware (`@RateLimit` routes fail closed, general budget fails open), dynamic IP deny list + config allowlist + kill switch; Tier-2 identifier cap centralised in `ChallengeService.issue`; Tier-4 OTP-only lock now enforced at the password step (arch §13.2). Also completed the contract §2/§4 surface: `challenge/methods`, `challenge/change` (OTP first factor), `challenge/resend`, `cancel`, `signout`. Fixed en route: the router's generated-middleware cache keyed on route metadata alone, silently sharing one handler between two generating middlewares (double-counted limits, skipped CSRF) — namespaced `cacheKey` here and in the SDK guard; the proper fix landed upstream in `@shadow-library/fastify` commit `04ac657` (cache scoped per middleware instance) — the namespaced keys here are now redundant but harmless, removable once the fixed version is released and the dependency bumped.
+
+### T-502 — Suspicious-login detection · L · Sec: Medium — **done**
+
+New-device/new-IP signals on successful logins (quiet on first-ever login) → `security.new_device_login` audit + alert email via outbox. **Deferred**: GeoIP/impossible-travel (needs an external location database) and forced step-up on suspicion (needs risk policy).
+
+### T-503 — Security event correlation + alerts · M · Sec: Medium — **done**
+
+Cross-account failed-login correlation per source IP → 1 h Tier-1 block + `security.ip_blocked`; unified `security.*` taxonomy with `securityEvent`-tagged structured logs (arch §13.3); token-reuse feeds the same taxonomy. Also secured the PDP: `POST /api/v1/authz/check` now requires a service token with the bootstrap-seeded `authz:check` scope (native KeyService verification; SDK requests the scope automatically).
+
+### T-504 — Readiness, graceful shutdown, DR drill · M · Sec: High — **done**
+
+`/health/ready` existed; worker now drains its in-flight tick on SIGTERM and requeues deliveries stranded in `SENDING` at boot; `docs/runbooks.md` covers key rotation/compromise, restore drill (RPO ≤5 m / RTO ≤1 h), token-reuse response, IP-block ops, bootstrap recovery, outbox ops, deploy order. The drill itself is an operational exercise, not code.
+
+### T-505 — Container & supply-chain hardening · S · Sec: Medium — **done**
+
+Non-root, version-pinned Bun image (digest pinned in CI via `--build-arg BUN_IMAGE`), `HEALTHCHECK`, dist-only context (`.dockerignore`), worker via `CMD` override, `docker-compose.dev.yml` for local datastores; CodeQL + test workflows retained. **Deferred**: dependency-audit gate and artifact signing (CI platform work).
+**M5 exit criteria:** rate tiers enforced and fail-closed on the auth surface, suspicious logins alerted, security events on one taxonomy, PDP authenticated, worker crash-safe and drain-clean, runbooks published. ✅ (deferred: geo signals, forced step-up, CI supply-chain gates, the physical DR drill)
+
+---
+
+## M6 — Admin & platform surfaces
+
+### T-601 — Admin vs platform-admin separation · M · Sec: High — **done**
+
+Administration rides the ordinary PDP (no bespoke flags): a bootstrap-provisioned **platform organisation** scopes admin role assignments; the `iam:*` permission taxonomy is seeded on the platform application and granted to `IAMAdmin`; the bootstrap admin converges to owner + IAMAdmin on every boot. Two tiers: `iam:roles:manage` platform-wide vs `app:roles:manage` resolved through an application-filtered PDP check (permission names are unique per application, so app admins can never reach across). Reads accept AAL1; every mutation demands AAL2 step-up and is actor-attributed in the audit chain. Break-glass: `docs/runbooks.md` bootstrap-recovery procedure.
+
+### T-602 — Account lifecycle admin APIs · M — **done**
+
+`/api/v1/admin/users`: search/detail (never credential material), lock (`OTP_ONLY`/`FULL` — full lock cuts sessions + refresh-token families) / unlock (covers Tier-4), force-password-reset (flags the account; the password step refuses even the correct credential without burning lockout budget until recovery/change clears it), terminate sessions, deactivate/reactivate, right-to-erasure soft delete (PII + credentials scrubbed, numeric skeleton kept so the hash-chained audit trail stays verifiable — regression-tested), per-user audit trail. Client/resource/role administration shipped alongside (`/admin/clients` with dual-secret rotation, `/admin/resources`, `/admin/roles` + `/admin/role-assignments`), plus self-service `GET/DELETE /me/sessions` (api-contract §4.4) and **OIDC back-channel logout** (§5.1: per-client `backchannel_logout_uri`, transactional delivery outbox in the worker, `sid` in ID tokens, discovery flags) — closing the M2 T-204 leftover.
+
+### T-603 — Login/account UI · L — **moved to `identity-web`**
+
+The browser UI (login, registration, recovery, consent, account portal, and the operator console) now lives in the separate **`identity-web`** front-end app — it is no longer part of this repository. This service is API-only: it exposes the flow-engine `status` contract and the supporting endpoints the UI consumes — `GET/POST /api/v1/auth/consent` (describes the client/scopes server-side, validates deny-redirects against registered URIs), `GET /api/v1/me` for the session identity, the step-up gate (403 `AUTH_006` → TOTP → retry), and the CSRF double-submit cookie. `oauth.login-url` points at wherever `identity-web` is deployed.
+
+**M6 exit criteria:** admin surfaces PDP-guarded with actor attribution, lifecycle APIs complete, back-channel logout delivered transactionally, hosted UI serving all interactive flows. ✅ (deferred: real-browser E2E, `acr`/`amr` claims, passkey-based step-up)
+
+---
+
+## M7 — Enterprise readiness
+
+### T-705 — Team organisations · L — **done**
+
+`/api/v1/organisations` + `/api/v1/me/organisations` (api-contract §7): TEAM orgs with slugs, OWNER/ADMIN/MEMBER administration riding `organisation_members` while product permissions stay on the PDP (one authorization system — ending membership or deleting the org revokes the org-scoped `role_assignments`). Invitations are email-bound single-use tokens (hashed at rest, 7-day expiry, superseded on re-invite, enumeration-neutral, Tier-2 budget 20/org/h); acceptance requires the invited address VERIFIED on the caller, so pre-registration invitations resolve after signup. Last-owner protection on demotion/removal/leave; owner handover and deletion demand an elevated owner. Decisions where docs were silent: owners are never invited directly (promote after joining); callers administer only ranks strictly below their own (owners may touch owners); absent/foreign orgs answer uniformly `ORG_001`. En route fix: `audit_events.organisation_id` was `uuid` and could never hold today's bigint org ids (it assumed the deferred D-8 conversion) — widened to varchar(64) so per-org hash chains actually work. Resource migration personal→team stays deferred (no shared resources exist yet to migrate).
+
+### T-703 — Verified domains · L — **done**
+
+`/api/v1/organisations/{id}/domains` (api-contract §7.3): DNS TXT proof at `_shadow-identity.<domain>` through an injectable resolver seam, re-checkable, evidence retained (`matched_record`, `last_checked_at`). One VERIFIED holder per domain (partial unique index, race-safe); VERIFIED never demotes on failed re-checks. All mutations ADMIN + AAL2. Domain-based routing / email-domain auto-capture deliberately deferred to T-702 — verification here is the attachment point for SAML/SCIM/JIT.
+
+### T-706 — Webhooks / event stream · L — **done**
+
+Platform-tier subscriptions (`/api/v1/admin/webhooks`, `iam:webhooks:manage`, api-contract §6.4) over the audit event stream: fan-out happens inside the audit writer's transaction with `(subscription, event)` uniqueness as the receiver-side idempotency key; payloads carry ids/metadata only, never audit `detail`. Stripe-style HMAC-SHA256 signatures (`t=…,v1=…`) with a 24 h dual-secret rotation overlap; AES-256-GCM secret storage; SSRF guard at registration and again post-DNS-resolution at send time; worker-driven skip-locked dispatch with backoff, dead-letter at 5, crash requeue, and admin redelivery. Decision recorded: org-scoped subscriptions are out of scope until a tenant-facing need appears.
+
+### T-701 — SAML 2.0 IdP · XL — **done**
+
+SP-initiated SSO (api-contract §8): HTTP-Redirect in, HTTP-POST out, signed assertions (enveloped XML-DSIG, RSA-SHA256, exclusive c14n via `xml-crypto`) from a dedicated RSA-2048 key lineage (`signing_keys.purpose = SAML`, self-signed X.509 via `@peculiar/x509`, same envelope encryption and rotation states as OIDC keys; metadata publishes every non-retired certificate so rotation never breaks SPs). Replay guard: login detours park the request in Redis under a single-use resume id; assertions live 5 min with `InResponseTo`/`Recipient`/`AudienceRestriction`. Registered SPs are platform-tier (`iam:clients:manage`, https-only exact-match ACS). Decisions recorded: SP AuthnRequest signature verification unsupported (XSW risk of hand-rolled XML-DSIG verification outweighs its value when nothing security-relevant is taken from the request); pairwise `PERSISTENT` NameIDs are master-key-derived HMACs. Deferred: assertion **encryption** (xmlenc), single logout, IdP-initiated SSO.
+
+### T-704 — SCIM 2.0 · XL — **done**
+
+Users + Groups + discovery documents per organisation (api-contract §9). Recorded decisions: `scim_tokens` retired unbuilt — org-bound SERVICE clients carrying `scim:provision` already give per-tenant rotatable credentials (dual-secret overlap), introspection and revocation, and keep ONE token infrastructure; `userName` restricted to the org's VERIFIED domains (a tenant provisions only its own namespace, which also closes the account-enumeration oracle); adopted pre-existing accounts (`managed = false`) can never be deactivated by a tenant — deprovisioning strips org membership and org-scoped refresh-token families only, while SCIM-born accounts (`managed = true`) are DISABLED with full session/token revocation and back-channel logout. SCIM bodies are runtime-validated instead of class-schema DTOs (RFC 7644 PATCH values are polymorphic — Entra sends `"False"` strings for booleans); the SCIM error envelope bypasses the platform error shape by design. Deferred: group→role mapping (groups are provisioning structure only until a tenant needs authorization semantics), bulk operations, eTags.
+
+### T-702 — Inbound OIDC federation · XL — **done**
+
+Home-realm discovery riding T-703's verified domains (api-contract §10): the login flow offers (or, when `enforced`, requires) the org's external OIDC IdP; the server-side RP does code+PKCE with per-flow state/nonce, verifies upstream ID tokens against the upstream JWKS (RS256/ES256/EdDSA allow-list) and demands `email_verified`. Tenant-takeover prevention is layered: endpoints only ever come from the issuer's own discovery document (issuer-match + SSRF guard), returning users match on (provider, subject) — never bare email after first link — and linking a first-time subject to an existing local account requires an email-OTP proof of control. JIT-provisioned users are passwordless org MEMBERs; federated proof is a first factor, so MFA-enrolled accounts still walk their local second factor; platform admins keep the password path as break-glass. Deferred + recorded: SAML **inbound** federation, group/claim mapping, upstream forced re-auth on step-up.
+
+**M7 is complete** (T-701, T-702, T-703, T-704, T-705, T-706).
+
+---
+
+## M7c — 2026-07-25 architecture-review remediation
+
+Findings from the July 2026 review of `docs/architecture.md` v1.1.0 (D-15 … D-22). Ordered by security impact; T-801/T-802/T-803 SHOULD land before any new first-party application onboards.
+
+### T-801 — Step-up intent binding (D-19) · M · Sec: High — **done (server side; W-1 + A-2 still required)**
+
+- **Change:** the elevation window is claimable first-come-first-served, so any first-party app holding a live app session can spend a step-up the user performed for a different app or for the identity console.
+- **Fix:** record intent at ceremony start — `POST /me/mfa/step-up` and `POST /me/webauthn/step-up` accept optional `clientId` + `resource` (identity-web forwards them from the step-up page URL; the SDK appends them to `AUTH_STEP_UP_URL`); store as `user_sessions.elevation_intent_client_id` / `elevation_intent_resource` (DB §7); `POST /api/v1/app-sessions/elevation` succeeds only on a matching `(client, audience)`; a `NULL` intent is claimable by no application. **Cross-repo:** identity-web step-up page + SDK step-up redirect.
+- **DoD:** claim with a mismatched client or audience fails; a console step-up is unclaimable; a matching claim consumes the window; existing elevation specs updated.
+
+**Landed:** `POST /me/mfa/step-up` and `POST /me/webauthn/step-up` accept optional `clientId` + `resource`, resolved through `OAuthClientService.resolveElevationIntent` **before** the factor is checked and stored on `user_sessions.elevation_intent_{client_id,resource}`. An intent naming an unknown or inactive client fails the ceremony (`OAU_002`) rather than opening a window nothing could ever claim — client ids already travel in browser authorize URLs, so answering reveals nothing new. `claimElevation` now demands a matching `(client, audience)`; a mismatch answers `AUTH_006` and, importantly, **does not spend the window**, so its rightful owner can still take it. `consumeElevation` clears the intent with the window. Enforcement is strict per the deployment decision: a `NULL` intent is claimable by no application.
+
+**Cross-repo — not yet satisfied.** Until identity-web (W-1) forwards `clientId`/`resource` from the step-up page URL and the SDK (A-2) appends them to `AUTH_STEP_UP_URL`, every *application* step-up opens an intentless window and its claim fails closed. Identity-console step-ups and every non-app-session route are unaffected.
+
+### T-802 — Service-access rule TTL refresh (D-17) · S · Sec: High
+
+- **Change:** rules load once at boot, making **revocation** restart-dependent — unbounded latency in a system that bounds every other window (arch §9.1).
+- **Fix (SDK):** re-fetch `GET /api/v1/authz/service-access` on an interval (default 300 s); a failed refresh keeps the last good rules; a failed initial load still aborts boot.
+- **DoD:** revoking a rule denies the caller within one interval without a restart; a transient identity outage does not flip the guard to deny-all.
+
+### T-803 — Workload-assertion audience pinning (D-16) · S · Sec: High — **done**
+
+- **Change:** the spec validated the assertion's `aud` without pinning the value, so any projected SA token could in principle pass.
+- **Fix:** reject client assertions whose `aud` is not the identity issuer; document the required projection (`audience: <issuer>`); regression-test with an API-server-audience token.
+- **DoD:** an assertion carrying the cluster default audience is rejected; the dedicated audience is accepted.
+
+### T-804 — Per-client budgets on M2M endpoints · S · Sec: Medium — **done**
+
+- **Change:** `POST /oauth2/token` and `/api/v1/app-sessions/*` sit on the 100 req/min per-IP tier; a fleet behind one egress IP shares one budget (and the SDK token cache is the only thing keeping it under).
+- **Fix:** budget authenticated M2M calls per client id (Redis, same tier machinery); unauthenticated traffic to the same endpoints stays on the IP tier.
+- **DoD:** two clients behind one IP consume independent budgets; an unauthenticated flood is still IP-limited.
+
+**Landed:** `@M2MBudget()` marks `POST /oauth2/token` and `/api/v1/app-sessions/*`. Authentication happens in a guard or a service, long after the `onRequest` rate-limit middleware, so the outcome is only knowable later — the marked routes therefore **read** the IP counter before the handler (`RateLimiterService.peek`, still fail-closed and still refusing an IP that has already flooded) and an `onResponse` middleware counts the request against that IP only when the reply says the caller never authenticated (401/403). A caller that does authenticate is charged to `m2m-client:<clientId>` at the point its credential is proven — `authenticateGrantClient` for the token grants, `callingClient()` for app-sessions. Revocation and introspection deliberately stay on the IP tier: administrative and low-volume, they would only pay twice.
+
+A refund-on-success design was rejected: the refund lags the consume by an argon2 verification, so a concurrent fleet would trip the IP limit before its refunds landed.
+
+### T-805 — Catalog-sync deletion guardrail (D-15) · S · Sec: Medium — **done**
+
+- **Fix:** `PUT /api/v1/authz/catalog` refuses a manifest that would delete more than half of the application's existing permissions or roles unless the push carries `force: true`; refusals are audited (`authz.catalog.sync_refused`) and change nothing.
+- **DoD:** a truncated manifest is refused without `force`; a forced sync proceeds and audits.
+
+### T-806 — Token exchange (D-22) · L · Sec: High — **done**
+
+- **Change:** implement RFC 8693 at `POST /oauth2/token`: verify the subject token, require the caller's application to own the subject token's `aud`, mint the same `sub`/`org`/`sid` with a mandatory `act` naming the caller, scope = caller's grants on the target ∩ the target's defined scopes, `aal` omitted (always AAL1), `exp` ≤ the subject token's, and refuse subject tokens that already carry `act` (single-hop delegation).
+- **DoD:** exchange yields a correctly bounded token; a chained exchange is refused; an elevated subject token yields an AAL1 result; `act` present on every exchanged token.
+
+**Landed:** `grant_type=urn:ietf:params:oauth:grant-type:token-exchange` at `POST /oauth2/token`, advertised in discovery, answering with `issued_token_type`. Ownership is checked as "the caller's **application** owns the API resource named by the subject token's `aud`" (`getResourceOwner`) rather than a bare `client_id === aud` string match — the same check before and after T-807's 1:1 provisioning. `act` is `{ sub: <caller client id> }`, the RFC's canonical actor slot, which is already how a service identifies itself in `sub`. `actor_token` is refused rather than ignored: the actor is always the authenticated caller, and silently dropping a security-relevant parameter is how delegation bugs happen.
+
+**Decision beyond the task text:** sensitive scopes are excluded from an exchanged token entirely. D-19 mints an `is_sensitive` scope only into an elevated token, and D-22 fixes an exchanged token at AAL1 — so letting one through would have been the one path where a sensitive capability reached a token that never proved a second factor.
+
+### T-807 — Application as the unit of identity (D-21) · L — **done (server side; A-3 + W-3 still required)**
+
+- **Change:** `GET /api/v1/apps/me` self-description; provision the client and the `api://<app>` resource 1:1 from application registration; publish `step_up_endpoint` and `app_session_endpoint` in discovery; SDK derives configuration from `AUTH_ISSUER` + `AUTH_APP_ID` and refreshes it on a TTL.
+- **DoD:** a service boots with issuer + app id + credential only; an admin scope grant propagates without a redeploy; the step-up URL comes from discovery.
+
+**Landed:** `GET /api/v1/apps/me` describes the caller's own registration — audience, redirect URIs, the scopes its API defines (sensitive ones listed apart), its grants on other applications, and `accessTokenTtl`. It takes `@Auth({ service: true })`, a new mode meaning "any valid platform service token, no further entitlement": the only subject is the caller itself, resolved from the token rather than the path, so there is nothing one application could read about another. Deliberately **not** `@M2MBudget()` — that decorator only peeks the IP tier and expects something to charge the client budget at the point of authentication, which this route has no reason to do.
+
+`provisionApplicationIdentity` creates the one client and the one `api://<app>` resource together, and it is idempotent, so a replayed registration never mints a second credential. Admin registration returns `clientId`, `audience` and the once-shown `clientSecret`. Discovery publishes `step_up_endpoint` and `app_session_endpoint`.
+
+**Consequence worth noting:** every application now owns a client by construction, which would have made `DELETE /admin/applications/:id` permanently refuse (clients FK-restrict it). Deletion now removes the application's *own* provisioned client with it — that client is its identity — while still refusing when any further client exists, so a deliberate extra registration is never destroyed as a side effect.
+
+### C-1 — Re-seed the ecosystem per D-21 — **done**
+
+Pulse holds one client (`pulse`, `authorization_code` + `client_credentials` + token-exchange, granted `authz:check`, `authz:roles:sync` and `app-session:manage`) instead of the `pulse` / `pulse-server` pair, and its audience is `api://pulse`. `novel-forge-server` / `webnovel-server` became `api://novel-forge` / `api://webnovel`; `notification.audience` now defaults to `api://pulse`.
+
+**Decision:** identity's own platform API keeps the bare `shadow-identity` identifier rather than becoming `api://shadow-identity`. It is not an application onboarding onto the platform but the platform itself, and the name is load-bearing in the access guard, SCIM auth, app-sessions and every service token already issued — renaming it buys symmetry at the cost of reconfiguring every consumer. C-1 targets the `<app>-server`-style identifiers, which are gone.
+
+### C-2 — Reset the migration baseline — **done**
+
+The journal and the `0000`–`0003` sequence were dropped and regenerated as a single `0000` baseline covering all 50 tables, including T-801's `elevation_intent_*` columns. `shadow check-migrations` is clean and the test template builds from it.
+
+### T-808 — `mfa.email_otp_fallback.enabled` policy (D-20) · S · Sec: Medium — **done (policy registered; exclusion has no target yet)**
+
+- **Fix:** register the boolean key (default `true`, folds `AND`); when folded `false` for a user's applicable organisations, EMAIL_OTP is excluded as an MFA second factor (first-factor OTP for passwordless accounts and recovery-flow proof of address control are unaffected).
+- **DoD:** an organisation disabling the policy removes EMAIL_OTP from its members' MFA options; passwordless sign-in and recovery still work.
+
+**Landed:** the key is registered as the registry's first `boolean` (default `true`, `AND` fold — the boolean analogue of `MIN`, so an organisation may refuse the fallback but never re-enable it over another's refusal), and boolean policies are now administrable end to end: `SetPolicyBody` carries `enabled` beside `value` and `PolicyItem` carries a `*Enabled` trio beside the `*Value` one, because class-schema cannot express a scalar union. `PolicyService.selectValue` makes the registry — not the caller — decide which field a key reads; the previous `Number(...)` mapping in the controller would have emitted `true` as `1`.
+
+**Gap recorded — the exclusion has nothing to exclude.** EMAIL_OTP is not an MFA second factor anywhere in this codebase: `MfaService.getFactors` knows only TOTP and WebAuthn, the login flow branches only to `AWAITING_TOTP`/`AWAITING_MFA_WEBAUTHN`, `getStepUpMethods` never emits it, and nothing ever writes an `EMAIL_OTP` row to `mfa_enrollments` (the `mfa_method` enum value and the `MfaEnrollmentItem` DTO entry are the only traces). Every EMAIL_OTP path that exists is a **first** factor or a proof of address control, which this policy explicitly must not affect. Architecture §8.5 lists email OTP as an MFA method, but no task ever built it — T-401/402/403 built TOTP, WebAuthn and recovery codes. So no read site was added: a gate over a factor that cannot be offered would be dead code. Wiring it is a one-line change in `getFactors`/`getStepUpMethods` **once the factor itself exists**; that work needs its own task.
+
+---
+
+## M8a — Application access control, visibility & customer tiering
+
+**Goal:** organisations control which applications their members may use (denied at sign-in and at every token mint), the platform admin controls each application's release surface (public / restricted / internal), and customer tiers ride the existing PDP via default roles and org-wide role grants. The authoritative design — data model, resolution algorithm, enforcement contracts, API table, and recorded decisions D-A1…D-A7 (union rule, managed-account override, INTERNAL hidden as unknown, hard cut on unassignment, vendor-controlled premium grants, implicit default roles, application-keyed enforcement) — lives in `docs/app-access-control.md`. T-901 → T-902 → T-903 are sequential; T-904 parallelises after T-901; W-901 follows T-903.
+
+### T-901 — Access model schema + `ApplicationAccessService` · M · Sec: High · Blocks M8a — **done**
+
+- **Change:** `applications.visibility` (`PUBLIC | RESTRICTED | INTERNAL`), `organisation_applications` (org × app × `PLATFORM_RELEASE | ORG_ASSIGNMENT`), `organisations.app_access_mode` (`ALL_APPS | ASSIGNED_ONLY`), `application_roles.is_default`, `principal_type` enum + `ORGANISATION`.
+- **Fix:** `ApplicationAccessService` (`src/modules/system/application/`) implementing the spec's resolution algorithm — personal org grants PUBLIC only, platform org sees INTERNAL, RESTRICTED needs release **and** (open mode or assignment), `scim_directory.managed = true` locks the account to the managing org — with per-org grant-set caching in Redis and version-bump invalidation mirroring `PolicyDecisionService`.
+- **State (2026-07-27):** schema, migration `generated/drizzle/0002_slim_iron_fist.sql`, `application-access.service.ts` (`APP_006` hidden / `APP_007` denied), and module wiring reviewed against the spec and completed; resolution-matrix specs written at `tests/system/application-access.service.spec.ts` (20 cases, service 100% line/func covered). `bun run verify` passes (format+lint+type-check+test, 479 pass / 0 fail); test template rebuilt; `db:generate` reports no drift. All work is in the working tree, **uncommitted** — the migration is not yet committed, so `bunx shadow check-migrations` still reports the generated files as uncommitted (its only remaining complaint; there is no schema drift). Also touched en route: `admin-role.dto.ts` (ORGANISATION principal, belongs to T-904).
+- **DoD:** resolution-matrix specs green (each visibility × org mode × membership state, managed override, suspended membership/org grants nothing, cache invalidation on assignment change); `bunx shadow check-migrations` clean; test template rebuilds; `bun run verify` + `bun test` pass.
+
+### T-902 — Sign-in & mint enforcement · M · Sec: High — **done**
+
+- **Change:** no per-user check exists between session validation and code issuance in `OAuthService.authorize`; app sessions outlive any assignment change.
+- **Fix:** enforce `assertUserAccess` at: authorize (hidden → `OAU_002` as unknown client; denied first-party → 302 to identity-web `/error?error=access_denied&application=…&client_id=…`; denied third-party → `redirect_uri?error=access_denied&state=…`; audit `oauth.authorize.denied`); **every app-session mint** (deny → revoke app session, `AUTH_005` — this is the revocation story, back-channel logout never reaches app-session clients); `refresh_token` grant (deny → revoke family, `invalid_grant`); token exchange (subject user vs target application → `invalid_target`); SAML SSO via new nullable `saml_service_providers.application_id`. `client_credentials` exempt (D-A7).
+- **DoD:** denied user gets the correct contract on each path; unassignment kills a live app session on next mint; granted users unaffected; specs for all five paths.
+
+**Landed:** all five enforcement points hang off the T-901 `ApplicationAccessService`, with `AppError.is` on `APP_006` (hidden) / `APP_007` (denied) selecting each path's contract. `OAuthService.authorize` gates immediately after `sessionService.validate`, before the consent branch — *hidden* answers `OAU_002` as an unknown client (D-A3), *denied* routes through `denyAuthorize`, which sends a first-party client to identity-web's hosted `/error?error=access_denied&application=…&client_id=…` and a third-party client back to its `redirect_uri?error=access_denied&state=…` (mirroring `ConsentService.decide`), always auditing `oauth.authorize.denied` with outcome `DENIED`. `AppSessionService.mintToken` re-checks on every mint and, on either denial, revokes the app session and answers `AUTH_005` so the SDK restarts login — the revocation story, since back-channel logout never reaches app-session clients (D-A4). `OAuthService.refresh` revokes the refresh-token family and answers `invalid_grant`. `OAuthService.tokenExchange` checks the **subject user** against the target audience's owning application and answers `invalid_target`; `client_credentials` stays exempt (D-A7). SAML gained a nullable `saml_service_providers.application_id` FK (`ON DELETE SET NULL`, migration `generated/drizzle/0003_great_penance.sql`, test template rebuilt): a linked SP runs the same gate before issuing the assertion and, having no OAuth `redirect_uri`, sends a denied browser to the hosted `/error?error=access_denied` page, while an unlinked SP keeps its pre-T-902 behaviour exactly; `applicationId` is settable on the admin SAML register/update DTOs, validated against `ApplicationService`. Specs cover every path (`tests/auth/app-access-enforcement.spec.ts`, plus additions to `tests/auth/token-exchange.spec.ts` and `tests/saml/saml-idp.spec.ts`); the token-exchange fixture became a real user with a personal workspace because the subject now must actually be able to reach the target. `bun run verify` and `bun test` pass (489/489); `bunx shadow check-migrations` reports only the expected uncommitted-files complaint (no schema drift). All work is in the working tree, **uncommitted**.
+
+### T-903 — Admin, organisation & launcher APIs · M — **done**
+
+- **Fix:** the full API table in `docs/app-access-control.md` §API surface — `visibility` on `PATCH /admin/applications/:id`; release endpoints `GET/POST/DELETE /admin/applications/:id/organisations`; org assignment `GET/POST/DELETE /organisations/:id/applications` (ADMIN + AAL2) and `appAccessMode` on `PATCH /organisations/:id` (OWNER + AAL2); extend the existing my-applications surface to return **accessible** apps (not merely used). Guardrail: an org cannot assign an app its members could never reach. All mutations audited (`application.visibility.changed`, `application.release.granted|revoked`, `org.application.assigned|unassigned`, `org.app_access_mode.changed`).
+- **DoD:** endpoint specs incl. permission/step-up matrices; launcher excludes newly inaccessible apps; audit events emitted; OpenAPI reflects the contract.
+
+**Landed:** the whole T-903 API table hangs off the T-901 `ApplicationAccessService`, with a new `OrganisationApplicationService` (`src/modules/system/application/`) owning the write side (release/revoke, assign/unassign, `appAccessMode`) and every mutation bumping the affected org's grant version via `invalidateOrganisation` (visibility change → `invalidateGlobal`), so T-902 enforcement converges. Platform admin: `PATCH /api/v1/admin/applications/:applicationId` now accepts `visibility` (appsManage + elevated; audits `application.visibility.changed`); `GET /api/v1/admin/applications/:applicationId/organisations` (appsRead) lists PLATFORM_RELEASE + ORG_ASSIGNMENT rows (org id/slug/name + source + assignedAt/assignedBy); `POST` + `DELETE .../organisations/:organisationId` (appsManage + elevated) release/revoke a RESTRICTED app, validating the app is RESTRICTED (`APP_008`) and the target is a live TEAM org (`ORG_002`/`ORG_003`), idempotent, audits `application.release.granted|revoked` on the global chain. Org admin: `GET /api/v1/organisations/:organisationId/applications` (orgRole ADMIN) returns the offerable set (PUBLIC + released RESTRICTED) with a per-app `assigned` flag plus `appAccessMode`; `POST` + `DELETE .../applications/:applicationId` (orgRole ADMIN + elevated) assign/unassign with the reachability guardrail (`ORG_011` for inactive, INTERNAL, or unreleased RESTRICTED), idempotent, audits `org.application.assigned|unassigned` on the org chain. `PATCH /api/v1/organisations/:organisationId` gained `appAccessMode` on the existing rename handler; a field-dependent service check demands an elevated OWNER for that field only (`AUTH_006`/`ORG_007`), leaving rename at ADMIN, audits `org.app_access_mode.changed`. Launcher: `GET /api/v1/me/applications` now returns every **accessible** app (per `resolveAccessibleApplicationIds`) enriched with first/last-used where a membership exists — surfacing accessible-but-unused apps and dropping used-but-revoked ones (D-A4); response stays backward-compatible (name/displayName/subDomain/isActive/lastUsedAt kept; firstUsedAt/lastUsedAt now optional; homePageUrl/logoUrl added). New error codes `APP_008`, `ORG_011`; `OrganisationResponse` and the admin application summary gained `visibility`/`appAccessMode` additively for the console. Specs at `tests/admin/admin-application-release.spec.ts`, `tests/organisation/organisation-application.spec.ts`, `tests/identity/launcher.spec.ts` cover the permission/step-up matrices, the guardrail, the release+assign lifecycle, the appAccessMode OWNER+elevated gate, the launcher accessible/unused/revoked cases, audit emission, and end-to-end composition with the sign-in gate. `bun run verify` passes (format+lint+type-check+test, 509 pass / 0 fail); `bunx shadow check-migrations` reports only the expected T-901/T-902 uncommitted-files complaint (no schema changes in this task). All work is in the working tree, **uncommitted**.
+
+### T-904 — Customer tiering: default roles + org-wide grants · M — **done**
+
+- **Fix:** catalog manifest accepts `default: boolean` per role → `application_roles.is_default`; `PolicyDecisionService.resolvePermissions` unions explicit assignments + `ORGANISATION`-principal assignments across the user's ACTIVE orgs + the app's default roles (deny-by-default preserved); `POST /admin/role-assignments` accepts `principalType: ORGANISATION` under the existing `requireRoleAdmin` tiers (D-A5); invalidation via a per-org version component folded into the returned `authzVersion` — never enumerate members.
+- **DoD:** fresh user holds baseline permissions with zero assignment rows; an org-wide grant flips PERMIT for every member within one decision-cache TTL and revocation propagates; ending membership drops org-granted permissions; version bump proven in specs.
+
+**Landed:** the catalog manifest gained an optional per-role `default: boolean` (`CatalogSyncBody.roles[].default`); `CatalogSyncService.sync` persists it to `application_roles.is_default` on the upsert's insert **and** update `set`, so a re-push that omits the flag clears it — the manifest stays the source of truth. `PolicyDecisionService.resolvePermissions` now composes its role set in `resolveRoleIds` from three sources (T-904): the principal's own explicit assignments (as before); `ORGANISATION`-principal grants where `principal_id = organisation_id =` the check's org, **gated by a fresh membership join** (`isActiveMember` — the checked USER must resolve ACTIVE in an ACTIVE org, verified against the database, never trusted from the caller); and the application's `is_default` roles. Default and org-wide sources apply to **USER** principals only — a SERVICE_ACCOUNT gets neither, both being customer concepts. `checkForApplication` keeps its permission-application filter, and `defaultRoleIds` narrows to the app in scope (all applications for the org-agnostic `check`). Deny-by-default is preserved: a principal that resolves no roles still yields the empty set.
+
+The membership join is the whole revocation story for org-wide grants: an ended or suspended membership, or a suspended/deleted org, makes `isActiveMember` false, so the ex-member stops receiving org-wide permissions **by construction** on the next decision — no member enumeration. For SDK decision-cache convergence, invalidation is split into two Redis components: the existing principal version (`authz_version:{type}:{id}`) and a new per-org version (`authz_version:org:{id}`). An `ORGANISATION` grant/revoke bumps the org component (routed through a type-aware `versionKey`, since an ORGANISATION principal's grants belong on the shared org axis, not a principal key nothing reads); catalog sync's snapshot-and-invalidate of an ORGANISATION holder converges its members the same way. `check`/`checkForApplication` now return `authzVersion = principalVersion + orgVersion` for the request's org, so either a per-principal change or an org-wide change changes the version within one cache TTL. Membership end still bumps the departing member's principal version via the pre-existing `revokeAllForPrincipalInOrganisation`; the org component is deliberately **not** bumped there (it would needlessly invalidate every other member — the join already makes the ex-member correct).
+
+Admin API: `POST /api/v1/admin/role-assignments` (+ `/revoke`) accept `principalType: 'ORGANISATION'` with `principalId` = the org id. Authorization is unchanged — `requireRoleAdmin(session, role.applicationId)` + elevated, so an app-scoped admin can mint an org-wide grant only for a role its application owns. The assignment's scope is **derived** from `principalId`, never trusted: for an ORGANISATION grant the controller ignores any divergent body `organisationId` and validates the target through `OrganisationService.assertActiveTeam` (must be a live TEAM org — `ORG_002` absent/suspended, `ORG_003` personal). The list endpoint already projects the ORGANISATION principal (query filter widened to include it). `revokeAllForOrganisation` clears ORGANISATION-principal rows with the rest of the org's grants (rows carry `organisation_id =` the org), proven by test.
+
+No schema migration — `application_roles.is_default` and the `principal_type` `ORGANISATION` value landed in T-901; `db:generate` reports no drift. Specs: `tests/authz/tiering.spec.ts` (default-role baseline, SERVICE_ACCOUNT exclusion, `checkForApplication` app-scoping, is_default flip on/off/clear, org-wide grant PERMIT for a member / DENY for a non-member / DENY on ended membership / DENY on suspended org, authzVersion change on grant+revoke, `revokeAllForOrganisation`) and `tests/admin/admin-role-organisation.spec.ts` (grant + list rendering, scope derivation, unknown/personal org rejection, revoke, two-tier `requireRoleAdmin` within-app vs cross-app). `bun run verify` and `bun test` pass; `bunx shadow check-migrations` reports only the expected T-901/T-902 uncommitted-files complaint (no schema drift). All work is in the working tree, **uncommitted**.
+
+**Coordination (not done here):** the catalog manifest's new `default` field and the admin role-assignment `ORGANISATION` principal are additive wire-contract changes — the `@shadow-library/auth` SDK's catalog push type gains `default?: boolean`, and identity-web's role-assignment form gains an Organisation principal (W-901). No SDK/web edits were made in this repo.
+
+### W-901 — identity-web surfaces (cross-repo, `../identity-web`) · L
+
+- **Fix (after T-903):** regenerate API types (`bun run generate:api-types` against a running server); extend `src/routes/_auth/error.tsx` `access_denied` variant to read `application`/`client_id`; console: visibility selector + "Organisations" release tab on application detail, `Organisation` principal in the roles assignment form; org workspace: "Applications" tab (assign/unassign, ADMIN) + access-mode toggle (OWNER) riding the existing `useStepUpGate` pattern; "My applications" page consumes the extended accessible-apps payload.
+- **DoD:** `bun run verify` passes in identity-web; Playwright specs for the denied page and the org Applications tab; both repos verified per the cross-repo checklist.
+
+### T-906 — Active organisation resolution + session organisation switching · M · Sec: High — **done**
+
+- **Change:** `ApplicationAccessService.resolveActiveOrganisationId` / `listGrantingOrganisations` (D-A10), reusing the existing per-org grant-set cache; `AppSessionService.create`, the `authorization_code` exchange and the refresh-family issue all take the session organisation from reachability instead of `user.personalOrganisationId`; `mintToken` realigns a stale organisation (D-A12) and a refresh whose pinned organisation stops granting revokes the family; `POST /api/v1/app-sessions/organisations` and `/organisation` (D-A11, handle rotation). Data migration `0005_pulse_internal_visibility` flips the pre-existing pulse row to `INTERNAL`; `EcosystemSeedService` seeds pulse as `INTERNAL` at creation and grants the bootstrap administrator `PulseAdmin` in the platform organisation.
+- **Why:** capability was evaluated in the personal workspace while access was resolved as a union across organisations (D-A1). Every pulse route answered `IAM_002`, because the operator's only role assignment lived in the platform organisation while the browser token named their personal workspace — and no pulse role had ever been assigned to anybody in the first place: the catalogue was seeded, the grants were not.
+- **Note:** both organisation routes are `POST`, the read included, because the session handle is a bearer secret and must not reach a query string, an access log or a `Referer` header.
+- **Coordination (cross-repo):** `@shadow-library/auth` gains `listOrganisations`/`switchOrganisation`, the `GET /auth/organisations` + `POST /auth/organisation` browser routes, `ORGANISATION_NOT_PERMITTED` (403, so a picker can tell a denial from an outage), and a guard fix so a credential carrying no `org` claim is refused regardless of `failOpen`. pulse-web renders an organisation switcher only when more than one is returned. **The SDK must be published and pulse-server's dependency bumped before that half reaches the cluster.**
+- **DoD:** resolution matrix (default membership / personal / lowest-id fallback; a PUBLIC app still resolves to the personal workspace); switch accepted for a granting organisation and `APP_007` otherwise; rotation retires the old handle; realign on mint; pulse seeded `INTERNAL` with `PulseAdmin` assigned and no default role; `bun run verify` and `bunx shadow check-migrations` clean.
+
+### T-905 — SCIM group → role mapping · L — **done**
+
+- **Fix:** map a tenant's directory groups onto application roles (`docs/app-access-control.md` §T-905, D-A8/D-A9): a `scim_group_role_mappings` table; a sync engine that materialises and revokes ordinary `role_assignments` marker rows (`granted_by = 'scim:group:<groupId>'`, org = the group's org, principal USER) as membership and mappings change; and an admin API (`GET/POST/DELETE /api/v1/admin/scim/group-mappings`) riding the two-tier `requireRoleAdmin` + AAL2, guarded by the ORG_011 reachability rule. Groups drive **capability** only — access stays org-level.
+- **DoD:** create backfills existing members and flips PERMIT; membership add/remove assigns/revokes; overlapping groups keep a shared role until the last releases it; mapping/group delete revokes only marker rows, never a manual grant; directory deprovision cleans derived rows; reachability guardrail rejects an unreachable app's role; migration drift clean; `bun run verify` + `bun test` pass.
+
+**Landed:** derived assignments are provenance-marked `role_assignments` rows (D-A9), so no schema change was needed for the grants themselves — only `scim_group_role_mappings` (`generated/drizzle/0004_last_whiplash.sql`: uuid PK, `group_id` uuid FK → scim_groups CASCADE, `role_id` int FK → application_roles CASCADE, `created_by`, `created_at`, `unique(group_id, role_id)`; test template rebuilt). `ScimGroupMappingService` (in the SCIM module) owns both the mapping CRUD and the sync. Its heart is a single `reconcile(user, role, org)` that re-derives whether *any* mapped group in the org the user still belongs to grants the role, then either materialises a marker row (`PolicyDecisionService.assignRole`, which invalidates the principal) or, for a marker row only — never a manual grant — revokes it (`revokeRole`, likewise invalidating). Because it re-derives from the final membership graph, one path serves membership add, membership remove, mapping create/delete and group delete, and the **overlap check falls out for free**: a second mapped group still granting the role means `grantingGroupId` is non-null, so the row is kept. `ScimGroupService` hands every membership change (add/replace/patch → the union of members before and after; delete → the (member, role) pairs captured before the cascade) to the engine; the RFC 7644 SCIM surface is otherwise untouched. Mapping create backfills all current members; the ORG_011 reachability rule is reused verbatim via a new public `OrganisationApplicationService.assertReachable`. Admin API: `GET .../group-mappings?organisationId=&groupId=` (rolesManage), `POST .../group-mappings` `{ groupId, roleId }` (201, idempotent) and `DELETE .../group-mappings/:mappingId` (200) — both authorised by `requireRoleAdmin(session, role.applicationId)` + elevated (an app-scoped admin can only map its own roles), audited `scim.group_mapping.created|deleted`. New error codes `SCIM_001` (group absent) / `SCIM_002` (mapping absent). En route the SCIM adopted-account deprovision path was aligned with the documented membership-end contract: the bare `organisationService.removeMember` it calls never revoked org-scoped assignments (only the `removeOrganisationMember`/`leave` paths do), so a deprovision left the derived rows behind — `ScimUserService.setActive(false)` now revokes them with the membership, matching every other membership-end path. Specs: `tests/scim/scim-group-mapping.spec.ts` (add/remove assign/revoke, backfill, overlap, group delete, deprovision proof) and `tests/admin/admin-scim-mapping.spec.ts` (create/backfill/list, idempotency, reachability guardrail, delete, marker-vs-manual, and the platform/app-scoped/foreign/non-admin/no-step-up authz matrix). `bun run verify` and `bun test` pass; `bunx shadow check-migrations` reports only the expected uncommitted-migration complaint (no schema drift). All work is in the working tree, **uncommitted**.
+
+---
+
+## M8 — Third-party developer platform (deferred)
+
+Consent screen enablement, third-party client review, publisher verification, sensitive-scope gating, per-app rate limits/quotas, developer docs + example apps. Requires M2 + M6.
+
+---
+
+## M9 — Advanced (deferred; not before foundations are mature)
+
+Risk-based/adaptive auth; device authorization grant (only if TV/CLI clients appear); PAR/JAR; DPoP/mTLS sender-constrained tokens (only with threat justification); multi-region data residency activation (D-7 groundwork already in place); policy simulation/versioning.
+
+---
+
+## Cross-cutting testing requirements (apply from M1)
+
+Per `docs/architecture.md` and the review: unit (validation, token codec, PKCE, argon2 params), integration (real PG/Redis), protocol conformance (M2), tenant-isolation harness (M1, CI-gated), authorization matrix (M3), token/session lifecycle + reuse detection, crypto-rotation, concurrency/race (parallel refresh, duplicate-email registration), fuzz (token/SCIM-filter/redirect-URI parsers), abuse-case (rate tiers, enumeration neutrality, lockout), load (token endpoint), chaos (Redis-down degradation), DR (restore drill). **The most dangerous currently-untested paths — the T-001/T-002 query helpers — get regression tests in M0.**
+
+## Definition of "production-ready" (exit of M5)
+
+Password + OIDC login, M2M, PDP, MFA, key rotation, tenant isolation, audit, rate limiting, notifications, and the SDK are all implemented, tested against real datastores, conformance-passed, hardened, and operable (readiness/shutdown/DR/runbooks). Enterprise federation/provisioning (M7+) is explicitly _not_ required for first production but is unblocked by the decisions already baked in.

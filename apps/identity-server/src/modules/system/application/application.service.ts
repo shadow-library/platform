@@ -1,0 +1,129 @@
+/**
+ * Importing npm packages
+ */
+import assert from 'node:assert';
+
+import { eq, InferInsertModel } from 'drizzle-orm';
+import { Injectable, OnModuleInit } from '@shadow-library/app';
+import { Logger } from '@shadow-library/common';
+
+/**
+ * Importing user defined packages
+ */
+import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
+import { Application, DatabaseService, PrimaryDatabase, schema } from '@server/modules/infrastructure/datastore';
+
+/**
+ * Defining types
+ */
+
+type IApplication = Omit<InferInsertModel<typeof schema.applications>, 'id' | 'createdAt' | 'updatedAt'>;
+
+export interface ApplicationDetails extends Application {
+  roles: Application.Role[];
+}
+
+export interface CreateApplication {
+  name: string;
+  description?: string;
+  displayName?: string;
+
+  homePageUrl?: string;
+  isActive?: boolean;
+  logoUrl?: string;
+}
+
+/**
+ * Declaring the constants
+ */
+
+@Injectable()
+export class ApplicationService implements OnModuleInit {
+  private readonly logger = Logger.getLogger(APP_NAME, ApplicationService.name);
+  private readonly db: PrimaryDatabase;
+
+  private cache = new Map<string, ApplicationDetails>();
+
+  constructor(private readonly databaseService: DatabaseService) {
+    this.db = databaseService.getPostgresClient();
+  }
+
+  async onModuleInit(): Promise<void> {
+    await this.loadApplications();
+  }
+
+  async loadApplications(): Promise<void> {
+    const applications = await this.db.query.applications.findMany({ with: { roles: true } });
+    const cache = new Map<string, ApplicationDetails>();
+    for (const application of applications) cache.set(application.name, application);
+    this.cache = cache;
+    this.logger.info(`Loaded ${applications.length} applications into cache`);
+  }
+
+  async createApplication(application: IApplication): Promise<Application> {
+    const [record] = await this.db
+      .insert(schema.applications)
+      .values(application)
+      .returning()
+      .catch(error => this.databaseService.translateError(error));
+
+    assert(record, 'Failed to create application');
+    this.logger.info(`Created application with ID ${record.id} and name ${record.name}`);
+    await this.loadApplications();
+    return record;
+  }
+
+  async updateApplication(name: string, update: Partial<IApplication>): Promise<Application> {
+    const condition = eq(schema.applications.name, name);
+    const [application] = await this.db
+      .update(schema.applications)
+      .set(update)
+      .where(condition)
+      .returning()
+      .catch(error => this.databaseService.translateError(error));
+    assert(application, `Failed to update application with name ${name}`);
+
+    this.logger.info(`Updated application with ID ${application.id} and name ${application.name}`, { update });
+    await this.loadApplications();
+    return application;
+  }
+
+  async deleteApplication(name: string): Promise<void> {
+    const condition = eq(schema.applications.name, name);
+    const [application] = await this.db
+      .delete(schema.applications)
+      .where(condition)
+      .returning()
+      .catch(error => this.databaseService.translateError(error));
+    assert(application, `Failed to delete application with name ${name}`);
+
+    this.cache.delete(name);
+    this.logger.info(`Deleted application with name ${name}`, { application });
+  }
+
+  getApplication(name: string): ApplicationDetails | null {
+    return this.cache.get(name) ?? null;
+  }
+
+  getApplicationOrThrow(name: string): ApplicationDetails {
+    const application = this.getApplication(name);
+    if (!application) throw AppErrorCode.APP_001.create();
+    return application;
+  }
+
+  getApplicationById(id: number): ApplicationDetails | null {
+    for (const application of this.cache.values()) if (application.id === id) return application;
+    return null;
+  }
+
+  getApplicationByIdOrThrow(id: number): ApplicationDetails {
+    const application = this.getApplicationById(id);
+    if (!application) throw AppErrorCode.APP_001.create();
+    return application;
+  }
+
+  listApplications(): Application[] {
+    return Array.from(this.cache.values());
+  }
+}

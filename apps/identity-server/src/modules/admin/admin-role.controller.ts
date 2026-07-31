@@ -1,0 +1,125 @@
+/**
+ * Importing npm packages
+ */
+
+import { Body, Get, HttpController, HttpStatus, Post, Query, RespondFor } from '@shadow-library/fastify';
+
+/**
+ * Importing user defined packages
+ */
+import { AppErrorCode } from '@server/classes';
+import { Auth, Context } from '@server/modules/access';
+import { PolicyDecisionService, type Principal } from '@server/modules/authz';
+import { OrganisationService } from '@server/modules/identity/organisation';
+import { AuditService } from '@server/modules/infrastructure/audit';
+import { Application } from '@server/modules/infrastructure/datastore';
+import { ApplicationRoleService } from '@server/modules/system/application';
+
+import { AdminAccessService, AdminActor } from './admin-access.service';
+import { ApplicationIdQuery, AssignmentListQuery, AssignmentListResponse, PermissionListResponse, RoleAssignmentBody } from './admin-role.dto';
+import { AdminActionResponse } from './admin-user.dto';
+import { ADMIN_PERMISSIONS } from './admin.constants';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ *
+ * Role and permission *definitions* are owned by each application and pushed declaratively through
+ * the SDK's catalog sync (`PUT /api/v1/authz/catalog`); admins no longer create them by hand. What
+ * remains here is *assignment* — granting a defined role to a principal — which stays a deliberate
+ * human decision, plus a read view of the catalog. `iam:roles:manage` operates anywhere while
+ * `app:roles:manage` only reaches the application that owns the caller's permission.
+ */
+
+@HttpController('/api/v1/admin')
+export class AdminRoleController {
+  constructor(
+    private readonly access: AdminAccessService,
+    private readonly policyDecisionService: PolicyDecisionService,
+    private readonly applicationRoleService: ApplicationRoleService,
+    private readonly organisationService: OrganisationService,
+    private readonly auditService: AuditService,
+  ) {}
+
+  private async findRoleOrThrow(roleId: number): Promise<Application.Role> {
+    const role = await this.applicationRoleService.getRole(roleId);
+    if (!role) throw AppErrorCode.APP_003.create();
+    return role;
+  }
+
+  /**
+   * Resolves the principal and the organisation the assignment is scoped to. An `ORGANISATION` grant
+   * (D-A5) is always scoped to the organisation that is its own principal, so the scope is derived
+   * from principalId — and validated as a live TEAM org — never trusted from a divergent body value.
+   * When `validate` is false (revocation) the coupling is enforced without the liveness check, so a
+   * grant on a since-suspended org can still be withdrawn.
+   */
+  private async resolveAssignment(body: RoleAssignmentBody, validate: boolean): Promise<{ principal: Principal; organisationId: string }> {
+    if (body.principalType !== 'ORGANISATION') return { principal: { type: body.principalType, id: body.principalId }, organisationId: body.organisationId };
+    if (validate) await this.organisationService.assertActiveTeam(body.principalId);
+    return { principal: { type: 'ORGANISATION', id: body.principalId }, organisationId: body.principalId };
+  }
+
+  private async record(actor: AdminActor, action: string, targetType: string, targetId: string, detail?: Record<string, unknown>): Promise<void> {
+    await this.auditService.record({ action, outcome: 'SUCCESS', actorType: 'USER', actorId: actor.session.userId.toString(), targetType, targetId, detail: detail ?? null });
+  }
+
+  @Get('/permissions')
+  @Auth({ permission: ADMIN_PERMISSIONS.rolesManage })
+  @RespondFor(200, PermissionListResponse)
+  async listApplicationPermissions(@Query() query: ApplicationIdQuery): Promise<PermissionListResponse> {
+    const permissions = await this.policyDecisionService.listPermissionsForApplication(query.applicationId);
+    return { items: permissions.map(permission => ({ id: permission.id, name: permission.name, description: permission.description ?? undefined })) };
+  }
+
+  @Post('/role-assignments')
+  @Auth({ elevated: true })
+  @HttpStatus(200)
+  @RespondFor(200, AdminActionResponse)
+  async assignRole(@Body() body: RoleAssignmentBody): Promise<AdminActionResponse> {
+    const role = await this.findRoleOrThrow(body.roleId);
+    const actor = await this.access.requireRoleAdmin(Context.getSession(), role.applicationId);
+    const { principal, organisationId } = await this.resolveAssignment(body, true);
+    await this.policyDecisionService.assignRole(principal, role.id, organisationId, actor.session.userId.toString());
+    await this.record(actor, 'admin.role.assigned', 'role_assignment', `${principal.type}:${principal.id}`, { roleId: role.id, organisationId });
+    return { success: true };
+  }
+
+  @Post('/role-assignments/revoke')
+  @Auth({ elevated: true })
+  @HttpStatus(200)
+  @RespondFor(200, AdminActionResponse)
+  async revokeRoleAssignment(@Body() body: RoleAssignmentBody): Promise<AdminActionResponse> {
+    const role = await this.findRoleOrThrow(body.roleId);
+    const actor = await this.access.requireRoleAdmin(Context.getSession(), role.applicationId);
+    const { principal, organisationId } = await this.resolveAssignment(body, false);
+    await this.policyDecisionService.revokeRole(principal, role.id, organisationId);
+    await this.record(actor, 'admin.role.revoked', 'role_assignment', `${principal.type}:${principal.id}`, { roleId: role.id, organisationId });
+    return { success: true };
+  }
+
+  @Get('/role-assignments')
+  @Auth({ permission: ADMIN_PERMISSIONS.rolesManage })
+  @RespondFor(200, AssignmentListResponse)
+  async listRoleAssignments(@Query() query: AssignmentListQuery): Promise<AssignmentListResponse> {
+    const assignments = await this.policyDecisionService.listAssignments({
+      principal: query.principalType && query.principalId ? { type: query.principalType, id: query.principalId } : undefined,
+      organisationId: query.organisationId,
+      roleId: query.roleId,
+    });
+    return {
+      items: assignments.map(assignment => ({
+        id: assignment.id,
+        principalType: assignment.principalType,
+        principalId: assignment.principalId,
+        roleId: assignment.roleId,
+        organisationId: assignment.organisationId.toString(),
+        grantedBy: assignment.grantedBy ?? undefined,
+        grantedAt: assignment.grantedAt.toISOString(),
+      })),
+    };
+  }
+}

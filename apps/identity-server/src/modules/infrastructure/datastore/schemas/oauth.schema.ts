@@ -1,0 +1,184 @@
+/**
+ * Importing npm packages
+ */
+import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
+import { bigint, boolean, index, integer, pgEnum, pgTable, primaryKey, text, timestamp, unique, uuid, varchar } from 'drizzle-orm/pg-core';
+
+/**
+ * Importing user defined packages
+ */
+import { applications } from './applications.schema';
+
+/**
+ * Defining types
+ */
+
+export type OAuthClient = InferSelectModel<typeof oauthClients>;
+export type ApiResource = InferSelectModel<typeof apiResources>;
+export type Scope = InferSelectModel<typeof scopes>;
+export type OidcLogoutDelivery = InferSelectModel<typeof oidcLogoutDeliveries>;
+
+export namespace OAuthClient {
+  export type Kind = InferEnum<typeof oauthClientKind>;
+  export type AuthMethod = InferEnum<typeof tokenEndpointAuthMethod>;
+  export type Secret = InferSelectModel<typeof oauthClientSecrets>;
+  export type RedirectUri = InferSelectModel<typeof oauthClientRedirectUris>;
+}
+
+export namespace OidcLogoutDelivery {
+  export type Status = InferEnum<typeof logoutDeliveryStatus>;
+}
+
+/**
+ * Declaring the constants
+ */
+
+export const oauthClientKind = pgEnum('oauth_client_kind', ['WEB_CONFIDENTIAL', 'SPA_PUBLIC', 'NATIVE_PUBLIC', 'SERVICE']);
+export const tokenEndpointAuthMethod = pgEnum('token_endpoint_auth_method', ['client_secret_basic', 'none', 'private_key_jwt']);
+
+export const oauthClients = pgTable('oauth_clients', {
+  /** Admin-chosen, immutable slug (lowercase letters, digits, hyphens). Public by design; embedded in tokens and configs. */
+  id: varchar('id', { length: 64 }).primaryKey(),
+  applicationId: integer('application_id')
+    .notNull()
+    .references(() => applications.id, { onDelete: 'restrict' }),
+  name: varchar('name', { length: 255 }).notNull(),
+  kind: oauthClientKind('kind').notNull(),
+  isFirstParty: boolean('is_first_party').notNull().default(false),
+  tokenEndpointAuthMethod: tokenEndpointAuthMethod('token_endpoint_auth_method').notNull(),
+  grantTypes: text('grant_types').array().notNull(),
+  requirePkce: boolean('require_pkce').notNull().default(true),
+  /** Kubernetes workload identity (D-16): the exact SA subjects and/or namespace-scoped patterns allowed to authenticate this client with a projected token instead of a secret. */
+  workloadSubjects: text('workload_subjects').array(),
+  accessTokenTtl: integer('access_token_ttl').notNull().default(600),
+  refreshTokenTtl: integer('refresh_token_ttl'),
+  organisationId: bigint('organisation_id', { mode: 'bigint' }),
+  isActive: boolean('is_active').notNull().default(true),
+  /** OIDC Back-Channel Logout 1.0: logout tokens for terminated sessions POST here when set. */
+  backchannelLogoutUri: text('backchannel_logout_uri'),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const oauthClientSecrets = pgTable(
+  'oauth_client_secrets',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: varchar('client_id', { length: 64 })
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    secretHash: text('secret_hash').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    expiresAt: timestamp('expires_at', { withTimezone: true }),
+    revokedAt: timestamp('revoked_at', { withTimezone: true }),
+  },
+  t => [index('oauth_client_secrets_client_id_idx').on(t.clientId)],
+);
+
+export const oauthClientRedirectUris = pgTable(
+  'oauth_client_redirect_uris',
+  {
+    clientId: varchar('client_id', { length: 64 })
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    uri: text('uri').notNull(),
+  },
+  t => [primaryKey({ columns: [t.clientId, t.uri] })],
+);
+
+export const apiResources = pgTable('api_resources', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  applicationId: integer('application_id')
+    .notNull()
+    .references(() => applications.id, { onDelete: 'cascade' }),
+  identifier: varchar('identifier', { length: 255 }).notNull().unique(),
+  displayName: varchar('display_name', { length: 255 }),
+  isActive: boolean('is_active').notNull().default(true),
+  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+});
+
+/** Which principal kind may hold a scope: end users, services (M2M), or both. Enforced at token mint and consent. */
+export const scopePrincipalType = pgEnum('scope_principal_type', ['USER', 'SERVICE', 'BOTH']);
+
+export const scopes = pgTable(
+  'scopes',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    apiResourceId: uuid('api_resource_id')
+      .notNull()
+      .references(() => apiResources.id, { onDelete: 'cascade' }),
+    name: varchar('name', { length: 128 }).notNull(),
+    description: text('description'),
+    isSensitive: boolean('is_sensitive').notNull().default(false),
+    /** A `SERVICE` scope is never minted into a user token nor shown at consent; a `USER` scope is never minted into a service token. */
+    principalType: scopePrincipalType('principal_type').notNull().default('BOTH'),
+  },
+  t => [unique('scopes_resource_name_unique').on(t.apiResourceId, t.name)],
+);
+
+export const oauthClientScopeGrants = pgTable(
+  'oauth_client_scope_grants',
+  {
+    clientId: varchar('client_id', { length: 64 })
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    scopeId: uuid('scope_id')
+      .notNull()
+      .references(() => scopes.id, { onDelete: 'cascade' }),
+  },
+  t => [primaryKey({ columns: [t.clientId, t.scopeId] })],
+);
+
+export const logoutDeliveryStatus = pgEnum('logout_delivery_status', ['PENDING', 'SENDING', 'SENT', 'FAILED', 'DEAD']);
+
+/**
+ * Transactional queue of OIDC back-channel logout deliveries. The logout token itself is minted at
+ * send time (they expire within minutes, while retries may span hours); the URI is snapshotted at
+ * enqueue so a client edit cannot redirect in-flight notifications.
+ */
+export const oidcLogoutDeliveries = pgTable(
+  'oidc_logout_deliveries',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    clientId: varchar('client_id', { length: 64 })
+      .notNull()
+      .references(() => oauthClients.id, { onDelete: 'cascade' }),
+    logoutUri: text('logout_uri').notNull(),
+    subject: varchar('subject', { length: 64 }).notNull(),
+    sid: varchar('sid', { length: 64 }).notNull(),
+    status: logoutDeliveryStatus('status').notNull().default('PENDING'),
+    attemptCount: integer('attempt_count').notNull().default(0),
+    nextAttemptAt: timestamp('next_attempt_at', { withTimezone: true }).notNull().defaultNow(),
+    lastError: text('last_error'),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    sentAt: timestamp('sent_at', { withTimezone: true }),
+  },
+  t => [index('oidc_logout_deliveries_claim_idx').on(t.status, t.nextAttemptAt)],
+);
+
+/**
+ * Declaring the relations
+ */
+
+export const oauthClientRelations = relations(oauthClients, ({ many, one }) => ({
+  application: one(applications, { fields: [oauthClients.applicationId], references: [applications.id] }),
+  secrets: many(oauthClientSecrets),
+  redirectUris: many(oauthClientRedirectUris),
+  scopeGrants: many(oauthClientScopeGrants),
+}));
+
+export const oauthClientSecretRelations = relations(oauthClientSecrets, ({ one }) => ({
+  client: one(oauthClients, { fields: [oauthClientSecrets.clientId], references: [oauthClients.id] }),
+}));
+
+export const oauthClientRedirectUriRelations = relations(oauthClientRedirectUris, ({ one }) => ({
+  client: one(oauthClients, { fields: [oauthClientRedirectUris.clientId], references: [oauthClients.id] }),
+}));
+
+export const apiResourceRelations = relations(apiResources, ({ many }) => ({
+  scopes: many(scopes),
+}));
+
+export const scopeRelations = relations(scopes, ({ one }) => ({
+  apiResource: one(apiResources, { fields: [scopes.apiResourceId], references: [apiResources.id] }),
+}));
