@@ -3,5 +3,5 @@
   "compilerOptions": {
     "types": ["bun"]
   },
-  "include": ["tests/**/*.ts"]
+  "include": ["lib/**/*.ts", "tests/**/*.ts", "playwright.config.ts"]
 }
