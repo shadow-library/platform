@@ -29,7 +29,7 @@ CREATE TYPE "public"."reforge_fidelity" AS ENUM('preserve', 'close', 'loose');--
 CREATE TYPE "public"."reforge_status" AS ENUM('pending', 'glossary', 'reforging', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."chapter_publication_status" AS ENUM('scheduled', 'published', 'failed', 'unpublished');--> statement-breakpoint
 CREATE TYPE "public"."publication_status" AS ENUM('draft', 'live', 'retired');--> statement-breakpoint
-CREATE TYPE "public"."job_kind" AS ENUM('extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish');--> statement-breakpoint
+CREATE TYPE "public"."job_kind" AS ENUM('extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish', 'import');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('pending', 'in_progress', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."validation_scope" AS ENUM('novel', 'chapter');--> statement-breakpoint
 CREATE TYPE "public"."draft_revision_source" AS ENUM('generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited');--> statement-breakpoint

@@ -1,5 +1,5 @@
 {
-  "id": "35786156-dc43-4666-8159-6f7b07962de8",
+  "id": "c2486e73-5cb5-486c-9205-2abaf97936d1",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -5810,7 +5810,8 @@
         "backfill",
         "rebrand",
         "reforge",
-        "publish"
+        "publish",
+        "import"
       ]
     },
     "public.job_status": {

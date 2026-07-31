@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { and, asc, eq, ne, sql } from 'drizzle-orm';
-import { Injectable } from '@shadow-library/app';
+import { Inject, Injectable } from '@shadow-library/app';
 import { AppError, Logger } from '@shadow-library/common';
 import { DatabaseService } from '@shadow-library/modules';
 
@@ -21,6 +21,7 @@ import { IndexingService } from '../ai/retrieval/indexing.service';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
 import { RecombineService } from '../source/recombine.service';
+import { IMAGE_STORAGE, type ImageStorageProvider } from '../storage/image-storage.interface';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 
@@ -51,9 +52,24 @@ interface ReforgePayload {
   limit?: number;
 }
 
+// Staged on `jobs.payload` by `NovelImportService.import` inside the same transaction that creates the
+// project — kept as a local shape (not imported from the novel-import module) exactly like every other
+// payload interface above, so JobExecutor never depends on the enqueuing feature module.
+interface ImportPayload {
+  mode: 'final' | 'source';
+  chapters: { title: string; content: string }[];
+  cover?: { mimeType: string; dataBase64: string };
+}
+
 /**
  * Declaring the constants
  */
+
+const IMPORT_BATCH_SIZE = 25;
+
+function countWords(text: string): number {
+  return text.trim().split(/\s+/).filter(Boolean).length;
+}
 
 @Injectable()
 export class JobExecutor {
@@ -69,6 +85,7 @@ export class JobExecutor {
     private readonly rebrandService: RebrandService,
     private readonly recombineService: RecombineService,
     private readonly publishRunner: PublishRunner,
+    @Inject(IMAGE_STORAGE) private readonly imageStorage: ImageStorageProvider,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
   }
@@ -141,6 +158,8 @@ export class JobExecutor {
         return this.runReforge(job);
       case 'publish':
         return this.runPublish(job);
+      case 'import':
+        return this.runImport(job);
       default:
         throw AppError.internal(`Unsupported job kind: ${job.kind}`);
     }
@@ -314,6 +333,57 @@ export class JobExecutor {
     const total = result.pushed.length + result.deleted.length + result.skipped.length + result.failed.length;
     await this.jobService.progress(job.id, { done: total - result.failed.length, total, current: 'done', phase: 'publish' });
     if (result.failed.length > 0) throw AppError.internal(`publish convergence incomplete: ${result.failed.length} chapter push(es) failed — see the publication ledger`);
+  }
+
+  // ─── Novel import (novel-import-format.md) ────────────────────────────────────
+  // The project row already exists (created transactionally with this job by NovelImportService); this
+  // job only writes chapters, the cover, and — for `source` mode — triggers the same auto-recombine
+  // hook that used to run on ingest completion. A mid-batch failure leaves the project and whatever
+  // chapters already landed in place (job marked failed, matching every other executor) rather than
+  // rolling back — the caller can inspect, retry manually, or delete the project.
+  private async runImport(job: Job.Row): Promise<void> {
+    const { mode, chapters, cover } = (job.payload ?? {}) as ImportPayload;
+    const projectId = job.projectId;
+    const total = chapters.length;
+    this.logger.info('runImport: starting', { jobId: job.id, projectId, mode, total, hasCover: !!cover });
+
+    for (let i = 0; i < total; i += IMPORT_BATCH_SIZE) {
+      const batch = chapters.slice(i, i + IMPORT_BATCH_SIZE);
+      await this.jobService.progress(job.id, { done: i, total, current: String(i + 1), phase: 'inserting' });
+      this.logger.debug('runImport: inserting chapter batch', { jobId: job.id, from: i + 1, to: i + batch.length, total });
+      const values = batch.map((chapter, offset) => ({
+        projectId,
+        number: i + offset + 1,
+        title: chapter.title,
+        content: chapter.content,
+        wordCount: countWords(chapter.content),
+        status: 'done' as const,
+        // `final` mode is the finished novel: human-authored, immutable, publishable from chapter 1
+        // (PUB_002/PUB_003). `source` mode explicitly writes the column's own default so a later
+        // rebrand/reforge/extract pass treats it exactly like any other source project's chapters.
+        generator: mode === 'final' ? ('human' as const) : ('standard' as const),
+        locked: mode === 'final',
+      }));
+      await this.db.insert(schema.chapters).values(values);
+    }
+    await this.jobService.progress(job.id, { done: total, total, current: 'chapters', phase: 'inserting' });
+
+    if (cover) {
+      this.logger.debug('runImport: storing cover asset', { jobId: job.id, projectId });
+      const bytes = new Uint8Array(Buffer.from(cover.dataBase64, 'base64'));
+      const ref = await this.imageStorage.save(projectId, 'cover', bytes, cover.mimeType);
+      await this.db.update(schema.projects).set({ coverImagePath: ref, updatedAt: new Date() }).where(eq(schema.projects.id, projectId));
+    }
+
+    if (mode === 'source') {
+      // Re-homes the auto-recombine hook that used to run on remote-ingest completion (recombine design
+      // §pipeline hooks) — autoRecombine already no-ops quietly when there is nothing to merge.
+      this.logger.info('runImport: source mode — running auto-recombine', { jobId: job.id, projectId });
+      await this.jobService.progress(job.id, { done: total, total, current: 'recombine', phase: 'recombining' });
+      await this.recombineService.autoRecombine(projectId);
+    }
+
+    this.logger.info('runImport: complete', { jobId: job.id, projectId, mode, chapters: total });
   }
 
   /** payload.chapters wins; otherwise every source chapter without a converted/attention row (failed rows always retry). */

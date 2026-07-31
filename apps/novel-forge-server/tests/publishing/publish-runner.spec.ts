@@ -241,7 +241,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     await publishingService.publishChapter(projectId, 2, { scheduledAt: future });
 
     const jobService = new JobService(databaseService);
-    const executor = new JobExecutor(jobService, new ConcurrencyController(), {} as never, {} as never, databaseService, {} as never, {} as never, runner);
+    const executor = new JobExecutor(jobService, new ConcurrencyController(), {} as never, {} as never, databaseService, {} as never, {} as never, runner, {} as never);
     const janitor = new PublicationJanitor(databaseService, jobService, executor);
 
     const swept = await janitor.sweep();
@@ -269,7 +269,7 @@ describe.if(pgAvailable)('PublishRunner (mocked reader service)', () => {
     reader.failOrdinals.add(1);
 
     const jobService = new JobService(databaseService);
-    const executor = new JobExecutor(jobService, new ConcurrencyController(), {} as never, {} as never, databaseService, {} as never, {} as never, runner);
+    const executor = new JobExecutor(jobService, new ConcurrencyController(), {} as never, {} as never, databaseService, {} as never, {} as never, runner, {} as never);
     const jobId = await jobService.enqueue(projectId, 'publish', `publish-${projectId}`);
     await executor.dispatch(jobId);
 

@@ -113,6 +113,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
       rebrandService,
       recombineService,
       {} as never,
+      {} as never,
     );
     return { executor, jobService, events };
   }

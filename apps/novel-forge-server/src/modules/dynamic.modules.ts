@@ -21,6 +21,7 @@ import { GenerationModule } from '@modules/generation';
 import { HubActionsModule } from '@modules/hub';
 import { IllustrationModule } from '@modules/illustration';
 import { JobsModule } from '@modules/jobs';
+import { NovelImportModule } from '@modules/novel-import';
 import { PipelineModule } from '@modules/pipeline';
 import { PlanImportModule } from '@modules/plan-import';
 import { PlanningModule } from '@modules/planning';
@@ -53,6 +54,7 @@ export const HttpRouteModule = FastifyModule.forRoot({
     HubActionsModule,
     IllustrationModule,
     JobsModule,
+    NovelImportModule,
     PipelineModule,
     PlanImportModule,
     PlanningModule,
@@ -67,6 +69,13 @@ export const HttpRouteModule = FastifyModule.forRoot({
   // because the first-party session surface is versionless while the domain API stays under /v1.
   // Cover/portrait uploads arrive as base64 JSON (~1.33x the file size); Fastify's 1MB default
   // rejects any real image with a 413. Lift the ceiling to comfortably fit the client's 8MB cap.
-  bodyLimit: 12 * 1024 * 1024,
+  //
+  // `POST /api/v1/import` (novel-import) carries a whole novel plus an optional base64 cover in one
+  // JSON body — realistically a few MB, but raised to 64MB for headroom. The SDK has no per-route
+  // body-limit override, so this stays one global ceiling (the smallest change that fits both
+  // callers) rather than a scoped config; `validateNovelBundle`'s tighter 48MB sanity check
+  // (novel-import-format.md) gives an oversized *bundle* a clear field error before it can ever hit
+  // this transport-level ceiling.
+  bodyLimit: 64 * 1024 * 1024,
   transformers: CUSTOM_DATA_TRANSFORMERS,
 });
