@@ -1,0 +1,15 @@
+{
+  "type": "library",
+  "build": {
+    "exports": {
+      ".": "index",
+      "./module": "module/index",
+      "./rp": "rp/index",
+      "./testing": "testing/index"
+    }
+  },
+  "release": {
+    "npm": true,
+    "changelog": true
+  }
+}
