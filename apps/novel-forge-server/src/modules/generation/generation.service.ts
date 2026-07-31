@@ -35,6 +35,7 @@ import { runToolLoop } from '../ai/tools/tool-loop';
 import { ToolRegistryService } from '../ai/tools/tool-registry.service';
 import { applyBriefReveals } from '../bible/fact/knowledge-view';
 import { approveVolumePlan } from '../bible/volume/volume.approve';
+import { redactJobForResponse } from '../jobs/job-response';
 import { JobExecutor } from '../jobs/job.executor';
 import { JobService } from '../jobs/job.service';
 import { type ChangeOp } from '../refinement/change-set';
@@ -1207,7 +1208,8 @@ export class GenerationService {
   // ─── Backfill ────────────────────────────────────────────────────────────────
 
   async listJobs(projectId: bigint): Promise<Job.Row[]> {
-    return this.jobService.listByProject(projectId);
+    const jobs = await this.jobService.listByProject(projectId);
+    return jobs.map(redactJobForResponse);
   }
 
   async backfill(projectId: bigint): Promise<JobEnqueueResult> {

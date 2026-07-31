@@ -383,6 +383,15 @@ export class JobExecutor {
       await this.recombineService.autoRecombine(projectId);
     }
 
+    // The chapters/cover are now durably in the `chapters`/`projects` tables — the full bundle prose
+    // sitting in `jobs.payload` (up to the novel-import size limit) has no further purpose and must
+    // not linger. Compact it to a small summary; `redactJobForResponse` keeps the wire safe regardless
+    // (mid-run or on a failed job, where this line is never reached), but this keeps the row itself small.
+    await this.db
+      .update(schema.jobs)
+      .set({ payload: { chapters: total, hasCover: !!cover } as never, updatedAt: new Date() })
+      .where(eq(schema.jobs.id, job.id));
+
     this.logger.info('runImport: complete', { jobId: job.id, projectId, mode, chapters: total });
   }
 

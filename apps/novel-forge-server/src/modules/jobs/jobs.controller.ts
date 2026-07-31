@@ -13,6 +13,7 @@ import { ContextService, Get, HttpController, Params, RespondFor } from '@shadow
  */
 import { AppErrorCode } from '@server/classes';
 
+import { redactJobForResponse } from './job-response';
 import { JobService } from './job.service';
 import { JobIdParams, JobResponse } from './jobs.dto';
 
@@ -40,6 +41,6 @@ export class JobsController {
     const ownerId = BigInt(this.context.getAuthPrincipal().sub);
     const job = await this.jobService.getForOwner(params.jobId, ownerId);
     if (!job) throw AppErrorCode.JOB_001.create();
-    return job;
+    return redactJobForResponse(job);
   }
 }

@@ -121,6 +121,23 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
     expect(await countProjectsNamed('Never Created — Bad Ordinals')).toBe(0);
   });
 
+  it('should reject an over-column-length title with a clean 422 (not a 500 from the DB insert)', async () => {
+    const bundle = finalBundle('Never Created — Oversized Title');
+    bundle.novel.title = 'x'.repeat(300); // valid prose length, but over projects.name's varchar(255)
+    const response = await testEnv.getRouter().mockRequest().post('/api/v1/import').body({ bundle });
+    expect(response.statusCode).toBe(422);
+    expect(response.json().code).toBe('VALIDATION_ERROR');
+    expect(await countProjectsNamed('x'.repeat(300))).toBe(0);
+  });
+
+  it('should reject an over-column-length chapter title with a clean 422', async () => {
+    const bundle = finalBundle('Never Created — Oversized Chapter Title');
+    bundle.volumes[0]!.chapters[0]!.title = 'y'.repeat(501); // over chapters.title's varchar(500)
+    const response = await testEnv.getRouter().mockRequest().post('/api/v1/import').body({ bundle });
+    expect(response.statusCode).toBe(422);
+    expect(await countProjectsNamed('Never Created — Oversized Chapter Title')).toBe(0);
+  });
+
   it('should import a final-mode bundle, run the job to completion, and land locked human chapters ready to publish', async () => {
     const { projectId, jobId } = await importAndRun(finalBundle('The Lantern Keeper (final)'));
 
@@ -158,6 +175,26 @@ describe.if(pgAvailable)('POST /api/v1/import', () => {
       const scheduled = await testEnv.getRouter().mockRequest().post(`/api/v1/projects/${projectId}/chapters/${n}/publish`).body({});
       expect(scheduled.statusCode).toBe(202);
     }
+  });
+
+  it('should never echo the bundle prose/cover back through the jobs endpoints, and compact the stored payload on success', async () => {
+    const { projectId, jobId } = await importAndRun(finalBundle('Redacted On The Wire'));
+
+    const byId = await testEnv.getRouter().mockRequest().get(`/api/v1/jobs/${jobId}`);
+    expect(byId.statusCode).toBe(200);
+    expect(byId.json().payload).toEqual({ chapters: 3, hasCover: true });
+    expect(JSON.stringify(byId.json())).not.toContain('Mira climbed');
+    expect(JSON.stringify(byId.json())).not.toContain('fake-cover-bytes');
+
+    const listed = await testEnv.getRouter().mockRequest().get(`/api/v1/projects/${projectId}/jobs`);
+    expect(listed.statusCode).toBe(200);
+    const importJob = (listed.json().items as { kind: string; payload: unknown }[]).find(j => j.kind === 'import');
+    expect(importJob?.payload).toEqual({ chapters: 3, hasCover: true });
+
+    // Not just redacted on the wire — the stored row itself is compacted, so it never sits there at
+    // full size either.
+    const row = await testEnv.getPostgresClient().query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
+    expect(row?.payload).toEqual({ chapters: 3, hasCover: true });
   });
 
   it('should import a source-mode bundle, run auto-recombine for real, land unlocked default-generator chapters, and allow enqueuing extract', async () => {

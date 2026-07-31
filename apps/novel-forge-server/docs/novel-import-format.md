@@ -44,10 +44,13 @@ Content-Type: application/json
   and cover storage happen asynchronously in that job.
 - **422** — the bundle failed validation. See §8. **Nothing is written** — no project, no job, no
   chapters — when a 422 is returned.
-- Track import progress with the existing jobs endpoint: `GET /api/v1/jobs/:jobId`, returning
-  `{ id, projectId, kind: "import", status: "pending" | "in_progress" | "done" | "failed", progress: { done, total, current, phase }, lastError, ... }`.
-  `phase` is `"inserting"` while chapters land (`source` mode only, then) `"recombining"` for the final
-  auto-recombine pass.
+- Track import progress with the existing jobs endpoints — `GET /api/v1/jobs/:jobId` and the per-project
+  `GET /api/v1/projects/:projectId/jobs` — returning
+  `{ id, projectId, kind: "import", status: "pending" | "in_progress" | "done" | "failed", progress: { done, total, current, phase }, payload: { chapters, hasCover }, lastError, ... }`.
+  See §10 for exactly what `progress.current`/`phase` step through. **`payload` never carries the
+  bundle's prose or cover bytes back** — for an `import` job it is always this small summary
+  (`chapters`: the chapter count, `hasCover`: whether a cover was supplied), on every poll, whether the
+  job is still running or finished; the full bundle is never echoed back over this endpoint.
 
 ## 3. Envelope
 
@@ -64,7 +67,7 @@ Content-Type: application/json
 
 | Field          | Type       | Required | Constraint / maps to                                                                 |
 | -------------- | ---------- | -------- | -------------------------------------------------------------------------------------- |
-| `title`        | string     | yes      | non-empty. Stored as both `projects.name` and `projects.title`.                        |
+| `title`        | string     | yes      | non-empty, **max 255 characters**. Stored as both `projects.name` (varchar 255) and `projects.title` (varchar 500) — capped at the tighter of the two. |
 | `synopsis`     | string     | yes      | non-empty. Stored as `projects.brief` — the same "overview" field the app's premise/refinement tooling reads and the export package renders as the novel's description. |
 | `genre`        | string     | no       | accepted and validated, but **not currently persisted** — the `projects` table has no evidenced genre column today (the AI premise pipeline's own `genre` field is likewise ephemeral, never written to a column). Reserved for a future column or web surface. |
 | `tags`         | string[]   | no       | stored as `projects.themes` — the same jsonb array the novel export package reads back out as `tags`. |
@@ -81,10 +84,10 @@ Content-Type: application/json
 
 Each entry in `chapters`:
 
-| Field     | Type   | Required | Constraint                          |
-| --------- | ------ | -------- | -------------------------------------- |
-| `title`   | string | yes      | non-empty                             |
-| `content` | string | yes      | non-empty, and not whitespace-only     |
+| Field     | Type   | Required | Constraint                                                              |
+| --------- | ------ | -------- | -------------------------------------------------------------------------- |
+| `title`   | string | yes      | non-empty, **max 500 characters** — aligned to `chapters.title` (varchar 500) |
+| `content` | string | yes      | non-empty, and not whitespace-only. Unbounded — `chapters.content` is `text`. |
 
 ### Chapter numbering is derived — never authored
 
@@ -127,12 +130,19 @@ kind (e.g. character portraits).
 
 ## 7. Size limits
 
-- **Transport limit**: the server's global HTTP body limit is 64MB. A request body larger than that is
-  rejected at the transport layer before any application code runs (a plain 413, not a field error).
+- **Transport limit**: `POST /api/v1/import` alone accepts request bodies up to **64MB** (a per-route
+  override on this one endpoint). Every other endpoint in the API stays at the app-wide default of
+  **12MB** — this route is not a blanket loosening of every write endpoint. A body over 64MB here (or
+  over 12MB anywhere else) is rejected at the transport layer before any application code runs (a plain
+  413, not a field error).
 - **Bundle content sanity check**: independent of the transport limit, `validateNovelBundle` sums every
   chapter's UTF-8 byte length plus every asset's estimated decoded byte size, and rejects anything over
   **48MB** with a clear field error (`bundle`) — comfortably under the transport ceiling, so a pathological
   bundle gets a readable validation message instead of a bare 413.
+- **Field-length caps**, aligned to the columns they write to (§4, §5): `novel.title` and each chapter's
+  `title` are capped independently of the byte-size checks above — see the field tables for the exact
+  numbers. `synopsis`, `instructions`, and chapter `content` write to unbounded `text` columns and are
+  deliberately left uncapped — `content` is the novel's actual prose.
 - For scale: a very large novel (hundreds of chapters at a few thousand words each) is typically a few
   MB of text; a cover image rarely exceeds a couple of MB even base64-encoded. Both limits have generous
   headroom over realistic bundles.
@@ -177,7 +187,81 @@ in this server (nothing auto-rolls-back, nothing auto-deletes). Inspect the job 
 either fix the underlying issue and re-import as a fresh bundle, or delete the project
 (`DELETE /api/v1/projects/:projectId`) and start over.
 
-## 10. Worked example
+## 10. Source-mode auto-recombine: title patterns and progress steps
+
+`source`-mode imports run an automatic post-insert pass that merges chapters whose titles look like
+translator-split parts of one original chapter, then renumbers the project contiguously. This section
+documents the actual patterns the pass recognizes, so a `source`-mode bundle can be authored to *avoid*
+accidental merges as reliably as to *produce* an intended one.
+
+### How a title is read
+
+Each chapter title is checked against a fixed ladder, in this order, and everything matched is stripped
+before what remains is treated as the chapter's "base" title:
+
+1. **Part-of-total marker** — a trailing `(N/M)` or `[N/M]`, e.g. `"Old Ways (1/2)"`. Declares this
+   chapter is part `N` of `M` total parts.
+2. **"Part N" / "Pt. N" word marker** — the word `part` or `pt.` followed by a number, anywhere in the
+   title, e.g. `"The Siege, Part 2"`.
+3. **Trailing parenthesized number** — a bare `(N)` at the end, e.g. `"The Siege (2)"` — read as a part
+   marker only when neither of the two markers above already set one.
+4. **Chapter-number prefix** — a leading `Chapter N`, `Ch. N`, `Ch N`, or `C N` (optionally followed by a
+   sub-part, `Chapter 700.2` or `Chapter 700-2`). The number after the word is the chapter's *original*
+   (source) chapter number, not a part marker, unless a `.N`/`-N` suffix is present — that suffix becomes
+   the part number.
+5. **Bare leading number prefix** — a leading `N:`, `N.`, or `N-` with no "chapter" word, e.g.
+   `"142: The Siege"` — also read as an original chapter number.
+6. **Trailing dash number** — a trailing `" - N"` / `" – N"` / `" — N"`, e.g. `"The Siege - 2"` — checked
+   last (after the chapter-prefix ladder above, so a leading number is never double-counted), read as a
+   part marker.
+
+What is left after every matched pattern is stripped is the base title (`"The Siege"`, `"Old Ways"`, …).
+
+### When chapters merge
+
+Two chapters, adjacent in chapter-number order, are folded into one group when either:
+
+- they carry the **same original (source) chapter number** (pattern 4 or 5 above on both), or
+- they have the **same base title** (compared case- and punctuation-insensitively) **and** their part
+  numbers form a continuing sequence — an unmarked chapter counts as part 1, and the next one must be
+  part 2, then part 3, and so on (or, for a part-of-total marker, the declared total says more parts are
+  still expected).
+
+A merged group's chapters are concatenated in chapter-number order into one chapter, titled with the
+shared base title, and the whole project is renumbered contiguously afterward — merging 3 chapters into 1
+shifts every later chapter down by 2. Ambiguous cases (e.g. two adjacent chapters with the identical bare
+title and no part marker at all, or a part sequence with a gap) are resolved by a best-effort AI pass when
+one is available, and default to staying split when it is not — nothing merges silently by accident on a
+*genuinely* ambiguous case; the patterns above are what decide the *unambiguous* ones.
+
+### Authoring to avoid accidental merges
+
+- Give unrelated chapters **distinct, complete titles**. Two unrelated chapters that happen to share an
+  identical bare title (no chapter number, no part marker) are the one case flagged as ambiguous rather
+  than silently split or merged — but avoid relying on that safety net.
+  - **Trailing markers are the biggest risk**: an unrelated chapter titled `"Homecoming (2)"`,
+  `"Homecoming - 2"`, or `"Homecoming, Part 2"` immediately following a chapter titled `"Homecoming"` will
+  read as a continuation and merge, even though nothing in the story connects them. Reuse a base title
+  across chapters only when they genuinely are sequential parts of one chapter.
+- If two chapters must share a title for narrative reasons but are **not** meant to merge, insert at
+  least one differently-titled chapter between them, or give each a distinct chapter-number prefix
+  (pattern 4/5) — an explicit, *different* original chapter number always prevents a merge outright.
+- `final`-mode imports never run this pass at all — title collisions are never a concern there.
+
+### `progress.current` / `phase` step-by-step
+
+Polling `GET /api/v1/jobs/:jobId` (or the per-project job list) while an import job runs returns, in
+order:
+
+1. One or more `{ phase: "inserting", current: "<N>", done, total }` updates while chapters land in
+   batches — `current` is the 1-based chapter number of the first chapter in the batch currently being
+   written, as a string; `done`/`total` count chapters.
+2. `{ phase: "inserting", current: "chapters", done: total, total }` once every chapter has landed.
+3. **`source` mode only**: `{ phase: "recombining", current: "recombine", done: total, total }` while
+   the auto-recombine pass (above) runs. `final`-mode imports stop after step 2 — there is no
+   recombine phase.
+
+## 11. Worked example
 
 A complete, valid, two-volume, three-chapter `source`-mode bundle — no assets, ready to import as-is:
 

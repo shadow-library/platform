@@ -70,12 +70,10 @@ export const HttpRouteModule = FastifyModule.forRoot({
   // Cover/portrait uploads arrive as base64 JSON (~1.33x the file size); Fastify's 1MB default
   // rejects any real image with a 413. Lift the ceiling to comfortably fit the client's 8MB cap.
   //
-  // `POST /api/v1/import` (novel-import) carries a whole novel plus an optional base64 cover in one
-  // JSON body — realistically a few MB, but raised to 64MB for headroom. The SDK has no per-route
-  // body-limit override, so this stays one global ceiling (the smallest change that fits both
-  // callers) rather than a scoped config; `validateNovelBundle`'s tighter 48MB sanity check
-  // (novel-import-format.md) gives an oversized *bundle* a clear field error before it can ever hit
-  // this transport-level ceiling.
-  bodyLimit: 64 * 1024 * 1024,
+  // Kept at 12MB globally — every other write route (~88 of them) should stay bounded by this. The
+  // one route that genuinely needs more (`POST /api/v1/import`, a whole novel bundle) overrides it
+  // per-route via `bodyLimit` on `@HttpRoute` (see `NovelImportController`), which `@shadow-library/fastify`
+  // forwards straight through to Fastify's native per-route `bodyLimit` — no global blowup needed.
+  bodyLimit: 12 * 1024 * 1024,
   transformers: CUSTOM_DATA_TRANSFORMERS,
 });

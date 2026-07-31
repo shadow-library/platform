@@ -30,6 +30,13 @@ const SLUG_PATTERN = '^[a-z0-9][a-z0-9-]*$';
 // Same whitelist `UploadImageBody`/`UpsertEntityImage` already validate covers and portraits against.
 const IMAGE_MIME_WHITELIST = ['image/png', 'image/jpeg', 'image/webp'] as const;
 
+// Column-aligned caps: `novel.title` writes to BOTH `projects.name` (varchar 255) and `projects.title`
+// (varchar 500) — capped at the tighter of the two so neither insert can overflow. `chapters[].title`
+// writes to `chapters.title` (varchar 500). `synopsis`/`instructions`/chapter `content` map to `text`
+// columns (unbounded) and are deliberately left uncapped here — `content` is the novel's actual prose.
+const PROJECT_TITLE_MAX_LENGTH = 255;
+const CHAPTER_TITLE_MAX_LENGTH = 500;
+
 @Schema()
 export class NovelImportAsset {
   // Referenced by `novel.cover` — unique within the bundle (checked by `validateNovelBundle`).
@@ -46,7 +53,9 @@ export class NovelImportAsset {
 
 @Schema()
 export class NovelImportChapter {
-  @Field({ minLength: 1 })
+  // Aligned to `chapters.title` (varchar 500) — a title beyond this would fail the insert mid-job
+  // instead of rejecting the bundle upfront.
+  @Field({ minLength: 1, maxLength: CHAPTER_TITLE_MAX_LENGTH })
   title: string;
 
   @Field({ minLength: 1 })
@@ -69,7 +78,8 @@ export class NovelImportVolume {
 
 @Schema()
 export class NovelImportMeta {
-  @Field({ minLength: 1 })
+  // Aligned to `projects.name` (varchar 255) — the tighter of the two columns this writes to.
+  @Field({ minLength: 1, maxLength: PROJECT_TITLE_MAX_LENGTH })
   title: string;
 
   // Maps to `projects.brief` — the same "overview" field the app's own premise/refinement flow reads
