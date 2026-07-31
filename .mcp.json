@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "serena": {
+      "type": "stdio",
+      "command": "serena",
+      "args": ["start-mcp-server", "--context=claude-code", "--project-from-cwd"]
+    },
+    "context7": {
+      "type": "http",
+      "url": "https://mcp.context7.com/mcp/oauth"
+    },
+    "playwright": {
+      "type": "stdio",
+      "command": "bunx",
+      "args": ["@playwright/mcp@latest"]
+    }
+  }
+}

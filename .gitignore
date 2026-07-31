@@ -1,0 +1,22 @@
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+coverage/
+test-results/
+
+# Logs
+logs/
+*.log
+
+# Environment — never commit real env files
+.env
+.env.*
+!.env.example
+
+# OS / editor
+.DS_Store
+
+# Serena cache (project.yml itself is committed)
+.serena/cache/

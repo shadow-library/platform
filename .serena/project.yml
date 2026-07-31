@@ -1,0 +1,12 @@
+# Serena project configuration for the platform monorepo.
+# The symbol index covers the whole repo root; .gitignore keeps node_modules,
+# dist, coverage, caches, and test artifacts out of it.
+project_name: "platform"
+languages:
+- typescript
+encoding: "utf-8"
+ignore_all_files_in_gitignore: true
+ls_workspace_folders:
+- "."
+ignored_paths: []
+read_only: false

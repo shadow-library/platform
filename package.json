@@ -1,0 +1,5 @@
+{
+  "name": "@shadow-library/platform",
+  "private": true,
+  "workspaces": ["apps/*", "packages/*", "e2e"]
+}
