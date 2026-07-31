@@ -141,6 +141,44 @@
   margin-bottom: 20px;
 }
 
+/* Import job banner */
+.progressHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progressRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.progressLabel {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--sh-bg-pressed);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--sh-info-solid);
+  transition: width 0.4s ease;
+}
+
+.error {
+  margin: 10px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
 /* Stat cards */
 .statGrid {
   display: grid;

@@ -20,7 +20,7 @@ export interface RebrandSettings {
   auditEnabled?: boolean;
 }
 
-export type RebrandPhase = 'pending' | 'ingesting' | 'glossary' | 'converting' | 'done' | 'failed';
+export type RebrandPhase = 'pending' | 'glossary' | 'converting' | 'done' | 'failed';
 export type ConversionStatus = 'converted' | 'attention' | 'failed';
 
 export interface Rebrand {
@@ -42,7 +42,6 @@ export interface ConversionCounts {
 export interface RebrandOverview {
   rebrand: Rebrand;
   sourceChapters: number;
-  scrapeComplete: boolean;
   glossaryCount: number;
   counts: ConversionCounts;
   job?: JobResponse | null;

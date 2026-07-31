@@ -38,7 +38,6 @@ type RowStatus = ConversionStatus | 'pending';
 const STATUS_CHIP: Record<RowStatus, ChipIntent> = { converted: 'success', attention: 'warning', failed: 'danger', pending: 'neutral' };
 const PHASE_LABEL: Record<string, string> = {
   pending: 'Not started',
-  ingesting: 'Acquiring source',
   glossary: 'Seeding glossary',
   converting: 'Converting chapters',
   done: 'Done',
@@ -157,7 +156,6 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
         <StatusChip intent="danger">{status.counts.failed} failed</StatusChip>
         <StatusChip intent="neutral">{remaining} remaining</StatusChip>
         <StatusChip intent="neutral">{status.glossaryCount} glossary names</StatusChip>
-        <StatusChip intent={status.scrapeComplete ? 'success' : 'neutral'}>{status.scrapeComplete ? 'source complete' : 'source incomplete'}</StatusChip>
       </div>
     </div>
   );
@@ -259,7 +257,7 @@ function RebrandScreen(): React.JSX.Element {
     <div className={`nf-page ${styles.page}`}>
       <PageHeader
         title="Rebrand"
-        subtitle="Convert the source novel into an alternate world: names remapped, nationalism removed, minor errors fixed — fully automatic from acquisition to manuscript."
+        subtitle="Convert the source novel into an alternate world: names remapped, nationalism removed, minor errors fixed — fully automatic once the source chapters are imported."
         extra={
           <>
             <Button variant="secondary" disabled={!readable} onClick={download}>
@@ -293,7 +291,7 @@ function RebrandScreen(): React.JSX.Element {
             error={chaptersQuery.error}
             isEmpty={chapters.length === 0}
             emptyTitle="No source chapters"
-            emptyDescription="Start the rebrand — it acquires the source first, then converts every chapter."
+            emptyDescription="Source chapters arrive through a novel-import bundle. Import a novel to give this pipeline something to convert."
           >
             <div className={styles.table}>
               <div className={styles.headerRow}>

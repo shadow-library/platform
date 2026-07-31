@@ -10,7 +10,7 @@ import { ApiError, APIRequest } from './api-request';
 import { type ChapterResponse, type ListChapterResponse, type ListChaptersQueryParams } from './api-types.gen';
 
 /**
- * Source chapters are the ingested/scraped chapters of a project (distinct from
+ * Source chapters are a project's chapters supplied via a novel-import bundle (distinct from
  * generated drafts). They back the Chapters list screen.
  */
 const chapterKeys = {

@@ -9,29 +9,25 @@ import { Button, IconButton, Spinner, toast, Tooltip } from '@shadow-library/ui'
 /**
  * Importing user defined modules
  */
-import { EditIcon, ResetIcon, SearchIcon, SourceIcon } from '@/components/icons';
+import { EditIcon, ResetIcon, SourceIcon } from '@/components/icons';
 import { type ChipIntent, PageHeader, QueryState, StatusChip } from '@/components/nf';
 import {
   type ChapterListResponse,
-  type GenerationJobItem,
   listChaptersQueryOptions,
   projectStatusQueryOptions,
   useConsolidateMutation,
   useExtractMutation,
-  useIngestMutation,
   useListChaptersQuery,
   useListJobsQuery,
-  useProjectQuery,
   useProjectStatusQuery,
-  useResumeMutation,
   useSkeletonMutation,
 } from '@/lib/apis';
 
 import styles from './source.module.css';
 
 export const Route = createFileRoute('/novels/$novelId/source')({
-  // The extracted-chapter list and lifecycle status are the pipeline screen's primary data; the ingest
-  // job stays a client (polling) query.
+  // The extracted-chapter list and lifecycle status are the pipeline screen's primary data; the
+  // background pipeline jobs stay a client (polling) query.
   loader: async ({ context, params }) => {
     await Promise.all([
       context.queryClient.prefetchQuery(listChaptersQueryOptions(params.novelId, { limit: 200 })),
@@ -64,15 +60,6 @@ const STAGE_CHIP: Record<StageState, StageChipMeta> = {
   failed: { intent: 'danger', label: 'failed' },
   pending: { intent: 'neutral', label: 'pending' },
 };
-
-interface IngestProgress {
-  done?: number;
-  phase?: string;
-}
-
-function isActiveJob(job: GenerationJobItem | undefined): boolean {
-  return job?.status === 'pending' || job?.status === 'in_progress';
-}
 
 const CHAPTER_CHIP: Record<string, ChipIntent> = { done: 'success', failed: 'danger', skipped: 'neutral' };
 
@@ -126,11 +113,6 @@ function ChapterRow({ chapter }: ChapterRowProps): React.JSX.Element {
         <StatusChip intent={CHAPTER_CHIP[chapter.status] ?? 'neutral'}>{chapter.status}</StatusChip>
       </span>
       <span className={styles.rowActions}>
-        {chapter.url && (
-          <Tooltip content="View source">
-            <IconButton size="sm" variant="ghost" aria-label="View source" icon={<SearchIcon size={14} />} onClick={() => window.open(chapter.url ?? '', '_blank')} />
-          </Tooltip>
-        )}
         <Tooltip content="Edit">
           <IconButton size="sm" variant="ghost" aria-label="Edit chapter" icon={<EditIcon size={14} />} />
         </Tooltip>
@@ -144,50 +126,32 @@ function SourceScreen(): React.JSX.Element {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const statusQuery = useProjectStatusQuery(novelId);
-  const projectQuery = useProjectQuery(novelId);
   const chaptersQuery = useListChaptersQuery(novelId, { limit: 200 });
   const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: 2500 });
-  const ingest = useIngestMutation(novelId);
   const extract = useExtractMutation(novelId);
   const consolidate = useConsolidateMutation(novelId);
   const skeleton = useSkeletonMutation(novelId);
-  const resume = useResumeMutation(novelId);
 
   const status = statusQuery.data;
-  const project = projectQuery.data;
   const chapters = chaptersQuery.data?.items ?? [];
   const total = status?.chaptersTotal ?? chapters.length;
   const extracted = status?.chaptersExtracted ?? chapters.filter(c => c.status === 'done').length;
 
-  const ingestJob = (jobsQuery.data?.items ?? []).filter(j => j.kind === 'ingest' || j.kind === 'resume').sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))[0];
-  const ingestActive = isActiveJob(ingestJob);
-  const ingestProgress = (ingestJob?.progress ?? null) as IngestProgress | null;
-
-  // While a scrape runs, keep the chapter list and counters live; when it lands, one final refresh
-  // picks up scrapeComplete and whatever the recombine/retitle passes changed.
+  // Chapters land through a novel-import bundle, not a screen action here — extract/consolidate/skeleton
+  // are the pipeline stages this screen can drive. While any of them is running in the background, keep
+  // the chapter list and counters live.
+  const jobActive = (jobsQuery.data?.items ?? []).some(j => j.status === 'pending' || j.status === 'in_progress');
   const wasActive = useRef(false);
   useEffect(() => {
-    if (wasActive.current && !ingestActive) queryClient.invalidateQueries({ queryKey: ['projects', novelId] });
-    wasActive.current = ingestActive;
-    if (!ingestActive) return;
+    if (wasActive.current && !jobActive) queryClient.invalidateQueries({ queryKey: ['projects', novelId] });
+    wasActive.current = jobActive;
+    if (!jobActive) return;
     const timer = setInterval(() => {
       queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'chapters'] });
       queryClient.invalidateQueries({ queryKey: ['projects', novelId, 'status'] });
     }, 4000);
     return () => clearInterval(timer);
-  }, [ingestActive, novelId, queryClient]);
-
-  const scraped = ingestActive ? (ingestProgress?.done ?? total) : total;
-  const ingestState: StageState = project?.scrapeComplete ? 'done' : ingestActive ? 'running' : ingestJob?.status === 'failed' ? 'failed' : 'pending';
-  const ingestHint = ingestActive
-    ? `${scraped} chapters · ${ingestProgress?.phase === 'recombining' ? 'merging parts…' : 'scraping…'}`
-    : ingestState === 'failed'
-      ? (ingestJob?.lastError ?? 'ingest failed — run again to resume')
-      : ingestState === 'done'
-        ? `${total} chapters · complete`
-        : total > 0
-          ? `${total} chapters so far`
-          : 'Not started';
+  }, [jobActive, novelId, queryClient]);
 
   const runToast = (label: string, err?: string): void => {
     if (err) toast.danger(err);
@@ -198,14 +162,6 @@ function SourceScreen(): React.JSX.Element {
   const stages: Stage[] = [
     {
       n: 1,
-      name: 'Ingest',
-      hint: ingestHint,
-      icon: <SourceIcon size={15} />,
-      state: ingestState,
-      onRun: ingestState === 'done' ? undefined : () => ingest.mutate(undefined, { onSuccess: () => runToast('Ingest'), onError: e => runToast('Ingest', e.message) }),
-    },
-    {
-      n: 2,
       name: 'Extract',
       hint: `${extracted} of ${total} chapters`,
       icon: <SourceIcon size={15} />,
@@ -214,16 +170,16 @@ function SourceScreen(): React.JSX.Element {
       onRun: () => extract.mutate(undefined, { onSuccess: () => runToast('Extract'), onError: e => runToast('Extract', e.message) }),
     },
     {
-      n: 3,
+      n: 2,
       name: 'Consolidate',
       hint: 'Merge & dedupe entities',
       icon: <ResetIcon size={15} />,
       state: status?.planApproved ? 'done' : 'pending',
       onRun: () => consolidate.mutate(undefined, { onSuccess: () => runToast('Consolidate'), onError: e => runToast('Consolidate', e.message) }),
     },
-    { n: 4, name: 'Assets', hint: 'Generated maps & art', icon: <SourceIcon size={15} />, state: 'pending' },
+    { n: 3, name: 'Assets', hint: 'Generated maps & art', icon: <SourceIcon size={15} />, state: 'pending' },
     {
-      n: 5,
+      n: 4,
       name: 'Skeleton',
       hint: 'Structural outline',
       icon: <SourceIcon size={15} />,
@@ -236,20 +192,11 @@ function SourceScreen(): React.JSX.Element {
     <div className={`nf-page ${styles.page}`}>
       <PageHeader
         title="Source Pipeline"
-        subtitle="Ingest an existing manuscript and turn it into a structured story bible. Each stage can be resumed independently."
+        subtitle="Turn imported source chapters into a structured story bible. Each stage can be re-run independently."
         extra={
-          <>
-            <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/runs', params: { novelId } })}>
-              View runs
-            </Button>
-            <Button
-              variant="primary"
-              loading={resume.isPending}
-              onClick={() => resume.mutate(undefined, { onSuccess: () => runToast('Pipeline'), onError: e => runToast('Pipeline', e.message) })}
-            >
-              Resume pipeline
-            </Button>
-          </>
+          <Button variant="secondary" onClick={() => navigate({ to: '/novels/$novelId/runs', params: { novelId } })}>
+            View runs
+          </Button>
         }
       />
 
@@ -269,7 +216,8 @@ function SourceScreen(): React.JSX.Element {
         error={chaptersQuery.error}
         isEmpty={chapters.length === 0}
         emptyTitle="No source chapters"
-        emptyDescription="Ingest a manuscript to populate this list."
+        emptyDescription="Source chapters arrive through a novel-import bundle — this project has none yet."
+        emptyAction={{ label: 'Import novel', onClick: () => navigate({ to: '/import' }) }}
       >
         <div className={styles.table}>
           <div className={styles.headerRow}>

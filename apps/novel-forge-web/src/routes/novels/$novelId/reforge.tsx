@@ -39,7 +39,6 @@ type RowStatus = ReforgeChapterStatus | 'pending';
 const STATUS_CHIP: Record<RowStatus, ChipIntent> = { reforged: 'success', attention: 'warning', failed: 'danger', pending: 'neutral' };
 const PHASE_LABEL: Record<string, string> = {
   pending: 'Not started',
-  ingesting: 'Acquiring source',
   glossary: 'Seeding glossary',
   reforging: 'Re-authoring chapters',
   done: 'Done',
@@ -171,7 +170,6 @@ function ProgressCard({ status }: ProgressCardProps): React.JSX.Element {
         <StatusChip intent="danger">{status.counts.failed} failed</StatusChip>
         <StatusChip intent="neutral">{remaining} remaining</StatusChip>
         <StatusChip intent="neutral">{status.glossaryCount} glossary names</StatusChip>
-        <StatusChip intent={status.scrapeComplete ? 'success' : 'neutral'}>{status.scrapeComplete ? 'source complete' : 'source incomplete'}</StatusChip>
       </div>
     </div>
   );
@@ -286,7 +284,7 @@ function ReforgeScreen(): React.JSX.Element {
     <div className={`nf-page ${styles.page}`}>
       <PageHeader
         title="Reforge"
-        subtitle="Re-author the source novel from scratch: same plot, characters, and dialogue meaning, unwanted content removed and the prose elevated — fully automatic from acquisition to manuscript."
+        subtitle="Re-author the source novel from scratch: same plot, characters, and dialogue meaning, unwanted content removed and the prose elevated — fully automatic once the source chapters are imported."
         extra={
           <>
             <Button variant="secondary" disabled={!readable} onClick={download}>
@@ -320,7 +318,7 @@ function ReforgeScreen(): React.JSX.Element {
             error={chaptersQuery.error}
             isEmpty={chapters.length === 0}
             emptyTitle="No source chapters"
-            emptyDescription="Start the reforge — it acquires the source first, then re-authors every chapter."
+            emptyDescription="Source chapters arrive through a novel-import bundle. Import a novel to give this pipeline something to re-author."
           >
             <div className={styles.table}>
               <div className={styles.headerRow}>

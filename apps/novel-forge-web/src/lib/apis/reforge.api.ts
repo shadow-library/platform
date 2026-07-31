@@ -34,7 +34,7 @@ export interface ReforgeStartBody {
   limit?: number;
 }
 
-export type ReforgePhase = 'pending' | 'ingesting' | 'glossary' | 'reforging' | 'done' | 'failed';
+export type ReforgePhase = 'pending' | 'glossary' | 'reforging' | 'done' | 'failed';
 export type ReforgeChapterStatus = 'reforged' | 'attention' | 'failed';
 
 export interface Reforge {
@@ -56,7 +56,6 @@ export interface ReforgeCounts {
 export interface ReforgeOverview {
   reforge: Reforge;
   sourceChapters: number;
-  scrapeComplete: boolean;
   glossaryCount: number;
   counts: ReforgeCounts;
   job?: JobResponse | null;

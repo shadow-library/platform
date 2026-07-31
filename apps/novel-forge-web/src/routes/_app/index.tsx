@@ -8,10 +8,10 @@ import { Button, SegmentedControl } from '@shadow-library/ui';
 /**
  * Importing user defined modules
  */
-import { BookIcon, PlusIcon } from '@/components/icons';
+import { BookIcon, PlusIcon, UploadIcon } from '@/components/icons';
 import { PageHeader, QueryState, StatusChip } from '@/components/nf';
 import { NewNovelModal } from '@/features/projects/NewNovelModal';
-import { listProjectsQueryOptions, type ProjectKind, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
+import { listProjectsQueryOptions, type ProjectResponse, useListProjectsQuery, useProjectStatusQuery } from '@/lib/apis';
 import { imageUrl, projectKindLabel, projectKindTag, projectTitle, relativeTime } from '@/lib/format';
 
 import styles from './index.module.css';
@@ -116,16 +116,10 @@ function Dashboard(): React.JSX.Element {
   const projects = projectsQuery.data?.items ?? [];
   const [filter, setFilter] = useState<Filter>('all');
   const [createOpen, setCreateOpen] = useState(false);
-  const [createKind, setCreateKind] = useState<ProjectKind>('new_novel');
 
   const sourceCount = projects.filter(p => p.kind === 'source').length;
   const newCount = projects.filter(p => p.kind === 'new_novel').length;
   const visible = filter === 'all' ? projects : projects.filter(p => p.kind === filter);
-
-  const openCreate = (kind: ProjectKind): void => {
-    setCreateKind(kind);
-    setCreateOpen(true);
-  };
 
   return (
     <div className={styles.page}>
@@ -134,10 +128,10 @@ function Dashboard(): React.JSX.Element {
         subtitle={`${projects.length} project${projects.length === 1 ? '' : 's'} · ${sourceCount} source · ${newCount} original`}
         extra={
           <>
-            <Button variant="secondary" onClick={() => openCreate('source')}>
-              Import source
+            <Button variant="secondary" prefix={<UploadIcon />} onClick={() => navigate({ to: '/import' })}>
+              Import novel
             </Button>
-            <Button variant="primary" prefix={<PlusIcon />} onClick={() => openCreate('new_novel')}>
+            <Button variant="primary" prefix={<PlusIcon />} onClick={() => setCreateOpen(true)}>
               New project
             </Button>
           </>
@@ -159,30 +153,24 @@ function Dashboard(): React.JSX.Element {
         error={projectsQuery.error}
         isEmpty={visible.length === 0}
         emptyTitle="No projects yet"
-        emptyDescription="Create your first novel or import a source to get started."
-        emptyAction={{ label: 'New project', onClick: () => openCreate('new_novel') }}
+        emptyDescription="Create your first novel from a premise, or import one from a novel-import bundle."
+        emptyAction={{ label: 'New project', onClick: () => setCreateOpen(true) }}
       >
         <div className={styles.grid}>
           {visible.map(project => (
             <ProjectCard key={project.id} project={project} />
           ))}
-          <button onClick={() => openCreate('new_novel')} className={styles.newCard}>
+          <button onClick={() => setCreateOpen(true)} className={styles.newCard}>
             <span className={styles.newIcon}>
               <PlusIcon size={20} />
             </span>
             <span className={styles.newLabel}>New project</span>
-            <span className={styles.newHint}>Start from premise or import source</span>
+            <span className={styles.newHint}>Start from a premise</span>
           </button>
         </div>
       </QueryState>
 
-      <NewNovelModal
-        key={createKind}
-        open={createOpen}
-        initialKind={createKind}
-        onOpenChange={setCreateOpen}
-        onCreated={project => navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } })}
-      />
+      <NewNovelModal open={createOpen} onOpenChange={setCreateOpen} onCreated={project => navigate({ to: '/novels/$novelId/overview', params: { novelId: project.id } })} />
     </div>
   );
 }

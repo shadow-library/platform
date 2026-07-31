@@ -13,12 +13,14 @@ import { PageContainer, SectionCard, StatusChip } from '@/components/nf';
 import { ImageUpload } from '@/components/nf/ImageUpload';
 import {
   aiUsageQueryOptions,
+  type GenerationJobItem,
   projectStatusQueryOptions,
   type ResetBody,
   type RoleUsage,
   useAiUsageQuery,
   useCloneProjectMutation,
   useDeleteCoverMutation,
+  useListJobsQuery,
   useListRunsQuery,
   useProjectQuery,
   useProjectStatusQuery,
@@ -151,6 +153,60 @@ function RunRow({ run }: RunRowProps): React.JSX.Element {
   );
 }
 
+interface ImportJobProgress {
+  phase?: string;
+  done?: number;
+  total?: number;
+  current?: string;
+}
+
+const IMPORT_PHASE_LABEL: Record<string, string> = {
+  inserting: 'Inserting chapters',
+  recombining: 'Merging split chapters',
+};
+
+interface ImportJobBannerProps {
+  job: GenerationJobItem;
+}
+
+/**
+ * Surfaces the background `import` job's progress right where a freshly imported novel lands —
+ * the same `{ phase, done, total }` shape rebrand/reforge poll, rendered as a compact inline bar
+ * instead of a full pipeline dashboard since there is nothing else to configure here.
+ */
+function ImportJobBanner({ job }: ImportJobBannerProps): React.JSX.Element {
+  const progress = (job.progress ?? null) as ImportJobProgress | null;
+  const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
+  const failed = job.status === 'failed';
+
+  return (
+    <SectionCard className={styles.sectionSpacer}>
+      <div className={styles.progressHead}>
+        <h3 className={styles.usageTitle}>{failed ? 'Import failed' : 'Importing novel'}</h3>
+        <StatusChip intent={failed ? 'danger' : 'info'}>
+          {!failed && <Spinner size="sm" />}
+          {failed ? 'failed' : (IMPORT_PHASE_LABEL[progress?.phase ?? ''] ?? 'working')}
+        </StatusChip>
+      </div>
+      {!failed && progress && (
+        <div className={styles.progressRow}>
+          <span className={styles.progressLabel}>
+            {progress.phase === 'inserting' && progress.current !== 'chapters'
+              ? `Chapter ${progress.current} · ${progress.done} of ${progress.total}`
+              : `${progress.done ?? 0} of ${progress.total ?? '?'}`}
+          </span>
+          {pct !== null && (
+            <div className={styles.progressTrack}>
+              <div className={styles.progressBar} style={{ width: `${pct}%` }} />
+            </div>
+          )}
+        </div>
+      )}
+      {failed && job.lastError && <p className={styles.error}>{job.lastError}</p>}
+    </SectionCard>
+  );
+}
+
 function OverviewScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const navigate = useNavigate();
@@ -158,6 +214,7 @@ function OverviewScreen(): React.JSX.Element {
   const statusQuery = useProjectStatusQuery(novelId);
   const usageQuery = useAiUsageQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
+  const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: 2500 });
   const cloneProject = useCloneProjectMutation(novelId);
   const resetProject = useResetProjectMutation(novelId);
   const uploadCover = useUploadCoverMutation(novelId);
@@ -195,6 +252,10 @@ function OverviewScreen(): React.JSX.Element {
   const onContinue = (): void => {
     navigate({ to: next.to, params: { novelId } });
   };
+
+  // The most recent `import` job, if any — surfaced right on the landing page a fresh import navigates
+  // to, the same status/progress shape rebrand/reforge poll (`GET /projects/:id/jobs`).
+  const importJob = (jobsQuery.data?.items ?? []).filter(j => j.kind === 'import').sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))[0];
 
   const roles = usage?.roles ?? [];
   const maxTokens = roles.reduce((m, r) => Math.max(m, r.inputTokens + r.outputTokens), 0);
@@ -243,6 +304,7 @@ function OverviewScreen(): React.JSX.Element {
         <EmptyState size="inline" title="Project not found" />
       ) : (
         <>
+          {importJob && (importJob.status === 'pending' || importJob.status === 'in_progress' || importJob.status === 'failed') && <ImportJobBanner job={importJob} />}
           <div className={styles.header}>
             <ImageUpload
               className={styles.headerCover}

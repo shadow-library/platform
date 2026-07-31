@@ -1,4 +1,123 @@
 export interface paths {
+  '/api/auth/login': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Login */
+    get: operations['get_api_auth_login'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/callback': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Callback */
+    get: operations['get_api_auth_callback'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/logout': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Logout */
+    post: operations['post_api_auth_logout'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/session': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Session */
+    get: operations['get_api_auth_session'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/organisations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Organisations */
+    get: operations['get_api_auth_organisations'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/organisation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Switch Organisation */
+    post: operations['post_api_auth_organisation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/auth/step-up': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Step Up */
+    get: operations['get_api_auth_step_up'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/ai/models': {
     parameters: {
       query?: never;
@@ -7,7 +126,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Models */
-    get: operations['listModels'];
+    get: operations['get_api_v1_ai_models'];
     put?: never;
     post?: never;
     delete?: never;
@@ -23,8 +142,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Novel */
-    get: operations['novel'];
+    /** Export Novel */
+    get: operations['get_api_v1_projects_projectId_export_novel'];
     put?: never;
     post?: never;
     delete?: never;
@@ -40,8 +159,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Serve */
-    get: operations['serve'];
+    /** Serve Image */
+    get: operations['get_api_v1_images_projectId_filename'];
     put?: never;
     post?: never;
     delete?: never;
@@ -60,7 +179,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Seed From Brief */
-    post: operations['seedFromBrief'];
+    post: operations['post_api_v1_projects_projectId_seed_from_brief'];
     delete?: never;
     options?: never;
     head?: never;
@@ -76,8 +195,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Plan */
-    post: operations['plan'];
+    /** Plan Volumes */
+    post: operations['post_api_v1_projects_projectId_plan'];
     delete?: never;
     options?: never;
     head?: never;
@@ -94,7 +213,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Approve Plan */
-    post: operations['approvePlan'];
+    post: operations['post_api_v1_projects_projectId_approve'];
     delete?: never;
     options?: never;
     head?: never;
@@ -110,8 +229,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Outline */
-    post: operations['outline'];
+    /** Outline Chapters */
+    post: operations['post_api_v1_projects_projectId_outline'];
     delete?: never;
     options?: never;
     head?: never;
@@ -128,7 +247,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Outline Arc */
-    post: operations['outlineArc'];
+    post: operations['post_api_v1_projects_projectId_arcs_arcKey_outline'];
     delete?: never;
     options?: never;
     head?: never;
@@ -143,7 +262,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Briefs */
-    get: operations['listBriefs'];
+    get: operations['get_api_v1_projects_projectId_briefs'];
     put?: never;
     post?: never;
     delete?: never;
@@ -160,9 +279,9 @@ export interface paths {
       cookie?: never;
     };
     /** Get Brief */
-    get: operations['getBrief'];
+    get: operations['get_api_v1_projects_projectId_briefs_n'];
     /** Update Brief */
-    put: operations['updateBrief'];
+    put: operations['put_api_v1_projects_projectId_briefs_n'];
     post?: never;
     delete?: never;
     options?: never;
@@ -179,8 +298,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Generate */
-    post: operations['generate'];
+    /** Generate Chapters */
+    post: operations['post_api_v1_projects_projectId_generate'];
     delete?: never;
     options?: never;
     head?: never;
@@ -195,7 +314,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Jobs */
-    get: operations['listJobs'];
+    get: operations['get_api_v1_projects_projectId_jobs'];
     put?: never;
     post?: never;
     delete?: never;
@@ -212,7 +331,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Drafts */
-    get: operations['listDrafts'];
+    get: operations['get_api_v1_projects_projectId_drafts'];
     put?: never;
     post?: never;
     delete?: never;
@@ -229,12 +348,12 @@ export interface paths {
       cookie?: never;
     };
     /** Get Draft */
-    get: operations['getDraft'];
+    get: operations['get_api_v1_projects_projectId_drafts_n'];
     /** Update Draft */
-    put: operations['updateDraft'];
+    put: operations['put_api_v1_projects_projectId_drafts_n'];
     post?: never;
     /** Delete Draft */
-    delete: operations['deleteDraft'];
+    delete: operations['delete_api_v1_projects_projectId_drafts_n'];
     options?: never;
     head?: never;
     patch?: never;
@@ -250,7 +369,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Revise Draft */
-    post: operations['reviseDraft'];
+    post: operations['post_api_v1_projects_projectId_drafts_n_revise'];
     delete?: never;
     options?: never;
     head?: never;
@@ -267,7 +386,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Judge Draft */
-    post: operations['judgeDraft'];
+    post: operations['post_api_v1_projects_projectId_drafts_n_judge'];
     delete?: never;
     options?: never;
     head?: never;
@@ -284,7 +403,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Feedback Draft */
-    post: operations['feedbackDraft'];
+    post: operations['post_api_v1_projects_projectId_drafts_n_feedback'];
     delete?: never;
     options?: never;
     head?: never;
@@ -301,7 +420,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Approve Draft */
-    post: operations['approveDraft'];
+    post: operations['post_api_v1_projects_projectId_drafts_n_approve'];
     delete?: never;
     options?: never;
     head?: never;
@@ -316,7 +435,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Revisions */
-    get: operations['listRevisions'];
+    get: operations['get_api_v1_projects_projectId_drafts_n_revisions'];
     put?: never;
     post?: never;
     delete?: never;
@@ -333,7 +452,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Revision */
-    get: operations['getRevision'];
+    get: operations['get_api_v1_projects_projectId_drafts_n_revisions_r'];
     put?: never;
     post?: never;
     delete?: never;
@@ -350,7 +469,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Draft Prompt */
-    get: operations['getDraftPrompt'];
+    get: operations['get_api_v1_projects_projectId_drafts_n_prompt'];
     put?: never;
     post?: never;
     delete?: never;
@@ -369,7 +488,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Import Draft */
-    post: operations['importDraft'];
+    post: operations['post_api_v1_projects_projectId_drafts_n_import'];
     delete?: never;
     options?: never;
     head?: never;
@@ -385,8 +504,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Finalize */
-    post: operations['finalize'];
+    /** Finalize Chapters */
+    post: operations['post_api_v1_projects_projectId_finalize'];
     delete?: never;
     options?: never;
     head?: never;
@@ -403,7 +522,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Generate Grok */
-    post: operations['generateGrok'];
+    post: operations['post_api_v1_projects_projectId_chapters_n_generate_grok'];
     delete?: never;
     options?: never;
     head?: never;
@@ -420,7 +539,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Propose Continuity */
-    post: operations['proposeContinuity'];
+    post: operations['post_api_v1_projects_projectId_chapters_n_propose_continuity'];
     delete?: never;
     options?: never;
     head?: never;
@@ -437,7 +556,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Extract To Bible */
-    post: operations['extractToBible'];
+    post: operations['post_api_v1_projects_projectId_chapters_n_extract_to_bible'];
     delete?: never;
     options?: never;
     head?: never;
@@ -452,14 +571,14 @@ export interface paths {
       cookie?: never;
     };
     /** Get Continuity Proposal */
-    get: operations['getContinuityProposal'];
+    get: operations['get_api_v1_projects_projectId_chapters_n_continuity_proposal'];
     put?: never;
     post?: never;
     delete?: never;
     options?: never;
     head?: never;
     /** Update Continuity Proposal */
-    patch: operations['updateContinuityProposal'];
+    patch: operations['patch_api_v1_projects_projectId_chapters_n_continuity_proposal'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/chapters/{n}/continuity-proposal/apply': {
@@ -472,7 +591,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Apply Continuity Proposal */
-    post: operations['applyContinuityProposal'];
+    post: operations['post_api_v1_projects_projectId_chapters_n_continuity_proposal_apply'];
     delete?: never;
     options?: never;
     head?: never;
@@ -489,7 +608,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Discard Continuity Proposal */
-    post: operations['discardContinuityProposal'];
+    post: operations['post_api_v1_projects_projectId_chapters_n_continuity_proposal_discard'];
     delete?: never;
     options?: never;
     head?: never;
@@ -505,8 +624,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Validate */
-    post: operations['validate'];
+    /** Validate Continuity */
+    post: operations['post_api_v1_projects_projectId_validate'];
     delete?: never;
     options?: never;
     head?: never;
@@ -523,7 +642,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Review Chapter */
-    post: operations['reviewChapter'];
+    post: operations['post_api_v1_projects_projectId_chapters_n_review'];
     delete?: never;
     options?: never;
     head?: never;
@@ -538,7 +657,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Review Queue */
-    get: operations['getReviewQueue'];
+    get: operations['get_api_v1_projects_projectId_review_queue'];
     put?: never;
     post?: never;
     delete?: never;
@@ -555,7 +674,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Runs */
-    get: operations['listRuns'];
+    get: operations['get_api_v1_projects_projectId_runs'];
     put?: never;
     post?: never;
     delete?: never;
@@ -572,7 +691,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Run */
-    get: operations['getRun'];
+    get: operations['get_api_v1_projects_projectId_runs_runId'];
     put?: never;
     post?: never;
     delete?: never;
@@ -589,7 +708,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Run Context */
-    get: operations['getRunContext'];
+    get: operations['get_api_v1_projects_projectId_runs_runId_context'];
     put?: never;
     post?: never;
     delete?: never;
@@ -606,7 +725,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Run Call */
-    get: operations['getRunCall'];
+    get: operations['get_api_v1_projects_projectId_runs_runId_calls_callId'];
     put?: never;
     post?: never;
     delete?: never;
@@ -623,7 +742,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Ai Usage */
-    get: operations['getAiUsage'];
+    get: operations['get_api_v1_projects_projectId_ai_usage'];
     put?: never;
     post?: never;
     delete?: never;
@@ -639,8 +758,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Search */
-    get: operations['search'];
+    /** Search Prose */
+    get: operations['get_api_v1_projects_projectId_search'];
     put?: never;
     post?: never;
     delete?: never;
@@ -657,7 +776,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Manuscript */
-    get: operations['getManuscript'];
+    get: operations['get_api_v1_projects_projectId_manuscript'];
     put?: never;
     post?: never;
     delete?: never;
@@ -675,8 +794,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Backfill */
-    post: operations['backfill'];
+    /** Backfill Indexes */
+    post: operations['post_api_v1_projects_projectId_backfill'];
     delete?: never;
     options?: never;
     head?: never;
@@ -690,11 +809,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** List */
-    get: operations['list'];
+    /** List Chapter Images */
+    get: operations['get_api_v1_projects_projectId_chapters_n_images'];
     put?: never;
-    /** Add */
-    post: operations['add'];
+    /** Add Chapter Image */
+    post: operations['post_api_v1_projects_projectId_chapters_n_images'];
     delete?: never;
     options?: never;
     head?: never;
@@ -711,8 +830,8 @@ export interface paths {
     get?: never;
     put?: never;
     post?: never;
-    /** Remove */
-    delete: operations['remove'];
+    /** Remove Chapter Image */
+    delete: operations['delete_api_v1_projects_projectId_chapters_n_images_imageId'];
     options?: never;
     head?: never;
     patch?: never;
@@ -726,7 +845,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Job */
-    get: operations['getJob'];
+    get: operations['get_api_v1_jobs_jobId'];
     put?: never;
     post?: never;
     delete?: never;
@@ -743,7 +862,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Chapters */
-    get: operations['listChapters'];
+    get: operations['get_api_v1_projects_projectId_source_chapters'];
     put?: never;
     post?: never;
     delete?: never;
@@ -760,15 +879,15 @@ export interface paths {
       cookie?: never;
     };
     /** Get Chapter */
-    get: operations['getChapter'];
+    get: operations['get_api_v1_projects_projectId_source_chapters_n'];
     put?: never;
     post?: never;
     /** Delete Chapter */
-    delete: operations['deleteChapter'];
+    delete: operations['delete_api_v1_projects_projectId_source_chapters_n'];
     options?: never;
     head?: never;
     /** Update Chapter */
-    patch: operations['updateChapter'];
+    patch: operations['patch_api_v1_projects_projectId_source_chapters_n'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/proposals': {
@@ -779,7 +898,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Proposals */
-    get: operations['listProposals'];
+    get: operations['get_api_v1_projects_projectId_proposals'];
     put?: never;
     post?: never;
     delete?: never;
@@ -796,14 +915,14 @@ export interface paths {
       cookie?: never;
     };
     /** Get Proposal */
-    get: operations['getProposal'];
+    get: operations['get_api_v1_projects_projectId_proposals_proposalId'];
     put?: never;
     post?: never;
     delete?: never;
     options?: never;
     head?: never;
     /** Update Proposal */
-    patch: operations['updateProposal'];
+    patch: operations['patch_api_v1_projects_projectId_proposals_proposalId'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/proposals/{proposalId}/apply': {
@@ -816,7 +935,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Apply Proposal */
-    post: operations['applyProposal'];
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_apply'];
     delete?: never;
     options?: never;
     head?: never;
@@ -833,7 +952,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Revert Proposal */
-    post: operations['revertProposal'];
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_revert'];
     delete?: never;
     options?: never;
     head?: never;
@@ -850,7 +969,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Discard Proposal */
-    post: operations['discardProposal'];
+    post: operations['post_api_v1_projects_projectId_proposals_proposalId_discard'];
     delete?: never;
     options?: never;
     head?: never;
@@ -865,7 +984,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Changes */
-    get: operations['listChanges'];
+    get: operations['get_api_v1_projects_projectId_changes'];
     put?: never;
     post?: never;
     delete?: never;
@@ -883,8 +1002,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Rollback */
-    post: operations['rollback'];
+    /** Rollback Changes */
+    post: operations['post_api_v1_projects_projectId_changes_rollback'];
     delete?: never;
     options?: never;
     head?: never;
@@ -899,10 +1018,10 @@ export interface paths {
       cookie?: never;
     };
     /** List Sessions */
-    get: operations['listSessions'];
+    get: operations['get_api_v1_projects_projectId_chat_sessions'];
     put?: never;
     /** Create Session */
-    post: operations['createSession'];
+    post: operations['post_api_v1_projects_projectId_chat_sessions'];
     delete?: never;
     options?: never;
     head?: never;
@@ -917,15 +1036,15 @@ export interface paths {
       cookie?: never;
     };
     /** Get Session */
-    get: operations['getSession'];
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId'];
     put?: never;
     post?: never;
     /** Delete Session */
-    delete: operations['deleteSession'];
+    delete: operations['delete_api_v1_projects_projectId_chat_sessions_sessionId'];
     options?: never;
     head?: never;
     /** Update Session */
-    patch: operations['updateSession'];
+    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/messages': {
@@ -936,10 +1055,10 @@ export interface paths {
       cookie?: never;
     };
     /** List Messages */
-    get: operations['listMessages'];
+    get: operations['get_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
     put?: never;
-    /** Turn */
-    post: operations['turn'];
+    /** Create Turn */
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_messages'];
     delete?: never;
     options?: never;
     head?: never;
@@ -960,7 +1079,7 @@ export interface paths {
     options?: never;
     head?: never;
     /** Update Session Model */
-    patch: operations['updateSessionModel'];
+    patch: operations['patch_api_v1_projects_projectId_chat_sessions_sessionId_model'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/chat/sessions/{sessionId}/archive': {
@@ -973,7 +1092,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Archive Session */
-    post: operations['archiveSession'];
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_archive'];
     delete?: never;
     options?: never;
     head?: never;
@@ -990,7 +1109,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Unarchive Session */
-    post: operations['unarchiveSession'];
+    post: operations['post_api_v1_projects_projectId_chat_sessions_sessionId_unarchive'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1007,7 +1126,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Enhance Premise */
-    post: operations['enhancePremise'];
+    post: operations['post_api_v1_projects_projectId_premise_enhance'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1024,7 +1143,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Audit Bible */
-    post: operations['auditBible'];
+    post: operations['post_api_v1_projects_projectId_bible_audit'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1041,7 +1160,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Plan Arcs */
-    post: operations['planArcs'];
+    post: operations['post_api_v1_projects_projectId_volumes_volumeKey_arcs_plan'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1056,7 +1175,7 @@ export interface paths {
       cookie?: never;
     };
     /** Preview Context */
-    get: operations['previewContext'];
+    get: operations['get_api_v1_projects_projectId_context_preview'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1073,10 +1192,10 @@ export interface paths {
       cookie?: never;
     };
     /** List Entities */
-    get: operations['listEntities'];
+    get: operations['get_api_v1_projects_projectId_entities'];
     put?: never;
     /** Create Entity */
-    post: operations['createEntity'];
+    post: operations['post_api_v1_projects_projectId_entities'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1091,15 +1210,15 @@ export interface paths {
       cookie?: never;
     };
     /** Get Entity */
-    get: operations['getEntity'];
+    get: operations['get_api_v1_projects_projectId_entities_entityKey'];
     put?: never;
     post?: never;
     /** Delete Entity */
-    delete: operations['deleteEntity'];
+    delete: operations['delete_api_v1_projects_projectId_entities_entityKey'];
     options?: never;
     head?: never;
     /** Update Entity */
-    patch: operations['updateEntity'];
+    patch: operations['patch_api_v1_projects_projectId_entities_entityKey'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/entities/{entityKey}/image': {
@@ -1112,9 +1231,9 @@ export interface paths {
     get?: never;
     put?: never;
     /** Upload Image */
-    post: operations['uploadImage'];
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_image'];
     /** Delete Image */
-    delete: operations['deleteImage'];
+    delete: operations['delete_api_v1_projects_projectId_entities_entityKey_image'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1130,7 +1249,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Add Image */
-    post: operations['addImage'];
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_images'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1148,7 +1267,7 @@ export interface paths {
     put?: never;
     post?: never;
     /** Remove Image */
-    delete: operations['removeImage'];
+    delete: operations['delete_api_v1_projects_projectId_entities_entityKey_images_imageId'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1164,7 +1283,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Approve Volumes */
-    post: operations['approveVolumes'];
+    post: operations['post_api_v1_projects_projectId_volumes_approve'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1179,10 +1298,10 @@ export interface paths {
       cookie?: never;
     };
     /** List Volumes */
-    get: operations['listVolumes'];
+    get: operations['get_api_v1_projects_projectId_volumes'];
     put?: never;
     /** Create Volume */
-    post: operations['createVolume'];
+    post: operations['post_api_v1_projects_projectId_volumes'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1197,15 +1316,15 @@ export interface paths {
       cookie?: never;
     };
     /** Get Volume */
-    get: operations['getVolume'];
+    get: operations['get_api_v1_projects_projectId_volumes_volumeKey'];
     put?: never;
     post?: never;
     /** Delete Volume */
-    delete: operations['deleteVolume'];
+    delete: operations['delete_api_v1_projects_projectId_volumes_volumeKey'];
     options?: never;
     head?: never;
     /** Update Volume */
-    patch: operations['updateVolume'];
+    patch: operations['patch_api_v1_projects_projectId_volumes_volumeKey'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/volumes/{volumeKey}/arcs': {
@@ -1216,7 +1335,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Arcs */
-    get: operations['listArcs'];
+    get: operations['get_api_v1_projects_projectId_volumes_volumeKey_arcs'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1235,7 +1354,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Approve Arcs */
-    post: operations['approveArcs'];
+    post: operations['post_api_v1_projects_projectId_volumes_volumeKey_arcs_approve'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1250,9 +1369,9 @@ export interface paths {
       cookie?: never;
     };
     /** Get Arc */
-    get: operations['getArc'];
+    get: operations['get_api_v1_projects_projectId_arcs_arcKey'];
     /** Upsert Arc */
-    put: operations['upsertArc'];
+    put: operations['put_api_v1_projects_projectId_arcs_arcKey'];
     post?: never;
     delete?: never;
     options?: never;
@@ -1268,7 +1387,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Bible Docs */
-    get: operations['listBibleDocs'];
+    get: operations['get_api_v1_projects_projectId_bible'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1285,11 +1404,81 @@ export interface paths {
       cookie?: never;
     };
     /** Get Bible Doc */
-    get: operations['getBibleDoc'];
+    get: operations['get_api_v1_projects_projectId_bible_section_slug'];
     /** Upsert Bible Doc */
-    put: operations['upsertBibleDoc'];
+    put: operations['put_api_v1_projects_projectId_bible_section_slug'];
     post?: never;
     delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Facts */
+    get: operations['get_api_v1_projects_projectId_facts'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts/{factKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Fact */
+    get: operations['get_api_v1_projects_projectId_facts_factKey'];
+    /** Upsert Fact */
+    put: operations['put_api_v1_projects_projectId_facts_factKey'];
+    post?: never;
+    /** Delete Fact */
+    delete: operations['delete_api_v1_projects_projectId_facts_factKey'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts/{factKey}/reveal': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reveal Fact */
+    post: operations['post_api_v1_projects_projectId_facts_factKey_reveal'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/facts/{factKey}/knowledge/{entityKey}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Retract Knowledge */
+    delete: operations['delete_api_v1_projects_projectId_facts_factKey_knowledge_entityKey'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1304,8 +1493,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Start */
-    post: operations['start'];
+    /** Start Illustration */
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_illustration'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1321,8 +1510,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Refine */
-    post: operations['refine'];
+    /** Refine Illustration */
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_illustration_refine'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1338,8 +1527,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Save */
-    post: operations['save'];
+    /** Save Illustration */
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_illustration_save'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1355,15 +1544,15 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Cancel */
-    post: operations['cancel'];
+    /** Cancel Illustration */
+    post: operations['post_api_v1_projects_projectId_entities_entityKey_illustration_cancel'];
     delete?: never;
     options?: never;
     head?: never;
     patch?: never;
     trace?: never;
   };
-  '/api/v1/projects/{projectId}/ingest': {
+  '/api/v1/import': {
     parameters: {
       query?: never;
       header?: never;
@@ -1372,8 +1561,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Ingest */
-    post: operations['ingest'];
+    /** Import Novel */
+    post: operations['post_api_v1_import'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1389,25 +1578,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Extract */
-    post: operations['extract'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/retitle': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Retitle */
-    post: operations['retitle'];
+    /** Extract Knowledge */
+    post: operations['post_api_v1_projects_projectId_extract'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1423,8 +1595,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Recombine */
-    post: operations['recombine'];
+    /** Recombine Chapters */
+    post: operations['post_api_v1_projects_projectId_recombine'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1440,8 +1612,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Consolidate */
-    post: operations['consolidate'];
+    /** Consolidate Source */
+    post: operations['post_api_v1_projects_projectId_consolidate'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1455,8 +1627,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Assets */
-    get: operations['assets'];
+    /** Get Assets */
+    get: operations['get_api_v1_projects_projectId_assets'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1474,25 +1646,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Skeleton */
-    post: operations['skeleton'];
-    delete?: never;
-    options?: never;
-    head?: never;
-    patch?: never;
-    trace?: never;
-  };
-  '/api/v1/projects/{projectId}/resume': {
-    parameters: {
-      query?: never;
-      header?: never;
-      path?: never;
-      cookie?: never;
-    };
-    get?: never;
-    put?: never;
-    /** Resume */
-    post: operations['resume'];
+    /** Generate Skeleton */
+    post: operations['post_api_v1_projects_projectId_skeleton'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1508,7 +1663,7 @@ export interface paths {
     };
     get?: never;
     /** Update Config */
-    put: operations['updateConfig'];
+    put: operations['put_api_v1_projects_projectId_rebrand_config'];
     post?: never;
     delete?: never;
     options?: never;
@@ -1523,11 +1678,11 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Status */
-    get: operations['status'];
+    /** Get Rebrand Status */
+    get: operations['get_api_v1_projects_projectId_rebrand'];
     put?: never;
     /** Start Rebrand */
-    post: operations['startRebrand'];
+    post: operations['post_api_v1_projects_projectId_rebrand'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1541,8 +1696,8 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Glossary */
-    get: operations['glossary'];
+    /** Get Glossary */
+    get: operations['get_api_v1_projects_projectId_rebrand_glossary'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1559,7 +1714,7 @@ export interface paths {
       cookie?: never;
     };
     /** List Conversions */
-    get: operations['listConversions'];
+    get: operations['get_api_v1_projects_projectId_rebrand_chapters'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1576,10 +1731,10 @@ export interface paths {
       cookie?: never;
     };
     /** Get Conversion */
-    get: operations['getConversion'];
+    get: operations['get_api_v1_projects_projectId_rebrand_chapters_chapter'];
     put?: never;
     /** Rerun Chapter */
-    post: operations['rerunChapter'];
+    post: operations['post_api_v1_projects_projectId_rebrand_chapters_chapter'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1593,10 +1748,166 @@ export interface paths {
       path?: never;
       cookie?: never;
     };
-    /** Manuscript */
-    get: operations['manuscript'];
+    /** Get Rebrand Manuscript */
+    get: operations['get_api_v1_projects_projectId_rebrand_manuscript'];
     put?: never;
     post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/config': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    /** Update Config */
+    put: operations['put_api_v1_projects_projectId_reforge_config'];
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Reforge Status */
+    get: operations['get_api_v1_projects_projectId_reforge'];
+    put?: never;
+    /** Start Reforge */
+    post: operations['post_api_v1_projects_projectId_reforge'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/chapters': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Reforges */
+    get: operations['get_api_v1_projects_projectId_reforge_chapters'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/chapters/{chapter}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Reforge */
+    get: operations['get_api_v1_projects_projectId_reforge_chapters_chapter'];
+    put?: never;
+    /** Rerun Chapter */
+    post: operations['post_api_v1_projects_projectId_reforge_chapters_chapter'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/reforge/manuscript': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** Get Reforge Manuscript */
+    get: operations['get_api_v1_projects_projectId_reforge_manuscript'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/publish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Publish Novel */
+    post: operations['post_api_v1_projects_projectId_publish'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/chapters/{chapter}/publish': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Publish Chapter */
+    post: operations['post_api_v1_projects_projectId_chapters_chapter_publish'];
+    /** Unpublish Chapter */
+    delete: operations['delete_api_v1_projects_projectId_chapters_chapter_publish'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/publications': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Publications */
+    get: operations['get_api_v1_projects_projectId_publications'];
+    put?: never;
+    post?: never;
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/projects/{projectId}/publications/reconcile': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Reconcile Publications */
+    post: operations['post_api_v1_projects_projectId_publications_reconcile'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1612,8 +1923,8 @@ export interface paths {
     };
     get?: never;
     put?: never;
-    /** Import */
-    post: operations['import'];
+    /** Import Plan */
+    post: operations['post_api_v1_projects_projectId_plan_import'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1628,10 +1939,10 @@ export interface paths {
       cookie?: never;
     };
     /** List Projects */
-    get: operations['listProjects'];
+    get: operations['get_api_v1_projects'];
     put?: never;
     /** Create Project */
-    post: operations['createProject'];
+    post: operations['post_api_v1_projects'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1646,15 +1957,15 @@ export interface paths {
       cookie?: never;
     };
     /** Get Project */
-    get: operations['getProject'];
+    get: operations['get_api_v1_projects_projectId'];
     put?: never;
     post?: never;
     /** Delete Project */
-    delete: operations['deleteProject'];
+    delete: operations['delete_api_v1_projects_projectId'];
     options?: never;
     head?: never;
     /** Update Project */
-    patch: operations['updateProject'];
+    patch: operations['patch_api_v1_projects_projectId'];
     trace?: never;
   };
   '/api/v1/projects/{projectId}/status': {
@@ -1665,7 +1976,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Project Status */
-    get: operations['getProjectStatus'];
+    get: operations['get_api_v1_projects_projectId_status'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1684,7 +1995,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Clone Project */
-    post: operations['cloneProject'];
+    post: operations['post_api_v1_projects_projectId_clone'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1701,7 +2012,7 @@ export interface paths {
     get?: never;
     put?: never;
     /** Reset Project */
-    post: operations['resetProject'];
+    post: operations['post_api_v1_projects_projectId_reset'];
     delete?: never;
     options?: never;
     head?: never;
@@ -1716,7 +2027,7 @@ export interface paths {
       cookie?: never;
     };
     /** Get Project Cost */
-    get: operations['getProjectCost'];
+    get: operations['get_api_v1_projects_projectId_cost'];
     put?: never;
     post?: never;
     delete?: never;
@@ -1735,9 +2046,9 @@ export interface paths {
     get?: never;
     put?: never;
     /** Upload Cover */
-    post: operations['uploadCover'];
+    post: operations['post_api_v1_projects_projectId_cover'];
     /** Delete Cover */
-    delete: operations['deleteCover'];
+    delete: operations['delete_api_v1_projects_projectId_cover'];
     options?: never;
     head?: never;
     patch?: never;
@@ -1747,6 +2058,44 @@ export interface paths {
 export type webhooks = Record<string, never>;
 export interface components {
   schemas: {
+    DevErrorResponseDto: {
+      code: string;
+      message: string;
+      fields?: components['schemas']['ErrorFieldDto'][];
+      stack?: string;
+    };
+    ErrorFieldDto: {
+      field: string;
+      msg: string;
+    };
+    AuthLogoutResponse: {
+      success: boolean;
+      redirectTo?: string;
+    };
+    AuthSessionResponse: {
+      sub: string;
+      scopes: string[];
+      org?: string;
+      aal?: string;
+      clientId?: string;
+    };
+    AuthOrganisationsResponse: {
+      organisations: components['schemas']['AuthOrganisationItem'][];
+    };
+    AuthOrganisationItem: {
+      id: string;
+      slug: string;
+      name: string;
+      /** @enum {string} */
+      type: 'PERSONAL' | 'TEAM';
+      active: boolean;
+    };
+    SwitchOrganisationBody: {
+      organisationId: string;
+    };
+    SwitchOrganisationResponse: {
+      organisationId: string;
+    };
     AiModelsResponse: {
       profile: string;
       models: components['schemas']['AiModelOption'][];
@@ -1769,17 +2118,6 @@ export interface components {
       role: string;
       provider: string;
       model: string;
-    };
-    DevErrorResponseDto: {
-      code: string;
-      type: string;
-      message: string;
-      fields?: components['schemas']['ErrorFieldDto'][];
-      stack?: string;
-    };
-    ErrorFieldDto: {
-      field: string;
-      msg: string;
     };
     SeedFromBriefBody: {
       brief: string;
@@ -1860,6 +2198,19 @@ export interface components {
     UpdateBriefBody: {
       title?: string;
       body: string;
+      knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
+    };
+    KnowledgeContractSchema: {
+      /** @description entity keys whose ledgered knowledge bounds what the chapter may state */
+      pov: string[];
+      /** @description facts discovered on-page during this chapter; ledgered when the draft is approved */
+      learns?: components['schemas']['KnowledgeRevealSchema'][];
+    };
+    KnowledgeRevealSchema: {
+      /** @description entity key of the character who learns the fact on-page this chapter */
+      entityKey: string;
+      /** @description key of the canon fact being revealed */
+      factKey: string;
     };
     GenerateBody: {
       limit?: number;
@@ -1896,7 +2247,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    JobKind: 'ingest' | 'extract' | 'generate' | 'finalize' | 'backfill' | 'resume' | 'rebrand';
+    JobKind: 'extract' | 'generate' | 'finalize' | 'backfill' | 'rebrand' | 'reforge' | 'publish' | 'import';
     /** @enum {string} */
     JobStatus: 'pending' | 'in_progress' | 'done' | 'failed';
     ListDraftResponse: {
@@ -2267,13 +2618,10 @@ export interface components {
       projectId: string;
       number: number;
       title?: null | string;
-      url?: null | string;
       wordCount?: null | number;
       status: components['schemas']['ChapterStatus'];
       generator?: null | string;
       continuityApplied: boolean;
-      /** Format: date-time */
-      scrapedAt?: null | string;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -2284,13 +2632,10 @@ export interface components {
       projectId: string;
       number: number;
       title?: null | string;
-      url?: null | string;
       wordCount?: null | number;
       status: components['schemas']['ChapterStatus'];
       generator?: null | string;
       continuityApplied: boolean;
-      /** Format: date-time */
-      scrapedAt?: null | string;
       /** Format: date-time */
       createdAt: string;
       /** Format: date-time */
@@ -2718,6 +3063,47 @@ export interface components {
       };
       body?: string;
     };
+    ListFactsResponse: {
+      facts: components['schemas']['FactResponse'][];
+    };
+    FactResponse: {
+      id: string;
+      projectId: string;
+      factKey: string;
+      text: string;
+      subjects?: null | string[];
+      constraintNote?: null | string;
+      terms?: null | string[];
+      revealChapter?: null | number;
+      knowledge: components['schemas']['KnowledgeEntryResponse'][];
+      /** Format: date-time */
+      createdAt: string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    KnowledgeEntryResponse: {
+      entityKey: string;
+      entityName: string;
+      learnedInChapter: number;
+      source: components['schemas']['FactSource'];
+      note?: null | string;
+      /** Format: date-time */
+      createdAt: string;
+    };
+    /** @enum {string} */
+    FactSource: 'brief' | 'manual' | 'import';
+    UpsertFactBody: {
+      text: string;
+      subjects?: string[];
+      constraintNote?: string;
+      terms?: string[];
+      revealChapter?: number;
+    };
+    RevealFactBody: {
+      entityKey: string;
+      chapter: number;
+      note?: string;
+    };
     StartIllustrationBody: {
       instruction?: string;
       noChat?: boolean;
@@ -2746,25 +3132,57 @@ export interface components {
     CancelIllustrationResponse: {
       cancelled: boolean;
     };
-    IngestBody: {
+    ImportNovelBody: {
+      bundle: components['schemas']['NovelBundle'];
+    };
+    NovelBundle: {
+      /** @enum {string} */
+      format: 'novel-import';
+      /** @enum {integer} */
+      schemaVersion: 1;
+      mode: components['schemas']['NovelImportMode'];
+      novel: components['schemas']['NovelImportMeta'];
+      volumes: components['schemas']['NovelImportVolume'][];
+      assets?: components['schemas']['NovelImportAsset'][];
+    };
+    /** @enum {string} */
+    NovelImportMode: 'final' | 'source';
+    NovelImportMeta: {
+      title: string;
+      synopsis: string;
+      genre?: string;
+      tags?: string[];
+      cover?: string;
+      instructions?: string;
+    };
+    NovelImportVolume: {
+      ordinal: number;
+      title?: string;
+      chapters: components['schemas']['NovelImportChapter'][];
+    };
+    NovelImportChapter: {
+      title: string;
+      content: string;
+    };
+    NovelImportAsset: {
+      name: string;
+      /** @enum {string} */
+      mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
+      dataBase64: string;
+    };
+    ImportNovelResponse: {
+      projectId: string;
+      jobId: string;
+    };
+    ExtractBody: {
       limit?: number;
-      delayMs?: number;
+      rearm?: boolean;
     };
     JobEnqueueResponse1: {
       jobId: string;
       kind: string;
       status: string;
       target: string;
-    };
-    ExtractBody: {
-      limit?: number;
-      rearm?: boolean;
-    };
-    RetitleResponse: {
-      fetched: number;
-      retitled: number;
-      chapterCount: number;
-      referenceCount: number;
     };
     RecombineBody: {
       dryRun?: boolean;
@@ -2799,9 +3217,6 @@ export interface components {
       };
       powerCurve: string;
     };
-    ResumeResponse: {
-      jobId: string;
-    };
     RebrandConfigBody: {
       directives?: string | null;
       settings?: components['schemas']['RebrandSettingsBody'];
@@ -2823,7 +3238,7 @@ export interface components {
       updatedAt: string;
     };
     /** @enum {string} */
-    RebrandStatus: 'pending' | 'ingesting' | 'glossary' | 'converting' | 'done' | 'failed';
+    RebrandStatus: 'pending' | 'glossary' | 'converting' | 'done' | 'failed';
     RebrandStartBody: {
       force?: boolean;
       limit?: number;
@@ -2831,7 +3246,6 @@ export interface components {
     RebrandStatusResponse: {
       rebrand: components['schemas']['RebrandResponse'];
       sourceChapters: number;
-      scrapeComplete: boolean;
       glossaryCount: number;
       counts: components['schemas']['ConversionCountsResponse'];
       job?: null | {
@@ -2891,6 +3305,155 @@ export interface components {
     ManuscriptResponse: {
       markdown: string;
     };
+    ReforgeConfigBody: {
+      instructions?: string | null;
+      fidelity?: components['schemas']['ReforgeFidelity'];
+      settings?: components['schemas']['ReforgeSettingsBody'];
+    };
+    /** @enum {string} */
+    ReforgeFidelity: 'preserve' | 'close' | 'loose';
+    ReforgeSettingsBody: {
+      judgeEnabled?: boolean;
+      targetWords?: number;
+    };
+    ReforgeResponse: {
+      id: string;
+      status: components['schemas']['ReforgeStatus'];
+      instructions?: null | string;
+      fidelity: components['schemas']['ReforgeFidelity'];
+      settings?: null | {
+        [key: string]: unknown;
+      };
+      lastError?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ReforgeStatus: 'pending' | 'glossary' | 'reforging' | 'done' | 'failed';
+    ReforgeStartBody: {
+      force?: boolean;
+      limit?: number;
+    };
+    ReforgeStatusResponse: {
+      reforge: components['schemas']['ReforgeResponse'];
+      sourceChapters: number;
+      glossaryCount: number;
+      counts: components['schemas']['ReforgeCountsResponse'];
+      job?: null | {
+        [key: string]: unknown;
+      };
+    };
+    ReforgeCountsResponse: {
+      reforged: number;
+      attention: number;
+      failed: number;
+    };
+    ListReforgesResponse: {
+      items: components['schemas']['ReforgeSummaryResponse'][];
+    };
+    ReforgeSummaryResponse: {
+      chapter: number;
+      title?: null | string;
+      status: components['schemas']['ReforgeChapterStatus'];
+      issueCount: number;
+      wordCount?: null | number;
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ReforgeChapterStatus: 'reforged' | 'attention' | 'failed';
+    ReforgeChapterResponse: {
+      chapter: number;
+      title?: null | string;
+      body: string;
+      summary?: null | string;
+      sourceBeats?: null | {
+        [key: string]: unknown;
+      };
+      changes?: null | {
+        [key: string]: unknown;
+      };
+      fidelity?: null | {
+        [key: string]: unknown;
+      };
+      issues?: null | components['schemas']['ReforgeDetailItem'][];
+      status: components['schemas']['ReforgeChapterStatus'];
+      wordCount?: null | number;
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    ReforgeDetailItem: {
+      detail?: string;
+    } & {
+      [key: string]: unknown;
+    };
+    ReforgeManuscriptResponse: {
+      markdown: string;
+    };
+    PublishNovelBody: {
+      novelSlug?: string;
+      title?: string;
+      blurb?: string | null;
+      coverPath?: string | null;
+      genres?: string[];
+      /** @enum {string} */
+      status?: 'live' | 'retired';
+    };
+    PublicationResponse: {
+      id: string;
+      novelSlug: string;
+      title: string;
+      blurb?: null | string;
+      coverPath?: null | string;
+      genres?: null | string[];
+      status: components['schemas']['PublicationStatus'];
+      revision: number;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    PublicationStatus: 'draft' | 'live' | 'retired';
+    PublishChapterBody: {
+      scheduledAt?: string;
+    };
+    ChapterPublicationResponse: {
+      id: string;
+      chapter: number;
+      publishedOrdinal: number;
+      title: string;
+      authorNote?: null | string;
+      contentHash: string;
+      revision: number;
+      status: components['schemas']['ChapterPublicationStatus'];
+      /** Format: date-time */
+      scheduledAt?: null | string;
+      /** Format: date-time */
+      publishedAt?: null | string;
+      error?: null | string;
+      /** Format: date-time */
+      updatedAt: string;
+    };
+    /** @enum {string} */
+    ChapterPublicationStatus: 'scheduled' | 'published' | 'failed' | 'unpublished';
+    PublicationsLedgerResponse: {
+      publication?: components['schemas']['PublicationResponse'];
+      chapters: components['schemas']['ChapterPublicationResponse'][];
+    };
+    ReconcileResponse: {
+      /** @enum {string} */
+      novel: 'applied' | 'noop';
+      pushed: number[];
+      deleted: number[];
+      skipped: number[];
+      failed: components['schemas']['ReconcileFailureItem'][];
+      unknownOrdinals: number[];
+    };
+    ReconcileFailureItem: {
+      ordinal: number;
+      error: string;
+    };
     ImportPlanBody: {
       bundle: components['schemas']['PlanBundle'];
       overwrite?: boolean;
@@ -2901,6 +3464,7 @@ export interface components {
       version: number;
       bible?: components['schemas']['PlanBundleBibleDoc'][];
       entities?: components['schemas']['PlanBundleEntity'][];
+      facts?: components['schemas']['PlanBundleFact'][];
       volumes?: components['schemas']['PlanBundleVolume'][];
       arcs?: components['schemas']['PlanBundleArc'][];
       briefs?: components['schemas']['PlanBundleBrief'][];
@@ -2924,6 +3488,14 @@ export interface components {
       motivation?: string;
       notes?: string;
       body?: string;
+    };
+    PlanBundleFact: {
+      factKey: string;
+      text: string;
+      subjects?: string[];
+      constraintNote?: string;
+      terms?: string[];
+      revealChapter?: number;
     };
     PlanBundleVolume: {
       volumeKey: string;
@@ -2962,6 +3534,7 @@ export interface components {
       startsFromPreviousChapter?: boolean;
       handoffBeat?: string;
       endingContract: components['schemas']['EndingContractSchema'];
+      knowledgeContract?: components['schemas']['KnowledgeContractSchema'];
     };
     EndingContractSchema: {
       /** @description the kind of hook the closing scene must land on */
@@ -2985,6 +3558,7 @@ export interface components {
     ImportResults: {
       bible: components['schemas']['CollectionResult'];
       entities: components['schemas']['CollectionResult'];
+      facts: components['schemas']['CollectionResult'];
       volumes: components['schemas']['CollectionResult'];
       arcs: components['schemas']['CollectionResult'];
       briefs: components['schemas']['CollectionResult'];
@@ -3002,9 +3576,7 @@ export interface components {
     CreateProjectBody: {
       name: string;
       kind: components['schemas']['ProjectKind'];
-      url?: string;
       title?: string;
-      webnovelId?: string;
       instructions?: string;
       contentMode?: components['schemas']['ContentMode'];
     };
@@ -3022,9 +3594,6 @@ export interface components {
       config?: components['schemas']['ProjectConfig'];
       brief?: null | string;
       instructions?: null | string;
-      sourceUrl?: null | string;
-      webnovelId?: null | string;
-      scrapeComplete: boolean;
       storyCurrentChapter?: null | number;
       /** Format: date-time */
       createdAt: string;
@@ -3081,7 +3650,6 @@ export interface components {
       contentMode?: components['schemas']['ContentMode'];
       brief?: string;
       instructions?: string | null;
-      webnovelId?: string | null;
     };
     CloneProjectBody: {
       name: string;
@@ -3115,7 +3683,261 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
-  listModels: {
+  get_api_auth_login: {
+    parameters: {
+      query?: {
+        return_to?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_auth_callback: {
+    parameters: {
+      query?: {
+        code?: string;
+        state?: string;
+        error?: string;
+        error_description?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_auth_logout: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthLogoutResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_auth_session: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthSessionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_auth_organisations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AuthOrganisationsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_auth_organisation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SwitchOrganisationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SwitchOrganisationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_auth_step_up: {
+    parameters: {
+      query?: {
+        return_to?: string;
+        claimed?: string;
+        retried?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_ai_models: {
     parameters: {
       query?: never;
       header?: never;
@@ -3153,7 +3975,7 @@ export interface operations {
       };
     };
   };
-  novel: {
+  get_api_v1_projects_projectId_export_novel: {
     parameters: {
       query?: never;
       header?: never;
@@ -3184,7 +4006,7 @@ export interface operations {
       };
     };
   };
-  serve: {
+  get_api_v1_images_projectId_filename: {
     parameters: {
       query?: never;
       header?: never;
@@ -3216,7 +4038,7 @@ export interface operations {
       };
     };
   };
-  seedFromBrief: {
+  post_api_v1_projects_projectId_seed_from_brief: {
     parameters: {
       query?: never;
       header?: never;
@@ -3225,7 +4047,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['SeedFromBriefBody'];
       };
@@ -3260,7 +4082,7 @@ export interface operations {
       };
     };
   };
-  plan: {
+  post_api_v1_projects_projectId_plan: {
     parameters: {
       query?: never;
       header?: never;
@@ -3269,7 +4091,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['PlanBody'];
       };
@@ -3304,7 +4126,7 @@ export interface operations {
       };
     };
   };
-  approvePlan: {
+  post_api_v1_projects_projectId_approve: {
     parameters: {
       query?: never;
       header?: never;
@@ -3344,7 +4166,7 @@ export interface operations {
       };
     };
   };
-  outline: {
+  post_api_v1_projects_projectId_outline: {
     parameters: {
       query?: never;
       header?: never;
@@ -3353,7 +4175,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['OutlineBody'];
       };
@@ -3388,7 +4210,7 @@ export interface operations {
       };
     };
   };
-  outlineArc: {
+  post_api_v1_projects_projectId_arcs_arcKey_outline: {
     parameters: {
       query?: never;
       header?: never;
@@ -3398,7 +4220,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['OutlineArcBody'];
       };
@@ -3433,7 +4255,7 @@ export interface operations {
       };
     };
   };
-  listBriefs: {
+  get_api_v1_projects_projectId_briefs: {
     parameters: {
       query?: never;
       header?: never;
@@ -3473,13 +4295,13 @@ export interface operations {
       };
     };
   };
-  getBrief: {
+  get_api_v1_projects_projectId_briefs_n: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -3514,7 +4336,7 @@ export interface operations {
       };
     };
   };
-  updateBrief: {
+  put_api_v1_projects_projectId_briefs_n: {
     parameters: {
       query?: never;
       header?: never;
@@ -3524,7 +4346,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateBriefBody'];
       };
@@ -3559,7 +4381,7 @@ export interface operations {
       };
     };
   };
-  generate: {
+  post_api_v1_projects_projectId_generate: {
     parameters: {
       query?: never;
       header?: never;
@@ -3568,7 +4390,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['GenerateBody'];
       };
@@ -3603,7 +4425,7 @@ export interface operations {
       };
     };
   };
-  listJobs: {
+  get_api_v1_projects_projectId_jobs: {
     parameters: {
       query?: never;
       header?: never;
@@ -3643,7 +4465,7 @@ export interface operations {
       };
     };
   };
-  listDrafts: {
+  get_api_v1_projects_projectId_drafts: {
     parameters: {
       query?: never;
       header?: never;
@@ -3683,13 +4505,13 @@ export interface operations {
       };
     };
   };
-  getDraft: {
+  get_api_v1_projects_projectId_drafts_n: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -3724,7 +4546,7 @@ export interface operations {
       };
     };
   };
-  updateDraft: {
+  put_api_v1_projects_projectId_drafts_n: {
     parameters: {
       query?: never;
       header?: never;
@@ -3734,7 +4556,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateDraftBody'];
       };
@@ -3769,7 +4591,7 @@ export interface operations {
       };
     };
   };
-  deleteDraft: {
+  delete_api_v1_projects_projectId_drafts_n: {
     parameters: {
       query?: never;
       header?: never;
@@ -3801,7 +4623,7 @@ export interface operations {
       };
     };
   };
-  reviseDraft: {
+  post_api_v1_projects_projectId_drafts_n_revise: {
     parameters: {
       query?: never;
       header?: never;
@@ -3811,7 +4633,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ReviseDraftBody'];
       };
@@ -3846,7 +4668,7 @@ export interface operations {
       };
     };
   };
-  judgeDraft: {
+  post_api_v1_projects_projectId_drafts_n_judge: {
     parameters: {
       query?: never;
       header?: never;
@@ -3887,7 +4709,7 @@ export interface operations {
       };
     };
   };
-  feedbackDraft: {
+  post_api_v1_projects_projectId_drafts_n_feedback: {
     parameters: {
       query?: never;
       header?: never;
@@ -3897,7 +4719,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['FeedbackBody'];
       };
@@ -3932,7 +4754,7 @@ export interface operations {
       };
     };
   };
-  approveDraft: {
+  post_api_v1_projects_projectId_drafts_n_approve: {
     parameters: {
       query?: never;
       header?: never;
@@ -3942,7 +4764,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ApproveDraftBody'];
       };
@@ -3977,13 +4799,13 @@ export interface operations {
       };
     };
   };
-  listRevisions: {
+  get_api_v1_projects_projectId_drafts_n_revisions: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -4018,14 +4840,14 @@ export interface operations {
       };
     };
   };
-  getRevision: {
+  get_api_v1_projects_projectId_drafts_n_revisions_r: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
-        r: number | string;
+        n: number;
+        r: number;
       };
       cookie?: never;
     };
@@ -4060,13 +4882,13 @@ export interface operations {
       };
     };
   };
-  getDraftPrompt: {
+  get_api_v1_projects_projectId_drafts_n_prompt: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -4101,7 +4923,7 @@ export interface operations {
       };
     };
   };
-  importDraft: {
+  post_api_v1_projects_projectId_drafts_n_import: {
     parameters: {
       query?: never;
       header?: never;
@@ -4111,7 +4933,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ImportDraftBody'];
       };
@@ -4146,7 +4968,7 @@ export interface operations {
       };
     };
   };
-  finalize: {
+  post_api_v1_projects_projectId_finalize: {
     parameters: {
       query?: never;
       header?: never;
@@ -4155,7 +4977,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['FinalizeBody'];
       };
@@ -4190,7 +5012,7 @@ export interface operations {
       };
     };
   };
-  generateGrok: {
+  post_api_v1_projects_projectId_chapters_n_generate_grok: {
     parameters: {
       query?: never;
       header?: never;
@@ -4200,7 +5022,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['GenerateGrokBody'];
       };
@@ -4235,7 +5057,7 @@ export interface operations {
       };
     };
   };
-  proposeContinuity: {
+  post_api_v1_projects_projectId_chapters_n_propose_continuity: {
     parameters: {
       query?: never;
       header?: never;
@@ -4276,7 +5098,7 @@ export interface operations {
       };
     };
   };
-  extractToBible: {
+  post_api_v1_projects_projectId_chapters_n_extract_to_bible: {
     parameters: {
       query?: never;
       header?: never;
@@ -4317,13 +5139,13 @@ export interface operations {
       };
     };
   };
-  getContinuityProposal: {
+  get_api_v1_projects_projectId_chapters_n_continuity_proposal: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -4358,7 +5180,7 @@ export interface operations {
       };
     };
   };
-  updateContinuityProposal: {
+  patch_api_v1_projects_projectId_chapters_n_continuity_proposal: {
     parameters: {
       query?: never;
       header?: never;
@@ -4368,7 +5190,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateContinuityBody'];
       };
@@ -4403,7 +5225,7 @@ export interface operations {
       };
     };
   };
-  applyContinuityProposal: {
+  post_api_v1_projects_projectId_chapters_n_continuity_proposal_apply: {
     parameters: {
       query?: never;
       header?: never;
@@ -4444,7 +5266,7 @@ export interface operations {
       };
     };
   };
-  discardContinuityProposal: {
+  post_api_v1_projects_projectId_chapters_n_continuity_proposal_discard: {
     parameters: {
       query?: never;
       header?: never;
@@ -4485,7 +5307,7 @@ export interface operations {
       };
     };
   };
-  validate: {
+  post_api_v1_projects_projectId_validate: {
     parameters: {
       query?: never;
       header?: never;
@@ -4525,7 +5347,7 @@ export interface operations {
       };
     };
   };
-  reviewChapter: {
+  post_api_v1_projects_projectId_chapters_n_review: {
     parameters: {
       query?: never;
       header?: never;
@@ -4566,7 +5388,7 @@ export interface operations {
       };
     };
   };
-  getReviewQueue: {
+  get_api_v1_projects_projectId_review_queue: {
     parameters: {
       query?: never;
       header?: never;
@@ -4606,7 +5428,7 @@ export interface operations {
       };
     };
   };
-  listRuns: {
+  get_api_v1_projects_projectId_runs: {
     parameters: {
       query?: never;
       header?: never;
@@ -4646,7 +5468,7 @@ export interface operations {
       };
     };
   };
-  getRun: {
+  get_api_v1_projects_projectId_runs_runId: {
     parameters: {
       query?: never;
       header?: never;
@@ -4687,7 +5509,7 @@ export interface operations {
       };
     };
   };
-  getRunContext: {
+  get_api_v1_projects_projectId_runs_runId_context: {
     parameters: {
       query?: never;
       header?: never;
@@ -4728,7 +5550,7 @@ export interface operations {
       };
     };
   };
-  getRunCall: {
+  get_api_v1_projects_projectId_runs_runId_calls_callId: {
     parameters: {
       query?: never;
       header?: never;
@@ -4770,7 +5592,7 @@ export interface operations {
       };
     };
   };
-  getAiUsage: {
+  get_api_v1_projects_projectId_ai_usage: {
     parameters: {
       query?: never;
       header?: never;
@@ -4810,7 +5632,7 @@ export interface operations {
       };
     };
   };
-  search: {
+  get_api_v1_projects_projectId_search: {
     parameters: {
       query: {
         q: string;
@@ -4854,7 +5676,7 @@ export interface operations {
       };
     };
   };
-  getManuscript: {
+  get_api_v1_projects_projectId_manuscript: {
     parameters: {
       query?: never;
       header?: never;
@@ -4894,7 +5716,7 @@ export interface operations {
       };
     };
   };
-  backfill: {
+  post_api_v1_projects_projectId_backfill: {
     parameters: {
       query?: never;
       header?: never;
@@ -4934,13 +5756,13 @@ export interface operations {
       };
     };
   };
-  list: {
+  get_api_v1_projects_projectId_chapters_n_images: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -4975,7 +5797,7 @@ export interface operations {
       };
     };
   };
-  add: {
+  post_api_v1_projects_projectId_chapters_n_images: {
     parameters: {
       query?: never;
       header?: never;
@@ -4985,7 +5807,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AddChapterImageBody'];
       };
@@ -5020,7 +5842,7 @@ export interface operations {
       };
     };
   };
-  remove: {
+  delete_api_v1_projects_projectId_chapters_n_images_imageId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5053,7 +5875,7 @@ export interface operations {
       };
     };
   };
-  getJob: {
+  get_api_v1_jobs_jobId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5093,7 +5915,7 @@ export interface operations {
       };
     };
   };
-  listChapters: {
+  get_api_v1_projects_projectId_source_chapters: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -5139,13 +5961,13 @@ export interface operations {
       };
     };
   };
-  getChapter: {
+  get_api_v1_projects_projectId_source_chapters_n: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        n: number | string;
+        n: number;
       };
       cookie?: never;
     };
@@ -5180,7 +6002,7 @@ export interface operations {
       };
     };
   };
-  deleteChapter: {
+  delete_api_v1_projects_projectId_source_chapters_n: {
     parameters: {
       query?: never;
       header?: never;
@@ -5212,7 +6034,7 @@ export interface operations {
       };
     };
   };
-  updateChapter: {
+  patch_api_v1_projects_projectId_source_chapters_n: {
     parameters: {
       query?: never;
       header?: never;
@@ -5222,7 +6044,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateChapterBody'];
       };
@@ -5257,7 +6079,7 @@ export interface operations {
       };
     };
   };
-  listProposals: {
+  get_api_v1_projects_projectId_proposals: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -5306,7 +6128,7 @@ export interface operations {
       };
     };
   };
-  getProposal: {
+  get_api_v1_projects_projectId_proposals_proposalId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5347,7 +6169,7 @@ export interface operations {
       };
     };
   };
-  updateProposal: {
+  patch_api_v1_projects_projectId_proposals_proposalId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5357,7 +6179,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateProposalBody'];
       };
@@ -5392,7 +6214,7 @@ export interface operations {
       };
     };
   };
-  applyProposal: {
+  post_api_v1_projects_projectId_proposals_proposalId_apply: {
     parameters: {
       query?: never;
       header?: never;
@@ -5402,7 +6224,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ApplyProposalBody'];
       };
@@ -5437,7 +6259,7 @@ export interface operations {
       };
     };
   };
-  revertProposal: {
+  post_api_v1_projects_projectId_proposals_proposalId_revert: {
     parameters: {
       query?: never;
       header?: never;
@@ -5478,7 +6300,7 @@ export interface operations {
       };
     };
   };
-  discardProposal: {
+  post_api_v1_projects_projectId_proposals_proposalId_discard: {
     parameters: {
       query?: never;
       header?: never;
@@ -5519,7 +6341,7 @@ export interface operations {
       };
     };
   };
-  listChanges: {
+  get_api_v1_projects_projectId_changes: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -5564,7 +6386,7 @@ export interface operations {
       };
     };
   };
-  rollback: {
+  post_api_v1_projects_projectId_changes_rollback: {
     parameters: {
       query?: never;
       header?: never;
@@ -5573,7 +6395,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RollbackBody'];
       };
@@ -5608,7 +6430,7 @@ export interface operations {
       };
     };
   };
-  listSessions: {
+  get_api_v1_projects_projectId_chat_sessions: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -5655,7 +6477,7 @@ export interface operations {
       };
     };
   };
-  createSession: {
+  post_api_v1_projects_projectId_chat_sessions: {
     parameters: {
       query?: never;
       header?: never;
@@ -5664,7 +6486,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateChatSessionBody'];
       };
@@ -5699,7 +6521,7 @@ export interface operations {
       };
     };
   };
-  getSession: {
+  get_api_v1_projects_projectId_chat_sessions_sessionId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5740,7 +6562,7 @@ export interface operations {
       };
     };
   };
-  deleteSession: {
+  delete_api_v1_projects_projectId_chat_sessions_sessionId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5781,7 +6603,7 @@ export interface operations {
       };
     };
   };
-  updateSession: {
+  patch_api_v1_projects_projectId_chat_sessions_sessionId: {
     parameters: {
       query?: never;
       header?: never;
@@ -5791,7 +6613,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateChatSessionBody'];
       };
@@ -5826,7 +6648,7 @@ export interface operations {
       };
     };
   };
-  listMessages: {
+  get_api_v1_projects_projectId_chat_sessions_sessionId_messages: {
     parameters: {
       query?: {
         /** @description return messages with ordinal strictly below this value */
@@ -5871,7 +6693,7 @@ export interface operations {
       };
     };
   };
-  turn: {
+  post_api_v1_projects_projectId_chat_sessions_sessionId_messages: {
     parameters: {
       query?: never;
       header?: never;
@@ -5881,7 +6703,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ChatTurnBody'];
       };
@@ -5916,7 +6738,7 @@ export interface operations {
       };
     };
   };
-  updateSessionModel: {
+  patch_api_v1_projects_projectId_chat_sessions_sessionId_model: {
     parameters: {
       query?: never;
       header?: never;
@@ -5926,7 +6748,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateSessionModelBody'];
       };
@@ -5961,7 +6783,7 @@ export interface operations {
       };
     };
   };
-  archiveSession: {
+  post_api_v1_projects_projectId_chat_sessions_sessionId_archive: {
     parameters: {
       query?: never;
       header?: never;
@@ -6002,7 +6824,7 @@ export interface operations {
       };
     };
   };
-  unarchiveSession: {
+  post_api_v1_projects_projectId_chat_sessions_sessionId_unarchive: {
     parameters: {
       query?: never;
       header?: never;
@@ -6043,7 +6865,7 @@ export interface operations {
       };
     };
   };
-  enhancePremise: {
+  post_api_v1_projects_projectId_premise_enhance: {
     parameters: {
       query?: never;
       header?: never;
@@ -6052,7 +6874,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['EnhancePremiseBody'];
       };
@@ -6087,7 +6909,7 @@ export interface operations {
       };
     };
   };
-  auditBible: {
+  post_api_v1_projects_projectId_bible_audit: {
     parameters: {
       query?: never;
       header?: never;
@@ -6127,7 +6949,7 @@ export interface operations {
       };
     };
   };
-  planArcs: {
+  post_api_v1_projects_projectId_volumes_volumeKey_arcs_plan: {
     parameters: {
       query?: never;
       header?: never;
@@ -6137,7 +6959,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['PlanArcsBody'];
       };
@@ -6172,7 +6994,7 @@ export interface operations {
       };
     };
   };
-  previewContext: {
+  get_api_v1_projects_projectId_context_preview: {
     parameters: {
       query: {
         purpose: 'generation' | 'outline' | 'chat' | 'arc_plan' | 'premise' | 'audit';
@@ -6222,7 +7044,7 @@ export interface operations {
       };
     };
   };
-  listEntities: {
+  get_api_v1_projects_projectId_entities: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -6269,7 +7091,7 @@ export interface operations {
       };
     };
   };
-  createEntity: {
+  post_api_v1_projects_projectId_entities: {
     parameters: {
       query?: never;
       header?: never;
@@ -6278,7 +7100,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateEntityBody'];
       };
@@ -6313,7 +7135,7 @@ export interface operations {
       };
     };
   };
-  getEntity: {
+  get_api_v1_projects_projectId_entities_entityKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6354,7 +7176,7 @@ export interface operations {
       };
     };
   };
-  deleteEntity: {
+  delete_api_v1_projects_projectId_entities_entityKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6386,7 +7208,7 @@ export interface operations {
       };
     };
   };
-  updateEntity: {
+  patch_api_v1_projects_projectId_entities_entityKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6396,7 +7218,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateEntityBody'];
       };
@@ -6431,7 +7253,7 @@ export interface operations {
       };
     };
   };
-  uploadImage: {
+  post_api_v1_projects_projectId_entities_entityKey_image: {
     parameters: {
       query?: never;
       header?: never;
@@ -6441,7 +7263,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UploadImageBody'];
       };
@@ -6476,7 +7298,7 @@ export interface operations {
       };
     };
   };
-  deleteImage: {
+  delete_api_v1_projects_projectId_entities_entityKey_image: {
     parameters: {
       query?: never;
       header?: never;
@@ -6517,7 +7339,7 @@ export interface operations {
       };
     };
   };
-  addImage: {
+  post_api_v1_projects_projectId_entities_entityKey_images: {
     parameters: {
       query?: never;
       header?: never;
@@ -6527,7 +7349,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AddEntityImageBody'];
       };
@@ -6562,7 +7384,7 @@ export interface operations {
       };
     };
   };
-  removeImage: {
+  delete_api_v1_projects_projectId_entities_entityKey_images_imageId: {
     parameters: {
       query?: never;
       header?: never;
@@ -6604,7 +7426,7 @@ export interface operations {
       };
     };
   };
-  approveVolumes: {
+  post_api_v1_projects_projectId_volumes_approve: {
     parameters: {
       query?: never;
       header?: never;
@@ -6644,7 +7466,7 @@ export interface operations {
       };
     };
   };
-  listVolumes: {
+  get_api_v1_projects_projectId_volumes: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -6690,7 +7512,7 @@ export interface operations {
       };
     };
   };
-  createVolume: {
+  post_api_v1_projects_projectId_volumes: {
     parameters: {
       query?: never;
       header?: never;
@@ -6699,7 +7521,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateVolumeBody'];
       };
@@ -6734,7 +7556,7 @@ export interface operations {
       };
     };
   };
-  getVolume: {
+  get_api_v1_projects_projectId_volumes_volumeKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6775,7 +7597,7 @@ export interface operations {
       };
     };
   };
-  deleteVolume: {
+  delete_api_v1_projects_projectId_volumes_volumeKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6807,7 +7629,7 @@ export interface operations {
       };
     };
   };
-  updateVolume: {
+  patch_api_v1_projects_projectId_volumes_volumeKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6817,7 +7639,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateVolumeBody'];
       };
@@ -6852,7 +7674,7 @@ export interface operations {
       };
     };
   };
-  listArcs: {
+  get_api_v1_projects_projectId_volumes_volumeKey_arcs: {
     parameters: {
       query?: never;
       header?: never;
@@ -6893,7 +7715,7 @@ export interface operations {
       };
     };
   };
-  approveArcs: {
+  post_api_v1_projects_projectId_volumes_volumeKey_arcs_approve: {
     parameters: {
       query?: never;
       header?: never;
@@ -6934,7 +7756,7 @@ export interface operations {
       };
     };
   };
-  getArc: {
+  get_api_v1_projects_projectId_arcs_arcKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6975,7 +7797,7 @@ export interface operations {
       };
     };
   };
-  upsertArc: {
+  put_api_v1_projects_projectId_arcs_arcKey: {
     parameters: {
       query?: never;
       header?: never;
@@ -6985,7 +7807,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpsertArcBody'];
       };
@@ -7020,7 +7842,7 @@ export interface operations {
       };
     };
   };
-  listBibleDocs: {
+  get_api_v1_projects_projectId_bible: {
     parameters: {
       query?: never;
       header?: never;
@@ -7060,7 +7882,7 @@ export interface operations {
       };
     };
   };
-  getBibleDoc: {
+  get_api_v1_projects_projectId_bible_section_slug: {
     parameters: {
       query?: never;
       header?: never;
@@ -7102,7 +7924,7 @@ export interface operations {
       };
     };
   };
-  upsertBibleDoc: {
+  put_api_v1_projects_projectId_bible_section_slug: {
     parameters: {
       query?: never;
       header?: never;
@@ -7113,7 +7935,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpsertBibleDocBody'];
       };
@@ -7148,7 +7970,252 @@ export interface operations {
       };
     };
   };
-  start: {
+  get_api_v1_projects_projectId_facts: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListFactsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_facts_factKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  put_api_v1_projects_projectId_facts_factKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['UpsertFactBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_facts_factKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_facts_factKey_reveal: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['RevealFactBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_facts_factKey_knowledge_entityKey: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        factKey: string;
+        entityKey: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['FactResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_entities_entityKey_illustration: {
     parameters: {
       query?: never;
       header?: never;
@@ -7158,7 +8225,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['StartIllustrationBody'];
       };
@@ -7193,7 +8260,7 @@ export interface operations {
       };
     };
   };
-  refine: {
+  post_api_v1_projects_projectId_entities_entityKey_illustration_refine: {
     parameters: {
       query?: never;
       header?: never;
@@ -7203,7 +8270,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RefineIllustrationBody'];
       };
@@ -7238,7 +8305,7 @@ export interface operations {
       };
     };
   };
-  save: {
+  post_api_v1_projects_projectId_entities_entityKey_illustration_save: {
     parameters: {
       query?: never;
       header?: never;
@@ -7248,7 +8315,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['SaveIllustrationBody'];
       };
@@ -7283,7 +8350,7 @@ export interface operations {
       };
     };
   };
-  cancel: {
+  post_api_v1_projects_projectId_entities_entityKey_illustration_cancel: {
     parameters: {
       query?: never;
       header?: never;
@@ -7293,7 +8360,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CancelIllustrationBody'];
       };
@@ -7328,18 +8395,16 @@ export interface operations {
       };
     };
   };
-  ingest: {
+  post_api_v1_import: {
     parameters: {
       query?: never;
       header?: never;
-      path: {
-        projectId: string;
-      };
+      path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
-        'application/json': components['schemas']['IngestBody'];
+        'application/json': components['schemas']['ImportNovelBody'];
       };
     };
     responses: {
@@ -7349,7 +8414,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['JobEnqueueResponse1'];
+          'application/json': components['schemas']['ImportNovelResponse'];
         };
       };
       /** @description Default Response */
@@ -7372,7 +8437,7 @@ export interface operations {
       };
     };
   };
-  extract: {
+  post_api_v1_projects_projectId_extract: {
     parameters: {
       query?: never;
       header?: never;
@@ -7381,7 +8446,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ExtractBody'];
       };
@@ -7416,7 +8481,7 @@ export interface operations {
       };
     };
   };
-  retitle: {
+  post_api_v1_projects_projectId_recombine: {
     parameters: {
       query?: never;
       header?: never;
@@ -7425,47 +8490,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      200: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['RetitleResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  recombine: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RecombineBody'];
       };
@@ -7500,7 +8525,7 @@ export interface operations {
       };
     };
   };
-  consolidate: {
+  post_api_v1_projects_projectId_consolidate: {
     parameters: {
       query?: never;
       header?: never;
@@ -7540,7 +8565,7 @@ export interface operations {
       };
     };
   };
-  assets: {
+  get_api_v1_projects_projectId_assets: {
     parameters: {
       query?: never;
       header?: never;
@@ -7580,7 +8605,7 @@ export interface operations {
       };
     };
   };
-  skeleton: {
+  post_api_v1_projects_projectId_skeleton: {
     parameters: {
       query?: never;
       header?: never;
@@ -7620,7 +8645,7 @@ export interface operations {
       };
     };
   };
-  resume: {
+  put_api_v1_projects_projectId_rebrand_config: {
     parameters: {
       query?: never;
       header?: never;
@@ -7629,47 +8654,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: never;
-    responses: {
-      /** @description Default Response */
-      202: {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['ResumeResponse'];
-        };
-      };
-      /** @description Default Response */
-      '4XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-      /** @description Default Response */
-      '5XX': {
-        headers: {
-          [name: string]: unknown;
-        };
-        content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
-        };
-      };
-    };
-  };
-  updateConfig: {
-    parameters: {
-      query?: never;
-      header?: never;
-      path: {
-        projectId: string;
-      };
-      cookie?: never;
-    };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RebrandConfigBody'];
       };
@@ -7704,7 +8689,7 @@ export interface operations {
       };
     };
   };
-  status: {
+  get_api_v1_projects_projectId_rebrand: {
     parameters: {
       query?: never;
       header?: never;
@@ -7744,7 +8729,7 @@ export interface operations {
       };
     };
   };
-  startRebrand: {
+  post_api_v1_projects_projectId_rebrand: {
     parameters: {
       query?: never;
       header?: never;
@@ -7753,7 +8738,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RebrandStartBody'];
       };
@@ -7788,7 +8773,7 @@ export interface operations {
       };
     };
   };
-  glossary: {
+  get_api_v1_projects_projectId_rebrand_glossary: {
     parameters: {
       query?: {
         category?: components['schemas']['RebrandGlossaryCategory'];
@@ -7832,7 +8817,7 @@ export interface operations {
       };
     };
   };
-  listConversions: {
+  get_api_v1_projects_projectId_rebrand_chapters: {
     parameters: {
       query?: never;
       header?: never;
@@ -7872,13 +8857,13 @@ export interface operations {
       };
     };
   };
-  getConversion: {
+  get_api_v1_projects_projectId_rebrand_chapters_chapter: {
     parameters: {
       query?: never;
       header?: never;
       path: {
         projectId: string;
-        chapter: number | string;
+        chapter: number;
       };
       cookie?: never;
     };
@@ -7913,7 +8898,7 @@ export interface operations {
       };
     };
   };
-  rerunChapter: {
+  post_api_v1_projects_projectId_rebrand_chapters_chapter: {
     parameters: {
       query?: never;
       header?: never;
@@ -7954,7 +8939,7 @@ export interface operations {
       };
     };
   };
-  manuscript: {
+  get_api_v1_projects_projectId_rebrand_manuscript: {
     parameters: {
       query?: never;
       header?: never;
@@ -7994,7 +8979,7 @@ export interface operations {
       };
     };
   };
-  import: {
+  put_api_v1_projects_projectId_reforge_config: {
     parameters: {
       query?: never;
       header?: never;
@@ -8003,7 +8988,507 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReforgeConfigBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeStatusResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['ReforgeStartBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_chapters: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ListReforgesResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_chapters_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeChapterResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_reforge_chapters_chapter: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['JobEnqueueResponse1'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_reforge_manuscript: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReforgeManuscriptResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_publish: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublishNovelBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublicationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_chapters_chapter_publish: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['PublishChapterBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterPublicationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_projects_projectId_chapters_chapter_publish: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+        chapter: number;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      202: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ChapterPublicationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_projects_projectId_publications: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['PublicationsLedgerResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_publications_reconcile: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ReconcileResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['DevErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_projects_projectId_plan_import: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        projectId: string;
+      };
+      cookie?: never;
+    };
+    requestBody: {
       content: {
         'application/json': components['schemas']['ImportPlanBody'];
       };
@@ -8038,7 +9523,7 @@ export interface operations {
       };
     };
   };
-  listProjects: {
+  get_api_v1_projects: {
     parameters: {
       query?: {
         limit?: number | string;
@@ -8082,14 +9567,14 @@ export interface operations {
       };
     };
   };
-  createProject: {
+  post_api_v1_projects: {
     parameters: {
       query?: never;
       header?: never;
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateProjectBody'];
       };
@@ -8124,7 +9609,7 @@ export interface operations {
       };
     };
   };
-  getProject: {
+  get_api_v1_projects_projectId: {
     parameters: {
       query?: never;
       header?: never;
@@ -8164,7 +9649,7 @@ export interface operations {
       };
     };
   };
-  deleteProject: {
+  delete_api_v1_projects_projectId: {
     parameters: {
       query?: never;
       header?: never;
@@ -8195,7 +9680,7 @@ export interface operations {
       };
     };
   };
-  updateProject: {
+  patch_api_v1_projects_projectId: {
     parameters: {
       query?: never;
       header?: never;
@@ -8204,7 +9689,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateProjectBody'];
       };
@@ -8239,7 +9724,7 @@ export interface operations {
       };
     };
   };
-  getProjectStatus: {
+  get_api_v1_projects_projectId_status: {
     parameters: {
       query?: never;
       header?: never;
@@ -8279,7 +9764,7 @@ export interface operations {
       };
     };
   };
-  cloneProject: {
+  post_api_v1_projects_projectId_clone: {
     parameters: {
       query?: never;
       header?: never;
@@ -8288,7 +9773,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CloneProjectBody'];
       };
@@ -8323,7 +9808,7 @@ export interface operations {
       };
     };
   };
-  resetProject: {
+  post_api_v1_projects_projectId_reset: {
     parameters: {
       query?: never;
       header?: never;
@@ -8332,7 +9817,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ResetBody'];
       };
@@ -8367,7 +9852,7 @@ export interface operations {
       };
     };
   };
-  getProjectCost: {
+  get_api_v1_projects_projectId_cost: {
     parameters: {
       query?: never;
       header?: never;
@@ -8407,7 +9892,7 @@ export interface operations {
       };
     };
   };
-  uploadCover: {
+  post_api_v1_projects_projectId_cover: {
     parameters: {
       query?: never;
       header?: never;
@@ -8416,7 +9901,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UploadImageBody1'];
       };
@@ -8451,7 +9936,7 @@ export interface operations {
       };
     };
   };
-  deleteCover: {
+  delete_api_v1_projects_projectId_cover: {
     parameters: {
       query?: never;
       header?: never;
@@ -8492,11 +9977,17 @@ export interface operations {
     };
   };
 }
+export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
+export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
+export type AuthLogoutResponse = components['schemas']['AuthLogoutResponse'];
+export type AuthSessionResponse = components['schemas']['AuthSessionResponse'];
+export type AuthOrganisationsResponse = components['schemas']['AuthOrganisationsResponse'];
+export type AuthOrganisationItem = components['schemas']['AuthOrganisationItem'];
+export type SwitchOrganisationBody = components['schemas']['SwitchOrganisationBody'];
+export type SwitchOrganisationResponse = components['schemas']['SwitchOrganisationResponse'];
 export type AiModelsResponse = components['schemas']['AiModelsResponse'];
 export type AiModelOption = components['schemas']['AiModelOption'];
 export type AiRoleDefault = components['schemas']['AiRoleDefault'];
-export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
-export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
 export type SeedFromBriefBody = components['schemas']['SeedFromBriefBody'];
 export type WorkflowRunResponse = components['schemas']['WorkflowRunResponse'];
 export type PlanBody = components['schemas']['PlanBody'];
@@ -8511,6 +10002,8 @@ export type OutlineArcBody = components['schemas']['OutlineArcBody'];
 export type ListBriefSummaryResponse = components['schemas']['ListBriefSummaryResponse'];
 export type BriefSummaryResponse = components['schemas']['BriefSummaryResponse'];
 export type UpdateBriefBody = components['schemas']['UpdateBriefBody'];
+export type KnowledgeContractSchema = components['schemas']['KnowledgeContractSchema'];
+export type KnowledgeRevealSchema = components['schemas']['KnowledgeRevealSchema'];
 export type GenerateBody = components['schemas']['GenerateBody'];
 export type JobEnqueueResponse = components['schemas']['JobEnqueueResponse'];
 export type ListGenerationJobResponse = components['schemas']['ListGenerationJobResponse'];
@@ -8628,6 +10121,12 @@ export type BibleDocListItem = components['schemas']['BibleDocListItem'];
 export type BibleSection = components['schemas']['BibleSection'];
 export type BibleDocResponse = components['schemas']['BibleDocResponse'];
 export type UpsertBibleDocBody = components['schemas']['UpsertBibleDocBody'];
+export type ListFactsResponse = components['schemas']['ListFactsResponse'];
+export type FactResponse = components['schemas']['FactResponse'];
+export type KnowledgeEntryResponse = components['schemas']['KnowledgeEntryResponse'];
+export type FactSource = components['schemas']['FactSource'];
+export type UpsertFactBody = components['schemas']['UpsertFactBody'];
+export type RevealFactBody = components['schemas']['RevealFactBody'];
 export type StartIllustrationBody = components['schemas']['StartIllustrationBody'];
 export type StartIllustrationResponse = components['schemas']['StartIllustrationResponse'];
 export type RefineIllustrationBody = components['schemas']['RefineIllustrationBody'];
@@ -8636,10 +10135,16 @@ export type SaveIllustrationBody = components['schemas']['SaveIllustrationBody']
 export type SaveIllustrationResponse = components['schemas']['SaveIllustrationResponse'];
 export type CancelIllustrationBody = components['schemas']['CancelIllustrationBody'];
 export type CancelIllustrationResponse = components['schemas']['CancelIllustrationResponse'];
-export type IngestBody = components['schemas']['IngestBody'];
-export type JobEnqueueResponse1 = components['schemas']['JobEnqueueResponse1'];
+export type ImportNovelBody = components['schemas']['ImportNovelBody'];
+export type NovelBundle = components['schemas']['NovelBundle'];
+export type NovelImportMode = components['schemas']['NovelImportMode'];
+export type NovelImportMeta = components['schemas']['NovelImportMeta'];
+export type NovelImportVolume = components['schemas']['NovelImportVolume'];
+export type NovelImportChapter = components['schemas']['NovelImportChapter'];
+export type NovelImportAsset = components['schemas']['NovelImportAsset'];
+export type ImportNovelResponse = components['schemas']['ImportNovelResponse'];
 export type ExtractBody = components['schemas']['ExtractBody'];
-export type RetitleResponse = components['schemas']['RetitleResponse'];
+export type JobEnqueueResponse1 = components['schemas']['JobEnqueueResponse1'];
 export type RecombineBody = components['schemas']['RecombineBody'];
 export type RecombineResponse = components['schemas']['RecombineResponse'];
 export type MergedChapterItem = components['schemas']['MergedChapterItem'];
@@ -8647,7 +10152,6 @@ export type AmbiguousBoundaryItem = components['schemas']['AmbiguousBoundaryItem
 export type ConsolidateResponse = components['schemas']['ConsolidateResponse'];
 export type AssetsResponse = components['schemas']['AssetsResponse'];
 export type SkeletonResponse = components['schemas']['SkeletonResponse'];
-export type ResumeResponse = components['schemas']['ResumeResponse'];
 export type RebrandConfigBody = components['schemas']['RebrandConfigBody'];
 export type RebrandSettingsBody = components['schemas']['RebrandSettingsBody'];
 export type RebrandResponse = components['schemas']['RebrandResponse'];
@@ -8664,11 +10168,35 @@ export type RebrandConversionStatus = components['schemas']['RebrandConversionSt
 export type ConversionResponse = components['schemas']['ConversionResponse'];
 export type ConversionDetailItem = components['schemas']['ConversionDetailItem'];
 export type ManuscriptResponse = components['schemas']['ManuscriptResponse'];
+export type ReforgeConfigBody = components['schemas']['ReforgeConfigBody'];
+export type ReforgeFidelity = components['schemas']['ReforgeFidelity'];
+export type ReforgeSettingsBody = components['schemas']['ReforgeSettingsBody'];
+export type ReforgeResponse = components['schemas']['ReforgeResponse'];
+export type ReforgeStatus = components['schemas']['ReforgeStatus'];
+export type ReforgeStartBody = components['schemas']['ReforgeStartBody'];
+export type ReforgeStatusResponse = components['schemas']['ReforgeStatusResponse'];
+export type ReforgeCountsResponse = components['schemas']['ReforgeCountsResponse'];
+export type ListReforgesResponse = components['schemas']['ListReforgesResponse'];
+export type ReforgeSummaryResponse = components['schemas']['ReforgeSummaryResponse'];
+export type ReforgeChapterStatus = components['schemas']['ReforgeChapterStatus'];
+export type ReforgeChapterResponse = components['schemas']['ReforgeChapterResponse'];
+export type ReforgeDetailItem = components['schemas']['ReforgeDetailItem'];
+export type ReforgeManuscriptResponse = components['schemas']['ReforgeManuscriptResponse'];
+export type PublishNovelBody = components['schemas']['PublishNovelBody'];
+export type PublicationResponse = components['schemas']['PublicationResponse'];
+export type PublicationStatus = components['schemas']['PublicationStatus'];
+export type PublishChapterBody = components['schemas']['PublishChapterBody'];
+export type ChapterPublicationResponse = components['schemas']['ChapterPublicationResponse'];
+export type ChapterPublicationStatus = components['schemas']['ChapterPublicationStatus'];
+export type PublicationsLedgerResponse = components['schemas']['PublicationsLedgerResponse'];
+export type ReconcileResponse = components['schemas']['ReconcileResponse'];
+export type ReconcileFailureItem = components['schemas']['ReconcileFailureItem'];
 export type ImportPlanBody = components['schemas']['ImportPlanBody'];
 export type PlanBundle = components['schemas']['PlanBundle'];
 export type PlanBundleBibleDoc = components['schemas']['PlanBundleBibleDoc'];
 export type PlanBundleSection = components['schemas']['PlanBundleSection'];
 export type PlanBundleEntity = components['schemas']['PlanBundleEntity'];
+export type PlanBundleFact = components['schemas']['PlanBundleFact'];
 export type PlanBundleVolume = components['schemas']['PlanBundleVolume'];
 export type PlanBundleArc = components['schemas']['PlanBundleArc'];
 export type PlanBundleBrief = components['schemas']['PlanBundleBrief'];
@@ -8693,8 +10221,11 @@ export type ResetBody = components['schemas']['ResetBody'];
 export type ResetResponse = components['schemas']['ResetResponse'];
 export type CostResponse = components['schemas']['CostResponse'];
 export type UploadImageBody1 = components['schemas']['UploadImageBody1'];
-export type NovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
-export type ServePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
+export type LoginQueryParams = Exclude<paths['/api/auth/login']['get']['parameters']['query'], undefined>;
+export type CallbackQueryParams = Exclude<paths['/api/auth/callback']['get']['parameters']['query'], undefined>;
+export type StepUpQueryParams = Exclude<paths['/api/auth/step-up']['get']['parameters']['query'], undefined>;
+export type ExportNovelPathParams = Exclude<paths['/api/v1/projects/{projectId}/export/novel']['get']['parameters']['path'], undefined>;
+export type ServeImagePathParams = Exclude<paths['/api/v1/images/{projectId}/{filename}']['get']['parameters']['path'], undefined>;
 export type ListBriefsPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs']['get']['parameters']['path'], undefined>;
 export type GetBriefPathParams = Exclude<paths['/api/v1/projects/{projectId}/briefs/{n}']['get']['parameters']['path'], undefined>;
 export type ListJobsPathParams = Exclude<paths['/api/v1/projects/{projectId}/jobs']['get']['parameters']['path'], undefined>;
@@ -8710,10 +10241,10 @@ export type GetRunPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/
 export type GetRunContextPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/context']['get']['parameters']['path'], undefined>;
 export type GetRunCallPathParams = Exclude<paths['/api/v1/projects/{projectId}/runs/{runId}/calls/{callId}']['get']['parameters']['path'], undefined>;
 export type GetAiUsagePathParams = Exclude<paths['/api/v1/projects/{projectId}/ai-usage']['get']['parameters']['path'], undefined>;
-export type SearchQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;
-export type SearchPathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;
+export type SearchProseQueryParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['query'], undefined>;
+export type SearchProsePathParams = Exclude<paths['/api/v1/projects/{projectId}/search']['get']['parameters']['path'], undefined>;
 export type GetManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/manuscript']['get']['parameters']['path'], undefined>;
-export type ListPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
+export type ListChapterImagesPathParams = Exclude<paths['/api/v1/projects/{projectId}/chapters/{n}/images']['get']['parameters']['path'], undefined>;
 export type GetJobPathParams = Exclude<paths['/api/v1/jobs/{jobId}']['get']['parameters']['path'], undefined>;
 export type ListChaptersQueryParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['query'], undefined>;
 export type ListChaptersPathParams = Exclude<paths['/api/v1/projects/{projectId}/source/chapters']['get']['parameters']['path'], undefined>;
@@ -8740,13 +10271,20 @@ export type ListArcsPathParams = Exclude<paths['/api/v1/projects/{projectId}/vol
 export type GetArcPathParams = Exclude<paths['/api/v1/projects/{projectId}/arcs/{arcKey}']['get']['parameters']['path'], undefined>;
 export type ListBibleDocsPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible']['get']['parameters']['path'], undefined>;
 export type GetBibleDocPathParams = Exclude<paths['/api/v1/projects/{projectId}/bible/{section}/{slug}']['get']['parameters']['path'], undefined>;
-export type AssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;
-export type StatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand']['get']['parameters']['path'], undefined>;
-export type GlossaryQueryParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['query'], undefined>;
-export type GlossaryPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['path'], undefined>;
+export type ListFactsPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts']['get']['parameters']['path'], undefined>;
+export type GetFactPathParams = Exclude<paths['/api/v1/projects/{projectId}/facts/{factKey}']['get']['parameters']['path'], undefined>;
+export type GetAssetsPathParams = Exclude<paths['/api/v1/projects/{projectId}/assets']['get']['parameters']['path'], undefined>;
+export type GetRebrandStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand']['get']['parameters']['path'], undefined>;
+export type GetGlossaryQueryParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['query'], undefined>;
+export type GetGlossaryPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/glossary']['get']['parameters']['path'], undefined>;
 export type ListConversionsPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/chapters']['get']['parameters']['path'], undefined>;
 export type GetConversionPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/chapters/{chapter}']['get']['parameters']['path'], undefined>;
-export type ManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/manuscript']['get']['parameters']['path'], undefined>;
+export type GetRebrandManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/rebrand/manuscript']['get']['parameters']['path'], undefined>;
+export type GetReforgeStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge']['get']['parameters']['path'], undefined>;
+export type ListReforgesPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/chapters']['get']['parameters']['path'], undefined>;
+export type GetReforgePathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/chapters/{chapter}']['get']['parameters']['path'], undefined>;
+export type GetReforgeManuscriptPathParams = Exclude<paths['/api/v1/projects/{projectId}/reforge/manuscript']['get']['parameters']['path'], undefined>;
+export type ListPublicationsPathParams = Exclude<paths['/api/v1/projects/{projectId}/publications']['get']['parameters']['path'], undefined>;
 export type ListProjectsQueryParams = Exclude<paths['/api/v1/projects']['get']['parameters']['query'], undefined>;
 export type GetProjectPathParams = Exclude<paths['/api/v1/projects/{projectId}']['get']['parameters']['path'], undefined>;
 export type GetProjectStatusPathParams = Exclude<paths['/api/v1/projects/{projectId}/status']['get']['parameters']['path'], undefined>;

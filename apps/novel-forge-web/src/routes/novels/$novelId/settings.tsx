@@ -144,7 +144,6 @@ function SettingsScreen(): React.JSX.Element {
   const [brief, setBrief] = useState('');
   const [instructions, setInstructions] = useState('');
   const [contentMode, setContentMode] = useState<ContentMode>('standard');
-  const [webnovelId, setWebnovelId] = useState('');
   const [models, setModels] = useState<Partial<Record<ModelGroup, string>>>({});
   const [confirmDelete, setConfirmDelete] = useState(false);
 
@@ -156,7 +155,6 @@ function SettingsScreen(): React.JSX.Element {
     // is always pre-filled with what the AI will actually use.
     setInstructions(project.instructions ?? '');
     setContentMode(project.contentMode);
-    setWebnovelId(project.webnovelId ?? '');
     const overrides = project.config?.models ?? {};
     const next: Partial<Record<ModelGroup, string>> = {};
     for (const group of ALL_ROLES) {
@@ -171,7 +169,7 @@ function SettingsScreen(): React.JSX.Element {
 
   const saveGeneral = (): void => {
     updateProject.mutate(
-      { title: title.trim(), brief, instructions, contentMode, ...(project?.kind === 'source' ? { webnovelId: webnovelId.trim() || null } : {}) },
+      { title: title.trim(), brief, instructions, contentMode },
       { onSuccess: () => toast.success('Settings saved'), onError: err => toast.danger(err.message) },
     );
   };
@@ -234,14 +232,6 @@ function SettingsScreen(): React.JSX.Element {
                   >
                     <Textarea value={instructions} onValueChange={setInstructions} minRows={6} autoGrow />
                   </FormField>
-                  {project?.kind === 'source' && (
-                    <FormField
-                      label="Webnovel book ID"
-                      helper="Optional — when set, chapter titles come from third-party-site.example's table of contents on the next ingest (or POST /retitle)."
-                    >
-                      <Input value={webnovelId} onValueChange={setWebnovelId} placeholder="e.g. 31931419070238805" />
-                    </FormField>
-                  )}
                   <FormField label="Content mode">
                     <SegmentedControl value={contentMode} onValueChange={v => setContentMode(v as ContentMode)}>
                       <SegmentedControl.Item value="standard">Standard</SegmentedControl.Item>

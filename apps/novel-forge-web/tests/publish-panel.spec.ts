@@ -62,7 +62,6 @@ const PROJECT = {
   title: 'The Hollow Saga',
   coverImagePath: null,
   contentMode: 'standard',
-  scrapeComplete: false,
   createdAt: NOW,
   updatedAt: NOW,
 };

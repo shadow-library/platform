@@ -13,6 +13,7 @@ import { Route as LoginRouteImport } from './../src/routes/login'
 import { Route as AppRouteImport } from './../src/routes/_app'
 import { Route as AppIndexRouteImport } from './../src/routes/_app/index'
 import { Route as NovelsNovelIdRouteImport } from './../src/routes/novels/$novelId'
+import { Route as AppImportRouteImport } from './../src/routes/_app/import'
 import { Route as NovelsNovelIdIndexRouteImport } from './../src/routes/novels/$novelId/index'
 import { Route as NovelsNovelIdVolumesRouteImport } from './../src/routes/novels/$novelId/volumes'
 import { Route as NovelsNovelIdStoryBibleRouteImport } from './../src/routes/novels/$novelId/story-bible'
@@ -47,6 +48,11 @@ const NovelsNovelIdRoute = NovelsNovelIdRouteImport.update({
   id: '/novels/$novelId',
   path: '/novels/$novelId',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppRoute,
 } as any)
 const NovelsNovelIdIndexRoute = NovelsNovelIdIndexRouteImport.update({
   id: '/',
@@ -127,6 +133,7 @@ const NovelsNovelIdChaptersRoute = NovelsNovelIdChaptersRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof AppIndexRoute
   '/login': typeof LoginRoute
+  '/import': typeof AppImportRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -146,6 +153,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/login': typeof LoginRoute
+  '/import': typeof AppImportRoute
   '/': typeof AppIndexRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
   '/novels/$novelId/chat': typeof NovelsNovelIdChatRoute
@@ -167,6 +175,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/_app': typeof AppRouteWithChildren
   '/login': typeof LoginRoute
+  '/_app/import': typeof AppImportRoute
   '/novels/$novelId': typeof NovelsNovelIdRouteWithChildren
   '/_app/': typeof AppIndexRoute
   '/novels/$novelId/chapters': typeof NovelsNovelIdChaptersRoute
@@ -190,6 +199,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/login'
+    | '/import'
     | '/novels/$novelId'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -209,6 +219,7 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/login'
+    | '/import'
     | '/'
     | '/novels/$novelId/chapters'
     | '/novels/$novelId/chat'
@@ -229,6 +240,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/_app'
     | '/login'
+    | '/_app/import'
     | '/novels/$novelId'
     | '/_app/'
     | '/novels/$novelId/chapters'
@@ -283,6 +295,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/novels/$novelId'
       preLoaderRoute: typeof NovelsNovelIdRouteImport
       parentRoute: typeof rootRouteImport
+    }
+    '/_app/import': {
+      id: '/_app/import'
+      path: '/import'
+      fullPath: '/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRoute
     }
     '/novels/$novelId/': {
       id: '/novels/$novelId/'
@@ -393,10 +412,12 @@ declare module '@tanstack/react-router' {
 }
 
 interface AppRouteChildren {
+  AppImportRoute: typeof AppImportRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
 const AppRouteChildren: AppRouteChildren = {
+  AppImportRoute: AppImportRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

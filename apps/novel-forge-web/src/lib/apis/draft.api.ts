@@ -28,7 +28,7 @@ import {
 } from './api-types.gen';
 
 /**
- * Drafts are the generated chapters of a project (distinct from ingested source
+ * Drafts are the generated chapters of a project (distinct from imported source
  * chapters). They back the editor, review/diff, versions, and approvals screens.
  */
 const draftKeys = {
