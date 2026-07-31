@@ -28,12 +28,12 @@
   },
   "homepage": "https://github.com/shadow-library/identity#readme",
   "devDependencies": {
-    "@types/bun": "^1.3.1",
+    "@types/bun": "catalog:",
     "@types/luxon": "^3.7.1",
     "@types/validator": "^13.15.10",
-    "drizzle-kit": "^0.31.6",
-    "type-fest": "^4.41.0",
-    "typescript": "^6.0.3"
+    "drizzle-kit": "catalog:",
+    "type-fest": "catalog:",
+    "typescript": "catalog:"
   },
   "dependencies": {
     "@peculiar/x509": "^2.0.0",
@@ -43,14 +43,14 @@
     "@shadow-library/fastify": "workspace:*",
     "@shadow-library/modules": "workspace:*",
     "@simplewebauthn/server": "^13.3.2",
-    "ajv": "^8.17.1",
+    "ajv": "catalog:",
     "ajv-formats": "^3.0.1",
-    "drizzle-orm": "^0.45.0",
+    "drizzle-orm": "catalog:",
     "drizzle-seed": "^0.3.1",
     "fast-xml-parser": "^5.10.0",
     "ioredis": "^5.8.2",
     "luxon": "^3.7.2",
-    "reflect-metadata": "^0.2.2",
+    "reflect-metadata": "catalog:",
     "ua-parser-js": "^2.0.6",
     "validator": "^13.15.23",
     "xml-crypto": "^6.1.2"

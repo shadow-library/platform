@@ -56,13 +56,13 @@
   },
   "devDependencies": {
     "@shadow-library/common": "workspace:*",
-    "@tanstack/react-query": "^5.101.2",
-    "@tanstack/react-router": "^1.170.17",
-    "@tanstack/react-router-ssr-query": "^1.167.1",
-    "@tanstack/react-start": "^1.168.27",
-    "@types/bun": "^1.3.9",
-    "@types/node": "^22.10.2",
-    "@types/react": "^19.2.0",
-    "react": "^19.2.0"
+    "@tanstack/react-query": "catalog:",
+    "@tanstack/react-router": "catalog:",
+    "@tanstack/react-router-ssr-query": "catalog:",
+    "@tanstack/react-start": "catalog:",
+    "@types/bun": "catalog:",
+    "@types/node": "catalog:",
+    "@types/react": "catalog:",
+    "react": "catalog:"
   }
 }

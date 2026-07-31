@@ -29,9 +29,10 @@
   },
   "homepage": "https://github.com/shadow-library/common#readme",
   "devDependencies": {
-    "@types/bun": "^1.1.13",
+    "@types/bun": "catalog:",
     "@types/fast-redact": "^3.0.4",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "catalog:",
+    "typescript": "catalog:"
   },
   "peerDependencies": {
     "reflect-metadata": "^0.2.2"
@@ -41,7 +42,7 @@
     "chokidar": "^5.0.0",
     "deepmerge": "^4.3.1",
     "fast-redact": "^3.5.0",
-    "type-fest": "^4.40.0",
+    "type-fest": "catalog:",
     "undici": "^7.10.0",
     "winston": "^3.17.0",
     "winston-transport": "^4.9.0"

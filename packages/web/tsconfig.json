@@ -1,24 +1,18 @@
 {
+  "extends": "../../tsconfig.base.json",
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "compilerOptions": {
-    "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
 
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "verbatimModuleSyntax": true,
     "types": ["node", "bun"],
 
-    "strict": true,
-    "noUncheckedIndexedAccess": true,
-    "noImplicitOverride": true,
+    /** Extra strictness this package opts into beyond the base. */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
-    "noFallthroughCasesInSwitch": true,
+    "strictPropertyInitialization": true,
 
-    "declaration": true,
-    "noEmit": true,
-    "skipLibCheck": true
+    "declaration": true
   }
 }

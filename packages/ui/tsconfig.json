@@ -1,41 +1,23 @@
 {
+  "extends": "../../tsconfig.base.json",
   "include": ["src", ".storybook/**/*"],
   "compilerOptions": {
-    /** Language and Environment */
-    "target": "ES2022",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
 
-    /** Type Checking */
-    "alwaysStrict": true,
-    "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": true,
-    "noImplicitOverride": true,
-    "noImplicitReturns": true,
-    "noImplicitThis": true,
-    "noUncheckedIndexedAccess": true,
+    /** Extra strictness this package opts into beyond the base. */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noUncheckedSideEffectImports": true,
-    "strict": true,
-    "strictBindCallApply": true,
-    "strictFunctionTypes": true,
-    "strictNullChecks": true,
-    "strictPropertyInitialization": false,
+    "strictPropertyInitialization": true,
+    // Preserves prior behavior: this package doesn't opt into verbatimModuleSyntax (which implies
+    // isolatedModules) the way the other web workspaces do, so isolatedModules stays off here too.
+    "isolatedModules": false,
 
-    /** Modules */
-    "module": "ESNext",
-    "moduleResolution": "bundler",
     "paths": {
       "@/*": ["./src/*"],
       "$storybook/*": ["./.storybook/*"]
     },
-    "types": ["vite/client", "vitest/globals", "storybook/test", "@testing-library/jest-dom"],
-
-    /** Emit */
-    "noEmit": true,
-
-    /** Completeness */
-    "skipLibCheck": true
+    "types": ["vite/client", "vitest/globals", "storybook/test", "@testing-library/jest-dom"]
   }
 }

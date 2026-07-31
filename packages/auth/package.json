@@ -53,8 +53,9 @@
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",
     "@shadow-library/fastify": "workspace:*",
-    "@types/bun": "1.3.14",
+    "@types/bun": "catalog:",
     "@types/node": "24.9.2",
-    "reflect-metadata": "^0.2.2"
+    "reflect-metadata": "catalog:",
+    "typescript": "catalog:"
   }
 }
