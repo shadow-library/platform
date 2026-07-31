@@ -1,0 +1,26 @@
+{
+  "build": {
+    "exports": {
+      ".": "index",
+      "./router": "router/index",
+      "./server": "server/index",
+      "./server-entry": "server-entry",
+      "./pwa": "pwa/index",
+      "./service-worker": "service-worker/index",
+      "./offline": "offline/index"
+    }
+  },
+  "verify": {
+    "lint": {
+      "globals": "both",
+      "overrides": [
+        {
+          "files": ["src/router/create-router.ts"],
+          "rules": {
+            "@typescript-eslint/explicit-module-boundary-types": "off"
+          }
+        }
+      ]
+    }
+  }
+}
