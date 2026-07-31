@@ -5,6 +5,9 @@ on:
     branches: [main]
   push:
     branches: [main]
+  # Manual re-run at any commit without needing a new push -- e.g. to re-verify main after an
+  # infra-only flake, with no code change to trigger a fresh run otherwise.
+  workflow_dispatch: {}
 
 permissions:
   contents: read
