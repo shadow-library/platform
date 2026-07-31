@@ -78,7 +78,7 @@ Also required, all admin operations:
 - `authz:check` (PDP + service-access rules) and `authz:roles:sync` (role-catalog push) if used. Method-level
   scope **replaces** class-level on identity's side, so the catalog push needs `authz:roles:sync` *only*.
 - `redirect_uris` are matched **exactly** — absolute, no fragment. Derived from the application's
-  registered public origins (`${origin}/auth/callback`), not hand-entered.
+  registered public origins (`${origin}/api/auth/callback`), not hand-entered.
 - Service-access rules (`/api/v1/admin/service-access`) for every M2M caller allowed to reach this service.
   Deny-by-default; granting a caller needs an admin change **plus a restart** of the target service.
 

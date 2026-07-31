@@ -4,9 +4,9 @@ The **frontend** of Shadow Identity: React 19 + TanStack Start **SSR**, TanStack
 `@shadow-library/ui` for components/theming, `@shadow-library/web` for transport/router/SSR. `.shadowrc.json` →
 `"type": "ssr"`. Full-document SSR — `src/routes/__root.tsx` owns `<html>`.
 
-Its sibling repository `identity-server` (Bun + Fastify JSON API) is a **separate, independent git repo** that
-this app consumes over HTTP. It lives at `../identity-server` in the local workspace but is cloned and versioned
-on its own. This guide is self-contained for work inside `identity-web`.
+Its sibling workspace `identity-server` (Bun + Fastify JSON API) serves the HTTP API this app consumes. It lives
+at `../identity-server` in this monorepo; both are workspaces of the platform repository with a single shared
+history. This guide is self-contained for work inside `apps/identity-web`.
 
 ---
 
