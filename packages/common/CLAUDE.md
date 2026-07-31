@@ -2,12 +2,13 @@
 
 Framework-agnostic core library shared by every app in the Shadow Library ecosystem: errors, config,
 logging, caching, HTTP client, reflection, flow state machines, and utilities. Published **ESM-only**
-(`type: module`). Currently `2.0.0-beta.0` (unreleased). Requires Node `>=23`; developed and tested with **Bun**.
+(`type: module`). Currently `2.0.0-beta.0`, private (this monorepo doesn't publish). Requires Node `>=23`;
+developed and tested with **Bun**.
 
-All build/verify/release tooling is centralized in **`@shadow-library/scripts`** (the `shadow` CLI), driven
-by `.shadowrc.json`. There is no local eslint/prettier/release-it config — do not re-add them; tweak via
+All build/verify tooling is centralized in the **root `scripts/` directory** (the `shadow` CLI), driven
+by `.shadowrc.json`. There is no local eslint/prettier config — do not re-add them; tweak via
 `.shadowrc.json` (`verify.lint` / `verify.format`) instead. The toolchain (typescript, eslint, prettier,
-tsc-alias, …) ships as that package's dependencies, so this repo pins none of them.
+tsc-alias, …) is a root devDependency, so this package pins none of them directly.
 
 ## Commands
 
@@ -18,7 +19,8 @@ tsc-alias, …) ships as that package's dependencies, so this repo pins none of 
 | Type-check | `bun run type-check` (`tsc`) |
 | Build (ESM-only → `dist/`) | `bun run build` (`shadow build`) |
 
-The husky pre-commit hook runs `bun verify` (format + lint + type-check + test); keep it green before committing.
+The root Husky pre-commit hook fast-verifies (format + lint) whichever workspaces have staged changes; run
+`bun run verify` (format + lint + type-check + test) here yourself before committing to catch the rest.
 
 ## Layout
 

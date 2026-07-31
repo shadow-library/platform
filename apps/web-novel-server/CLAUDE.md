@@ -54,8 +54,8 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 
 ### Conventions
 
-- **Package manager:** Bun (`bun.lock`; the `shadow` CLI ships as `@shadow-library/scripts`). ESM
-  (`"type": "module"`). **TypeScript 6.x**, `strict`, `moduleResolution: bundler`.
+- **Package manager:** Bun (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
+  directory). ESM (`"type": "module"`). **TypeScript 6.x**, `strict`, `moduleResolution: bundler`.
 - **Path aliases:** `@server/*` → `src/*`, `@modules/*` → `src/modules/*`, `@scripts/*` → `scripts/*`.
 - **Formatting/style:** Prettier — single quotes, trailing commas `all`, print width **180**,
   `arrowParens: avoid`; 2-space indent, semicolons. `PascalCase` types/classes, `camelCase` values,

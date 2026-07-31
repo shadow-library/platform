@@ -24,15 +24,15 @@
 | --- | --- |
 | Language | TypeScript 5.9 (strict), React 18.3+/19 |
 | Styling | **CSS Modules** + CSS custom-property design tokens |
-| Build | `shadow build` (`@shadow-library/scripts`, `type: component`) — native Rollup (`rollup-plugin-esbuild`) + PostCSS (`rollup-plugin-postcss`, `postcss-import`) CSS-Modules pipeline with `'use client'` banners; shadow synthesizes `dist/package.json` |
+| Build | `shadow build` (root `scripts/` tooling, `type: component`) — native Rollup (`rollup-plugin-esbuild`) + PostCSS (`rollup-plugin-postcss`, `postcss-import`) CSS-Modules pipeline with `'use client'` banners; shadow synthesizes `dist/package.json` |
 | Types | `tsc` (declaration emit) + `tsc-alias` |
-| Lint / format | `shadow verify` (`@shadow-library/scripts`) — Prettier + a shipped ESLint flat config (typescript-eslint + perfectionist + react/react-hooks/jsx-a11y) |
+| Lint / format | `shadow verify` (root `scripts/` tooling) — Prettier + a shipped ESLint flat config (typescript-eslint + perfectionist + react/react-hooks/jsx-a11y) |
 | Tests | Vitest — `unit` project (happy-dom) + `storybook` project (Playwright/Chromium) + Testing Library |
 | Docs / visual QA | Storybook 10 (`@storybook/react-vite`) |
 | Composition | `@radix-ui/react-slot` (the sanctioned `asChild` Slot) |
 | Overlays / behavior | **Radix UI primitives** (`@radix-ui/react-select`, and the sibling packages added per component: dropdown-menu, popover, dialog, tooltip, …). Overlay, menu, and disclosure components wrap the matching Radix primitive 1:1 and skin it with a CSS Module; Radix owns focus management, positioning/flip, and ARIA. Keep the primitive **external** in the build (declare it a dependency), never fork it. |
-| Package manager | Bun (`bun.lock`) |
-| Releases | `shadow release` (`@shadow-library/scripts`) — computes the bump from Conventional Commits, builds + tests, tags, GitHub release, npm publish; `shadow commit-msg` + Husky enforce the message format |
+| Package manager | Bun (single root `bun.lock`, workspace protocol for in-monorepo deps) |
+| Releases | Retired — this package is private (`UNLICENSED`) and not published; `shadow commit-msg` + root Husky still enforce the commit-message format |
 
 **Do not introduce Tailwind CSS, CSS-in-JS runtimes, or any other styling system.** Components style exclusively through CSS Modules; the library also ships one hand-authored, token-backed, **unprefixed** global utility layer (`src/styles/utilities.css`) for consumers' own layout markup — see *Styling Guidelines* rule 4.
 
@@ -60,7 +60,7 @@ ui/
 │   │   └── index.css         # Aggregates tokens.css + reset.css + utilities.css (the global entry)
 │   ├── types.ts              # Shared public types
 │   └── index.ts              # Package entry: imports global CSS, re-exports public API
-├── .shadowrc.json            # `@shadow-library/scripts` config: build (component: exports + css + alias) + verify (lint/format/globals/overrides)
+├── .shadowrc.json            # shadow (root `scripts/` tooling) config: build (component: exports + css + alias) + verify (lint/format/globals/overrides)
 ├── tsconfig.json             # Base TS config (strict; @/* → src/*)
 ├── tsconfig.build.json       # Declaration-emit config for the build
 └── vitest.config.ts          # unit + storybook test projects

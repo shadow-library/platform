@@ -21,6 +21,8 @@ export interface VerifyOptions {
   cwd: string;
   /** Apply fixes in place (prettier `--write`, eslint `--fix`) instead of only reporting. */
   fix?: boolean;
+  /** Stop after format + lint, skipping the delegated type-check/test steps — the root pre-commit hook's speed budget. */
+  fast?: boolean;
 }
 
 interface DelegatedStep {
@@ -67,7 +69,7 @@ function detectReactVersion(packageJson: PackageJson): string | undefined {
  * `prettier` run (editor format-on-save, `bunx prettier`) format identically. A repo with no prettier
  * config falls back to prettier's built-in defaults, same as a bare `prettier` would.
  */
-async function runFormat(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
+export async function runFormat(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
   const files = Array.from(new Bun.Glob(verifyConfig.formatFiles).scanSync({ cwd, onlyFiles: true }));
 
   if (files.length === 0) {
@@ -104,7 +106,7 @@ async function runFormat(cwd: string, verifyConfig: VerifyConfig, fix: boolean):
 }
 
 /** Lints the repo with the shipped flat config (plus `verify.lint` overrides), fixing in place when requested. */
-async function runLint(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
+export async function runLint(cwd: string, verifyConfig: VerifyConfig, fix: boolean): Promise<boolean> {
   // typescript-eslint's ConfigArray is structurally compatible with ESLint's flat config but nominally distinct.
   const overrideConfig = createLintConfig(verifyConfig.lint) as unknown as Linter.Config[];
   // errorOnUnmatchedPattern is off because the file glob spans src/tests/scripts and not every repo has all three.
@@ -165,6 +167,11 @@ export async function verify(options: VerifyOptions): Promise<number> {
 
   if (!(await runFormat(options.cwd, verifyConfig, fix))) return 1;
   if (!(await runLint(options.cwd, verifyConfig, fix))) return 1;
+
+  if (options.fast) {
+    log.success('verify passed (fast — type-check/test skipped)');
+    return 0;
+  }
 
   const steps = verifyConfig.test ? DELEGATED_STEPS : DELEGATED_STEPS.filter(step => step.label !== 'test');
   for (const step of steps) {

@@ -5,6 +5,9 @@
   "version": "0.0.0",
   "description": "Whole-platform Playwright suite — cross-app flows against the local compose deployment. Stub only; a later phase fills this in.",
   "scripts": {
+    "verify": "bun ../scripts/src/bin/shadow.ts verify",
+    "build": "echo 'e2e: nothing to build yet'",
+    "type-check": "tsc",
     "test": "bun test"
   }
 }

@@ -1,0 +1,23 @@
+ROOT="$(pwd)"
+
+# Map staged files to the workspace(s) they touch (apps/<x>, packages/<x>, e2e, or the scripts/ tooling
+# itself), deduplicated. A commit that only touches root-level files (README, this hook, ...) runs nothing.
+workspaces="$(git diff --cached --name-only --diff-filter=ACMR | sed -nE 's#^(apps/[^/]+|packages/[^/]+|e2e)/.*#\1#p; s#^scripts/.*#scripts#p' | sort -u)"
+
+if [ -z "$workspaces" ]; then
+  exit 0
+fi
+
+# Fast (format + lint only, no type-check/test -- that's CI's job) verify, scoped to each changed workspace
+# instead of the whole platform, so pre-commit stays quick even as the monorepo grows.
+status=0
+for ws in $workspaces; do
+  echo "pre-commit: verify --fast ($ws)"
+  if [ "$ws" = "scripts" ]; then
+    (cd "$ROOT/scripts" && bun src/bin/shadow.ts verify --fast) || status=1
+  else
+    (cd "$ROOT/$ws" && bun "$ROOT/scripts/src/bin/shadow.ts" verify --fast) || status=1
+  fi
+done
+
+exit $status

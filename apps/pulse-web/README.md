@@ -33,7 +33,7 @@ This project uses [@shadow-library/ui](https://www.npmjs.com/package/@shadow-lib
 
 ## Linting & Formatting
 
-This project uses the `shadow` CLI ([@shadow-library/scripts](https://www.npmjs.com/package/@shadow-library/scripts)) for formatting, linting, type-checking, and builds, driven by `.shadowrc.json`:
+This project uses the `shadow` CLI (root tooling — see `scripts/README.md`) for formatting, linting, type-checking, and builds, driven by `.shadowrc.json`:
 
 ```bash
 bun run verify        # prettier + eslint + type-check

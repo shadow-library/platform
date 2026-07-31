@@ -11,12 +11,11 @@
     "./testing": "./src/testing/index.ts"
   },
   "scripts": {
-    "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "shadow verify",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bun test",
-    "build": "shadow build",
+    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "pack": "bun run build && cd dist && bun pm pack --destination .."
   },
   "engines": {
@@ -56,7 +55,6 @@
     "@shadow-library/fastify": "workspace:*",
     "@types/bun": "1.3.14",
     "@types/node": "24.9.2",
-    "husky": "^9.1.7",
     "reflect-metadata": "^0.2.2"
   }
 }

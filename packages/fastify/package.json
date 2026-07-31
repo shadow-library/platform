@@ -8,11 +8,10 @@
   ],
   "description": "A Fastify wrapper featuring decorator-based routing, middleware and error handling",
   "scripts": {
-    "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
     "type-check": "tsc",
-    "build": "shadow build",
-    "verify": "shadow verify",
+    "build": "bun ../../scripts/src/bin/shadow.ts build",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "test": "bun test --isolate"
   },
   "repository": {
@@ -41,7 +40,6 @@
     "@shadow-library/class-schema": "workspace:*",
     "@shadow-library/common": "workspace:*",
     "@types/bun": "^1.2.20",
-    "husky": "^9.1.7",
     "reflect-metadata": "^0.2.2",
     "typescript": "^5.9.2"
   },

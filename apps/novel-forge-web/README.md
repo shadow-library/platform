@@ -8,7 +8,7 @@ Authoring workspace for Shadow Applications. A server-rendered React app built w
 | ---------------- | --------------------------------------------------- |
 | Runtime / PM     | [Bun](https://bun.sh)                               |
 | Framework        | [TanStack Start](https://tanstack.com/start) (full-document SSR) |
-| Build tool       | [Vite 7](https://vite.dev) via the `shadow` CLI (`@shadow-library/scripts`) |
+| Build tool       | [Vite 7](https://vite.dev) via the `shadow` CLI (root `scripts/` tooling) |
 | UI library       | [React 19](https://react.dev)                       |
 | Routing          | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split) |
 | Server state     | [TanStack Query](https://tanstack.com/query)        |

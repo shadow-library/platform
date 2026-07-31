@@ -1,1 +1,0 @@
-bun run src/bin/shadow.ts commit-msg "$1"

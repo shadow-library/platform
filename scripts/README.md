@@ -1,17 +1,30 @@
-# @shadow-library/scripts
+# scripts/
 
-A shared CLI for the Shadow Library ecosystem. It centralizes the workflows that were duplicated — and
-had drifted — across the `shadow-library/*` repositories: the library build, local verification
-(format + lint + type-check + test), OpenAPI type generation, release, and the migration-drift check.
+Root tooling for the platform monorepo — the `shadow` CLI (build, local verification, OpenAPI type
+generation, and the migration-drift check) plus the commit-message linter, all driven by a workspace's own
+`.shadowrc.json`. This directory is **not** a Bun workspace and is never installed as a package: its
+dependencies live in the root `package.json`, and every command is invoked by path with `bun`.
 
-Everything is driven from a single **`.shadowrc.json`** at the repo root, and every command runs on
-[Bun](https://bun.sh). The binary is named **`shadow`**.
+## Layout
 
-## Installation
+- `src/bin/shadow.ts` — the CLI entrypoint (`shadow <command>`).
+- `src/` — the command implementations (`build.ts`, `verify.ts`, `gen-api-types.ts`, `check-migrations.ts`,
+  `commit-msg.ts`, `init.ts`, `prepare.ts`, …) plus `config.ts` (`.shadowrc.json` loading) and `utils/`.
+- `scripts/` — this package's own dev scripts (`verify.ts`); dogfoods `shadow verify` against itself.
+- `tests/` — `bun:test` specs for everything above, run from the repo root.
 
-```bash
-bun add -D @shadow-library/scripts
+## Invoking it
+
+Every workspace (`apps/*`, `packages/*`, `e2e`) wires thin `package.json` scripts that call this by relative
+path, e.g. from `apps/identity-server/package.json`:
+
+```json
+{ "scripts": { "verify": "bun ../../scripts/src/bin/shadow.ts verify", "build": "bun ../../scripts/src/bin/shadow.ts build" } }
 ```
+
+Bun resolves the `@lib/*` import alias from `scripts/tsconfig.json` regardless of the caller's working
+directory, so this works unmodified from any workspace. Run `bun scripts/src/bin/shadow.ts --help` from the
+repo root for the full command reference.
 
 ## Commands
 
@@ -19,170 +32,60 @@ bun add -D @shadow-library/scripts
 shadow init [--type <library|component|backend|spa|ssr>]
 shadow prepare
 shadow build
-shadow verify [--fix]
+shadow verify [--fix] [--fast]
 shadow gen-api-types <url> [--out <path>]
-shadow release <stable|alpha|beta> [--path <path>]
 shadow check-migrations [--dir <path>]
-```
-
-Run `shadow --help` for a summary. This document is the full reference.
-
-## Configuration — `.shadowrc.json`
-
-A single file at the repo root configures every command. All fields are optional; the defaults below
-apply when the file (or a field) is absent.
-
-```jsonc
-{
-  "build": {
-    "exports": { ".": "index" },       // public subpath → source-relative base (no extension)
-    "bin": { "my-cli": "bin/my-cli" }, // optional; string shorthand also accepted
-    "outDir": "dist"
-  },
-  "verify": {
-    "files": "{src,tests,scripts}/**/*.ts",  // what lint + format cover
-    "lint": {
-      "rules": {},                     // merged over the shipped ESLint flat config
-      "ignores": []                    // appended to the shipped ignore globs
-    }
-    // Prettier options are NOT configured here — they live in the repo's .prettierrc.json (see below).
-  },
-  "release": {
-    "npm": true,                       // publish to npm after tagging
-    "publishDir": "dist",
-    "changelog": true                  // generate the GitHub release body from commits
-  },
-  "genApiTypes": {
-    "outputPath": "src/lib/apis/api-types.gen.ts"
-  },
-  "checkMigrations": {
-    "dir": "generated/drizzle"
-  }
-}
 ```
 
 ### `build`
 
-Cleans `outDir`, compiles the package with `tsc` + `tsc-alias`, synthesizes `dist/package.json`
-(`main`/`module`/`types`/`exports`/`typesVersions`, rewritten `sideEffects` and `bin` paths), and copies
-`README.md`/`LICENSE` into the output if present.
+Cleans `outDir`, compiles the package with `tsc` + `tsc-alias` (or a `library`/`component` build's own
+pipeline), synthesizes `dist/package.json`, and copies `README.md`/`LICENSE` into the output if present.
+Dispatches on `.shadowrc.json` `type`: `library`/`component` → a package build; `backend` → a single-file
+`Bun.build` bundle; `spa`/`ssr` → the repo's own Vite build. See `src/config.ts` for the full `build` schema.
 
-Produces a single, flat **ESM** tree (no `esm/`/`cjs/` subdirectories, no CommonJS) with type
-declarations and correct subpath exports. The `exports` map is keyed by public subpath and valued by the
-source-relative base:
+### `verify [--fix] [--fast]`
 
-```jsonc
-{ "build": { "exports": { ".": "index", "./errors": "errors/index", "./utils": "utils/index" } } }
-```
-
-A `bin` entry (string shorthand or `name → base` map) is rewritten into `dist/package.json` pointing at
-the compiled `./…js`, gets a `bun` shebang injected if missing, and is `chmod 755`'d.
-
-**Prerequisites:** a `tsconfig.build.json` extending your `tsconfig.json` (`noEmit: false`,
-`declaration: true`). `typescript` and `tsc-alias` ship as dependencies of this package.
-
-### `verify [--fix]`
-
-Runs, in order, stopping at the first failure:
-
-1. **format** — Prettier over `verify.files`, reading options from the repo's own **`.prettierrc.json`**
-   (resolved by prettier itself, see [Prettier config](#prettier-config)). `shadow` no longer carries a
-   copy of the ruleset, so `shadow verify` and a bare `prettier` run — editor format-on-save, `bunx
-   prettier --write` — read the exact same file and can't drift.
-2. **lint** — ESLint using the **shipped flat config** (`typescript-eslint` strict + stylistic, with
-   **`eslint-plugin-perfectionist`** handling import sorting). `verify.lint.rules` / `verify.lint.ignores`
-   are layered on top. No `eslint.config.js` is needed in the consuming repo.
-3. **type-check** — the repo's `type-check` (or `typecheck`) package.json script, if present.
-4. **test** — the repo's `test` package.json script, if present.
-
-`--fix` applies Prettier and ESLint fixes in place. Steps 3–4 are delegated to the repo's own scripts;
-a step that maps back to `shadow verify` is skipped instead of recursing. This is a local pre-commit
-convenience, not a CI replacement.
-
-#### Prettier config
-
-The Prettier ruleset is **not** kept in `.shadowrc.json`. The standard is a plain **`.prettierrc.json`**
-at the repo root — the one place prettier itself, an editor's format-on-save, and the `shadow verify`
-format step all read from, so nothing can drift. `shadow init` drops it (the canonical ecosystem
-ruleset) when a repo has none:
-
-```json
-{
-  "singleQuote": true,
-  "trailingComma": "all",
-  "printWidth": 180,
-  "arrowParens": "avoid"
-}
-```
-
-`shadow verify` and `shadow gen-api-types` resolve this file via prettier's own config resolution rather
-than applying a built-in ruleset — a repo that wants to tweak an option edits `.prettierrc.json`
-directly. `shadow init` never overwrites an existing prettier config (any `.prettierrc*` /
-`prettier.config.*` file or a package.json `"prettier"` key).
+Runs, in order, stopping at the first failure: **format** (Prettier, reading the root `.prettierrc.json` via
+prettier's own upward config resolution) → **lint** (ESLint with the flat config `src/eslint-config.ts`
+ships, layered with `.shadowrc.json` `verify.lint` overrides) → **type-check** (the workspace's own
+`type-check`/`typecheck` script) → **test** (the workspace's own `test` script). `--fix` applies
+format/lint fixes in place. `--fast` stops after lint — the root pre-commit hook's speed budget.
 
 ### `prepare`
 
-The `prepare`-lifecycle setup, wired by `shadow init` as `"prepare": "shadow prepare"` (the slot husky's
-own `"prepare": "husky"` used) so it runs on every `bun install` / `npm install`. It readies the configs
-the ecosystem needs; **for now that is husky only** — activating git hooks. It tolerates a not-yet-`git
-init`ed repo so a fresh clone's first install never fails.
+The `prepare`-lifecycle hook wired once at the repo root (`"prepare": "husky"` there now owns hook
+activation directly; this command remains for parity with `shadow init`-scaffolded repos and tolerates a
+not-yet-`git init`ed directory).
 
 ### `gen-api-types <url>`
 
-Fetches an OpenAPI document, rewrites every `operationId` to `${method}_${path}` (unique by
-construction), widens non-string GET query parameter types to also accept `string`, runs
-`openapi-typescript`, appends per-schema and `<Name>QueryParams`/`<Name>PathParams` aliases, formats with
-Prettier (the same base ruleset as `verify`), and writes it out atomically.
-
-Output path defaults to `genApiTypes.outputPath`; override per-invocation with `--out <path>`.
-
-### `release <stable|alpha|beta>`
-
-You choose only the **channel**; the CLI infers the rest:
-
-1. Reads the commits since the last `v*` tag and derives the semver bump from Conventional Commits —
-   any breaking change → **major**, any `feat` → **minor**, otherwise → **patch**.
-2. Computes the next version for the chosen channel (`stable` finalizes; `alpha`/`beta` cut or advance a
-   prerelease).
-3. Runs the test gate, builds, then performs **every remote git operation through Octokit**: a Verified
-   `package.json` commit on `main` (Contents API), the `v<version>` tag, and the GitHub release (marked
-   pre-release for `alpha`/`beta`).
-4. Publishes `publishDir` to npm when `release.npm` is `true`.
-
-**Prerequisites:** `GITHUB_TOKEN` in the environment (a GitHub App installation token, so the commit is
-Verified), `NODE_AUTH_TOKEN` for npm publish, and a checkout with full history and tags
-(`fetch-depth: 0`). `--path` defaults to `process.cwd()`.
+Fetches an OpenAPI document, rewrites every `operationId` to `${method}_${path}`, widens non-string GET
+query parameter types to also accept `string`, runs `openapi-typescript`, appends per-schema and
+`<Name>QueryParams`/`<Name>PathParams` aliases, formats with the root Prettier config, and writes the result
+atomically. Output path defaults to `.shadowrc.json` `genApiTypes.outputPath`; override with `--out <path>`.
 
 ### `check-migrations [--dir <path>]`
 
-Runs the repo's `db:generate` script, then fails if it leaves the migrations directory dirty — checking
-both modified **and** untracked files (`git status --porcelain`), since a new migration is a new file
-`git diff` alone would never flag. `--dir` defaults to `checkMigrations.dir` and must resolve inside the
-repo.
+Runs the workspace's `db:generate` script, then fails if it leaves the migrations directory dirty (checked
+via `git status --porcelain`, so a brand-new untracked migration is caught too, not just a diff).
 
-## Example — a library repo
+## Configuration — `.shadowrc.json`
 
-`.shadowrc.json`:
+Unchanged from before the monorepo migration: one optional file per workspace, layered over the defaults in
+`src/config.ts`. `type` genuinely differs per workspace (`library`, `component`, `backend`, `spa`, `ssr`);
+`build`/`verify`/`genApiTypes`/`checkMigrations` blocks hold each workspace's real deltas. There is no
+`release` block anymore — release/publish tooling was retired with the migration to this monorepo, since
+nothing here is published.
 
-```json
-{ "build": { "exports": { ".": "index" } } }
-```
+## Commit-message linting
 
-`package.json`:
+`src/commit-msg.ts` lints against `@commitlint/config-conventional` (plus any `.shadowrc.json`
+`verify.commit` override), run programmatically so no workspace needs its own `commitlint.config.js`. The
+root `.husky/commit-msg` hook drives it: `bun scripts/src/bin/shadow.ts commit-msg "$1"`.
 
-```json
-{
-  "scripts": {
-    "build": "shadow build",
-    "verify": "shadow verify",
-    "type-check": "tsc"
-  }
-}
-```
+## Testing this directory
 
-## Failure and exit-code behavior
-
-Every command throws a `ShadowError` on failure; the CLI catches it, prints the message (no stack trace)
-to stderr, and sets the exit code — `error.exitCode` when set, otherwise `1`. `verify` propagates a
-delegated step's own exit code. Unexpected (non-`ShadowError`) failures print a full stack trace so a bug
-in this package isn't silently swallowed.
+`bun test scripts/tests` from the repo root (also wired as the root `test:tooling` script). `scripts/tsconfig.json`
+extends the root `tsconfig.base.json` and adds only the `@lib/*` path alias — kept for editor support and
+`tsc --noEmit` type-checking, since this directory ships no build output of its own.

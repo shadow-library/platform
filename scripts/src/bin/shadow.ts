@@ -12,7 +12,6 @@ import { isRepoType, REPO_TYPES, type RepoType } from '@lib/config';
 import { genApiTypes } from '@lib/gen-api-types';
 import { init } from '@lib/init';
 import { prepare } from '@lib/prepare';
-import { release } from '@lib/release';
 import { log, ShadowError } from '@lib/utils';
 import { verify } from '@lib/verify';
 
@@ -31,23 +30,22 @@ Usage:
   shadow init [--type <library|component|backend|spa|ssr>]
   shadow prepare
   shadow build [--type <library|component|backend|spa|ssr>]
-  shadow verify [--fix]
+  shadow verify [--fix] [--fast]
   shadow commit-msg <file>
   shadow gen-api-types <url> [--out <path>]
-  shadow release <major|minor|patch|alpha|beta> [--force] [--path <path>]
   shadow check-migrations [--dir <path>]
 
 Commands:
   init [--type <t>]      Set up husky hooks, a starter .shadowrc.json + .prettierrc.json (prompts for the repo type; --type skips it)
   prepare                Prepare-lifecycle setup (wired as "prepare": "shadow prepare"); activates husky. Runs on install
   build [--type <t>]     Build per .shadowrc.json by type: library (flat dist), component (Rollup+CSS Modules), backend (single-file bundle), spa/ssr (vite)
-  verify [--fix]         Format (via the repo's .prettierrc.json) + lint the whole repo, then type-check + test
+  verify [--fix] [--fast] Format (via the repo's .prettierrc.json) + lint the whole repo, then type-check + test
+                          (--fast stops after lint — the root pre-commit hook's speed budget)
   commit-msg <file>      Lint a commit message (drives the husky commit-msg hook)
   gen-api-types <url>    Fetch an OpenAPI document and generate TypeScript types
-  release <type>         Release major|minor|patch (stable, guarded) or alpha|beta (prerelease); libraries only; --force overrides
   check-migrations       Fail if "db:generate" leaves uncommitted migration changes
 
-Configuration lives in .shadowrc.json. See https://github.com/shadow-library/scripts#readme.
+Configuration lives in .shadowrc.json. See scripts/README.md for the full reference.
 `;
 
 /** Validates the optional `--type` flag against the known repo types, so a CI typo fails loudly instead of silently defaulting. */
@@ -88,7 +86,7 @@ async function main(): Promise<number> {
       return 0;
 
     case 'verify':
-      return verify({ cwd, fix: flags.fix === true });
+      return verify({ cwd, fix: flags.fix === true, fast: flags.fast === true });
 
     case 'commit-msg':
       return commitMsg({ cwd, file: positionals[0] ?? '' });
@@ -98,14 +96,6 @@ async function main(): Promise<number> {
       if (!url) throw new ShadowError('Usage: shadow gen-api-types <url> [--out <path>]');
       const out = flags.out;
       await genApiTypes({ cwd, url, outputPath: typeof out === 'string' ? out : undefined });
-      return 0;
-    }
-
-    case 'release': {
-      const releaseType = positionals[0];
-      if (!releaseType) throw new ShadowError('Usage: shadow release <major|minor|patch|alpha|beta> [--force] [--path <path>]');
-      const targetPath = flags.path;
-      await release({ release: releaseType, force: flags.force === true, path: typeof targetPath === 'string' ? targetPath : undefined });
       return 0;
     }
 

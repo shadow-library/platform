@@ -6,12 +6,11 @@
   "description": "Frontend application framework for the Shadow Apps ecosystem — the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
   "sideEffects": false,
   "scripts": {
-    "prepare": "husky",
     "clean": "rm -rf dist",
-    "verify": "shadow verify",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bun test",
-    "build": "shadow build"
+    "build": "bun ../../scripts/src/bin/shadow.ts build"
   },
   "engines": {
     "node": ">=20.0.0"
@@ -64,7 +63,6 @@
     "@types/bun": "^1.3.9",
     "@types/node": "^22.10.2",
     "@types/react": "^19.2.0",
-    "husky": "^9.1.7",
     "react": "^19.2.0"
   }
 }

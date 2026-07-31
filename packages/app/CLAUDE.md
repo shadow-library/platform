@@ -22,9 +22,9 @@ bun run test:integration     # Integration tests only
 To run a single unit test file: `bun test tests/path/to/file.spec.ts`
 To run a single integration test: `bun test ./tests/integration/path/to/file.spec.ts`
 
-**Tooling** is centralized in `@shadow-library/scripts` (the `shadow` CLI), driven by `.shadowrc.json` — there is no local `eslint.config.js`, `.prettierrc`, `commitlint.config.js`, or `.release-it.json`. `shadow build`/`verify`/`release`/`commit-msg` replace the former hand-rolled `scripts/` and release-it setup.
+**Tooling** is centralized in the root `scripts/` tooling (the `shadow` CLI, invoked from this package via `bun run verify`/`bun run build`), driven by `.shadowrc.json` — there is no local `eslint.config.js`, `.prettierrc`, or `commitlint.config.js`. `shadow build`/`verify`/`commit-msg` replace the former hand-rolled `scripts/` setup; release/publish tooling was retired with the migration to the monorepo (this package is private).
 
-**Pre-commit hook** runs `bun verify`; the **commit-msg hook** runs `shadow commit-msg`.
+**Pre-commit and commit-msg hooks live at the repo root** (one Husky setup for the whole monorepo, not per-package) — the pre-commit hook fast-verifies whichever workspaces have staged changes; the commit-msg hook runs `shadow commit-msg`.
 
 ## Architecture
 
@@ -87,7 +87,7 @@ Every TypeScript file follows this section comment pattern:
 
 ### Style rules
 
-Format and lint rules are shipped by `@shadow-library/scripts` (applied via `shadow verify`); `.shadowrc.json` `verify` layers repo-specific overrides on top. Key points:
+Format and lint rules are shipped by the root `scripts/` tooling (applied via `shadow verify`); `.shadowrc.json` `verify` layers repo-specific overrides on top. Key points:
 
 - **Prettier**: single quotes, trailing commas everywhere, 180 char width, no arrow parens
 - **ESLint** (typescript-eslint strict + stylistic): `no-console` is an error; `explicit-module-boundary-types` required; `no-explicit-any` is off; import order enforced by `eslint-plugin-perfectionist` (builtin > external > internal > parent/sibling), where `@lib/*` and `@shadow-library/*` count as **internal** and the four banner comments partition the sorted blocks; Node built-ins must use `node:` protocol prefix

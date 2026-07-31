@@ -6,9 +6,8 @@
   "sideEffects": false,
   "description": "Decorator-based JSON schema generator at runtime",
   "scripts": {
-    "prepare": "husky",
-    "build": "shadow build",
-    "verify": "shadow verify",
+    "build": "bun ../../scripts/src/bin/shadow.ts build",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bun test"
   },

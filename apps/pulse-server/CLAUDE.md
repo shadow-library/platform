@@ -22,9 +22,9 @@ bun run db:migrate          # Run migrations
 bun run db:seed             # Seed initial data
 ```
 
-All scripting (build, lint, format, commit-msg linting, husky hooks) is owned by the `shadow` CLI
-(`@shadow-library/scripts`), configured through `.shadowrc.json` — there is no per-repo eslint,
-prettier, or commitlint config.
+All scripting (build, lint, format, commit-msg linting) is owned by the `shadow` CLI (root `scripts/`
+tooling), configured through `.shadowrc.json` — there is no per-repo eslint, prettier, or commitlint
+config. Husky hooks live once at the repo root, not per-package.
 
 Tests require a running PostgreSQL instance. The template database must be created before running tests (`bun run db:create-template`). Each test file gets its own database cloned from the template via `createDatabaseFromTemplate`.
 

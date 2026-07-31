@@ -13,13 +13,12 @@ import { ShadowError } from '@lib/utils';
  * Defining types
  */
 /**
- * What a repo is, which decides how `shadow build` builds it (and whether `shadow release` applies):
- *  - `library`   — a published package → `tsc` + `tsc-alias` (or a custom bundler) to a flat `dist/` with exports; releasable.
- *  - `component` — a published React component library with CSS Modules → a Rollup + PostCSS build (`shadow init` installs the
- *                  bundler stack); releasable.
- *  - `backend`   — a runnable service → a single-file, tree-shaken `Bun.build` bundle (`bun dist/main.js`); not released.
- *  - `spa`       — a client React app → the repo's `vite build`; not released.
- *  - `ssr`       — a server-rendered React app → the repo's `vite build` (server + client); not released.
+ * What a repo is, which decides how `shadow build` builds it:
+ *  - `library`   — a package consumed by other workspaces → `tsc` + `tsc-alias` (or a custom bundler) to a flat `dist/` with exports.
+ *  - `component` — a React component library with CSS Modules → a Rollup + PostCSS build (`shadow init` installs the bundler stack).
+ *  - `backend`   — a runnable service → a single-file, tree-shaken `Bun.build` bundle (`bun dist/main.js`).
+ *  - `spa`       — a client React app → the repo's `vite build`.
+ *  - `ssr`       — a server-rendered React app → the repo's `vite build` (server + client).
  */
 export type RepoType = 'library' | 'component' | 'backend' | 'spa' | 'ssr';
 
@@ -120,15 +119,6 @@ export interface VerifyConfig {
   test: boolean;
 }
 
-export interface ReleaseConfig {
-  /** Publish the built package to npm after tagging. */
-  npm: boolean;
-  /** Directory published to npm (the build output), relative to the repo root. */
-  publishDir: string;
-  /** Prepend a generated changelog section to the GitHub release body. */
-  changelog: boolean;
-}
-
 export interface GenApiTypesConfig {
   /** Output path for generated API types, relative to the repo root. */
   outputPath: string;
@@ -140,11 +130,10 @@ export interface CheckMigrationsConfig {
 }
 
 export interface ShadowConfig {
-  /** What the repo is — drives how `shadow build` builds it and whether `shadow release` applies. */
+  /** What the repo is — drives how `shadow build` builds it. */
   type: RepoType;
   build: BuildConfig;
   verify: VerifyConfig;
-  release: ReleaseConfig;
   genApiTypes: GenApiTypesConfig;
   checkMigrations: CheckMigrationsConfig;
 }
@@ -172,7 +161,6 @@ export interface RawShadowConfig {
     files?: string | { lint?: string; format?: string };
     test?: boolean;
   };
-  release?: { npm?: boolean; publishDir?: string; changelog?: boolean };
   genApiTypes?: { outputPath?: string };
   checkMigrations?: { dir?: string };
 }
@@ -230,7 +218,6 @@ const DEFAULT_CONFIG: ShadowConfig = {
     formatFiles: DEFAULT_FILES,
     test: true,
   },
-  release: { npm: true, publishDir: 'dist', changelog: true },
   genApiTypes: { outputPath: 'src/lib/apis/api-types.gen.ts' },
   checkMigrations: { dir: 'generated/drizzle' },
 };
@@ -302,11 +289,6 @@ export function loadConfig(cwd: string, packageName?: string): ShadowConfig {
       lintFiles,
       formatFiles,
       test: raw.verify?.test ?? DEFAULT_CONFIG.verify.test,
-    },
-    release: {
-      npm: raw.release?.npm ?? DEFAULT_CONFIG.release.npm,
-      publishDir: raw.release?.publishDir ?? DEFAULT_CONFIG.release.publishDir,
-      changelog: raw.release?.changelog ?? DEFAULT_CONFIG.release.changelog,
     },
     genApiTypes: { outputPath: raw.genApiTypes?.outputPath ?? DEFAULT_CONFIG.genApiTypes.outputPath },
     checkMigrations: { dir: raw.checkMigrations?.dir ?? DEFAULT_CONFIG.checkMigrations.dir },

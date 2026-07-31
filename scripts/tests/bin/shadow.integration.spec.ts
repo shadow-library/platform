@@ -49,14 +49,8 @@ describe('shadow (bin, integration)', () => {
     expect(result.stderr).toContain('Usage: shadow gen-api-types');
   });
 
-  it('should exit 1 with a usage message when release is missing its channel', () => {
-    const result = invoke(['release']);
-    expect(result.status).toBe(1);
-    expect(result.stderr).toContain('Usage: shadow release');
-  });
-
   it('should not print a raw stack trace for a known ShadowError', () => {
-    const result = invoke(['release']);
+    const result = invoke(['gen-api-types']);
     expect(result.stderr).not.toContain(' at ');
   });
 });

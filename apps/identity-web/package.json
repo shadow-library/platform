@@ -3,16 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "prepare": "shadow prepare",
     "dev": "vite dev --port 3000",
-    "build": "shadow build",
+    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "start": "bun main.ts",
     "preview": "vite preview --port 3000",
-    "verify": "shadow verify",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",
-    "generate:api-types": "shadow gen-api-types http://localhost:8080/dev/api-docs/openapi.json"
+    "generate:api-types": "bun ../../scripts/src/bin/shadow.ts gen-api-types http://localhost:8080/dev/api-docs/openapi.json"
   },
   "dependencies": {
     "@shadow-library/common": "workspace:*",

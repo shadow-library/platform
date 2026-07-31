@@ -39,7 +39,6 @@ describe('config', () => {
     expect(config.verify.test).toBe(true);
     expect(config.verify.lint).toStrictEqual({ rules: {}, ignores: [], overrides: [], globals: undefined, react: undefined, reactVersion: undefined });
     expect(config.verify.commit).toStrictEqual({ extends: ['@commitlint/config-conventional'], rules: {} });
-    expect(config.release).toStrictEqual({ npm: true, publishDir: 'dist', changelog: true });
     expect(config.checkMigrations.dir).toBe('generated/drizzle');
   });
 

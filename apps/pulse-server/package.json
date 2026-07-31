@@ -5,16 +5,16 @@
   "version": "0.0.0",
   "description": "A notification service for Shadow applications",
   "scripts": {
-    "prepare": "shadow prepare",
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "shadow verify",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "bun run tsc",
     "test": "bun test",
-    "build": "shadow build",
+    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "dev": "bun run --watch src/main.ts",
     "db:create-template": "bun run scripts/create-template-db.ts",
     "db:migrate": "bun run scripts/migrate-db.ts",
-    "db:seed": "bun run scripts/seed.ts"
+    "db:seed": "bun run scripts/seed.ts",
+    "check-migrations": "bun ../../scripts/src/bin/shadow.ts check-migrations"
   },
   "repository": {
     "type": "git",
@@ -30,7 +30,6 @@
     "@types/bun": "^1.3.1",
     "@types/validator": "^13.15.10",
     "drizzle-kit": "^0.31.7",
-    "husky": "^9.1.7",
     "typescript": "^6.0.3"
   },
   "dependencies": {

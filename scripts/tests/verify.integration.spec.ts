@@ -136,6 +136,16 @@ describe('verify (integration)', () => {
     await expect(verify({ cwd: fixtureDir })).resolves.toBe(1);
   });
 
+  it('should stop after lint under --fast, skipping a failing delegated step', async () => {
+    fixtureDir = createFixtureDir('shadow-verify-fast-');
+    writeFixtureFiles(fixtureDir, {
+      'package.json': JSON.stringify({ name: '@fixtures/fast', scripts: { 'type-check': failScript, test: failScript } }),
+      'src/index.ts': CLEAN_SOURCE,
+    });
+
+    await expect(verify({ cwd: fixtureDir, fast: true })).resolves.toBe(0);
+  });
+
   it('should skip a delegated step that maps back to "shadow verify" instead of recursing', async () => {
     fixtureDir = createFixtureDir('shadow-verify-recursive-');
     writeFixtureFiles(fixtureDir, {

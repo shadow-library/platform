@@ -48,8 +48,9 @@ bun run test         # Playwright e2e (needs the backend up); test:setup install
 bun run generate:api-types   # regenerate src/lib/apis/api-types.gen.ts from the OpenAPI spec
 ```
 
-Tooling (lint/format/commitlint rules, build type, husky hooks) is centralized in `@shadow-library/scripts` —
-the `shadow` CLI — configured through `.shadowrc.json`; there are no per-repo ESLint/Prettier/commitlint configs.
+Tooling (lint/format/commitlint rules, build type) is centralized in the root `scripts/` tooling — the
+`shadow` CLI — configured through `.shadowrc.json`; there are no per-repo ESLint/Prettier/commitlint configs.
+Root-level husky hooks own commit linting and pre-commit checks across the whole monorepo.
 
 ## Environment
 

@@ -9,12 +9,11 @@
     "**/reflector.service.js"
   ],
   "scripts": {
-    "prepare": "husky",
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "shadow verify",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bun test",
-    "build": "shadow build"
+    "build": "bun ../../scripts/src/bin/shadow.ts build"
   },
   "engines": {
     "node": ">=23.0.0"
@@ -32,7 +31,6 @@
   "devDependencies": {
     "@types/bun": "^1.1.13",
     "@types/fast-redact": "^3.0.4",
-    "husky": "^9.1.6",
     "reflect-metadata": "^0.2.2"
   },
   "peerDependencies": {

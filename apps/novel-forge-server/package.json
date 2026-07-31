@@ -5,12 +5,11 @@
   "version": "0.0.0",
   "description": "Backend service for the AI-powered novel generation platform. Provides workflow orchestration, lore management, chapter generation, AI integrations, user review pipelines, and continuity validation.",
   "scripts": {
-    "prepare": "shadow prepare",
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "shadow verify",
+    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc -p tsconfig.json",
     "test": "bun test",
-    "build": "shadow build",
+    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "dev": "bun run --watch src/main.ts",
     "db:create-template": "bun run scripts/create-template-db.ts",
     "db:migrate": "bun run src/migrate.ts",
@@ -21,7 +20,8 @@
     "test:ai:local": "bun test tests/ai/local/",
     "test:ai:unit": "bun test tests/ai/prompts.spec.ts tests/ai/model-router.spec.ts tests/ai/context-assembler.spec.ts",
     "test:ai:graph": "bun test tests/ai/workflow.spec.ts",
-    "test:ai:tools": "bun test tests/ai/tool-registry.spec.ts"
+    "test:ai:tools": "bun test tests/ai/tool-registry.spec.ts",
+    "check-migrations": "bun ../../scripts/src/bin/shadow.ts check-migrations"
   },
   "repository": {
     "type": "git",
@@ -36,7 +36,6 @@
   "devDependencies": {
     "@types/bun": "^1.3.1",
     "drizzle-kit": "^0.31.7",
-    "husky": "^9.1.7",
     "type-fest": "^4.41.0",
     "typescript": "^6.0.3"
   },
