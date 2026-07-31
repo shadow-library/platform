@@ -1,0 +1,11 @@
+{
+  "extends": "./tsconfig.json",
+  "tsc-alias": { "resolveFullPaths": true },
+  "compilerOptions": {
+    /** Emit */
+    "noEmit": false,
+    "declaration": true,
+    "removeComments": true
+  },
+  "include": ["src/**/*.ts"]
+}

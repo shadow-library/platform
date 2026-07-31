@@ -1,0 +1,136 @@
+/**
+ * Importing npm packages
+ */
+import assert from 'node:assert';
+
+import { FastifyDynamicSwaggerOptions } from '@fastify/swagger';
+import { FastifyApiReferenceOptions } from '@scalar/fastify-api-reference';
+import { OpenAPIV3 } from 'openapi-types';
+import { Inject, Injectable } from '@shadow-library/app';
+import { JSONSchema } from '@shadow-library/class-schema';
+import { AppError, Config, utils } from '@shadow-library/common';
+
+/**
+ * Importing user defined packages
+ */
+import { DEFAULT_CONFIGS, HTTP_CORE_CONFIGS } from '../http-core.constants';
+import { type HttpCoreModuleOptions, type OpenAPIOptions } from '../http-core.types';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+@Injectable()
+export class OpenApiService {
+  private readonly options: OpenAPIOptions;
+
+  private schemaCounter = 0;
+  private schemaIdMap = new Map<string, string>();
+
+  constructor(@Inject(HTTP_CORE_CONFIGS) options: HttpCoreModuleOptions) {
+    /** The stamped version ties the served contract to the code revision that produced it, so consumers can trace generated artifacts back to a commit */
+    const version = options.openapi.info?.version ?? Config.register('app.version', DEFAULT_CONFIGS['app.version']);
+    this.options = { ...options.openapi, info: { title: Config.get('app.name'), ...options.openapi.info, version } };
+  }
+
+  private resolveSchemaId(id: string): string {
+    if (!this.options.normalizeSchemaIds) return id;
+    if (!id.startsWith('class-schema:')) return id;
+
+    const existing = this.schemaIdMap.get(id);
+    if (existing) return existing;
+
+    const existingValues = Array.from(this.schemaIdMap.values());
+    let normalized = id.replace('class-schema:', '').split(/[:-]/g)[0] as string;
+    if (existingValues.includes(normalized)) {
+      for (let index = 1; index <= 100; index++) {
+        const candidate = normalized + index;
+        if (!existingValues.includes(candidate)) {
+          normalized = candidate;
+          break;
+        }
+        if (index === 100) throw AppError.internal(`Unable to normalize schema ID for ${id} after 100 attempts`);
+      }
+    }
+
+    this.schemaIdMap.set(id, normalized);
+    return normalized;
+  }
+
+  private normalizeOpenapiSpec(document: Partial<OpenAPIV3.Document>, schema: JSONSchema, normaliseSchema = true): JSONSchema {
+    document.components ??= {};
+    document.components.schemas ??= {};
+    assert(schema.$id, 'Schema must have an $id');
+
+    const schemaId = this.resolveSchemaId(schema.$id);
+    if (document.components.schemas[schemaId]) return { $ref: `#/components/schemas/${schemaId}` };
+
+    const definitions = [schema, ...Object.values(schema.definitions ?? {})];
+    for (const definition of definitions) {
+      if (definition.required?.length === 0) delete definition.required;
+      if (definition.$id && ((schema === definition && normaliseSchema) || schema !== definition)) {
+        const resolvedId = this.resolveSchemaId(definition.$id);
+        document.components.schemas[resolvedId] = utils.object.omitKeys(definition, ['definitions', '$id']);
+      }
+
+      const properties = [...Object.values(definition.properties ?? {}), ...Object.values(definition.patternProperties ?? {})];
+      for (const property of properties) {
+        if (property.$ref && !property.$ref.startsWith('#/components/schemas/')) {
+          const resolvedRefId = this.resolveSchemaId(property.$ref);
+          property.$ref = `#/components/schemas/${resolvedRefId}`;
+        }
+
+        if (property.items?.$ref && !property.items.$ref.startsWith('#/components/schemas/')) {
+          const resolvedRefId = this.resolveSchemaId(property.items.$ref);
+          property.items.$ref = `#/components/schemas/${resolvedRefId}`;
+        }
+      }
+    }
+
+    if (!normaliseSchema) return schema;
+    return { $ref: `#/components/schemas/${schemaId}` };
+  }
+
+  private normalizeParamsOpenapiSpec(document: Partial<OpenAPIV3.Document>, schema: JSONSchema): JSONSchema {
+    const normalizedSchema = this.normalizeOpenapiSpec(document, schema, false);
+
+    const requiredFields = new Set(normalizedSchema.required);
+    const properties = normalizedSchema.properties ?? {};
+    for (const key in properties) {
+      const originalSchema = properties[key] as JSONSchema;
+      if (originalSchema.default !== undefined) requiredFields.delete(key);
+    }
+
+    if (requiredFields.size) normalizedSchema.required = Array.from(requiredFields);
+    else delete normalizedSchema.required;
+
+    return normalizedSchema;
+  }
+
+  getFastifySwaggerOptions(): FastifyDynamicSwaggerOptions {
+    return {
+      openapi: utils.object.omitKeys(this.options, ['enabled', 'routePrefix', 'normalizeSchemaIds']),
+      refResolver: { buildLocalReference: (json, _1, _2, index) => (typeof json.$id === 'string' ? json.$id : `Fragment-${index}`) },
+      transform: opts => {
+        const schema = opts.schema as JSONSchema;
+        const document = (opts as any).openapiObject;
+        if (!schema.$id) schema.$id = `AutoGeneratedSchema${++this.schemaCounter}`;
+        const swaggerSchema = structuredClone(schema);
+        const responses = (swaggerSchema.response ?? {}) as Record<string, JSONSchema>;
+        if (swaggerSchema.body) swaggerSchema.body = this.normalizeOpenapiSpec(document, swaggerSchema.body);
+        if (swaggerSchema.querystring) swaggerSchema.querystring = this.normalizeParamsOpenapiSpec(document, swaggerSchema.querystring);
+        if (swaggerSchema.params) swaggerSchema.params = this.normalizeParamsOpenapiSpec(document, swaggerSchema.params);
+        for (const statusCode in responses) responses[statusCode] = this.normalizeOpenapiSpec(document, responses[statusCode] as JSONSchema);
+        return { schema: swaggerSchema, url: opts.url };
+      },
+    };
+  }
+
+  getScalarOptions(): FastifyApiReferenceOptions {
+    return { routePrefix: this.options.routePrefix };
+  }
+}

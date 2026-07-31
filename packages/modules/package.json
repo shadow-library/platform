@@ -1,0 +1,72 @@
+{
+  "name": "@shadow-library/modules",
+  "type": "module",
+  "version": "0.7.0-alpha.1",
+  "sideEffects": false,
+  "description": " A collection of shared modules for the Shadow Apps ecosystem, providing reusable components for configuration management, authentication, cloud access, email, notifications, and other essential services. Designed for seamless integration across all Node.js applications following the Shadow Library architecture.",
+  "scripts": {
+    "prepare": "husky",
+    "clean": "rm -rf dist logs CHANGELOG.md",
+    "type-check": "tsc",
+    "build": "shadow build",
+    "verify": "shadow verify",
+    "test": "bun test"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/shadow-library/modules.git"
+  },
+  "author": "Leander Paul <leanderpaul97@outlook.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/shadow-library/modules/issues"
+  },
+  "homepage": "https://github.com/shadow-library/modules#readme",
+  "devDependencies": {
+    "@shadow-library/app": "2.0.0-alpha.0",
+    "@shadow-library/class-schema": "0.5.0-alpha.0",
+    "@shadow-library/common": "2.0.0-alpha.1",
+    "@shadow-library/fastify": "2.0.0-alpha.0",
+    "@shadow-library/scripts": "^0.2.3",
+    "@types/bun": "^1.3.1",
+    "@types/luxon": "^3.7.1",
+    "@types/memcached": "^2.2.10",
+    "drizzle-orm": "^0.45.0",
+    "husky": "^9.1.7",
+    "ioredis": "^5.8.2",
+    "memcached": "^2.2.2",
+    "reflect-metadata": "^0.2.2",
+    "typescript": "^5.9.3"
+  },
+  "peerDependencies": {
+    "@shadow-library/app": "^2.0.0-alpha.0",
+    "@shadow-library/class-schema": "^0.5.0-alpha.0",
+    "@shadow-library/common": "^2.0.0-alpha.1",
+    "@shadow-library/fastify": "^2.0.0-alpha.0",
+    "drizzle-orm": "^0.45.0",
+    "ioredis": "^5.8.2",
+    "memcached": "^2.2.2",
+    "reflect-metadata": "^0.2.2"
+  },
+  "dependencies": {
+    "@fastify/compress": "^8.1.0",
+    "@fastify/cookie": "^11.0.2",
+    "@fastify/helmet": "^13.0.2",
+    "@fastify/swagger": "^9.5.2",
+    "@scalar/fastify-api-reference": "^1.38.1",
+    "luxon": "^3.7.2",
+    "openapi-types": "^12.1.3",
+    "type-fest": "^4.41.0"
+  },
+  "peerDependenciesMeta": {
+    "drizzle-orm": {
+      "optional": true
+    },
+    "ioredis": {
+      "optional": true
+    },
+    "memcached": {
+      "optional": true
+    }
+  }
+}
