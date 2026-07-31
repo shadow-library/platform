@@ -148,6 +148,12 @@
   justify-content: space-between;
 }
 
+.progressHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
 .progressRow {
   display: flex;
   flex-direction: column;

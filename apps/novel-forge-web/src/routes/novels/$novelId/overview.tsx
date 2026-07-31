@@ -153,6 +153,15 @@ function RunRow({ run }: RunRowProps): React.JSX.Element {
   );
 }
 
+/** The most recently updated job of `kind`, if any — shared by the polling decision and the render. */
+function latestJob(items: GenerationJobItem[], kind: GenerationJobItem['kind']): GenerationJobItem | undefined {
+  return items.filter(j => j.kind === kind).sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))[0];
+}
+
+function jobIsActive(job: GenerationJobItem | undefined): boolean {
+  return job?.status === 'pending' || job?.status === 'in_progress';
+}
+
 interface ImportJobProgress {
   phase?: string;
   done?: number;
@@ -167,6 +176,8 @@ const IMPORT_PHASE_LABEL: Record<string, string> = {
 
 interface ImportJobBannerProps {
   job: GenerationJobItem;
+  /** Only offered on a failed job — an in-flight import clears itself once the job leaves this list's active states. */
+  onDismiss?: () => void;
 }
 
 /**
@@ -174,7 +185,7 @@ interface ImportJobBannerProps {
  * the same `{ phase, done, total }` shape rebrand/reforge poll, rendered as a compact inline bar
  * instead of a full pipeline dashboard since there is nothing else to configure here.
  */
-function ImportJobBanner({ job }: ImportJobBannerProps): React.JSX.Element {
+function ImportJobBanner({ job, onDismiss }: ImportJobBannerProps): React.JSX.Element {
   const progress = (job.progress ?? null) as ImportJobProgress | null;
   const pct = progress?.total ? Math.round(((progress.done ?? 0) / progress.total) * 100) : null;
   const failed = job.status === 'failed';
@@ -183,10 +194,13 @@ function ImportJobBanner({ job }: ImportJobBannerProps): React.JSX.Element {
     <SectionCard className={styles.sectionSpacer}>
       <div className={styles.progressHead}>
         <h3 className={styles.usageTitle}>{failed ? 'Import failed' : 'Importing novel'}</h3>
-        <StatusChip intent={failed ? 'danger' : 'info'}>
-          {!failed && <Spinner size="sm" />}
-          {failed ? 'failed' : (IMPORT_PHASE_LABEL[progress?.phase ?? ''] ?? 'working')}
-        </StatusChip>
+        <div className={styles.progressHeadActions}>
+          <StatusChip intent={failed ? 'danger' : 'info'}>
+            {!failed && <Spinner size="sm" />}
+            {failed ? 'failed' : (IMPORT_PHASE_LABEL[progress?.phase ?? ''] ?? 'working')}
+          </StatusChip>
+          {onDismiss && <IconButton size="sm" variant="ghost" aria-label="Dismiss" icon={<CloseIcon size={14} />} onClick={onDismiss} />}
+        </div>
       </div>
       {!failed && progress && (
         <div className={styles.progressRow}>
@@ -214,7 +228,12 @@ function OverviewScreen(): React.JSX.Element {
   const statusQuery = useProjectStatusQuery(novelId);
   const usageQuery = useAiUsageQuery(novelId);
   const runsQuery = useListRunsQuery(novelId);
-  const jobsQuery = useListJobsQuery(novelId, true, { refetchInterval: 2500 });
+  // Only the `import` job needs live polling here (it's the one this screen surfaces progress for); once
+  // it settles — or there never was one — stop, rather than polling this project's jobs forever on every
+  // overview visit.
+  const jobsQuery = useListJobsQuery(novelId, true, {
+    refetchInterval: query => (jobIsActive(latestJob(query.state.data?.items ?? [], 'import')) ? 2500 : false),
+  });
   const cloneProject = useCloneProjectMutation(novelId);
   const resetProject = useResetProjectMutation(novelId);
   const uploadCover = useUploadCoverMutation(novelId);
@@ -224,6 +243,8 @@ function OverviewScreen(): React.JSX.Element {
   const [cloneName, setCloneName] = useState('');
   const [resetOpen, setResetOpen] = useState(false);
   const [resetStage, setResetStage] = useState<ResetBody['stage']>('generate');
+  // A failed import banner has no other exit — a fresh import (a different job id) un-dismisses itself.
+  const [dismissedImportJobId, setDismissedImportJobId] = useState<string | null>(null);
 
   const project = projectQuery.data;
   const status = statusQuery.data;
@@ -255,7 +276,7 @@ function OverviewScreen(): React.JSX.Element {
 
   // The most recent `import` job, if any — surfaced right on the landing page a fresh import navigates
   // to, the same status/progress shape rebrand/reforge poll (`GET /projects/:id/jobs`).
-  const importJob = (jobsQuery.data?.items ?? []).filter(j => j.kind === 'import').sort((a, b) => +new Date(b.updatedAt) - +new Date(a.updatedAt))[0];
+  const importJob = latestJob(jobsQuery.data?.items ?? [], 'import');
 
   const roles = usage?.roles ?? [];
   const maxTokens = roles.reduce((m, r) => Math.max(m, r.inputTokens + r.outputTokens), 0);
@@ -304,7 +325,9 @@ function OverviewScreen(): React.JSX.Element {
         <EmptyState size="inline" title="Project not found" />
       ) : (
         <>
-          {importJob && (importJob.status === 'pending' || importJob.status === 'in_progress' || importJob.status === 'failed') && <ImportJobBanner job={importJob} />}
+          {importJob && importJob.id !== dismissedImportJobId && (importJob.status === 'pending' || importJob.status === 'in_progress' || importJob.status === 'failed') && (
+            <ImportJobBanner job={importJob} onDismiss={importJob.status === 'failed' ? () => setDismissedImportJobId(importJob.id) : undefined} />
+          )}
           <div className={styles.header}>
             <ImageUpload
               className={styles.headerCover}

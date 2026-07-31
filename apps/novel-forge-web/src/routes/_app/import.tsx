@@ -25,8 +25,13 @@ export const Route = createFileRoute('/_app/import')({
 const BUNDLE_FORMAT = 'novel-import';
 const BUNDLE_SCHEMA_VERSION = 1;
 
+// Optional-chained like import-plan.tsx's own preview counts (`bundle[key]?.length ?? 0`): a bundle that
+// parses as JSON and carries the right envelope (`format`/`schemaVersion`) can still be structurally
+// broken past that — a missing volume `chapters` array, say. `readBundle` already rejects those before
+// they reach `bundle` state, but this stays defensive so a preview render can never crash into the route
+// error boundary even if that guard is ever loosened.
 function chapterCount(bundle: NovelBundle): number {
-  return bundle.volumes.reduce((sum, volume) => sum + volume.chapters.length, 0);
+  return (bundle.volumes ?? []).reduce((sum, volume) => sum + (volume.chapters?.length ?? 0), 0);
 }
 
 function ImportNovelScreen(): React.JSX.Element {
@@ -46,9 +51,14 @@ function ImportNovelScreen(): React.JSX.Element {
         setParseError(`Not a supported novel-import bundle — expected format "${BUNDLE_FORMAT}" schema version ${BUNDLE_SCHEMA_VERSION}.`);
         return;
       }
-      if (!Array.isArray(parsed.volumes) || parsed.volumes.length === 0) {
+      if (!parsed.novel?.title) {
         setBundle(null);
-        setParseError('The bundle has no volumes — at least one volume with one chapter is required.');
+        setParseError('The bundle is missing its novel metadata (at least a title).');
+        return;
+      }
+      if (!Array.isArray(parsed.volumes) || parsed.volumes.length === 0 || parsed.volumes.some(volume => !Array.isArray(volume.chapters) || volume.chapters.length === 0)) {
+        setBundle(null);
+        setParseError('The bundle has no volumes, or a volume has no chapters — every volume needs at least one chapter.');
         return;
       }
       setBundle(parsed);
@@ -107,7 +117,7 @@ function ImportNovelScreen(): React.JSX.Element {
                   <div className={styles.previewLabel}>Mode</div>
                 </div>
                 <div className={styles.previewCell}>
-                  <div className={styles.previewCount}>{bundle.volumes.length}</div>
+                  <div className={styles.previewCount}>{bundle.volumes?.length ?? 0}</div>
                   <div className={styles.previewLabel}>Volumes</div>
                 </div>
                 <div className={styles.previewCell}>
@@ -115,13 +125,13 @@ function ImportNovelScreen(): React.JSX.Element {
                   <div className={styles.previewLabel}>Chapters</div>
                 </div>
                 <div className={styles.previewCell}>
-                  <div className={styles.previewCount}>{bundle.novel.cover ? 'Yes' : 'No'}</div>
+                  <div className={styles.previewCount}>{bundle.novel?.cover ? 'Yes' : 'No'}</div>
                   <div className={styles.previewLabel}>Cover</div>
                 </div>
               </div>
               <div className={styles.previewNovel}>
-                <span className={styles.previewNovelTitle}>{bundle.novel.title}</span>
-                <span className={styles.previewNovelSynopsis}>{bundle.novel.synopsis}</span>
+                <span className={styles.previewNovelTitle}>{bundle.novel?.title}</span>
+                <span className={styles.previewNovelSynopsis}>{bundle.novel?.synopsis}</span>
               </div>
             </div>
           )}

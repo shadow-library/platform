@@ -38,7 +38,7 @@ export function useAiUsageQuery(projectId: string, enabled = true): UseQueryResu
   return useQuery({ ...aiUsageQueryOptions(projectId), enabled: enabled && Boolean(projectId) });
 }
 
-export function useListJobsQuery(projectId: string, enabled = true, opts?: PollingOptions): UseQueryResult<ListGenerationJobResponse, ApiError> {
+export function useListJobsQuery(projectId: string, enabled = true, opts?: PollingOptions<ListGenerationJobResponse>): UseQueryResult<ListGenerationJobResponse, ApiError> {
   return useQuery<ListGenerationJobResponse, ApiError>({
     queryKey: insightKeys.jobs(projectId),
     queryFn: () => APIRequest.get(`/projects/${projectId}/jobs`).execute(),

@@ -137,10 +137,11 @@ function SourceScreen(): React.JSX.Element {
   const total = status?.chaptersTotal ?? chapters.length;
   const extracted = status?.chaptersExtracted ?? chapters.filter(c => c.status === 'done').length;
 
-  // Chapters land through a novel-import bundle, not a screen action here — extract/consolidate/skeleton
-  // are the pipeline stages this screen can drive. While any of them is running in the background, keep
-  // the chapter list and counters live.
-  const jobActive = (jobsQuery.data?.items ?? []).some(j => j.status === 'pending' || j.status === 'in_progress');
+  // Only `import` (chapters still landing/recombining right after the bundle lands) and `extract` (the
+  // one background job this screen's own actions enqueue — consolidate/skeleton are synchronous) can
+  // change what this screen shows. Other kinds (e.g. an hours-long `generate` run elsewhere in the
+  // project) shouldn't re-trigger this screen's own refresh loop.
+  const jobActive = (jobsQuery.data?.items ?? []).some(j => (j.kind === 'import' || j.kind === 'extract') && (j.status === 'pending' || j.status === 'in_progress'));
   const wasActive = useRef(false);
   useEffect(() => {
     if (wasActive.current && !jobActive) queryClient.invalidateQueries({ queryKey: ['projects', novelId] });
