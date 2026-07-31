@@ -1,5 +1,5 @@
 {
-  "id": "4c046f1d-d0db-4a67-b222-8e6482bb3014",
+  "id": "0463c602-6829-4dda-af0d-aea57cbe38bc",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -88,50 +88,6 @@
           "type": "bigint",
           "primaryKey": false,
           "notNull": false
-        },
-        "source_url": {
-          "name": "source_url",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_adapter": {
-          "name": "source_adapter",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "source_novel_id": {
-          "name": "source_novel_id",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "webnovel_id": {
-          "name": "webnovel_id",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scrape_next_url": {
-          "name": "scrape_next_url",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
-        "scrape_next_number": {
-          "name": "scrape_next_number",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true,
-          "default": 1
-        },
-        "scrape_complete": {
-          "name": "scrape_complete",
-          "type": "boolean",
-          "primaryKey": false,
-          "notNull": true,
-          "default": false
         },
         "story_current_chapter": {
           "name": "story_current_chapter",
@@ -223,12 +179,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "url": {
-          "name": "url",
-          "type": "varchar",
-          "primaryKey": false,
-          "notNull": false
-        },
         "content": {
           "name": "content",
           "type": "text",
@@ -295,12 +245,6 @@
           "primaryKey": false,
           "notNull": false
         },
-        "scraped_at": {
-          "name": "scraped_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": false
-        },
         "created_at": {
           "name": "created_at",
           "type": "timestamp",
@@ -362,73 +306,6 @@
           "columns": [
             "project_id",
             "number"
-          ]
-        }
-      },
-      "policies": {},
-      "checkConstraints": {},
-      "isRLSEnabled": false
-    },
-    "public.reference_chapters": {
-      "name": "reference_chapters",
-      "schema": "",
-      "columns": {
-        "id": {
-          "name": "id",
-          "type": "bigserial",
-          "primaryKey": true,
-          "notNull": true
-        },
-        "project_id": {
-          "name": "project_id",
-          "type": "bigint",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "index": {
-          "name": "index",
-          "type": "integer",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "title": {
-          "name": "title",
-          "type": "varchar(500)",
-          "primaryKey": false,
-          "notNull": true
-        },
-        "created_at": {
-          "name": "created_at",
-          "type": "timestamp",
-          "primaryKey": false,
-          "notNull": true,
-          "default": "now()"
-        }
-      },
-      "indexes": {},
-      "foreignKeys": {
-        "reference_chapters_project_id_projects_id_fk": {
-          "name": "reference_chapters_project_id_projects_id_fk",
-          "tableFrom": "reference_chapters",
-          "tableTo": "projects",
-          "columnsFrom": [
-            "project_id"
-          ],
-          "columnsTo": [
-            "id"
-          ],
-          "onDelete": "cascade",
-          "onUpdate": "no action"
-        }
-      },
-      "compositePrimaryKeys": {},
-      "uniqueConstraints": {
-        "reference_chapters_project_id_index_unique": {
-          "name": "reference_chapters_project_id_index_unique",
-          "nullsNotDistinct": false,
-          "columns": [
-            "project_id",
-            "index"
           ]
         }
       },
@@ -5929,12 +5806,10 @@
       "name": "job_kind",
       "schema": "public",
       "values": [
-        "ingest",
         "extract",
         "generate",
         "finalize",
         "backfill",
-        "resume",
         "rebrand",
         "reforge",
         "publish"

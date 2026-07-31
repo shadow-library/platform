@@ -12,13 +12,10 @@ import { DatabaseModule } from '@shadow-library/modules';
  * Importing user defined packages
  */
 import { AiModule } from '../ai/ai.module';
-import { AcquireService } from './acquire.service';
-import { AdapterRegistry } from './adapters/adapter.registry';
 import { AssetService } from './asset.service';
 import { ChapterController } from './chapter/chapter.controller';
 import { ChapterService } from './chapter/chapter.service';
 import { RecombineService } from './recombine.service';
-import { WebnovelCatalogService } from './webnovel-catalog.service';
 
 /**
  * Defining types
@@ -31,7 +28,7 @@ import { WebnovelCatalogService } from './webnovel-catalog.service';
 @Module({
   imports: [DatabaseModule, AiModule],
   controllers: [ChapterController],
-  providers: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService, WebnovelCatalogService],
-  exports: [ChapterService, AdapterRegistry, AcquireService, AssetService, RecombineService, WebnovelCatalogService],
+  providers: [ChapterService, AssetService, RecombineService],
+  exports: [ChapterService, AssetService, RecombineService],
 })
 export class SourceModule {}

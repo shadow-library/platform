@@ -2,14 +2,14 @@
 
 Translated web novels often split one source chapter into 2–5 translator "chapters" (`Chapter 700 (1/2)`, `Chapter 700 Part 2`, `c700.3`, or a bare repeated title). The recombine
 pass merges these back into original chapters — deterministic title-driven grouping, one AI call for the boundaries titles cannot decide, transactional merge + contiguous
-renumbering — and runs automatically after every completed scrape and as a rebrand-job phase. Drives tasks RC1–RC2 in CLAUDE.md.
+renumbering — and runs automatically as a rebrand/reforge-job phase. Drives tasks RC1–RC2 in CLAUDE.md.
 
 ## 1. Behavior
 
 - `POST /projects/:projectId/recombine` body `{dryRun?, useAi?}` → `{applied, before, after, merged: [{number, title, parts}], ambiguous: [{afterNumber, reason}]}` (synchronous,
   wired through `PipelineController` like `consolidate`).
-- Automatic: `RecombineService.autoRecombine` (always `useAi: true`) runs when an ingest/resume job reports the scrape complete, and in the rebrand job between acquisition and
-  glossary seeding (progress `{phase: 'recombining'}`). Guard violations log-and-skip — automatic hygiene never fails a job.
+- Automatic: `RecombineService.autoRecombine` (always `useAi: true`) runs in the rebrand/reforge job between the chapters-exist check and glossary seeding (progress
+  `{phase: 'recombining'}`). Guard violations log-and-skip — automatic hygiene never fails a job.
 
 ## 2. Detection ladder (`src/modules/source/title-parts.ts`, pure)
 
@@ -32,31 +32,17 @@ the output are ignored; missing decisions default to split.
 
 ## 4. Apply
 
-Guards: project exists + kind `source` (`PRJ_001`/`PRJ_003`); `scrapeComplete` (`SRC_002`); **no derived data** (`SRC_003`) — chapter numbers are referenced by
+Guards: project exists + kind `source` (`PRJ_001`/`PRJ_003`); chapters exist (`SRC_002`); **no derived data** (`SRC_003`) — chapter numbers are referenced by
 `chapters.summary`, `entity_appearances`, `beats`, `chapter_chunks`, `briefs`, `chapter_conversions`, and `drafts`, so renumbering is only legal before any exist.
 (`rebrand_glossary.createdChapter` is display-only metadata and recombine precedes glossary seeding — not guarded.) Dry runs skip the apply guards.
 
 In one transaction: merged content = member bodies joined with a blank line; title = stripped display base; `wordCount` recomputed; `chapters.mergedFrom` (jsonb, RC1 column) =
-`[{number, title, words, url}]` audit trail; absorbed rows deleted; survivors renumbered contiguously in two phases (park on negative numbers, flip sign once) to dodge
-`unique(projectId, number)`; finally `projects.scrapeNextNumber = after + 1`.
+`[{number, title, words}]` audit trail; absorbed rows deleted; survivors renumbered contiguously in two phases (park on negative numbers, flip sign once) to dodge
+`unique(projectId, number)`.
 
 Idempotent: a second run sees clean base titles, so the plan degenerates to a no-op; post-extraction runs are guard-blocked.
 
-## 5. Reference titles from third-party-site.example (WN1–WN2)
+## 5. Limitations
 
-Aggregator sites mirror webnovel's official translation — same chapters, same splits — but frequently lose or mangle the titles. When a project carries the optional
-`projects.webnovelId`, `WebnovelCatalogService` fetches the book's table of contents once (the book page issues the `_csrfToken` cookie the chapter-list endpoint requires) into
-`reference_chapters` (`projectId`, `index`, `title`), and the retitle pass overwrites scraped titles **positionally**: chapter N takes TOC entry N. Webnovel's title wins whenever
-the id is provided; TOC gaps leave scraped titles alone; a count mismatch maps the overlap 1:1 and logs the disagreement instead of guessing.
-
-Webnovel splits chapters exactly like the mirrors do, so the catalog is NOT a merge oracle — its value for recombine is indirect: webnovel titles carry clean part markers, so the
-deterministic ladder works on novels whose source titles were blank. Hook order is therefore retitle → recombine, both on ingest completion and in rebrand phase 1.5. Manual
-lever: `POST /projects/:projectId/retitle` re-fetches the catalog and re-applies titles (`SRC_004` when no id is configured). `autoSync` fetches the catalog only once — later
-runs reuse it — and log-and-skips on any network or parse failure.
-
-## 6. Limitations
-
-- Ongoing novels: once complete, `scrapeNextUrl` is null so a resume cannot continue anyway; if the source grows later, re-ingest appends and a pre-extraction re-run handles the
-  new tail.
 - Already-extracted projects: auto-run no-ops with a log line; recombining them requires deliberately wiping derived data first (out of scope).
 - Null titles are never merged deterministically; they reach the AI only when flagged short.

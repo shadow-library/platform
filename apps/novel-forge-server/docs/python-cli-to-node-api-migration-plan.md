@@ -34,7 +34,7 @@ These were decided by the maintainer and take precedence over the defaults inher
 3. **Job status must be queryable at any time.** The in-process async runner is fine, but the `jobs` table + `GET /jobs/:id` (and `GET /projects/:id/jobs`) must reflect live status/progress at all times (see §7.7).
 4. **Embeddings = `ollama/qwen3-embedding:8b`** (not Voyage), **truncated (Matryoshka/MRL) to 1024 dims**. pgvector dimension = **1024** (`EMBEDDING_DIM=1024`, a single migration/config constant).
 5. **Illustration = OpenAI image generation** (not Gemini) — `openai` provider, `gpt-image-1`.
-6. **Only the `third-party-source` source adapter** is supported now (behind the adapter registry seam; others are add-only).
+6. **Only the removed source adapter** is supported now (behind the adapter registry seam; others are add-only).
 7. **AI providers are config/env-selectable, including local subprocess providers.** Support `ollama` (local server) plus the subscription **subprocess** providers `anthropic-claude-code` and `openai-codex`, enabled by env flags / project config — primarily for local development. (This reverses the earlier "drop CLI providers" assumption.) API-key providers `anthropic` and `openai` remain.
 8. **Illustration image storage is a swappable provider** (NestJS-style DI, which `@shadow-library/*` supports via dynamic modules). Ship a **local-folder** implementation now behind an `IMAGE_STORAGE` token + `ImageStorageProvider` interface; a cloud (e.g. S3) implementation must be swappable by changing one module registration — no service code changes (§9.4).
 9. **No durable external queue** — the in-process runner is sufficient.
@@ -88,7 +88,7 @@ src/lore_forge/
     embeddings.py        backfill missing prose embeddings
     manuscript.py        stitch finalized chapters → manuscript.md
     scaffold.py          copy bible_templates/ → projects/<name>/bible/
-  sources/               source-site adapters (base, registry, third-party-source, page, fetcher, text-cleaner)
+  sources/               source-site adapters (base, registry, the removed adapter, page, fetcher, text-cleaner)
   bible_templates/       the 28-file bible scaffold (frontmatter conventions live here)
   web/                   Flask browse UI (OUT OF SCOPE — replaced by the API)
 data/models.yml          the model registry (kind + prices), keyed by provider/model
@@ -294,7 +294,7 @@ Legend risk: 🟢 mechanical · 🟡 needs care · 🔴 high (core logic / corre
 | `bible.py` | Markdown canon reader/writer + trackers | normalized tables (`entities`,`volumes`,`bible_documents`,`plot_threads`,…) + `modules/bible/*` | BibleService, entity/volume services | The biggest transform: frontmatter→columns, body→text, tracker tables→real tables. Arc→Volume (§1.1.16). | 🔴 |
 | `drafts.py` | draft files + STATUS/DRAFT_STATE | `drafts` table + `modules/generation/draft.service.ts` | DraftService | STATUS.md/DRAFT_STATE.md are derived views (a GET endpoint), not files. `state` → jsonb. | 🟡 |
 | `briefs.py` | outline briefs | `briefs` table + `modules/generation/brief.service.ts` | BriefService | | 🟢 |
-| `pipeline/acquire.py` | resumable scrape | `modules/source/acquire.service.ts` + `sources/*` | AcquireService | Port fetcher + adapters + text cleaner; cursor→`projects` columns. Runs as a job. | 🔴 |
+| `pipeline/acquire.py` | resumable scrape | `modules/source/acquire.service.ts` + `sources/*` | (ported, later removed) | Port fetcher + adapters + text cleaner; cursor→`projects` columns. Runs as a job. | 🔴 |
 | `sources/*` (adapters, text cleaner) | HTML→Markdown, site adapters | `modules/source/adapters/*`, `source/text-cleaner.ts` | (registry) | `text.py` is byte-sensitive — port with byte-level tests. | 🔴 |
 | `pipeline/extract.py` | queue drain → knowledge → embed | `modules/extraction/extraction.service.ts` (+ LangChain) | ExtractionService | Idempotent persist in a txn; enqueue via jobs. | 🔴 |
 | `pipeline/consolidate.py` | significance + relationship promotion | `modules/extraction/consolidate.service.ts` | ConsolidateService | Deterministic; port synonym/structural/symmetric/inverse maps verbatim. | 🟡 |
@@ -403,9 +403,9 @@ Follow pulse patterns: `Create*Body`, `Update*Body extends PartialType(OmitType(
 
 **projects** — folds the SQLite singletons (`project`, `source_novel`, `scrape_cursor`, `story_skeleton`, `novel_spec`→dropped, story-state cursor) into one row (all were 1:1 per project):
 - `id bigserial pk`, `ownerId bigint` (**nullable, unused now — auth-ready seam, decision §1.1.2**), `name varchar(255) notNull unique`, `kind projectKind notNull`, `title varchar(500)`
-- source: `sourceUrl varchar`, `sourceAdapter varchar`, `sourceNovelId varchar`
+- source (columns later dropped when the acquisition pipeline was removed): a source URL, an adapter identifier, and a source novel id (all varchar)
 - new-novel seed: `brief text` (**the user's high-level "what the novel is about" — input for full-bible generation + clone A/B, §8.7**), `premise text`, `themes jsonb`, `instructions text`, `sourceProjectId bigint references(projects.id)` (nullable self-ref: which source it derived from)
-- scrape cursor: `scrapeNextUrl varchar`, `scrapeNextNumber integer notNull default 1`, `scrapeComplete boolean notNull default false`
+- scrape cursor (columns later dropped when the acquisition pipeline was removed): a next-URL field, a next-chapter-number counter (default 1), and a completion flag (default false)
 - story-state cursor: `storyCurrentChapter integer default 0`, `storyCurrentVolumeKey varchar` (the Volume the current chapter belongs to — §1.1.16; single-tier, so no separate arc/volume columns)
 - skeleton: `skeletonCharacterArcs jsonb` (**character** arcs = development journeys, name kept — §1.1.16), `skeletonPowerCurve text`
 - `contentMode` (`pgEnum ['standard','grok_only']`, notNull default `'standard'`) — `grok_only` forces every role to xAI and disables embeddings (§8.5)
@@ -506,7 +506,7 @@ Base: `/api`, `prefixVersioning` (so `/api/v1/...`). All ids are bigint path par
 
 | Verb | Route | Body | Response | Service |
 |---|---|---|---|---|
-| POST | `/ingest` | `IngestBody { limit?, concurrency?, delayMs? }` | 202 `JobResponse` | AcquireService (job `ingest`) |
+| POST | `/ingest` | `IngestBody { limit?, concurrency?, delayMs? }` | 202 `JobResponse` | (job `ingest`, later removed) |
 | POST | `/extract` | `ExtractBody { limit?, retryFailed? }` | 202 `JobResponse` | ExtractionService (job `extract`) |
 | POST | `/consolidate` | `{ significanceChapters?, relationshipChapters? }` | 200 `ConsolidateResponse` | ConsolidateService (sync, no LLM) |
 | POST | `/resume` | — | 202 `JobResponse` | ingest→extract chain |
@@ -807,7 +807,7 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 
 ### Phase 6 — Source pipeline (acquire, extract, consolidate, assets, skeleton)
 - **Files:** `modules/source/{acquire,adapters/*,text-cleaner}.ts`, `modules/extraction/{extraction,consolidate}.service.ts`, `modules/source/asset.service.ts`, `modules/planning/skeleton.service.ts`, jobs module.
-- **Tasks:** port fetcher + third-party-source adapter + `text.py` cleaner (byte-level tests), cursor-driven ingest job, extract job (persist txn + embed + auto-consolidate), consolidate maps, assets renderer (string), skeleton LLM.
+- **Tasks:** port fetcher + the removed source adapter + `text.py` cleaner (byte-level tests), cursor-driven ingest job, extract job (persist txn + embed + auto-consolidate), consolidate maps, assets renderer (string), skeleton LLM.
 - **Acceptance:** faked-fetcher ingest resumes+idempotent; faked-router extract accumulates+resumes; consolidate promotes correctly.
 - **Commands:** `bun test tests/source tests/extraction`.
 
@@ -871,7 +871,7 @@ Use `bun:test` + `TestEnvironment` (template-DB clone per spec) + a **fake `Mode
 - [ ] No placeholder/stub endpoints; no `TODO`/`throw new Error('not implemented')` in shipped routes (the `S3ImageStorageProvider` interface stub is exempt but must be clearly marked).
 - [ ] All long ops are async jobs; **`GET /jobs/:id` reflects live status + progress at any time**; crash-recovery re-claims `in_progress` jobs.
 - [ ] **Concurrency policy holds:** local-LLM work is globally serial; same-novel remote serial; different-novel remote parallel (§9.2).
-- [ ] **Embeddings** = `ollama/qwen3-embedding:8b` truncated to **1024** dims (pgvector `vector(1024)`); **illustration** = `openai/gpt-image-1`; only the `third-party-source` adapter is wired.
+- [ ] **Embeddings** = `ollama/qwen3-embedding:8b` truncated to **1024** dims (pgvector `vector(1024)`); **illustration** = `openai/gpt-image-1`; only the removed source adapter is wired.
 - [ ] **Grok-only isolation:** a `grok_only` project calls **only** `xai` for all LLM/image roles (verified by spy), rejects non-xai overrides (`AI_003`), and runs embeddings/retrieval as no-ops; `standard` projects never touch Grok.
 - [ ] **Grok interlude chapters:** `generate-grok` produces a `generator:grok`, human-reviewed (no auto-judge) chapter; finalize commits prose with **no** bible write-back and **no** embedding; brief for the next chapter uses the grok chapter's summary/state, not its verbatim prose; `validate`/`review` skip grok chapters.
 - [ ] **Staged continuity promotion:** `propose-continuity` (Grok) stages an **editable** proposal without touching the bible; the UI can show + edit the proposed deltas; apply mutates the bible idempotently from the edited proposal (no new LLM call); discard changes nothing.
@@ -898,7 +898,7 @@ Use `bun:test` + `TestEnvironment` (template-DB clone per spec) + a **fake `Mode
 3. **In-process async runner** with **always-queryable job status/progress** (`GET /jobs/:id`); no durable external queue.
 4. **Embeddings = `ollama/qwen3-embedding:8b`** truncated to **1024** dims; pgvector **dim 1024** (constant `EMBEDDING_DIM`).
 5. **Illustration = `openai/gpt-image-1`** (not Gemini).
-6. **Only the `third-party-source` source adapter** (behind the registry seam).
+6. **Only the removed source adapter** (behind the registry seam).
 7. **Providers = `anthropic`, `openai`, `ollama` + env-gated subprocess `anthropic-claude-code` / `openai-codex`** (local-dev subscription usage).
 8. **Image storage = swappable DI provider** (`IMAGE_STORAGE`), local-folder impl now, cloud later via one module change.
 9. **Concurrency:** local-LLM ⇒ global serial; same-novel remote ⇒ serial; different-novel remote ⇒ parallel (§9.2).

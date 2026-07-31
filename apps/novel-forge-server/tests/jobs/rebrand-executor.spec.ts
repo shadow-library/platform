@@ -33,8 +33,6 @@ interface Harness {
 
 interface HarnessOptions {
   failChapters?: number[];
-  stallAcquire?: boolean;
-  acquireBatches?: { ingested: number; complete: boolean }[];
 }
 
 /**
@@ -66,10 +64,10 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  async function seedProject(scrapeComplete: boolean, chapters = 3): Promise<bigint> {
+  async function seedProject(chapters = 3): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
-      .values({ name: `rebrand-exec-${Date.now()}-${Math.random()}`, kind: 'source', scrapeComplete })
+      .values({ name: `rebrand-exec-${Date.now()}-${Math.random()}`, kind: 'source' })
       .returning();
     if (!project) throw new Error('failed to seed project');
     await db.insert(schema.rebrands).values({ projectId: project.id, worldNotes: 'Veldram bible.' });
@@ -77,22 +75,12 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
     return project.id;
   }
 
-  // The executor with scripted collaborators: the acquire stub completes the scrape on its first call
-  // (or stalls), the run service records chapter order and fails on demand, the seed just logs.
+  // The executor with scripted collaborators: the run service records chapter order and fails on
+  // demand, the seed and recombine collaborators just log.
   function buildExecutor(options: HarnessOptions = {}): Harness {
     const events: (string | number)[] = [];
     const jobService = new JobService({ getPostgresClient: () => db } as never);
     const concurrency = new ConcurrencyController();
-
-    const acquireService = {
-      ingest: async (projectId: bigint) => {
-        events.push('ingest');
-        if (options.stallAcquire) return { ingested: 0, complete: false };
-        const batch = options.acquireBatches?.shift() ?? { ingested: 1, complete: true };
-        if (batch.complete) await db.update(schema.projects).set({ scrapeComplete: true }).where(eq(schema.projects.id, projectId));
-        return batch;
-      },
-    } as never;
 
     const rebrandService = {
       seedGlossary: async () => {
@@ -104,13 +92,6 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
     const recombineService = {
       autoRecombine: async () => {
         events.push('recombine');
-        return null;
-      },
-    } as never;
-
-    const webnovelCatalog = {
-      autoSync: async () => {
-        events.push('retitle');
         return null;
       },
     } as never;
@@ -129,10 +110,8 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
       workflowRunService,
       {} as never,
       { getPostgresClient: () => db } as never,
-      acquireService,
       rebrandService,
       recombineService,
-      webnovelCatalog,
       {} as never,
     );
     return { executor, jobService, events };
@@ -145,12 +124,12 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
   }
 
   it('should run the three phases in order and mark the rebrand done', async () => {
-    const projectId = await seedProject(false);
+    const projectId = await seedProject();
     const harness = buildExecutor();
 
     const jobId = await runRebrandJob(harness, projectId);
 
-    expect(harness.events).toEqual(['ingest', 'retitle', 'recombine', 'seed', 1, 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 1, 2, 3]);
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('done');
     const rebrand = await db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) });
@@ -158,7 +137,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
   });
 
   it('should skip converted and attention chapters but always retry failed ones', async () => {
-    const projectId = await seedProject(true);
+    const projectId = await seedProject();
     await db.insert(schema.chapterConversions).values([
       { projectId, chapter: 1, body: 'done prose', status: 'converted' },
       { projectId, chapter: 2, body: '', status: 'failed' },
@@ -167,16 +146,16 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
 
     await runRebrandJob(harness, projectId);
 
-    expect(harness.events).toEqual(['retitle', 'recombine', 'seed', 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 2, 3]);
   });
 
   it('should flag a failed chapter run and keep converting the rest', async () => {
-    const projectId = await seedProject(true);
+    const projectId = await seedProject();
     const harness = buildExecutor({ failChapters: [2] });
 
     const jobId = await runRebrandJob(harness, projectId);
 
-    expect(harness.events).toEqual(['retitle', 'recombine', 'seed', 1, 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 1, 2, 3]);
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('done');
 
@@ -186,7 +165,7 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
   });
 
   it('should never clobber a previous successful body when a forced re-run fails', async () => {
-    const projectId = await seedProject(true, 1);
+    const projectId = await seedProject(1);
     await db.insert(schema.chapterConversions).values({ projectId, chapter: 1, body: 'good prose', status: 'converted' });
     const harness = buildExecutor({ failChapters: [1] });
 
@@ -197,73 +176,31 @@ describe.if(pgAvailable)('JobExecutor.runRebrand', () => {
   });
 
   it('should honour explicit chapters, force, and limit', async () => {
-    const projectId = await seedProject(true);
+    const projectId = await seedProject();
     await db.insert(schema.chapterConversions).values({ projectId, chapter: 1, body: 'done', status: 'converted' });
 
     const explicit = buildExecutor();
     await runRebrandJob(explicit, projectId, { chapters: [3, 1] });
     // Chapter 1 is converted already, so only 3 runs; the requested list is sorted ascending first.
-    expect(explicit.events).toEqual(['retitle', 'recombine', 'seed', 3]);
+    expect(explicit.events).toEqual(['recombine', 'seed', 3]);
 
     const forced = buildExecutor();
     const forcedJobId = await forced.jobService.enqueue(projectId, 'rebrand', `rebrand-${projectId}-forced`, { force: true, limit: 2 });
     await forced.executor.dispatch(forcedJobId);
-    expect(forced.events).toEqual(['retitle', 'recombine', 'seed', 1, 2]);
+    expect(forced.events).toEqual(['recombine', 'seed', 1, 2]);
   });
 
-  it('should recombine after a completed ingest job and skip mid-scrape', async () => {
-    const completed = await seedProject(false);
+  it('should fail the job and mark the rebrand failed when no chapters exist', async () => {
+    const projectId = await seedProject(0);
     const harness = buildExecutor();
-    const jobId = await harness.jobService.enqueue(completed, 'ingest', `ingest-${completed}`, {});
-    await harness.executor.dispatch(jobId);
-    expect(harness.events).toEqual(['ingest', 'retitle', 'recombine']);
-
-    const midScrape = await seedProject(false);
-    const stalled = buildExecutor({ stallAcquire: true });
-    const stalledJobId = await stalled.jobService.enqueue(midScrape, 'ingest', `ingest-${midScrape}`, {});
-    await stalled.executor.dispatch(stalledJobId);
-    expect(stalled.events).toEqual(['ingest']);
-  });
-
-  it('should loop ingest batches to completion when no limit is given', async () => {
-    const projectId = await seedProject(false);
-    const harness = buildExecutor({
-      acquireBatches: [
-        { ingested: 10, complete: false },
-        { ingested: 10, complete: false },
-        { ingested: 3, complete: true },
-      ],
-    });
-    const jobId = await harness.jobService.enqueue(projectId, 'ingest', `ingest-${projectId}`, {});
-    await harness.executor.dispatch(jobId);
-
-    expect(harness.events).toEqual(['ingest', 'ingest', 'ingest', 'retitle', 'recombine']);
-    const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
-    expect(job?.status).toBe('done');
-  });
-
-  it('should keep an explicit ingest limit to a single batch', async () => {
-    const projectId = await seedProject(false);
-    const harness = buildExecutor({ acquireBatches: [{ ingested: 5, complete: false }] });
-    const jobId = await harness.jobService.enqueue(projectId, 'ingest', `ingest-${projectId}`, { limit: 5 });
-    await harness.executor.dispatch(jobId);
-
-    expect(harness.events).toEqual(['ingest']);
-    const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
-    expect(job?.status).toBe('done');
-  });
-
-  it('should fail the job and mark the rebrand failed when acquisition stalls', async () => {
-    const projectId = await seedProject(false);
-    const harness = buildExecutor({ stallAcquire: true });
 
     const jobId = await runRebrandJob(harness, projectId);
 
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('failed');
-    expect(job?.lastError).toContain('acquisition stalled');
+    expect(job?.lastError).toContain('has no chapters');
     const rebrand = await db.query.rebrands.findFirst({ where: eq(schema.rebrands.projectId, projectId) });
     expect(rebrand?.status).toBe('failed');
-    expect(rebrand?.lastError).toContain('acquisition stalled');
+    expect(rebrand?.lastError).toContain('has no chapters');
   });
 });

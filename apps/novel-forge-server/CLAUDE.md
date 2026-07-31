@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Backend service for an AI-powered novel generation platform: story bible, world/character/lore management, volume planning, chapter generation with judge/repair loops, human review, continuity validation, and knowledge retrieval. Built with Bun, TypeScript, Fastify via `@shadow-library/app` + `@shadow-library/fastify` (NestJS-like DI), PostgreSQL + Drizzle + pgvector, LangChain/LangGraph/LlamaIndex.TS.
 
-**Current state:** the platform is built out — 61 of the 63 checklist tasks below are complete. The only open items are **CK5** (remaining knowledge follow-ups: web facts panel, `forRevision` sections, arc-planner reveal authoring, bible-audit spoiler check) and **PB5** (the external `novel-forge-reader` service, which lives in its own repo). Treat the checklist below as a completed build log plus those two follow-ups — not a from-scratch plan.
+**Current state:** the platform is built out — 60 of the 62 checklist tasks below are complete. The only open items are **CK5** (remaining knowledge follow-ups: web facts panel, `forRevision` sections, arc-planner reveal authoring, bible-audit spoiler check) and **PB5** (the external `novel-forge-reader` service, which lives in its own repo). Treat the checklist below as a completed build log plus those two follow-ups — not a from-scratch plan.
 
 ## Source-of-truth documents — read before implementing
 
@@ -81,7 +81,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] A9 — Job executors, crash recovery, checkpoint janitor (A9)
 - [x] A10 — Local LLM test harness: Ollama rung-3 suite + `ai:smoke` (A10, §8)
 - [x] A11 — Hardening sweep, CI wiring, observability polish, docs (A11)
-- [x] M6 — Source pipeline: acquire, extract, consolidate, assets, skeleton (migration Phase 6)
+- [x] M6 — Source pipeline: extract, consolidate, assets, skeleton (migration Phase 6)
 - [x] M7 — Illustration + manuscript modules (non-AI remainder of migration Phase 7)
 - [x] M8 — Final verification against migration §12 checklist + design-doc §8.6 command table
 - [x] R1 — Refinement schema & error codes: `arcs`, `chat_sessions`, `chat_messages`, `refinement_proposals` tables + `volumes`/`briefs` column additions, enums, `ARC_`/`CHT_`/`RFN_`/`PRM_` codes, `content-hash` util (refinement §3). Verify: migration applies to template DB, schema tests green.
@@ -107,9 +107,8 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RB5 — Rebrand job & endpoints: three-phase `runRebrand` executor (flag-and-continue), rebrand controller/DTOs wired via `PipelineModule` (rebrand §6–7). Verify: executor + controller e2e tests.
 - [x] RB6 — Web UI (`novel-forge-web`): rebrand panel — config, start + progress, chapter status list, original/converted reader toggle, re-run, manuscript download (rebrand §8). Verify: web type-check/build green.
 - [x] RC1 — Recombine core: `chapters.mergedFrom` column, `SRC_002`/`SRC_003`, `title-parts` detection ladder, `RecombineService` (guards, transactional merge + renumber, dry-run), `POST /recombine` (recombine §2, §4). Verify: parser matrix + service/e2e tests green.
-- [x] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks on ingest completion + rebrand phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
-- [x] WN1 — Webnovel reference titles: `projects.webnovelId` + `reference_chapters`, `SRC_004`, `WebnovelCatalogService` (cookie + chapter-list fetch, positional retitle, once-only autoSync), `POST /retitle`, executor hooks before recombine (recombine §5). Verify: parser + service/hook tests green.
-- [x] WN2 — Web UI (`novel-forge-web`): optional "Webnovel book ID" field on project creation and settings (recombine §5). Verify: web type-check/build green.
+- [x] RC2 — Recombine AI + auto-run: `recombine` prompt + schema + registry, `useAi` boundary resolution (chunked, default split), executor hooks in rebrand/reforge phase 1.5 (recombine §1, §3). Verify: mocked-router + executor ordering tests green.
+- [x] WN — Reference-title catalog feature (recombine §5) was removed together with the remote-acquisition pipeline; source projects no longer sync chapter titles from an external catalog.
 - [x] PI1 — Plan-import module: bundle DTOs, pure `validatePlanBundle` cross-item validator, transactional import service (overwrite prune, approval pass), `POST /plan/import`, `IMP_` codes, `renderBriefBody` moved to `src/common` (plan-import §1–5). Verify: validator matrix + template-DB e2e import/idempotence/approve tests.
 - [x] PI2 — Web UI (`novel-forge-web`): "Import plan" screen — bundle picker with count preview, overwrite/approve toggles, per-collection result chips, warnings + field-error lists (plan-import §6). Verify: web type-check/lint/build green.
 - [x] PI3 — Authoring skill (external, `~/.claude/skills/novel-plan-forge/`): SKILL.md process, workspace templates, zero-dep `pack.mjs` targeting the §2 bundle (plan-import §7). Verify: packed example workspace imports cleanly against a local server.
@@ -129,7 +128,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 - [x] RF2 — Reforge prompt modules: `AiRole 'reforge'`, `reforge-outline`/`reforge-write` (role reforge) + `reforge-judge` (role judge) prompts + class-schema outputs, registry entries, render goldens (reforge §4). Verify: prompt suite green.
 - [x] RF3 — Reforge context purposes: `forReforgeOutline` + `forReforge` packs, `REFORGE_OUTLINE_BUDGET`/`REFORGE_BUDGET`, stable/volatile split (reforge §5). Verify: assembler tests — stable segment byte-identical across assemblies with unchanged canon.
 - [x] RF4 — Chapter-reforge graph: outline → write → residueScan → judge with single-repair routing (`routeAfterFidelityJudge` — renamed from the doc's `routeAfterJudge` to avoid the shared-barrel clash with chapter-generation's), `sourceBeats` persistence, `runChapterReforge` (reforge §6). Verify: route matrix + mocked-router graph runs.
-- [x] RF5 — Reforge job & endpoints: three-phase `runReforge` executor (flag-and-continue, reuses acquire/recombine/seedGlossary), reforge controller/DTOs wired via `PipelineModule` (reforge §7). `ReforgeModule` imports only `DatabaseModule` — the executor already owns `seedGlossary` via the wired `RebrandService`, so no `ReforgeModule → RebrandModule` edge is needed (keeps the graph acyclic). Verify: executor + controller e2e tests.
+- [x] RF5 — Reforge job & endpoints: three-phase `runReforge` executor (flag-and-continue, reuses recombine/seedGlossary), reforge controller/DTOs wired via `PipelineModule` (reforge §7). `ReforgeModule` imports only `DatabaseModule` — the executor already owns `seedGlossary` via the wired `RebrandService`, so no `ReforgeModule → RebrandModule` edge is needed (keeps the graph acyclic). Verify: executor + controller e2e tests.
 - [x] RF6 — Web UI (`novel-forge-web`): reforge panel — config (instructions, fidelity, judge toggle), start + progress, chapter status list, source/reforged reader toggle, re-run, manuscript download (reforge §8). Verify: web type-check/build green.
 
 **Non-negotiables in every session:** the hard rules in `docs/ai-system-design.md` Appendix A; migration-doc §1.1 decisions; never leave the tree red or half-migrated; prefer deterministic service code over AI calls.

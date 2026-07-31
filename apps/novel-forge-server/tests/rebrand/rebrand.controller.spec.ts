@@ -44,7 +44,7 @@ describe.if(pgAvailable)('Rebrand API', () => {
       .getRouter()
       .mockRequest()
       .post('/api/v1/projects')
-      .body({ name: `rebrand-api-${Math.random()}`, kind, ...(kind === 'source' ? { url: 'https://example.com/novel' } : {}) });
+      .body({ name: `rebrand-api-${Math.random()}`, kind });
     return response.json().id as string;
   }
 
@@ -64,7 +64,6 @@ describe.if(pgAvailable)('Rebrand API', () => {
       expect(status.json()).toMatchObject({
         rebrand: { directives: 'weave romance into the story' },
         sourceChapters: 0,
-        scrapeComplete: false,
         glossaryCount: 0,
         counts: { converted: 0, attention: 0, failed: 0 },
       });

@@ -123,9 +123,6 @@ export class RebrandStatusResponse {
   @Field(() => Integer)
   sourceChapters: number;
 
-  @Field()
-  scrapeComplete: boolean;
-
   @Field(() => Integer)
   glossaryCount: number;
 

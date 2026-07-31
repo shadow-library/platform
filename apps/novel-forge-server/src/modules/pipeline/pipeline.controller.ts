@@ -17,20 +17,7 @@ import { JobService } from '../jobs/job.service';
 import { SkeletonService } from '../planning/skeleton.service';
 import { AssetService } from '../source/asset.service';
 import { RecombineService } from '../source/recombine.service';
-import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
-import {
-  AssetsResponse,
-  ConsolidateResponse,
-  ExtractBody,
-  IngestBody,
-  JobEnqueueResponse,
-  PipelineProjectParams,
-  RecombineBody,
-  RecombineResponse,
-  ResumeResponse,
-  RetitleResponse,
-  SkeletonResponse,
-} from './pipeline.dto';
+import { AssetsResponse, ConsolidateResponse, ExtractBody, JobEnqueueResponse, PipelineProjectParams, RecombineBody, RecombineResponse, SkeletonResponse } from './pipeline.dto';
 
 /**
  * Defining types
@@ -50,22 +37,7 @@ export class PipelineController {
     private readonly consolidateService: ConsolidateService,
     private readonly skeletonService: SkeletonService,
     private readonly recombineService: RecombineService,
-    private readonly webnovelCatalog: WebnovelCatalogService,
   ) {}
-
-  // ─── Ingest ─────────────────────────────────────────────────────────────────
-
-  @Post('/ingest')
-  @HttpStatus(202)
-  @RespondFor(202, JobEnqueueResponse)
-  async ingestSource(@Params() params: PipelineProjectParams, @Body() body: IngestBody): Promise<JobEnqueueResponse> {
-    const { projectId } = params;
-    const payload = { limit: body.limit, delayMs: body.delayMs };
-    const target = `ingest-${projectId}`;
-    const jobId = await this.jobService.enqueue(projectId, 'ingest', target, payload);
-    this.jobExecutor.dispatch(jobId).catch(() => undefined);
-    return { jobId, kind: 'ingest', status: 'pending', target };
-  }
 
   // ─── Extract ─────────────────────────────────────────────────────────────────
 
@@ -79,14 +51,6 @@ export class PipelineController {
     const jobId = await this.jobService.enqueue(projectId, 'extract', target, payload);
     this.jobExecutor.dispatch(jobId).catch(() => undefined);
     return { jobId, kind: 'extract', status: 'pending', target };
-  }
-
-  // ─── Retitle ─────────────────────────────────────────────────────────────────
-
-  @Post('/retitle')
-  @RespondFor(200, RetitleResponse)
-  retitleChapters(@Params() params: PipelineProjectParams): Promise<RetitleResponse> {
-    return this.webnovelCatalog.sync(params.projectId);
   }
 
   // ─── Recombine ───────────────────────────────────────────────────────────────
@@ -120,18 +84,5 @@ export class PipelineController {
   @RespondFor(200, SkeletonResponse)
   generateSkeleton(@Params() params: PipelineProjectParams): Promise<SkeletonResponse> {
     return this.skeletonService.generateSkeleton(params.projectId) as Promise<SkeletonResponse>;
-  }
-
-  // ─── Resume ──────────────────────────────────────────────────────────────────
-
-  @Post('/resume')
-  @HttpStatus(202)
-  @RespondFor(202, ResumeResponse)
-  async resumeIngest(@Params() params: PipelineProjectParams): Promise<ResumeResponse> {
-    const { projectId } = params;
-    const target = `ingest-${projectId}`;
-    const jobId = await this.jobService.enqueue(projectId, 'ingest', target, {});
-    this.jobExecutor.dispatch(jobId).catch(() => undefined);
-    return { jobId };
   }
 }

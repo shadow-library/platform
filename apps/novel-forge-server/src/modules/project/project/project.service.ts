@@ -5,7 +5,7 @@
 /**
  * Importing npm packages
  */
-import { and, asc, desc, eq, inArray, notInArray, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, ne, sql } from 'drizzle-orm';
 import { Inject, Injectable } from '@shadow-library/app';
 import { Logger, OffsetPaginationResult, utils } from '@shadow-library/common';
 import { ContextService } from '@shadow-library/fastify';
@@ -69,8 +69,7 @@ export class ProjectService {
   }
 
   async create(body: CreateProjectBody): Promise<Project.Presented> {
-    if (body.kind === 'source' && !body.url) throw AppErrorCode.SRC_001.create();
-    this.logger.debug('create project', { name: body.name, kind: body.kind, url: body.url, webnovelId: body.webnovelId, contentMode: body.contentMode });
+    this.logger.debug('create project', { name: body.name, kind: body.kind, contentMode: body.contentMode });
 
     const [project] = await this.db
       .insert(schema.projects)
@@ -78,9 +77,7 @@ export class ProjectService {
         ownerId: this.ownerId(),
         name: body.name,
         kind: body.kind,
-        sourceUrl: body.url,
         title: body.title,
-        webnovelId: body.webnovelId,
         // Blank instructions stay null so the column means "use the default"; `present` fills it in.
         instructions: body.instructions?.trim() || null,
         contentMode: body.contentMode,
@@ -196,9 +193,6 @@ export class ProjectService {
           title: source.title,
           contentMode: body.contentMode ?? source.contentMode,
           config: body.config ?? source.config ?? null,
-          sourceUrl: source.sourceUrl,
-          sourceAdapter: source.sourceAdapter,
-          sourceNovelId: source.sourceNovelId,
           skeletonCharacterArcs: source.skeletonCharacterArcs,
           skeletonPowerCurve: source.skeletonPowerCurve,
         })
@@ -247,10 +241,6 @@ export class ProjectService {
               .values(chapterRows.map(r => ({ ...r, projectId: newProject.id })))
               .catch(err => this.databaseService.translateError(err));
           }
-          await tx
-            .update(schema.projects)
-            .set({ scrapeNextUrl: source.scrapeNextUrl, scrapeNextNumber: source.scrapeNextNumber, scrapeComplete: source.scrapeComplete, updatedAt: new Date() })
-            .where(eq(schema.projects.id, newProject.id));
         }
       }
 
@@ -281,14 +271,14 @@ export class ProjectService {
       tablesCleared.push('worldFacts');
       await this.db.delete(schema.mysteries).where(eq(schema.mysteries.projectId, id));
       tablesCleared.push('mysteries');
-      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), inArray(schema.jobs.kind, ['extract', 'resume'])));
-      tablesCleared.push('jobs(extract/resume)');
+      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), eq(schema.jobs.kind, 'extract')));
+      tablesCleared.push('jobs(extract)');
     }
 
     if (stage === 'plan' || stage === 'all') {
       await this.db.delete(schema.volumes).where(eq(schema.volumes.projectId, id));
       if (!tablesCleared.includes('volumes')) tablesCleared.push('volumes');
-      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), notInArray(schema.jobs.kind, ['extract', 'ingest'])));
+      await this.db.delete(schema.jobs).where(and(eq(schema.jobs.projectId, id), ne(schema.jobs.kind, 'extract')));
       if (!tablesCleared.some(t => t.startsWith('jobs'))) tablesCleared.push('jobs(plan)');
     }
 

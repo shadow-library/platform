@@ -36,7 +36,6 @@ export interface RebrandConfigUpdate {
 export interface RebrandStatusResult {
   rebrand: Rebrand.Row;
   sourceChapters: number;
-  scrapeComplete: boolean;
   glossaryCount: number;
   counts: { converted: number; attention: number; failed: number };
 }
@@ -102,8 +101,7 @@ export class RebrandService {
 
   async status(projectId: bigint): Promise<RebrandStatusResult> {
     const rebrand = await this.getOrCreate(projectId);
-    const [project, statusRows, [chapterCount], [glossaryCount]] = await Promise.all([
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+    const [statusRows, [chapterCount], [glossaryCount]] = await Promise.all([
       this.db
         .select({ status: schema.chapterConversions.status, count: sql<number>`count(*)::int` })
         .from(schema.chapterConversions)
@@ -122,7 +120,7 @@ export class RebrandService {
     const counts = { converted: 0, attention: 0, failed: 0 };
     for (const row of statusRows) counts[row.status] = row.count;
 
-    return { rebrand, sourceChapters: chapterCount?.count ?? 0, scrapeComplete: project?.scrapeComplete ?? false, glossaryCount: glossaryCount?.count ?? 0, counts };
+    return { rebrand, sourceChapters: chapterCount?.count ?? 0, glossaryCount: glossaryCount?.count ?? 0, counts };
   }
 
   async listGlossary(projectId: bigint, filter: GlossaryListFilter = {}): Promise<Rebrand.GlossaryEntry[]> {

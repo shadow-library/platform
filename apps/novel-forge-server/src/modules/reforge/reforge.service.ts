@@ -30,7 +30,6 @@ export interface ReforgeConfigUpdate {
 export interface ReforgeStatusResult {
   reforge: Reforge.Row;
   sourceChapters: number;
-  scrapeComplete: boolean;
   glossaryCount: number;
   counts: { reforged: number; attention: number; failed: number };
 }
@@ -93,8 +92,7 @@ export class ReforgeService {
 
   async status(projectId: bigint): Promise<ReforgeStatusResult> {
     const reforge = await this.getOrCreate(projectId);
-    const [project, statusRows, [chapterCount], [glossaryCount]] = await Promise.all([
-      this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) }),
+    const [statusRows, [chapterCount], [glossaryCount]] = await Promise.all([
       this.db
         .select({ status: schema.chapterReforges.status, count: sql<number>`count(*)::int` })
         .from(schema.chapterReforges)
@@ -114,7 +112,7 @@ export class ReforgeService {
     const counts = { reforged: 0, attention: 0, failed: 0 };
     for (const row of statusRows) counts[row.status] = row.count;
 
-    return { reforge, sourceChapters: chapterCount?.count ?? 0, scrapeComplete: project?.scrapeComplete ?? false, glossaryCount: glossaryCount?.count ?? 0, counts };
+    return { reforge, sourceChapters: chapterCount?.count ?? 0, glossaryCount: glossaryCount?.count ?? 0, counts };
   }
 
   /** Per-chapter status summaries for the UI list — bodies stay out, they're fetched per chapter. */

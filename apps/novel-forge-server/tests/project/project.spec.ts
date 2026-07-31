@@ -43,7 +43,6 @@ describe.if(pgAvailable)('Projects API', () => {
       const response = await testEnv.getRouter().mockRequest().post('/api/v1/projects').body({
         name: 'test-source',
         kind: 'source',
-        url: 'https://example.com/novel',
       });
       expect(response.statusCode).toBe(201);
       const body = response.json();

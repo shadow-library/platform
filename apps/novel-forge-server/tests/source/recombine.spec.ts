@@ -77,13 +77,13 @@ describe.if(pgAvailable)('RecombineService', () => {
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  async function seedProject(options: { scrapeComplete?: boolean; kind?: 'source' | 'new_novel' } = {}): Promise<bigint> {
+  async function seedProject(options: { kind?: 'source' | 'new_novel'; withChapters?: boolean } = {}): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
-      .values({ name: `recombine-${Date.now()}-${Math.random()}`, kind: options.kind ?? 'source', scrapeComplete: options.scrapeComplete ?? true, scrapeNextNumber: 7 })
+      .values({ name: `recombine-${Date.now()}-${Math.random()}`, kind: options.kind ?? 'source' })
       .returning();
     if (!project) throw new Error('failed to seed project');
-    await db.insert(schema.chapters).values(FIXTURE.map(f => ({ projectId: project.id, ...f, status: 'done' as const })));
+    if (options.withChapters ?? true) await db.insert(schema.chapters).values(FIXTURE.map(f => ({ projectId: project.id, ...f, status: 'done' as const })));
     return project.id;
   }
 
@@ -106,12 +106,9 @@ describe.if(pgAvailable)('RecombineService', () => {
     expect(gate?.content).toBe('Part one of the gate.\n\nPart two of the gate.');
     expect(gate?.wordCount).toBe(10);
     expect(gate?.mergedFrom).toEqual([
-      { number: 2, title: 'Chapter 2 - The Gate (1/2)', words: 5, url: null },
-      { number: 3, title: 'Chapter 2 - The Gate (2/2)', words: 5, url: null },
+      { number: 2, title: 'Chapter 2 - The Gate (1/2)', words: 5 },
+      { number: 3, title: 'Chapter 2 - The Gate (2/2)', words: 5 },
     ]);
-
-    const project = await db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-    expect(project?.scrapeNextNumber).toBe(5);
   });
 
   it('should be a no-op on a second run', async () => {
@@ -122,8 +119,8 @@ describe.if(pgAvailable)('RecombineService', () => {
     expect(second).toMatchObject({ applied: false, before: 4, after: 4, merged: [] });
   });
 
-  it('should plan without writing in dry-run mode, even mid-scrape', async () => {
-    const projectId = await seedProject({ scrapeComplete: false });
+  it('should plan without writing in dry-run mode', async () => {
+    const projectId = await seedProject();
 
     const result = await service.recombine(projectId, { dryRun: true });
     expect(result).toMatchObject({ applied: false, before: 6, after: 4 });
@@ -132,9 +129,9 @@ describe.if(pgAvailable)('RecombineService', () => {
     expect(rows).toHaveLength(6);
   });
 
-  it('should enforce the scrape-complete and derived-data guards', async () => {
-    const midScrape = await seedProject({ scrapeComplete: false });
-    expect(service.recombine(midScrape)).rejects.toThrow(/completed scrape/);
+  it('should enforce the chapters-exist and derived-data guards', async () => {
+    const empty = await seedProject({ withChapters: false });
+    expect(service.recombine(empty)).rejects.toThrow(/requires chapters to exist/);
 
     const extracted = await seedProject();
     await db.insert(schema.briefs).values({ projectId: extracted, chapter: 1, body: 'brief body' });
@@ -145,15 +142,15 @@ describe.if(pgAvailable)('RecombineService', () => {
   });
 
   it('should log-and-skip guard violations in autoRecombine', async () => {
-    const midScrape = await seedProject({ scrapeComplete: false });
-    expect(await service.autoRecombine(midScrape)).toBeNull();
+    const empty = await seedProject({ withChapters: false });
+    expect(await service.autoRecombine(empty)).toBeNull();
   });
 
   describe('AI boundary resolution', () => {
     async function seedBareRepeat(): Promise<bigint> {
       const [project] = await db
         .insert(schema.projects)
-        .values({ name: `recombine-ai-${Date.now()}-${Math.random()}`, kind: 'source', scrapeComplete: true })
+        .values({ name: `recombine-ai-${Date.now()}-${Math.random()}`, kind: 'source' })
         .returning();
       if (!project) throw new Error('failed to seed project');
       await db.insert(schema.chapters).values([
@@ -174,7 +171,7 @@ describe.if(pgAvailable)('RecombineService', () => {
       expect(String(calls[0]?.['boundaries'])).toContain('flag: bare_repeat');
       expect(String(calls[0]?.['boundaries'])).toContain('the guard caught it.');
 
-      const gate = await db.query.chapters.findFirst({ where: eq(schema.chapters.projectId, projectId) });
+      const gate = await db.query.chapters.findFirst({ where: eq(schema.chapters.projectId, projectId), orderBy: [asc(schema.chapters.number)] });
       expect(gate?.content).toBe('The blade fell and\n\nthe guard caught it.');
     });
 

@@ -29,13 +29,11 @@ export class AppErrorCode extends ServerErrorCode {
   /*!
    * Source Errors
    */
-  static readonly SRC_001 = AppErrorCode.badRequest('SRC_001', 'No source adapter found for this URL');
-  static readonly SRC_002 = AppErrorCode.badRequest('SRC_002', 'Recombine requires a completed scrape — finish ingesting the source first');
+  static readonly SRC_002 = AppErrorCode.badRequest('SRC_002', 'Recombine requires chapters to exist for this project');
   static readonly SRC_003 = AppErrorCode.badRequest(
     'SRC_003',
     'Recombine is unavailable once extraction, briefs, or conversions reference chapters — renumbering would corrupt them',
   );
-  static readonly SRC_004 = AppErrorCode.badRequest('SRC_004', 'No webnovel book id is configured for this project');
 
   /*!
    * Export Errors

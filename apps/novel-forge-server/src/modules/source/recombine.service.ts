@@ -101,7 +101,8 @@ export class RecombineService {
       return this.toResult(plan, false);
     }
 
-    if (!project.scrapeComplete) throw AppErrorCode.SRC_002.create();
+    // Chapters are supplied externally for a source project — nothing to recombine until at least one exists.
+    if (chapters.length === 0) throw AppErrorCode.SRC_002.create();
     await this.assertNoDerivedData(projectId);
     if (plan.after === plan.before) {
       this.logger.debug('recombine: no merges to apply (before == after)', { projectId, before: plan.before });
@@ -227,7 +228,7 @@ export class RecombineService {
 
         if (members.length > 1) {
           const content = members.map(m => m.row.content ?? '').join('\n\n');
-          const mergedFrom: Chapter.MergedPart[] = members.map(m => ({ number: m.number, title: m.title, words: m.words, url: m.row.url }));
+          const mergedFrom: Chapter.MergedPart[] = members.map(m => ({ number: m.number, title: m.title, words: m.words }));
           this.logger.debug('recombine: merging group', { projectId, newNumber, title: group.title, absorbing: members.map(m => m.number) });
           await tx
             .update(schema.chapters)
@@ -253,11 +254,6 @@ export class RecombineService {
         .update(schema.chapters)
         .set({ number: sql`-${schema.chapters.number}`, updatedAt: new Date() })
         .where(and(eq(schema.chapters.projectId, projectId), lt(schema.chapters.number, 0)));
-
-      await tx
-        .update(schema.projects)
-        .set({ scrapeNextNumber: plan.after + 1, updatedAt: new Date() })
-        .where(eq(schema.projects.id, projectId));
     });
   }
 

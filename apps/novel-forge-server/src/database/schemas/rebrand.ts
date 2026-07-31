@@ -39,8 +39,8 @@ export namespace Rebrand {
  * Declaring the constants
  */
 
-// Advisory display state only — resume logic derives the real phase from scrapeComplete,
-// worldNotes and the chapter_conversions rows, so a stale status can never corrupt a run.
+// Advisory display state only — resume logic derives the real phase from worldNotes and the
+// chapter_conversions rows, so a stale status can never corrupt a run.
 export const rebrandStatus = pgEnum('rebrand_status', ['pending', 'ingesting', 'glossary', 'converting', 'done', 'failed']);
 export const rebrandConversionStatus = pgEnum('rebrand_conversion_status', ['converted', 'attention', 'failed']);
 export const rebrandGlossaryCategory = pgEnum('rebrand_glossary_category', ['character', 'place', 'country', 'culture', 'faction', 'technique', 'item', 'term']);

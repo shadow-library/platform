@@ -11,7 +11,7 @@ Reforge is a strict superset of rebrand in intent but a different mechanism: reb
 3. **Remove unpreferred content** — the author declares, in `reforges.instructions`, what to cut (filler arcs, problematic content, undesired subplots, repetitive padding). The writer drops it and repairs the surrounding beat so the chapter still flows. Declared removals are exempt from the fidelity judge's "dropped a beat" check.
 4. **Elevate prose** — unlike `rebrand-convert` (whose style preamble governs only *inserted* material), reforge re-authors the *entire* chapter under `AUTHORING_STYLE` + the project's writing instructions. This is the whole point: bad MTL prose is replaced, not patched.
 5. **Fidelity gate** — a deterministic residue scan (reused from rebrand) plus one AI **fidelity judge** call per chapter check beat coverage, naming consistency, and removal compliance. Prose *taste* is deliberately NOT a gate (the writer owns quality; gating on subjective quality causes repair thrash — same reasoning as `rebrand-audit`). One repair attempt, then flag-and-continue.
-6. **Fully automatic & crash-resumable** — the job finishes acquisition, recombines split parts, seeds the shared glossary, then reforges every chapter ascending. Per-chapter failures flag-and-continue (`failed`/`attention`), never block on a human — identical semantics to the rebrand job.
+6. **Fully automatic & crash-resumable** — the job verifies chapters are present, recombines split parts, seeds the shared glossary, then reforges every chapter ascending. Per-chapter failures flag-and-continue (`failed`/`attention`), never block on a human — identical semantics to the rebrand job.
 
 Fixed decisions: reforged chapters live **side-by-side** (`chapter_reforges`; source + rebrand rows untouched); the rename backbone is **shared with rebrand** (reforge calls `RebrandService.seedGlossary`, idempotent); fidelity defaults to **`preserve`** (preserve meaning, re-prose fully); scope includes a minimal web UI.
 
@@ -28,7 +28,7 @@ AI is used for: glossary seed (rebrand's), per-chapter **outline**, per-chapter 
 
 ## 3. Schema (`src/database/schemas/reforge.ts`) — RF1
 
-- `reforges` — one per project (unique `projectId`): `status` (`reforge_status`: pending|ingesting|glossary|reforging|done|failed — advisory display only; resume derives the real phase from `scrapeComplete`, `rebrands.worldNotes` and reforge rows), `instructions` (author's prose + removal guidance), `fidelity` (`reforge_fidelity`: preserve|close|loose, default `preserve`), `settings` jsonb (`{judgeEnabled?, targetWords?}`), `lastError`.
+- `reforges` — one per project (unique `projectId`): `status` (`reforge_status`: pending|ingesting|glossary|reforging|done|failed — advisory display only; resume derives the real phase from `rebrands.worldNotes` and reforge rows), `instructions` (author's prose + removal guidance), `fidelity` (`reforge_fidelity`: preserve|close|loose, default `preserve`), `settings` jsonb (`{judgeEnabled?, targetWords?}`), `lastError`.
 - `chapter_reforges` — unique (`projectId`, `chapter`): `title`, `body` (`''` sentinel on failed rows), `summary`, `sourceBeats` jsonb (the faithful outline the writer worked from — the fidelity anchor, kept for audit/repair), `changes` jsonb (`{renames, removals, addedScenes, proseNotes}`), `fidelity` jsonb (judge verdict: `{verdict, coveredBeats, missingBeats, drift, naming}`), `carryState` jsonb, `status` (`reforge_chapter_status`: reforged|attention|failed), `issues` jsonb (`[{source: 'residue'|'fidelity'|'run', type, detail, excerpt?}]`), `wordCount`, `runId`, `revision` (+1 per re-reforge).
 
 `job_kind` gains `'reforge'`. Error codes: `REF_001` (reforge not configured, 404), `REF_002` (reforged chapter not found, 404), `REF_003` (source projects only, 400). Baseline migration regenerated; template DB rebuilt.
@@ -75,7 +75,7 @@ loadChapter → outlineContext → outline → writeContext → write → residu
 
 `JobExecutor.runReforge`, kind `'reforge'`, payload `{chapters?: number[], force?: boolean, limit?: number}`. Phases derived from data, never from `reforges.status`:
 
-1. **Acquire** — loop `AcquireService.ingest` until `scrapeComplete`; then `webnovelCatalog.autoSync` + `recombineService.autoRecombine` (shared with rebrand phase 1/1.5).
+1. **Verify chapters** — a source project's chapters are supplied externally before the pipeline runs; the phase throws if none exist. Then `recombineService.autoRecombine` (shared with rebrand phase 1/1.5).
 2. **Glossary** — `RebrandService.seedGlossary` (no-op when world notes already set).
 3. **Reforge** — targets = `payload.chapters` ?? source chapters minus existing `reforged`/`attention` rows (`failed` always retried); `force` re-reforges everything; `limit` caps trial runs. Serial ascending; a failed run upserts a `failed` row and continues.
 
@@ -83,7 +83,7 @@ loadChapter → outlineContext → outline → writeContext → write → residu
 
 - `PUT /projects/:projectId/reforge/config` — instructions/fidelity/settings (getOrCreate; `REF_003` unless kind is `source`).
 - `POST /projects/:projectId/reforge` — 202; enqueue kind `reforge`, target `reforge-{projectId}`.
-- `GET /projects/:projectId/reforge` — reforge row + chapter counts by status + `scrapeComplete` + glossary count + latest reforge-job progress.
+- `GET /projects/:projectId/reforge` — reforge row + chapter counts by status + source chapter count + glossary count + latest reforge-job progress.
 - `GET /projects/:projectId/reforge/chapters/:chapter` — reforge row (`REF_002`).
 - `POST /projects/:projectId/reforge/chapters/:chapter` — 202; single-chapter re-run (`{chapters:[n], force:true}`).
 - `GET /projects/:projectId/reforge/manuscript` — `# title\n\nbody` join of `reforged`+`attention` rows ascending.

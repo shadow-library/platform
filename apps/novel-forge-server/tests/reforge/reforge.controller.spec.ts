@@ -44,7 +44,7 @@ describe.if(pgAvailable)('Reforge API', () => {
       .getRouter()
       .mockRequest()
       .post('/api/v1/projects')
-      .body({ name: `reforge-api-${Math.random()}`, kind, ...(kind === 'source' ? { url: 'https://example.com/novel' } : {}) });
+      .body({ name: `reforge-api-${Math.random()}`, kind });
     return response.json().id as string;
   }
 
@@ -69,7 +69,6 @@ describe.if(pgAvailable)('Reforge API', () => {
       expect(status.json()).toMatchObject({
         reforge: { instructions: 'cut the filler tournament arc; raise the prose', fidelity: 'close' },
         sourceChapters: 0,
-        scrapeComplete: false,
         glossaryCount: 0,
         counts: { reforged: 0, attention: 0, failed: 0 },
       });

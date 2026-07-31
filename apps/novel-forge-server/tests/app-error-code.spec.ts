@@ -25,7 +25,7 @@ describe('AppErrorCode', () => {
   });
 
   it('should define all domain error codes', () => {
-    expect(AppErrorCode.SRC_001).toBeDefined();
+    expect(AppErrorCode.SRC_002).toBeDefined();
     expect(AppErrorCode.CHP_001).toBeDefined();
     expect(AppErrorCode.PLN_001).toBeDefined();
     expect(AppErrorCode.DRF_001).toBeDefined();

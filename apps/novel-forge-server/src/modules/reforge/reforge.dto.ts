@@ -114,9 +114,6 @@ export class ReforgeStatusResponse {
   @Field(() => Integer)
   sourceChapters: number;
 
-  @Field()
-  scrapeComplete: boolean;
-
   @Field(() => Integer)
   glossaryCount: number;
 

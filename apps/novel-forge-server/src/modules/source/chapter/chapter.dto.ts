@@ -61,9 +61,6 @@ export class ChapterListResponse {
   @Field({ optional: true, nullable: true })
   title?: string | null;
 
-  @Field({ optional: true, nullable: true })
-  url?: string | null;
-
   @Field(() => Integer, { optional: true, nullable: true })
   wordCount?: number | null;
 
@@ -75,9 +72,6 @@ export class ChapterListResponse {
 
   @Field()
   continuityApplied: boolean;
-
-  @Field(() => String, { optional: true, nullable: true, format: 'date-time' })
-  scrapedAt?: Date | null;
 
   @Field(() => String, { format: 'date-time' })
   createdAt: Date;

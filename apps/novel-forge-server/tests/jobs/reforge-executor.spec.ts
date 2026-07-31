@@ -33,7 +33,6 @@ interface Harness {
 
 interface HarnessOptions {
   failChapters?: number[];
-  stallAcquire?: boolean;
 }
 
 /**
@@ -65,10 +64,10 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
   // Leaving the pool open starves later spec files of connections and silently skips their suites.
   afterAll(() => (db as unknown as { $client: SQL }).$client.close());
 
-  async function seedProject(scrapeComplete: boolean, chapters = 3): Promise<bigint> {
+  async function seedProject(chapters = 3): Promise<bigint> {
     const [project] = await db
       .insert(schema.projects)
-      .values({ name: `reforge-exec-${Date.now()}-${Math.random()}`, kind: 'source', scrapeComplete })
+      .values({ name: `reforge-exec-${Date.now()}-${Math.random()}`, kind: 'source' })
       .returning();
     if (!project) throw new Error('failed to seed project');
     await db.insert(schema.reforges).values({ projectId: project.id, instructions: 'raise the prose' });
@@ -77,21 +76,12 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
     return project.id;
   }
 
-  // The executor with scripted collaborators: the acquire stub completes the scrape on its first call
-  // (or stalls), the run service records chapter order and fails on demand, the shared seed just logs.
+  // The executor with scripted collaborators: the run service records chapter order and fails on
+  // demand, the shared seed and recombine collaborators just log.
   function buildExecutor(options: HarnessOptions = {}): Harness {
     const events: (string | number)[] = [];
     const jobService = new JobService({ getPostgresClient: () => db } as never);
     const concurrency = new ConcurrencyController();
-
-    const acquireService = {
-      ingest: async (projectId: bigint) => {
-        events.push('ingest');
-        if (options.stallAcquire) return { ingested: 0, complete: false };
-        await db.update(schema.projects).set({ scrapeComplete: true }).where(eq(schema.projects.id, projectId));
-        return { ingested: 1, complete: true };
-      },
-    } as never;
 
     const rebrandService = {
       seedGlossary: async () => {
@@ -103,13 +93,6 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
     const recombineService = {
       autoRecombine: async () => {
         events.push('recombine');
-        return null;
-      },
-    } as never;
-
-    const webnovelCatalog = {
-      autoSync: async () => {
-        events.push('retitle');
         return null;
       },
     } as never;
@@ -128,10 +111,8 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
       workflowRunService,
       {} as never,
       { getPostgresClient: () => db } as never,
-      acquireService,
       rebrandService,
       recombineService,
-      webnovelCatalog,
       {} as never,
     );
     return { executor, jobService, events };
@@ -144,12 +125,12 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
   }
 
   it('should run the three phases in order and mark the reforge done', async () => {
-    const projectId = await seedProject(false);
+    const projectId = await seedProject();
     const harness = buildExecutor();
 
     const jobId = await runReforgeJob(harness, projectId);
 
-    expect(harness.events).toEqual(['ingest', 'retitle', 'recombine', 'seed', 1, 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 1, 2, 3]);
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('done');
     const reforge = await db.query.reforges.findFirst({ where: eq(schema.reforges.projectId, projectId) });
@@ -157,7 +138,7 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
   });
 
   it('should skip reforged and attention chapters but always retry failed ones', async () => {
-    const projectId = await seedProject(true);
+    const projectId = await seedProject();
     await db.insert(schema.chapterReforges).values([
       { projectId, chapter: 1, body: 'done prose', status: 'reforged' },
       { projectId, chapter: 2, body: '', status: 'failed' },
@@ -166,16 +147,16 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
 
     await runReforgeJob(harness, projectId);
 
-    expect(harness.events).toEqual(['retitle', 'recombine', 'seed', 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 2, 3]);
   });
 
   it('should flag a failed chapter run and keep reforging the rest', async () => {
-    const projectId = await seedProject(true);
+    const projectId = await seedProject();
     const harness = buildExecutor({ failChapters: [2] });
 
     const jobId = await runReforgeJob(harness, projectId);
 
-    expect(harness.events).toEqual(['retitle', 'recombine', 'seed', 1, 2, 3]);
+    expect(harness.events).toEqual(['recombine', 'seed', 1, 2, 3]);
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('done');
 
@@ -185,7 +166,7 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
   });
 
   it('should never clobber a previous successful body when a forced re-run fails', async () => {
-    const projectId = await seedProject(true, 1);
+    const projectId = await seedProject(1);
     await db.insert(schema.chapterReforges).values({ projectId, chapter: 1, body: 'good prose', status: 'reforged' });
     const harness = buildExecutor({ failChapters: [1] });
 
@@ -196,31 +177,31 @@ describe.if(pgAvailable)('JobExecutor.runReforge', () => {
   });
 
   it('should honour explicit chapters, force, and limit', async () => {
-    const projectId = await seedProject(true);
+    const projectId = await seedProject();
     await db.insert(schema.chapterReforges).values({ projectId, chapter: 1, body: 'done', status: 'reforged' });
 
     const explicit = buildExecutor();
     await runReforgeJob(explicit, projectId, { chapters: [3, 1] });
     // Chapter 1 is reforged already, so only 3 runs; the requested list is sorted ascending first.
-    expect(explicit.events).toEqual(['retitle', 'recombine', 'seed', 3]);
+    expect(explicit.events).toEqual(['recombine', 'seed', 3]);
 
     const forced = buildExecutor();
     const forcedJobId = await forced.jobService.enqueue(projectId, 'reforge', `reforge-${projectId}-forced`, { force: true, limit: 2 });
     await forced.executor.dispatch(forcedJobId);
-    expect(forced.events).toEqual(['retitle', 'recombine', 'seed', 1, 2]);
+    expect(forced.events).toEqual(['recombine', 'seed', 1, 2]);
   });
 
-  it('should fail the job and mark the reforge failed when acquisition stalls', async () => {
-    const projectId = await seedProject(false);
-    const harness = buildExecutor({ stallAcquire: true });
+  it('should fail the job and mark the reforge failed when no chapters exist', async () => {
+    const projectId = await seedProject(0);
+    const harness = buildExecutor();
 
     const jobId = await runReforgeJob(harness, projectId);
 
     const job = await db.query.jobs.findFirst({ where: eq(schema.jobs.id, jobId) });
     expect(job?.status).toBe('failed');
-    expect(job?.lastError).toContain('acquisition stalled');
+    expect(job?.lastError).toContain('has no chapters');
     const reforge = await db.query.reforges.findFirst({ where: eq(schema.reforges.projectId, projectId) });
     expect(reforge?.status).toBe('failed');
-    expect(reforge?.lastError).toContain('acquisition stalled');
+    expect(reforge?.lastError).toContain('has no chapters');
   });
 });

@@ -69,7 +69,7 @@ describe.if(pgAvailable)('RebrandService', () => {
 
     const [project] = await db
       .insert(schema.projects)
-      .values({ name: `rebrand-svc-${Date.now()}`, kind: 'source', scrapeComplete: true })
+      .values({ name: `rebrand-svc-${Date.now()}`, kind: 'source' })
       .returning();
     if (!project) throw new Error('failed to seed project');
     projectId = project.id;
@@ -143,7 +143,6 @@ describe.if(pgAvailable)('RebrandService', () => {
       const result = await service.status(projectId);
       expect(result.counts).toEqual({ converted: 1, attention: 1, failed: 0 });
       expect(result.sourceChapters).toBe(2);
-      expect(result.scrapeComplete).toBe(true);
       expect(result.glossaryCount).toBe(2);
     });
   });

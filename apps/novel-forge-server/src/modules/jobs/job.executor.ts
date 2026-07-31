@@ -20,9 +20,7 @@ import { WorkflowRunService } from '../ai/graphs/workflow-run.service';
 import { IndexingService } from '../ai/retrieval/indexing.service';
 import { PublishRunner } from '../publishing/publish-runner';
 import { RebrandService } from '../rebrand/rebrand.service';
-import { AcquireService } from '../source/acquire.service';
 import { RecombineService } from '../source/recombine.service';
-import { WebnovelCatalogService } from '../source/webnovel-catalog.service';
 import { ConcurrencyController } from './concurrency.controller';
 import { JobService } from './job.service';
 
@@ -41,11 +39,6 @@ interface ExtractPayload {
   chapters: number[];
 }
 
-interface IngestPayload {
-  limit?: number;
-  delayMs?: number;
-}
-
 interface RebrandPayload {
   chapters?: number[];
   force?: boolean;
@@ -62,10 +55,6 @@ interface ReforgePayload {
  * Declaring the constants
  */
 
-// Pages per acquire batch when scraping to completion — small enough that job progress (and a crash
-// cursor) advances every few seconds, polite enough for the source site.
-const INGEST_BATCH = 10;
-
 @Injectable()
 export class JobExecutor {
   private readonly logger = Logger.getLogger(APP_NAME, JobExecutor.name);
@@ -77,10 +66,8 @@ export class JobExecutor {
     private readonly workflowRunService: WorkflowRunService,
     private readonly indexingService: IndexingService,
     private readonly databaseService: DatabaseService,
-    private readonly acquireService: AcquireService,
     private readonly rebrandService: RebrandService,
     private readonly recombineService: RecombineService,
-    private readonly webnovelCatalog: WebnovelCatalogService,
     private readonly publishRunner: PublishRunner,
   ) {
     this.db = databaseService.getPostgresClient() as PrimaryDatabase;
@@ -148,9 +135,6 @@ export class JobExecutor {
         return this.runExtract(job);
       case 'backfill':
         return this.runBackfill(job);
-      case 'ingest':
-      case 'resume':
-        return this.runIngest(job);
       case 'rebrand':
         return this.runRebrand(job);
       case 'reforge':
@@ -200,44 +184,6 @@ export class JobExecutor {
     this.logger.info('runBackfill: done', { jobId: job.id, projectId: job.projectId });
   }
 
-  // An explicit `limit` keeps the old single-batch behavior; without one the job scrapes to
-  // completion in polite batches, publishing the running chapter count after each so the UI can
-  // follow live. `done` is the total chapters scraped so far (the cursor), not this job's count.
-  private async runIngest(job: Job.Row): Promise<void> {
-    const { limit, delayMs } = (job.payload ?? {}) as IngestPayload;
-    this.logger.info('runIngest: starting', { jobId: job.id, projectId: job.projectId, limit, delayMs, batchSize: INGEST_BATCH });
-    await this.jobService.progress(job.id, { done: 0, total: 0, current: 'scraping', phase: 'ingest' });
-
-    let complete: boolean;
-    let scraped: number;
-    let batch = 0;
-    do {
-      const result = await this.acquireService.ingest(job.projectId, { limit: limit ?? INGEST_BATCH, delayMs });
-      complete = result.complete;
-
-      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, job.projectId), columns: { scrapeNextNumber: true } });
-      scraped = Math.max((project?.scrapeNextNumber ?? 1) - 1, 0);
-      await this.jobService.progress(job.id, { done: scraped, total: 0, current: `chapter ${scraped}`, phase: 'ingest' });
-      this.logger.debug('runIngest: batch complete', { jobId: job.id, batch: batch++, ingested: result.ingested, scrapedTotal: scraped, complete });
-
-      if (!complete && result.ingested === 0) throw AppError.internal('acquisition stalled: 0 pages ingested and the scrape is incomplete');
-    } while (!complete && limit === undefined);
-
-    // A finished scrape triggers the hygiene passes (recombine design §1, §5): reference titles
-    // first — webnovel's part markers feed the recombine ladder — then part merging. Both are safe
-    // no-ops when unconfigured or guarded.
-    if (complete) {
-      this.logger.info('runIngest: scrape complete — running hygiene passes', { jobId: job.id, projectId: job.projectId, scraped });
-      await this.jobService.progress(job.id, { done: scraped, total: scraped, current: 'merging parts', phase: 'recombining' });
-      await this.webnovelCatalog.autoSync(job.projectId);
-      await this.recombineService.autoRecombine(job.projectId);
-    } else {
-      this.logger.info('runIngest: batch limit reached, scrape still incomplete', { jobId: job.id, projectId: job.projectId, scraped });
-    }
-
-    await this.jobService.progress(job.id, { done: scraped, total: scraped, current: 'done', phase: 'ingest' });
-  }
-
   // ─── Rebrand (rebrand design §6) ──────────────────────────────────────────────
   // Three phases, each derived from data — never from rebrands.status, which is advisory display
   // state updated at phase boundaries. Resume recomputes everything, so a crashed job re-posts clean.
@@ -247,26 +193,18 @@ export class JobExecutor {
     this.logger.info('runRebrand: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
 
     try {
-      // Phase 1: finish acquisition. Blocking on a stalled scrape is correct — nothing to convert.
-      let project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+      // Phase 1: a source project's chapters are supplied externally before the pipeline runs —
+      // verify they exist rather than acquiring them ourselves.
+      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       if (!project) throw AppError.internal(`project ${projectId} not found`);
-      this.logger.debug('runRebrand: phase 1 — acquisition', { jobId: job.id, projectId, scrapeComplete: project.scrapeComplete });
-      while (!project.scrapeComplete) {
-        await this.setRebrandStatus(projectId, 'ingesting');
-        await this.jobService.progress(job.id, { done: project.scrapeNextNumber ?? 0, total: 0, current: 'scraping', phase: 'ingest' });
-        const result = await this.acquireService.ingest(projectId, {});
-        project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-        if (!project) throw AppError.internal(`project ${projectId} not found`);
-        this.logger.debug('runRebrand: acquisition batch', { jobId: job.id, ingested: result.ingested, scrapeComplete: project.scrapeComplete });
-        if (result.ingested === 0 && !project.scrapeComplete) throw AppError.internal('acquisition stalled: 0 pages ingested and the scrape is incomplete');
-      }
+      const chapterCount = await this.db.$count(schema.chapters, eq(schema.chapters.projectId, projectId));
+      this.logger.debug('runRebrand: phase 1 — chapters present', { jobId: job.id, projectId, chapterCount });
+      if (chapterCount === 0) throw AppError.internal(`project ${projectId} has no chapters — provide chapters before running rebrand`);
 
-      // Phase 1.5: reference titles from webnovel (when configured), then merge translator-split
-      // chapter parts — both before the glossary ever sees them (recombine design §1, §5); the
-      // guards make these safe no-ops on resume.
-      this.logger.info('runRebrand: phase 1.5 — retitle + recombine', { jobId: job.id, projectId });
+      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them
+      // (recombine design §1); the guard makes this a safe no-op on resume.
+      this.logger.info('runRebrand: phase 1.5 — recombine', { jobId: job.id, projectId });
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
-      await this.webnovelCatalog.autoSync(projectId);
       await this.recombineService.autoRecombine(projectId);
 
       // Phase 2: glossary seed (idempotent inside the service — resume never re-seeds or re-bills).
@@ -307,34 +245,26 @@ export class JobExecutor {
 
   // ─── Reforge (reforge design §7) ──────────────────────────────────────────────
   // Three phases, each derived from data — never from reforges.status, which is advisory display
-  // state. Reuses the rebrand acquire/recombine/seed backbone verbatim, then re-authors each chapter
-  // through the reforge graph. Per-chapter failures flag-and-continue, identical to runRebrand.
+  // state. Reuses the rebrand recombine/seed backbone verbatim, then re-authors each chapter through
+  // the reforge graph. Per-chapter failures flag-and-continue, identical to runRebrand.
   private async runReforge(job: Job.Row): Promise<void> {
     const projectId = job.projectId;
     const payload = (job.payload ?? {}) as ReforgePayload;
     this.logger.info('runReforge: starting', { jobId: job.id, projectId, force: payload.force, limit: payload.limit, chapters: payload.chapters });
 
     try {
-      // Phase 1: finish acquisition. Blocking on a stalled scrape is correct — nothing to reforge.
-      let project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
+      // Phase 1: a source project's chapters are supplied externally before the pipeline runs —
+      // verify they exist rather than acquiring them ourselves.
+      const project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
       if (!project) throw AppError.internal(`project ${projectId} not found`);
-      this.logger.debug('runReforge: phase 1 — acquisition', { jobId: job.id, projectId, scrapeComplete: project.scrapeComplete });
-      while (!project.scrapeComplete) {
-        await this.setReforgeStatus(projectId, 'ingesting');
-        await this.jobService.progress(job.id, { done: project.scrapeNextNumber ?? 0, total: 0, current: 'scraping', phase: 'ingest' });
-        const result = await this.acquireService.ingest(projectId, {});
-        project = await this.db.query.projects.findFirst({ where: eq(schema.projects.id, projectId) });
-        if (!project) throw AppError.internal(`project ${projectId} not found`);
-        this.logger.debug('runReforge: acquisition batch', { jobId: job.id, ingested: result.ingested, scrapeComplete: project.scrapeComplete });
-        if (result.ingested === 0 && !project.scrapeComplete) throw AppError.internal('acquisition stalled: 0 pages ingested and the scrape is incomplete');
-      }
+      const chapterCount = await this.db.$count(schema.chapters, eq(schema.chapters.projectId, projectId));
+      this.logger.debug('runReforge: phase 1 — chapters present', { jobId: job.id, projectId, chapterCount });
+      if (chapterCount === 0) throw AppError.internal(`project ${projectId} has no chapters — provide chapters before running reforge`);
 
-      // Phase 1.5: reference titles from webnovel (when configured), then merge translator-split
-      // chapter parts — both before the glossary ever sees them (recombine design §1, §5); the
-      // guards make these safe no-ops on resume.
-      this.logger.info('runReforge: phase 1.5 — retitle + recombine', { jobId: job.id, projectId });
+      // Phase 1.5: merge translator-split chapter parts before the glossary ever sees them
+      // (recombine design §1); the guard makes this a safe no-op on resume.
+      this.logger.info('runReforge: phase 1.5 — recombine', { jobId: job.id, projectId });
       await this.jobService.progress(job.id, { done: 0, total: 0, current: 'merging parts', phase: 'recombining' });
-      await this.webnovelCatalog.autoSync(projectId);
       await this.recombineService.autoRecombine(projectId);
 
       // Phase 2: glossary seed via the SHARED rebrand rename bible (idempotent — resume never re-seeds

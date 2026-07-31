@@ -6,7 +6,7 @@
  * Importing npm packages
  */
 import { InferEnum, InferSelectModel, relations } from 'drizzle-orm';
-import { AnyPgColumn, bigint, bigserial, boolean, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
+import { AnyPgColumn, bigint, bigserial, integer, pgEnum, pgTable, text, timestamp, varchar } from 'drizzle-orm/pg-core';
 
 /**
  * Importing user defined packages
@@ -84,14 +84,6 @@ export const projects = pgTable('projects', {
   themes: jsonb('themes'),
   instructions: text('instructions'),
   sourceProjectId: bigint('source_project_id', { mode: 'bigint' }).references((): AnyPgColumn => projects.id, { onDelete: 'set null' }),
-  sourceUrl: varchar('source_url'),
-  sourceAdapter: varchar('source_adapter'),
-  sourceNovelId: varchar('source_novel_id'),
-  // Optional third-party-site.example book id — enables the reference-title catalog (recombine design §5).
-  webnovelId: varchar('webnovel_id'),
-  scrapeNextUrl: varchar('scrape_next_url'),
-  scrapeNextNumber: integer('scrape_next_number').notNull().default(1),
-  scrapeComplete: boolean('scrape_complete').notNull().default(false),
   storyCurrentChapter: integer('story_current_chapter').default(0),
   storyCurrentVolumeKey: varchar('story_current_volume_key'),
   skeletonCharacterArcs: jsonb('skeleton_character_arcs'),

@@ -29,7 +29,7 @@ CREATE TYPE "public"."reforge_fidelity" AS ENUM('preserve', 'close', 'loose');--
 CREATE TYPE "public"."reforge_status" AS ENUM('pending', 'ingesting', 'glossary', 'reforging', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."chapter_publication_status" AS ENUM('scheduled', 'published', 'failed', 'unpublished');--> statement-breakpoint
 CREATE TYPE "public"."publication_status" AS ENUM('draft', 'live', 'retired');--> statement-breakpoint
-CREATE TYPE "public"."job_kind" AS ENUM('ingest', 'extract', 'generate', 'finalize', 'backfill', 'resume', 'rebrand', 'reforge', 'publish');--> statement-breakpoint
+CREATE TYPE "public"."job_kind" AS ENUM('extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish');--> statement-breakpoint
 CREATE TYPE "public"."job_status" AS ENUM('pending', 'in_progress', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."validation_scope" AS ENUM('novel', 'chapter');--> statement-breakpoint
 CREATE TYPE "public"."draft_revision_source" AS ENUM('generated', 'patched', 'rewritten', 'revised', 'imported', 'hand_edited', 'chat_edited');--> statement-breakpoint
@@ -52,13 +52,6 @@ CREATE TABLE "projects" (
 	"themes" jsonb,
 	"instructions" text,
 	"source_project_id" bigint,
-	"source_url" varchar,
-	"source_adapter" varchar,
-	"source_novel_id" varchar,
-	"webnovel_id" varchar,
-	"scrape_next_url" varchar,
-	"scrape_next_number" integer DEFAULT 1 NOT NULL,
-	"scrape_complete" boolean DEFAULT false NOT NULL,
 	"story_current_chapter" integer DEFAULT 0,
 	"story_current_volume_key" varchar,
 	"skeleton_character_arcs" jsonb,
@@ -72,7 +65,6 @@ CREATE TABLE "chapters" (
 	"project_id" bigint NOT NULL,
 	"number" integer NOT NULL,
 	"title" varchar(500),
-	"url" varchar,
 	"content" text,
 	"summary" text,
 	"word_count" integer,
@@ -83,19 +75,9 @@ CREATE TABLE "chapters" (
 	"continuity_applied" boolean DEFAULT false NOT NULL,
 	"merged_from" jsonb,
 	"note" text,
-	"scraped_at" timestamp,
 	"created_at" timestamp DEFAULT now() NOT NULL,
 	"updated_at" timestamp DEFAULT now() NOT NULL,
 	CONSTRAINT "chapters_project_id_number_unique" UNIQUE("project_id","number")
-);
---> statement-breakpoint
-CREATE TABLE "reference_chapters" (
-	"id" bigserial PRIMARY KEY NOT NULL,
-	"project_id" bigint NOT NULL,
-	"index" integer NOT NULL,
-	"title" varchar(500) NOT NULL,
-	"created_at" timestamp DEFAULT now() NOT NULL,
-	CONSTRAINT "reference_chapters_project_id_index_unique" UNIQUE("project_id","index")
 );
 --> statement-breakpoint
 CREATE TABLE "canon_facts" (
@@ -736,7 +718,6 @@ CREATE TABLE "workflow_runs" (
 --> statement-breakpoint
 ALTER TABLE "projects" ADD CONSTRAINT "projects_source_project_id_projects_id_fk" FOREIGN KEY ("source_project_id") REFERENCES "public"."projects"("id") ON DELETE set null ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "chapters" ADD CONSTRAINT "chapters_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
-ALTER TABLE "reference_chapters" ADD CONSTRAINT "reference_chapters_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "canon_facts" ADD CONSTRAINT "canon_facts_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "character_knowledge" ADD CONSTRAINT "character_knowledge_project_id_projects_id_fk" FOREIGN KEY ("project_id") REFERENCES "public"."projects"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint
 ALTER TABLE "character_knowledge" ADD CONSTRAINT "character_knowledge_fact_id_canon_facts_id_fk" FOREIGN KEY ("fact_id") REFERENCES "public"."canon_facts"("id") ON DELETE cascade ON UPDATE no action;--> statement-breakpoint

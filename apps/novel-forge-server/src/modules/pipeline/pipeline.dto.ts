@@ -28,15 +28,6 @@ export class PipelineProjectParams {
 }
 
 @Schema()
-export class IngestBody {
-  @Field(() => Integer, { optional: true })
-  limit?: number;
-
-  @Field(() => Integer, { optional: true })
-  delayMs?: number;
-}
-
-@Schema()
 export class ExtractBody {
   @Field(() => Integer, { optional: true })
   limit?: number;
@@ -84,27 +75,6 @@ export class SkeletonResponse {
 
   @Field()
   powerCurve: string;
-}
-
-@Schema()
-export class ResumeResponse {
-  @Field()
-  jobId: string;
-}
-
-@Schema()
-export class RetitleResponse {
-  @Field(() => Integer)
-  fetched: number;
-
-  @Field(() => Integer)
-  retitled: number;
-
-  @Field(() => Integer)
-  chapterCount: number;
-
-  @Field(() => Integer)
-  referenceCount: number;
 }
 
 @Schema()

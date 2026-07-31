@@ -38,8 +38,8 @@ export namespace Reforge {
  * Declaring the constants
  */
 
-// Advisory display state only — resume logic derives the real phase from scrapeComplete, the shared
-// rebrand world notes and the chapter_reforges rows, so a stale status can never corrupt a run.
+// Advisory display state only — resume logic derives the real phase from the shared rebrand world
+// notes and the chapter_reforges rows, so a stale status can never corrupt a run.
 export const reforgeStatus = pgEnum('reforge_status', ['pending', 'ingesting', 'glossary', 'reforging', 'done', 'failed']);
 export const reforgeChapterStatus = pgEnum('reforge_chapter_status', ['reforged', 'attention', 'failed']);
 // How faithful the re-author stays to the source: preserve = keep beats + dialogue meaning, re-prose fully

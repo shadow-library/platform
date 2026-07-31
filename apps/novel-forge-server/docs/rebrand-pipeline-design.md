@@ -1,6 +1,6 @@
 # Rebrand Pipeline Design
 
-A fully-automated conversion pipeline for source projects: it takes the scraped source novel and produces a "rebranded" version — de-nationalized, renamed into a
+A fully-automated conversion pipeline for source projects: it takes the source novel's chapters and produces a "rebranded" version — de-nationalized, renamed into a
 fictional alternate world, copy-edited — with optional directive-driven scene insertion. One POST runs everything with zero human intervention. This doc drives
 tasks RB1–RB6 in CLAUDE.md and follows the conventions of `ai-system-design.md` (its Appendix A hard rules apply unchanged).
 
@@ -13,8 +13,8 @@ tasks RB1–RB6 in CLAUDE.md and follows the conventions of `ai-system-design.md
    dialogue meaning are preserved.
 4. **Optional scene insertion** — a free-text directive on the rebrand config (e.g. "weave romance in") licenses added scenes, with cross-chapter continuity carried
    in a per-chapter `carryState` (the drafts `state` precedent).
-5. **Fully automatic** — the job finishes acquisition if needed, seeds the glossary, then converts every chapter ascending. Crash-resumable at every step;
-   per-chapter failures flag-and-continue (status `failed`/`attention`), never block on a human.
+5. **Fully automatic** — the job verifies the project's chapters are present, seeds the glossary, then converts every chapter ascending. Crash-resumable at every
+   step; per-chapter failures flag-and-continue (status `failed`/`attention`), never block on a human.
 
 Fixed decisions: converted chapters live **side-by-side** in the same project (`chapter_conversions`; source rows untouched); quality gate is a **deterministic
 residue scan + one AI audit call** per chapter with a single repair attempt; scope includes a minimal web UI.
@@ -38,7 +38,7 @@ AI is used only for: glossary seed, per-chapter convert, per-chapter audit.
 ## 3. Schema (`src/database/schemas/rebrand.ts`)
 
 - `rebrands` — one per project: `status` (`rebrand_status`: pending|ingesting|glossary|converting|done|failed — advisory display only; resume derives the real phase
-  from `scrapeComplete`, `worldNotes` and conversion rows), `directives`, `worldNotes` (null = unseeded), `settings` jsonb (`{bannedExtra?, auditEnabled?}`),
+  from `worldNotes` and conversion rows), `directives`, `worldNotes` (null = unseeded), `settings` jsonb (`{bannedExtra?, auditEnabled?}`),
   `lastError`. Unique on `projectId`.
 - `rebrand_glossary` — `sourceName` (unique with `projectId`), `variants` jsonb string[], `replacement`, `category` (`rebrand_glossary_category`:
   character|place|country|culture|faction|technique|item|term), `notes`, `createdChapter` (0 = seeded, N = discovered converting chapter N).
@@ -93,9 +93,9 @@ loadChapter → assembleContext → convert → residueScan → audit ─┬→ 
 Kind `'rebrand'`, payload `{chapters?: number[], force?: boolean, limit?: number}`. Three phases, each derived from data (never from `rebrands.status`, which is
 updated at phase boundaries for display only):
 
-1. **Acquire** — loop `AcquireService.ingest` until `scrapeComplete`. A stalled loop (0 pages ingested, still incomplete) throws — pre-conversion, blocking is
-   correct. Once complete, the recombine pass runs (`RecombineService.autoRecombine`, see `chapter-recombine-design.md`) to merge translator-split chapter parts
-   before anything downstream sees them; its guards make it a safe no-op on already-processed projects.
+1. **Verify chapters** — a source project's chapters are supplied externally before the pipeline runs; the phase throws if none exist — pre-conversion, blocking is
+   correct. Then the recombine pass runs (`RecombineService.autoRecombine`, see `chapter-recombine-design.md`) to merge translator-split chapter parts before
+   anything downstream sees them; its guards make it a safe no-op on already-processed projects.
 2. **Glossary** — `RebrandService.seedGlossary` (no-op when `worldNotes` is already set).
 3. **Convert** — target chapters = `payload.chapters` ?? source chapters minus existing `converted`/`attention` conversions (`failed` always retried); `force`
    reconverts everything; `limit` caps the batch for trial runs. Chapters run ascending, serial. A failed run upserts a `failed` conversion row with the error in
@@ -107,7 +107,7 @@ Resume recomputes the remaining chapters from the DB on every run; the chapter l
 
 - `PUT /projects/:projectId/rebrand/config` — directives/settings (creates the row via getOrCreate; `RBR_003` unless project kind is `source`).
 - `POST /projects/:projectId/rebrand` — 202; enqueue kind `rebrand`, target `rebrand-{projectId}`; fire-and-forget dispatch.
-- `GET /projects/:projectId/rebrand` — rebrand row + conversion counts by status + `scrapeComplete` + glossary count + latest rebrand-job progress.
+- `GET /projects/:projectId/rebrand` — rebrand row + conversion counts by status + source chapter count + glossary count + latest rebrand-job progress.
 - `GET /projects/:projectId/rebrand/glossary` — list (category/page/limit).
 - `GET /projects/:projectId/rebrand/chapters/:chapter` — conversion row (`RBR_002`).
 - `POST /projects/:projectId/rebrand/chapters/:chapter` — 202; single-chapter re-run (target `rebrand-{projectId}-ch-{chapter}`, payload

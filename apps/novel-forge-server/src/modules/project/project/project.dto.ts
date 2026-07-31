@@ -39,14 +39,7 @@ export class CreateProjectBody {
   kind: Project.Kind;
 
   @Field({ optional: true })
-  url?: string;
-
-  @Field({ optional: true })
   title?: string;
-
-  // Optional third-party-site.example book id — the source of authoritative chapter titles for source projects.
-  @Field({ optional: true })
-  webnovelId?: string;
 
   // Author instructions for how the AI writes each chapter (voice, craft, length). Left unset, the
   // project falls back to DEFAULT_WRITING_INSTRUCTIONS.
@@ -177,15 +170,6 @@ export class ProjectResponse {
   @Field({ optional: true, nullable: true })
   instructions?: string | null;
 
-  @Field({ optional: true, nullable: true })
-  sourceUrl?: string | null;
-
-  @Field({ optional: true, nullable: true })
-  webnovelId?: string | null;
-
-  @Field()
-  scrapeComplete: boolean;
-
   @Field(() => Integer, { optional: true, nullable: true })
   storyCurrentChapter?: number | null;
 
@@ -223,9 +207,6 @@ export class UpdateProjectBody {
   // Author chapter-writing instructions; send empty string to clear back to the default.
   @Field({ optional: true, nullable: true })
   instructions?: string | null;
-
-  @Field({ optional: true, nullable: true })
-  webnovelId?: string | null;
 }
 
 @Schema()

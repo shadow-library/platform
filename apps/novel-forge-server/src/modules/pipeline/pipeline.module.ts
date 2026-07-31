@@ -35,7 +35,7 @@ import { PipelineController } from './pipeline.controller';
  *
  * Intentionally separate from SourceModule and JobsModule to avoid circular
  * dependencies: SourceModule has no JobsModule dependency; JobsModule imports
- * SourceModule (for AcquireService in JobExecutor) and RebrandModule (for
+ * SourceModule (for RecombineService in JobExecutor) and RebrandModule (for
  * RebrandService in the rebrand job) — so their controllers live here.
  */
 @Module({
