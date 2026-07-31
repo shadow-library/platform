@@ -1,0 +1,6 @@
+{
+  "verify": {
+    "files": "**/*.ts",
+    "test": false
+  }
+}

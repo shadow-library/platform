@@ -270,6 +270,11 @@
     "e2e": {
       "name": "e2e",
       "version": "0.0.0",
+      "devDependencies": {
+        "@playwright/test": "catalog:",
+        "@types/bun": "catalog:",
+        "typescript": "catalog:",
+      },
     },
     "packages/app": {
       "name": "@shadow-library/app",

@@ -4,11 +4,18 @@
   "type": "module",
   "license": "UNLICENSED",
   "version": "0.0.0",
-  "description": "Whole-platform Playwright suite — cross-app flows against already-deployed service URLs supplied via E2E_* environment variables (no local compose deployment). Stub only; a later phase fills this in.",
+  "description": "Whole-platform Playwright suite — cross-app smoke flows against already-deployed service URLs supplied via environment variables (see README.md).",
   "scripts": {
     "verify": "bun ../scripts/src/bin/shadow.ts verify",
-    "build": "echo 'e2e: nothing to build yet'",
+    "build": "echo 'e2e: nothing to build'",
     "type-check": "tsc",
-    "test": "bun test"
+    "test": "bunx playwright test",
+    "test:setup": "bunx playwright install --with-deps chromium",
+    "test:report": "bunx playwright show-report test-results/html-report"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/bun": "catalog:",
+    "typescript": "catalog:"
   }
 }
