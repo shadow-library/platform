@@ -19,6 +19,7 @@ import { runFormat, runLint } from '@lib/verify';
  */
 const cwd = path.join(import.meta.dirname, '..');
 const fix = process.argv.includes('--fix');
+const fast = process.argv.includes('--fast');
 
 // scripts/ is root tooling, not a workspace — it has no package.json (and so no `.shadowrc.json`-driven
 // type/test wiring to read). This mirrors `verify()`'s format → lint → type-check → test pipeline directly
@@ -31,10 +32,19 @@ const VERIFY_CONFIG: VerifyConfig = {
   test: true,
 };
 
-/** This package dogfoods its own format/lint/type-check/test — every change to the tooling is checked with the tooling. */
+/**
+ * This package dogfoods its own format/lint/type-check/test — every change to the tooling is checked with
+ * the tooling. `--fast` stops after lint (the root pre-commit hook's speed budget, mirroring `shadow verify
+ * --fast` for real workspaces).
+ */
 async function main(): Promise<number> {
   if (!(await runFormat(cwd, VERIFY_CONFIG, fix))) return 1;
   if (!(await runLint(cwd, VERIFY_CONFIG, fix))) return 1;
+
+  if (fast) {
+    log.success('verify passed (fast — type-check/test skipped)');
+    return 0;
+  }
 
   log.info('run    type-check (tsc --noEmit)');
   const typeCheck = run('bunx', ['tsc', '--noEmit'], { cwd });

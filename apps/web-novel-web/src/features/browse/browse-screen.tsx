@@ -202,7 +202,7 @@ export function BrowseScreen(): React.JSX.Element {
               {chapterRange[0].toLocaleString()}–{formatChapterHi(chapterRange[1])} ch
             </Tag>
           )}
-          {search.updatedWithin && <Tag onRemove={() => patch({ updatedWithin: undefined })}>{UPDATED_LABELS[search.updatedWithin as UpdatedWindow]}</Tag>}
+          {search.updatedWithin && <Tag onRemove={() => patch({ updatedWithin: undefined })}>{UPDATED_LABELS[search.updatedWithin]}</Tag>}
           {search.language && <Tag onRemove={() => patch({ language: undefined })}>{search.language}</Tag>}
           {search.translatedOnly && <Tag onRemove={() => patch({ translatedOnly: undefined })}>Translated</Tag>}
           {search.hideMature && <Tag onRemove={() => patch({ hideMature: undefined })}>Hide mature</Tag>}

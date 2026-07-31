@@ -2,6 +2,7 @@
   "name": "pulse-web",
   "private": true,
   "type": "module",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "vite --port 3000",
     "build": "bun ../../scripts/src/bin/shadow.ts build",

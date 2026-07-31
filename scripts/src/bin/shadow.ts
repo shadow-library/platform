@@ -37,7 +37,10 @@ Usage:
 
 Commands:
   init [--type <t>]      Set up husky hooks, a starter .shadowrc.json + .prettierrc.json (prompts for the repo type; --type skips it)
-  prepare                Prepare-lifecycle setup (wired as "prepare": "shadow prepare"); activates husky. Runs on install
+  prepare                Prepare-lifecycle setup: activates husky. This platform's own root package.json calls
+                          "prepare": "husky" directly and no workspace wires this command anymore; it remains
+                          for shadow init-scaffolded standalone repos that still use the "prepare": "shadow
+                          prepare" slot
   build [--type <t>]     Build per .shadowrc.json by type: library (flat dist), component (Rollup+CSS Modules), backend (single-file bundle), spa/ssr (vite)
   verify [--fix] [--fast] Format (via the repo's .prettierrc.json) + lint the whole repo, then type-check + test
                           (--fast stops after lint — the root pre-commit hook's speed budget)

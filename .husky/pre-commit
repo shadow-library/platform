@@ -14,7 +14,9 @@ status=0
 for ws in $workspaces; do
   echo "pre-commit: verify --fast ($ws)"
   if [ "$ws" = "scripts" ]; then
-    (cd "$ROOT/scripts" && bun src/bin/shadow.ts verify --fast) || status=1
+    # scripts/ has no package.json for shadow.ts's `verify` command to read (it isn't a workspace) --
+    # scripts/scripts/verify.ts dogfoods the tooling against its own known layout instead.
+    (cd "$ROOT" && bun scripts/scripts/verify.ts --fast) || status=1
   else
     (cd "$ROOT/$ws" && bun "$ROOT/scripts/src/bin/shadow.ts" verify --fast) || status=1
   fi

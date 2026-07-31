@@ -493,7 +493,7 @@
         "rollup-plugin-postcss": "^4.0.2",
         "storybook": "^10.4.6",
         "tsc-alias": "^1.8.16",
-        "typescript": "^5.9.3",
+        "typescript": "catalog:",
         "vite": "catalog:",
         "vitest": "^4.1.0",
       },
@@ -513,6 +513,8 @@
       "version": "0.2.2-alpha.0",
       "dependencies": {
         "@shadow-library/common": "workspace:*",
+        "@tanstack/history": "1.162.0",
+        "@tanstack/router-core": "1.171.14",
       },
       "devDependencies": {
         "@tanstack/react-query": "catalog:",
@@ -3022,8 +3024,6 @@
     "@shadow-library/fastify/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@shadow-library/modules/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
-
-    "@shadow-library/ui/typescript": ["typescript@5.9.3", "", { "bin": { "tsc": "bin/tsc", "tsserver": "bin/tsserver" } }, "sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw=="],
 
     "@shadow-library/web/@types/node": ["@types/node@22.10.2", "", { "dependencies": { "undici-types": "~6.20.0" } }, "sha512-Xxr6BBRCAOQixvonOye19wnzyDiUtTeqldOOmj3CkeblonbccA12PFwlufvRdrpjXxqnmUaeiU5EOA+7s5diUQ=="],
 

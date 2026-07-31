@@ -5,10 +5,13 @@
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "jsx": "react-jsx",
 
-    /** Extra strictness this package opts into beyond the base. */
+    /** Kept from this package's own original config -- the base doesn't set these. */
     "noUnusedLocals": true,
     "noUnusedParameters": true,
     "noUncheckedSideEffectImports": true,
+    /** Not a new opt-in: this package never set strictPropertyInitialization itself, so under its old
+     *  standalone config "strict: true" alone made it effectively true. The base sets it false, so
+     *  this override cancels that out to preserve the package's original effective behavior. */
     "strictPropertyInitialization": true,
     // Preserves prior behavior: this package doesn't opt into verbatimModuleSyntax (which implies
     // isolatedModules) the way the other web workspaces do, so isolatedModules stays off here too.

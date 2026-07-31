@@ -2,6 +2,7 @@
   "name": "novel-forge-web",
   "private": true,
   "type": "module",
+  "license": "UNLICENSED",
   "scripts": {
     "dev": "vite dev",
     "build": "bun ../../scripts/src/bin/shadow.ts build",

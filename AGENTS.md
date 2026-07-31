@@ -32,7 +32,7 @@ Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `m
 
 - Single workspace: `bun run verify` inside it (format + lint + type-check, plus tests where the workspace wires them); backends also `bun test`.
 - All workspaces, dependency-ordered: `bun run --filter '*' verify` from the root.
-- Whole platform: `bun run local:up` (compose build, health checks, migrate, seed), then the `e2e` suite; `bun run local:check` for a smoke pass; `bun run local:down` to tear down.
+- Whole platform: the `e2e` workspace runs cross-app flows against already-deployed service URLs supplied via environment variables (see `e2e/README` once it lands) — there is no local compose deployment in this plan.
 
 ## Conventions
 
