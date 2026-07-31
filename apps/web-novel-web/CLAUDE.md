@@ -77,7 +77,7 @@ Run from `web-novel-web/`. Prerequisite: **Bun**.
 | Install | `bun install` | |
 | Develop | `bun run dev` | `vite dev`, serves on **:3000**; proxies `/api` → `SERVER_URL` (default `http://localhost:8080`) |
 | Test | `bun run test` | `vitest run` (jsdom; specs in `tests/**/*.spec.{ts,tsx}`) |
-| Verify (the gate) | `bun run verify` | `shadow verify` = **format + lint + type-check + test**; auto-fix with `shadow verify --fix` |
+| Verify (the gate) | `bun run verify` | `shadow verify` = **format + lint + type-check + test**; auto-fix with `bun run verify --fix` |
 | Type-check | `bun run type-check` | `tsc` |
 | Build | `bun run build` | `shadow build` → `bun run build:app` (manifest → `vite build` SSR + client → `vite build` service worker) |
 | Run prod build | `bun run start` | `bun main.ts` — the shared `@shadow-library/web` Bun server; ports from `PORT`/`HEALTH_PORT` |

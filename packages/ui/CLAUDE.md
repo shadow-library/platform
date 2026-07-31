@@ -6,7 +6,7 @@
 
 ## Project Overview
 
-**Purpose.** Shadow UI is an enterprise-grade, reusable React component library for the Shadow Apps ecosystem. It implements the **Shadow UI v1.1** design system (see the imported Claude Design project *Shadow UI Design System*) as accessible, themeable, tree-shakeable components published to npm as `@shadow-library/ui`.
+**Purpose.** Shadow UI is an enterprise-grade, reusable React component library for the Shadow Apps ecosystem. It implements the **Shadow UI v1.1** design system (see the imported Claude Design project *Shadow UI Design System*) as accessible, themeable, tree-shakeable components consumed as `@shadow-library/ui` by every first-party web app in this monorepo via `workspace:*` — private, not published to npm.
 
 **Supported framework.** React 18.3+ / 19 (declared as a peer dependency). Components are framework-idiomatic React with TypeScript; no application/business logic lives here.
 

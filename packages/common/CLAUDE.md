@@ -14,7 +14,7 @@ tsc-alias, …) is a root devDependency, so this package pins none of them direc
 
 | Task | Command |
 | --- | --- |
-| Verify (format + lint + type-check + test) | `bun run verify` (autofix: `bunx shadow verify --fix`) |
+| Verify (format + lint + type-check + test) | `bun run verify` (autofix: `bun run verify --fix`) |
 | Run tests | `bun test` (single file: `bun test tests/errors/app.error.spec.ts`) |
 | Type-check | `bun run type-check` (`tsc`) |
 | Build (ESM-only → `dist/`) | `bun run build` (`shadow build`) |

@@ -2,11 +2,11 @@
 
 The **backend** of Shadow Identity: Bun + TypeScript, Fastify HTTP layer (`@shadow-library/fastify`), Drizzle ORM
 over Postgres, Redis-backed opaque sessions, OAuth 2.1 / OIDC. **JSON / REST only.** The consumer SDK
-`@shadow-library/auth` lives in its own repository. `.shadowrc.json` → `"type": "backend"`.
+`@shadow-library/auth` lives in this monorepo at `packages/auth`. `.shadowrc.json` → `"type": "backend"`.
 
-Its sibling repository `identity-web` (React 19 SSR, TanStack Start) is a **separate, independent git repo** that
-consumes this server's JSON API. It lives at `../identity-web` in the local workspace but is cloned and versioned
-on its own. This guide is self-contained for work inside `identity-server`.
+Its sibling workspace `identity-web` (React 19 SSR, TanStack Start) consumes this server's JSON API. It lives at
+`../identity-web` in this monorepo; both are workspaces of the platform repository with a single shared history.
+This guide is self-contained for work inside `apps/identity-server`.
 
 ---
 
@@ -46,17 +46,19 @@ one client belongs **here**, not in the web app.
 ## Working rules
 
 1. **Check the current working directory before running any command.** Every command below is scoped to this
-   repo — run it from **inside** `identity-server/` (confirm with `pwd`), never from the parent folder or the
-   sibling repo.
+   repo — run it from **inside** `identity-server/` (confirm with `pwd`), never from the repo root or the
+   sibling workspace.
 2. **Read the existing related code before editing.** Find the neighbouring controller/service/DTO/schema and
    follow its conventions. Don't add a second way to do something that already has one.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
-5. **Package manager is `bun`** (`bun.lock`, no `packageManager` field). Use `bun`/`bunx`. Add/upgrade/remove
-   deps with `bun add`/`bun remove` **in this repo only** — never edit the sibling repo's `package.json`.
+5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
+   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
+   only** — never edit another workspace's `package.json` to solve a problem here.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
-   deletion unless the user **explicitly** requests it. This repo has its own independent history.
+   deletion unless the user **explicitly** requests it. This monorepo's history is shared across every
+   workspace — a destructive operation here isn't scoped to just this workspace.
 
 ---
 
@@ -69,16 +71,16 @@ one client belongs **here**, not in the web app.
 | Dev worker (watch)                             | `bun run dev:worker`           |
 | Build                                          | `bun run build`                |
 | Verify — **format + lint + type-check + test** | `bun run verify`               |
-| Verify with autofix                            | `bunx shadow verify --fix`     |
+| Verify with autofix                            | `bun run verify --fix`         |
 | Type-check only                                | `bun run type-check`           |
 | Test                                           | `bun test`                     |
 | Generate a migration                           | `bun run db:generate`          |
 | Apply migrations                               | `bun run db:migrate`           |
 | Create test template DB                        | `bun run db:create-template`   |
-| Check for uncommitted migration drift          | `bunx shadow check-migrations` |
+| Check for uncommitted migration drift          | `bun run check-migrations`     |
 
 Lint and format have **no standalone scripts** — they run through `bun run verify` (`shadow verify`); use
-`bunx shadow verify --fix` to auto-apply. Copy `.env.example` → `.env` before first run.
+`bun run verify --fix` to auto-apply. Copy `.env.example` → `.env` before first run.
 
 ---
 

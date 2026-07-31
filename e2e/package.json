@@ -4,7 +4,7 @@
   "type": "module",
   "license": "UNLICENSED",
   "version": "0.0.0",
-  "description": "Whole-platform Playwright suite — cross-app flows against the local compose deployment. Stub only; a later phase fills this in.",
+  "description": "Whole-platform Playwright suite — cross-app flows against already-deployed service URLs supplied via E2E_* environment variables (no local compose deployment). Stub only; a later phase fills this in.",
   "scripts": {
     "verify": "bun ../scripts/src/bin/shadow.ts verify",
     "build": "echo 'e2e: nothing to build yet'",

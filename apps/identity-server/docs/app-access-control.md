@@ -52,7 +52,7 @@ principal_type enum += 'ORGANISATION'           -- role_assignments; principal_i
 
 `app_access_mode` is deliberately a **column**, not an `organisation_policies` key — the policy registry folds values across all applicable orgs (MIN/AND); this setting is read for one specific org and never folded.
 
-Migration via `bun run db:generate`; `bunx shadow check-migrations` must be clean; the test template DB must rebuild.
+Migration via `bun run db:generate`; `bun run check-migrations` must be clean; the test template DB must rebuild.
 
 ## Access resolution (T-901 — `ApplicationAccessService`, `src/modules/system/application/`)
 
