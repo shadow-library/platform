@@ -1,2 +1,3 @@
 [test]
+preload = ["./src/bootstrap.ts"]
 coverageThreshold = 0.9

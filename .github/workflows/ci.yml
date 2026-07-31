@@ -221,13 +221,14 @@ jobs:
         }}
       LOG_LEVEL: ${{ matrix.workspace == 'apps/pulse-server' && 'http' || '' }}
       # pulse-server's notification-messages route is gated `@EnableIf(() => Config.get('app.stage')
-      # === 'dev')`. Left unset, this relies on bootstrap.ts's `Config.load('app.stage', {
-      # defaultValue: 'dev' })` -- but tests/common/stage.spec.ts (which runs immediately before
-      # tests/notification/notification.spec.ts in file order) saves/restores 'app.stage' through the
-      # *raw* `Config['cache']`, not the public `Config.get()` that materializes the registered
-      # default. Observed in CI: that route 404s right after stage.spec.ts runs. Setting the "Pulse-
-      # owned env var" (per apps/pulse-server/CLAUDE.md) explicitly sidesteps the ambiguity entirely --
-      # a plain env value, not an application code change.
+      # === 'dev')`. The real bug (fixed in apps/pulse-server/bunfig.toml, see that commit) is that
+      # `Config.load()` skips re-resolving a key once it's *present* in the cache, even with value
+      # `undefined` -- and tests/common/stage.spec.ts, bun test's first-discovered file in CI's file
+      # order, saves/restores 'app.stage' through the raw `Config['cache']` before bootstrap.ts (which
+      # registers the 'dev' default) has ever been imported, poisoning the cache with an explicit
+      # `undefined` that then permanently blocks the default. Setting the "Pulse-owned env var" (per
+      # apps/pulse-server/CLAUDE.md) here didn't fix that by itself, but it's correct defense-in-depth
+      # now that bootstrap.ts preloads first -- an explicit value beats relying on the default.
       APP_STAGE: ${{ matrix.workspace == 'apps/pulse-server' && 'dev' || '' }}
       # Capped to 1 for every backend, not just pulse-server (whose old mined workflow was the only
       # one that already had this). `DatabaseService` does not close its postgres pool on shutdown
