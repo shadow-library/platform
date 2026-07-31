@@ -30,9 +30,11 @@ export default defineConfig({
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
 
+  // TanStack Start serves through a Node/Bun SSR server (not `vite preview`); build once, then run it on 3000.
   webServer: {
-    command: isCI ? 'bun preview' : 'bun run build && bun preview',
+    command: isCI ? 'PORT=3000 bun run start' : 'bun run build && PORT=3000 bun run start',
     url: 'http://localhost:3000',
     reuseExistingServer: !isCI,
+    timeout: 180_000,
   },
 });

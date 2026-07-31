@@ -4,11 +4,11 @@
   "type": "module",
   "license": "UNLICENSED",
   "scripts": {
-    "dev": "vite --port 3000",
+    "dev": "vite dev",
     "build": "bun ../../scripts/src/bin/shadow.ts build",
+    "start": "bun run serve.ts",
     "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
-    "preview": "vite preview --port 3000",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",
     "generate:api-types": "bun ../../scripts/src/bin/shadow.ts gen-api-types http://localhost:8080/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts"
@@ -16,19 +16,17 @@
   "dependencies": {
     "@shadow-library/ui": "workspace:*",
     "@shadow-library/web": "workspace:*",
-    "@tanstack/react-devtools": "^0.7.0",
     "@tanstack/react-query": "catalog:",
-    "@tanstack/react-query-devtools": "catalog:",
     "@tanstack/react-router": "catalog:",
-    "@tanstack/react-router-devtools": "catalog:",
     "@tanstack/react-router-ssr-query": "catalog:",
-    "@tanstack/router-plugin": "^1.168.0",
+    "@tanstack/react-start": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:"
   },
   "devDependencies": {
     "@playwright/test": "catalog:",
-    "@tanstack/devtools-vite": "^0.3.11",
+    "@tanstack/react-query-devtools": "catalog:",
+    "@tanstack/react-router-devtools": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "@types/react": "catalog:",
@@ -36,7 +34,6 @@
     "@vitejs/plugin-react": "catalog:",
     "rollup-plugin-visualizer": "^6.0.5",
     "typescript": "catalog:",
-    "vite": "catalog:",
-    "web-vitals": "^5.1.0"
+    "vite": "catalog:"
   }
 }

@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { useMutation, type UseMutationResult, useQuery, useQueryClient, type UseQueryResult } from '@tanstack/react-query';
-import { type ApiError, APIRequest } from '@shadow-library/web';
+import { type ApiError, APIRequest } from './api-request';
 
 /**
  * Importing user defined packages
@@ -35,21 +35,21 @@ const layoutKeys = {
 export function useListLayoutsQuery(): UseQueryResult<ListLayoutResponse, ApiError> {
   return useQuery<ListLayoutResponse, ApiError>({
     queryKey: layoutKeys.list(),
-    queryFn: ({ signal }) => APIRequest.get('/api/v1/layouts').signal(signal).execute(),
+    queryFn: () => APIRequest.get('/layouts').execute(),
   });
 }
 
 export function useLayoutQuery(layoutId: string): UseQueryResult<LayoutDetailResponse, ApiError> {
   return useQuery<LayoutDetailResponse, ApiError>({
     queryKey: layoutKeys.detail(layoutId),
-    queryFn: ({ signal }) => APIRequest.get(`/api/v1/layouts/${layoutId}`).signal(signal).execute(),
+    queryFn: () => APIRequest.get(`/layouts/${layoutId}`).execute(),
   });
 }
 
 export function useCreateLayoutMutation(): UseMutationResult<LayoutResponse, ApiError, CreateLayoutBody> {
   const queryClient = useQueryClient();
   return useMutation<LayoutResponse, ApiError, CreateLayoutBody>({
-    mutationFn: data => APIRequest.post('/api/v1/layouts').body(data).execute(),
+    mutationFn: data => APIRequest.post('/layouts').body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: layoutKeys.lists() }),
   });
 }
@@ -57,7 +57,7 @@ export function useCreateLayoutMutation(): UseMutationResult<LayoutResponse, Api
 export function useUpdateLayoutMutation(layoutId: string): UseMutationResult<LayoutResponse, ApiError, UpdateLayoutBody> {
   const queryClient = useQueryClient();
   return useMutation<LayoutResponse, ApiError, UpdateLayoutBody>({
-    mutationFn: data => APIRequest.patch(`/api/v1/layouts/${layoutId}`).body(data).execute(),
+    mutationFn: data => APIRequest.patch(`/layouts/${layoutId}`).body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: layoutKeys.detail(layoutId) });
       queryClient.invalidateQueries({ queryKey: layoutKeys.lists() });
@@ -68,7 +68,7 @@ export function useUpdateLayoutMutation(layoutId: string): UseMutationResult<Lay
 export function useUpsertLayoutDraftMutation(layoutId: string): UseMutationResult<LayoutVersionResponse, ApiError, UpsertLayoutDraftBody> {
   const queryClient = useQueryClient();
   return useMutation<LayoutVersionResponse, ApiError, UpsertLayoutDraftBody>({
-    mutationFn: data => APIRequest.put(`/api/v1/layouts/${layoutId}/draft`).body(data).execute(),
+    mutationFn: data => APIRequest.put(`/layouts/${layoutId}/draft`).body(data).execute(),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: layoutKeys.detail(layoutId) }),
   });
 }
@@ -76,7 +76,7 @@ export function useUpsertLayoutDraftMutation(layoutId: string): UseMutationResul
 export function usePublishLayoutMutation(layoutId: string): UseMutationResult<LayoutVersionResponse, ApiError, PublishLayoutBody> {
   const queryClient = useQueryClient();
   return useMutation<LayoutVersionResponse, ApiError, PublishLayoutBody>({
-    mutationFn: data => APIRequest.post(`/api/v1/layouts/${layoutId}/publish`).body(data).execute(),
+    mutationFn: data => APIRequest.post(`/layouts/${layoutId}/publish`).body(data).execute(),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: layoutKeys.detail(layoutId) });
       queryClient.invalidateQueries({ queryKey: layoutKeys.lists() });
