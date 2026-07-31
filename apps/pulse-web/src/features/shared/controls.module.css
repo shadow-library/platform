@@ -1,0 +1,57 @@
+/* Shared layout helpers for list/detail pages — imported directly by feature pages. */
+.toolbar {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+}
+
+.rowActions {
+  display: flex;
+  gap: 4px;
+  justify-content: flex-end;
+}
+
+.pagination {
+  margin-top: 16px;
+}
+
+.detailCard {
+  margin-bottom: 28px;
+}
+
+.filterSm {
+  width: 170px;
+}
+
+.filter {
+  width: 180px;
+}
+
+.searchNarrow {
+  width: 300px;
+}
+
+.search {
+  width: 320px;
+}
+
+.searchWide {
+  width: 100%;
+  max-width: 340px;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+.danger {
+  color: var(--sh-danger-text);
+}
+
+.loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 80px 0;
+}

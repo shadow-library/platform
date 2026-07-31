@@ -1,0 +1,30 @@
+.workspace {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.mark {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  background: var(--sh-accent);
+}
+
+.workspaceText {
+  display: flex;
+  flex-direction: column;
+  line-height: 1.1;
+}
+
+.workspaceName {
+  font-weight: 680;
+  font-size: 15px;
+  color: var(--sh-text-primary);
+}
+
+.workspaceSub {
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}

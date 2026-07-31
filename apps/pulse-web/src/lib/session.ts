@@ -1,0 +1,71 @@
+/**
+ * Importing npm packages
+ */
+import { type QueryClient, useQuery } from '@tanstack/react-query';
+import { useLocation, useNavigate } from '@tanstack/react-router';
+import { useEffect, useRef } from 'react';
+import { isApiError } from '@shadow-library/web';
+import { requireAuth } from '@shadow-library/web/router';
+
+/**
+ * Importing user defined packages
+ */
+import { sessionQueryOptions, type SessionResponse } from '@/lib/apis';
+
+/**
+ * Defining types
+ */
+
+type SessionGuardStatus = 'authenticated' | 'redirecting';
+
+/**
+ * Declaring the constants
+ *
+ * The auth gate for every admin route group. Built on `@shadow-library/web`'s `requireAuth`, it
+ * ensures the session query before any protected markup renders — an unauthenticated visitor (401)
+ * is redirected to `/login`, which bounces the browser to the server's OIDC login with the intended
+ * destination preserved as `returnTo`. A non-401 failure propagates to the route error boundary.
+ */
+export function requireSession(queryClient: QueryClient, returnTo: string): Promise<SessionResponse> {
+  return requireAuth(queryClient, sessionQueryOptions(), { loginTo: '/login', returnTo });
+}
+
+/**
+ * The route gate (`requireSession`) only runs when the browser first enters the `_app` group: TanStack
+ * reuses the layout match, so its `beforeLoad` never re-runs while navigating between pages inside the
+ * shell. This hook closes that gap. It keeps the session query live for as long as the shell is mounted,
+ * re-validating against the server on every in-app navigation and whenever the tab regains focus, and it
+ * bounces to `/login` (which hands off to SSO, preserving `returnTo`) the moment the server reports the
+ * session is gone. The returned status lets the shell withhold its chrome while the redirect is in
+ * flight, so a session that ends mid-use never keeps rendering the app.
+ */
+export function useSessionGuard(): SessionGuardStatus {
+  const navigate = useNavigate();
+  const location = useLocation();
+  /** `refetchOnMount` is off because the gate already fetched on entry; navigation and focus drive every later check. */
+  const { error, refetch } = useQuery({ ...sessionQueryOptions(), refetchOnMount: false, refetchOnWindowFocus: 'always' });
+
+  const isInitialRender = useRef(true);
+  useEffect(() => {
+    if (isInitialRender.current) {
+      isInitialRender.current = false;
+      return;
+    }
+    void refetch();
+  }, [location.pathname, refetch]);
+
+  const isUnauthenticated = isApiError(error) && error.status === 401;
+  /**
+   * Fire the bounce exactly once. The redirect itself moves through `/login`, which changes `location`
+   * and would otherwise re-run this effect and nest `/login` into its own `returnTo`; the ref also pins
+   * `returnTo` to the protected page the session died on, not the transient `/login` URL.
+   */
+  const hasRedirected = useRef(false);
+  useEffect(() => {
+    if (!isUnauthenticated || hasRedirected.current) return;
+    hasRedirected.current = true;
+    void navigate({ to: '/login', search: { returnTo: location.href } });
+  }, [isUnauthenticated, navigate, location.href]);
+
+  return isUnauthenticated ? 'redirecting' : 'authenticated';
+}

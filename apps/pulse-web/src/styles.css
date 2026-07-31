@@ -1,0 +1,36 @@
+@import '@shadow-library/ui/styles.css';
+
+/* App-level globals — the library ships tokens + reset; these are Pulse-shell conventions. */
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--sh-surface-app);
+}
+
+#app {
+  height: 100%;
+}
+
+a {
+  color: var(--sh-accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--sh-accent-hover);
+}
+
+/* Scrollbar skin (matches the Pulse design). Applied globally now that the shell owns the scrolling
+   content region — there is no app-side element left to hang a class on. */
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--sh-border-default);
+  border-radius: 8px;
+  border: 2px solid var(--sh-surface-app);
+}
