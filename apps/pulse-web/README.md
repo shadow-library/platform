@@ -1,5 +1,7 @@
 Welcome to your new TanStack app! 
 
+Pulse Web is the web client for Pulse, the platform's notifications and activity service.
+
 # Getting Started
 
 To run this application:
