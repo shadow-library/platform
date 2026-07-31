@@ -1,0 +1,17 @@
+/**
+ * Importing npm packages
+ */
+import 'reflect-metadata';
+
+/**
+ * exporting modules
+ */
+export * from './classes';
+export * from './decorators';
+export { ModuleRef } from './injector';
+export * from './injection-token';
+export * from './interfaces';
+export * from './utils';
+
+export * from './shadow-application';
+export * from './shadow-factory';

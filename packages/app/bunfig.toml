@@ -1,0 +1,18 @@
+[test]
+# Reflect metadata is required for decorator-based DI (mirrors Jest's setupFiles).
+preload = ["reflect-metadata"]
+
+# Coverage is collected for the unit suite (see `test:unit`) and written to ./coverage.
+coverageSkipTestFiles = true
+coverageReporter = ["text", "lcov"]
+coverageDir = "coverage"
+
+# Declaration-only sources have no executable logic to cover: type-only interfaces,
+# barrel re-exports, and the abstract ModuleRef contract.
+coveragePathIgnorePatterns = ["examples/**", "**/index.ts", "**/*.interface.ts", "src/injector/module-ref.ts"]
+
+# No hard `coverageThreshold`: Bun applies it per-file, and its instrumentation reports
+# spurious gaps that Jest/istanbul did not (it counts TypeScript parameter-property/field
+# declarations as executable lines and phantom module/class scopes as functions, and it
+# ignores `istanbul ignore` pragmas). The suite still exercises the same paths that hit
+# 100% under Jest; coverage is reported for inspection, and "all tests pass" is the gate.
