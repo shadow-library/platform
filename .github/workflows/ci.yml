@@ -115,55 +115,31 @@ jobs:
 
           # ---------------------------------------------------------------
           # 4. Per-workspace CI metadata mined from the old imported
-          #    workflows — service needs, env vars, extra steps. Anything
-          #    not listed here (every other app, every package, e2e) is a
-          #    plain `bun run verify` + `bun run build` with no services.
+          #    workflows — service needs and extra steps. Anything not
+          #    listed here (every other app, every package, e2e) is a plain
+          #    `bun run verify` + `bun run build` with no services.
+          #
+          #    Deliberately structural-only (workspace path + booleans) —
+          #    no env var *values* here. A first version put the mined env
+          #    map (including identity-server's dummy SECURITY_MASTER_
+          #    ENCRYPTION_KEY fixture) in this same JSON and GitHub Actions
+          #    silently dropped the whole `matrix` job output — "Skip output
+          #    'matrix' since it may contain secret" — which then made
+          #    `fromJSON(needs.changes.outputs.matrix)` fail matrix
+          #    expansion entirely (no `verify` job instances at all). That
+          #    guard applies to anything routed through $GITHUB_OUTPUT or
+          #    $GITHUB_ENV, regardless of whether the value is a real
+          #    secret. The per-workspace env values now live as static
+          #    job-level `env:` on `verify` below — literal YAML, not piped
+          #    through either file — exactly how the original per-workspace
+          #    workflows declared them.
           # ---------------------------------------------------------------
           cat > /tmp/workspace-metadata.json <<'JSON'
           {
-            "apps/identity-server": {
-              "needsPostgres": true,
-              "needsRedis": true,
-              "createTemplateDb": false,
-              "checkMigrations": true,
-              "env": {
-                "DATABASE_POSTGRES_URL": "postgresql://postgres:postgres@localhost:5432/shadow_identity",
-                "DATABASE_REDIS_URL": "redis://localhost:6379",
-                "DATABASE_POSTGRES_LAZY_CONNECTION": "true",
-                "SECURITY_MASTER_ENCRYPTION_KEY": "ci-master-key-0000000000000000000000000000000000000000000000000000000000"
-              }
-            },
-            "apps/novel-forge-server": {
-              "needsPostgres": true,
-              "needsRedis": false,
-              "createTemplateDb": true,
-              "checkMigrations": true,
-              "env": {
-                "DATABASE_POSTGRES_URL": "postgresql://postgres:postgres@localhost:5432/novel_forge_test"
-              }
-            },
-            "apps/pulse-server": {
-              "needsPostgres": true,
-              "needsRedis": false,
-              "createTemplateDb": true,
-              "checkMigrations": true,
-              "env": {
-                "DATABASE_POSTGRES_URL": "postgresql://postgres:postgres@localhost:5432/shadow_pulse",
-                "LOG_LEVEL": "http",
-                "DATABASE_POSTGRES_MAX_CONNECTIONS": "1",
-                "DATABASE_POSTGRES_LAZY_CONNECTION": "true"
-              }
-            },
-            "apps/web-novel-server": {
-              "needsPostgres": true,
-              "needsRedis": false,
-              "createTemplateDb": false,
-              "checkMigrations": true,
-              "env": {
-                "DATABASE_POSTGRES_URL": "postgresql://postgres:postgres@localhost:5432/shadow_webnovel",
-                "DATABASE_POSTGRES_LAZY_CONNECTION": "true"
-              }
-            }
+            "apps/identity-server": { "needsPostgres": true, "needsRedis": true, "createTemplateDb": false, "checkMigrations": true },
+            "apps/novel-forge-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true },
+            "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true },
+            "apps/web-novel-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": false, "checkMigrations": true }
           }
           JSON
 
@@ -186,8 +162,7 @@ jobs:
                   needsPostgres: ($m.needsPostgres // false),
                   needsRedis: ($m.needsRedis // false),
                   createTemplateDb: ($m.createTemplateDb // false),
-                  checkMigrations: ($m.checkMigrations // false),
-                  env: ($m.env // {})
+                  checkMigrations: ($m.checkMigrations // false)
                 }
             )
           ')"
@@ -211,6 +186,37 @@ jobs:
       max-parallel: 4
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.matrix) }}
+
+    # Per-backend env, mined from the old imported workflows. Static YAML — not computed in the
+    # `changes` job and threaded through a matrix field — so none of it is subject to GitHub
+    # Actions' "may contain secret" job-output/env-file guard (see the note in the `changes` job).
+    # A ternary ladder keyed on `matrix.workspace`; every var is empty string for a workspace that
+    # doesn't need it, which is harmless (the apps read these with `??` fallbacks or don't read
+    # them at all).
+    env:
+      DATABASE_POSTGRES_URL: >-
+        ${{
+          matrix.workspace == 'apps/identity-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_identity' ||
+          matrix.workspace == 'apps/novel-forge-server' && 'postgresql://postgres:postgres@localhost:5432/novel_forge_test' ||
+          matrix.workspace == 'apps/pulse-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_pulse' ||
+          matrix.workspace == 'apps/web-novel-server' && 'postgresql://postgres:postgres@localhost:5432/shadow_webnovel' ||
+          ''
+        }}
+      DATABASE_REDIS_URL: ${{ matrix.workspace == 'apps/identity-server' && 'redis://localhost:6379' || '' }}
+      DATABASE_POSTGRES_LAZY_CONNECTION: >-
+        ${{
+          (matrix.workspace == 'apps/identity-server' || matrix.workspace == 'apps/pulse-server' || matrix.workspace == 'apps/web-novel-server') && 'true' ||
+          ''
+        }}
+      # CI-only fixture key, never a real secret — matches what the old identity-server workflow
+      # hardcoded directly in YAML.
+      SECURITY_MASTER_ENCRYPTION_KEY: >-
+        ${{
+          matrix.workspace == 'apps/identity-server' && 'ci-master-key-0000000000000000000000000000000000000000000000000000000000' ||
+          ''
+        }}
+      LOG_LEVEL: ${{ matrix.workspace == 'apps/pulse-server' && 'http' || '' }}
+      DATABASE_POSTGRES_MAX_CONNECTIONS: ${{ matrix.workspace == 'apps/pulse-server' && '1' || '' }}
 
     services:
       postgres:
@@ -246,11 +252,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Set workspace env
-        env:
-          MATRIX_ENV: ${{ toJSON(matrix.env) }}
-        run: echo "$MATRIX_ENV" | jq -r 'to_entries[] | "\(.key)=\(.value)"' >> "$GITHUB_ENV"
 
       # `bun run --filter` has no pnpm-style `<workspace>...` dependency-closure selector (verified
       # against Bun's docs — `--filter` is a plain name/path glob). It does, however, "automatically
