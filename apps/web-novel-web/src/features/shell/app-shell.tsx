@@ -184,8 +184,10 @@ export function AppShell({ children }: AppShellProps): React.JSX.Element {
     </TopNavigation>
   );
 
+  // A reading app draws its own measure per screen — a full-bleed novel hero, a 1280px browse grid, a
+  // 760px help page — so the shell supplies the chrome and the drawer but hands the region over whole.
   return (
-    <Shell sidebar={sidebar} topbar={topbar} className={styles.shellRoot}>
+    <Shell sidebar={sidebar} topbar={topbar} contentWidth="fluid" contentPadding="none" className={styles.shellRoot}>
       <div className={`${styles.content} ${isPhone ? styles.contentWithBottomNav : ''}`}>{children}</div>
       {isPhone && (
         <BottomNavigation value={activeNav?.to ?? '/'} onValueChange={to => void navigate({ to })}>
