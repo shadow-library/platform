@@ -47,7 +47,16 @@ cd e2e
 bun run test                      # or: bunx playwright test
 ```
 
-`bun run verify` runs format + lint + type-check + the suite, same as any other workspace.
+`verify` and `test` are deliberately split, the same way the SSR/SPA web apps do it (`e2e/.shadowrc.json`
+sets `verify.test: false`, mirroring `apps/{identity,novel-forge,pulse}-web`):
+
+- **`bun run verify`** — format + lint + type-check only. Static, no network, no browser. This is what CI's
+  affected-workspace job runs, and it must stay green with zero reachable services: it never invokes
+  Playwright, so a runner with no k3d cluster can't produce connection-error failures here.
+- **`bun run test`** (equivalently `bunx playwright test`) — the actual live smoke suite. It needs either a
+  reachable deployment (the local k3d ingress by default, or an env override) or explicit empty-string
+  opt-outs for whichever products aren't reachable from wherever it's run — otherwise a spec that resolves
+  a URL will genuinely try to hit it and fail on a real connection error, not skip.
 
 ## How skipping works
 
