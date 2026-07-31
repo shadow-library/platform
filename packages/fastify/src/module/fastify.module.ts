@@ -1,0 +1,88 @@
+/**
+ * Importing npm packages
+ */
+import { v4 as uuid } from 'uuid';
+import { Dispatcher, DynamicModule, Module, Provider, ProviderToken } from '@shadow-library/app';
+import { ClassSchema } from '@shadow-library/class-schema';
+import { Config, utils } from '@shadow-library/common';
+
+/**
+ * Importing user defined packages
+ */
+import { DefaultErrorHandler } from '../classes';
+import { FASTIFY_CONFIG, FASTIFY_INSTANCE } from '../constants';
+import { ContextService } from '../services';
+import { DevErrorResponseDto, ErrorResponseDto } from './error-response.dto';
+import { FastifyConfig, FastifyModuleAsyncOptions, FastifyModuleOptions } from './fastify-module.interface';
+import { FastifyRouter } from './fastify-router';
+import { createFastifyInstance } from './fastify.utils';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+@Module({})
+export class FastifyModule {
+  private static getDefaultConfig(): FastifyConfig {
+    const stackTrace = Config.get('app.dev.stack-trace');
+    const errorResponseClass = stackTrace ? DevErrorResponseDto : ErrorResponseDto;
+    const errorResponseSchema = ClassSchema.generate(errorResponseClass);
+
+    return {
+      host: Config.get('app.host'),
+      port: Config.get('app.port'),
+      responseSchema: { '4xx': errorResponseSchema, '5xx': errorResponseSchema },
+      errorHandler: new DefaultErrorHandler(),
+      maskSensitiveData: Config.isProd(),
+
+      requestIdLogLabel: 'rid',
+      genReqId: () => uuid(),
+      routerOptions: {
+        ignoreTrailingSlash: true,
+        ignoreDuplicateSlashes: true,
+      },
+    };
+  }
+
+  private static createConfigFactory(factory: FastifyModuleAsyncOptions['useFactory']) {
+    return (...args: any[]) => {
+      const config = factory(...args);
+      if (config instanceof Promise) return config.then(resolvedConfig => Object.assign({}, this.getDefaultConfig(), resolvedConfig));
+      return Object.assign({}, this.getDefaultConfig(), config);
+    };
+  }
+
+  static forRoot(options: FastifyModuleOptions): DynamicModule {
+    const config = Object.assign({}, this.getDefaultConfig(), utils.object.omitKeys(options, ['imports', 'controllers', 'providers', 'exports', 'fastifyFactory']));
+    return this.forRootAsync({
+      imports: options.imports,
+      controllers: options.controllers,
+      providers: options.providers,
+      exports: options.exports,
+      useFactory: () => config,
+      fastifyFactory: options.fastifyFactory,
+    });
+  }
+
+  static forRootAsync(options: FastifyModuleAsyncOptions): DynamicModule {
+    const fastifyFactory = (config: FastifyConfig) => createFastifyInstance(config, options.fastifyFactory);
+
+    const providers: Provider[] = [{ token: Dispatcher, useClass: FastifyRouter }, ContextService];
+    providers.push({ token: FASTIFY_CONFIG, useFactory: this.createConfigFactory(options.useFactory), inject: options.inject });
+    providers.push({ token: FASTIFY_INSTANCE, useFactory: fastifyFactory, inject: [FASTIFY_CONFIG] });
+    if (options.providers) providers.push(...options.providers);
+
+    const exports: ProviderToken[] = [Dispatcher, ContextService, FASTIFY_INSTANCE];
+    if (options.exports) exports.push(...options.exports);
+
+    const Module: DynamicModule = { module: FastifyModule, providers, exports };
+    if (options.imports) Module.imports = options.imports;
+    if (options.controllers) Module.controllers = options.controllers;
+
+    return Module;
+  }
+}

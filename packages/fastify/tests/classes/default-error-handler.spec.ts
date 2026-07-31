@@ -1,0 +1,125 @@
+/**
+ * Importing npm packages
+ */
+import { beforeEach, describe, expect, it, jest } from 'bun:test';
+import { errorCodes } from 'fastify';
+import { AppError, Config, Logger, ValidationError } from '@shadow-library/common';
+
+/**
+ * Importing user defined packages
+ */
+import { DefaultErrorHandler, ServerErrorCode } from '@shadow-library/fastify';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+describe('DefaultErrorHandler', () => {
+  const request = {} as any;
+  const response = { status: jest.fn().mockReturnThis(), send: jest.fn().mockReturnThis() } as any;
+  const body = { code: 'S001', message: expect.any(String) };
+  let errorHandler: DefaultErrorHandler;
+
+  beforeEach(() => {
+    errorHandler = new DefaultErrorHandler();
+    jest.clearAllMocks();
+  });
+
+  it('should handle server error', () => {
+    const error = ServerErrorCode.S001.create();
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(ServerErrorCode.S001.status);
+    expect(response.send).toHaveBeenCalledWith(body);
+  });
+
+  it('should handle validation error', () => {
+    const error = new ValidationError('name', 'Invalid Name');
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(422);
+    expect(response.send).toHaveBeenCalledWith({
+      code: 'VALIDATION_ERROR',
+      message: 'Validation Error',
+      fields: [{ field: 'name', msg: 'Invalid Name' }],
+    });
+  });
+
+  it('should handle app error', () => {
+    const error = new AppError(ServerErrorCode.S001);
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.send).toHaveBeenCalledWith(body);
+  });
+
+  it('should handle fastify error', () => {
+    const error = errorCodes.FST_ERR_CTP_INVALID_MEDIA_TYPE('application/unknown');
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(415);
+    expect(response.send).toHaveBeenCalledWith({
+      code: 'S006',
+      message: 'Unsupported Media Type: application/unknown',
+    });
+  });
+
+  it('should handle fastify server error', () => {
+    const error = errorCodes.FST_ERR_HOOK_TIMEOUT();
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
+  });
+
+  it('should log the cause of the error', () => {
+    const error = new AppError(ServerErrorCode.S001, undefined, new Error('Test Cause'));
+    const fn = jest.spyOn(errorHandler['logger'], 'warn');
+    errorHandler.handle(error, request, response);
+    expect(fn).toHaveBeenCalledWith('Caused by', error.cause);
+  });
+
+  it('should handle unknown error of type Error', () => {
+    const error = new Error('Test Error');
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
+  });
+
+  it('should handle unknown error of type unknown', () => {
+    const error = { error: 'Test Error' } as any;
+    errorHandler.handle(error, request, response);
+
+    expect(response.status).toHaveBeenCalledWith(500);
+    expect(response.send).toHaveBeenCalledWith({ code: 'S001', message: 'An unexpected server error occurred while processing the request' });
+  });
+
+  describe('stack trace', () => {
+    beforeEach(() => {
+      jest.spyOn(Config, 'get').mockReturnValue(true as any);
+    });
+
+    it('should include stack trace in error response when enabled', () => {
+      const handler = new DefaultErrorHandler();
+      const error = ServerErrorCode.S001.create();
+      handler.handle(error, request, response);
+
+      expect(response.send).toHaveBeenCalledWith(expect.objectContaining({ stack: expect.any(String) }));
+    });
+
+    it('should warn when stack trace is enabled in production', () => {
+      jest.spyOn(Config, 'isProd').mockReturnValue(true);
+      const warn = jest.fn();
+      jest.spyOn(Logger, 'getLogger').mockReturnValue({ warn, error: jest.fn() } as any);
+
+      new DefaultErrorHandler();
+
+      expect(warn).toHaveBeenCalledWith('Stack trace logging is enabled in production');
+    });
+  });
+});
