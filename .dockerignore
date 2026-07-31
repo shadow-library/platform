@@ -1,0 +1,54 @@
+# Build context hygiene for docker/Dockerfile (repo-root context, shared by all 8 apps/*
+# images). Keep this in sync with .gitignore's intent, but note it can't be app-specific: the
+# same context is sent regardless of which app --build-arg APP selects, so nothing app-scoped
+# (e.g. "the other 7 apps/*/src") can be excluded here — see docker/README.md for why.
+
+# Dependencies — reinstalled fresh inside the build (bun install --frozen-lockfile)
+**/node_modules
+
+# Build output — images build from source; nothing here is ever a build input
+**/dist
+**/.tanstack
+**/.vite
+**/coverage
+**/.nyc_output
+**/*.tsbuildinfo
+**/CHANGELOG.md
+
+# VCS, CI, and editor/IDE tooling — never needed inside the image
+.git
+.github
+**/.github
+.husky
+.serena
+.claude
+**/.claude
+**/.vscode
+**/.idea
+
+# Tests and their artifacts — not part of any app's production build
+**/tests
+**/test-results
+**/playwright-report
+**/blob-report
+**/.playwright-mcp
+**/stats.html
+**/count.txt
+
+# Secrets — env values are supplied at container runtime, never baked into a layer
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
+# Docs — large and irrelevant to the build. `shadow build` copies README.md/LICENSE into a
+# package's dist/ *if present* (skipped silently otherwise), so excluding them costs nothing.
+**/*.md
+**/docs
+
+# OS / logs
+**/.DS_Store
+**/*.log
+**/logs
