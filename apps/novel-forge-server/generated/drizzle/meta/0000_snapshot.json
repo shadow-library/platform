@@ -1,5 +1,5 @@
 {
-  "id": "0463c602-6829-4dda-af0d-aea57cbe38bc",
+  "id": "35786156-dc43-4666-8159-6f7b07962de8",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -5746,7 +5746,6 @@
       "schema": "public",
       "values": [
         "pending",
-        "ingesting",
         "glossary",
         "converting",
         "done",
@@ -5776,7 +5775,6 @@
       "schema": "public",
       "values": [
         "pending",
-        "ingesting",
         "glossary",
         "reforging",
         "done",

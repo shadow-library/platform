@@ -23,10 +23,10 @@ CREATE TYPE "public"."refinement_kind" AS ENUM('chat', 'hub', 'premise_enhance',
 CREATE TYPE "public"."refinement_proposal_status" AS ENUM('pending', 'applied', 'discarded', 'superseded', 'conflicted', 'reverted');--> statement-breakpoint
 CREATE TYPE "public"."rebrand_conversion_status" AS ENUM('converted', 'attention', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."rebrand_glossary_category" AS ENUM('character', 'place', 'country', 'culture', 'faction', 'technique', 'item', 'term');--> statement-breakpoint
-CREATE TYPE "public"."rebrand_status" AS ENUM('pending', 'ingesting', 'glossary', 'converting', 'done', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."rebrand_status" AS ENUM('pending', 'glossary', 'converting', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."reforge_chapter_status" AS ENUM('reforged', 'attention', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."reforge_fidelity" AS ENUM('preserve', 'close', 'loose');--> statement-breakpoint
-CREATE TYPE "public"."reforge_status" AS ENUM('pending', 'ingesting', 'glossary', 'reforging', 'done', 'failed');--> statement-breakpoint
+CREATE TYPE "public"."reforge_status" AS ENUM('pending', 'glossary', 'reforging', 'done', 'failed');--> statement-breakpoint
 CREATE TYPE "public"."chapter_publication_status" AS ENUM('scheduled', 'published', 'failed', 'unpublished');--> statement-breakpoint
 CREATE TYPE "public"."publication_status" AS ENUM('draft', 'live', 'retired');--> statement-breakpoint
 CREATE TYPE "public"."job_kind" AS ENUM('extract', 'generate', 'finalize', 'backfill', 'rebrand', 'reforge', 'publish');--> statement-breakpoint

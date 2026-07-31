@@ -416,7 +416,7 @@ Follow pulse patterns: `Create*Body`, `Update*Body extends PartialType(OmitType(
 
 `chapterStatus = pgEnum(['done','failed','skipped'])`
 
-**chapters** — `id bigserial pk`, `projectId`, `number integer notNull`, `title varchar(500)`, `url varchar`, `content text`, `summary text`, `wordCount integer`, `status chapterStatus notNull`, `generator contentGenerator notNull default 'standard'` (§8.6), `continuityApplied boolean notNull default false` (was the bible write-back done — always true for standard finalize; false for grok chapters until promoted), `note text`, `scrapedAt timestamp`, timestamps. **unique(projectId, number)**. index(projectId, status).
+**chapters** — `id bigserial pk`, `projectId`, `number integer notNull`, `title varchar(500)`, `content text`, `summary text`, `wordCount integer`, `status chapterStatus notNull`, `generator contentGenerator notNull default 'standard'` (§8.6), `continuityApplied boolean notNull default false` (was the bible write-back done — always true for standard finalize; false for grok chapters until promoted), `note text`, timestamps (a source-page URL and a scrape timestamp were also tracked here; both columns were later dropped when the acquisition pipeline was removed). **unique(projectId, number)**. index(projectId, status).
 
 ### 6.3 `schemas/knowledge.ts` (entities + graph)
 
@@ -509,7 +509,7 @@ Base: `/api`, `prefixVersioning` (so `/api/v1/...`). All ids are bigint path par
 | POST | `/ingest` | `IngestBody { limit?, concurrency?, delayMs? }` | 202 `JobResponse` | (job `ingest`, later removed) |
 | POST | `/extract` | `ExtractBody { limit?, retryFailed? }` | 202 `JobResponse` | ExtractionService (job `extract`) |
 | POST | `/consolidate` | `{ significanceChapters?, relationshipChapters? }` | 200 `ConsolidateResponse` | ConsolidateService (sync, no LLM) |
-| POST | `/resume` | — | 202 `JobResponse` | ingest→extract chain |
+| POST | `/resume` | — | 202 `JobResponse` | (ingest→extract chain, later removed) |
 | POST | `/skeleton` | — | 200 `SkeletonResponse` | SkeletonService (LLM) |
 | GET | `/assets` | `?which=NAME` | 200 `AssetResponse { markdown }` | AssetService (returns string) |
 | GET | `/chapters` | `ListChaptersQuery` | 200 `ListChapterResponse` | ChapterService (no prose in list) |
@@ -758,7 +758,7 @@ export interface ImageStorageProvider {
 1. Insert a new `projects` row: fresh `id`, new `name` (unique), copied `kind`/`title`/`brief`/`source*`/`storyState`/`skeleton`; `config` = the override if given else the source's; `contentMode` = override else source's; `ownerId` copied (auth-ready). 
 2. Copy child tables with the new `projectId`, preserving per-project string keys (`entityKey`/`volumeKey`/…) since uniqueness is `(projectId, key)`; numeric surrogate ids are regenerated. Order parents-before-children for FKs.
 3. **`resetDerived: true` (default)** copies only the **inputs** and drops derived data so each clone regenerates under its own `config`:
-   - **source project:** copy `chapters` (ingested prose) + scrape cursor; **drop** extracted knowledge (entities/beats/threads/world_facts/mysteries/relationships/appearances/observations/summaries), `chapterChunks`, `extractionRuns`, `validationReports`, `jobs`.
+   - **source project:** copy `chapters` (source prose); **drop** extracted knowledge (entities/beats/threads/world_facts/mysteries/relationships/appearances/observations/summaries), `chapterChunks`, `extractionRuns`, `validationReports`, `jobs`.
    - **new-novel project:** copy the authored **bible** (`bible_documents`, `entities`, `volumes`, `brief`, trackers) + plan; **drop** drafts, generated `chapters`, `chapterChunks`, `continuityProposals`, `validationReports`, `jobs`, and reset the story-state cursor.
 4. **`resetDerived: false`** = full byte-for-byte copy (including derived data + embeddings), for snapshotting.
 

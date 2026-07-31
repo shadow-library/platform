@@ -37,7 +37,7 @@ AI is used only for: glossary seed, per-chapter convert, per-chapter audit.
 
 ## 3. Schema (`src/database/schemas/rebrand.ts`)
 
-- `rebrands` — one per project: `status` (`rebrand_status`: pending|ingesting|glossary|converting|done|failed — advisory display only; resume derives the real phase
+- `rebrands` — one per project: `status` (`rebrand_status`: pending|glossary|converting|done|failed — advisory display only; resume derives the real phase
   from `worldNotes` and conversion rows), `directives`, `worldNotes` (null = unseeded), `settings` jsonb (`{bannedExtra?, auditEnabled?}`),
   `lastError`. Unique on `projectId`.
 - `rebrand_glossary` — `sourceName` (unique with `projectId`), `variants` jsonb string[], `replacement`, `category` (`rebrand_glossary_category`:
