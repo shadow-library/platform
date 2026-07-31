@@ -1,0 +1,465 @@
+/**
+ * Importing npm packages
+ */
+import { describe, expect, it } from 'bun:test';
+
+import { Class } from 'type-fest';
+
+/**
+ * Importing user defined packages
+ */
+import { BRAND } from '@lib/constants';
+import { EnumType } from '@lib/enum-type';
+import { ClassSchema, Field, Integer, Schema } from '@shadow-library/class-schema';
+import { type AsType } from '@shadow-library/common';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+describe('ClassSchema', () => {
+  @Schema({ $id: Sample.name })
+  class Sample {}
+
+  @Schema({ $id: Primitive.name })
+  class Primitive {
+    @Field()
+    str: string;
+
+    @Field()
+    num: number;
+
+    @Field()
+    bool: boolean;
+
+    @Field()
+    obj: object;
+
+    @Field()
+    arr: object[];
+  }
+
+  @Schema({ $id: Complex.name })
+  class Complex {
+    @Field({ format: 'email' })
+    email: string;
+
+    @Field(() => String, { format: 'date-time', nullable: true })
+    date = '2000-01-01T00:00:00Z';
+
+    @Field(() => Integer, { minimum: 18 })
+    age: number;
+
+    @Field(() => Sample)
+    primitive: Sample;
+
+    @Field(() => [Primitive])
+    primitives: Primitive[] = [];
+  }
+
+  @Schema({ $id: AdditionalProperties.name, additionalProperties: String })
+  class AdditionalProperties {
+    [key: string]: string;
+  }
+
+  @Schema({ $id: PatternProperties.name, patternProperties: { '^[a-zA-Z]{3,32}$': Boolean } })
+  class PatternProperties {
+    [key: string]: boolean;
+  }
+
+  @Schema({ $id: ExtendedPrimitive.name, title: 'ExtendedPrimitiveTitle' })
+  class ExtendedPrimitive extends Primitive {
+    @Field()
+    extended: AdditionalProperties;
+
+    @Field()
+    patternProperties: PatternProperties;
+  }
+
+  @Schema({ $id: File.name })
+  class File {
+    @Field()
+    name: string;
+
+    @Field({ optional: true })
+    size?: number;
+
+    // `AsType` keeps the compile-time type `Folder` while erasing to `Object` in the emitted
+    // `design:type`, so the circular pair never triggers a runtime "used before initialization".
+    @Field(() => Folder)
+    parent: AsType<Folder>;
+
+    @Field({ requiredIf: 'size' })
+    unit: string;
+  }
+
+  @Schema({ $id: Folder.name })
+  class Folder {
+    @Field()
+    name: string;
+
+    @Field(() => [File])
+    files: File[];
+
+    @Field(() => [Folder])
+    folders: Folder[];
+  }
+
+  describe('isBranded', () => {
+    it('should return true for branded schema', () => {
+      const schema = new ClassSchema(Sample).getJSONSchema();
+      expect(ClassSchema.isBranded(schema)).toBe(true);
+    });
+
+    it('should return true for branded array schema', () => {
+      const schema = new ClassSchema([Sample]).getJSONSchema();
+      expect(ClassSchema.isBranded(schema)).toBe(true);
+    });
+
+    it('should return true for branded clone schema', () => {
+      const schema = new ClassSchema(Sample).getJSONSchema(true);
+      expect(ClassSchema.isBranded(schema)).toBe(true);
+    });
+
+    it('should return false for non-branded schema', () => {
+      expect(ClassSchema.isBranded({ type: 'object' })).toBe(false);
+    });
+  });
+
+  describe('generate', () => {
+    it('should return the json schema of the class', () => {
+      expect(ClassSchema.generate(Primitive)).toStrictEqual({
+        $id: Primitive.name,
+        type: 'object',
+        required: ['str', 'num', 'bool', 'obj', 'arr'],
+        additionalProperties: false,
+        properties: {
+          str: { type: 'string' },
+          num: { type: 'number' },
+          bool: { type: 'boolean' },
+          obj: { type: 'object' },
+          arr: { type: 'array' },
+        },
+      });
+    });
+
+    [String, Number, Boolean, Object, Array].forEach(type => {
+      it(`should return the JSON schema for primitive type '${type.name}'`, () => {
+        expect(ClassSchema.generate(type)).toStrictEqual({ $id: type.name, type: type.name.toLowerCase() as any });
+      });
+    });
+  });
+
+  it('should return the id of the schema', () => {
+    const schema = new ClassSchema(Sample);
+    expect(schema.getId()).toEqual(Sample.name);
+  });
+
+  it('should get the JSON schema for primitive types', () => {
+    const schema = new ClassSchema(Primitive);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: Primitive.name,
+      type: 'object',
+      required: ['str', 'num', 'bool', 'obj', 'arr'],
+      additionalProperties: false,
+      properties: {
+        str: { type: 'string' },
+        num: { type: 'number' },
+        bool: { type: 'boolean' },
+        obj: { type: 'object' },
+        arr: { type: 'array' },
+      },
+    });
+  });
+
+  it('should get the JSON schema for inherited classes', () => {
+    const schema = new ClassSchema(ExtendedPrimitive);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: ExtendedPrimitive.name,
+      title: 'ExtendedPrimitiveTitle',
+      type: 'object',
+      required: ['str', 'num', 'bool', 'obj', 'arr', 'extended', 'patternProperties'],
+      additionalProperties: false,
+      properties: {
+        str: { type: 'string' },
+        num: { type: 'number' },
+        bool: { type: 'boolean' },
+        obj: { type: 'object' },
+        arr: { type: 'array' },
+        extended: { $ref: AdditionalProperties.name },
+        patternProperties: { $ref: PatternProperties.name },
+      },
+      definitions: {
+        [AdditionalProperties.name]: {
+          $id: AdditionalProperties.name,
+          type: 'object',
+          additionalProperties: { type: 'string' },
+        },
+        [PatternProperties.name]: {
+          $id: PatternProperties.name,
+          type: 'object',
+          additionalProperties: false,
+          patternProperties: { '^[a-zA-Z]{3,32}$': { type: 'boolean' } },
+        },
+      },
+    });
+  });
+
+  it('should get the JSON schema for complex types', () => {
+    const schema = new ClassSchema(Complex);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: Complex.name,
+      type: 'object',
+      definitions: {
+        [Primitive.name]: {
+          $id: Primitive.name,
+          type: 'object',
+          required: ['str', 'num', 'bool', 'obj', 'arr'],
+          additionalProperties: false,
+          properties: {
+            str: { type: 'string' },
+            num: { type: 'number' },
+            bool: { type: 'boolean' },
+            obj: { type: 'object' },
+            arr: { type: 'array' },
+          },
+        },
+        [Sample.name]: {
+          $id: Sample.name,
+          type: 'object',
+          additionalProperties: false,
+        },
+      },
+      required: ['email', 'date', 'age', 'primitive', 'primitives'],
+      additionalProperties: false,
+      properties: {
+        email: { type: 'string', format: 'email' },
+        date: { type: ['string', 'null'], format: 'date-time', default: '2000-01-01T00:00:00Z' },
+        age: { type: 'integer', minimum: 18 },
+        primitive: { $ref: Sample.name },
+        primitives: { type: 'array', items: { $ref: Primitive.name }, default: [] },
+      },
+    });
+  });
+
+  it('should get the JSON schema for circular types', () => {
+    const schema = new ClassSchema(File);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: File.name,
+      type: 'object',
+      definitions: {
+        [Folder.name]: {
+          type: 'object',
+          $id: Folder.name,
+          additionalProperties: false,
+          properties: {
+            name: { type: 'string' },
+            files: { type: 'array', items: { $ref: File.name } },
+            folders: { type: 'array', items: { $ref: Folder.name } },
+          },
+          required: ['name', 'files', 'folders'],
+        },
+      },
+      required: ['name', 'parent'],
+      additionalProperties: false,
+      properties: {
+        name: { type: 'string' },
+        size: { type: 'number' },
+        parent: { $ref: Folder.name },
+        unit: { type: 'string' },
+      },
+      dependencies: { size: ['unit'] },
+    });
+  });
+
+  it('should get the JSON schema for array of object', () => {
+    const schema = new ClassSchema([Sample]);
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: `${Sample.name}?type=Array`,
+      definitions: {
+        Sample: { $id: 'Sample', type: 'object', additionalProperties: false },
+      },
+      type: 'array',
+      items: { $ref: Sample.name },
+    });
+  });
+
+  it('should add the dependencies to set for a schema', () => {
+    const dependencies = new Set<Class<unknown>>();
+    new ClassSchema(File, { dependencies });
+    expect(dependencies.size).toBe(1);
+    expect(dependencies.has(Folder)).toBe(true);
+  });
+
+  it('should return the schema for only the class members', () => {
+    const schema = new ClassSchema(File, { shallow: true });
+    expect(schema.getJSONSchema()).toStrictEqual({
+      $id: File.name,
+      type: 'object',
+      required: ['name', 'parent'],
+      additionalProperties: false,
+      properties: {
+        name: { type: 'string' },
+        size: { type: 'number' },
+        parent: { $ref: Folder.name },
+        unit: { type: 'string' },
+      },
+      dependencies: { size: ['unit'] },
+    });
+  });
+
+  it('should brand the original json schema', () => {
+    const schema = new ClassSchema(File).getJSONSchema();
+    expect((schema as any)[BRAND]).toBe(true);
+  });
+
+  it('should brand the cloned json schema', () => {
+    const schema = new ClassSchema(File).getJSONSchema(true);
+    expect((schema as any)[BRAND]).toBe(true);
+  });
+
+  it('should generate the JSON schema with conditional keywords', () => {
+    @Schema({
+      $id: ConditionalSchema.name,
+      if: { properties: { role: { const: 'admin' } } },
+      then: { required: ['accessLevel'] },
+    })
+    class ConditionalSchema {
+      @Field()
+      role: string;
+
+      @Field({ optional: true })
+      accessLevel?: string;
+    }
+
+    const schema = new ClassSchema(ConditionalSchema).getJSONSchema();
+    expect(schema).toStrictEqual({
+      $id: ConditionalSchema.name,
+      type: 'object',
+      required: ['role'],
+      additionalProperties: false,
+      properties: {
+        role: { type: 'string' },
+        accessLevel: { type: 'string' },
+      },
+      if: { properties: { role: { const: 'admin' } } },
+      then: { required: ['accessLevel'] },
+    });
+  });
+
+  describe('EnumType', () => {
+    const StatusEnum = EnumType.create('Status', ['active', 'inactive', 'pending']);
+    const PriorityEnum = EnumType.create('Priority', [1, 2, 3, 4, 5]);
+
+    it('should generate schema for string enum', () => {
+      expect(ClassSchema.generate(StatusEnum)).toMatchObject({
+        $id: StatusEnum.id,
+        type: 'string',
+        enum: ['active', 'inactive', 'pending'],
+      });
+    });
+
+    it('should generate schema for int enum', () => {
+      expect(ClassSchema.generate(PriorityEnum)).toMatchObject({
+        $id: PriorityEnum.id,
+        type: 'number',
+        enum: [1, 2, 3, 4, 5],
+      });
+    });
+
+    it('should generate the schema for multiple enums', () => {
+      const UserStatusEnum = EnumType.create('UserStatus', ['active', 'inactive', 'pending']);
+      const UserPriorityEnum = EnumType.create('UserPriority', [1, 2, 3, 4, 5]);
+
+      @Schema({ $id: User.name })
+      class User {
+        @Field()
+        name: string;
+
+        @Field(() => UserStatusEnum)
+        status: string;
+
+        @Field(() => UserPriorityEnum)
+        priority: number;
+      }
+
+      const schema = ClassSchema.generate(User);
+      expect(schema).toEqual({
+        $id: 'User',
+        type: 'object',
+        definitions: {
+          [UserStatusEnum.id]: {
+            $id: UserStatusEnum.id,
+            type: 'string',
+            enum: ['active', 'inactive', 'pending'],
+          },
+          [UserPriorityEnum.id]: {
+            $id: UserPriorityEnum.id,
+            type: 'number',
+            enum: [1, 2, 3, 4, 5],
+          },
+        },
+        properties: {
+          name: { type: 'string' },
+          status: { $ref: UserStatusEnum.id },
+          priority: { $ref: UserPriorityEnum.id },
+        },
+        required: ['name', 'status', 'priority'],
+        additionalProperties: false,
+      });
+    });
+  });
+
+  describe('primitive arrays', () => {
+    // Uses the default (absolute) `class-schema:<name>-<n>` `$id`, which is where a bare `$ref: 'String'`
+    // for array items fails to resolve. Items must inline their primitive `type` instead.
+    @Schema()
+    class WithPrimitiveArray {
+      @Field(() => [String])
+      tags: string[];
+
+      @Field(() => [Integer], { optional: true })
+      counts?: number[];
+    }
+
+    it('should inline primitive array items instead of emitting an unresolvable $ref', () => {
+      const schema = ClassSchema.generate(WithPrimitiveArray);
+      expect(schema.properties?.tags).toStrictEqual({ type: 'array', items: { type: 'string' } });
+      expect(schema.properties?.counts).toStrictEqual({ type: 'array', items: { type: 'integer' } });
+      expect(schema.definitions).toBeUndefined();
+    });
+  });
+
+  describe('nullable fields', () => {
+    @Schema({ $id: NullableHost.name })
+    class NullableHost {
+      @Field(() => String, { nullable: true })
+      text: string | null;
+
+      @Field(() => Sample, { nullable: true })
+      ref: Sample | null;
+
+      @Field(() => [Sample], { nullable: true })
+      list: Sample[] | null;
+    }
+
+    it('should extend the type array for nullable primitive fields', () => {
+      const schema = ClassSchema.generate(NullableHost);
+      expect(schema.properties?.text).toStrictEqual({ type: ['string', 'null'] });
+    });
+
+    it('should wrap nullable $ref fields in a nullable anyOf instead of emitting an invalid type', () => {
+      const schema = ClassSchema.generate(NullableHost);
+      expect(schema.properties?.ref).toStrictEqual({ anyOf: [{ $ref: Sample.name }, { type: 'null' }] });
+    });
+
+    it('should extend the type array for nullable array fields', () => {
+      const schema = ClassSchema.generate(NullableHost);
+      expect(schema.properties?.list).toStrictEqual({ type: ['array', 'null'], items: { $ref: Sample.name } });
+    });
+  });
+});
