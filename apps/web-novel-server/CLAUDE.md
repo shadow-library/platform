@@ -76,7 +76,7 @@ Run from `web-novel-server/`. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** 
 | Install | `bun install` | |
 | Develop | `bun run dev` | `bun --watch src/main.ts`, serves on **:8080** |
 | Test | `bun test` | Live Postgres: builds a migrated template DB, clones it per test; boots a mock IdP |
-| Verify (the gate) | `bun run verify` | `shadow verify` = **format + lint + type-check + test**; auto-fix with `shadow verify --fix` |
+| Verify (the gate) | `bun run verify` | `shadow verify` = **format + lint + type-check + test**; auto-fix with `bun run verify --fix` |
 | Type-check | `bun run type-check` | `bun run tsc` |
 | Build | `bun run build` | `shadow build` → single-file `dist/main.js` (+ `generated/drizzle` assets); run with `bun dist/main.js` |
 | Generate migration | `bun run db:generate` | `drizzle-kit generate` → `generated/drizzle/` |

@@ -4,9 +4,9 @@ The **frontend** of Shadow Identity: React 19 + TanStack Start **SSR**, TanStack
 `@shadow-library/ui` for components/theming, `@shadow-library/web` for transport/router/SSR. `.shadowrc.json` →
 `"type": "ssr"`. Full-document SSR — `src/routes/__root.tsx` owns `<html>`.
 
-Its sibling repository `identity-server` (Bun + Fastify JSON API) is a **separate, independent git repo** that
-this app consumes over HTTP. It lives at `../identity-server` in the local workspace but is cloned and versioned
-on its own. This guide is self-contained for work inside `identity-web`.
+Its sibling workspace `identity-server` (Bun + Fastify JSON API) serves the HTTP API this app consumes. It lives
+at `../identity-server` in this monorepo; both are workspaces of the platform repository with a single shared
+history. This guide is self-contained for work inside `apps/identity-web`.
 
 ---
 
@@ -54,10 +54,12 @@ secret, or reused by more than one client belongs in the **server**, not here.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
-5. **Package manager is `bun`** (`bun.lock`, no `packageManager` field). Use `bun`/`bunx`. Add/upgrade/remove
-   deps with `bun add`/`bun remove` **in this repo only** — never edit the sibling repo's `package.json`.
+5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
+   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
+   only** — never edit another workspace's `package.json` to solve a problem here.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
-   deletion unless the user **explicitly** requests it. This repo has its own independent history.
+   deletion unless the user **explicitly** requests it. This monorepo's history is shared across every
+   workspace — a destructive operation here isn't scoped to just this workspace.
 
 ---
 
@@ -71,7 +73,7 @@ secret, or reused by more than one client belongs in the **server**, not here.
 | Production start | `bun run start` |
 | Preview a build | `bun run preview` |
 | Verify — **format + lint + type-check** | `bun run verify` |
-| Verify with autofix | `bunx shadow verify --fix` |
+| Verify with autofix | `bun run verify --fix` |
 | Type-check only | `bun run type-check` |
 | E2E tests (Playwright — **needs the server running**) | `bun run test` |
 | Install Playwright browser | `bun run test:setup` |

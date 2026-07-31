@@ -42,7 +42,7 @@ The dev server runs on [http://localhost:3000](http://localhost:3000). Every bac
 | `bun run type-check`         | Type-check only (`tsc --noEmit`)                       |
 | `bun run start`              | Run the production SSR server (`serve.ts` → `@shadow-library/web/server-entry`) |
 | `bun run verify`             | `shadow verify` — format (Prettier) + lint (ESLint) + type-check |
-| `bunx shadow verify --fix`   | Auto-fix formatting and lint issues                    |
+| `bun run verify --fix`       | Auto-fix formatting and lint issues                    |
 | `bun run test`               | Run Playwright end-to-end tests                        |
 | `bun run test:setup`         | Install the Chromium browser Playwright needs          |
 | `bun run generate:api-types` | Regenerate API types from the backend OpenAPI spec     |

@@ -15,7 +15,7 @@ The Bun-workspaces monorepo for the Shadow Library platform: every first-party a
 | `apps/pulse-server`, `apps/pulse-web` | Pulse: notifications and platform activity |
 | `apps/web-novel-server`, `apps/web-novel-web` | Web Novel: the public reading platform |
 | `packages/app`, `packages/auth`, `packages/class-schema`, `packages/common`, `packages/fastify`, `packages/modules`, `packages/ui`, `packages/web` | The shared ecosystem packages every app builds on |
-| `e2e/` | Whole-platform Playwright suite — cross-app flows against the local compose deployment |
+| `e2e/` | Whole-platform Playwright suite — cross-app flows against already-deployed service URLs supplied via `E2E_*` environment variables (no local compose deployment) |
 | `scripts/` | Root tooling (plain scripts invoked from root `package.json` — not a workspace) |
 
 Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `modules` (+ `auth` for non-identity servers). Web apps build on `ui` and `web`.
@@ -27,6 +27,15 @@ Backend dependency order: `common` → `class-schema`/`app` → `fastify` → `m
 - Per-workspace config files exist only where behavior genuinely differs from the root defaults. A new workspace needs only `package.json`, a `tsconfig.json` extending `tsconfig.base.json`, and source.
 - The server↔web API contract is **not** atomic: each web app's `api-types.gen.ts` is generated from a *running* server (`generate:api-types` → `http://localhost:8080`). A server contract change requires regenerating consumer types and updating callers as coordinated work.
 - Apps remain independently built, imaged, and deployed; the monorepo changes development, not runtime architecture.
+
+## Working across workspaces
+
+- **A breaking change is one change.** If it originates in `packages/*`, fix every first-party `apps/*`
+  consumer in the same change — never land the package change and leave callers to a follow-up.
+  Affected-workspace CI and the e2e suite both enforce this.
+- **The server↔web contract is not atomic.** A server API change requires regenerating the consuming web
+  app's `api-types.gen.ts` from a *running* server and updating its callers as part of the same
+  coordinated change (see Hard rules above).
 
 ## Validation
 
