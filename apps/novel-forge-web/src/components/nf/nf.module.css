@@ -1,0 +1,99 @@
+.pageContainer {
+  padding: 28px 28px 80px;
+}
+
+.pageHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 20px;
+}
+
+.pageHeaderMain {
+  min-width: 0;
+}
+
+.pageHeaderTitleRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pageTitle {
+  margin: 0;
+  font-size: var(--sh-text-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.pageSubtitle {
+  margin: 4px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.pageHeaderExtra {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.sectionCard {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 20px 22px;
+}
+
+.sectionHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+}
+
+.queryLoading {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 64px;
+}
+
+.assetBox {
+  flex: 0 0 auto;
+  height: var(--nf-asset-h, 80px);
+  width: var(--nf-asset-w, 100%);
+  border-radius: var(--nf-asset-r, 8px);
+  border: 1.5px solid var(--sh-border-subtle);
+  background: var(--nf-asset-bg, var(--sh-surface-well));
+  background-image:
+    linear-gradient(to top right, transparent calc(50% - 1px), var(--sh-border-default) calc(50% - 1px), var(--sh-border-default) calc(50% + 1px), transparent calc(50% + 1px)),
+    linear-gradient(to top left, transparent calc(50% - 1px), var(--sh-border-default) calc(50% - 1px), var(--sh-border-default) calc(50% + 1px), transparent calc(50% + 1px));
+}
+
+/* Solid-colour variant drops the diagonal-cross wireframe. */
+.assetBox[data-solid='true'] {
+  background-image: none;
+}
+
+.paneLoader {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100%;
+  padding: 48px;
+}
+
+.paneError {
+  padding: 24px;
+}

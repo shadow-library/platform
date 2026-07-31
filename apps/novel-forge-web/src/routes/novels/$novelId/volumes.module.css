@@ -1,0 +1,361 @@
+.pageVolumes {
+  padding: 32px 32px 120px;
+}
+
+.pageDetail {
+  padding: 32px 32px 130px;
+}
+
+.spacer {
+  flex: 1;
+}
+
+.iconTertiary {
+  color: var(--sh-text-tertiary);
+  flex-shrink: 0;
+}
+
+/* Breadcrumb */
+.crumbCurrent {
+  color: var(--sh-text-primary);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  padding: 5px 7px;
+}
+
+.crumbBtn {
+  border: none;
+  background: transparent;
+  color: var(--sh-text-secondary);
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  cursor: pointer;
+  padding: 5px 7px;
+  border-radius: 6px;
+}
+
+/* A small uppercase field label. */
+.sectionLabel {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 9px;
+}
+
+/* Field prose spans the full record width so it lines up with the arc / brief list below it, and is
+   justified so both edges meet the table's edges. */
+.fieldText {
+  margin: 0 0 30px;
+  font-size: var(--sh-text-body);
+  line-height: 1.7;
+  text-align: justify;
+}
+
+/* Floating Forge composer, centered at the bottom of the pane. */
+.forgeDock {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  bottom: 22px;
+  width: min(680px, calc(100% - 60px));
+  display: flex;
+  justify-content: center;
+  z-index: 5;
+}
+
+/* Volumes list header */
+.listHead {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 8px;
+}
+
+.listHeadMain {
+  flex: 1;
+}
+
+.subtitle {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.list {
+  margin-top: 20px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+/* Record eyebrow + title shared by the volume / arc / brief detail views. */
+.recordKind {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 8px;
+}
+
+.title {
+  margin: 0 0 6px;
+  font-size: var(--sh-text-h1);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.titleBrief {
+  margin-bottom: 10px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  margin-bottom: 30px;
+}
+
+.sectionHeadRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.sectionH2 {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+}
+
+.written {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.emptyArcs {
+  margin: 0 0 30px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+  line-height: 1.6;
+}
+
+.inlineLink {
+  border: none;
+  background: transparent;
+  color: var(--sh-accent);
+  cursor: pointer;
+  font-size: inherit;
+  padding: 0;
+  font-weight: 600;
+}
+
+.listBordered {
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.listSpaced {
+  margin-bottom: 30px;
+}
+
+.approveNote {
+  margin: 0 0 14px;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+/* Shared record rows (self-contained so they don't fight `.nf-selrow` specificity). */
+.row {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  transition: background 0.12s;
+}
+
+.row:hover {
+  background: var(--sh-bg-hover);
+}
+
+/* A chapter with no brief yet: shown for context but not a navigation target. */
+.row:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.row:disabled:hover {
+  background: transparent;
+}
+
+.rowVolume {
+  gap: 18px;
+  padding: 16px 12px;
+}
+
+.rowArc {
+  gap: 14px;
+  padding: 14px 12px;
+}
+
+.rowBrief {
+  gap: 14px;
+  padding: 13px 12px;
+}
+
+.volNum {
+  font-family: var(--sh-font-mono);
+  font-size: 15px;
+  font-weight: 700;
+  width: 32px;
+  flex-shrink: 0;
+  text-align: center;
+}
+
+.arcNum {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  width: 22px;
+  flex-shrink: 0;
+}
+
+.briefNum {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  width: 30px;
+  flex-shrink: 0;
+}
+
+.rowMain {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+}
+
+.rowName {
+  display: block;
+  font-size: var(--sh-text-body);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowSub {
+  display: block;
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowRange {
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+  width: 86px;
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.statusCol {
+  width: 110px;
+  flex-shrink: 0;
+}
+
+.statusColSm {
+  width: 100px;
+  flex-shrink: 0;
+}
+
+.briefName {
+  flex: 1;
+  min-width: 0;
+  text-align: left;
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Brief detail */
+.briefMeta {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 24px;
+}
+
+.briefActions {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 34px;
+}
+
+.editWrap {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-bottom: 30px;
+}
+
+.editActions {
+  display: flex;
+  gap: 8px;
+}
+
+.briefBody {
+  margin: 0 0 30px;
+  font-size: var(--sh-text-body);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+/* Plan dialog */
+.dialogRow {
+  display: flex;
+  gap: 12px;
+}
+
+.formCol {
+  flex: 1;
+}
+
+/* Screen shell */
+.screen {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--sh-surface-app);
+  overflow: hidden;
+}
+
+.crumbBar {
+  height: 60px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 22px;
+}
+
+.body {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+}
+
+.scrollFill {
+  position: absolute;
+  inset: 0;
+}

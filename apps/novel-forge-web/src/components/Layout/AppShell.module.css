@@ -1,0 +1,17 @@
+/* The flex root and the sidebar placement come from the design system's Shell now. What stays here is
+   the content box the full-bleed screens position against. */
+
+/* Shell pins itself from md up and lets the document scroll below it, which suits a reading app. This is
+   an authoring tool that scrolled its content pane at every width before, and its editor, chat, and bible
+   assume chrome that never scrolls away, so keep the pin the whole way down. */
+.shellRoot {
+  height: 100dvh;
+  overflow: hidden;
+}
+
+/* Fills the shell's content region and anchors `.nf-splitpane`'s `position: absolute; inset: 0`, so the
+   editor, chat, and bible reach every edge. */
+.content {
+  position: relative;
+  min-height: 100%;
+}

@@ -1,0 +1,151 @@
+.spacer {
+  flex: 1;
+}
+
+.head {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-card);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.chapNum {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.chapTitle {
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+}
+
+.glyph {
+  font-size: 15px;
+}
+
+.detailScroll {
+  flex: 1;
+  min-height: 0;
+  padding: 22px 24px;
+}
+
+.detailInner {
+  max-width: 680px;
+  margin: 0 auto;
+}
+
+.verdict {
+  border: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-card);
+  border-radius: var(--sh-radius-lg);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.verdict[data-contradiction='true'] {
+  border-color: var(--sh-danger-border);
+  background: var(--sh-danger-bg-subtle);
+}
+
+.verdictHead {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.verdictIcon {
+  color: var(--sh-warning-solid);
+}
+
+.verdict[data-contradiction='true'] .verdictIcon {
+  color: var(--sh-danger-solid);
+}
+
+.verdictTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  color: var(--sh-text-primary);
+}
+
+.verdict[data-contradiction='true'] .verdictTitle {
+  color: var(--sh-danger-text-on-subtle);
+}
+
+.verdictNote {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  line-height: 1.55;
+}
+
+.excerptLabel {
+  margin-bottom: 8px;
+}
+
+.excerpt {
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 16px 18px;
+  font-size: 15px;
+  line-height: 1.7;
+  color: var(--sh-text-secondary);
+}
+
+.footer {
+  flex-shrink: 0;
+  padding: 14px 24px;
+  border-top: 1px solid var(--sh-border-subtle);
+  background: var(--sh-surface-card);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.hotkeys {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: auto;
+  font-size: 11px;
+  color: var(--sh-text-tertiary);
+}
+
+.railHeadFlex {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.railTitle {
+  font-size: var(--sh-text-body);
+  font-weight: 700;
+}
+
+.rowTopRow {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.rowTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  color: var(--sh-text-primary);
+  text-align: left;
+}
+
+[data-active='true'] .rowTitle {
+  color: var(--sh-accent);
+}
+
+.rowWords {
+  font-size: 11px;
+  color: var(--sh-text-secondary);
+  text-align: left;
+}

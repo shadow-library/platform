@@ -1,0 +1,38 @@
+# Reinstalled for the container platform inside the build stage — never copy host deps.
+node_modules
+
+# Build / tooling output
+dist
+stats.html
+count.txt
+*.tsbuildinfo
+
+# VCS & CI
+.git
+.github
+
+# Local tooling & caches
+.husky
+.tanstack
+.vite
+.playwright-mcp
+
+# Tests & their artifacts (build only runs tsc + vite build)
+tests
+playwright.config.ts
+playwright-report
+test-results
+blob-report
+
+# Env & editor
+.env
+.env.*
+.vscode
+.idea
+.DS_Store
+
+# Docker & docs
+Dockerfile
+.dockerignore
+README.md
+*.log

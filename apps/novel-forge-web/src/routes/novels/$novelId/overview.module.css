@@ -1,0 +1,381 @@
+.loading {
+  display: flex;
+  justify-content: center;
+  padding: 64px;
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* A book-cover portrait (3:4) with a floor so it stays legible; top-aligned with the title block. */
+.headerCover {
+  width: 144px;
+  min-width: 144px;
+  height: 192px;
+  flex-shrink: 0;
+  border-radius: var(--sh-radius-lg);
+  box-shadow: var(--sh-shadow-e1);
+}
+
+.headerMain {
+  flex: 1;
+  min-width: 0;
+}
+
+.kindRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+}
+
+.created {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.projectTitle {
+  margin: 0 0 6px;
+  font-size: var(--sh-text-display);
+  font-weight: 700;
+  letter-spacing: -0.025em;
+}
+
+.brief {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  color: var(--sh-text-secondary);
+  max-width: 620px;
+  /* Keep a runaway brief from ballooning the header — cap it and let the ellipsis hint at more. */
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.headerActions {
+  display: flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+/* Lifecycle stepper */
+.stepper {
+  display: flex;
+  align-items: center;
+}
+
+.stepContents {
+  display: contents;
+}
+
+.connector {
+  flex: 1;
+  height: 2px;
+  background: var(--sh-bg-pressed);
+  margin: 0 6px 22px;
+}
+
+.connector[data-lit='true'] {
+  background: var(--sh-success-solid);
+}
+
+.step {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+}
+
+.stepDot {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  background: var(--sh-surface-well);
+  color: var(--sh-text-tertiary);
+  border: 1.5px solid var(--sh-border-default);
+}
+
+.stepDot[data-state='done'] {
+  background: var(--sh-success-solid);
+  color: var(--sh-success-on-solid);
+  border: none;
+}
+
+.stepDot[data-state='current'] {
+  background: var(--sh-accent);
+  color: var(--sh-on-accent);
+  border: none;
+  box-shadow: 0 0 0 4px var(--sh-accent-soft);
+}
+
+.stepLabel {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 500;
+  color: var(--sh-text-tertiary);
+}
+
+.stepLabel[data-state='done'] {
+  font-weight: 600;
+  color: var(--sh-text-primary);
+}
+
+.stepLabel[data-state='current'] {
+  font-weight: 700;
+  color: var(--sh-accent);
+}
+
+.sectionSpacer {
+  margin-bottom: 20px;
+}
+
+/* Import job banner */
+.progressHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progressHeadActions {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.progressRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.progressLabel {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--sh-bg-pressed);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--sh-info-solid);
+  transition: width 0.4s ease;
+}
+
+.error {
+  margin: 10px 0 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+/* Stat cards */
+.statGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.statCard {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 16px 18px;
+}
+
+.statCardLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.statCardFooter {
+  margin-top: 10px;
+}
+
+.statBig {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.statNum {
+  font-size: 28px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.statUnit {
+  font-size: 14px;
+  color: var(--sh-text-tertiary);
+}
+
+.planRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+/* Usage + runs */
+.mainGrid {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 20px;
+  margin-bottom: 20px;
+}
+
+.usageHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+
+.usageTitle {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+}
+
+.usageSub {
+  margin: 3px 0 0;
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.usageCostWrap {
+  text-align: right;
+}
+
+.usageCost {
+  font-size: 26px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.bars {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+  height: 116px;
+  margin-bottom: 14px;
+}
+
+.barCol {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  cursor: default;
+}
+
+.barTrack {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+}
+
+.barFill {
+  height: var(--pct);
+  background: var(--sh-indigo-400);
+  border-radius: 3px 3px 0 0;
+  transition: background 0.12s;
+}
+
+.barCol:hover .barFill {
+  background: var(--sh-indigo-500);
+}
+
+.barLabel {
+  margin-top: 6px;
+  font-size: 9px;
+  color: var(--sh-text-tertiary);
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tokenGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+  padding-top: 14px;
+  border-top: 1px solid var(--sh-border-subtle);
+}
+
+.tokenLabel {
+  font-size: var(--sh-text-caption);
+  color: var(--sh-text-tertiary);
+}
+
+.tokenValue {
+  font-size: var(--sh-text-body-lg);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.emptyRuns {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-tertiary);
+}
+
+.runRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--sh-border-subtle);
+}
+
+.runDot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--nf-dot);
+  flex-shrink: 0;
+}
+
+.runBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.runTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.runMeta {
+  font-size: 10px;
+  color: var(--sh-text-tertiary);
+}

@@ -1,0 +1,224 @@
+.page {
+  padding: 28px 28px 60px;
+}
+
+.cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 24px;
+}
+
+.card {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.cardTitle {
+  margin: 0;
+  font-size: var(--sh-text-body);
+  font-weight: 700;
+}
+
+.cardActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.auditRow {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+  cursor: pointer;
+}
+
+.auditHint {
+  color: var(--sh-text-tertiary);
+}
+
+/* Progress card */
+.progressHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.progressRow {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.progressLabel {
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+}
+
+.progressTrack {
+  height: 4px;
+  border-radius: 99px;
+  background: var(--sh-bg-pressed);
+  overflow: hidden;
+}
+
+.progressBar {
+  height: 100%;
+  background: var(--sh-info-solid);
+  transition: width 0.4s ease;
+}
+
+.error {
+  margin: 0;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-danger-text);
+}
+
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Chapter table */
+.sectionHead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.sectionTitle {
+  margin: 0;
+  font-size: var(--sh-text-h3);
+  font-weight: 700;
+}
+
+.table {
+  background: var(--sh-surface-card);
+  border: 1px solid var(--sh-border-subtle);
+  border-radius: var(--sh-radius-lg);
+  overflow: hidden;
+}
+
+.headerRow {
+  display: grid;
+  grid-template-columns: 52px 1fr 210px 150px;
+  gap: 12px;
+  padding: 9px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sh-text-tertiary);
+}
+
+.headerActions {
+  text-align: right;
+}
+
+.row {
+  display: grid;
+  grid-template-columns: 52px 1fr 210px 150px;
+  gap: 12px;
+  padding: 8px 18px;
+  border-bottom: 1px solid var(--sh-border-subtle);
+  align-items: center;
+}
+
+.row:last-child {
+  border-bottom: none;
+}
+
+.rowNum {
+  font-family: var(--sh-font-mono);
+  font-size: 12px;
+  color: var(--sh-text-tertiary);
+}
+
+.rowTitle {
+  font-size: var(--sh-text-body-sm);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowStatus {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.issueCount {
+  font-size: 11px;
+  color: var(--sh-warning-text, var(--sh-text-tertiary));
+}
+
+.rowActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+/* Reader drawer */
+.readerControls {
+  margin-bottom: 14px;
+}
+
+.issueBox {
+  border: 1px solid var(--sh-warning-border);
+  background: var(--sh-warning-bg-subtle);
+  border-radius: var(--sh-radius-md);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.issueTitle {
+  font-size: var(--sh-text-body-sm);
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.issueRow {
+  font-size: var(--sh-text-body-sm);
+  line-height: 1.5;
+}
+
+.issueType {
+  font-family: var(--sh-font-mono);
+  font-size: 11px;
+  color: var(--sh-warning-solid);
+}
+
+.changeSummary {
+  margin: 0 0 12px;
+  font-size: var(--sh-text-body-sm);
+  color: var(--sh-text-secondary);
+  font-style: italic;
+}
+
+.metaList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.metaRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: var(--sh-text-body-sm);
+}
+
+.prose {
+  font-size: var(--sh-text-body);
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
