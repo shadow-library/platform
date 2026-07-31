@@ -2,6 +2,8 @@
 
 The **@shadow-library/common** package provides a comprehensive collection of essential utilities, services, and error-handling mechanisms designed to streamline development across the Shadow Library ecosystem. This package is built with TypeScript and offers robust, reusable components for task management, API requests, caching, logging, configuration management, and more.
 
+Every app in the platform depends on this package, directly or transitively.
+
 ## Features
 
 ### 🏗️ **Task Management & Orchestration**
