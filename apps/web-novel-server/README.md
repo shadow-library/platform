@@ -52,8 +52,11 @@ in-process and serves discovery/JWKS/token/service-access, so no identity deploy
 ```bash
 bun run build            # shadow build → single-file dist/main.js (+ generated/drizzle assets)
 bun dist/main.js         # run the production bundle
-docker build -t web-novel-server .
 ```
+
+The image build is now shared and monorepo-root-context — see [`docker/README.md`](../../docker/README.md)
+for the exact command (`docker build -f docker/Dockerfile --target runtime-backend --build-arg
+APP=web-novel-server ...`, run from the repo root, not this directory).
 
 Ports: `8080` app (`/health`, `/health/ready`), `8081` HttpCoreModule health server
 (enable with `HEALTH_ENABLED=true`; on by default in production).

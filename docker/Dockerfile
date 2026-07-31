@@ -77,12 +77,17 @@ RUN bun install --frozen-lockfile
 FROM deps AS build
 ARG APP
 
+# packages/* build first, and before apps/${APP} is even copied in: the packages build consumes
+# nothing under apps/, so keeping it above the app-source COPY makes this whole layer — install
+# through packages build — byte-identical, and therefore cache-shared, across all 8 apps' image
+# builds. Copying apps/${APP} first (as an earlier version of this Dockerfile did) put a
+# per-app-varying layer ahead of the packages build, invalidating it on every app source change
+# even though the build doesn't depend on that source at all.
 COPY scripts/ scripts/
 COPY packages/ packages/
-COPY apps/${APP}/ apps/${APP}/
-
 RUN bun run --filter './packages/*' build
 
+COPY apps/${APP}/ apps/${APP}/
 WORKDIR /workspace/apps/${APP}
 RUN bun run build
 
@@ -148,22 +153,35 @@ ARG APP_VERSION=local
 ENV APP_VERSION=${APP_VERSION} \
     NODE_ENV=production \
     SERVER_PORT=8080 \
-    PORT=8080 \
+    APP_PORT=8080 \
+    APP_HOST=0.0.0.0 \
     HEALTH_HOST=0.0.0.0
 
 USER bun
 WORKDIR /app
 COPY --from=build --chown=bun:bun /workspace/apps/${APP}/dist .
 
-# 8080: main HTTP server (framework default `server.host` is already 0.0.0.0). 8081: the
-# framework's dependency-free liveness/readiness pair (GET /health/live, /health/ready) from
-# @shadow-library/modules' HttpCoreModule, enabled whenever NODE_ENV=production — its OWN default
-# `health.host` is 'localhost', not '0.0.0.0', which Bun.serve resolved to the IPv6 loopback
-# (`::1`) only in the environment this was verified in; that's unreachable through Docker's port
-# publishing (and likely through a k8s liveness probe hitting the pod IP, not the loopback address
-# at all) even though the process is healthy. HEALTH_HOST=0.0.0.0 makes the probe port bind the
-# same way the main port already does — confirmed by a real boot-check (docker/README.md).
+# Two independent host-binding defaults exist across the platform's backends, neither of them
+# "the framework default" — each app's OWN bootstrap.ts picks one:
+#   - identity-server, novel-forge-server, web-novel-server each register their own `server.host`
+#     key (bootstrap.ts) with a default of 0.0.0.0, and pass it into FastifyModule.forRoot()
+#     explicitly, overriding the framework's default. SERVER_PORT is a no-op knob for these three.
+#   - pulse-server never registers `server.host` or passes an explicit host into
+#     FastifyModule.forRoot(), so it falls through to @shadow-library/fastify's OWN default —
+#     `app.host`, default 'localhost' — which resolved to the IPv6 loopback (`::1`) only inside
+#     the container in the environment this was verified in, making the published port 8080
+#     unreachable (connection reset) even though the process and health checks looked fine.
+#     APP_HOST=0.0.0.0 fixes that; APP_PORT is the matching (currently no-op, since 8080 is
+#     already `app.port`'s default) knob for the same fallback. Both are no-ops for the other
+#     three backends, which never read `app.host`/`app.port`.
+# 8081: the framework's dependency-free liveness/readiness pair (GET /health/live, /health/ready)
+# from @shadow-library/modules' HttpCoreModule, enabled whenever NODE_ENV=production — its OWN
+# default `health.host` is also 'localhost', hitting the identical IPv6-loopback problem;
+# HEALTH_HOST=0.0.0.0 fixes that independently of the main port. Both fixes confirmed by a real
+# boot-check (docker/README.md).
 EXPOSE 8080 8081
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+  CMD bun -e "fetch('http://127.0.0.1:'+(process.env.HEALTH_PORT||8081)+'/health/live').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
 ENTRYPOINT ["bun", "run"]
 CMD ["main.js"]
 

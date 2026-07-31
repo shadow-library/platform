@@ -52,7 +52,7 @@ No image bakes in secrets or environment-specific URLs — everything below is s
 | App | Target | Ports (container) | Health check | Required runtime env (non-exhaustive — see the app's `.env.example`) |
 | --- | --- | --- | --- | --- |
 | identity-server | runtime-backend | 8080 (app), 8081 (health) | `GET :8081/health/live`, `:8081/health/ready` | `DATABASE_POSTGRES_URL`, `DATABASE_REDIS_URL`, `SECURITY_MASTER_ENCRYPTION_KEY` |
-| novel-forge-server | runtime-backend | 8080, 8081 | `GET :8081/health/live`, `:8081/health/ready` | `DATABASE_POSTGRES_URL` |
+| novel-forge-server | runtime-backend | 8080, 8081 | `GET :8081/health/live`, `:8081/health/ready` | `DATABASE_POSTGRES_URL`; **hard boot requirement:** `AUTH_APP_ID` + one client credential (`AUTH_CLIENT_SECRET` or `AUTH_CLIENT_ASSERTION_PATH`) + a reachable `AUTH_ISSUER` — the SDK reads this app's registration back from that exact issuer at boot and the process exits in production without all three (`AUTH_APP_ID` is `isProdRequired`; the credential check throws unconditionally) |
 | pulse-server | runtime-backend | 8080, 8081 | `GET :8081/health/live`, `:8081/health/ready` | `DATABASE_POSTGRES_URL` |
 | web-novel-server | runtime-backend | 8080, 8081 | `GET :8081/health/live`, `:8081/health/ready`, also `GET :8080/health` | `DATABASE_POSTGRES_URL`, `AUTH_ISSUER`, `AUTH_APP_ID` |
 | identity-web | runtime-ssr | 3000 (app), 3001 (health) | `GET :3001/healthz` | `SERVER_URL` (identity-server origin) |
@@ -60,11 +60,27 @@ No image bakes in secrets or environment-specific URLs — everything below is s
 | web-novel-web | runtime-ssr | 3000, 3001 | `GET :3001/healthz` | `SERVER_URL` (web-novel-server origin); reverse proxy routes `/api` to web-novel-server |
 | pulse-web | runtime-spa | 3000, 3001 | `GET :3001/healthz` | none — API is same-origin `/api`, routed to pulse-server by the ingress |
 
-`SERVER_PORT` (backends' framework-level config key) and `PORT` are both set to `8080` in the
-image so either naming convention a backend reads resolves the same value — the platform's
-backends aren't fully consistent about which one they register (`server.port` → `SERVER_PORT`
-env, but `web-novel-server`'s own `.env.example` documents it as `PORT`); setting both is a no-op
-for whichever name a given backend doesn't use.
+The platform's backends bind their main port through two different, mutually exclusive config
+keys, and no backend reads a bare `PORT` at all (that env var is dead weight — some `.env.example`
+files label it `PORT` in a comment, but the code registers `server.port`, not `PORT`, as the
+actual key). `runtime-backend` sets both families so whichever one a given app reads resolves to
+`8080`:
+
+- `identity-server`, `novel-forge-server`, `web-novel-server` each register their own `server.host`
+  / `server.port` (bootstrap.ts) and pass them into `FastifyModule.forRoot()` explicitly — env
+  `SERVER_PORT` (`SERVER_HOST` isn't set; their own default is already `0.0.0.0`).
+- `pulse-server` never overrides host/port, so it falls through to `@shadow-library/fastify`'s own
+  `app.host` / `app.port` default — env `APP_HOST` / `APP_PORT`. `app.host` defaults to
+  `'localhost'`, which resolved to the IPv6 loopback only, inside the container, in the
+  environment this was verified in — unreachable through Docker's published port even though the
+  process and its health checks were fine. `APP_HOST=0.0.0.0` fixes that; it and `APP_PORT` are
+  no-ops for the other three backends, which never read either key.
+
+`novel-forge-server`'s default local image storage (`STORAGE_LOCAL_DIR`, default `./images`,
+i.e. `/app/images`) writes into the container's own filesystem at runtime — that's ephemeral (lost
+whenever the container is replaced), not a permissions problem (`/app` is `bun`-owned in this
+image, confirmed writable). Mount a volume at `/app/images` (or point `STORAGE_LOCAL_DIR`
+elsewhere) for anything that needs to survive a restart.
 
 ## Judgment calls
 
