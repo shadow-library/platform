@@ -49,7 +49,7 @@ The dev server runs on [http://localhost:3000](http://localhost:3000). Every bac
 
 ## Production
 
-`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip, streamed SSR, and graceful drain, on `PORT` (default 3000). Liveness lives on its own port — `GET /healthz` on `HEALTH_PORT` (default 3001) — so probes never touch the backend or the renderer. Backend calls happen server-side through Start server functions against `API_ORIGIN`; there is no `/api` proxy in production, so the ingress must route `/api/auth/*` (the interactive login redirect) to novel-forge-server directly. The `Dockerfile` builds and runs exactly this.
+`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip, streamed SSR, and graceful drain, on `PORT` (default 3000). Liveness lives on its own port — `GET /healthz` on `HEALTH_PORT` (default 3001) — so probes never touch the backend or the renderer. Backend calls happen server-side through Start server functions against `API_ORIGIN`; there is no `/api` proxy in production, so the ingress must route `/api/auth/*` (the interactive login redirect) to novel-forge-server directly. The shared, monorepo-root-context [`docker/Dockerfile`](../../docker/Dockerfile) builds and runs exactly this — see [`docker/README.md`](../../docker/README.md) for the exact `--target runtime-ssr --build-arg APP=novel-forge-web --build-arg SSR_ENTRY=serve.ts` command.
 
 ## Project Structure
 
