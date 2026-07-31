@@ -423,7 +423,7 @@ describe('ContextAssembler — memory budget trimming', () => {
     // to guarantee a non-empty context pack (at-least-one guarantee in applyBudget).
     expect(pack.sections.length).toBeLessThan(3);
     expect(pack.sections.length).toBeGreaterThan(0);
-  });
+  }, 15_000); // consistently ~5.4s on GitHub Actions' 2-vCPU runners, just over the 5s default — CI-speed headroom, not a functional change
 });
 
 // ─── forRebrand / forRebrandSeed — rebrand packs (rebrand design §5) ─────────
