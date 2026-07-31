@@ -43,7 +43,8 @@ test.describe('health not exposed', () => {
         const contentType = response.headers()['content-type'] ?? '';
         const body = (await response.text()).trim();
 
-        const looksLikeRawHealthContract = response.status() === 200 && !contentType.includes('html') && (body === 'ok' || body === 'not ready');
+        // 200 'ok' is the live/ready-success shape; 503 'not ready' is the readiness-failure shape - a leak either way.
+        const looksLikeRawHealthContract = (response.status() === 200 || response.status() === 503) && !contentType.includes('html') && (body === 'ok' || body === 'not ready');
         expect(
           looksLikeRawHealthContract,
           `${url}${path} looks like it exposes the internal health contract (status ${response.status()}, content-type "${contentType}", body "${body.slice(0, 50)}")`,
