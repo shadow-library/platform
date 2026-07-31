@@ -1,5 +1,5 @@
 {
   "verify": {
-    "files": "{lib,tests}/**/*.ts"
+    "files": "**/*.ts"
   }
 }

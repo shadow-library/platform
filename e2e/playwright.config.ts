@@ -21,8 +21,9 @@ import { loadDotEnv } from './lib';
  * relying on Bun's own startup-time auto-load, which does not reach forked workers (see `lib/load-env.ts`)
  * — reliably lands the vars before any spec reads them.
  *
- * There is no local compose deployment (see `AGENTS.md`), so there is no `webServer` and no single
- * `baseURL`: each spec resolves its own product URL from `lib/env.ts` and skips cleanly when unset.
+ * Every product URL (`lib/env.ts`) defaults to the local k3d dev ingress and is resolved per spec, not
+ * from a single `baseURL` — this workspace never starts a server itself: whether that's the local k3d
+ * cluster or a deployed environment reached via an env override, it's already running.
  */
 loadDotEnv(path.join(import.meta.dirname, '.env'));
 
@@ -32,7 +33,8 @@ export default defineConfig({
   testDir: './tests',
   fullyParallel: true,
   forbidOnly: isCI,
-  retries: 1,
+  // Unconditional retries would hide real local flake; CI still gets one to absorb network jitter.
+  retries: isCI ? 1 : 0,
   workers: isCI ? 2 : undefined,
   timeout: 30_000,
   expect: { timeout: 10_000 },
@@ -45,6 +47,10 @@ export default defineConfig({
     trace: 'on-first-retry',
     actionTimeout: 15_000,
     navigationTimeout: 30_000,
+    // The k3d dev ingress presents a self-signed/local-CA cert on *.shadow-apps.test — not a production
+    // trust concern, since every target here is either that local cluster or an env-overridden URL the
+    // caller explicitly chose.
+    ignoreHTTPSErrors: true,
   },
 
   projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],

@@ -22,7 +22,13 @@ import { existsSync, readFileSync } from 'node:fs';
  * environment variable, e.g. in CI) always wins over the file.
  */
 
-/** Loads `KEY=VALUE` pairs from `path` into `process.env`, skipping blanks/comments and anything already set. */
+/**
+ * Loads `KEY=VALUE` pairs from `path` into `process.env`, skipping blanks/comments and anything already
+ * set. Tolerates a leading `export ` (copy-pasting a shell snippet shouldn't break parsing) and strips an
+ * unquoted inline comment (`KEY=1 # note` → `1`, not `1 # note` — a `#` only starts a comment when it's
+ * preceded by whitespace or opens the value outright, so `KEY=a#b` stays `a#b`). A quoted value
+ * (`KEY="a # b"`) is kept verbatim, `#` included.
+ */
 export function loadDotEnv(path: string): void {
   if (!existsSync(path)) return;
 
@@ -30,13 +36,22 @@ export function loadDotEnv(path: string): void {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith('#')) continue;
 
-    const separatorIndex = trimmed.indexOf('=');
+    const withoutExport = trimmed.startsWith('export ') ? trimmed.slice('export '.length).trimStart() : trimmed;
+
+    const separatorIndex = withoutExport.indexOf('=');
     if (separatorIndex === -1) continue;
 
-    const key = trimmed.slice(0, separatorIndex).trim();
-    const rawValue = trimmed.slice(separatorIndex + 1).trim();
-    const isQuoted = (rawValue.startsWith('"') && rawValue.endsWith('"')) || (rawValue.startsWith("'") && rawValue.endsWith("'"));
-    const value = isQuoted ? rawValue.slice(1, -1) : rawValue;
+    const key = withoutExport.slice(0, separatorIndex).trim();
+    const rawValue = withoutExport.slice(separatorIndex + 1).trim();
+    const isQuoted = (rawValue.startsWith('"') && rawValue.endsWith('"') && rawValue.length >= 2) || (rawValue.startsWith("'") && rawValue.endsWith("'") && rawValue.length >= 2);
+
+    let value: string;
+    if (isQuoted) {
+      value = rawValue.slice(1, -1);
+    } else {
+      const commentIndex = rawValue.search(/(?:^|\s)#/);
+      value = (commentIndex === -1 ? rawValue : rawValue.slice(0, commentIndex)).trim();
+    }
 
     if (process.env[key] === undefined) process.env[key] = value;
   }

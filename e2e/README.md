@@ -1,24 +1,42 @@
 # e2e
 
-Cross-app Playwright smoke suite for the Shadow Library platform. It targets **already-deployed**
-services — there is no local compose deployment (see `../AGENTS.md`) — so every base URL arrives via
-environment variables, and every spec skips cleanly, with a visible reason, when its product isn't
-configured for a given run.
+Cross-app Playwright smoke suite for the Shadow Library platform. Every base URL defaults to the local k3d
+dev ingress (`*.shadow-apps.test`) and can be overridden via environment variables to point at any other
+already-running deployment. Every spec skips cleanly, with a visible reason, when its product is opted out
+for a given run.
 
 ## Configuration
 
-Copy `.env.example` to `.env` and fill in the base URLs you have. Bun loads `.env` automatically from this
-directory's cwd for any script here (`bun run test`, `bunx playwright test`, ...) — no dotenv dependency
-needed. Leaving a var unset is a deliberate, supported way to opt a product out of a run.
+Nothing is required for a normal local run — the four URLs already default to the local k3d ingress (see
+`lib/env.ts`). Copy `.env.example` to `.env` only to override one, e.g. to point at a deployed environment
+or to opt a product out.
+
+`playwright.config.ts` parses `.env` itself (`lib/load-env.ts`, a small dependency-free `KEY=VALUE`
+reader) rather than relying on Bun's automatic `.env` loading: Playwright's test workers run as separate
+Node processes, and Bun's auto-load — which only applies to the process Bun itself starts — does not reach
+them (confirmed empirically: a worker's `process.env` lacked vars a direct `bun -e` in the same directory
+saw fine). Because `playwright.config.ts` is re-imported in every worker, loading `.env` there is what
+actually lands the vars everywhere a spec reads them.
+
+Each URL var has three states, not two:
+
+| State | Effect |
+| --- | --- |
+| unset | falls back to the `.test` default |
+| set to `""` (blank) | explicitly opted out — skips, never falls back to the default |
+| set to anything else | overrides the default |
 
 | Variable | Purpose |
 | --- | --- |
-| `E2E_IDENTITY_URL` | Base URL of the identity app. |
-| `E2E_NOVEL_FORGE_URL` | Base URL of the Novel Forge app. |
-| `E2E_PULSE_URL` | Base URL of the Pulse app. |
-| `E2E_WEB_NOVEL_URL` | Base URL of the Web Novel app. |
-| `E2E_API_HEALTH` | Set to `1` to opt into `api-health.spec.ts`'s `/health/live` + `/health/ready` checks. Unset (default) skips that file. |
-| `E2E_STORAGE_STATE` | Path to a Playwright storage-state JSON for authenticated flows. Unset skips every authenticated spec. |
+| `E2E_IDENTITY_URL` | Base URL of the identity app. Default `https://identity.shadow-apps.test`. |
+| `E2E_NOVEL_FORGE_URL` | Base URL of the Novel Forge app. Default `https://novel-forge.shadow-apps.test`. |
+| `E2E_PULSE_URL` | Base URL of the Pulse app. Default `https://pulse.shadow-apps.test`. |
+| `E2E_WEB_NOVEL_URL` | Base URL of the Web Novel app. Default `https://web-novel.shadow-apps.test`. |
+| `E2E_STORAGE_STATE` | Path to a Playwright storage-state JSON for authenticated flows. Unset, or set to a path that doesn't exist, skips every authenticated spec. |
+
+The local ingress presents a self-signed/local-CA cert, so `playwright.config.ts` sets
+`ignoreHTTPSErrors: true` — not a production trust concern, since every target is either that local
+cluster or a URL the caller explicitly overrode.
 
 ## Running
 
@@ -29,8 +47,7 @@ cd e2e
 bun run test                      # or: bunx playwright test
 ```
 
-`bun run verify` runs format + lint + type-check + the suite, same as any other workspace. With no `.env`
-present it's still green — every spec skips instead of failing.
+`bun run verify` runs format + lint + type-check + the suite, same as any other workspace.
 
 ## How skipping works
 
@@ -41,20 +58,23 @@ environment reports precisely which product/spec was skipped and why — never a
 
 ## Specs
 
-- **`web-reachability.spec.ts`** — for each configured product, the app root returns a 200-family
-  response, renders a real document (non-empty `<title>`), and shows no browser/framework crash
-  interstitial. The baseline "is it even up" check.
-- **`api-health.spec.ts`** — for each configured product, `GET /health/live` and `GET /health/ready`
-  against the platform's shared `HttpCoreModule` liveness/readiness contract. Gated behind
-  `E2E_API_HEALTH=1`; a failure here (e.g. an ingress that doesn't proxy these paths) is a genuine finding
-  about the deployment, left unsoftened.
+- **`web-reachability.spec.ts`** — for each configured product, the root navigates (following any
+  server-side redirect) to a genuine 2xx response with a real rendered document (non-empty `<title>`). The
+  baseline "does it load" check — deliberately just that, no body-text scanning for "error page" copy,
+  which risks a false positive against a fiction-reading site's own content.
+- **`health-not-exposed.spec.ts`** — always on (no opt-in) for every configured product: `GET
+  /health/live` and `/health/ready` must not return the platform's raw `HttpCoreModule` health contract
+  (a bare `text/*` body of `ok`/`not ready`) — that contract lives on a separate internal port
+  (`health.port`, default 8081) by design, never the public app port an ingress fronts. Asserts on response
+  shape, not status alone, because one product's SPA build answers any unmatched path with a `200
+  text/html` catch-all shell — that's routing, not health exposure. See the spec's header comment for the
+  per-product evidence this was verified against.
 - **`auth-gate.spec.ts`** — an unauthenticated visit to one known-protected path per app lands on a URL
-  containing `/login` (a local login screen, or — for Novel Forge/Pulse — after a same-origin bounce to
-  the backend's OIDC redirect and on to identity's hosted login).
+  containing `/login`.
 - **`public-reading.spec.ts`** — Web Novel's public home renders behind the shared `<main>` landmark,
   whether the catalog has rows or shows an empty state.
 - **`authenticated-placeholder.spec.ts`** — structural placeholder for phase-two session-backed flows;
-  skips cleanly until `E2E_STORAGE_STATE` is provided.
+  skips cleanly until `E2E_STORAGE_STATE` is set *and* points at a file that actually exists.
 
 ## Extending
 
