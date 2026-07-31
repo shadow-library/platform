@@ -220,6 +220,15 @@ jobs:
           ''
         }}
       LOG_LEVEL: ${{ matrix.workspace == 'apps/pulse-server' && 'http' || '' }}
+      # pulse-server's notification-messages route is gated `@EnableIf(() => Config.get('app.stage')
+      # === 'dev')`. Left unset, this relies on bootstrap.ts's `Config.load('app.stage', {
+      # defaultValue: 'dev' })` -- but tests/common/stage.spec.ts (which runs immediately before
+      # tests/notification/notification.spec.ts in file order) saves/restores 'app.stage' through the
+      # *raw* `Config['cache']`, not the public `Config.get()` that materializes the registered
+      # default. Observed in CI: that route 404s right after stage.spec.ts runs. Setting the "Pulse-
+      # owned env var" (per apps/pulse-server/CLAUDE.md) explicitly sidesteps the ambiguity entirely --
+      # a plain env value, not an application code change.
+      APP_STAGE: ${{ matrix.workspace == 'apps/pulse-server' && 'dev' || '' }}
       # Capped to 1 for every backend, not just pulse-server (whose old mined workflow was the only
       # one that already had this). `DatabaseService` does not close its postgres pool on shutdown
       # (see the comment in each backend's scripts/create-template-db.ts) and `TestEnvironment` boots
