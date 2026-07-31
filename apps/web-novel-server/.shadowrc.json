@@ -1,0 +1,20 @@
+{
+  "type": "backend",
+  "build": {
+    "entry": "src/main.ts",
+    "entries": ["src/migrate.ts"],
+    "assets": ["generated/drizzle"]
+  },
+  "verify": {
+    "files": "{src,tests,scripts}/**/*.ts",
+    "lint": {
+      "globals": "node",
+      "rules": {
+        "@typescript-eslint/no-namespace": "off"
+      }
+    }
+  },
+  "checkMigrations": {
+    "dir": "generated/drizzle"
+  }
+}
