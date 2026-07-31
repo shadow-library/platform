@@ -1,0 +1,310 @@
+/**
+ * Importing npm packages
+ */
+import assert from 'node:assert';
+
+import { and, asc, desc, eq, sql } from 'drizzle-orm';
+import parsePhoneNumber from 'libphonenumber-js';
+import validator from 'validator';
+import { Injectable } from '@shadow-library/app';
+import { AppError, type AppErrorObject, Logger, OffsetPagination, OffsetPaginationResult, utils } from '@shadow-library/common';
+import { DatabaseService } from '@shadow-library/modules';
+
+/**
+ * Importing user defined packages
+ */
+import { SenderEndpointService, SenderRoutingRuleService } from '@modules/configuration';
+import { DEFAULT_LOCALE, type ResolvedTemplate, resolvePayload, TemplateResolverService } from '@modules/template';
+import { AppErrorCode } from '@server/classes';
+import { APP_NAME } from '@server/constants';
+import { Configuration, Notification, PrimaryDatabase, schema, Template } from '@server/database';
+
+import { NotificationProviderService } from './notification-provider.service';
+import { NotificationOpResult } from './providers';
+
+/**
+ * Defining types
+ */
+
+export enum NotificationStatus {
+  ACCEPTED = 'ACCEPTED',
+  PARTIAL_ACCEPTED = 'PARTIAL_ACCEPTED',
+  FAILED = 'FAILED',
+}
+
+export enum ChannelNotificationStatus {
+  QUEUED = 'QUEUED',
+  FAILED = 'FAILED',
+}
+
+export interface Recipients {
+  email?: string;
+  phone?: string;
+  push?: string;
+}
+
+export interface SendNotificationConfig {
+  templateKey: string;
+  recipients: Recipients;
+  payload?: Record<string, any>;
+  locale?: string;
+  service?: string;
+}
+
+export interface ChannelSendResult {
+  channel: Notification.Channel;
+  status: ChannelNotificationStatus;
+  locale?: string;
+  jobId?: string;
+  /**
+   * Already the wire shape (`AppError.toResponse()`): the fastify 2.0 response-transform pipeline
+   * `structuredClone`s the payload, which strips custom properties off `Error` instances, so a live
+   * `AppError` cannot survive to an output transformer.
+   */
+  error?: AppErrorObject;
+}
+
+export interface SendNotificationResult {
+  status: NotificationStatus;
+  channelResults: ChannelSendResult[];
+}
+
+export interface ListMessagesQuery extends Partial<OffsetPagination> {
+  channel?: Notification.Channel;
+  recipient?: string;
+}
+
+export type NotificationMessage = Notification.Message & {
+  channel: Notification.Channel;
+  recipient: string;
+  locale: string;
+  payload?: unknown;
+  templateKey: string;
+  messageType: Template.MessageType;
+};
+
+/**
+ * Declaring the constants
+ */
+const MAX_ATTEMPTS = 5;
+const BASE_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 2, TRANSACTIONAL: 30, PROMOTIONAL: 5 * 60 };
+const MAX_DELAY_SECONDS: Record<Template.MessageType, number> = { OTP: 30, TRANSACTIONAL: 30 * 60, PROMOTIONAL: 6 * 60 * 60 };
+const PRIORITY_MODIFIER: Record<Notification.Priority, number> = { LOW: 2, MEDIUM: 1, HIGH: 0.5 };
+const RECIPIENT_VALIDATION_ERROR_CODES: Record<Notification.Channel, AppErrorCode> = {
+  SMS: AppErrorCode.NTF_001,
+  EMAIL: AppErrorCode.NTF_002,
+  PUSH: AppErrorCode.NTF_003,
+};
+
+@Injectable()
+export class NotificationService {
+  private readonly logger = Logger.getLogger(APP_NAME, NotificationService.name);
+  private readonly db: PrimaryDatabase;
+
+  constructor(
+    private readonly databaseService: DatabaseService,
+    private readonly notificationProviderService: NotificationProviderService,
+
+    private readonly templateResolver: TemplateResolverService,
+    private readonly senderRoutingRuleService: SenderRoutingRuleService,
+    private readonly senderEndpointService: SenderEndpointService,
+  ) {
+    this.db = this.databaseService.getPostgresClient();
+  }
+
+  private getValidatedRecipient(channel: Notification.Channel, recipients: Recipients): string | null {
+    switch (channel) {
+      case 'SMS': {
+        if (!recipients.phone) return null;
+        if (!validator.isMobilePhone(recipients.phone)) return null;
+        return recipients.phone;
+      }
+
+      case 'EMAIL': {
+        if (!recipients.email) return null;
+        if (!validator.isEmail(recipients.email)) return null;
+        return recipients.email;
+      }
+
+      case 'PUSH': {
+        if (!recipients.push) return null;
+        return recipients.push;
+      }
+
+      default:
+        return null;
+    }
+  }
+
+  private getRegion(notificationJob: Notification.Job): string {
+    if (notificationJob.channel !== 'SMS') return 'ZZ';
+    const phoneNumber = parsePhoneNumber(notificationJob.recipient);
+    return phoneNumber?.country ?? 'ZZ';
+  }
+
+  private getNextAttemptAt(messageType: Template.MessageType, priority: Notification.Priority, attempt: number): Date {
+    const baseDelay = BASE_DELAY_SECONDS[messageType];
+    const maxDelay = MAX_DELAY_SECONDS[messageType];
+    const priorityModifier = PRIORITY_MODIFIER[priority];
+    const delaySeconds = Math.min(baseDelay * Math.pow(2, attempt) * priorityModifier, maxDelay);
+    const jitter = Math.floor(Math.random() * 0.25 * delaySeconds);
+    const totalDelaySeconds = delaySeconds + jitter;
+    return new Date(Date.now() + totalDelaySeconds * 1000);
+  }
+
+  /**
+   * Executes a single job end-to-end: re-resolves the render bundle from the pinned version (so a retry re-renders
+   * identical content), selects a vendor via the routing rules, renders + hands off to the provider, and records the
+   * outcome with an exponential, message-type-aware backoff. Stubbed out in tests to avoid real provider calls.
+   */
+  private async executeNotificationJob(notificationJob: Notification.Job): Promise<void> {
+    const attempt = notificationJob.attempt + 1;
+    const recipient = utils.string.mask(notificationJob.recipient);
+    const jobLogData: Record<string, any> = { jobId: notificationJob.id, ...utils.object.pickKeys(notificationJob, ['channel', 'locale', 'createdAt']), recipient, attempt };
+    try {
+      const template = await this.db.query.templates.findFirst({ where: eq(schema.templates.id, notificationJob.templateId) });
+      assert(template, 'Template not found for notification job');
+      const bundle = await this.templateResolver.loadRenderBundle(notificationJob.templateVersionId, notificationJob.channel, notificationJob.locale);
+      assert(bundle, 'Render bundle not found for notification job');
+
+      const region = this.getRegion(notificationJob);
+      const service = notificationJob.service ?? 'default';
+      Object.assign(jobLogData, { templateKey: template.templateKey, service, region });
+      this.logger.debug('Resolved service, region and messageType for notification job', jobLogData);
+
+      const routingRule = await this.senderRoutingRuleService.resolveSenderRoutingRule(service, region, template.messageType);
+      const senderEndpoints = await this.senderEndpointService.getSenderEndpointsByChannel(routingRule.senderProfileId, notificationJob.channel);
+      if (senderEndpoints.length === 0) throw AppErrorCode.SND_EP_001.create();
+      Object.assign(jobLogData, { routingRuleId: routingRule.id, senderProfileId: routingRule.senderProfileId, senderEndpointCount: senderEndpoints.length });
+      this.logger.debug(`Resolved sender profile for notification job - ${notificationJob.id}`, jobLogData);
+
+      const senderEndpointIndex = notificationJob.attempt % senderEndpoints.length;
+      const senderEndpoint = senderEndpoints[senderEndpointIndex] as Configuration.SenderEndpoint;
+      Object.assign(jobLogData, { senderEndpointId: senderEndpoint.id });
+      this.logger.debug(`Resolved sender endpoint for notification job - ${notificationJob.id}`, jobLogData);
+
+      let result: NotificationOpResult;
+      if (notificationJob.channel === 'SMS') result = await this.notificationProviderService.sendSMS(notificationJob, senderEndpoint, bundle);
+      else if (notificationJob.channel === 'EMAIL') result = await this.notificationProviderService.sendEmail(notificationJob, senderEndpoint, bundle);
+      else result = await this.notificationProviderService.sendPushNotification(notificationJob, senderEndpoint, bundle);
+
+      let status: Notification.Status = result.success ? 'SENT' : 'FAILED';
+      if (!result.success && attempt >= MAX_ATTEMPTS) status = 'PERMANENTLY_FAILED';
+      const updateResult = await this.db
+        .update(schema.notificationJobs)
+        .set({
+          status,
+          attempt: sql`${schema.notificationJobs.attempt} + 1`,
+          lastAttemptedAt: new Date(),
+          nextAttemptAt: result.success ? null : this.getNextAttemptAt(template.messageType, notificationJob.priority, notificationJob.attempt + 1),
+        })
+        .where(eq(schema.notificationJobs.id, notificationJob.id))
+        .returning({ id: schema.notificationJobs.id, status: schema.notificationJobs.status });
+      this.logger.info(`Executed notification job - ${notificationJob.id}`, { ...jobLogData, result, updateResult, status });
+    } catch (error) {
+      const result = await this.db
+        .update(schema.notificationJobs)
+        .set({
+          status: 'PERMANENTLY_FAILED',
+          attempt: sql`${schema.notificationJobs.attempt} + 1`,
+          lastError: error instanceof AppError ? error.code : 'UNKNOWN_ERROR',
+          lastAttemptedAt: new Date(),
+        })
+        .where(eq(schema.notificationJobs.id, notificationJob.id))
+        .returning({ id: schema.notificationJobs.id, status: schema.notificationJobs.status });
+      this.logger.error(`Error executing notification job - ${notificationJob.id}`, error);
+      this.logger.error(`Failed to execute notification job - ${notificationJob.id}`, { ...jobLogData, result });
+    }
+  }
+
+  private async sendChannelNotification(
+    channel: Notification.Channel,
+    resolved: ResolvedTemplate,
+    payload: Record<string, unknown>,
+    config: SendNotificationConfig,
+  ): Promise<ChannelSendResult> {
+    const recipient = this.getValidatedRecipient(channel, config.recipients);
+    if (!recipient) {
+      const errorCode = RECIPIENT_VALIDATION_ERROR_CODES[channel];
+      return { channel, status: ChannelNotificationStatus.FAILED, error: errorCode.create().toResponse() };
+    }
+
+    if (!resolved.publishedVersion) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_VER_003.create().toResponse() };
+
+    const content = await this.templateResolver.findContent(resolved.publishedVersion.id, channel, config.locale ?? DEFAULT_LOCALE);
+    if (!content) return { channel, status: ChannelNotificationStatus.FAILED, error: AppErrorCode.TPL_CNT_003.create().toResponse() };
+
+    const [notification] = await this.db
+      .insert(schema.notificationJobs)
+      .values({
+        templateId: resolved.template.id,
+        templateVersionId: resolved.publishedVersion.id,
+        channel,
+        service: config.service,
+        locale: content.locale,
+        priority: resolved.template.priority,
+        recipient,
+        payload,
+        status: 'PENDING',
+      })
+      .returning();
+    assert(notification, 'Failed to create notification job');
+
+    const logData = { channel, recipient: utils.string.mask(recipient), templateKey: config.templateKey, locale: content.locale };
+    this.logger.info(`Created notification job - ${notification.id}`, logData);
+    this.logger.debug('Notification job details', { notification });
+    this.executeNotificationJob(notification);
+    return { jobId: notification.id, channel, status: ChannelNotificationStatus.QUEUED, locale: content.locale };
+  }
+
+  async send(config: SendNotificationConfig): Promise<SendNotificationResult> {
+    const resolved = await this.templateResolver.resolveForSend(config.templateKey);
+    if (resolved.enabledChannels.length === 0) return { status: NotificationStatus.ACCEPTED, channelResults: [] };
+
+    /** The variable contract is enforced once for the whole send — a breach is a producer bug, not a per-channel outcome. */
+    const payload = resolvePayload(resolved.template.variableSchema, config.payload ?? {});
+    const promises = resolved.enabledChannels.map(channel => this.sendChannelNotification(channel, resolved, payload, config));
+    const results = await Promise.all(promises);
+
+    let status = NotificationStatus.FAILED;
+    const successCount = results.reduce((count, r) => (r.status === ChannelNotificationStatus.QUEUED ? count + 1 : count), 0);
+    if (successCount === results.length) status = NotificationStatus.ACCEPTED;
+    else if (successCount > 0) status = NotificationStatus.PARTIAL_ACCEPTED;
+
+    return { status, channelResults: results };
+  }
+
+  async listMessages(filter: ListMessagesQuery = {}): Promise<OffsetPaginationResult<NotificationMessage>> {
+    const query = utils.pagination.normalise(filter, { mode: 'offset', defaults: { limit: 20, offset: 0, sortBy: 'createdAt', sortOrder: 'desc' } });
+    const sortOrder = query.sortOrder === 'asc' ? asc : desc;
+
+    const whereConditions: ReturnType<typeof eq>[] = [];
+    if (filter.channel) whereConditions.push(eq(schema.notificationJobs.channel, filter.channel));
+    if (filter.recipient) whereConditions.push(eq(schema.notificationJobs.recipient, filter.recipient));
+    const where = whereConditions.length > 0 ? and(...whereConditions) : undefined;
+
+    const baseQuery = this.db
+      .select()
+      .from(schema.notificationMessages)
+      .innerJoin(schema.notificationJobs, eq(schema.notificationMessages.notificationJobId, schema.notificationJobs.id))
+      .innerJoin(schema.templates, eq(schema.notificationJobs.templateId, schema.templates.id))
+      .where(where);
+
+    const [countResult, rows] = await Promise.all([
+      this.db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.notificationMessages)
+        .innerJoin(schema.notificationJobs, eq(schema.notificationMessages.notificationJobId, schema.notificationJobs.id))
+        .where(where),
+      baseQuery.limit(query.limit).offset(query.offset).orderBy(sortOrder(schema.notificationMessages.createdAt)),
+    ]);
+
+    const total = Number(countResult[0]?.count ?? 0);
+    const items = rows.map(row => ({
+      ...row.notification_messages,
+      ...utils.object.pickKeys(row.notification_jobs, ['channel', 'recipient', 'locale', 'payload']),
+      ...utils.object.pickKeys(row.templates, ['templateKey', 'messageType']),
+    }));
+    return utils.pagination.createResult(query, items, total);
+  }
+}
