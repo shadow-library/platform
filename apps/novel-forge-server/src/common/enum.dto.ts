@@ -1,0 +1,61 @@
+/**
+ * Importing packages with side effects
+ */
+
+/**
+ * Importing npm packages
+ */
+import { EnumType } from '@shadow-library/class-schema';
+
+/**
+ * Importing user defined packages
+ */
+import { schema } from '@server/database';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+export const SortByTime = EnumType.create('SortByTime', ['createdAt', 'updatedAt']);
+export const ProjectKind = EnumType.create('ProjectKind', schema.projectKind.enumValues);
+export const ContentMode = EnumType.create('ContentMode', schema.contentMode.enumValues);
+export const ContentGenerator = EnumType.create('ContentGenerator', schema.contentGenerator.enumValues);
+export const ChapterStatus = EnumType.create('ChapterStatus', schema.chapterStatus.enumValues);
+export const EntityType = EnumType.create('EntityType', schema.entityType.enumValues);
+export const EntitySignificance = EnumType.create('EntitySignificance', schema.entitySignificance.enumValues);
+export const EntityOrigin = EnumType.create('EntityOrigin', schema.entityOrigin.enumValues);
+export const FactSource = EnumType.create('FactSource', schema.factSource.enumValues);
+export const PlanStatus = EnumType.create('PlanStatus', schema.planStatus.enumValues);
+export const ThreadStatus = EnumType.create('ThreadStatus', schema.threadStatus.enumValues);
+export const MysteryStatus = EnumType.create('MysteryStatus', schema.mysteryStatus.enumValues);
+export const DraftStatus = EnumType.create('DraftStatus', schema.draftStatus.enumValues);
+export const JudgeVerdict = EnumType.create('JudgeVerdict', schema.judgeVerdict.enumValues);
+export const ContinuityProposalStatus = EnumType.create('ContinuityProposalStatus', schema.continuityProposalStatus.enumValues);
+export const JobKind = EnumType.create('JobKind', schema.jobKind.enumValues);
+export const JobStatus = EnumType.create('JobStatus', schema.jobStatus.enumValues);
+export const ValidationScope = EnumType.create('ValidationScope', schema.validationScope.enumValues);
+export const BibleSection = EnumType.create('BibleSection', schema.bibleSection.enumValues);
+export const DraftReviewStatus = EnumType.create('DraftReviewStatus', schema.draftReviewStatus.enumValues);
+export const WorkflowRunStatus = EnumType.create('WorkflowRunStatus', schema.workflowRunStatus.enumValues);
+export const ModelCallStatus = EnumType.create('ModelCallStatus', schema.modelCallStatus.enumValues);
+export const ToolCallStatus = EnumType.create('ToolCallStatus', schema.toolCallStatus.enumValues);
+export const DraftRevisionSource = EnumType.create('DraftRevisionSource', schema.draftRevisionSource.enumValues);
+export const UserFeedbackArtifactType = EnumType.create('UserFeedbackArtifactType', schema.userFeedbackArtifactType.enumValues);
+export const UserFeedbackDisposition = EnumType.create('UserFeedbackDisposition', schema.userFeedbackDisposition.enumValues);
+export const ChatScope = EnumType.create('ChatScope', schema.chatScope.enumValues);
+export const ChatSessionStatus = EnumType.create('ChatSessionStatus', schema.chatSessionStatus.enumValues);
+export const ChatMode = EnumType.create('ChatMode', schema.chatMode.enumValues);
+export const RebrandStatus = EnumType.create('RebrandStatus', schema.rebrandStatus.enumValues);
+export const RebrandConversionStatus = EnumType.create('RebrandConversionStatus', schema.rebrandConversionStatus.enumValues);
+export const RebrandGlossaryCategory = EnumType.create('RebrandGlossaryCategory', schema.rebrandGlossaryCategory.enumValues);
+export const ReforgeStatus = EnumType.create('ReforgeStatus', schema.reforgeStatus.enumValues);
+export const ReforgeChapterStatus = EnumType.create('ReforgeChapterStatus', schema.reforgeChapterStatus.enumValues);
+export const ReforgeFidelity = EnumType.create('ReforgeFidelity', schema.reforgeFidelity.enumValues);
+export const RefinementKind = EnumType.create('RefinementKind', schema.refinementKind.enumValues);
+export const PublicationStatus = EnumType.create('PublicationStatus', schema.publicationStatus.enumValues);
+export const ChapterPublicationStatus = EnumType.create('ChapterPublicationStatus', schema.chapterPublicationStatus.enumValues);
+export const RefinementProposalStatus = EnumType.create('RefinementProposalStatus', schema.refinementProposalStatus.enumValues);

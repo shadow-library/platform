@@ -1,0 +1,233 @@
+/**
+ * Importing packages with side effects
+ */
+
+/**
+ * Importing npm packages
+ */
+import { Field, Integer, Schema } from '@shadow-library/class-schema';
+import { Transform } from '@shadow-library/fastify';
+import { Paginated, PaginationQuery } from '@shadow-library/modules/http-core';
+
+/**
+ * Importing user defined packages
+ */
+import { ChatMode, ChatScope, ChatSessionStatus, SortByTime } from '@server/common';
+import { type Refinement } from '@server/database';
+
+import { AppliedArtifactItem, OpResultItem, ProposalResponse } from './refinement.dto';
+
+/**
+ * Defining types
+ */
+
+/**
+ * Declaring the constants
+ */
+
+@Schema()
+export class ChatProjectParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+}
+
+@Schema()
+export class ChatSessionParams {
+  @Field(() => String, { pattern: '^[0-9]+$' })
+  @Transform('bigint:parse')
+  projectId: bigint;
+
+  // A pattern, not `format: 'uuid'` — fastify's route schema compiler has no uuid format registered
+  // and fails to build the route with one.
+  @Field({ pattern: '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' })
+  sessionId: string;
+}
+
+@Schema()
+export class CreateChatSessionBody {
+  @Field(() => ChatScope)
+  scopeType: Refinement.ChatScope;
+
+  @Field({ optional: true })
+  scopeRef?: string;
+
+  @Field({ optional: true })
+  title?: string;
+
+  @Field(() => ChatMode, { optional: true })
+  mode?: Refinement.ChatMode;
+}
+
+@Schema({ minProperties: 1 })
+export class UpdateChatSessionBody {
+  @Field(() => ChatMode, { optional: true })
+  mode?: Refinement.ChatMode;
+
+  @Field({ optional: true })
+  title?: string;
+}
+
+@Schema()
+export class UpdateSessionModelBody {
+  // Both null (or omitted) clears the override so the session falls back to the project/profile default.
+  @Field({ optional: true, nullable: true })
+  provider?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  model?: string | null;
+}
+
+@Schema()
+export class ListChatSessionsQuery extends PaginationQuery(SortByTime) {
+  @Field(() => ChatScope, { optional: true })
+  scopeType?: Refinement.ChatScope;
+
+  @Field(() => ChatSessionStatus, { optional: true })
+  status?: Refinement.ChatSessionStatus;
+}
+
+@Schema()
+export class ChatSessionResponse {
+  @Field()
+  id: string;
+
+  @Field(() => String)
+  projectId: bigint;
+
+  @Field(() => ChatScope)
+  scopeType: Refinement.ChatScope;
+
+  @Field({ optional: true, nullable: true })
+  scopeRef?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  title?: string | null;
+
+  @Field(() => ChatSessionStatus)
+  status: Refinement.ChatSessionStatus;
+
+  @Field(() => ChatMode)
+  mode: Refinement.ChatMode;
+
+  @Field({ optional: true, nullable: true })
+  modelProvider?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  modelId?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  summary?: string | null;
+
+  @Field(() => Integer)
+  summaryThroughOrdinal: number;
+
+  @Field(() => String, { format: 'date-time', optional: true, nullable: true })
+  lastTurnAt?: Date | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+
+  @Field(() => String, { format: 'date-time' })
+  updatedAt: Date;
+}
+
+@Schema()
+export class ListChatSessionResponse extends Paginated(ChatSessionResponse) {}
+
+@Schema()
+export class ListChatMessagesQuery {
+  @Field(() => Integer, { optional: true, minimum: 1, description: 'return messages with ordinal strictly below this value' })
+  before?: number;
+
+  @Field(() => Integer, { optional: true, minimum: 1, maximum: 200 })
+  limit?: number;
+}
+
+@Schema()
+export class ChatMessageResponse {
+  @Field(() => String)
+  id: bigint;
+
+  @Field()
+  sessionId: string;
+
+  @Field(() => Integer)
+  ordinal: number;
+
+  @Field()
+  role: string;
+
+  @Field()
+  content: string;
+
+  @Field(() => String, { optional: true, nullable: true })
+  proposalId?: bigint | null;
+
+  @Field({ optional: true, nullable: true })
+  runId?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  modelProvider?: string | null;
+
+  @Field({ optional: true, nullable: true })
+  modelId?: string | null;
+
+  @Field(() => String, { format: 'date-time' })
+  createdAt: Date;
+}
+
+@Schema()
+export class ListChatMessagesResponse {
+  @Field(() => [ChatMessageResponse])
+  messages: ChatMessageResponse[];
+
+  // True while a chat-turn is still running for this session — the signal any tab (a refresh, a
+  // second tab) uses to show that Forge is working, since the turn persists the user message before
+  // the model call. Clears once the reply lands or the run fails.
+  @Field()
+  pendingTurn: boolean;
+}
+
+@Schema()
+export class ChatTurnBody {
+  // Generous on purpose: authors paste whole premises, chapters, and reference docs into the hub
+  // (~200k chars ≈ 50k tokens). Compaction and the pack budgets handle the size downstream; the
+  // 12MB fastify bodyLimit is the real transport ceiling.
+  @Field({ minLength: 1, maxLength: 200_000 })
+  content: string;
+}
+
+// The in-turn apply outcome of an auto-mode turn (chat-hub design §6 step 6).
+@Schema()
+export class TurnAppliedResult {
+  @Field(() => [AppliedArtifactItem])
+  applied: AppliedArtifactItem[];
+
+  @Field(() => [String])
+  staleMarked: string[];
+
+  @Field(() => [OpResultItem])
+  opResults: OpResultItem[];
+}
+
+@Schema()
+export class ChatTurnResponse {
+  @Field(() => ChatMessageResponse)
+  userMessage: ChatMessageResponse;
+
+  @Field(() => ChatMessageResponse)
+  assistantMessage: ChatMessageResponse;
+
+  @Field(() => ProposalResponse, { optional: true })
+  proposal?: ProposalResponse;
+
+  @Field(() => TurnAppliedResult, { optional: true, description: 'present when the session runs in auto mode and this turn applied its change-set' })
+  applied?: TurnAppliedResult;
+
+  @Field({ optional: true, description: 'why an auto-mode change-set was NOT applied (conflict, finalize gating, action failure)' })
+  applyNote?: string;
+
+  @Field()
+  runId: string;
+}
