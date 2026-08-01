@@ -36,9 +36,16 @@ genuinely deviates from the root lint config, and no husky hooks at all — husk
 root (`"prepare": "husky"` in the root `package.json`; `.husky/pre-commit` and `.husky/commit-msg` are
 committed there and already fan out per-workspace, see below).
 
-**Prerequisites:** `tsconfig.build.json` extending `tsconfig.json` (`noEmit: false`,
-`declaration: true`, `rootDir: "src"`); base `tsconfig.json` on `module: ESNext` +
-`moduleResolution: bundler`. TypeScript itself is a root devDependency — workspaces don't pin
+**Prerequisites:** `tsconfig.build.json` extending both the workspace's own `tsconfig.json` and the root
+`tsconfig.build.base.json` (`noEmit: false`, `declaration: true`, `removeComments: true` — the shared boolean
+options; path-valued fields like `rootDir`/`include`/`exclude` stay in the workspace's own file, since TS
+resolves `extends`-inherited paths relative to the file that declares them, not the extender). A workspace
+whose emit shape is fully covered by the base needs only a one-liner `{ "extends": ["./tsconfig.json",
+"../../tsconfig.build.base.json"], "tsc-alias": { "resolveFullPaths": true } }`; a genuine delta (e.g.
+`packages/ui`'s declaration-only component build) still layers its own `compilerOptions`/`include`/`exclude`.
+The shared `bun:test` `Expect<T>` augmentation lives once at root `types/bun-test.d.ts`, wired into every
+workspace via `tsconfig.base.json`'s `files` — no per-workspace `tests/test.d.ts` copy needed. Base
+`tsconfig.json` on `module: ESNext` + `moduleResolution: bundler`. TypeScript itself is a root devDependency — workspaces don't pin
 their own copy.
 
 ## Convention first, then the `"shadow"` package.json key
@@ -144,6 +151,7 @@ repo-relative directory (`packages/common`) or its package name (`@shadow-librar
 | `bun scripts/verify.ts --all` | Verifies every workspace plus `scripts`, reporting a combined failure list instead of aborting on the first. Root `bun run verify`. |
 | `bun scripts/gen-api-types.ts <workspace> [url]` | OpenAPI doc → typed `src/lib/apis/api-types.gen.ts` (unique operationIds `<method>_<path>`, GET query-param widening, `<Name>QueryParams`/`PathParams` aliases; formatted via the root Prettier config). Defaults to a locally running server. |
 | `bun scripts/check-migrations.ts <workspace>` | Requires a `db:generate` script, runs it; fails on uncommitted migrations in `generated/drizzle` (tracked AND untracked). |
+| `bun scripts/db.ts <workspace> generate\|migrate\|create-template\|seed` | The 4 backends' Drizzle/Postgres CLI. No workspace carries its own `drizzle.config.ts` — `generate` shells `drizzle-kit generate` with `--schema`/`--out`/`--dialect` derived from convention (override the schema path via `shadow.db.schema`); `migrate` runs whichever `shadow.entries` item matches `/migrate/i`; `create-template`/`seed` run each backend's own `scripts/create-template-db.ts`/`scripts/seed.ts`, which stay backend-owned since their driver choice and seed strategy genuinely differ per backend. Each backend's `db:*` package.json scripts delegate here. |
 
 Commit messages are linted by `@commitlint/cli` against the root `commitlint.config.ts`, wired once at the
 repo root in `.husky/commit-msg` (`bunx --bun commitlint --edit "$1"`). There is no tooling command for it.

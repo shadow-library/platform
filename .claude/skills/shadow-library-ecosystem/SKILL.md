@@ -122,7 +122,7 @@ those runs from the repo root by path (`bun scripts/verify.ts <workspace>`); see
 
 | # | Rule | Instead of |
 | --- | --- | --- |
-| 1 | MUST read env/config via `Config` (`common`); MUST NOT read `process.env` in app code | Only exception: infra scripts that run outside the app (e.g. `drizzle.config.ts`) |
+| 1 | MUST read env/config via `Config` (`common`); MUST NOT read `process.env` in app code | Only exception: infra scripts that run outside the app (e.g. `scripts/create-template-db.ts`, `src/migrate.ts` — backends have no `drizzle.config.ts`; `scripts/db.ts <workspace> generate` derives schema/out/dialect by convention instead) |
 | 2 | MUST log via `Logger.getLogger(namespace, label)`; MUST NOT use `console.*` | winston/pino/bare console |
 | 3 | MUST throw catalog errors: domain → `ErrorCode` subclass `.create()`/`.throw()`; invariant/infra → `AppError.internal(reason, cause)`; field validation → `ValidationError`; generic HTTP → `ServerErrorCode` (`fastify`) | `new Error(...)`, ad-hoc error objects |
 | 4 | MUST NOT import legacy/nonexistent symbols: `InternalError`, `NeverError`, `ServerError`, `APIError`, `HttpErrorCode`, `CloudWatchTransport`, `@Ctx` (removed from `fastify` in its v2 line) — none of these exist in current packages | — |

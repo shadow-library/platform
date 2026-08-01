@@ -112,17 +112,19 @@ This endpoint lists all REST routes, authentication methods, and response schema
 
 ## 🧰 Database Management
 
-Use **Drizzle ORM** for schema management and migrations:
+Use **Drizzle ORM** for schema management and migrations. There is no `drizzle.config.ts` in this workspace —
+`db:generate`/`db:migrate` delegate to the root `bun scripts/db.ts apps/identity-server <command>`, which derives
+schema/out/dialect from convention instead:
 
 ```bash
 # Generate Migrations
-bunx drizzle-kit generate
+bun run db:generate
 
 # Execute Migrations
-bunx drizzle-kit migrate
+bun run db:migrate
 
-# View DB
-bunx drizzle-kit studio
+# View DB (drizzle-kit studio has no config file to read from here — pass the same flags scripts/db.ts uses)
+bunx drizzle-kit studio --schema src/modules/infrastructure/datastore/schemas/index.ts --dialect postgresql --url "$DATABASE_POSTGRES_URL"
 ```
 
 ---

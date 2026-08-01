@@ -74,17 +74,17 @@ This workspace's own scripts run from **inside** `web-novel-server/`; `build`/`v
 always run from the **repo root** by path. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** (dev DSN
 `postgresql://postgres:postgres@localhost:5432/shadow_webnovel`, see `.env`).
 
-| Purpose                | Command                                       | Notes                                                                                                      |
-| ---------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Install                | `bun install`                                 |                                                                                                            |
-| Develop                | `bun run dev`                                 | `bun --watch src/main.ts`, serves on **:8080**                                                             |
-| Test                   | `bun test`                                    | Live Postgres: builds a migrated template DB, clones it per test; boots a mock IdP                         |
-| Verify (the gate)      | `bun scripts/verify.ts apps/web-novel-server` | **format + lint + type-check + test**, from the repo root; auto-fix with `--fix`                           |
-| Type-check             | `bun run type-check`                          | `bun run tsc`                                                                                              |
-| Build                  | `bun scripts/build.ts apps/web-novel-server`  | Single-file `dist/main.js` (+ `generated/drizzle` assets), from the repo root; run with `bun dist/main.js` |
-| Generate migration     | `bun run db:generate`                         | `drizzle-kit generate` → `generated/drizzle/`                                                              |
-| Apply migrations       | `bun run db:migrate`                          | `scripts/migrate-db.ts` (Bun native SQL driver)                                                            |
-| Build test template DB | `bun run db:create-template`                  | `scripts/create-template-db.ts`                                                                            |
+| Purpose                | Command                                       | Notes                                                                                                                                        |
+| ---------------------- | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Install                | `bun install`                                 |                                                                                                                                              |
+| Develop                | `bun run dev`                                 | `bun --watch src/main.ts`, serves on **:8080**                                                                                               |
+| Test                   | `bun test`                                    | Live Postgres: builds a migrated template DB, clones it per test; boots a mock IdP                                                           |
+| Verify (the gate)      | `bun scripts/verify.ts apps/web-novel-server` | **format + lint + type-check + test**, from the repo root; auto-fix with `--fix`                                                             |
+| Type-check             | `bun run type-check`                          | `bun run tsc`                                                                                                                                |
+| Build                  | `bun scripts/build.ts apps/web-novel-server`  | Single-file `dist/main.js` (+ `generated/drizzle` assets), from the repo root; run with `bun dist/main.js`                                   |
+| Generate migration     | `bun run db:generate`                         | `bun scripts/db.ts apps/web-novel-server generate` → `drizzle-kit generate` (schema/out/dialect only, no config file) → `generated/drizzle/` |
+| Apply migrations       | `bun run db:migrate`                          | `bun scripts/db.ts apps/web-novel-server migrate` → `src/migrate.ts` (Bun native SQL driver)                                                 |
+| Build test template DB | `bun run db:create-template`                  | `bun scripts/db.ts apps/web-novel-server create-template` → `scripts/create-template-db.ts`                                                  |
 
 There is no `build` or `verify` script in this workspace's `package.json` — they are root tooling only. Lint
 and format have no standalone scripts either — they run inside `bun scripts/verify.ts`. Ports: **8080** app
