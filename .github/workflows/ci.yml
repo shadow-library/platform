@@ -12,6 +12,12 @@ on:
 permissions:
   contents: read
 
+# Superseded pushes to the same PR branch cancel their in-flight run; main runs are never
+# cancelled (every main commit deserves its own verdict).
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   # Computes which workspaces a change actually touches, from a plain `git diff` against the
   # merge-base — not dorny/paths-filter — because the rule set below isn't a static path→label
@@ -191,9 +197,8 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      # Private repo on standard-tier concurrency — 4 keeps the matrix meaningfully parallel
-      # without saturating the account's concurrent-job budget when every workspace is affected.
-      max-parallel: 4
+      # No max-parallel: the repo is public, where GitHub-hosted runners allow far more concurrent
+      # jobs than this matrix ever produces — the full 18-leg fan-out runs in a single wave.
       matrix:
         include: ${{ fromJSON(needs.changes.outputs.matrix) }}
 
@@ -283,14 +288,36 @@ jobs:
         with:
           bun-version: 1.3.14
 
+      # Bun's global download cache, keyed on the lockfile — turns each job's install into mostly
+      # cache-hits instead of registry downloads. restore-keys lets a lockfile change still start
+      # from the previous cache rather than cold.
+      - name: Cache Bun downloads
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: bun-cache-${{ runner.os }}-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            bun-cache-${{ runner.os }}-
+
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # `--deps` builds exactly this workspace's transitive `workspace:*` closure, in dependency order --
-      # the selector bun's `--filter` doesn't offer, which previously forced building every package.
-      - name: Build workspace dependencies
+      # Package dists are content-cached under one key covering every input that can affect any
+      # package's build output. On a hit the build is skipped entirely. On a miss the job builds
+      # the FULL package set — not just this workspace's closure — so the cache saved under the
+      # shared key is complete for every other job and run; a closure-only build here would poison
+      # the key with a partial dist set.
+      - name: Restore built package dists
+        id: pkgdist
         if: matrix.workspace != 'scripts'
-        run: bun scripts/build.ts ${{ matrix.workspace }} --deps
+        uses: actions/cache@v4
+        with:
+          path: packages/*/dist
+          key: pkgdist-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/package.json', 'packages/*/tsconfig*.json', 'bun.lock', 'tsconfig.base.json', 'tsconfig.build.base.json', 'scripts/**') }}
+
+      - name: Build packages
+        if: matrix.workspace != 'scripts' && steps.pkgdist.outputs.cache-hit != 'true'
+        run: bun scripts/build.ts 'packages/*'
 
       # Standardized across every backend (the old identity-server workflow was the only one that
       # ran this) — cheap, and it catches an uncommitted `drizzle-kit generate` output the same way
