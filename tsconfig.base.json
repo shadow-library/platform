@@ -1,4 +1,10 @@
 {
+  /**
+   * `files` (unlike `include`/`exclude`/path-valued compilerOptions) resolves to an absolute path at the point it
+   * is declared, so this reaches every workspace that extends this base regardless of its own directory depth —
+   * the shared `bun:test` `Expect<T>` augmentation, formerly duplicated as 8 byte-identical `tests/test.d.ts` copies.
+   */
+  "files": ["types/bun-test.d.ts"],
   "compilerOptions": {
     /** Language and Environment */
     "emitDecoratorMetadata": true,

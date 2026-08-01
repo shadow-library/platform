@@ -1,12 +1,14 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": ["./tsconfig.json", "../../tsconfig.build.base.json"],
   "tsc-alias": { "resolveFullPaths": true },
   "compilerOptions": {
-    /** Emit */
-    "noEmit": false,
-    "declaration": true,
+    /** Emit — declaration-only for a Rollup-built component; overrides the base's tsc-emits-JS shape. */
     "emitDeclarationOnly": true,
     "outDir": "dist",
+    // Preserves this package's original, pre-centralization behavior: ui never opted into removeComments (unlike
+    // the base's other 6 consumers), so its .d.ts kept leading banner comments. Overriding back to false here
+    // keeps that emit byte-identical now that removeComments lives in the shared base.
+    "removeComments": false,
     // tsc-alias needs this whenever baseUrl is implicit (unlike fastify/modules, ui doesn't set one) --
     // newer tsc-alias enforces it; the other library packages already declare it for the same reason.
     "rootDir": "src"

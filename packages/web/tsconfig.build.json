@@ -1,13 +1,7 @@
 {
-  "extends": "./tsconfig.json",
+  "extends": ["./tsconfig.json", "../../tsconfig.build.base.json"],
   "tsc-alias": { "resolveFullPaths": true },
-  "compilerOptions": {
-    "noEmit": false,
-    "declaration": true,
-    "removeComments": true,
-    "rootDir": "src",
-    "sourceMap": true
-  },
+  "compilerOptions": { "sourceMap": true, "rootDir": "src" },
   "include": ["src/**/*.ts", "src/**/*.tsx"],
   "exclude": ["src/**/*.test.ts", "src/**/*.test.tsx"]
 }
