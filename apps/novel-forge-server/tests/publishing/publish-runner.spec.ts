@@ -25,9 +25,9 @@ import { PublicationJanitor } from '@modules/jobs/publication.janitor';
 import { PublishRunner } from '@modules/publishing/publish-runner';
 import { PublishingService } from '@modules/publishing/publishing.service';
 import { ReaderPushClient } from '@modules/publishing/reader-push.client';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 import { MockReaderService } from './mock-reader';
 

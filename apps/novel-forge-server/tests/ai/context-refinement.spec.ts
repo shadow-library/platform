@@ -15,9 +15,9 @@ import { drizzle } from 'drizzle-orm/bun-sql';
  */
 import { CatalogService } from '@modules/ai/context/catalog.service';
 import { ARC_PLAN_BUDGET, CHAT_PACK_BUDGET, ContextAssembler, PREMISE_BUDGET } from '@modules/ai/context/context-assembler.service';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

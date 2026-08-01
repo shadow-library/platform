@@ -17,9 +17,9 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { ConcurrencyController } from '@modules/jobs/concurrency.controller';
 import { JobExecutor } from '@modules/jobs/job.executor';
 import { JobService } from '@modules/jobs/job.service';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

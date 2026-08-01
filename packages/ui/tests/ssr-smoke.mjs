@@ -2,7 +2,7 @@
  * Standalone SSR smoke test for the *built* package. Runs in plain Node (no Vite, no bundler) so it
  * proves the published `dist` is import-safe, server-renderable, and deterministic — the exact things a
  * Node/SSR consumer needs. Exits non-zero with a message on the first failed assertion. Driven by
- * `src/ssr.dist.test.ts`, but also runnable directly: `node scripts/ssr-smoke.mjs`.
+ * `src/ssr.dist.test.ts`, but also runnable directly: `node tests/ssr-smoke.mjs`.
  */
 import assert from 'node:assert/strict';
 import path from 'node:path';

@@ -13,9 +13,9 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 /**
  * Importing user defined packages
  */
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

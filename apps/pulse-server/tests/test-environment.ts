@@ -14,9 +14,9 @@ import { DatabaseService } from '@shadow-library/modules';
  */
 import { PULSE_PERMISSIONS, PULSE_SCOPES } from '@modules/auth';
 import { NotificationService } from '@modules/notification';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

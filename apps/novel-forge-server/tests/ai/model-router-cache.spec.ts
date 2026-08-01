@@ -16,9 +16,9 @@ import { drizzle } from 'drizzle-orm/bun-sql';
 import { ModelRouterService } from '@modules/ai/model-router.service';
 import { type JudgeOutput, JudgeSchema } from '@modules/ai/schemas/judge.schema';
 import { TelemetryHandler } from '@modules/ai/telemetry.handler';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

@@ -14,8 +14,8 @@ import { drizzle } from 'drizzle-orm/bun-sql';
  * Importing user defined packages
  */
 import { GenerationService } from '@modules/generation/generation.service';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

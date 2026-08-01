@@ -21,9 +21,9 @@ import { DatabaseService } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { APP_NAME } from '@server/constants';
 import { type PrimaryDatabase } from '@server/database';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

@@ -15,9 +15,9 @@ import { drizzle } from 'drizzle-orm/bun-sql';
  */
 import { ChapterImageService } from '@modules/generation/chapter-image.service';
 import { GenerationService } from '@modules/generation/generation.service';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Declaring the constants

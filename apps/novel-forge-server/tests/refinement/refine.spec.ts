@@ -21,8 +21,8 @@ import { ModelRouterService } from '@modules/ai/model-router.service';
 import { ProposalService } from '@modules/refinement/proposal.service';
 import { RefineService } from '@modules/refinement/refine.service';
 import { REQUIRED_BIBLE_DOCS } from '@modules/refinement/required-bible-docs';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase, schema } from '@server/database';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

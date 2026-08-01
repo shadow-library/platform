@@ -14,10 +14,10 @@ import { DatabaseService } from '@shadow-library/modules';
 /**
  * Importing user defined packages
  */
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { AppModule } from '@server/app.module';
 import { APP_NAME } from '@server/constants';
 import { PrimaryDatabase } from '@server/modules/infrastructure/datastore';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

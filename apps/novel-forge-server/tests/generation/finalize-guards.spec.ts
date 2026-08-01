@@ -14,9 +14,9 @@ import { AppError } from '@shadow-library/common';
  * Importing user defined packages
  */
 import { GenerationService } from '@modules/generation/generation.service';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

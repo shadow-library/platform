@@ -16,9 +16,9 @@ import { AppError, ValidationError } from '@shadow-library/common';
  */
 import { type ImportPlanBody, type PlanBundle } from '@modules/plan-import/plan-import.dto';
 import { PlanImportService } from '@modules/plan-import/plan-import.service';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase } from '@server/database';
 import * as schema from '@server/database/schemas';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types

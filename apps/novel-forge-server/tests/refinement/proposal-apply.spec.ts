@@ -14,8 +14,8 @@ import { drizzle } from 'drizzle-orm/bun-sql';
  * Importing user defined packages
  */
 import { ActionExecutorRegistry, type ChangeOp, ProposalApplyService, ProposalService } from '@modules/refinement';
-import { createDatabaseFromTemplate } from '@scripts/create-template-db';
 import { type PrimaryDatabase, type Refinement, schema } from '@server/database';
+import { createDatabaseFromTemplate } from '@tests/fixtures/template-db';
 
 /**
  * Defining types
