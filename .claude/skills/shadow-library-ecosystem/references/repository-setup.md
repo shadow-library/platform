@@ -213,34 +213,60 @@ There is no release command — see "No release tooling" below.
 
 ## Container builds (deployable apps)
 
-Every deployable workspace (`backend`, `ssr`) builds its Docker image with the app version baked in as a
-build argument:
+Every deployable workspace (`backend`, `ssr`) owns a hand-maintained `apps/<name>/Dockerfile` — 8 total,
+comment-free by convention, app-specific rather than generated. Each copies **every** workspace manifest
+(a `--frozen-lockfile` install fails loudly if any is missing), scopes the install with
+`--filter ./apps/<name> --filter ./`, COPYs only the app's own `workspace:*` dependency closure as
+source, and builds with the root tooling (`bun scripts/build.ts <app> --deps`, then the app itself).
+Every `bun install` line carries a BuildKit cache mount
+(`--mount=type=cache,target=/root/.bun/install/cache`), so reinstalls after a manifest change resolve
+from the build host's shared download cache instead of the network. Backends produce a dist-only
+runtime (`ENTRYPOINT ["bun", "run"]`, `CMD ["main.js"]`, port 8080); ssr apps a production-filtered
+`node_modules` runtime that preserves the monorepo layout (port 3000). No HEALTHCHECK and no
+health-port EXPOSE — health endpoints are internal-only by design and never internet-exposed. When
+editing a Dockerfile, MUST keep it comment-free, closure-only, and structurally parallel to its 7
+siblings (the manifest COPY block and `ARG BUN_VERSION` are intentionally identical across all 8 —
+a change to one usually means the same change to all).
+
+The build context is always the repo root:
 
 ```bash
-docker build \
-  --build-arg BUN_IMAGE=<digest-pinned base> \
-  --build-arg APP_VERSION=$(git rev-parse --short=7 HEAD) \
-  .
+docker build --build-arg APP_VERSION=$(git rev-parse --short=7 HEAD) -f apps/<name>/Dockerfile .
 ```
 
-and the Dockerfile carries:
+Only backends declare `ARG APP_VERSION` (defaulting to `local`); ssr images take no build args, and
+passing one just produces a BuildKit warning. `APP_VERSION` is the **7-character head commit** (with a
+`-dirty-<id>` suffix when built from an uncommitted tree). `HttpCoreModule` stamps it into the served
+OpenAPI document's `info.version`, making every running image traceable to the exact commit it was
+built from. The app reads it through `Config` (never `process.env`), and it MUST NOT be hand-set in
+`.env` files — it is build metadata, not configuration. In practice you rarely run `docker build` by
+hand: `gitops build` (next section) derives the tag and version and passes the argument itself.
 
-```dockerfile
-ARG APP_VERSION=local
-ENV APP_VERSION=${APP_VERSION}
-```
+## Local deployment — the `gitops` CLI
 
-`APP_VERSION` is the **7-character head commit**. `HttpCoreModule` stamps it into the served OpenAPI
-document's `info.version`, and the ecosystem's contract pipeline pulls `openapi.json` from deployed
-dev instances to generate SDK/web API types — the stamp is what makes every generated artifact
-traceable to the exact server commit it was derived from. An image built without the argument serves
-`local` and breaks that audit trail. The app reads the value through `Config` (never `process.env`),
-and it MUST NOT be hand-set in `.env` files — it is build metadata, not configuration. (`BUN_IMAGE`
-is the existing convention for digest-pinning the base image in CI; pass both.) Each app owns its own
-hand-maintained `apps/<name>/Dockerfile` (8 total, one per backend/ssr app; build context is always the
-repo root) — backends take `--build-arg APP_VERSION=$(git rev-parse --short HEAD)`, ssr web apps take no
-build-arg. See each Dockerfile's own header comment for its exact invocation. Apps remain independently
-built, imaged, and deployed even though development now happens in one repo.
+Deployment is owned by the separate `devops` repository (a Go CLI installed on PATH as `gitops`); this
+monorepo only guarantees each app's Dockerfile builds a deploy-ready image. `gitops` reads this
+checkout as its image source via `PLATFORM_ROOT`, which defaults to the `platform/` sibling of the
+devops checkout. The local dev environment is a k3d cluster serving
+`https://<service>.shadow-apps.test` (dnsmasq loopback DNS + mkcert wildcard TLS) — the same URLs the
+root `e2e/` suite defaults to when its `E2E_*` vars are unset, so a green local deploy is directly
+e2e-testable with `cd e2e && bun run test`.
+
+- **Bootstrap / repair:** `gitops up dev` — cluster → dns → tls → secrets → apply, in that order;
+  every step is idempotent, so re-running it is the normal way to fix a half-built environment.
+- **Inner loop (code → running pod):** `gitops build <app>... --no-commit --deploy`, e.g.
+  `gitops build identity-server --no-commit --deploy`. It builds the selected images from this repo's
+  **working tree** (uncommitted changes included — the tag becomes `sha-<head>-dirty-<id>` so the
+  Deployment spec always moves), pushes them to the shared local registry, pins `image.tag` in each
+  component's `values-dev.yaml`, and Helm-upgrades exactly those components.
+- Selectors are `<service>-<component>` names (`identity-server`, `identity-web`); no selector builds
+  every component. `--jobs <n>` raises build concurrency after the first image (default 3 — the first
+  build runs alone to populate the shared Bun download cache the others mount).
+- `gitops apply dev [service|component...]` re-deploys from the devops working tree without
+  rebuilding; `gitops status dev` reports cluster/release/pod health; `gitops stop dev` / `start dev`
+  park and resume the cluster without destroying it.
+
+Images reach prod only through `gitops promote` — never build at prod directly.
 
 ## No release tooling
 
@@ -289,9 +315,11 @@ If you're wiring a new workspace into the matrix, its steps are just:
 - run: bun scripts/build.ts ${{ matrix.workspace }}
 ```
 
-(`test` runs inside `verify` by convention for everything except the web apps and `e2e` — `identity-web`,
-`novel-forge-web`, and `pulse-web` have a Playwright e2e `test` script needing a live backend, out of CI's
-scope for now. `web-novel-web`'s `test` is `vitest run` — a real jsdom unit suite — so it opts back in with
-`"shadow": { "verifyTest": true }`. `packages/ui` verifies its `test` script (`vitest run --project unit`)
-normally as a `component`; only its separate `test:stories` script — the Storybook interaction/a11y
-project — is never invoked by `verify` and stays out of CI.)
+(`test` runs inside `verify` by convention for everything except the web apps and `e2e` —
+`identity-web`, `novel-forge-web`, and `pulse-web` carry **no `test` script at all**: their old per-app
+Playwright suites were removed, and browser e2e lives solely in the root `e2e/` workspace, which needs a
+live deployment and whose `verify` is therefore static-only. `web-novel-web`'s `test` is `vitest run` —
+a real jsdom unit suite — so it opts back in with `"shadow": { "verifyTest": true }`. `packages/ui`
+verifies its `test` script (`vitest run --project unit`) normally as a `component`; only its separate
+`test:stories` script — the Storybook interaction/a11y project — is never invoked by `verify` and stays
+out of CI.)

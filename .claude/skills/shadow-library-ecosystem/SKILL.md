@@ -57,6 +57,7 @@ skill unless it touches workspace conventions directly.
 | Writing/changing tests                                                                                  | `references/testing.md`          |
 | Authoring a reusable/configurable module (`forRoot`-style, ecosystem package, app-local dynamic module) | `references/library-modules.md`  |
 | Touching build/verify/lint/husky config, CI, or scaffolding a new workspace                             | `references/repository-setup.md` |
+| Building an app's Docker image, or deploying/testing it on the local k3d cluster (`gitops`)             | `references/repository-setup.md` |
 | Adopting the ecosystem in a workspace that hand-rolls things (fully or partially)                       | `references/migration.md`        |
 | About to write any new helper/util/component, or unsure what a package exports                          | `references/api-catalog.md`      |
 
@@ -73,7 +74,7 @@ skill unless it touches workspace conventions directly.
 | `apps/web-novel-server`                                                                                                                            | `@shadow-library/web-novel-server`   | Web Novel: the public reading platform's backend (`type: backend`)                                                                                           |
 | `apps/web-novel-web`                                                                                                                               | `web-novel-web`                      | Web Novel's web app (`type: ssr`)                                                                                                                            |
 | `packages/app`, `packages/auth`, `packages/class-schema`, `packages/common`, `packages/fastify`, `packages/modules`, `packages/ui`, `packages/web` | `@shadow-library/<name>`             | The shared ecosystem packages every app builds on (all `type: library`, except `packages/ui` which is `type: component`)                                     |
-| `e2e/`                                                                                                                                             | `e2e`                                | Whole-platform Playwright suite — cross-app flows against already-deployed service URLs                                                                      |
+| `e2e/`                                                                                                                                             | `e2e`                                | Whole-platform Playwright suite — cross-app flows against deployed service URLs (`E2E_*` vars; defaults to the local `gitops` dev cluster at `https://<service>.shadow-apps.test`) |
 | `scripts/`                                                                                                                                         | _(not a workspace)_                  | Root tooling — directly-runnable Bun scripts (`build.ts`, `verify.ts`, `gen-api-types.ts`, `check-migrations.ts`), always invoked from the repo root by path |
 
 **Web Novel naming note:** the workspace/package names use the hyphenated `web-novel-*` form, but the
