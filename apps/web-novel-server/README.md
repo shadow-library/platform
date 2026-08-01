@@ -7,13 +7,13 @@ Shadow identity service (OIDC) — this app keeps **no local user or session tab
 
 ## Surfaces
 
-| Surface | Paths | Auth |
-| --- | --- | --- |
-| Internal publish (forge → reader) | `PUT /internal/novels/:slug`, `PUT`/`DELETE /internal/novels/:slug/chapters/:ordinal`, `GET /internal/novels/:slug/manifest` | Identity-issued M2M bearer with scope `webnovel:publish` + admin-configured service-access rule |
-| Public catalog | `GET /api/novels` (search/genre/status/sort/pagination), `GET /api/novels/:slug`, `GET /api/novels/:slug/chapters`, `GET /api/novels/:slug/chapters/:ordinal` (ETag = contentHash, 304 on If-None-Match) | none |
-| Session | `GET /api/auth/login?returnTo=`, `GET /api/auth/callback`, `GET /api/auth/session` (flat `{ userId, email?, name? }` or 401), `POST /api/auth/logout` | OIDC via identity; stateless signed session cookie |
-| Reader | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug` | session cookie |
-| Health | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`) | none |
+| Surface                           | Paths                                                                                                                                                                                                    | Auth                                                                                            |
+| --------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Internal publish (forge → reader) | `PUT /internal/novels/:slug`, `PUT`/`DELETE /internal/novels/:slug/chapters/:ordinal`, `GET /internal/novels/:slug/manifest`                                                                             | Identity-issued M2M bearer with scope `webnovel:publish` + admin-configured service-access rule |
+| Public catalog                    | `GET /api/novels` (search/genre/status/sort/pagination), `GET /api/novels/:slug`, `GET /api/novels/:slug/chapters`, `GET /api/novels/:slug/chapters/:ordinal` (ETag = contentHash, 304 on If-None-Match) | none                                                                                            |
+| Session                           | `GET /api/auth/login?returnTo=`, `GET /api/auth/callback`, `GET /api/auth/session` (flat `{ userId, email?, name? }` or 401), `POST /api/auth/logout`                                                    | OIDC via identity; stateless signed session cookie                                              |
+| Reader                            | `GET /api/me/progress`, `GET`/`PUT /api/novels/:slug/progress`, `GET`/`POST /api/library`, `DELETE /api/library/:slug`                                                                                   | session cookie                                                                                  |
+| Health                            | `GET /health`, `GET /health/ready` on :8080; `/health/live` + `/health/ready` on :8081 (`HEALTH_ENABLED`)                                                                                                | none                                                                                            |
 
 Publish semantics (optimistic concurrency, revisions are forge-assigned and monotonic): incoming
 revision **below** stored → `409` (`WBN_003`, audited `stale_rejected`); **equal** revision with
@@ -41,7 +41,9 @@ identity issuer; without `AUTH_CLIENT_ID` the app boots offline and every M2M ca
 
 ```bash
 bun test                 # live Postgres: builds a migrated template DB, clones it per test
-bun run verify           # shadow verify: format + lint + type-check + test (pre-commit gate)
+
+# from the repo root — this workspace has no verify script of its own:
+bun scripts/verify.ts apps/web-novel-server   # format + lint + type-check + test (pre-commit gate)
 ```
 
 The suite is self-contained: a mock identity provider (`@shadow-library/auth/testing`) boots
@@ -50,8 +52,9 @@ in-process and serves discovery/JWKS/token/service-access, so no identity deploy
 ## Building and shipping
 
 ```bash
-bun run build            # shadow build → single-file dist/main.js (+ generated/drizzle assets)
-bun dist/main.js         # run the production bundle
+# from the repo root — this workspace has no build script of its own:
+bun scripts/build.ts apps/web-novel-server   # single-file dist/main.js (+ generated/drizzle assets)
+bun dist/main.js                              # run the production bundle
 ```
 
 The image build is now shared and monorepo-root-context — see [`docker/README.md`](../../docker/README.md)

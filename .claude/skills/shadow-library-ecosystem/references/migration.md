@@ -29,7 +29,7 @@ a working state.
 | a hand-rolled TanStack Router+Query setup | `createAppRouter` (`web/router`) |
 | a custom Bun/Node static+SSR server | `serve` (`web/server-entry`) |
 | hand-rolled service worker / manifest / IndexedDB cache | `web/pwa`, `web/service-worker`, `web/offline` |
-| hand-rolled build/lint/commit-msg scripts, per-workspace `.prettierrc.json`/`eslint.config.js`/`commitlint.config.js` | the `shadow` CLI (`references/repository-setup.md`) |
+| hand-rolled build/lint/commit-msg scripts, per-workspace `.prettierrc.json`/`commitlint.config.*`, a leftover `.shadowrc.json` | the root `scripts/` tooling + the root tool configs (`references/repository-setup.md`) |
 
 3. Add the `workspace:*` dependencies you'll need — this is a one-line `package.json` edit plus
    `bun install`, not an install command: backend usually all five (`common`, `app`, `class-schema`,
@@ -83,11 +83,15 @@ a working state.
 - Verify: startup connection checks pass; cache L1/L2 behave.
 
 ### Stage 7 — Tooling
-- Adopt the `shadow` CLI: wire `verify`/`build`/`type-check` scripts to call
-  `bun ../../scripts/src/bin/shadow.ts <cmd>` and run `shadow init --type backend` for a starter
-  `.shadowrc.json`. Remove hand-rolled scripts/configs. Do not add a workspace-local
-  `.prettierrc.json`/`eslint.config.js`/`commitlint.config.js` — the root ones already cover every
-  workspace. Per `references/repository-setup.md`, husky hooks live once at the repo root; don't wire
+- Adopt the root tooling: **delete** the workspace's own `verify`/`build`/`check-migrations`/
+  `generate:api-types` scripts — those now run from the repo root by path
+  (`bun scripts/verify.ts <workspace>`, `bun scripts/build.ts <workspace>`, …). Keep only what is
+  genuinely the workspace's own (`type-check`, `test`, `dev`, `db:*`). Remove any hand-rolled
+  scripts/configs and any leftover `.shadowrc.json` (that format no longer exists — non-inferable build
+  inputs go in a `"shadow"` key in the workspace's `package.json`). Do not add a workspace-local
+  `.prettierrc.json` or `commitlint.config.*` — the root ones cover every workspace; a workspace
+  `eslint.config.ts` *is* allowed, but only where the workspace genuinely deviates from the root lint
+  config. Per `references/repository-setup.md`, husky hooks live once at the repo root; don't wire
   per-workspace hooks.
 
 ## Web migration — staged
@@ -137,7 +141,8 @@ When a workspace already uses *some* of the ecosystem, look specifically for the
 - [ ] Web app hand-rolling `getRouter`/server-fetch/prod-server → `web/router`, `web/server`, `web/server-entry`.
 - [ ] Hand-rolled service worker / manifest / offline cache → `web/pwa`, `web/service-worker`, `web/offline`.
 - [ ] Manual helmet/cors/health/openapi → `HttpCoreModule`.
-- [ ] Hand-rolled build/lint/commit-msg scripts, or a workspace-local `.prettierrc.json` → the `shadow` CLI.
+- [ ] Hand-rolled build/lint/commit-msg scripts, a workspace-local `.prettierrc.json`, or a leftover
+      `.shadowrc.json` → the root `scripts/` tooling, run from the repo root.
 
 ## Guardrails
 

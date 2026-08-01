@@ -4,12 +4,12 @@ The Shadow Library platform monorepo: four products and the shared package ecosy
 
 ## The products
 
-| Product | What it is | Live |
-| --- | --- | --- |
-| **Identity** | The platform's identity provider: OAuth 2.1 / OIDC, first-party app sessions, step-up auth, M2M tokens, and an admin surface for app registration and access control. | [identity.shadow-apps.com](https://identity.shadow-apps.com) |
-| **Novel Forge** | AI-assisted novel authoring: story bibles, arc/volume planning, chapter generation with judge/repair loops, epistemic character-knowledge tracking, and a documented bundle-import feature for bringing manuscripts in. | — |
-| **Pulse** | Platform notifications and activity: template catalog, multi-channel delivery, and a dashboard. | [pulse.shadow-apps.com](https://pulse.shadow-apps.com) |
-| **Web Novel** | The public reading platform: published novels flow one-way from Novel Forge into a fast, cache-first reader. | [webnovel.shadow-apps.com](https://webnovel.shadow-apps.com) |
+| Product         | What it is                                                                                                                                                                                                              | Live                                                         |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| **Identity**    | The platform's identity provider: OAuth 2.1 / OIDC, first-party app sessions, step-up auth, M2M tokens, and an admin surface for app registration and access control.                                                   | [identity.shadow-apps.com](https://identity.shadow-apps.com) |
+| **Novel Forge** | AI-assisted novel authoring: story bibles, arc/volume planning, chapter generation with judge/repair loops, epistemic character-knowledge tracking, and a documented bundle-import feature for bringing manuscripts in. | —                                                            |
+| **Pulse**       | Platform notifications and activity: template catalog, multi-channel delivery, and a dashboard.                                                                                                                         | [pulse.shadow-apps.com](https://pulse.shadow-apps.com)       |
+| **Web Novel**   | The public reading platform: published novels flow one-way from Novel Forge into a fast, cache-first reader.                                                                                                            | [webnovel.shadow-apps.com](https://webnovel.shadow-apps.com) |
 
 Each product is a server (Bun + Fastify-style HTTP over a custom DI kernel, PostgreSQL + Drizzle) and a web app (React 19; SSR via TanStack Start) — eight independently deployable applications.
 
@@ -27,7 +27,7 @@ packages/
   ui                      the React component library + design tokens
   web                     frontend wiring: transport, router/SSR, PWA, production server
 e2e/                      cross-app Playwright suite, run against deployed instances via E2E_* env vars
-scripts/                  the repo's own tooling (build, verify, commit lint, API-type generation)
+scripts/                  the repo's own tooling — runnable Bun scripts (build, verify, API-type generation, migration drift)
 docker/                   one parameterized Dockerfile builds every app from the repo root
 ```
 
@@ -36,11 +36,15 @@ Everything internal resolves as `workspace:*` — nothing is published to npm; a
 ## Working in the repo
 
 ```bash
-bun install                       # one lockfile, all workspaces
-bun run --filter '*' verify       # dependency-ordered: format, lint, type-check, tests
-bun run --filter '*' build        # build every workspace
+bun install                            # one lockfile, all workspaces
+bun run verify                         # format, lint, type-check, tests — every workspace
+bun run build                          # build every workspace, in dependency order
+bun scripts/verify.ts packages/common  # or scope either to one workspace
+bun scripts/build.ts apps/pulse-server --deps
 docker build -f docker/Dockerfile --build-arg APP=<app> --target runtime-<kind> .
 ```
+
+Tooling is convention-driven: a workspace's type and build inputs are inferred from its path, dependencies, and `package.json` `exports`. Lint, format, and commit rules live in the tools' own config files at the root.
 
 Agent tooling ships with the repo: `.mcp.json` (Serena, Context7, Playwright MCP), `AGENTS.md` conventions, and the `shadow-library-ecosystem` skill under `.claude/skills/`.
 

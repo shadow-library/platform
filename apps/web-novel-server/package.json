@@ -6,15 +6,20 @@
   "description": "Public webnovel reader service: serves published novels pushed one-way from novel-forge-server",
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "bun run tsc",
     "test": "bun test",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "dev": "bun run --watch src/main.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "bun run scripts/migrate-db.ts",
-    "db:create-template": "bun run scripts/create-template-db.ts",
-    "check-migrations": "bun ../../scripts/src/bin/shadow.ts check-migrations"
+    "db:create-template": "bun run scripts/create-template-db.ts"
+  },
+  "shadow": {
+    "entries": [
+      "src/migrate.ts"
+    ],
+    "assets": [
+      "generated/drizzle"
+    ]
   },
   "repository": {
     "type": "git",

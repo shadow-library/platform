@@ -10,22 +10,22 @@ The forge can always regenerate the reader's content tables — drop them, re-pu
 regenerate a draft, and the forge can never regenerate a reader's bookmarks. That is the segregation line, and it is testable: "wipe reader content and re-publish" is a
 supported operation (§6).
 
-Consequently the reader service is **not** the source of truth for published content — it is the *authoritative serving copy* of a projection. The forge is the system of
+Consequently the reader service is **not** the source of truth for published content — it is the _authoritative serving copy_ of a projection. The forge is the system of
 record for everything authored **and for the publication ledger** (what was published, when, in what order, at which revision). Losing the reader database loses audience
 data only; losing the publication ledger would lose release history and the ordinals that anchor reader URLs and progress — so the ledger lives in the forge.
 
 ## 2. Segregation of concerns
 
-| concern | system of record | notes |
-|---|---|---|
-| Bible, entities, canon facts, plans, arcs, briefs | novel-forge | never leaves the forge |
-| Drafts, revisions, judge results, AI runs | novel-forge | never leaves the forge |
-| Finalized chapter content | novel-forge | the master copy, forever |
-| Publication decisions: what, when, in what order | novel-forge | `publications` / `chapter_publications` (§3) |
-| Rendered published copy readers see | reader service (serving) | rebuildable projection (§6) |
-| Reader accounts, sessions | reader service | forge never touches these |
-| Reading progress, bookmarks, library | reader service | originates there, stays there |
-| Comments, ratings, view counts | reader service | forge may *read* via analytics endpoint, never write |
+| concern                                           | system of record         | notes                                                |
+| ------------------------------------------------- | ------------------------ | ---------------------------------------------------- |
+| Bible, entities, canon facts, plans, arcs, briefs | novel-forge              | never leaves the forge                               |
+| Drafts, revisions, judge results, AI runs         | novel-forge              | never leaves the forge                               |
+| Finalized chapter content                         | novel-forge              | the master copy, forever                             |
+| Publication decisions: what, when, in what order  | novel-forge              | `publications` / `chapter_publications` (§3)         |
+| Rendered published copy readers see               | reader service (serving) | rebuildable projection (§6)                          |
+| Reader accounts, sessions                         | reader service           | forge never touches these                            |
+| Reading progress, bookmarks, library              | reader service           | originates there, stays there                        |
+| Comments, ratings, view counts                    | reader service           | forge may _read_ via analytics endpoint, never write |
 
 ## 3. Forge-side schema (PB1)
 
@@ -81,12 +81,12 @@ Error codes: `PUB_001` (NOT_FOUND, publication not found), `PUB_002` (CLIENT_ERR
 
 One-way HTTP, forge → reader, service-to-service bearer token (single shared secret; the `/internal/*` surface is never exposed publicly).
 
-| call | behavior |
-|---|---|
-| `PUT /internal/novels/:slug` | novel metadata upsert (title, blurb, cover) |
-| `PUT /internal/novels/:slug/chapters/:ordinal` | chapter upsert — idempotent: same `contentHash` → no-op; different → replace + bump revision |
-| `DELETE /internal/novels/:slug/chapters/:ordinal` | unpublish |
-| `GET /internal/novels/:slug/manifest` | `[{ordinal, contentHash}]` — the reconciliation primitive (§6) |
+| call                                              | behavior                                                                                     |
+| ------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| `PUT /internal/novels/:slug`                      | novel metadata upsert (title, blurb, cover)                                                  |
+| `PUT /internal/novels/:slug/chapters/:ordinal`    | chapter upsert — idempotent: same `contentHash` → no-op; different → replace + bump revision |
+| `DELETE /internal/novels/:slug/chapters/:ordinal` | unpublish                                                                                    |
+| `GET /internal/novels/:slug/manifest`             | `[{ordinal, contentHash}]` — the reconciliation primitive (§6)                               |
 
 Flow: author action → gates → `chapter_publications` row (`scheduled`) → `publish` job (new `job_kind`) → executor renders payload → PUT → row `published` with
 `publishedAt`. The ledger row **is** the outbox: a failed push stays `failed` with `error`, and job retries plus a janitor sweep (checkpoint-janitor pattern) re-push it.

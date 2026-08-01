@@ -1,17 +1,17 @@
 /**
  * Importing npm packages
  */
-import { Module, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, forwardRef } from '@shadow-library/app';
+import { forwardRef, Module, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
-import { CatInternalService } from './cat-internal.service';
-import { CatController } from './cat.controller';
-import { CatService } from './cat.service';
 import { CommonModule } from '../common/common.module';
 import { OutputService } from '../common/output.service';
 import { DogModule } from '../dog/dog.module';
+import { CatInternalService } from './cat-internal.service';
+import { CatController } from './cat.controller';
+import { CatService } from './cat.service';
 
 /**
  * Defining types

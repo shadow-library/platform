@@ -6,21 +6,21 @@ built with TanStack Start (Router + Query) — full-document SSR — bundled wit
 
 ## Tech Stack
 
-| Concern         | Choice                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------- |
-| Runtime / PM     | [Bun](https://bun.sh)                                                                        |
-| Framework        | [TanStack Start](https://tanstack.com/start) (full-document SSR)                             |
-| Build tool       | [Vite 7](https://vite.dev) via the `shadow` CLI (root `scripts/` tooling)                    |
-| UI library       | [React 19](https://react.dev)                                                                |
-| Routing          | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split)                 |
-| Server state     | [TanStack Query](https://tanstack.com/query)                                                 |
-| Components       | `@shadow-library/ui` (CSS Modules + `--sh-*` design tokens)                                  |
-| Transport / SSR  | `@shadow-library/web` (server functions + `createServerFetch`, `createAppRouter`, `serve`)   |
-| Auth             | Session-gated via `requireAuth` — every route under `/_app` is private                       |
-| Types            | [TypeScript 6](https://www.typescriptlang.org) (strict)                                      |
-| Lint / Format    | `shadow verify` (shared ESLint + Prettier ruleset)                                           |
-| Git hooks        | Husky → `shadow verify` / `shadow commit-msg` (Conventional Commits)                         |
-| E2E tests        | [Playwright](https://playwright.dev)                                                         |
+| Concern         | Choice                                                                                     |
+| --------------- | ------------------------------------------------------------------------------------------ |
+| Runtime / PM    | [Bun](https://bun.sh)                                                                      |
+| Framework       | [TanStack Start](https://tanstack.com/start) (full-document SSR)                           |
+| Build tool      | [Vite 7](https://vite.dev) via `bun scripts/build.ts` (root tooling)                       |
+| UI library      | [React 19](https://react.dev)                                                              |
+| Routing         | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split)               |
+| Server state    | [TanStack Query](https://tanstack.com/query)                                               |
+| Components      | `@shadow-library/ui` (CSS Modules + `--sh-*` design tokens)                                |
+| Transport / SSR | `@shadow-library/web` (server functions + `createServerFetch`, `createAppRouter`, `serve`) |
+| Auth            | Session-gated via `requireAuth` — every route under `/_app` is private                     |
+| Types           | [TypeScript 6](https://www.typescriptlang.org) (strict)                                    |
+| Lint / Format   | `bun scripts/verify.ts` (shared ESLint + Prettier ruleset)                                 |
+| Git hooks       | Husky → `bun scripts/verify.ts --fast` / `commitlint` (Conventional Commits)               |
+| E2E tests       | [Playwright](https://playwright.dev)                                                       |
 
 ## Prerequisites
 
@@ -41,22 +41,30 @@ app redirects to `/login`, which hands the browser to `/api/auth/login?return_to
 
 ## Scripts
 
-| Script                       | Description                                                                      |
-| ----------------------------- | --------------------------------------------------------------------------------- |
-| `bun dev`                    | Start the TanStack Start dev server (SSR) on port 3000                          |
-| `bun run build`              | `shadow build` — the client + SSR server bundles to `dist/`                     |
-| `bun run type-check`         | Type-check only (`tsc`)                                                         |
-| `bun run start`              | Run the production SSR server (`serve.ts` → `@shadow-library/web/server-entry`) |
-| `bun run verify`             | `shadow verify` — format (Prettier) + lint (ESLint) + type-check                |
-| `bun run verify --fix`       | Auto-fix formatting and lint issues                                             |
-| `bun run test`               | Run Playwright end-to-end tests                                                 |
-| `bun run test:setup`         | Install the Chromium browser Playwright needs                                   |
-| `bun run generate:api-types` | Regenerate API types from the backend OpenAPI spec                              |
+This workspace's own scripts, run from `apps/pulse-web`:
+
+| Script               | Description                                                                     |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `bun dev`            | Start the TanStack Start dev server (SSR) on port 3000                          |
+| `bun run type-check` | Type-check only (`tsc`)                                                         |
+| `bun run start`      | Run the production SSR server (`serve.ts` → `@shadow-library/web/server-entry`) |
+| `bun run test`       | Run Playwright end-to-end tests                                                 |
+| `bun run test:setup` | Install the Chromium browser Playwright needs                                   |
+
+The root tooling, run from the **repository root** — this workspace has no build or verify script of
+its own:
+
+| Command                                       | Description                                        |
+| --------------------------------------------- | -------------------------------------------------- |
+| `bun scripts/build.ts apps/pulse-web`         | The client + SSR server bundles to `dist/`         |
+| `bun scripts/verify.ts apps/pulse-web`        | Format (Prettier) + lint (ESLint) + type-check     |
+| `bun scripts/verify.ts apps/pulse-web --fix`  | Auto-fix formatting and lint issues                |
+| `bun scripts/gen-api-types.ts apps/pulse-web` | Regenerate API types from the backend OpenAPI spec |
 
 ## Production
 
-`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts`
-boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip,
+`bun scripts/build.ts apps/pulse-web` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch
+handler). `serve.ts` boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip,
 streamed SSR, and graceful drain, on `PORT` (default 3000). Liveness lives on its own port — `GET
 /healthz` on `HEALTH_PORT` (default 3001) — so probes never touch the backend or the renderer. Backend
 calls happen server-side through Start server functions against `API_ORIGIN`; there is no `/api` proxy in
@@ -112,17 +120,19 @@ const templates = await APIRequest.get('/templates').query({ limit: 20 }).execut
 ```
 
 Response and error types come from `src/lib/apis/api-types.gen.ts`, generated from the backend OpenAPI
-spec via `bun run generate:api-types` (`shadow gen-api-types`).
+spec via `bun scripts/gen-api-types.ts apps/pulse-web`, run from the repository root.
 
 ## Code Conventions
 
-- Lint, formatting, and commit-message rules are the ecosystem's shared ruleset, driven by
-  `.shadowrc.json` — no per-repo ESLint/Prettier/commitlint config.
+- Lint, formatting, and commit-message rules are the ecosystem's shared ruleset: the root
+  `eslint.config.ts`, `.prettierrc.json`, and `commitlint.config.ts`. This workspace needs no lint
+  config of its own — the root config reaches it by path (`apps/*-web/**`) for the React layer and
+  browser globals.
 - Single quotes, trailing commas, 180-char line width; imports grouped npm → user-defined and sorted.
 - TypeScript runs in strict mode with `noUncheckedIndexedAccess`; exported functions carry explicit
   return types.
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org); husky runs `shadow verify`
-  pre-commit and `shadow commit-msg` on the message.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org); husky runs
+  `bun scripts/verify.ts <workspace> --fast` pre-commit and `commitlint` on the message.
 
 ## Testing
 

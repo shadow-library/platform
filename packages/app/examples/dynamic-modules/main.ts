@@ -19,4 +19,4 @@ import { AppService } from './app.service';
 
 const app = await ShadowFactory.create(AppModule);
 const appService = app.select(AppModule).get(AppService);
-console.log('Message:', appService.getHello());
+process.stdout.write(`Message: ${appService.getHello()}\n`);

@@ -17,8 +17,8 @@ duplicate this business logic. When both are checked out together they live side
 managing dependencies, validating — **load and follow the `shadow-library-ecosystem` skill.** This repo is
 built entirely on `@shadow-library/*` packages (`app`, `fastify`, `class-schema`, `common`, `modules`,
 `auth`), so the skill defines the conventions and the building blocks you must reuse (DI, config, logging,
-errors, validation, HTTP routing, DB access, and the `shadow` CLI). Do **not** hand-roll anything the
-ecosystem already provides, and do not begin work before the skill is loaded.
+errors, validation, HTTP routing, DB access, and the root `scripts/` tooling). Do **not** hand-roll anything
+the ecosystem already provides, and do not begin work before the skill is loaded.
 
 > If a generic ecosystem pattern conflicts with what is actually in this repo, **the repo wins.** This file
 > documents what this codebase really does; follow it over any generic default.
@@ -27,9 +27,11 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 
 ## 1. Know where you are, work here only
 
-- **Check the current working directory first.** Confirm you are inside `web-novel-server/` before running
-  anything. Every command — `bun install`, `bun run …`, `shadow …`, `drizzle-kit …`, `bun test` — runs from
-  this repo's root, never from the parent folder and never against `web-novel-web`.
+- **Check the current working directory first.** This workspace's own scripts — `bun install`, `bun run dev`,
+  `bun run type-check`, `bun test`, `drizzle-kit …`, `bun run db:*` — run from **inside** `web-novel-server/`.
+  Root tooling (`build`, `verify`, `check-migrations`) has no equivalent workspace script and always runs from
+  the **repo root** by path (`bun scripts/verify.ts apps/web-novel-server`). Either way, never run these against
+  `web-novel-web`.
 - **Change dependencies only in this repo**, using the existing package manager (**Bun**), and only when
   nothing already installed solves the problem. Never add a dependency here to serve the web app.
 
@@ -54,8 +56,8 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 
 ### Conventions
 
-- **Package manager:** Bun (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
-  directory). ESM (`"type": "module"`). **TypeScript 6.x**, `strict`, `moduleResolution: bundler`.
+- **Package manager:** Bun (single root `bun.lock`; the root tooling lives in `scripts/`, invoked by path,
+  not a CLI). ESM (`"type": "module"`). **TypeScript 6.x**, `strict`, `moduleResolution: bundler`.
 - **Path aliases:** `@server/*` → `src/*`, `@modules/*` → `src/modules/*`, `@scripts/*` → `scripts/*`.
 - **Formatting/style:** Prettier — single quotes, trailing commas `all`, print width **180**,
   `arrowParens: avoid`; 2-space indent, semicolons. `PascalCase` types/classes, `camelCase` values,
@@ -64,26 +66,28 @@ ecosystem already provides, and do not begin work before the skill is loaded.
 - **File section banners:** open every source file (not barrels) with the ecosystem's banner blocks in order,
   keeping empty ones — `Importing packages with side effects`, `Importing npm packages`,
   `Importing user defined packages`, `Defining types`, `Declaring the constants`.
-- **Named exports + a barrel `index.ts` per folder.** Comment the *why*, never the *what*.
+- **Named exports + a barrel `index.ts` per folder.** Comment the _why_, never the _what_.
 
 ## 4. Commands
 
-Run from `web-novel-server/`. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** (dev DSN
+This workspace's own scripts run from **inside** `web-novel-server/`; `build`/`verify` are root tooling and
+always run from the **repo root** by path. Prerequisites: **Bun ≥ 1.3** and **PostgreSQL** (dev DSN
 `postgresql://postgres:postgres@localhost:5432/shadow_webnovel`, see `.env`).
 
-| Purpose | Command | Notes |
-| --- | --- | --- |
-| Install | `bun install` | |
-| Develop | `bun run dev` | `bun --watch src/main.ts`, serves on **:8080** |
-| Test | `bun test` | Live Postgres: builds a migrated template DB, clones it per test; boots a mock IdP |
-| Verify (the gate) | `bun run verify` | `shadow verify` = **format + lint + type-check + test**; auto-fix with `bun run verify --fix` |
-| Type-check | `bun run type-check` | `bun run tsc` |
-| Build | `bun run build` | `shadow build` → single-file `dist/main.js` (+ `generated/drizzle` assets); run with `bun dist/main.js` |
-| Generate migration | `bun run db:generate` | `drizzle-kit generate` → `generated/drizzle/` |
-| Apply migrations | `bun run db:migrate` | `scripts/migrate-db.ts` (Bun native SQL driver) |
-| Build test template DB | `bun run db:create-template` | `scripts/create-template-db.ts` |
+| Purpose                | Command                                       | Notes                                                                                                      |
+| ---------------------- | --------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Install                | `bun install`                                 |                                                                                                            |
+| Develop                | `bun run dev`                                 | `bun --watch src/main.ts`, serves on **:8080**                                                             |
+| Test                   | `bun test`                                    | Live Postgres: builds a migrated template DB, clones it per test; boots a mock IdP                         |
+| Verify (the gate)      | `bun scripts/verify.ts apps/web-novel-server` | **format + lint + type-check + test**, from the repo root; auto-fix with `--fix`                           |
+| Type-check             | `bun run type-check`                          | `bun run tsc`                                                                                              |
+| Build                  | `bun scripts/build.ts apps/web-novel-server`  | Single-file `dist/main.js` (+ `generated/drizzle` assets), from the repo root; run with `bun dist/main.js` |
+| Generate migration     | `bun run db:generate`                         | `drizzle-kit generate` → `generated/drizzle/`                                                              |
+| Apply migrations       | `bun run db:migrate`                          | `scripts/migrate-db.ts` (Bun native SQL driver)                                                            |
+| Build test template DB | `bun run db:create-template`                  | `scripts/create-template-db.ts`                                                                            |
 
-Lint and format have no standalone scripts — they run inside `shadow verify`. Ports: **8080** app
+There is no `build` or `verify` script in this workspace's `package.json` — they are root tooling only. Lint
+and format have no standalone scripts either — they run inside `bun scripts/verify.ts`. Ports: **8080** app
 (`/health`, `/health/ready`); **8081** HttpCoreModule health server (`HEALTH_ENABLED=true`, on in prod).
 
 ## 5. Backend guidance
@@ -150,8 +154,9 @@ is a **contract change** shared with `web-novel-web`. Land it deliberately:
 - **Never leak secrets or server-only values.** Keep `SESSION_SECRET`, `*_CLIENT_SECRET`, `DATABASE_*`, and
   tokens out of API responses, logs, and error messages. `@RespondFor` already restricts responses to declared
   DTO fields — rely on that rather than returning raw entities.
-- **Verify before done:** run `bun run verify` (format + lint + type-check + test) from this repo's root.
-  While iterating you may narrow to `bun run test` / `bun run type-check`, but the full gate must pass.
+- **Verify before done:** run `bun scripts/verify.ts apps/web-novel-server` (format + lint + type-check + test)
+  from the monorepo root. While iterating you may narrow to `bun run test` / `bun run type-check` inside this
+  workspace, but the full gate must pass.
 - **Cross-repo change → verify in both repos.** A green server does not imply a green web app; run the web
   app's gate in `web-novel-web` too.
 - **Report per repo, separately.** When you finish, state — for **each** repo you changed — what you changed

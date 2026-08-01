@@ -20,19 +20,19 @@ actually lands the vars everywhere a spec reads them.
 
 Each URL var has three states, not two:
 
-| State | Effect |
-| --- | --- |
-| unset | falls back to the `.test` default |
-| set to `""` (blank) | explicitly opted out — skips, never falls back to the default |
-| set to anything else | overrides the default |
+| State                | Effect                                                        |
+| -------------------- | ------------------------------------------------------------- |
+| unset                | falls back to the `.test` default                             |
+| set to `""` (blank)  | explicitly opted out — skips, never falls back to the default |
+| set to anything else | overrides the default                                         |
 
-| Variable | Purpose |
-| --- | --- |
-| `E2E_IDENTITY_URL` | Base URL of the identity app. Default `https://identity.shadow-apps.test`. |
-| `E2E_NOVEL_FORGE_URL` | Base URL of the Novel Forge app. Default `https://novel-forge.shadow-apps.test`. |
-| `E2E_PULSE_URL` | Base URL of the Pulse app. Default `https://pulse.shadow-apps.test`. |
-| `E2E_WEB_NOVEL_URL` | Base URL of the Web Novel app. Default `https://web-novel.shadow-apps.test`. |
-| `E2E_STORAGE_STATE` | Path to a Playwright storage-state JSON for authenticated flows. Unset, or set to a path that doesn't exist, skips every authenticated spec. |
+| Variable              | Purpose                                                                                                                                      |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| `E2E_IDENTITY_URL`    | Base URL of the identity app. Default `https://identity.shadow-apps.test`.                                                                   |
+| `E2E_NOVEL_FORGE_URL` | Base URL of the Novel Forge app. Default `https://novel-forge.shadow-apps.test`.                                                             |
+| `E2E_PULSE_URL`       | Base URL of the Pulse app. Default `https://pulse.shadow-apps.test`.                                                                         |
+| `E2E_WEB_NOVEL_URL`   | Base URL of the Web Novel app. Default `https://web-novel.shadow-apps.test`.                                                                 |
+| `E2E_STORAGE_STATE`   | Path to a Playwright storage-state JSON for authenticated flows. Unset, or set to a path that doesn't exist, skips every authenticated spec. |
 
 The local ingress presents a self-signed/local-CA cert, so `playwright.config.ts` sets
 `ignoreHTTPSErrors: true` — not a production trust concern, since every target is either that local
@@ -47,16 +47,19 @@ cd e2e
 bun run test                      # or: bunx playwright test
 ```
 
-`verify` and `test` are deliberately split, the same way the SSR/SPA web apps do it (`e2e/.shadowrc.json`
-sets `verify.test: false`, mirroring `apps/{identity,novel-forge,pulse}-web`):
+`verify` and `test` are deliberately split, the same way the SSR/SPA web apps do it. `e2e` infers as a
+`none`-type workspace (nothing to build), and the root tooling's convention is that `verify` skips the test
+step for `none`-type and web-app workspaces — there is no `.shadowrc.json` or other config file that sets
+this; both were retired:
 
-- **`bun run verify`** — format + lint + type-check only. Static, no network, no browser. This is what CI's
-  affected-workspace job runs, and it must stay green with zero reachable services: it never invokes
-  Playwright, so a runner with no k3d cluster can't produce connection-error failures here.
-- **`bun run test`** (equivalently `bunx playwright test`) — the actual live smoke suite. It needs either a
-  reachable deployment (the local k3d ingress by default, or an env override) or explicit empty-string
-  opt-outs for whichever products aren't reachable from wherever it's run — otherwise a spec that resolves
-  a URL will genuinely try to hit it and fail on a real connection error, not skip.
+- **`bun scripts/verify.ts e2e`** (run from the repo root) — format + lint + type-check only. Static, no
+  network, no browser. This is what CI's affected-workspace job runs, and it must stay green with zero
+  reachable services: it never invokes Playwright, so a runner with no k3d cluster can't produce
+  connection-error failures here.
+- **`bun run test`** (equivalently `bunx playwright test`, from inside `e2e/`) — the actual live smoke suite.
+  It needs either a reachable deployment (the local k3d ingress by default, or an env override) or explicit
+  empty-string opt-outs for whichever products aren't reachable from wherever it's run — otherwise a spec
+  that resolves a URL will genuinely try to hit it and fail on a real connection error, not skip.
 
 ## How skipping works
 
@@ -72,18 +75,18 @@ environment reports precisely which product/spec was skipped and why — never a
   baseline "does it load" check — deliberately just that, no body-text scanning for "error page" copy,
   which risks a false positive against a fiction-reading site's own content.
 - **`health-not-exposed.spec.ts`** — always on (no opt-in) for every configured product: `GET
-  /health/live` and `/health/ready` must not return the platform's raw `HttpCoreModule` health contract
+/health/live` and `/health/ready` must not return the platform's raw `HttpCoreModule` health contract
   (a bare `text/*` body of `ok`/`not ready`) — that contract lives on a separate internal port
   (`health.port`, default 8081) by design, never the public app port an ingress fronts. Asserts on response
   shape, not status alone, because one product's SPA build answers any unmatched path with a `200
-  text/html` catch-all shell — that's routing, not health exposure. See the spec's header comment for the
+text/html` catch-all shell — that's routing, not health exposure. See the spec's header comment for the
   per-product evidence this was verified against.
 - **`auth-gate.spec.ts`** — an unauthenticated visit to one known-protected path per app lands on a URL
   containing `/login`.
 - **`public-reading.spec.ts`** — Web Novel's public home renders behind the shared `<main>` landmark,
   whether the catalog has rows or shows an empty state.
 - **`authenticated-placeholder.spec.ts`** — structural placeholder for phase-two session-backed flows;
-  skips cleanly until `E2E_STORAGE_STATE` is set *and* points at a file that actually exists.
+  skips cleanly until `E2E_STORAGE_STATE` is set _and_ points at a file that actually exists.
 
 ## Extending
 

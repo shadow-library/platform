@@ -1,25 +1,17 @@
-ROOT="$(pwd)"
+# Map staged files to the target(s) they touch (apps/<x>, packages/<x>, e2e, or the root tooling),
+# deduplicated. Root-level configs verify as part of the `scripts` target, so a change to one picks it up.
+targets="$(git diff --cached --name-only --diff-filter=ACMR | sed -nE 's#^(apps/[^/]+|packages/[^/]+|e2e)/.*#\1#p; s#^(scripts/.*|[^/]+\.(ts|json|md))$#scripts#p' | sort -u)"
 
-# Map staged files to the workspace(s) they touch (apps/<x>, packages/<x>, e2e, or the scripts/ tooling
-# itself), deduplicated. A commit that only touches root-level files (README, this hook, ...) runs nothing.
-workspaces="$(git diff --cached --name-only --diff-filter=ACMR | sed -nE 's#^(apps/[^/]+|packages/[^/]+|e2e)/.*#\1#p; s#^scripts/.*#scripts#p' | sort -u)"
-
-if [ -z "$workspaces" ]; then
+if [ -z "$targets" ]; then
   exit 0
 fi
 
-# Fast (format + lint only, no type-check/test -- that's CI's job) verify, scoped to each changed workspace
+# Fast (format + lint only, no type-check/test -- that's CI's job) verify, scoped to each changed target
 # instead of the whole platform, so pre-commit stays quick even as the monorepo grows.
 status=0
-for ws in $workspaces; do
-  echo "pre-commit: verify --fast ($ws)"
-  if [ "$ws" = "scripts" ]; then
-    # scripts/ has no package.json for shadow.ts's `verify` command to read (it isn't a workspace) --
-    # scripts/scripts/verify.ts dogfoods the tooling against its own known layout instead.
-    (cd "$ROOT" && bun scripts/scripts/verify.ts --fast) || status=1
-  else
-    (cd "$ROOT/$ws" && bun "$ROOT/scripts/src/bin/shadow.ts" verify --fast) || status=1
-  fi
+for target in $targets; do
+  echo "pre-commit: verify --fast ($target)"
+  bun scripts/verify.ts "$target" --fast || status=1
 done
 
 exit $status

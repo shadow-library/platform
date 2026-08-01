@@ -9,9 +9,11 @@ Load this when writing or changing tests in any `apps/*`/`packages/*` workspace.
   workspace). `packages/ui` is the exception — it uses Vitest (`unit` + `storybook` projects) because it
   needs a browser-like DOM; follow its own conventions there, not `bun:test`.
 - `describe` blocks name the unit or route; test names MUST start with `should`.
-- `shadow verify` runs the workspace's `test` script unless `.shadowrc.json` sets `verify.test: false` —
-  set on `identity-web`, `novel-forge-web`, and `pulse-web` (their `test` is a Playwright e2e suite
-  needing a live backend). Check `.shadowrc.json` before assuming `bun run verify` covered the tests.
+- `bun scripts/verify.ts <workspace>` (from the repo root) runs the workspace's `test` script by
+  convention for everything except the web apps and `e2e` — `identity-web`, `novel-forge-web`, and
+  `pulse-web` are excluded because their `test` is a Playwright e2e suite needing a live backend, while
+  `web-novel-web` opts back in with `"shadow": { "verifyTest": true }` in its `package.json`. Check that
+  key before assuming verify covered the tests.
 
 ## Backend integration style — boot real modules
 

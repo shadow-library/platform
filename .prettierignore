@@ -1,0 +1,10 @@
+# Generated output. The build rewrites these, so formatting them makes `verify` fail the moment anyone
+# builds — the per-workspace format globs this replaced excluded them for exactly that reason.
+**/*.gen.ts
+**/generated/
+stats.html
+**/public/manifest.webmanifest
+
+# Not code, and prettier's HTML/markdown opinions fight the tools that own these.
+**/storybook-static/
+bun.lock

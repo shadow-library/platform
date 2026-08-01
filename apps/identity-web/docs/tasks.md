@@ -84,7 +84,7 @@ can be completed end-to-end.
     generic variant is preserved when unnamed.
   - **Console** — application detail gains a step-up-gated visibility selector, a header/list
     visibility badge, and an "Organisations" tab (RESTRICTED only) to release/revoke orgs; roles gains
-    an *Organisation* principal type (id = org id) rendered sensibly in the assignments list.
+    an _Organisation_ principal type (id = org id) rendered sensibly in the assignments list.
   - **Org workspace** — new admin-gated "Applications" tab: OWNER-only access-mode toggle (step-up)
     with each mode explained, and per-app assign/unassign switches (ADMIN, step-up) with visibility
     badges and empty/edge states, gated via `orgAccessOf`.

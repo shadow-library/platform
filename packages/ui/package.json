@@ -22,14 +22,25 @@
   },
   "description": "Shadow UI — enterprise React component library for the Shadow Apps ecosystem, styled with CSS Modules and CSS-variable design tokens, documented in Storybook, with full TypeScript support",
   "scripts": {
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "storybook": "storybook dev -p 4000",
     "build-storybook": "storybook build",
     "type-check": "tsc",
     "test:setup": "bunx playwright install",
     "test": "vitest run --project unit",
-    "test:stories": "vitest run --project storybook",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify"
+    "test:stories": "vitest run --project storybook"
+  },
+  "shadow": {
+    "alias": {
+      "@/": "src/"
+    },
+    "css": {
+      "layer": "shadow-library",
+      "useClient": [
+        "**/*.tsx",
+        "**/hooks/**",
+        "**/router.{ts,tsx}"
+      ]
+    }
   },
   "repository": {
     "type": "git",

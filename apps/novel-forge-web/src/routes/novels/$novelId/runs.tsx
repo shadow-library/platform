@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { createFileRoute } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, Spinner } from '@shadow-library/ui';
 
 /**
@@ -397,7 +397,9 @@ function RunsScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   // Newest runs arrive first from the API; keep polling while any run is still executing.
   const runsQuery = useListRunsQuery(novelId, true, { refetchInterval: 4000 });
-  const runs = runsQuery.data?.items ?? [];
+  // Memoized so identity is stable across renders where the query data hasn't changed — otherwise the
+  // `?? []` fallback mints a new array every render and re-triggers the effect below on every render.
+  const runs = useMemo(() => runsQuery.data?.items ?? [], [runsQuery.data]);
   const [selectedId, setSelectedId] = useState<string | undefined>();
 
   useEffect(() => {

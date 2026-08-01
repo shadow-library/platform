@@ -2,7 +2,7 @@
  * Importing npm packages
  */
 import { createFileRoute, useNavigate } from '@tanstack/react-router';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Button, Dialog, FormField, IconButton, Kbd, Textarea, toast, Tooltip } from '@shadow-library/ui';
 
 /**
@@ -190,7 +190,9 @@ function ReviewDetail({ novelId, draft }: ReviewDetailProps): React.JSX.Element 
 function ReviewScreen(): React.JSX.Element {
   const { novelId } = Route.useParams();
   const queueQuery = useReviewQueueQuery(novelId);
-  const drafts = queueQuery.data?.drafts ?? [];
+  // Memoized so identity is stable across renders where the query data hasn't changed — otherwise the
+  // `?? []` fallback mints a new array every render and re-triggers the effect below on every render.
+  const drafts = useMemo(() => queueQuery.data?.drafts ?? [], [queueQuery.data]);
   const [selectedChapter, setSelectedChapter] = useState<number | undefined>();
 
   useEffect(() => {

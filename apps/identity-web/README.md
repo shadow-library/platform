@@ -40,16 +40,19 @@ SERVER_PORT=9091 bun run src/main.ts
 ```bash
 bun install
 bun run dev          # Vite + Start dev server on http://localhost:3000
-bun run build        # shadow build (ssr) → dist/client + dist/server
 bun run start        # serve the production build (Bun — main.ts) — set SERVER_URL + PORT
-bun run verify       # shadow verify: format + lint + type-check (e2e stays a separate step)
 bun run type-check   # tsc
 bun run test         # Playwright e2e (needs the backend up); test:setup installs Chromium
-bun run generate:api-types   # regenerate src/lib/apis/api-types.gen.ts from the OpenAPI spec
+
+# from the repo root, by workspace path — this workspace has no build/verify/generate:api-types script:
+bun scripts/build.ts apps/identity-web              # ssr build → dist/client + dist/server
+bun scripts/verify.ts apps/identity-web             # format + lint + type-check (e2e stays a separate step)
+bun scripts/gen-api-types.ts apps/identity-web      # regenerate src/lib/apis/api-types.gen.ts from the OpenAPI spec
 ```
 
-Tooling (lint/format/commitlint rules, build type) is centralized in the root `scripts/` tooling — the
-`shadow` CLI — configured through `.shadowrc.json`; there are no per-repo ESLint/Prettier/commitlint configs.
+Tooling (build type, format, commitlint rules) is centralized in the root `scripts/` tooling, invoked by path —
+there is no `shadow` CLI and no `.shadowrc.json`; both were retired. This workspace **does** have its own
+`eslint.config.ts` (it deviates from the root ESLint config); there is no per-repo Prettier or commitlint config.
 Root-level husky hooks own commit linting and pre-commit checks across the whole monorepo.
 
 ## Environment

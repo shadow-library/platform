@@ -1,7 +1,9 @@
 /**
  * Importing npm packages
  */
-import { Inject, Dispatcher } from '@shadow-library/app';
+import { type JsonObject } from 'type-fest';
+
+import { Dispatcher, Inject } from '@shadow-library/app';
 import { ContextService, FastifyRouter, Get, HttpController, Query } from '@shadow-library/fastify';
 
 /**
@@ -11,6 +13,15 @@ import { ContextService, FastifyRouter, Get, HttpController, Query } from '@shad
 /**
  * Defining types
  */
+
+export interface RouteResponse {
+  message: string;
+  rid: string;
+}
+
+export interface UnifiedRouteResponse extends RouteResponse {
+  results: JsonObject[];
+}
 
 /**
  * Declaring the constants
@@ -24,27 +35,27 @@ export class RoutesController {
   ) {}
 
   @Get('/hello')
-  getHello() {
+  getHello(): RouteResponse {
     const rid = this.contextService.getRID();
     return { message: 'Hello World!', rid };
   }
 
   @Get('/welcome')
-  getWelcome() {
+  getWelcome(): RouteResponse {
     const rid = this.contextService.getRID();
     return { message: 'Welcome to Fastify with Shadow!', rid };
   }
 
   @Get('/greet')
-  getGreet(@Query() params: Record<string, any>) {
+  getGreet(@Query() params: Record<string, any>): RouteResponse {
     const rid = this.contextService.getRID();
     return { message: `Hello, ${params.name ?? 'stranger'}!`, rid };
   }
 
   @Get('/unified')
-  async unifiedRoute(@Query() query: Record<string, any>) {
+  async unifiedRoute(@Query() query: Record<string, any>): Promise<UnifiedRouteResponse> {
     const rid = this.contextService.getRID();
-    const results: object[] = [];
+    const results: JsonObject[] = [];
     for (const route of query.routes?.split(',') ?? []) {
       const childRouteResult = await this.fastifyRouter.resolveChildRoute(route);
       results.push(childRouteResult);

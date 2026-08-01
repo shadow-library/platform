@@ -6,16 +6,23 @@
   "description": "description",
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "bun run tsc",
     "test": "bun test",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "dev": "bun run --watch src/main.ts",
     "dev:worker": "bun run --watch src/worker.ts",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
-    "db:create-template": "bun run scripts/create-template-db.ts",
-    "check-migrations": "bun ../../scripts/src/bin/shadow.ts check-migrations"
+    "db:create-template": "bun run scripts/create-template-db.ts"
+  },
+  "shadow": {
+    "entries": [
+      "src/worker.ts",
+      "src/migrate.ts"
+    ],
+    "assets": [
+      "generated/drizzle",
+      "public"
+    ]
   },
   "repository": {
     "type": "git",

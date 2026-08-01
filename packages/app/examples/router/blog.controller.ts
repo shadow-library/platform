@@ -1,9 +1,8 @@
 /**
  * Importing npm packages
  */
-import { utils } from '@shadow-library/common';
-
 import { Controller, Handler } from '@shadow-library/app';
+import { utils } from '@shadow-library/common';
 
 /**
  * Importing user defined packages

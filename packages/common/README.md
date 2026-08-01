@@ -139,18 +139,19 @@ client.
 2. **One `static readonly` entry per failure, built with a category factory** — never `new ErrorCode(...)`.
    The factory encodes the status and the exposure:
 
-   | Factory            | Status | When to use                                       | Shown to client? |
-   | ------------------ | ------ | ------------------------------------------------- | ---------------- |
-   | `badRequest`       | 400    | malformed input or business-rule violation        | yes              |
-   | `unauthenticated`  | 401    | no established identity                            | yes              |
-   | `forbidden`        | 403    | identity lacks the required privilege              | yes              |
-   | `notFound`         | 404    | resource or identifier does not exist              | yes              |
-   | `conflict`         | 409    | conflicts with the current state of the resource   | yes              |
-   | `validation`       | 422    | syntactically valid but violates data constraints  | yes              |
-   | `unavailable`      | 503    | a dependency failed transiently (retryable)        | yes              |
-   | `internal`         | 500    | a defect or broken invariant                       | **no — masked**  |
+   | Factory           | Status | When to use                                       | Shown to client? |
+   | ----------------- | ------ | ------------------------------------------------- | ---------------- |
+   | `badRequest`      | 400    | malformed input or business-rule violation        | yes              |
+   | `unauthenticated` | 401    | no established identity                           | yes              |
+   | `forbidden`       | 403    | identity lacks the required privilege             | yes              |
+   | `notFound`        | 404    | resource or identifier does not exist             | yes              |
+   | `conflict`        | 409    | conflicts with the current state of the resource  | yes              |
+   | `validation`      | 422    | syntactically valid but violates data constraints | yes              |
+   | `unavailable`     | 503    | a dependency failed transiently (retryable)       | yes              |
+   | `internal`        | 500    | a defect or broken invariant                      | **no — masked**  |
 
    Pass a trailing status argument only for outliers the factory name still fits (`badRequest(code, msg, 429)`).
+
 3. **Code strings are `UPPER_SNAKE_CASE`, semantic, and unique.** `USER_NOT_FOUND`, `EMAIL_ALREADY_EXISTS` —
    a reader knows what happened from the code alone. Never opaque codes like `S001`. The static property name
    and the code string are identical.
@@ -229,17 +230,18 @@ load-bearing: it drives env-var naming and prefix subscriptions.
    Config.load('db.url', { isProdRequired: true });
    Config.load('db.pool.max', { validateType: 'integer', defaultValue: '10' });
    ```
+
 6. **Any prefix is subscribable.** Because keys are hierarchical, `Config.subscribe('db', cb)` fires for
    every `db.*` change, while `Config.subscribe('db.pool.max', cb)` fires only for that key.
 
-| Config key        | Env var (derived)      | Example type                          |
-| ----------------- | ---------------------- | ------------------------------------- |
-| `app.env`         | `NODE_ENV` (override)  | `development \| production \| test`   |
-| `app.name`        | `APP_NAME`             | `string`                              |
-| `log.level`       | `LOG_LEVEL`            | `silly \| debug \| http \| info \| …` |
-| `log.dir`         | `LOG_DIR`              | `string`                              |
-| `db.url`          | `DB_URL`               | `string`                              |
-| `db.pool.max`     | `DB_POOL_MAX`          | `number`                              |
+| Config key    | Env var (derived)     | Example type                          |
+| ------------- | --------------------- | ------------------------------------- |
+| `app.env`     | `NODE_ENV` (override) | `development \| production \| test`   |
+| `app.name`    | `APP_NAME`            | `string`                              |
+| `log.level`   | `LOG_LEVEL`           | `silly \| debug \| http \| info \| …` |
+| `log.dir`     | `LOG_DIR`             | `string`                              |
+| `db.url`      | `DB_URL`              | `string`                              |
+| `db.pool.max` | `DB_POOL_MAX`         | `number`                              |
 
 ---
 

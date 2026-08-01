@@ -114,7 +114,9 @@ export default function Topbar(): React.JSX.Element {
   const logout = useLogoutMutation();
   const projectQuery = useProjectQuery(novelId ?? '', inProject);
   const projectsQuery = useListProjectsQuery({ limit: 50 });
-  const projects = projectsQuery.data?.items ?? [];
+  // Memoized so identity is stable across renders where the query data hasn't changed — otherwise the
+  // `?? []` fallback mints a new array every render and defeats the `commands` useMemo below it.
+  const projects = useMemo(() => projectsQuery.data?.items ?? [], [projectsQuery.data]);
 
   const crumbRoot = inProject && projectQuery.data ? projectTitle(projectQuery.data) : 'Projects';
   const leafSegment = pathname.split('/').filter(Boolean).pop();

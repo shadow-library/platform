@@ -77,6 +77,9 @@ jobs:
           for d in apps/*/; do ALL_WORKSPACES+=("apps/$(basename "$d")"); done
           for d in packages/*/; do ALL_WORKSPACES+=("packages/$(basename "$d")"); done
           ALL_WORKSPACES+=("e2e")
+          # Not a workspace -- the root tooling (scripts/ + the root configs), which `verify.ts` accepts
+          # as a target so the thing that verifies everything else is itself format/lint/type-checked.
+          ALL_WORKSPACES+=("scripts")
 
           # ---------------------------------------------------------------
           # 3. Apply the affected-path rules:
@@ -92,7 +95,7 @@ jobs:
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
-                packages/*|scripts/*|package.json|bun.lock|tsconfig.base.json|.prettierrc.json|.github/workflows/ci.yml)
+                packages/*|scripts/*|package.json|bun.lock|tsconfig.base.json|tsconfig.json|tsconfig.web.json|.prettierrc.json|eslint.config.ts|eslint-plugins.d.ts|commitlint.config.ts|.github/workflows/ci.yml)
                   AFFECTS_ALL=true
                   ;;
                 apps/*)
@@ -120,7 +123,7 @@ jobs:
           # 4. Per-workspace CI metadata mined from the old imported
           #    workflows — service needs and extra steps. Anything not
           #    listed here (every other app, every package, e2e) is a plain
-          #    `bun run verify` + `bun run build` with no services.
+          #    verify + build with no services.
           #
           #    Deliberately structural-only (workspace path + booleans) —
           #    no env var *values* here. A first version put the mined env
@@ -283,37 +286,33 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # `bun run --filter` has no pnpm-style `<workspace>...` dependency-closure selector (verified
-      # against Bun's docs — `--filter` is a plain name/path glob). It does, however, "automatically
-      # respect package dependency order" for whatever it matches, so building every package in one
-      # shot is both correct (every consumer's `workspace:*` import resolves to a real `dist/`) and
-      # simpler than computing each workspace's transitive dependency subset by hand.
-      - name: Build workspace dependencies (packages/*)
-        run: bun run --filter './packages/*' build
+      # `--deps` builds exactly this workspace's transitive `workspace:*` closure, in dependency order --
+      # the selector bun's `--filter` doesn't offer, which previously forced building every package.
+      - name: Build workspace dependencies
+        if: matrix.workspace != 'scripts'
+        run: bun scripts/build.ts ${{ matrix.workspace }} --deps
 
       # Standardized across every backend (the old identity-server workflow was the only one that
       # ran this) — cheap, and it catches an uncommitted `drizzle-kit generate` output the same way
       # everywhere.
       - name: Check migrations
         if: matrix.checkMigrations
-        working-directory: ${{ matrix.workspace }}
-        run: bun run check-migrations
+        run: bun scripts/check-migrations.ts ${{ matrix.workspace }}
 
       - name: Create template database
         if: matrix.createTemplateDb
         working-directory: ${{ matrix.workspace }}
         run: bun run db:create-template
 
-      # `shadow verify` = format + lint + type-check + test (test only where `.shadowrc.json`
-      # wires it — off for the three web apps whose "test" is a Playwright e2e suite, and for
-      # packages/ui's storybook interaction/a11y project; both are out of scope for this phase).
+      # verify = format + lint + type-check + test. The test step runs only where the workspace opts in:
+      # off by convention for the web apps whose "test" is a Playwright e2e suite (and for e2e itself),
+      # re-enabled via `"shadow": { "verifyTest": true }` where that convention doesn't hold.
       - name: Verify
-        working-directory: ${{ matrix.workspace }}
-        run: bun run verify
+        run: bun scripts/verify.ts ${{ matrix.workspace }}
 
       - name: Build
-        working-directory: ${{ matrix.workspace }}
-        run: bun run build
+        if: matrix.workspace != 'scripts'
+        run: bun scripts/build.ts ${{ matrix.workspace }}
 
   # Single required-status-check target. A matrix job with zero legs (nothing affected) reports
   # as "skipped", not "success" — a required check pinned directly to `verify` would then hang

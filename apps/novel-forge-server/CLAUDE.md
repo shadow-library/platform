@@ -29,8 +29,6 @@ Read the doc section referenced by the current task before writing code; do not 
 ```bash
 bun run dev                 # watch-mode server (src/main.ts)
 bun run type-check          # tsc, no emit
-bun run verify              # shadow verify: format + lint + type-check + test (add --fix to autofix)
-bun run build               # shadow build: bundle to dist/main.js
 bun test                    # all tests (bunfig.toml enforces 90% coverage)
 bun test tests/foo.spec.ts  # single file
 bun test -t "pattern"       # single test by name
@@ -39,6 +37,10 @@ bun run db:migrate          # apply migrations (src/migrate.ts)
 bun run db:create-template  # build the template DB the test suite clones
 bun run db:seed             # seed local data
 bun run ai:smoke            # AI smoke check (scripts/ai-smoke.ts)
+
+# from the repo root, by workspace path — this workspace has no build/verify script:
+bun scripts/verify.ts apps/novel-forge-server              # format + lint + type-check + test (add --fix to autofix)
+bun scripts/build.ts apps/novel-forge-server                # bundle to dist/main.js
 ```
 
 ## Architecture & conventions
@@ -62,7 +64,7 @@ Work strictly in checklist order — each task assumes the ones above it. One se
 1. Read this checklist; pick the **first unchecked task**.
 2. Read its referenced doc section(s) fully.
 3. Implement only that task. If it's too large for one session, finish a coherent sub-step and note remaining work under the checkbox.
-4. Verify green: `bun run verify`.
+4. Verify green: `bun scripts/verify.ts apps/novel-forge-server` (run from the repo root).
 5. Tick the checkbox here (and remove any progress note if done), then commit everything with a conventional message.
 
 **Checklist** (M = migration doc §10, A = ai-system-design §10, R = interactive-refinement-design):

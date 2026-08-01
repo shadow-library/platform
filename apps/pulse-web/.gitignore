@@ -1,20 +1,7 @@
-node_modules
-.DS_Store
-dist
+# Vite SSR build output / local overrides
 dist-ssr
 *.local
-count.txt
-.env
-.nitro
-.tanstack
-.wrangler
 
-# Playwright
-/test-results/
-/playwright-report/
-/blob-report/
-/playwright/.cache/
-/playwright/.auth/
-
-# Generated
+# Bundle analysis (rollup-plugin-visualizer)
 stats.html
+count.txt

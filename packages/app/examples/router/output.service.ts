@@ -17,8 +17,9 @@ import { Injectable } from '@shadow-library/app';
 
 @Injectable()
 export class OutputService {
+  /** This example is a standalone demo program, so its output is written straight to the stream rather than through a real logger. */
   private log(message: string): void {
-    console.log(message); // eslint-disable-line no-console
+    process.stdout.write(`${message}\n`);
   }
 
   print(message: string): void {

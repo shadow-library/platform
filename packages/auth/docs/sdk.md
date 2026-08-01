@@ -2,7 +2,7 @@
 
 |                  |                                                                                                                                                                              |
 | :--------------- | :--------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Status**       | v1.1 implemented in the SDK (A-1 … A-9); integration against a server carrying T-801/T-805/T-806/T-807 still outstanding                                                      |
+| **Status**       | v1.1 implemented in the SDK (A-1 … A-9); integration against a server carrying T-801/T-805/T-806/T-807 still outstanding                                                     |
 | **Version**      | 1.1.0 (spec)                                                                                                                                                                 |
 | **Last updated** | 2026-07-25                                                                                                                                                                   |
 | **Repository**   | this repository — originally developed inside `identity-server` as the workspace package `packages/auth`, since extracted so consumers version the SDK independently (§11.1) |
@@ -38,23 +38,23 @@ export { createTestIdP } from '@shadow-library/auth/testing';
 
 Steady-state configuration is **three settings** (D-21, architecture §8.6):
 
-| Env variable                 | Config                 | Meaning                                                                        |
-| :--------------------------- | :--------------------- | :----------------------------------------------------------------------------- |
-| `AUTH_ISSUER`                | `issuer`               | Identity base URL; discovery from `{issuer}/.well-known/openid-configuration`   |
-| `AUTH_APP_ID`                | `appId`                | This application's id at identity; also the OAuth client id unless overridden   |
-| `AUTH_CLIENT_ASSERTION_PATH` | `client.assertionPath` | Path to a projected k8s SA token — the in-cluster credential                    |
-| `AUTH_CLIENT_SECRET`         | `client.secret`        | Static secret (`client_secret_basic`) — the credential outside the cluster      |
-| `AUTH_CLIENT_ID`             | `client.id`            | Only when the OAuth client id differs from the app id                           |
+| Env variable                 | Config                 | Meaning                                                                       |
+| :--------------------------- | :--------------------- | :---------------------------------------------------------------------------- |
+| `AUTH_ISSUER`                | `issuer`               | Identity base URL; discovery from `{issuer}/.well-known/openid-configuration` |
+| `AUTH_APP_ID`                | `appId`                | This application's id at identity; also the OAuth client id unless overridden |
+| `AUTH_CLIENT_ASSERTION_PATH` | `client.assertionPath` | Path to a projected k8s SA token — the in-cluster credential                  |
+| `AUTH_CLIENT_SECRET`         | `client.secret`        | Static secret (`client_secret_basic`) — the credential outside the cluster    |
+| `AUTH_CLIENT_ID`             | `client.id`            | Only when the OAuth client id differs from the app id                         |
 
 Everything else identity already stores is **derived** and refreshed on a TTL (`AUTH_APP_REFRESH_SECONDS`, default 300 s):
 
-| Derived value                     | Source                                    |
-| :-------------------------------- | :---------------------------------------- |
-| audience (`aud` this API accepts) | `GET /api/v1/apps/me` → `audience`        |
-| browser redirect URI              | `GET /api/v1/apps/me` → `redirectUris`    |
-| requested scopes                  | `GET /api/v1/apps/me` → `scopes`          |
-| step-up endpoint                  | discovery → `step_up_endpoint`            |
-| app-session endpoint              | discovery → `app_session_endpoint`        |
+| Derived value                     | Source                                 |
+| :-------------------------------- | :------------------------------------- |
+| audience (`aud` this API accepts) | `GET /api/v1/apps/me` → `audience`     |
+| browser redirect URI              | `GET /api/v1/apps/me` → `redirectUris` |
+| requested scopes                  | `GET /api/v1/apps/me` → `scopes`       |
+| step-up endpoint                  | discovery → `step_up_endpoint`         |
+| app-session endpoint              | discovery → `app_session_endpoint`     |
 
 `AUTH_AUDIENCE`, `AUTH_REDIRECT_URI`, `AUTH_SCOPES` and `AUTH_STEP_UP_URL` are **removed**, not deprecated: a stale value in a deploy silently overriding what identity says is worse than having no override. The escape hatch is code — `audience` on the client, `browser: { redirectUri, scopes, stepUpUrl }` on the module — where it is visible and reviewed.
 
@@ -80,7 +80,7 @@ AuthModule.forRoot({
 });
 ```
 
-Config is validated at startup; a missing app id in production is a boot failure, and so is a first registration resolve that fails or answers for a different application (a credential provisioned elsewhere would otherwise boot and then reject every token addressed to it). A *later* refresh failure keeps the last good registration — an identity outage must not change which tokens a service accepts. `AuthClient` also refuses to construct with neither an explicit `audience` nor a credential to derive one with.
+Config is validated at startup; a missing app id in production is a boot failure, and so is a first registration resolve that fails or answers for a different application (a credential provisioned elsewhere would otherwise boot and then reject every token addressed to it). A _later_ refresh failure keeps the last good registration — an identity outage must not change which tokens a service accepts. `AuthClient` also refuses to construct with neither an explicit `audience` nor a credential to derive one with.
 
 ### 2.2 Client authentication: projected SA token or secret
 

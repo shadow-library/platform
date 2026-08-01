@@ -44,7 +44,7 @@ These were decided by the maintainer and take precedence over the defaults inher
 13. **New-novel creation → high-level brief → full lore-bible generation (§8.7).** After a `new_novel` project is created, the user is prompted for a **high-level description of what the novel is about**. From that single brief the system **generates the entire lore bible** (vision, world, power system, plot, primary characters, factions, locations, and a draft Volume plan) — everything `status: draft`/`planned`. The user then **edits any section** via the bible CRUD endpoints (§7.3) to align it to their needs. This is a from-scratch variant of the source-based `newnovel`; the raw brief is stored on `projects.brief`.
 14. **Novel settings — reassign any operation's model at any time, except Grok-locked ones.** A project's per-role model config (§8.0) is editable anytime via `PATCH /projects/:id` (`config`) and takes effect on the next operation, so any operation's model can be A/B'd live. The exception: a `grok_only` project (and the grok-interlude operations, §8.6) are **locked to xAI** — attempting to reassign them off `xai` is rejected `AI_003`.
 15. **Clone a novel into another (§7.1) for model A/B testing.** `POST /projects/:id/clone` deep-copies a project so the **same input** can be run through **different models** and the outputs compared. Default `resetDerived: true` copies only the inputs (source chapters + cursor, or the authored bible + brief) and drops derived data (extracted knowledge, drafts, generated chapters, embeddings, reports); each clone then regenerates cleanly under its own `config`.
-16. **Single "Volume" planning unit (rename + flatten `arc` → `Volume`).** The Python app plans in a two-tier volume→arc hierarchy, which is confusing. **The target uses ONE planning/generation unit called a `Volume`** — it is the Python "arc" renamed, and the old grouping "volume" tier is removed. A Volume owns a contiguous block of chapters (`chapters_per_volume`, default 5), carries objective/conflict/payoff/ordinal/cast/status/body, and gates generation via `draft → approved`. Everywhere the source said "arc" the target says "Volume": table `volumes` (was `arcs`), `volumeKey` (was `arcKey`), `/volumes` routes, `chapters_per_volume`. **Exception:** a *character arc* (a character's development journey, e.g. `skeletonCharacterArcs`) keeps that name — it is standard, unrelated to plot structure. §2 documents the source's original volume/arc terms faithfully; §5–§8 use the flattened `Volume`. **Amended by `docs/interactive-refinement-design.md` §2.1:** Volume remains the top planning tier, but an `Arc` sub-tier (new semantics, not the Python arc) is reinstated inside volumes, and chapter→volume layout becomes cumulative per-volume `targetChapterCount` instead of a global `chapters_per_volume`.
+16. **Single "Volume" planning unit (rename + flatten `arc` → `Volume`).** The Python app plans in a two-tier volume→arc hierarchy, which is confusing. **The target uses ONE planning/generation unit called a `Volume`** — it is the Python "arc" renamed, and the old grouping "volume" tier is removed. A Volume owns a contiguous block of chapters (`chapters_per_volume`, default 5), carries objective/conflict/payoff/ordinal/cast/status/body, and gates generation via `draft → approved`. Everywhere the source said "arc" the target says "Volume": table `volumes` (was `arcs`), `volumeKey` (was `arcKey`), `/volumes` routes, `chapters_per_volume`. **Exception:** a _character arc_ (a character's development journey, e.g. `skeletonCharacterArcs`) keeps that name — it is standard, unrelated to plot structure. §2 documents the source's original volume/arc terms faithfully; §5–§8 use the flattened `Volume`. **Amended by `docs/interactive-refinement-design.md` §2.1:** Volume remains the top planning tier, but an `Arc` sub-tier (new semantics, not the Python arc) is reinstated inside volumes, and chapter→volume layout becomes cumulative per-volume `targetChapterCount` instead of a global `chapters_per_volume`.
 17. **Web-novel only, in very simple English (§8.0).** Every prose-authoring model call (generation, revision, auto-fix, outline, newnovel, plan, and the bible-builder) carries a global directive: produce **web-novel-style** content only, and write in **very easy-to-understand English** — short sentences, common everyday words, minimal jargon or archaic phrasing — so it reads clearly for a broad, non-native-English audience. This is prepended to the authoring system prompts (not the analytical extract/judge/validate prompts, which reason over text rather than write prose).
 
 ---
@@ -99,42 +99,42 @@ data/models.yml          the model registry (kind + prices), keyed by provider/m
 - **Project** — one novel + everything derived, isolated under `projects/<name>/`. Two kinds:
   - **source project** — an existing novel scraped and understood; knowledge in SQLite.
   - **new-novel project** — an original novel written; canon is the Markdown bible; SQLite holds runtime state (finalized chapters, summaries, jobs).
-  A project is detected as new-novel iff `bible/` exists (`bible.exists()`); otherwise source.
+    A project is detected as new-novel iff `bible/` exists (`bible.exists()`); otherwise source.
 - **Resumable by construction** — a scrape cursor, an idempotent `job` queue, upsert-by-key writes, and draft-file presence mean any command re-runs from the last completed unit without duplicating.
-- **Role-routed AI** — every model call asks for work by *role* (`extraction`, `analysis`, `planning`, `generation`, `validation`, `review`, `classification`, `embedding`, `retrieval`, `illustration`); `config.yml` maps role → `provider/model`.
+- **Role-routed AI** — every model call asks for work by _role_ (`extraction`, `analysis`, `planning`, `generation`, `validation`, `review`, `classification`, `embedding`, `retrieval`, `illustration`); `config.yml` maps role → `provider/model`.
 
 ### 2.3 CLI commands (complete — none may be skipped)
 
 `--project/-p` (env fallback `$LORE_FORGE_PROJECT`) is implied on all; `--model/-M role=provider/model` (repeatable) overrides a role for one run; global `-v` raises log level.
 
-| Command | Model roles | What it does |
-|---|---|---|
-| `init -u URL` / `init -t TITLE` | none | With `--url`: route to a source adapter, persist source + cursor at ch 1 (source project). Without: scaffold the Markdown bible (new-novel). |
-| `ingest -n N --concurrency --delay-ms` | none | Scrape chapters from the cursor forward; clean HTML→Markdown; store in SQLite; enqueue an extract job each. Resumable. |
-| `extract -n N -r` | extraction, embedding | Drain the extract queue: per chapter → structured knowledge → atomic upsert → best-effort embed. `-r` re-arms parked chapters. Auto-runs `consolidate` at the end. |
-| `consolidate -S N -R N` | none | Recompute entity significance (recurrence) + rebuild lore relationships from staged observations. Deterministic, idempotent. |
-| `assets -w NAME` | none | Render SQLite knowledge → Markdown under `knowledge/` (source projects only). |
-| `skeleton` | analysis | Reverse-engineer a source's volume/arc + character-role + power-curve *shape* (abstracted from names/world). |
-| `newnovel -s SRC -i INSTR` | analysis | Seed a new-novel bible (premise/world/primary characters) from a source digest + instructions. Creates the target project + scaffold. |
-| `plan` | planning | Draft the volume/arc plan into `06_Arcs/*.md` (`status: draft`), optionally mirroring a source skeleton. |
-| `approve` | none | Flip every arc's frontmatter `status` → `approved`. The generation gate. |
-| `outline -n -s -g CTX` | planning | Draft per-chapter briefs (purpose/beats/constraints) for a batch into `briefs/`. Author edits them; `generate` expands. |
-| `generate -n N -a --max-fixes` | generation, validation, retrieval, classification | Draft the next chapters to `drafts/`. Judge each; on `[HARD]` contradiction **stop** (interactive) or **auto-fix** (`-a`) and continue. |
-| `revise -c N -m NOTE` | generation, validation, retrieval | Rewrite a draft to feedback; bump revision; re-judge. |
-| `judge -c N` | validation, retrieval | Re-check draft(s) for contradictions; record verdict in frontmatter. |
-| `finalize -c N` | analysis, embedding | Commit reviewed draft(s) to canon (in order): store prose, embed, continuity write-back (planned→active, register new chars, update trackers), advance story-state cursor. |
-| `prompt -c N` | none (retrieval if vectors) | Export chapter N's full canon-aware generation prompt to `handoff/` for an external AI. No generation call. |
-| `import -c N -f FILE -t -s` | none | Bring external prose in as a draft (verbatim), re-entering judge/finalize. |
-| `illustrate -e ID -i -no-chat` | illustration | Generate an entity image (Gemini), refine in a chat loop, store to `images/` + write `image:` frontmatter pointer. |
-| `validate` | validation | Whole-novel consistency sweep vs. canon + summaries → `validation_report` (scope novel). |
-| `review -c N` | review | Score one finalized chapter across 7 dimensions → `validation_report` (scope chapter). |
-| `backfill` | embedding | Embed finalized chapters whose prose vectors are missing. Idempotent. |
-| `export` | none | Stitch finalized chapters → `manuscript.md`. |
-| `resume` | extraction, embedding | `ingest` to completion, then drain the extract queue. |
-| `cost -g N` | none | Estimate per-role token volume + compare every priced registry model. |
-| `status` | none | Progress: source (scrape/extract/knowledge tallies) or new-novel (bible completeness, plan gate, drafts/finalized, validation). |
-| `reset -s STAGE -y` | none | DANGEROUS. Roll back a stage's derived data (extract/plan/generate/all); keeps ingested chapters (source) or the authored bible (new-novel). |
-| `browse` | none for reading | Local Flask web UI. **OUT OF SCOPE** — the whole API replaces it. |
+| Command                                | Model roles                                       | What it does                                                                                                                                                               |
+| -------------------------------------- | ------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `init -u URL` / `init -t TITLE`        | none                                              | With `--url`: route to a source adapter, persist source + cursor at ch 1 (source project). Without: scaffold the Markdown bible (new-novel).                               |
+| `ingest -n N --concurrency --delay-ms` | none                                              | Scrape chapters from the cursor forward; clean HTML→Markdown; store in SQLite; enqueue an extract job each. Resumable.                                                     |
+| `extract -n N -r`                      | extraction, embedding                             | Drain the extract queue: per chapter → structured knowledge → atomic upsert → best-effort embed. `-r` re-arms parked chapters. Auto-runs `consolidate` at the end.         |
+| `consolidate -S N -R N`                | none                                              | Recompute entity significance (recurrence) + rebuild lore relationships from staged observations. Deterministic, idempotent.                                               |
+| `assets -w NAME`                       | none                                              | Render SQLite knowledge → Markdown under `knowledge/` (source projects only).                                                                                              |
+| `skeleton`                             | analysis                                          | Reverse-engineer a source's volume/arc + character-role + power-curve _shape_ (abstracted from names/world).                                                               |
+| `newnovel -s SRC -i INSTR`             | analysis                                          | Seed a new-novel bible (premise/world/primary characters) from a source digest + instructions. Creates the target project + scaffold.                                      |
+| `plan`                                 | planning                                          | Draft the volume/arc plan into `06_Arcs/*.md` (`status: draft`), optionally mirroring a source skeleton.                                                                   |
+| `approve`                              | none                                              | Flip every arc's frontmatter `status` → `approved`. The generation gate.                                                                                                   |
+| `outline -n -s -g CTX`                 | planning                                          | Draft per-chapter briefs (purpose/beats/constraints) for a batch into `briefs/`. Author edits them; `generate` expands.                                                    |
+| `generate -n N -a --max-fixes`         | generation, validation, retrieval, classification | Draft the next chapters to `drafts/`. Judge each; on `[HARD]` contradiction **stop** (interactive) or **auto-fix** (`-a`) and continue.                                    |
+| `revise -c N -m NOTE`                  | generation, validation, retrieval                 | Rewrite a draft to feedback; bump revision; re-judge.                                                                                                                      |
+| `judge -c N`                           | validation, retrieval                             | Re-check draft(s) for contradictions; record verdict in frontmatter.                                                                                                       |
+| `finalize -c N`                        | analysis, embedding                               | Commit reviewed draft(s) to canon (in order): store prose, embed, continuity write-back (planned→active, register new chars, update trackers), advance story-state cursor. |
+| `prompt -c N`                          | none (retrieval if vectors)                       | Export chapter N's full canon-aware generation prompt to `handoff/` for an external AI. No generation call.                                                                |
+| `import -c N -f FILE -t -s`            | none                                              | Bring external prose in as a draft (verbatim), re-entering judge/finalize.                                                                                                 |
+| `illustrate -e ID -i -no-chat`         | illustration                                      | Generate an entity image (Gemini), refine in a chat loop, store to `images/` + write `image:` frontmatter pointer.                                                         |
+| `validate`                             | validation                                        | Whole-novel consistency sweep vs. canon + summaries → `validation_report` (scope novel).                                                                                   |
+| `review -c N`                          | review                                            | Score one finalized chapter across 7 dimensions → `validation_report` (scope chapter).                                                                                     |
+| `backfill`                             | embedding                                         | Embed finalized chapters whose prose vectors are missing. Idempotent.                                                                                                      |
+| `export`                               | none                                              | Stitch finalized chapters → `manuscript.md`.                                                                                                                               |
+| `resume`                               | extraction, embedding                             | `ingest` to completion, then drain the extract queue.                                                                                                                      |
+| `cost -g N`                            | none                                              | Estimate per-role token volume + compare every priced registry model.                                                                                                      |
+| `status`                               | none                                              | Progress: source (scrape/extract/knowledge tallies) or new-novel (bible completeness, plan gate, drafts/finalized, validation).                                            |
+| `reset -s STAGE -y`                    | none                                              | DANGEROUS. Roll back a stage's derived data (extract/plan/generate/all); keeps ingested chapters (source) or the authored bible (new-novel).                               |
+| `browse`                               | none for reading                                  | Local Flask web UI. **OUT OF SCOPE** — the whole API replaces it.                                                                                                          |
 
 ### 2.4 Core workflows
 
@@ -163,6 +163,7 @@ data/models.yml          the model registry (kind + prices), keyed by provider/m
 `project`(singleton), `source_novel`(singleton), `novel_spec`(LEGACY, unused — **drop**), `volume`, `arc`, `story_skeleton`(singleton), `scrape_cursor`(singleton), `chapter`, `entity`, `entity_alias`, `entity_relationship`(promoted), `entity_appearance`(recurrence ledger), `relationship_observation`(staged), `beat`, `plot_thread`, `chapter_summary`, `world_fact`, `mystery`, `job`, `extraction_run`, `validation_report`.
 
 Key idempotency rules (in `repo.py`) that MUST carry over:
+
 - `upsert_entity` **merges** `attributes` JSON across chapters and keeps the **min** `first_seen_chapter`; aliases are insert-or-ignore.
 - `upsert_*` everywhere is ON CONFLICT DO UPDATE with `COALESCE` to avoid clobbering existing non-null fields (e.g. thread `opened_chapter` keeps first, `closed_chapter` takes latest).
 - `add_appearance` / `add_relationship_observation` are insert-or-ignore per (entity, chapter) / (entity, target, kind, chapter).
@@ -182,7 +183,7 @@ Key idempotency rules (in `repo.py`) that MUST carry over:
 
 ### 2.8 AI workflows (see §8 for the full migration table)
 
-Every AI call goes through `ModelRouter` (`llm/registry.py`): resolve role→adapter/model, trace request *before* the call, retry transient failures (HTTP 408/429/5xx, connection/timeout names) with exponential backoff (`RetryConfig`: attempts 4, backoff 1s→30s), tolerant JSON extraction (`_extract_json` scans the first balanced `{...}`), raise `ModelResponseError` on unparseable JSON (permanent, never retried). Structured output uses provider-native tool-use (Anthropic) or prompt-directive JSON (Ollama). Prompts + JSON schemas are all in `llm/prompts.py`.
+Every AI call goes through `ModelRouter` (`llm/registry.py`): resolve role→adapter/model, trace request _before_ the call, retry transient failures (HTTP 408/429/5xx, connection/timeout names) with exponential backoff (`RetryConfig`: attempts 4, backoff 1s→30s), tolerant JSON extraction (`_extract_json` scans the first balanced `{...}`), raise `ModelResponseError` on unparseable JSON (permanent, never retried). Structured output uses provider-native tool-use (Anthropic) or prompt-directive JSON (Ollama). Prompts + JSON schemas are all in `llm/prompts.py`.
 
 ### 2.9 Config / environment
 
@@ -196,7 +197,7 @@ Every AI call goes through `ModelRouter` (`llm/registry.py`): resolve role→ada
 ### 2.11 Risks / confusing areas (read before implementing)
 
 1. **Two project shapes share tables.** Source-project knowledge (SQLite) and new-novel canon (Markdown) overlap heavily (both have entities, arcs, threads…). The target must unify them into one relational model keyed by `project_id`, distinguished by `project.kind` and entity `origin`. Get this right or the schema fragments.
-2. **The generation brief is the crown jewel.** `generation._brief` assembles a *serial, budgeted, anti-branching* context (story-so-far summaries + established facts under a char budget, previous-chapter verbatim tail, continuation `state`, active/planned cast split, retrieval snippets). Porting it faithfully is what keeps bulk-drafted chapters on one timeline. Do not simplify.
+2. **The generation brief is the crown jewel.** `generation._brief` assembles a _serial, budgeted, anti-branching_ context (story-so-far summaries + established facts under a char budget, previous-chapter verbatim tail, continuation `state`, active/planned cast split, retrieval snippets). Porting it faithfully is what keeps bulk-drafted chapters on one timeline. Do not simplify.
 3. **`[HARD]`/`[SOFT]` judge semantics.** `_parse_verdict`: `CONSISTENT` → clean; all-`[SOFT]` → consistent (notes kept); any `[HARD]` or untagged → contradiction (fail-closed). Auto-fix stops early when the judge repeats the same finding.
 4. **Continuation `state` is load-bearing and untrusted.** Model may return `state` as a non-dict; `_state_dict` degrades to `{}`. Patches must re-verify `state.time` (a stale field poisons every later brief).
 5. **Patch-first repair.** Auto-fix returns minimal find/replace edits; each `find` must occur exactly once or it falls back to a full rewrite. Byte-identical untouched prose is the correctness guarantee.
@@ -283,35 +284,35 @@ Present: the pulse template renamed — `main.ts`, `app.module.ts`, `bootstrap.t
 
 Legend risk: 🟢 mechanical · 🟡 needs care · 🔴 high (core logic / correctness).
 
-| Python (file · symbol) | Responsibility | Target module / file | Service / repo / controller | Notes | Risk |
-|---|---|---|---|---|---|
-| `cli.py` (Typer app) | Command surface | `modules/**/**.controller.ts` | all controllers | Each command → one or more REST endpoints (§7). No CLI. | 🟡 |
-| `project.py` `Project` | Per-project isolation, paths, conn | `modules/project/project.service.ts` + `projects` table | ProjectService | "Project" becomes a DB row; `project_id` FK everywhere. Paths (drafts/handoff/images) become tables/columns. | 🔴 |
-| `config.py` `Config`/registry | role→model map, tuning, models.yml | `modules/ai/model-registry.*` + `config.jsonb` on project + `bootstrap.ts` | ModelRegistryService, AiConfigService | Registry → a TS const (`ai/models.ts`). Per-project overrides → `projects.config` jsonb deep-merged over defaults. Keys via `Config.load`. | 🟡 |
-| `costing.py` | per-role cost estimate | `modules/ai/costing.service.ts` | CostingService | Pure function over registry + corpus stats. | 🟢 |
-| `storage/db.py`,`schema.sql`,`repo.py` | SQLite + all SQL | `database/schemas/*` + per-module services | DatabaseService (framework) | Reproduce every table + idempotent upsert semantics in Drizzle. | 🔴 |
-| `storage/vectors.py` (LanceDB) | prose-chunk embeddings + search | `modules/ai/retrieval.service.ts` (LlamaIndex + pgvector) | RetrievalService | `chapter_chunks` becomes a pgvector table; add/search/reset/embedded map over. | 🟡 |
-| `bible.py` | Markdown canon reader/writer + trackers | normalized tables (`entities`,`volumes`,`bible_documents`,`plot_threads`,…) + `modules/bible/*` | BibleService, entity/volume services | The biggest transform: frontmatter→columns, body→text, tracker tables→real tables. Arc→Volume (§1.1.16). | 🔴 |
-| `drafts.py` | draft files + STATUS/DRAFT_STATE | `drafts` table + `modules/generation/draft.service.ts` | DraftService | STATUS.md/DRAFT_STATE.md are derived views (a GET endpoint), not files. `state` → jsonb. | 🟡 |
-| `briefs.py` | outline briefs | `briefs` table + `modules/generation/brief.service.ts` | BriefService | | 🟢 |
-| `pipeline/acquire.py` | resumable scrape | `modules/source/acquire.service.ts` + `sources/*` | (ported, later removed) | Port fetcher + adapters + text cleaner; cursor→`projects` columns. Runs as a job. | 🔴 |
-| `sources/*` (adapters, text cleaner) | HTML→Markdown, site adapters | `modules/source/adapters/*`, `source/text-cleaner.ts` | (registry) | `text.py` is byte-sensitive — port with byte-level tests. | 🔴 |
-| `pipeline/extract.py` | queue drain → knowledge → embed | `modules/extraction/extraction.service.ts` (+ LangChain) | ExtractionService | Idempotent persist in a txn; enqueue via jobs. | 🔴 |
-| `pipeline/consolidate.py` | significance + relationship promotion | `modules/extraction/consolidate.service.ts` | ConsolidateService | Deterministic; port synonym/structural/symmetric/inverse maps verbatim. | 🟡 |
-| `pipeline/assets.py` | knowledge→Markdown | `modules/source/asset.service.ts` (returns Markdown string) | AssetService | Render on demand to a string/response, not files. | 🟢 |
-| `pipeline/skeleton.py` | reverse-engineer shape | `modules/planning/skeleton.service.ts` (LangChain) | SkeletonService | | 🟡 |
-| `pipeline/newnovel.py` | seed new-novel bible | `modules/planning/newnovel.service.ts` (LangChain) | NewNovelService | Writes normalized bible rows instead of Markdown. | 🟡 |
-| `pipeline/planning.py` | volume plan + approve | `modules/planning/planning.service.ts` (LangChain) | PlanningService | Single-tier `volumes` rows `status draft→approved` (arc→Volume, §1.1.16). | 🟡 |
-| `pipeline/generation.py` | draft/judge/auto-fix/revise/finalize/outline/handoff | `modules/generation/*` (LangGraph + LangChain) | GenerationService, JudgeService, FinalizeService, graph | The core. Auto-fix loop = LangGraph. Brief assembly = pure service. | 🔴 |
-| `pipeline/validation.py` | validate + review | `modules/validation/validation.service.ts` (LangChain) | ValidationService | Persist `validation_reports`. | 🟡 |
-| `pipeline/illustrate.py` | entity image + refine | `modules/illustration/illustration.service.ts` | IllustrationService | **OpenAI** image gen (was Gemini). Interactive loop → session (id + preview endpoints). Bytes persisted via the swappable `IMAGE_STORAGE` provider (local folder now). | 🟡 |
-| `pipeline/embeddings.py` | backfill | `modules/ai/retrieval.service.ts#backfill` | RetrievalService | | 🟢 |
-| `pipeline/manuscript.py` | stitch manuscript | `modules/generation/manuscript.service.ts` | ManuscriptService | Return assembled Markdown. | 🟢 |
-| `pipeline/scaffold.py` | copy bible templates | `modules/planning/scaffold.service.ts` | ScaffoldService | Seed default bible_documents rows for a new-novel project (no file copy). | 🟡 |
-| `llm/base.py`,`registry.py`,`adapters/*`,`prompts.py`,`trace.py` | provider-agnostic AI + retry + tracing | `modules/ai/*` (LangChain chat models, `ai/prompts/*`, `ai/schemas/*`) | ModelRouterService, ConcurrencyController | Router → resolve role to a LangChain `ChatModel`; providers: `anthropic`,`openai`,`ollama`,`anthropic-claude-code`,`openai-codex` (env/config-gated); retry via `withRetry`; trace → `extraction_runs`/logs; serialize per §9.2. | 🔴 |
-| `image storage` (new) | persist illustration bytes | `modules/storage/*` (`IMAGE_STORAGE` token, `ImageStorageProvider`, `LocalImageStorageProvider`) | ImageStorage (DI) | Swappable provider (local folder now, cloud later) — one module change to swap. | 🟡 |
-| `web/*` (Flask) | browse UI | — | — | OUT OF SCOPE. Replaced by the API + (future) a separate frontend. | — |
-| `logging_config.py` | structlog | framework `Logger` | — | Drop; use `@shadow-library/common` Logger. | 🟢 |
+| Python (file · symbol)                                           | Responsibility                                       | Target module / file                                                                             | Service / repo / controller                             | Notes                                                                                                                                                                                                                            | Risk |
+| ---------------------------------------------------------------- | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---- |
+| `cli.py` (Typer app)                                             | Command surface                                      | `modules/**/**.controller.ts`                                                                    | all controllers                                         | Each command → one or more REST endpoints (§7). No CLI.                                                                                                                                                                          | 🟡   |
+| `project.py` `Project`                                           | Per-project isolation, paths, conn                   | `modules/project/project.service.ts` + `projects` table                                          | ProjectService                                          | "Project" becomes a DB row; `project_id` FK everywhere. Paths (drafts/handoff/images) become tables/columns.                                                                                                                     | 🔴   |
+| `config.py` `Config`/registry                                    | role→model map, tuning, models.yml                   | `modules/ai/model-registry.*` + `config.jsonb` on project + `bootstrap.ts`                       | ModelRegistryService, AiConfigService                   | Registry → a TS const (`ai/models.ts`). Per-project overrides → `projects.config` jsonb deep-merged over defaults. Keys via `Config.load`.                                                                                       | 🟡   |
+| `costing.py`                                                     | per-role cost estimate                               | `modules/ai/costing.service.ts`                                                                  | CostingService                                          | Pure function over registry + corpus stats.                                                                                                                                                                                      | 🟢   |
+| `storage/db.py`,`schema.sql`,`repo.py`                           | SQLite + all SQL                                     | `database/schemas/*` + per-module services                                                       | DatabaseService (framework)                             | Reproduce every table + idempotent upsert semantics in Drizzle.                                                                                                                                                                  | 🔴   |
+| `storage/vectors.py` (LanceDB)                                   | prose-chunk embeddings + search                      | `modules/ai/retrieval.service.ts` (LlamaIndex + pgvector)                                        | RetrievalService                                        | `chapter_chunks` becomes a pgvector table; add/search/reset/embedded map over.                                                                                                                                                   | 🟡   |
+| `bible.py`                                                       | Markdown canon reader/writer + trackers              | normalized tables (`entities`,`volumes`,`bible_documents`,`plot_threads`,…) + `modules/bible/*`  | BibleService, entity/volume services                    | The biggest transform: frontmatter→columns, body→text, tracker tables→real tables. Arc→Volume (§1.1.16).                                                                                                                         | 🔴   |
+| `drafts.py`                                                      | draft files + STATUS/DRAFT_STATE                     | `drafts` table + `modules/generation/draft.service.ts`                                           | DraftService                                            | STATUS.md/DRAFT_STATE.md are derived views (a GET endpoint), not files. `state` → jsonb.                                                                                                                                         | 🟡   |
+| `briefs.py`                                                      | outline briefs                                       | `briefs` table + `modules/generation/brief.service.ts`                                           | BriefService                                            |                                                                                                                                                                                                                                  | 🟢   |
+| `pipeline/acquire.py`                                            | resumable scrape                                     | `modules/source/acquire.service.ts` + `sources/*`                                                | (ported, later removed)                                 | Port fetcher + adapters + text cleaner; cursor→`projects` columns. Runs as a job.                                                                                                                                                | 🔴   |
+| `sources/*` (adapters, text cleaner)                             | HTML→Markdown, site adapters                         | `modules/source/adapters/*`, `source/text-cleaner.ts`                                            | (registry)                                              | `text.py` is byte-sensitive — port with byte-level tests.                                                                                                                                                                        | 🔴   |
+| `pipeline/extract.py`                                            | queue drain → knowledge → embed                      | `modules/extraction/extraction.service.ts` (+ LangChain)                                         | ExtractionService                                       | Idempotent persist in a txn; enqueue via jobs.                                                                                                                                                                                   | 🔴   |
+| `pipeline/consolidate.py`                                        | significance + relationship promotion                | `modules/extraction/consolidate.service.ts`                                                      | ConsolidateService                                      | Deterministic; port synonym/structural/symmetric/inverse maps verbatim.                                                                                                                                                          | 🟡   |
+| `pipeline/assets.py`                                             | knowledge→Markdown                                   | `modules/source/asset.service.ts` (returns Markdown string)                                      | AssetService                                            | Render on demand to a string/response, not files.                                                                                                                                                                                | 🟢   |
+| `pipeline/skeleton.py`                                           | reverse-engineer shape                               | `modules/planning/skeleton.service.ts` (LangChain)                                               | SkeletonService                                         |                                                                                                                                                                                                                                  | 🟡   |
+| `pipeline/newnovel.py`                                           | seed new-novel bible                                 | `modules/planning/newnovel.service.ts` (LangChain)                                               | NewNovelService                                         | Writes normalized bible rows instead of Markdown.                                                                                                                                                                                | 🟡   |
+| `pipeline/planning.py`                                           | volume plan + approve                                | `modules/planning/planning.service.ts` (LangChain)                                               | PlanningService                                         | Single-tier `volumes` rows `status draft→approved` (arc→Volume, §1.1.16).                                                                                                                                                        | 🟡   |
+| `pipeline/generation.py`                                         | draft/judge/auto-fix/revise/finalize/outline/handoff | `modules/generation/*` (LangGraph + LangChain)                                                   | GenerationService, JudgeService, FinalizeService, graph | The core. Auto-fix loop = LangGraph. Brief assembly = pure service.                                                                                                                                                              | 🔴   |
+| `pipeline/validation.py`                                         | validate + review                                    | `modules/validation/validation.service.ts` (LangChain)                                           | ValidationService                                       | Persist `validation_reports`.                                                                                                                                                                                                    | 🟡   |
+| `pipeline/illustrate.py`                                         | entity image + refine                                | `modules/illustration/illustration.service.ts`                                                   | IllustrationService                                     | **OpenAI** image gen (was Gemini). Interactive loop → session (id + preview endpoints). Bytes persisted via the swappable `IMAGE_STORAGE` provider (local folder now).                                                           | 🟡   |
+| `pipeline/embeddings.py`                                         | backfill                                             | `modules/ai/retrieval.service.ts#backfill`                                                       | RetrievalService                                        |                                                                                                                                                                                                                                  | 🟢   |
+| `pipeline/manuscript.py`                                         | stitch manuscript                                    | `modules/generation/manuscript.service.ts`                                                       | ManuscriptService                                       | Return assembled Markdown.                                                                                                                                                                                                       | 🟢   |
+| `pipeline/scaffold.py`                                           | copy bible templates                                 | `modules/planning/scaffold.service.ts`                                                           | ScaffoldService                                         | Seed default bible_documents rows for a new-novel project (no file copy).                                                                                                                                                        | 🟡   |
+| `llm/base.py`,`registry.py`,`adapters/*`,`prompts.py`,`trace.py` | provider-agnostic AI + retry + tracing               | `modules/ai/*` (LangChain chat models, `ai/prompts/*`, `ai/schemas/*`)                           | ModelRouterService, ConcurrencyController               | Router → resolve role to a LangChain `ChatModel`; providers: `anthropic`,`openai`,`ollama`,`anthropic-claude-code`,`openai-codex` (env/config-gated); retry via `withRetry`; trace → `extraction_runs`/logs; serialize per §9.2. | 🔴   |
+| `image storage` (new)                                            | persist illustration bytes                           | `modules/storage/*` (`IMAGE_STORAGE` token, `ImageStorageProvider`, `LocalImageStorageProvider`) | ImageStorage (DI)                                       | Swappable provider (local folder now, cloud later) — one module change to swap.                                                                                                                                                  | 🟡   |
+| `web/*` (Flask)                                                  | browse UI                                            | —                                                                                                | —                                                       | OUT OF SCOPE. Replaced by the API + (future) a separate frontend.                                                                                                                                                                | —    |
+| `logging_config.py`                                              | structlog                                            | framework `Logger`                                                                               | —                                                       | Drop; use `@shadow-library/common` Logger.                                                                                                                                                                                       | 🟢   |
 
 ---
 
@@ -402,6 +403,7 @@ Follow pulse patterns: `Create*Body`, `Update*Body extends PartialType(OmitType(
 `projectKind = pgEnum(['source','new_novel'])`
 
 **projects** — folds the SQLite singletons (`project`, `source_novel`, `scrape_cursor`, `story_skeleton`, `novel_spec`→dropped, story-state cursor) into one row (all were 1:1 per project):
+
 - `id bigserial pk`, `ownerId bigint` (**nullable, unused now — auth-ready seam, decision §1.1.2**), `name varchar(255) notNull unique`, `kind projectKind notNull`, `title varchar(500)`
 - source (columns later dropped when the acquisition pipeline was removed): a source URL, an adapter identifier, and a source novel id (all varchar)
 - new-novel seed: `brief text` (**the user's high-level "what the novel is about" — input for full-bible generation + clone A/B, §8.7**), `premise text`, `themes jsonb`, `instructions text`, `sourceProjectId bigint references(projects.id)` (nullable self-ref: which source it derived from)
@@ -433,6 +435,7 @@ Follow pulse patterns: `Create*Body`, `Update*Body extends PartialType(OmitType(
 `planStatus = pgEnum(['draft','approved','source'])`
 
 The Python two-tier volume→arc is **flattened to one table**: a **Volume** is the unit chapters hang on (the Python "arc" renamed). There is no separate grouping table.
+
 - **volumes** — `id bigserial pk`, `projectId`, `volumeKey varchar notNull` (stable snake_case id — was `arcKey`), `ordinal integer notNull default 0` (reading order, 1,2,3…), `title`, `objective text`, `conflict text`, `payoff text`, `startChapter integer`, `endChapter integer` (contiguous span, laid out deterministically from `chapters_per_volume`), `status planStatus notNull default 'draft'` (generation gate), `cast jsonb`, `body text` (authored goal/conflict/payoff prose), timestamps. **unique(projectId, volumeKey)**. index(projectId, ordinal).
 
 ### 6.5 `schemas/story.ts` (beats / threads / world / mysteries / timeline / power)
@@ -447,11 +450,13 @@ The Python two-tier volume→arc is **flattened to one table**: a **Volume** is 
 ### 6.6 `schemas/bible.ts`
 
 `bibleSection = pgEnum(['project','world','power','plot','story_state','ai','lore'])`
+
 - **bibleDocuments** — `id bigserial pk`, `projectId`, `section bibleSection notNull`, `slug varchar notNull` (e.g. `vision`, `world`, `power`, `plot`, `state`, `writing_style`), `frontmatter jsonb`, `body text`, timestamps. **unique(projectId, section, slug)**. Holds only genuinely free-prose sections; entities/volumes/trackers are their own tables. Story-state cursor lives on `projects`, not here (the `state.md` body may still be a bibleDocument for prose).
 
 ### 6.7 `schemas/generation.ts` (drafts / briefs)
 
 `draftStatus = pgEnum(['draft','final'])`, `judgeVerdict = pgEnum(['consistent','contradiction'])`
+
 - **drafts** — `id bigserial pk`, `projectId`, `chapter integer notNull`, `title varchar(500)`, `status draftStatus notNull default 'draft'`, `revision integer notNull default 0`, `words integer`, `volumeKey varchar` (was `arcKey`; §1.1.16), `summary text`, `body text notNull`, `state jsonb`, `generator contentGenerator notNull default 'standard'` (§8.6 — `grok` ⇒ human-reviewed, no auto-judge), `judge judgeVerdict` (null for grok drafts — human review), `judgeNote text`, timestamps. **unique(projectId, chapter)**.
 - **briefs** — `id bigserial pk`, `projectId`, `chapter integer notNull`, `volumeKey varchar` (was `arcKey`; §1.1.16), `title varchar`, `body text notNull`, timestamps. **unique(projectId, chapter)**.
 - **continuityProposals** — `id bigserial pk`, `projectId`, `chapter integer notNull`, `status continuityProposalStatus notNull default 'pending'`, `proposal jsonb notNull` (the Grok CONTINUITY delta — appeared/new_characters/threads/mysteries/timeline/relationships/power — **human-editable before apply**), `model varchar`, `appliedAt timestamp`, timestamps. **unique(projectId, chapter)** (re-proposing upserts the pending row). Staged, human-reviewed bible write-back for grok chapters (§8.6).
@@ -459,6 +464,7 @@ The Python two-tier volume→arc is **flattened to one table**: a **Volume** is 
 ### 6.8 `schemas/jobs.ts` (work queue + provenance + reports)
 
 `jobKind`, `jobStatus`, `validationScope` pgEnums.
+
 - **jobs** — `id uuid defaultRandom pk`, `projectId`, `kind jobKind notNull`, `target varchar notNull`, `status jobStatus notNull default 'pending'`, `attempts smallint notNull default 0`, `lastError varchar(2000)`, `payload jsonb`, `progress jsonb` (**live progress `{ done, total, current, phase }`, updated incrementally — §7.7**), `nextAttemptAt timestamp`, timestamps. **unique(projectId, kind, target)** (mirrors `job.id = "kind:target"`). index(projectId, kind, status).
 - **extractionRuns** — `id bigserial pk`, `projectId`, `chapter integer`, `role varchar`, `model varchar`, `status varchar` (`ok|error`), `rawJson jsonb`, `createdAt`. index(projectId, chapter).
 - **validationReports** — `id bigserial pk`, `projectId`, `scope validationScope notNull`, `chapter integer`, `issues integer notNull`, `summary text`, `payload jsonb notNull`, `createdAt`. index(projectId, scope, chapter).
@@ -466,6 +472,7 @@ The Python two-tier volume→arc is **flattened to one table**: a **Volume** is 
 ### 6.9 `schemas/vectors.ts` (pgvector — replaces LanceDB)
 
 Enable `CREATE EXTENSION IF NOT EXISTS vector;` (first migration, hand-added SQL). Managed via LlamaIndex's `PGVectorStore` but declare a Drizzle table for reset/backfill bookkeeping:
+
 - **chapterChunks** — `id bigserial pk`, `projectId`, `chapter integer notNull`, `chunkIdx integer notNull`, `text text notNull`, `embedding vector(1024)` (**`ollama/qwen3-embedding:8b`** truncated to **1024** dims; `EMBEDDING_DIM=1024` migration/config constant). index HNSW/IVFFlat on `embedding`. index(projectId, chapter). Delete-by-(projectId,chapter) before re-add for idempotency (mirrors `vectors.add_chapter_chunks`). **`grok_only` projects write no chunks** (embeddings disabled — §8.5).
 
 > Use `drizzle-orm/pg-core`'s custom type or `pgvector` drizzle helper for `vector`. If LlamaIndex owns the table shape, align the Drizzle declaration to it and only use Drizzle for delete/count/`embedded_chapters`.
@@ -490,73 +497,74 @@ Base: `/api`, `prefixVersioning` (so `/api/v1/...`). All ids are bigint path par
 
 ### 7.1 Projects module (`/projects`)
 
-| Verb | Route | Body/Query | Response | Service | Notes |
-|---|---|---|---|---|---|
-| POST | `/projects` | `CreateProjectBody { name, kind, url?, title?, contentMode? }` | 201 `ProjectResponse` | ProjectService.create | `kind=source` needs `url` (route to adapter, set cursor); `kind=new_novel` scaffolds default bible rows. `contentMode=grok_only` requires `ai.xaiApiKey` (else `AI_003`). Replaces `init`. |
-| GET | `/projects` | `ListProjectsQuery` | 200 `ListProjectResponse` | list | |
-| GET | `/projects/:id` | — | 200 `ProjectResponse` | get | 404 `PRJ_001`. |
-| GET | `/projects/:id/status` | — | 200 `ProjectStatusResponse` | status | Shape-aware (source vs new-novel), mirrors `_status_*`. Replaces `status`. |
-| PATCH | `/projects/:id` | `UpdateProjectBody { title?, config?, contentMode? }` | 200 | update | **Novel settings (§1.1.14):** rename; reassign any role's model **anytime** (takes effect next op); reject moving a Grok-locked role off `xai` (`AI_003`). |
-| POST | `/projects/:id/clone` | `CloneProjectBody { name, config?, contentMode?, resetDerived? }` | 201 `ProjectResponse` | ProjectService.clone | **§1.1.15** — deep-copy for model A/B on the same input. `resetDerived` default true (inputs only). |
-| DELETE | `/projects/:id` | — | 204 | remove | Cascades. |
-| POST | `/projects/:id/reset` | `ResetBody { stage: extract|plan|generate|all }` | 200 `ResetResponse` | reset | DANGEROUS. Mirrors `reset` semantics per shape. |
-| GET | `/projects/:id/cost` | `?generateChapters=N` | 200 `CostResponse` | CostingService.estimate | Replaces `cost`. |
+| Verb   | Route                  | Body/Query                                                        | Response                    | Service                 | Notes                                                                                                                                                                                      |
+| ------ | ---------------------- | ----------------------------------------------------------------- | --------------------------- | ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| POST   | `/projects`            | `CreateProjectBody { name, kind, url?, title?, contentMode? }`    | 201 `ProjectResponse`       | ProjectService.create   | `kind=source` needs `url` (route to adapter, set cursor); `kind=new_novel` scaffolds default bible rows. `contentMode=grok_only` requires `ai.xaiApiKey` (else `AI_003`). Replaces `init`. |
+| GET    | `/projects`            | `ListProjectsQuery`                                               | 200 `ListProjectResponse`   | list                    |                                                                                                                                                                                            |
+| GET    | `/projects/:id`        | —                                                                 | 200 `ProjectResponse`       | get                     | 404 `PRJ_001`.                                                                                                                                                                             |
+| GET    | `/projects/:id/status` | —                                                                 | 200 `ProjectStatusResponse` | status                  | Shape-aware (source vs new-novel), mirrors `_status_*`. Replaces `status`.                                                                                                                 |
+| PATCH  | `/projects/:id`        | `UpdateProjectBody { title?, config?, contentMode? }`             | 200                         | update                  | **Novel settings (§1.1.14):** rename; reassign any role's model **anytime** (takes effect next op); reject moving a Grok-locked role off `xai` (`AI_003`).                                 |
+| POST   | `/projects/:id/clone`  | `CloneProjectBody { name, config?, contentMode?, resetDerived? }` | 201 `ProjectResponse`       | ProjectService.clone    | **§1.1.15** — deep-copy for model A/B on the same input. `resetDerived` default true (inputs only).                                                                                        |
+| DELETE | `/projects/:id`        | —                                                                 | 204                         | remove                  | Cascades.                                                                                                                                                                                  |
+| POST   | `/projects/:id/reset`  | `ResetBody { stage: extract                                       | plan                        | generate                | all }`                                                                                                                                                                                     | 200 `ResetResponse` | reset | DANGEROUS. Mirrors `reset` semantics per shape. |
+| GET    | `/projects/:id/cost`   | `?generateChapters=N`                                             | 200 `CostResponse`          | CostingService.estimate | Replaces `cost`.                                                                                                                                                                           |
 
 ### 7.2 Source module (`/projects/:id/source/...`)
 
-| Verb | Route | Body | Response | Service |
-|---|---|---|---|---|
-| POST | `/ingest` | `IngestBody { limit?, concurrency?, delayMs? }` | 202 `JobResponse` | (job `ingest`, later removed) |
-| POST | `/extract` | `ExtractBody { limit?, retryFailed? }` | 202 `JobResponse` | ExtractionService (job `extract`) |
-| POST | `/consolidate` | `{ significanceChapters?, relationshipChapters? }` | 200 `ConsolidateResponse` | ConsolidateService (sync, no LLM) |
-| POST | `/resume` | — | 202 `JobResponse` | (ingest→extract chain, later removed) |
-| POST | `/skeleton` | — | 200 `SkeletonResponse` | SkeletonService (LLM) |
-| GET | `/assets` | `?which=NAME` | 200 `AssetResponse { markdown }` | AssetService (returns string) |
-| GET | `/chapters` | `ListChaptersQuery` | 200 `ListChapterResponse` | ChapterService (no prose in list) |
-| GET | `/chapters/:n` | — | 200 `ChapterResponse` (+knowledge) | get |
-| PATCH | `/chapters/:n` | `{ title?, content }` | 200 | update editor text |
-| DELETE | `/chapters/:n` | — | 204 | delete + per-chapter knowledge |
-| GET | `/knowledge/entities` `/relationships` `/threads` `/world-facts` `/mysteries` `/beats` | paginated | 200 lists | reads |
+| Verb   | Route                                                                                  | Body                                               | Response                           | Service                               |
+| ------ | -------------------------------------------------------------------------------------- | -------------------------------------------------- | ---------------------------------- | ------------------------------------- |
+| POST   | `/ingest`                                                                              | `IngestBody { limit?, concurrency?, delayMs? }`    | 202 `JobResponse`                  | (job `ingest`, later removed)         |
+| POST   | `/extract`                                                                             | `ExtractBody { limit?, retryFailed? }`             | 202 `JobResponse`                  | ExtractionService (job `extract`)     |
+| POST   | `/consolidate`                                                                         | `{ significanceChapters?, relationshipChapters? }` | 200 `ConsolidateResponse`          | ConsolidateService (sync, no LLM)     |
+| POST   | `/resume`                                                                              | —                                                  | 202 `JobResponse`                  | (ingest→extract chain, later removed) |
+| POST   | `/skeleton`                                                                            | —                                                  | 200 `SkeletonResponse`             | SkeletonService (LLM)                 |
+| GET    | `/assets`                                                                              | `?which=NAME`                                      | 200 `AssetResponse { markdown }`   | AssetService (returns string)         |
+| GET    | `/chapters`                                                                            | `ListChaptersQuery`                                | 200 `ListChapterResponse`          | ChapterService (no prose in list)     |
+| GET    | `/chapters/:n`                                                                         | —                                                  | 200 `ChapterResponse` (+knowledge) | get                                   |
+| PATCH  | `/chapters/:n`                                                                         | `{ title?, content }`                              | 200                                | update editor text                    |
+| DELETE | `/chapters/:n`                                                                         | —                                                  | 204                                | delete + per-chapter knowledge        |
+| GET    | `/knowledge/entities` `/relationships` `/threads` `/world-facts` `/mysteries` `/beats` | paginated                                          | 200 lists                          | reads                                 |
 
 ### 7.3 Planning module (`/projects/:id/...`)
 
-| Verb | Route | Body | Response | Service |
-|---|---|---|---|---|
-| POST | `/seed-from-brief` | `{ brief, force? }` | 202 `JobResponse` | BibleBuilderService (LangGraph) — **fills the entire bible from the high-level brief (§8.7)**; `force` overwrites hand-edits |
-| POST | `/seed` | `NewNovelBody { sourceProjectId, instructions }` | 200 `SeedResponse` | NewNovelService (LLM) — from a source, replaces `newnovel` |
-| POST | `/plan` | — | 200 `PlanResponse` | PlanningService.plan (LLM) |
-| POST | `/approve` | — | 200 `{ volumesApproved, approved }` | PlanningService.approve |
-| GET/POST/PATCH/DELETE | `/volumes`, `/volumes/:volumeKey` | volume CRUD DTOs | volume responses | VolumeService (hand-authoring the single-tier plan, §1.1.16) |
-| GET/PUT | `/bible/:section/:slug` | `{ frontmatter?, body }` | doc responses | BibleService (edit vision/world/power/plot/style) |
-| GET/POST/PATCH/DELETE | `/entities`, `/entities/:entityKey` | entity DTOs | entity responses | EntityService (author characters/factions/locations) |
+| Verb                  | Route                               | Body                                             | Response                            | Service                                                                                                                      |
+| --------------------- | ----------------------------------- | ------------------------------------------------ | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| POST                  | `/seed-from-brief`                  | `{ brief, force? }`                              | 202 `JobResponse`                   | BibleBuilderService (LangGraph) — **fills the entire bible from the high-level brief (§8.7)**; `force` overwrites hand-edits |
+| POST                  | `/seed`                             | `NewNovelBody { sourceProjectId, instructions }` | 200 `SeedResponse`                  | NewNovelService (LLM) — from a source, replaces `newnovel`                                                                   |
+| POST                  | `/plan`                             | —                                                | 200 `PlanResponse`                  | PlanningService.plan (LLM)                                                                                                   |
+| POST                  | `/approve`                          | —                                                | 200 `{ volumesApproved, approved }` | PlanningService.approve                                                                                                      |
+| GET/POST/PATCH/DELETE | `/volumes`, `/volumes/:volumeKey`   | volume CRUD DTOs                                 | volume responses                    | VolumeService (hand-authoring the single-tier plan, §1.1.16)                                                                 |
+| GET/PUT               | `/bible/:section/:slug`             | `{ frontmatter?, body }`                         | doc responses                       | BibleService (edit vision/world/power/plot/style)                                                                            |
+| GET/POST/PATCH/DELETE | `/entities`, `/entities/:entityKey` | entity DTOs                                      | entity responses                    | EntityService (author characters/factions/locations)                                                                         |
 
 ### 7.4 Generation module (`/projects/:id/...`)
 
-| Verb | Route | Body | Response | Service | Notes |
-|---|---|---|---|---|---|
-| POST | `/outline` | `OutlineBody { count?, start?, context? }` | 200 `OutlineResponse` | GenerationService.outline (LLM) | Writes `briefs`. |
-| GET/PUT | `/briefs/:n` | `{ title?, body }` | brief responses | BriefService | Author edits. |
-| POST | `/generate` | `GenerateBody { limit?, autoFix?, maxFixes?, guidance? }` | 202 `JobResponse` | GenerationService.generate (LangGraph job) | Draft → judge → (auto-fix loop). |
-| GET | `/drafts` | — | 200 `ListDraftResponse` (+ derived STATUS view) | DraftService | Replaces STATUS.md/DRAFT_STATE.md. |
-| GET | `/drafts/:n` | — | 200 `DraftResponse` | get |
-| PUT | `/drafts/:n` | `{ title?, body, summary?, state? }` | 200 | hand-edit draft |
-| POST | `/drafts/:n/revise` | `{ note }` | 200 `DraftResponse` | revise (LLM) |
-| POST | `/drafts/:n/judge` (or `/judge`) | — | 200 `JudgeResponse` | judge (LLM) |
-| POST | `/finalize` | `{ chapter? }` | 200 `FinalizeResponse` | FinalizeService (LLM write-back) | In-order gate. |
-| GET | `/drafts/:n/prompt` | — | 200 `{ markdown }` | export handoff prompt |
-| POST | `/drafts/:n/import` | `{ prose, title?, summary? }` | 201 `DraftResponse` | import external prose |
-| GET | `/manuscript` | — | 200 `{ markdown }` | ManuscriptService (export) |
-| POST | `/backfill` | — | 202 `JobResponse` | RetrievalService.backfill |
+| Verb    | Route                            | Body                                                      | Response                                        | Service                                    | Notes                              |
+| ------- | -------------------------------- | --------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------ | ---------------------------------- |
+| POST    | `/outline`                       | `OutlineBody { count?, start?, context? }`                | 200 `OutlineResponse`                           | GenerationService.outline (LLM)            | Writes `briefs`.                   |
+| GET/PUT | `/briefs/:n`                     | `{ title?, body }`                                        | brief responses                                 | BriefService                               | Author edits.                      |
+| POST    | `/generate`                      | `GenerateBody { limit?, autoFix?, maxFixes?, guidance? }` | 202 `JobResponse`                               | GenerationService.generate (LangGraph job) | Draft → judge → (auto-fix loop).   |
+| GET     | `/drafts`                        | —                                                         | 200 `ListDraftResponse` (+ derived STATUS view) | DraftService                               | Replaces STATUS.md/DRAFT_STATE.md. |
+| GET     | `/drafts/:n`                     | —                                                         | 200 `DraftResponse`                             | get                                        |
+| PUT     | `/drafts/:n`                     | `{ title?, body, summary?, state? }`                      | 200                                             | hand-edit draft                            |
+| POST    | `/drafts/:n/revise`              | `{ note }`                                                | 200 `DraftResponse`                             | revise (LLM)                               |
+| POST    | `/drafts/:n/judge` (or `/judge`) | —                                                         | 200 `JudgeResponse`                             | judge (LLM)                                |
+| POST    | `/finalize`                      | `{ chapter? }`                                            | 200 `FinalizeResponse`                          | FinalizeService (LLM write-back)           | In-order gate.                     |
+| GET     | `/drafts/:n/prompt`              | —                                                         | 200 `{ markdown }`                              | export handoff prompt                      |
+| POST    | `/drafts/:n/import`              | `{ prose, title?, summary? }`                             | 201 `DraftResponse`                             | import external prose                      |
+| GET     | `/manuscript`                    | —                                                         | 200 `{ markdown }`                              | ManuscriptService (export)                 |
+| POST    | `/backfill`                      | —                                                         | 202 `JobResponse`                               | RetrievalService.backfill                  |
 
 **Grok interlude chapters (§8.6)** `/projects/:id`:
-| Verb | Route | Body | Response | Service | Notes |
-|---|---|---|---|---|---|
-| POST | `/chapters/:n/generate-grok` | `{ guidance? }` | 200 `DraftResponse` | GenerationService.generateGrok | Force `xai` for `generation` (per-op). `generator: grok`, no auto-judge (human review). Requires `ai.xaiApiKey` → `AI_003`. |
-| POST | `/chapters/:n/propose-continuity` | — | 200 `ContinuityProposalResponse` | ContinuityProposalService.propose | Grok extracts the write-back delta; **stages** it (pending), does not apply. |
-| GET | `/chapters/:n/continuity-proposal` | — | 200 `ContinuityProposalResponse` | get | The proposed bible changes for the UI. |
-| PATCH | `/chapters/:n/continuity-proposal` | `{ proposal }` | 200 | edit | Human edits the delta (reword/remove items) before applying. |
-| POST | `/chapters/:n/continuity-proposal/apply` | — | 200 `{ applied }` | apply | Applies the **edited** delta to the bible (no new LLM call); `continuityApplied=true`. |
-| POST | `/chapters/:n/continuity-proposal/discard` | — | 204 | discard | Nothing enters the bible. |
+
+| Verb  | Route                                      | Body            | Response                         | Service                           | Notes                                                                                                                       |
+| ----- | ------------------------------------------ | --------------- | -------------------------------- | --------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| POST  | `/chapters/:n/generate-grok`               | `{ guidance? }` | 200 `DraftResponse`              | GenerationService.generateGrok    | Force `xai` for `generation` (per-op). `generator: grok`, no auto-judge (human review). Requires `ai.xaiApiKey` → `AI_003`. |
+| POST  | `/chapters/:n/propose-continuity`          | —               | 200 `ContinuityProposalResponse` | ContinuityProposalService.propose | Grok extracts the write-back delta; **stages** it (pending), does not apply.                                                |
+| GET   | `/chapters/:n/continuity-proposal`         | —               | 200 `ContinuityProposalResponse` | get                               | The proposed bible changes for the UI.                                                                                      |
+| PATCH | `/chapters/:n/continuity-proposal`         | `{ proposal }`  | 200                              | edit                              | Human edits the delta (reword/remove items) before applying.                                                                |
+| POST  | `/chapters/:n/continuity-proposal/apply`   | —               | 200 `{ applied }`                | apply                             | Applies the **edited** delta to the bible (no new LLM call); `continuityApplied=true`.                                      |
+| POST  | `/chapters/:n/continuity-proposal/discard` | —               | 204                              | discard                           | Nothing enters the bible.                                                                                                   |
 
 **Validation module** `/projects/:id`: POST `/validate` → 200 (or 202) `ValidationReportResponse`; POST `/chapters/:n/review` → 200 `ReviewResponse`; GET `/validation-reports` list. **Note:** `validate`/`review` skip `generator: grok` chapters in a `standard` project (a censoring model would refuse); surface them as "human-reviewed, not machine-validated."
 
@@ -589,6 +597,7 @@ Quick ops (`consolidate`, `plan`, `approve`, `judge`, `finalize` one chapter, `v
 Add deps: `langchain`, `@langchain/core`, `@langchain/anthropic`, `@langchain/openai` (LLM **and** image gen), `@langchain/xai` (Grok), `@langchain/ollama` (local LLM + `qwen3-embedding:8b`), `@langchain/langgraph`, `llamaindex` + `@llamaindex/postgres` (pgvector), `zod`, `pgvector`. Config keys via `bootstrap.ts`: `ai.anthropicApiKey`, `ai.openaiApiKey`, `ai.xaiApiKey`, `ai.grokLlmModel`, `ai.grokImageModel`, `ai.ollamaHost`, `ai.allowClaudeCode` (bool), `ai.allowCodex` (bool), `ai.claudeCodeBin`, `ai.codexBin`, plus `EMBEDDING_DIM` (=1024).
 
 **Providers (decision §1.1.4–7):**
+
 - `anthropic` — Claude via API key (`ChatAnthropic`).
 - `openai` — GPT via API key (`ChatOpenAI`) **and** image gen (`gpt-image-1`) for `illustration` in `standard` projects.
 - `xai` — Grok via API key (`ChatXAI` from `@langchain/xai`, OpenAI-compatible), incl. its image model. **The only provider used by `grok_only` projects** (§8.5). Config key `ai.xaiApiKey`.
@@ -598,32 +607,33 @@ Add deps: `langchain`, `@langchain/core`, `@langchain/anthropic`, `@langchain/op
 The registry (`ai/models.ts`) maps `provider/model → { kind, input, output }`; local/subprocess models are free (no prices). Role→model defaults live in `ai/defaults.ts`, overridable per project via `projects.config`. A role whose model is absent/wrong-kind, or whose subprocess provider is disabled by env, is rejected (`AI_002`).
 
 **`modules/ai/`** mirrors `llm/`:
+
 - `models.ts` — the registry (port `data/models.yml`): `Record<providerSlashModel, { kind:'llm'|'embedding'|'image', input:number, output:number }>`. Validation identical to `_validate_models`.
 - `model-router.service.ts` — `ModelRouterService` = the `ModelRouter` analogue. `chatFor(role, opts?): BaseChatModel` (LangChain, e.g. `ChatAnthropic({ model, temperature, maxTokens })`), `embeddingsFor(role)`, `imageModelFor(role, opts?)`. Resolve role→provider/model from project `config` merged over defaults; **`opts.forceProvider`** pins a single call to a provider (used by grok interlude chapters, §8.6) — subject to the same registry/enable checks. `grok_only` (§8.5) still wins over `forceProvider`. Wrap every call with:
   - **Retry:** `.withRetry({ stopAfterAttempt: retry.attempts })` or a custom transient-classifier matching `_is_transient` (HTTP 408/429/5xx + connection/timeout names) with exponential backoff (1s→30s). Non-transient (auth/bad-request/refusal) fail fast.
   - **Structured output:** `chat.withStructuredOutput(zodSchema)` (Anthropic tool-use). For prompt-driven providers, append the JSON directive (`json_directive`) and parse tolerantly (port `_extract_json`: first balanced `{...}`), throwing an `AiResponseError` (→ `AI_001`) on failure.
-  - **Tracing/provenance:** record request/response to `extractionRuns` (or a `model_calls` log) *before* parsing, so raw output survives an invalid parse. Log `model call` with role/op/provider/model/seconds.
+  - **Tracing/provenance:** record request/response to `extractionRuns` (or a `model_calls` log) _before_ parsing, so raw output survives an invalid parse. Log `model call` with role/op/provider/model/seconds.
 - `ai/schemas/*.ts` — Zod ports of every schema in `prompts.py` (EXTRACTION, NEW_NOVEL, PLAN, SKELETON, GENERATION, OUTLINE, TITLE, REVISION, FIX, CONTINUITY, VALIDATION, REVIEW). Keep field descriptions (they steer the model).
 - `ai/prompts/*.ts` — port every system/prompt builder verbatim (`build_extraction`, `build_new_novel`, `build_plan`, `build_skeleton`, `build_generation`, `build_outline`, `build_title`, `build_revision`, `build_fix`, `build_continuity`, `build_judge`, `build_validation`, `build_review`, `build_illustration`). **Do not paraphrase** — the exact wording (serialization rules, `[HARD]`/`[SOFT]` convention, `CONSISTENT` sentinel) is behavior.
-- `ai/prompts/authoring-preamble.ts` — **the global web-novel + simple-English directive (decision §1.1.17).** A constant `AUTHORING_STYLE` string **prepended to the system prompt of every prose-authoring call** — `build_generation`, `build_revision`, `build_fix`, `build_outline`, `build_new_novel`, `build_plan`, and the bible-builder (§8.7). It instructs: *write a **web novel** only; use **very simple, easy-to-understand English** — short sentences, common everyday words, no rare/archaic/ornate vocabulary or heavy jargon; explain any invented term plainly; keep it readable for a broad, non-native-English audience.* It is **not** added to the analytical prompts (`build_extraction`, `build_judge`, `build_validation`, `build_review`, `build_continuity`) — those reason over text, they don't produce the novel's prose. Keeping it one constant means the style is tuned in one place. (The `target_words`/pacing directives already in the builders remain.)
+- `ai/prompts/authoring-preamble.ts` — **the global web-novel + simple-English directive (decision §1.1.17).** A constant `AUTHORING_STYLE` string **prepended to the system prompt of every prose-authoring call** — `build_generation`, `build_revision`, `build_fix`, `build_outline`, `build_new_novel`, `build_plan`, and the bible-builder (§8.7). It instructs: _write a **web novel** only; use **very simple, easy-to-understand English** — short sentences, common everyday words, no rare/archaic/ornate vocabulary or heavy jargon; explain any invented term plainly; keep it readable for a broad, non-native-English audience._ It is **not** added to the analytical prompts (`build_extraction`, `build_judge`, `build_validation`, `build_review`, `build_continuity`) — those reason over text, they don't produce the novel's prose. Keeping it one constant means the style is tuned in one place. (The `target_words`/pacing directives already in the builders remain.)
 
 ### 8.1 Single-shot LangChain calls (one call in → structured out)
 
 For each, the pattern is: assemble context (pure service) → `router.chatFor(role).withStructuredOutput(Schema).invoke([system, prompt])` → persist. **Use LangChain (not LangGraph)** for these:
 
-| Workflow | Role | Schema | Persist |
-|---|---|---|---|
-| Extraction (per chapter) | extraction | ExtractionSchema | entities/aliases/appearances/observations/beats/threads/worldFacts/mysteries/chapters.summary (one txn) + embed |
-| New-novel seed | analysis | NewNovelSchema | bibleDocuments (vision/world/power/plot) + entities (`origin seeded`, `status planned`) |
-| Plan | planning | PlanSchema | volumes (`status draft`; single-tier, §1.1.16) |
-| Skeleton | analysis | SkeletonSchema | projects.skeleton* + source volumes (`status source`) |
-| Outline (batch) | planning | OutlineSchema | briefs |
-| Title salvage | classification | TitleSchema | draft.title (sanitize: strip "Chapter N:", reject multiline/overlong) |
-| Revision | generation | GenerationSchema | draft (rev++) |
-| Continuity write-back | analysis | ContinuitySchema | flip planned→active, register generated entities, upsert trackers (idempotent) |
-| Validate | validation | ValidationSchema | validationReports (novel) |
-| Review | review | ReviewSchema | validationReports (chapter) |
-| Judge | validation | (free text → parse) | draft.judge/judgeNote; `_parse_verdict` HARD/SOFT logic |
+| Workflow                 | Role           | Schema              | Persist                                                                                                         |
+| ------------------------ | -------------- | ------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Extraction (per chapter) | extraction     | ExtractionSchema    | entities/aliases/appearances/observations/beats/threads/worldFacts/mysteries/chapters.summary (one txn) + embed |
+| New-novel seed           | analysis       | NewNovelSchema      | bibleDocuments (vision/world/power/plot) + entities (`origin seeded`, `status planned`)                         |
+| Plan                     | planning       | PlanSchema          | volumes (`status draft`; single-tier, §1.1.16)                                                                  |
+| Skeleton                 | analysis       | SkeletonSchema      | projects.skeleton* + source volumes (`status source`)                                                           |
+| Outline (batch)          | planning       | OutlineSchema       | briefs                                                                                                          |
+| Title salvage            | classification | TitleSchema         | draft.title (sanitize: strip "Chapter N:", reject multiline/overlong)                                           |
+| Revision                 | generation     | GenerationSchema    | draft (rev++)                                                                                                   |
+| Continuity write-back    | analysis       | ContinuitySchema    | flip planned→active, register generated entities, upsert trackers (idempotent)                                  |
+| Validate                 | validation     | ValidationSchema    | validationReports (novel)                                                                                       |
+| Review                   | review         | ReviewSchema        | validationReports (chapter)                                                                                     |
+| Judge                    | validation     | (free text → parse) | draft.judge/judgeNote; `_parse_verdict` HARD/SOFT logic                                                         |
 
 **Judge is text, not structured** — it returns `CONSISTENT` or tagged finding lines; port `_parse_verdict` exactly (all-SOFT ⇒ consistent+notes; any HARD/untagged ⇒ contradiction).
 
@@ -634,6 +644,7 @@ This is the one true state machine. Model `generate --auto-fix` as a LangGraph `
 **State:** `{ projectId, chapter, layout, brief, draft, verdict, findings, attempt, maxFixes, prevFinding, result }`.
 
 **Nodes/edges:**
+
 1. `assembleBrief` (pure) → `draftChapter` (generation LLM, GenerationSchema) → write draft.
 2. → `judge` (validation LLM) → set verdict/findings.
 3. Conditional edge: `verdict==consistent` → `accept` (END). `contradiction` → `repair`.
@@ -648,6 +659,7 @@ The **interactive** (non-auto-fix) mode is the same graph truncated: draft → j
 ### 8.3 LlamaIndex.TS — indexing, retrieval, RAG
 
 Replace LanceDB + the Voyage embed calls with LlamaIndex + pgvector:
+
 - **Index/store:** `PGVectorStore` over the `chapterChunks` table (dim = embedding model dim). One logical namespace per `projectId` (filter on `projectId`).
 - **Chunking:** port `_chunk` (paragraph-boundary ~`chunk_chars`) or use a LlamaIndex `SentenceSplitter` tuned to match; keep chunk text for retrieval display.
 - **Embedding:** a LlamaIndex embedding model bound to the `embedding` role — **`ollama/qwen3-embedding:8b`** (truncated to dim 1024), configurable per project; **skipped entirely for `grok_only` projects** (§8.5). Add on finalize (`_embed_prose`) and extract (`_embed`); **best-effort** (failure never fails the chapter). Delete-by-(projectId,chapter) before re-add (idempotent). Because this is a **local** model, all embedding work is serialized by the ConcurrencyController (§9.2).
@@ -665,7 +677,7 @@ Replace LanceDB + the Voyage embed calls with LlamaIndex + pgvector:
 
 Decision §1.1.11. A project's `contentMode` (`standard | grok_only`) is read by `ModelRouterService` on every resolve. This is a **hard routing override that fails closed**, not a soft preference — the point is that Anthropic/OpenAI/Ollama models **refuse** to extract, judge, validate, or review uncensored prose, which would silently break the pipeline. Enforce it centrally so no service can bypass it:
 
-- **Routing:** when `project.contentMode === 'grok_only'`, `chatFor(role)` and `imageModelFor(role)` **ignore config/defaults and return an `xai` model** (`ai.grokLlmModel`, e.g. `grok-4`; `ai.grokImageModel` for illustration). Any attempt to resolve a role to a non-`xai` provider throws `AI_003` ("grok_only project may only use xAI"). This covers *every* prose-touching role — extraction, analysis, planning, generation, validation, review, classification, continuity — so nothing refuses.
+- **Routing:** when `project.contentMode === 'grok_only'`, `chatFor(role)` and `imageModelFor(role)` **ignore config/defaults and return an `xai` model** (`ai.grokLlmModel`, e.g. `grok-4`; `ai.grokImageModel` for illustration). Any attempt to resolve a role to a non-`xai` provider throws `AI_003` ("grok_only project may only use xAI"). This covers _every_ prose-touching role — extraction, analysis, planning, generation, validation, review, classification, continuity — so nothing refuses.
 - **Embeddings/retrieval disabled:** xAI has no embedding model and substituting another provider would reintroduce a censoring model. So for `grok_only`, `embeddingsFor` is a no-op (returns nothing) and `RetrievalService.retrieve` returns `[]`. Generation still works — retrieval is best-effort in the brief (§8.3) — it just relies on the serial draft-memory instead of semantic recall. `chapterChunks` stays empty (§6.9); `backfill` is a no-op.
 - **Validation on write:** creating/patching a project validates that, if `grok_only`, `ai.xaiApiKey` is set and every explicitly-overridden role in `config` is `xai` (reject otherwise, `AI_003`). Switching a `standard` project to `grok_only` re-points routing immediately (no re-embed needed since retrieval just goes dark).
 - **Concurrency:** `xai` is a **remote API** provider, so `grok_only` jobs follow the remote rule in §9.2 (same-novel serial, different-novel parallel) — unless a role still routes local (it won't, since grok_only forbids non-xai).
@@ -676,22 +688,20 @@ Decision §1.1.11. A project's `contentMode` (`standard | grok_only`) is read by
 Decision §1.1.12. Distinct from a `grok_only` project (§8.5): a `standard` project keeps its normal models but may author **individual** chapters with Grok. Per-chapter flag `generator` on `drafts` + `chapters` (`standard | grok`). This needs a **per-op provider override** on the router — `chatFor('generation', { forceProvider: 'xai' })` — independent of the project's default routing; requires `ai.xaiApiKey` (else `AI_003`).
 
 **Authoring flow (chapter n):**
+
 1. `POST /projects/:id/chapters/:n/generate-grok { guidance }` (or `generate` with `generator:'grok'`, limit 1). Router forces `xai` for the `generation` role for this call only. The brief is assembled normally (Grok reads canon fine). Draft written `generator: grok`.
 2. **No automated judge** — the continuity judge would route to a censoring model and refuse, and per the requirement the **human evaluates**. `judge` stays null; the UI marks it "awaiting human review." The human hand-edits the draft freely, then finalizes.
 3. **`finalize` of a grok chapter:** store prose + summary + continuation `state` (so serial continuity still flows to later chapters), advance the story-state cursor, update the chapter-summaries serial memory — **but skip the continuity write-back AND skip embedding** (`chapters.continuityApplied=false`). Its entities/threads/etc. do **not** enter the bible/knowledge tables and its explicit prose is **not** indexed for retrieval. This is the "most grok content isn't maintained as canon" default.
 
 **Adjacency safety (important):** when assembling the brief for any chapter whose immediately-previous chapter is `generator: grok`, substitute that chapter's one-line **summary + continuation `state`** for the usual verbatim previous-chapter prose tail (`_prev_ending`), so a censoring model is never fed explicit text. Grok chapters are also excluded from retrieval (not embedded), so they can't surface into a standard chapter's brief that way either.
 
-**Opt-in promotion to the lore bible (staged, editable, human-decided write-back):**
-4. `POST /projects/:id/chapters/:n/propose-continuity` runs the continuity write-back extraction **with Grok** (CONTINUITY_SCHEMA — only Grok will read the uncensored prose) and **stages** the result in `continuity_proposals` (status `pending`) **instead of applying it**. Returns the structured proposal for the UI.
-5. **The UI shows exactly the changes Grok proposes** — each delta is a concrete bible change (new character X, thread Y opened, timeline event Z, relationship, power-up). `GET .../continuity-proposal` fetches the pending proposal; `PATCH .../continuity-proposal` lets the human **edit** it (rename/reword/remove any item — removing items is how per-change reject works) before saving.
-6. The human decides: `POST .../continuity-proposal/apply` applies the **edited** deltas to the bible/knowledge tables (the same idempotent write-back logic as `_continuity`, but sourced from the reviewed proposal — **no fresh LLM call**), sets `chapters.continuityApplied=true` and the proposal `applied`; `POST .../continuity-proposal/discard` sets `discarded` and changes nothing.
+**Opt-in promotion to the lore bible (staged, editable, human-decided write-back):** 4. `POST /projects/:id/chapters/:n/propose-continuity` runs the continuity write-back extraction **with Grok** (CONTINUITY_SCHEMA — only Grok will read the uncensored prose) and **stages** the result in `continuity_proposals` (status `pending`) **instead of applying it**. Returns the structured proposal for the UI. 5. **The UI shows exactly the changes Grok proposes** — each delta is a concrete bible change (new character X, thread Y opened, timeline event Z, relationship, power-up). `GET .../continuity-proposal` fetches the pending proposal; `PATCH .../continuity-proposal` lets the human **edit** it (rename/reword/remove any item — removing items is how per-change reject works) before saving. 6. The human decides: `POST .../continuity-proposal/apply` applies the **edited** deltas to the bible/knowledge tables (the same idempotent write-back logic as `_continuity`, but sourced from the reviewed proposal — **no fresh LLM call**), sets `chapters.continuityApplied=true` and the proposal `applied`; `POST .../continuity-proposal/discard` sets `discarded` and changes nothing.
 
 The staged-proposal mechanism is generic (it could gate standard-chapter write-back too) but is **default-on only for grok chapters**; standard chapters keep the automatic write-back at finalize. All of this obeys the §9.2 concurrency rules (a grok op is a remote `xai` call ⇒ per-project serial).
 
 ### 8.7 Full lore-bible generation from a high-level brief (LangGraph)
 
-Decision §1.1.13. Creating a `new_novel` project scaffolds an empty bible; the user is then prompted for a high-level brief, and `POST /projects/:id/seed-from-brief { brief }` runs a LangGraph **bible-builder** job that fills the *entire* bible from that one brief, in dependency order — each node a structured LLM call (role `analysis`/`planning`) writing to the normalized tables:
+Decision §1.1.13. Creating a `new_novel` project scaffolds an empty bible; the user is then prompted for a high-level brief, and `POST /projects/:id/seed-from-brief { brief }` runs a LangGraph **bible-builder** job that fills the _entire_ bible from that one brief, in dependency order — each node a structured LLM call (role `analysis`/`planning`) writing to the normalized tables:
 
 1. `foundation` — title, premise, themes, tone → `projects` (premise/themes) + `bible_documents` (vision). New `build_bible_from_brief(brief)` prompt (a source-less variant of `build_new_novel`; reuse/extend NEW_NOVEL_SCHEMA).
 2. `world` + `power` — foundational world facts + power/magic system → `world_facts`, `bible_documents` (world, power).
@@ -727,7 +737,7 @@ Every AI-touching unit of work (a job, or a synchronous LLM op) is scheduled thr
   - remote ⇒ `"project:<projectId>"` — **serial within a novel, parallel across novels**: same-novel API jobs queue behind each other (continuity ordering); different-novel API jobs run concurrently.
 - **Implementation:** an in-memory `Map<string, Promise<void>>` promise-chain per key (a keyed async mutex/queue). `run(key, fn)` chains `fn` onto the key's tail promise and returns the result; distinct keys never block each other. Keep the map process-local (no external queue). Provide `pendingByKey()` for observability.
 - **Interaction with §7.7:** synchronous quick ops also acquire their key before calling the model, so a sync local call can't overlap a running local job. The controller is the single choke point for the whole policy — do not scatter locks into services.
-- **Edge cases:** a remote job whose only local touch is optional best-effort embedding still classifies local (embedding uses ollama); if that is too coarse in practice, allow a per-op class override so the *embedding sub-step* takes `local:global` while the *generation* stays `project:<id>` — but default to the simple whole-job classification first.
+- **Edge cases:** a remote job whose only local touch is optional best-effort embedding still classifies local (embedding uses ollama); if that is too coarse in practice, allow a per-op class override so the _embedding sub-step_ takes `local:global` while the _generation_ stays `project:<id>` — but default to the simple whole-job classification first.
 
 ### 9.3 AI provider selection (env / config gated)
 
@@ -743,7 +753,7 @@ export const IMAGE_STORAGE = Symbol('IMAGE_STORAGE');
 export interface ImageStorageProvider {
   save(projectId: bigint, entityKey: string, bytes: Uint8Array, mime: string): Promise<string>; // returns a stable ref/path
   read(ref: string): Promise<{ bytes: Uint8Array; mime: string }>;
-  getUrl(ref: string): string;      // a servable URL or API route
+  getUrl(ref: string): string; // a servable URL or API route
   delete(ref: string): Promise<void>;
 }
 ```
@@ -755,7 +765,7 @@ export interface ImageStorageProvider {
 
 `ProjectService.clone(sourceId, { name, config?, contentMode?, resetDerived = true })` copies a project so the **same input** can be run through **different models**. In one transaction:
 
-1. Insert a new `projects` row: fresh `id`, new `name` (unique), copied `kind`/`title`/`brief`/`source*`/`storyState`/`skeleton`; `config` = the override if given else the source's; `contentMode` = override else source's; `ownerId` copied (auth-ready). 
+1. Insert a new `projects` row: fresh `id`, new `name` (unique), copied `kind`/`title`/`brief`/`source*`/`storyState`/`skeleton`; `config` = the override if given else the source's; `contentMode` = override else source's; `ownerId` copied (auth-ready).
 2. Copy child tables with the new `projectId`, preserving per-project string keys (`entityKey`/`volumeKey`/…) since uniqueness is `(projectId, key)`; numeric surrogate ids are regenerated. Order parents-before-children for FKs.
 3. **`resetDerived: true` (default)** copies only the **inputs** and drops derived data so each clone regenerates under its own `config`:
    - **source project:** copy `chapters` (source prose); **drop** extracted knowledge (entities/beats/threads/world_facts/mysteries/relationships/appearances/observations/summaries), `chapterChunks`, `extractionRuns`, `validationReports`, `jobs`.
@@ -771,6 +781,7 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 > Work phase-by-phase; each ends green (typecheck + lint + relevant tests). Commit per phase.
 
 ### Phase 1 — Project structure & dependencies
+
 - **Goal:** the app boots on the pulse architecture with Postgres wired.
 - **Files:** bump/add deps in `package.json` (match pulse `@shadow-library/*` versions; add `drizzle-orm`, `drizzle-kit`, AI stack §8.0); add scripts (`db:create-template`, `db:migrate`, `db:seed`); `tsconfig.json` path aliases (`@modules`, `@server`, `@scripts`, `@tests`); rewrite `bootstrap.ts` (drop `db.uri` mongo default; add `app.stage`, `database.postgres.url`, `ai.*` keys per §8.0, `storage.driver`+`storage.imageDir`); `constants.ts` (`APP_NAME='novel-forge'`); `drizzle.config.ts`; `common/` (enum.dto placeholder, data-transformers, index); a permissive `common/auth.guard.ts` (auth-ready seam, allows all now); update `classes/app-error-code.ts` groups; `database/database.module.ts` + `database.constants.ts` + `index.ts`; `modules/dynamic.modules.ts`; `app.module.ts` imports `[DatabaseModule, HttpRouteModule]`; `tests/test-environment.ts` + `scripts/create-template-db.ts`/`migrate-db.ts`/`seed.ts`.
 - **Tasks:** `bun install`; get `bun run dev` to boot against a local Postgres; `bun run type-check` clean.
@@ -778,6 +789,7 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 - **Commands:** `bun install && bun run type-check && bun run dev`.
 
 ### Phase 2 — Database schema & migrations
+
 - **Goal:** full schema + pgvector.
 - **Files:** `database/schemas/{projects,chapters,knowledge,plan,story,bible,generation,jobs,vectors}.ts` + `index.ts` barrel; `common/enum.dto.ts` (EnumType from every pgEnum); pgvector extension SQL.
 - **Tasks:** author all tables/enums/relations/uniques/indexes (§6); `drizzle-kit generate`; add `CREATE EXTENSION vector`; `db:create-template`.
@@ -785,6 +797,7 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 - **Commands:** `bunx drizzle-kit generate && bun run db:migrate && bun run db:create-template`.
 
 ### Phase 3 — Core domain modules (projects, chapters, entities, bible)
+
 - **Goal:** CRUD + isolation.
 - **Files:** `modules/project/*`, `modules/source/chapter.*`, `modules/bible/*` (entity, volume, bible-document services + controllers + DTOs), register in `dynamic.modules.ts`.
 - **Tasks:** ProjectService (create source/new-novel, status, reset, cost hook, **live model-settings via PATCH `config` with the grok-lock exception**, **`clone` deep-copy §9.5**), row-level `projectId` scoping everywhere; entity/volume/document CRUD with idempotent upserts.
@@ -792,6 +805,7 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 - **Commands:** `bun test tests/project`.
 
 ### Phase 4 — Repository/persistence semantics
+
 - **Goal:** port idempotent write logic (`repo.py`).
 - **Files:** methods on the domain services (or a shared `KnowledgeRepository`).
 - **Tasks:** `upsertEntity` (merge attributes, min firstSeen), thread/world/mystery/beat upserts with COALESCE, appearance/observation insert-ignore, tracker upsert/append idempotency, `resetStage`, `rearmJobs`, `workSummary`, `corpusStats`.
@@ -799,6 +813,7 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 - **Commands:** `bun test tests/knowledge`.
 
 ### Phase 5 — AI layer, execution (jobs + concurrency) & storage
+
 - **Goal:** provider-agnostic AI with retry/trace + pgvector retrieval, the async job runner, the concurrency controller, and the swappable image-storage provider.
 - **Files:** `modules/ai/{models,defaults,model-router.service,costing.service}.ts`, `ai/prompts/*`, `ai/schemas/*`, `modules/ai/retrieval.service.ts` (LlamaIndex+pgvector), the subprocess provider wrappers (`ai/providers/claude-code.ts`, `ai/providers/codex.ts`, env-gated), `modules/ai/concurrency.controller.ts` (§9.2), `modules/jobs/{job.service,job.controller,job.dto}.ts` (§9.1, `GET /jobs/:id`), `modules/storage/{image-storage.interface,local-image-storage.provider,storage.module}.ts` (§9.4), fake router for tests.
 - **Tasks:** port registry+validation (providers: anthropic/openai/xai/ollama + gated claude-code/codex; embedding default `ollama/qwen3-embedding:8b` truncated to dim 1024; image `openai/gpt-image-1`, or `xai` image for grok_only); router with **`contentMode` precedence** (grok_only ⇒ xai-only + embeddings off, §8.5) + chatFor/embeddingsFor/imageModelFor + transient-only retry + structured + trace; all prompts/schemas; chunk/embed/search/backfill; JobService (enqueue/recover/progress); ConcurrencyController (keyed mutex, local⇒global / remote⇒per-project); `StorageModule.forRoot` + `LocalImageStorageProvider`.
@@ -806,18 +821,21 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 - **Commands:** `bun test tests/ai tests/jobs tests/storage`.
 
 ### Phase 6 — Source pipeline (acquire, extract, consolidate, assets, skeleton)
+
 - **Files:** `modules/source/{acquire,adapters/*,text-cleaner}.ts`, `modules/extraction/{extraction,consolidate}.service.ts`, `modules/source/asset.service.ts`, `modules/planning/skeleton.service.ts`, jobs module.
 - **Tasks:** port fetcher + the removed source adapter + `text.py` cleaner (byte-level tests), cursor-driven ingest job, extract job (persist txn + embed + auto-consolidate), consolidate maps, assets renderer (string), skeleton LLM.
 - **Acceptance:** faked-fetcher ingest resumes+idempotent; faked-router extract accumulates+resumes; consolidate promotes correctly.
 - **Commands:** `bun test tests/source tests/extraction`.
 
 ### Phase 7 — Generation (newnovel, plan, outline, generate graph, revise, judge, finalize, validate, review, illustrate, manuscript)
+
 - **Files:** `modules/planning/{newnovel,planning,scaffold,bible-builder}.service.ts` (bible-builder = seed-from-brief LangGraph, §8.7), `modules/generation/*` (brief service, generation graph, draft/finalize/manuscript services + controller + DTOs, `grok-chapter.service.ts`, `continuity-proposal.service.ts`), `modules/validation/*`, `modules/illustration/*`.
 - **Tasks:** **full-bible builder from a brief** (LangGraph, §8.7 — fills every section `draft`/`planned`, editable, `force`-guarded re-seed); port brief assembly faithfully (incl. the **grok-adjacency rule** §8.6); LangGraph generate/auto-fix; judge parse; finalize write-back + ordering; validate/review (skip `generator:grok` chapters); illustration session; handoff/import; **grok interlude chapters** (`generate-grok`, human review, finalize without write-back/embed, `generator:grok` flags); **staged continuity proposal** (propose via Grok → edit → apply/discard, §8.6).
 - **Acceptance:** faked-router: **seed-from-brief fills every bible section (`draft`/`planned`) from one brief, sections editable, re-seed without `force` preserves edits**; plan gate, chapter→volume layout, forward-only drafting, auto-fix loop transitions + early stop, write-back flips planned→active, finalize in-order; a grok chapter finalizes with no bible mutation + no embedding; a proposal stages (pending), edits persist, apply mutates the bible idempotently, discard changes nothing; a standard chapter after a grok chapter gets summary/state (not verbatim) in its brief.
 - **Commands:** `bun test tests/generation tests/validation`.
 
 ### Phase 8 — Concurrency, job recovery & provider-swap hardening
+
 - **Goal:** prove the runtime policies end-to-end (no data migration — decision §1.1.1).
 - **Files:** wire pipelines (Phases 6–7) through `JobService` + `ConcurrencyController`; crash-recovery sweep on boot; `S3ImageStorageProvider` **stub interface only** (to prove swappability — not a working cloud impl).
 - **Tasks:** route every long op through `enqueue`; persist `progress` at each chapter/unit; recover `in_progress` on start; verify subprocess providers gate on env; verify one-line storage swap.
@@ -825,11 +843,13 @@ The clone is independent (row-level isolation); running `extract`/`generate` on 
 - **Commands:** `bun test tests/jobs tests/concurrency tests/storage`.
 
 ### Phase 9 — Tests
+
 - **Files:** `tests/**` mirroring modules + `test-environment.ts` mocks (fake router, mocked long jobs).
 - **Tasks:** unit + service + API + AI-orchestration (mocked) + edge cases (§11).
 - **Acceptance:** `bun test` green; coverage of the §2.11 risk areas.
 
 ### Phase 10 — Documentation & verification
+
 - **Files:** `README.md`, `CLAUDE.md` (commands, architecture, env), API notes.
 - **Tasks:** run the §12 checklist end-to-end.
 - **Acceptance:** every checklist item passes.
@@ -846,7 +866,7 @@ Use `bun:test` + `TestEnvironment` (template-DB clone per spec) + a **fake `Mode
 - **API:** each endpoint (status codes, DTO validation, error codes, pagination), dev-only route gating, 404/409 mapping.
 - **Jobs & concurrency:** job enqueue idempotency + status/progress reflected live; crash-recovery re-arms `in_progress`; ConcurrencyController — local job ⇒ global serial, same-novel remote ⇒ serial, different-novel remote ⇒ parallel, mixed ⇒ local; sync op waits behind a running local job.
 - **Providers & storage:** subprocess providers rejected when their env flag is off; embedding resolves to `ollama/qwen3-embedding:8b` (dim 1024); image to `openai/gpt-image-1`; `IMAGE_STORAGE` swap (local ↔ stub) needs no service change; `LocalImageStorageProvider` save/read/getUrl round-trip.
-- **Grok-only mode:** a `grok_only` project routes *every* LLM/image role to `xai` (assert with a spy that no anthropic/openai/ollama model is ever constructed for it); non-xai config override rejected `AI_003`; embeddings/retrieval are no-ops (empty chunks, `retrieve()===[]`, `backfill` no-op); a `standard` project in the same test run never touches xAI.
+- **Grok-only mode:** a `grok_only` project routes _every_ LLM/image role to `xai` (assert with a spy that no anthropic/openai/ollama model is ever constructed for it); non-xai config override rejected `AI_003`; embeddings/retrieval are no-ops (empty chunks, `retrieve()===[]`, `backfill` no-op); a `standard` project in the same test run never touches xAI.
 - **Grok interlude chapters (§8.6):** `generate-grok` forces `xai` for one chapter (spy), sets `generator:grok`, runs no auto-judge; finalize commits prose but writes **no** bible/knowledge rows and **no** embedding (`continuityApplied=false`); a standard chapter after a grok chapter gets summary/state (not verbatim tail) in its brief; `validate`/`review` skip grok chapters. **Continuity proposal:** propose stages a pending Grok delta (no bible change); PATCH edits persist; apply mutates the bible idempotently from the edited delta with no new LLM call and sets `continuityApplied=true`; discard changes nothing; apply/get with no pending proposal → `CNT_001`.
 - **Full-bible builder (§8.7):** seed-from-brief writes rows into every bible section (vision/world/power/plot/characters/factions/locations/volumes), all `draft`/`planned`; sections editable via CRUD afterward; `brief` persisted on the project; re-seed without `force` preserves an edited section, `force` overwrites.
 - **Novel settings (§1.1.14):** PATCH `config` reassigns a role's model and the next op uses it; a grok-locked role/op rejects the change `AI_003`.
@@ -878,7 +898,7 @@ Use `bun:test` + `TestEnvironment` (template-DB clone per spec) + a **fake `Mode
 - [ ] **Brief → full bible:** `seed-from-brief` fills every bible section (editable, `draft`/`planned`) from one high-level brief; `brief` stored; re-seed respects `force`.
 - [ ] **Live model settings:** any operation's model is reassignable anytime via PATCH `config` (next op honors it); Grok-locked ops reject the change (`AI_003`).
 - [ ] **Novel clone:** `clone` deep-copies inputs into a new project for model A/B; `resetDerived` default keeps inputs + drops derived; the clone is fully isolated.
-- [ ] **Single Volume unit (§1.1.16):** the plan is one `volumes` table (no `arcs`); `/volumes` routes, `volumeKey`, `chapters_per_volume`, chapter→volume layout; no `arc`/`arcKey` symbol remains in `src/` (except *character arc*).
+- [ ] **Single Volume unit (§1.1.16):** the plan is one `volumes` table (no `arcs`); `/volumes` routes, `volumeKey`, `chapters_per_volume`, chapter→volume layout; no `arc`/`arcKey` symbol remains in `src/` (except _character arc_).
 - [ ] **Web-novel simple English (§1.1.17):** `AUTHORING_STYLE` is prepended to every prose-authoring prompt and absent from analytical prompts (assert via the built prompt strings).
 - [ ] **Subprocess providers** (`anthropic-claude-code`, `openai-codex`) selectable only when their env flag is set; `ollama` supported.
 - [ ] **Image storage is a swappable provider** (`IMAGE_STORAGE`); local-folder impl ships; swap needs one module change.
@@ -905,10 +925,10 @@ Use `bun:test` + `TestEnvironment` (template-DB clone per spec) + a **fake `Mode
 10. **Out of scope:** the Flask `browse` UI (a future frontend consumes this API); `novel_spec` legacy table.
 11. **Grok-only content mode** (`projects.contentMode = grok_only`, §8.5): adult/uncensored novels route every LLM + image role to **xAI Grok** and call no other provider (fail-closed, `AI_003`); embeddings/retrieval are disabled for these projects. `standard` projects never use Grok. Provider `xai` added; new keys `ai.xaiApiKey`/`ai.grokLlmModel`/`ai.grokImageModel`.
 12. **Grok interlude chapters + staged continuity promotion** (§8.6): a `standard` project can author individual chapters with Grok (`generator:grok`), human-reviewed (no auto-judge), committed to the manuscript but **not** written back to the bible or embedded by default (grok-adjacency rule protects the following standard chapter's brief). Opt-in promotion re-extracts the write-back **with Grok** and **stages an editable proposal** (`continuity_proposals`) the human reviews, edits, and applies or discards — nothing enters the bible without that decision.
-13. **Brief → full lore-bible generation** (§8.7): a new `new_novel` project is seeded from a single high-level brief that fills the *entire* bible (all sections `draft`/`planned`) via a LangGraph builder; every section is then editable; the brief is stored on `projects.brief`.
+13. **Brief → full lore-bible generation** (§8.7): a new `new_novel` project is seeded from a single high-level brief that fills the _entire_ bible (all sections `draft`/`planned`) via a LangGraph builder; every section is then editable; the brief is stored on `projects.brief`.
 14. **Live per-operation model settings** (§1.1.14): any role's model is reassignable anytime via PATCH `config`, effective next op; Grok-locked ops/projects can't be moved off `xai` (`AI_003`).
 15. **Novel cloning** (§9.5): deep-copy a project (inputs-only by default) for A/B testing the same input across different model configs.
-16. **Single "Volume" planning unit** (§1.1.16): the Python two-tier volume→arc is flattened to one `volumes` table (Python "arc" renamed Volume); `volumeKey`, `/volumes` routes, `chapters_per_volume`. *Character arc* (development journey) keeps its name. §2 keeps the source's original terms; §5–§8 use Volume.
+16. **Single "Volume" planning unit** (§1.1.16): the Python two-tier volume→arc is flattened to one `volumes` table (Python "arc" renamed Volume); `volumeKey`, `/volumes` routes, `chapters_per_volume`. _Character arc_ (development journey) keeps its name. §2 keeps the source's original terms; §5–§8 use Volume.
 17. **Web-novel-only, very simple English** (§1.1.17, §8.0): a global `AUTHORING_STYLE` preamble is prepended to every prose-authoring prompt (generation/revision/fix/outline/newnovel/plan/bible-builder) — web-novel style, short sentences, common words, minimal jargon; not added to the analytical prompts.
 
 **Standing assumptions (proceed unless told otherwise):**

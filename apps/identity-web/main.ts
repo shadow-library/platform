@@ -4,7 +4,7 @@
  */
 import { join } from 'node:path';
 
-import { Logger, Config } from '@shadow-library/common';
+import { Config, Logger } from '@shadow-library/common';
 import { serve } from '@shadow-library/web/server-entry';
 
 /**

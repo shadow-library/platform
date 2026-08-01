@@ -37,9 +37,9 @@ Design invariants, in order of precedence:
 §1.1.16 flattened the Python volume→arc hierarchy into a single `Volume` unit. That decision is **amended, not reverted**:
 
 - `Volume` remains the top planning tier and the approval gate it is today (`draft → approved`), and remains the unit the volume-planner writes.
-- A new **`Arc`** sub-tier is added *inside* volumes. It is not the Python "arc" (which was the generation unit); it is a narrative-structure unit that partitions a volume's chapters into escalation blocks, each with its own objective, escalation, payoff, and handoff hook.
+- A new **`Arc`** sub-tier is added _inside_ volumes. It is not the Python "arc" (which was the generation unit); it is a narrative-structure unit that partitions a volume's chapters into escalation blocks, each with its own objective, escalation, payoff, and handoff hook.
 - The deterministic chapter→volume mapping changes from a global `chapters_per_volume` constant to **cumulative per-volume `targetChapterCount`**: on `/volumes/approve`, volume ranges are computed as running sums in ordinal order (`vol1 = [1..n1]`, `vol2 = [n1+1..n1+n2]`, …). `generate.chapters_per_volume` remains only as the default seed for `targetChapterCount`.
-- *Character arcs* keep their name and JSONB home (`projects.skeletonCharacterArcs`), unchanged.
+- _Character arcs_ keep their name and JSONB home (`projects.skeletonCharacterArcs`), unchanged.
 - Arcs are optional per volume: an arc-less volume (e.g. source-imported) keeps volume-scoped outlining and no arc gate. This is a new project with no legacy data, so no adoption/migration machinery exists — adopting arcs on a volume simply means planning them.
 
 ### 2.2 ai-system-design Appendix A — rules 12 and 13
@@ -69,81 +69,81 @@ All Drizzle, one migration (task R1). Conventions match existing schemas (bigser
 
 ### 3.1 `arcs` (added to `src/database/schemas/plan.ts`)
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigserial pk | |
-| `projectId` | bigint FK projects cascade | |
-| `arcKey` | varchar notNull | stable snake_case id, e.g. `vol_2_arc_1` |
-| `volumeKey` | varchar notNull | loose key coupling, same convention as `briefs.volumeKey` |
-| `ordinal` | integer notNull default 0 | order within the volume |
-| `title` | varchar(500) | |
-| `objective` | text | what the arc accomplishes |
-| `escalation` | text | conflict/escalation description |
-| `payoff` | text | how the arc resolves |
-| `hook` | text | how the arc hands off to the next arc (or volume) |
-| `chapterStart` / `chapterEnd` | integer | **absolute** chapter numbers; containment inside the parent volume's `[startChapter, endChapter]` is enforced in service code (keeps joins with `briefs.chapter`/`drafts.chapter` trivial) |
-| `cast` | jsonb | array of entityKeys |
-| `status` | `plan_status` (reused) | arcs use `draft`/`approved` only |
-| `body` | text | authored arc prose (ideas, materials, notes) |
-| `revision` | integer notNull default 1 | bumped on every write; conflict detection |
-| `contentHash` | varchar | sha256 of canonical content serialization |
-| `staleReason` | varchar | set when the parent volume changed after arc creation; cleared on re-approve/re-outline |
-| `createdAt` / `updatedAt` | timestamp | |
+| Column                        | Type                       | Notes                                                                                                                                                                                      |
+| ----------------------------- | -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `id`                          | bigserial pk               |                                                                                                                                                                                            |
+| `projectId`                   | bigint FK projects cascade |                                                                                                                                                                                            |
+| `arcKey`                      | varchar notNull            | stable snake_case id, e.g. `vol_2_arc_1`                                                                                                                                                   |
+| `volumeKey`                   | varchar notNull            | loose key coupling, same convention as `briefs.volumeKey`                                                                                                                                  |
+| `ordinal`                     | integer notNull default 0  | order within the volume                                                                                                                                                                    |
+| `title`                       | varchar(500)               |                                                                                                                                                                                            |
+| `objective`                   | text                       | what the arc accomplishes                                                                                                                                                                  |
+| `escalation`                  | text                       | conflict/escalation description                                                                                                                                                            |
+| `payoff`                      | text                       | how the arc resolves                                                                                                                                                                       |
+| `hook`                        | text                       | how the arc hands off to the next arc (or volume)                                                                                                                                          |
+| `chapterStart` / `chapterEnd` | integer                    | **absolute** chapter numbers; containment inside the parent volume's `[startChapter, endChapter]` is enforced in service code (keeps joins with `briefs.chapter`/`drafts.chapter` trivial) |
+| `cast`                        | jsonb                      | array of entityKeys                                                                                                                                                                        |
+| `status`                      | `plan_status` (reused)     | arcs use `draft`/`approved` only                                                                                                                                                           |
+| `body`                        | text                       | authored arc prose (ideas, materials, notes)                                                                                                                                               |
+| `revision`                    | integer notNull default 1  | bumped on every write; conflict detection                                                                                                                                                  |
+| `contentHash`                 | varchar                    | sha256 of canonical content serialization                                                                                                                                                  |
+| `staleReason`                 | varchar                    | set when the parent volume changed after arc creation; cleared on re-approve/re-outline                                                                                                    |
+| `createdAt` / `updatedAt`     | timestamp                  |                                                                                                                                                                                            |
 
 Constraints: `unique(projectId, arcKey)`; `index(projectId, volumeKey, ordinal)`; CHECK `chapter_start <= chapter_end`.
 
 ### 3.2 `chat_sessions` (new file `src/database/schemas/refinement.ts`)
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | uuid pk defaultRandom | |
-| `projectId` | bigint FK cascade | |
-| `scopeType` | pgEnum `chat_scope`: `novel` \| `bible_document` \| `volume_plan` \| `volume` \| `arc_plan` \| `arc` \| `brief` | |
-| `scopeRef` | varchar nullable | `doc:<section>/<slug>`, `volume:<volumeKey>`, `arc:<arcKey>`, `chapter:<n>`; null for `novel`/`volume_plan`; `arc_plan` uses `volume:<volumeKey>` |
-| `title` | varchar(500) | |
-| `status` | pgEnum `chat_session_status`: `active` \| `archived` | |
-| `summary` | text nullable | rolling compacted history (§5.4) |
-| `summaryThroughOrdinal` | integer notNull default 0 | compaction watermark |
-| `lastTurnAt` | timestamp nullable | |
-| `createdAt` / `updatedAt` | timestamp | |
+| Column                    | Type                                                                                                            | Notes                                                                                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `id`                      | uuid pk defaultRandom                                                                                           |                                                                                                                                                   |
+| `projectId`               | bigint FK cascade                                                                                               |                                                                                                                                                   |
+| `scopeType`               | pgEnum `chat_scope`: `novel` \| `bible_document` \| `volume_plan` \| `volume` \| `arc_plan` \| `arc` \| `brief` |                                                                                                                                                   |
+| `scopeRef`                | varchar nullable                                                                                                | `doc:<section>/<slug>`, `volume:<volumeKey>`, `arc:<arcKey>`, `chapter:<n>`; null for `novel`/`volume_plan`; `arc_plan` uses `volume:<volumeKey>` |
+| `title`                   | varchar(500)                                                                                                    |                                                                                                                                                   |
+| `status`                  | pgEnum `chat_session_status`: `active` \| `archived`                                                            |                                                                                                                                                   |
+| `summary`                 | text nullable                                                                                                   | rolling compacted history (§5.4)                                                                                                                  |
+| `summaryThroughOrdinal`   | integer notNull default 0                                                                                       | compaction watermark                                                                                                                              |
+| `lastTurnAt`              | timestamp nullable                                                                                              |                                                                                                                                                   |
+| `createdAt` / `updatedAt` | timestamp                                                                                                       |                                                                                                                                                   |
 
 Indexes: `(projectId, status)`, `(projectId, scopeType, scopeRef)`.
 
 ### 3.3 `chat_messages`
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigserial pk | |
-| `sessionId` | uuid FK chat_sessions cascade | |
-| `projectId` | bigint FK cascade | |
-| `ordinal` | integer notNull | `unique(sessionId, ordinal)` |
-| `role` | pgEnum `chat_message_role`: `user` \| `assistant` | |
-| `content` | text notNull | |
-| `proposalId` | bigint nullable | → refinement_proposals; set on assistant messages that carried a change-set |
-| `runId` | varchar nullable | workflow_runs correlation (rule 11) |
-| `tokens` | integer nullable | o200k_base count, cached for compaction math |
-| `createdAt` | timestamp | |
+| Column       | Type                                              | Notes                                                                       |
+| ------------ | ------------------------------------------------- | --------------------------------------------------------------------------- |
+| `id`         | bigserial pk                                      |                                                                             |
+| `sessionId`  | uuid FK chat_sessions cascade                     |                                                                             |
+| `projectId`  | bigint FK cascade                                 |                                                                             |
+| `ordinal`    | integer notNull                                   | `unique(sessionId, ordinal)`                                                |
+| `role`       | pgEnum `chat_message_role`: `user` \| `assistant` |                                                                             |
+| `content`    | text notNull                                      |                                                                             |
+| `proposalId` | bigint nullable                                   | → refinement_proposals; set on assistant messages that carried a change-set |
+| `runId`      | varchar nullable                                  | workflow_runs correlation (rule 11)                                         |
+| `tokens`     | integer nullable                                  | o200k_base count, cached for compaction math                                |
+| `createdAt`  | timestamp                                         |                                                                             |
 
 ### 3.4 `refinement_proposals`
 
 `continuity_proposals` is `unique(projectId, chapter)` with `chapter notNull` — structurally wrong for heterogeneous artifacts, so this is a new table; `continuity_proposals` is untouched.
 
-| Column | Type | Notes |
-|---|---|---|
-| `id` | bigserial pk | |
-| `projectId` | bigint FK cascade | |
-| `sessionId` | uuid nullable FK chat_sessions | null for premise/audit/arc-plan invoked outside chat |
-| `messageId` | bigint nullable | the assistant message that produced it |
-| `scopeType` / `scopeRef` | as chat_sessions | denormalized; `novel` for premise/audit |
-| `kind` | pgEnum `refinement_kind`: `chat` \| `premise_enhance` \| `bible_audit` \| `arc_plan` | |
-| `status` | pgEnum `refinement_proposal_status`: `pending` \| `applied` \| `discarded` \| `superseded` \| `conflicted` | |
-| `summary` | text | human-readable one-liner |
-| `changeSet` | jsonb notNull | ops array (§6.1) |
-| `baseline` | jsonb notNull | `{ "<artifactRef>": { revision, contentHash } }` captured at proposal time |
-| `model` / `runId` | varchar | attribution |
-| `appliedAt` | timestamp nullable | |
-| `error` | jsonb nullable | conflict detail on `conflicted` |
-| `createdAt` / `updatedAt` | timestamp | |
+| Column                    | Type                                                                                                       | Notes                                                                      |
+| ------------------------- | ---------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
+| `id`                      | bigserial pk                                                                                               |                                                                            |
+| `projectId`               | bigint FK cascade                                                                                          |                                                                            |
+| `sessionId`               | uuid nullable FK chat_sessions                                                                             | null for premise/audit/arc-plan invoked outside chat                       |
+| `messageId`               | bigint nullable                                                                                            | the assistant message that produced it                                     |
+| `scopeType` / `scopeRef`  | as chat_sessions                                                                                           | denormalized; `novel` for premise/audit                                    |
+| `kind`                    | pgEnum `refinement_kind`: `chat` \| `premise_enhance` \| `bible_audit` \| `arc_plan`                       |                                                                            |
+| `status`                  | pgEnum `refinement_proposal_status`: `pending` \| `applied` \| `discarded` \| `superseded` \| `conflicted` |                                                                            |
+| `summary`                 | text                                                                                                       | human-readable one-liner                                                   |
+| `changeSet`               | jsonb notNull                                                                                              | ops array (§6.1)                                                           |
+| `baseline`                | jsonb notNull                                                                                              | `{ "<artifactRef>": { revision, contentHash } }` captured at proposal time |
+| `model` / `runId`         | varchar                                                                                                    | attribution                                                                |
+| `appliedAt`               | timestamp nullable                                                                                         |                                                                            |
+| `error`                   | jsonb nullable                                                                                             | conflict detail on `conflicted`                                            |
+| `createdAt` / `updatedAt` | timestamp                                                                                                  |                                                                            |
 
 Indexes: `(projectId, status)`, `(sessionId)`, `(projectId, scopeType, scopeRef, status)`.
 
@@ -224,14 +224,14 @@ The playbooks are where the "senior web novelist" lives: the `novel` playbook pu
 
 Module `src/modules/refinement/`, controller root `/projects/:projectId`:
 
-| Method | Path | Notes |
-|---|---|---|
-| POST | `/chat/sessions` | `{scopeType, scopeRef?, title?}`; validates scopeRef exists |
-| GET | `/chat/sessions?scopeType&status` | list |
-| GET | `/chat/sessions/:sessionId` | detail |
-| GET | `/chat/sessions/:sessionId/messages?before&limit` | paged transcript |
-| POST | `/chat/sessions/:sessionId/messages` | `{content}` → `{userMessage, assistantMessage, proposal?, runId}` |
-| POST | `/chat/sessions/:sessionId/archive` · `/unarchive` | |
+| Method | Path                                               | Notes                                                             |
+| ------ | -------------------------------------------------- | ----------------------------------------------------------------- |
+| POST   | `/chat/sessions`                                   | `{scopeType, scopeRef?, title?}`; validates scopeRef exists       |
+| GET    | `/chat/sessions?scopeType&status`                  | list                                                              |
+| GET    | `/chat/sessions/:sessionId`                        | detail                                                            |
+| GET    | `/chat/sessions/:sessionId/messages?before&limit`  | paged transcript                                                  |
+| POST   | `/chat/sessions/:sessionId/messages`               | `{content}` → `{userMessage, assistantMessage, proposal?, runId}` |
+| POST   | `/chat/sessions/:sessionId/archive` · `/unarchive` |                                                                   |
 
 ### 5.4 History compaction
 
@@ -274,13 +274,13 @@ Single `db.transaction`, mirroring `applyContinuityProposal` (`generation.servic
 
 ### 6.3 Proposal endpoints
 
-| Method | Path | Notes |
-|---|---|---|
-| GET | `/proposals?status&sessionId&kind&scopeType` | list |
-| GET | `/proposals/:id` | detail incl. changeSet + baseline |
-| PATCH | `/proposals/:id` | `{changeSet}` hand-edit while pending; re-validated |
-| POST | `/proposals/:id/apply` | → `{applied: [{artifactRef, newRevision}], staleMarked: [...]}`; 409 on conflict |
-| POST | `/proposals/:id/discard` | |
+| Method | Path                                         | Notes                                                                            |
+| ------ | -------------------------------------------- | -------------------------------------------------------------------------------- |
+| GET    | `/proposals?status&sessionId&kind&scopeType` | list                                                                             |
+| GET    | `/proposals/:id`                             | detail incl. changeSet + baseline                                                |
+| PATCH  | `/proposals/:id`                             | `{changeSet}` hand-edit while pending; re-validated                              |
+| POST   | `/proposals/:id/apply`                       | → `{applied: [{artifactRef, newRevision}], staleMarked: [...]}`; 409 on conflict |
+| POST   | `/proposals/:id/discard`                     |                                                                                  |
 
 ### 6.4 Supersession
 
@@ -292,7 +292,7 @@ When a new turn in the same session produces a change-set touching an artifactRe
 
 Both are standalone chains through the same proposal pipe — runnable on any project at any time, independent of chat.
 
-**`POST /premise/enhance`** `{overview?}` (falls back to `projects.brief`/`premise`). The `premise-enhance` module (role `premise`, authoring) evaluates the overview as a web novel — hook strength, stakes, protagonist drive, progression/power system, serialization viability, genre conventions — and returns `{enhancedPremise, hook, stakes, protagonistDrive, progressionSystem, serializationNotes, genre, themes[], changeSet}`. The change-set (kind `premise_enhance`) carries `premise.update` plus `bible_document.upsert` ops for the project/premise doc. The response surfaces the rationale fields so the user sees *why* before applying; refinement continues in a `novel`-scoped chat.
+**`POST /premise/enhance`** `{overview?}` (falls back to `projects.brief`/`premise`). The `premise-enhance` module (role `premise`, authoring) evaluates the overview as a web novel — hook strength, stakes, protagonist drive, progression/power system, serialization viability, genre conventions — and returns `{enhancedPremise, hook, stakes, protagonistDrive, progressionSystem, serializationNotes, genre, themes[], changeSet}`. The change-set (kind `premise_enhance`) carries `premise.update` plus `bible_document.upsert` ops for the project/premise doc. The response surfaces the rationale fields so the user sees _why_ before applying; refinement continues in a `novel`-scoped chat.
 
 **`POST /bible/audit`**. The `bible-audit` module (role `audit`, analytical, llm_cache-cacheable) receives the bible doc inventory (section/slug/first-lines) plus the code constant `REQUIRED_BIBLE_DOCS` — the manifest of what a serialized web novel's bible needs, all slugs under the **existing** `bible_section` enum (no enum change), e.g. `project/pacing-tone`, `project/reader-promise`, `power/progression-ladder`, `plot/escalation-map`. Output: `{findings[], changeSet}` — `bible_document.upsert` ops (drafted content for missing docs, grounded in the premise) and `bible_document.remove` ops for docs that serve nothing (findings explain each). Kind `bible_audit`, same apply/discard flow.
 
@@ -335,7 +335,7 @@ Resolved by the existing catalog/ref-resolution stage; invalid refs keep today's
 
 Every brief carries `endingContract` (§3.5). Enforcement is three-point:
 
-- **`outline` v2** (arc-scoped): output schema makes `endingContract` required per brief; the outliner receives the arc's objective/escalation/hook and the *next* chapter's intent, so contracts chain — each chapter ends where the next can pick up. The arc's final chapter inherits the arc's `hook` as its handoff.
+- **`outline` v2** (arc-scoped): output schema makes `endingContract` required per brief; the outliner receives the arc's objective/escalation/hook and the _next_ chapter's intent, so contracts chain — each chapter ends where the next can pick up. The arc's final chapter inherits the arc's `hook` as its handoff.
 - **`generation` v2**: the template renders `## ENDING CONTRACT` in the volatile tail; system text instructs that the closing scene must satisfy hookType/emotionalBeat/openQuestion/handoffState, must not resolve `mustNotResolve` items, and must never wrap up conclusively unless the contract says so.
 - **`judge` v2**: input gains the contract; output gains `endingCompliance: { compliant, issues[] }`. The judge node in `chapter-generation.graph.ts` routes non-compliance into the existing `repairPatch` path with the issues as fix instructions (soft, patch-first — same ladder as continuity findings).
 
@@ -367,12 +367,12 @@ Convention for every module with `cacheStrategy` (enforced by render goldens):
 
 Injection lives entirely in `ModelRouterService.structured()` — nodes and services stay provider-agnostic. When `provider === 'anthropic'` and the module declares `cacheStrategy`, the router formats the template to messages, converts string contents to content-block arrays, and sets `cache_control: { type: 'ephemeral' }` at the three breakpoints above (≤ Anthropic's 4-breakpoint limit; blocks under ~1 024 tokens are left unmarked). Provider matrix:
 
-| Provider | Behavior |
-|---|---|
-| anthropic | explicit `cache_control` blocks |
-| openai / xai | no-op in code; automatic prefix caching benefits from stable-first ordering |
-| ollama | no-op (KV-cache reuse still benefits from the stable prefix) |
-| subprocess providers | no-op |
+| Provider             | Behavior                                                                    |
+| -------------------- | --------------------------------------------------------------------------- |
+| anthropic            | explicit `cache_control` blocks                                             |
+| openai / xai         | no-op in code; automatic prefix caching benefits from stable-first ordering |
+| ollama               | no-op (KV-cache reuse still benefits from the stable prefix)                |
+| subprocess providers | no-op                                                                       |
 
 Orthogonal to `llm_cache` (whole-response memo for deterministic roles), which is unchanged; `audit` and `compact` join `CACHEABLE_ROLES`; creative roles (chat, premise, arc, generation) stay out.
 
@@ -386,27 +386,27 @@ Orthogonal to `llm_cache` (whole-response memo for deterministic roles), which i
 
 Constants beside `DEFAULT_BUDGET = 24_000`, counted with js-tiktoken `o200k_base` as everywhere else:
 
-| Purpose | Total | Split |
-|---|---|---|
-| chat | 24 000 | stable ≤ 14k · history ≤ 6k (summary ≤ 1.5k + last 6 verbatim turns) · volatile delta ≤ 2k · remainder headroom |
-| arc_plan | 16 000 | |
-| premise | 8 000 | |
-| audit | 12 000 | |
+| Purpose  | Total  | Split                                                                                                           |
+| -------- | ------ | --------------------------------------------------------------------------------------------------------------- |
+| chat     | 24 000 | stable ≤ 14k · history ≤ 6k (summary ≤ 1.5k + last 6 verbatim turns) · volatile delta ≤ 2k · remainder headroom |
+| arc_plan | 16 000 |                                                                                                                 |
+| premise  | 8 000  |                                                                                                                 |
+| audit    | 12 000 |                                                                                                                 |
 
 ---
 
 ## 11. Prompt modules & model roles
 
-| Key | Role | Kind | llm_cache | Output |
-|---|---|---|---|---|
-| `premise-enhance` | `premise` | authoring | no | enhanced premise + rationale + changeSet |
-| `bible-audit` | `audit` | analytical | **yes** | findings + changeSet |
-| `chat-refine` | `chat` | authoring | no | `{reply, changeSet?}` |
-| `chat-compact` | `compact` | analytical | **yes** | `{summary}` |
-| `arc-plan` | `arc` | authoring | no | `{arcs[]}` with coverage postValidate |
-| `outline` **v2** | (existing) | authoring | no | + required `endingContract`, arc-aware |
-| `generation` **v2** | (existing) | authoring | no | ending-contract instructions + volatile-tail render |
-| `judge` **v2** | (existing) | analytical | yes (existing) | + `endingCompliance` |
+| Key                 | Role       | Kind       | llm_cache      | Output                                              |
+| ------------------- | ---------- | ---------- | -------------- | --------------------------------------------------- |
+| `premise-enhance`   | `premise`  | authoring  | no             | enhanced premise + rationale + changeSet            |
+| `bible-audit`       | `audit`    | analytical | **yes**        | findings + changeSet                                |
+| `chat-refine`       | `chat`     | authoring  | no             | `{reply, changeSet?}`                               |
+| `chat-compact`      | `compact`  | analytical | **yes**        | `{summary}`                                         |
+| `arc-plan`          | `arc`      | authoring  | no             | `{arcs[]}` with coverage postValidate               |
+| `outline` **v2**    | (existing) | authoring  | no             | + required `endingContract`, arc-aware              |
+| `generation` **v2** | (existing) | authoring  | no             | ending-contract instructions + volatile-tail render |
+| `judge` **v2**      | (existing) | analytical | yes (existing) | + `endingCompliance`                                |
 
 New roles are added to both `AI_PROFILE` default maps (production + local-test). All five new features run as chains under a new public helper `WorkflowRunService.runChain(projectId, graph, target, fn)` (generalizing the private `createRun`/`completeRun`/`failRun` trio), with `graph` values `chat-turn`, `premise-enhance`, `bible-audit`, `arc-plan`. Version bumps (v2) intentionally invalidate render goldens and `llm_cache` keys.
 
@@ -416,15 +416,15 @@ New roles are added to both `AI_PROFILE` default maps (production + local-test).
 
 Everything under `/projects/:projectId`:
 
-| Area | Endpoints |
-|---|---|
-| Chat | `POST/GET /chat/sessions`, `GET /chat/sessions/:id`, `GET/POST /chat/sessions/:id/messages`, `POST /chat/sessions/:id/archive|unarchive` |
-| Proposals | `GET /proposals`, `GET/PATCH /proposals/:id`, `POST /proposals/:id/apply|discard` |
-| Premise | `POST /premise/enhance` |
-| Bible audit | `POST /bible/audit` |
-| Arcs | `POST /volumes/:volumeKey/arcs/plan`, `GET /volumes/:volumeKey/arcs`, `GET/PUT /arcs/:arcKey`, `POST /volumes/:volumeKey/arcs/approve`, `POST /arcs/:arcKey/outline` |
-| Volumes (changed) | `PATCH /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` computes cumulative ranges |
-| Preview (new) | `GET /context/preview?purpose=generation|outline|chat|arc_plan|premise|audit` with `chapter`, `scopeType`/`scopeRef`, or `volumeKey` per purpose |
+| Area              | Endpoints                                                                                                                                                            |
+| ----------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Chat              | `POST/GET /chat/sessions`, `GET /chat/sessions/:id`, `GET/POST /chat/sessions/:id/messages`, `POST /chat/sessions/:id/archive                                        | unarchive` |
+| Proposals         | `GET /proposals`, `GET/PATCH /proposals/:id`, `POST /proposals/:id/apply                                                                                             | discard`   |
+| Premise           | `POST /premise/enhance`                                                                                                                                              |
+| Bible audit       | `POST /bible/audit`                                                                                                                                                  |
+| Arcs              | `POST /volumes/:volumeKey/arcs/plan`, `GET /volumes/:volumeKey/arcs`, `GET/PUT /arcs/:arcKey`, `POST /volumes/:volumeKey/arcs/approve`, `POST /arcs/:arcKey/outline` |
+| Volumes (changed) | `PATCH /volumes/:volumeKey` accepts `targetChapterCount`; `POST /volumes/approve` computes cumulative ranges                                                         |
+| Preview (new)     | `GET /context/preview?purpose=generation                                                                                                                             | outline    | chat | arc_plan | premise | audit`with`chapter`, `scopeType`/`scopeRef`, or `volumeKey` per purpose |
 
 ---
 

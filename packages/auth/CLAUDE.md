@@ -28,15 +28,15 @@ hand-rolling config, logging, errors, or validation.
 
 ## Commands
 
-| Purpose | Command |
-|---|---|
-| Install | `bun install` |
-| Verify — format + lint + type-check + test | `bun run verify` |
-| Verify with autofix | `bun run verify --fix` |
-| Type-check only | `bun run type-check` |
-| Test | `bun test` |
-| Build | `bun run build` |
-| Release | Retired — this package is private and not published; `shadow commit-msg` + root Husky still enforce the commit-message format |
+| Purpose                                    | Command                                                                                                                       |
+| ------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| Install                                    | `bun install`                                                                                                                 |
+| Verify — format + lint + type-check + test | `bun run verify`                                                                                                              |
+| Verify with autofix                        | `bun run verify --fix`                                                                                                        |
+| Type-check only                            | `bun run type-check`                                                                                                          |
+| Test                                       | `bun test`                                                                                                                    |
+| Build                                      | `bun run build`                                                                                                               |
+| Release                                    | Retired — this package is private and not published; `shadow commit-msg` + root Husky still enforce the commit-message format |
 
 ## Conventions
 

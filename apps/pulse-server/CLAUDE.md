@@ -10,8 +10,6 @@ Pulse Server is a multi-channel notification service (SMS, Email, Push, WhatsApp
 
 ```bash
 bun run dev              # Start dev server with watch mode
-bun run build            # Production build via `shadow build` (single-file dist/main.js + dist/migrate-db.js)
-bun run verify           # `shadow verify`: prettier + eslint + type-check + tests (add --fix to autofix)
 bun run type-check       # TypeScript type checking (tsc, no emit)
 bun test                 # Run all tests
 bun test tests/notification/notification.spec.ts  # Run a single test file
@@ -20,11 +18,16 @@ bun test tests/notification/notification.spec.ts  # Run a single test file
 bun run db:create-template  # Create template database (required before tests)
 bun run db:migrate          # Run migrations
 bun run db:seed             # Seed initial data
+
+# From the repo root, by workspace path — this workspace has no build/verify script:
+bun scripts/build.ts apps/pulse-server    # single-file dist/main.js + dist/migrate-db.js
+bun scripts/verify.ts apps/pulse-server   # prettier + eslint + type-check + tests (add --fix to autofix)
 ```
 
-All scripting (build, lint, format, commit-msg linting) is owned by the `shadow` CLI (root `scripts/`
-tooling), configured through `.shadowrc.json` — there is no per-repo eslint, prettier, or commitlint
-config. Husky hooks live once at the repo root, not per-package.
+All root-tooling scripting (build, lint, format, commit-msg linting) is convention-driven, invoked by path
+from `scripts/` — there is no `shadow` CLI and no `.shadowrc.json`; both were retired. This workspace **does**
+have its own `eslint.config.ts` layering deviations on top of the root ESLint config; there is no per-repo
+Prettier or commitlint config. Husky hooks live once at the repo root, not per-package.
 
 Tests require a running PostgreSQL instance. The template database must be created before running tests (`bun run db:create-template`). Each test file gets its own database cloned from the template via `createDatabaseFromTemplate`.
 
@@ -53,12 +56,12 @@ Each module follows the pattern: `*.module.ts`, `*.controller.ts`, `*.service.ts
 
 The entire auth surface is declared and loaded by `@shadow-library/auth/module` (the v1.1 "derived configuration" SDK), so pulse restates none of it. A steady-state deploy sets exactly three things plus one credential:
 
-| Env var | Meaning |
-| --- | --- |
-| `AUTH_ISSUER` | Identity base URL; must match identity's issuer exactly (a trailing-slash mismatch is a blanket 401) |
-| `AUTH_APP_ID` | Pulse's app id at identity (`pulse`); doubles as the OAuth client id. Prod-required |
-| `AUTH_CLIENT_SECRET` | Static client secret — the credential outside the cluster |
-| `AUTH_CLIENT_ASSERTION_PATH` | Projected k8s SA token — the preferred in-cluster credential (use instead of the secret) |
+| Env var                      | Meaning                                                                                              |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `AUTH_ISSUER`                | Identity base URL; must match identity's issuer exactly (a trailing-slash mismatch is a blanket 401) |
+| `AUTH_APP_ID`                | Pulse's app id at identity (`pulse`); doubles as the OAuth client id. Prod-required                  |
+| `AUTH_CLIENT_SECRET`         | Static client secret — the credential outside the cluster                                            |
+| `AUTH_CLIENT_ASSERTION_PATH` | Projected k8s SA token — the preferred in-cluster credential (use instead of the secret)             |
 
 The audience (`api://pulse`), redirect URIs (`{origin}/api/auth/callback`), and granted scopes (`authz:check`, `authz:roles:sync`, `app-session:manage`) are **derived** from `GET {AUTH_ISSUER}/api/v1/apps/me` at boot and refreshed on a TTL — never set in a pulse env var. Optional local-dev-over-http knobs (the session cookie defaults to the `__Host-`-prefixed, `Secure` `__Host-shadow-session`): `AUTH_SESSION_COOKIE_SECURE=false` (drops `Secure` + the `__Host-` prefix), `AUTH_SESSION_COOKIE_NAME`, `AUTH_SESSION_COOKIE_SAME_SITE`. `APP_PUBLIC_URL`, `AUTH_AUDIENCE`, `AUTH_IDENTITY_RESOURCE`, `APP_CLIENT_ID`/`APP_CLIENT_SECRET` are all **gone**.
 
@@ -99,5 +102,5 @@ Conventional Commits format: `<type>(<scope>): <subject>` (max 70 chars). Types:
 
 - Strict TypeScript (`strict: true`, `noUncheckedIndexedAccess: true`), TypeScript 6.x (no `baseUrl`; `./`-relative `paths`)
 - ESModules (`"type": "module"`); the whole @shadow-library 2.0 line is ESM-only
-- Lint/format rules ship with `shadow verify` (typescript-eslint strict + stylistic, perfectionist import sorting, prettier base rules); repo overrides live in `.shadowrc.json`
+- Lint/format rules ship with `bun scripts/verify.ts` (typescript-eslint strict + stylistic, perfectionist import sorting, prettier base rules); this workspace's `eslint.config.ts` layers its own deviations on top of the root config
 - Errors: throw `AppErrorCode.X.create()` (ErrorCode catalogs from `@shadow-library/common` 2.0); the `ServerError` class no longer exists

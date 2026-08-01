@@ -5,14 +5,15 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "build:app": "bun run scripts/generate-manifest.ts && vite build && vite build --config vite.sw.config.ts && bun run format:gen",
-    "format:gen": "prettier --log-level warn --single-quote --trailing-comma all --print-width 180 --arrow-parens avoid --write src/routeTree.gen.ts",
+    "format:gen": "prettier --log-level warn --write src/routeTree.gen.ts",
     "start": "bun main.ts",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
-    "test": "vitest run",
-    "generate:api-types": "bun ../../scripts/src/bin/shadow.ts gen-api-types http://localhost:8080/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts"
+    "test": "vitest run"
+  },
+  "shadow": {
+    "command": "bun run build:app",
+    "verifyTest": true
   },
   "dependencies": {
     "@shadow-library/ui": "workspace:*",

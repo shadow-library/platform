@@ -6,7 +6,7 @@
 ## 1. Overview & product intent
 
 The chat becomes the **central hub of the product** — the ChatGPT/Claude-style conversation through which the
-author can inspect, modify, and drive *everything*: premise, bible, entities, volumes, arcs, briefs, draft
+author can inspect, modify, and drive _everything_: premise, bible, entities, volumes, arcs, briefs, draft
 prose, and the generation pipeline itself. It is the app's central selling point.
 
 Two modes, switchable per session at any time:
@@ -49,17 +49,17 @@ them for confirmation and auto mode executes them in-turn.
 
 ## 2. Amendments to existing documents
 
-- **ai-system-design Appendix A rule 2** — amended: *"Authoring nodes have zero tools; no write tools exist,
-  ever"* becomes *"…; **chat turns may consult the read-only tool registry through the declared-lookup
-  protocol (chat-hub design §7)**; no write tools exist, ever."* The lookup protocol keeps the model on the
+- **ai-system-design Appendix A rule 2** — amended: _"Authoring nodes have zero tools; no write tools exist,
+  ever"_ becomes _"…; **chat turns may consult the read-only tool registry through the declared-lookup
+  protocol (chat-hub design §7)**; no write tools exist, ever."_ The lookup protocol keeps the model on the
   structured-output path (no native tool binding required), every lookup is audited in `tool_calls`, and the
   vocabulary is exactly the existing six read-only tools.
-- **Appendix A rule 13** — *unchanged and load-bearing*: auto mode does **not** write domain tables from the
+- **Appendix A rule 13** — _unchanged and load-bearing_: auto mode does **not** write domain tables from the
   chat; it stages a `refinement_proposals` row and applies it through the same engine in the same turn.
   `autoApplied = true` marks provenance.
-- **New hard rule 14:** *Every proposal apply records the inverse ops and post-apply artifact states needed
+- **New hard rule 14:** _Every proposal apply records the inverse ops and post-apply artifact states needed
   to undo it; revert executes those inverse ops through the same apply engine under the same conflict guard.
-  No apply path may skip inverse capture.*
+  No apply path may skip inverse capture._
 - **interactive-refinement-design §5.2/§6.1** — the op grammar and playbooks grow as specified here (§4–§5);
   the seven scoped playbooks are unchanged except where noted.
 - Migration-doc §1.1 immutability decisions are **not** relaxed.
@@ -70,32 +70,32 @@ All changes fold into the single-baseline migration.
 
 ### 3.1 Column/enum additions
 
-| Table / enum | Change |
-|---|---|
-| `chat_scope` | + `'project'` (the hub scope; `scopeRef` stays `NULL`) |
-| new enum `chat_mode` | `('manual', 'auto')` |
-| `chat_sessions` | + `mode chat_mode NOT NULL DEFAULT 'manual'` |
-| `refinement_proposal_status` | + `'reverted'` |
-| `refinement_proposals` | + `autoApplied boolean NOT NULL DEFAULT false` — applied by an auto-mode turn |
-| `refinement_proposals` | + `opResults jsonb` — per-op array `[{ index, status: 'applied'\|'declined'\|'failed', error?, result? }]`; `result` carries action outputs (`jobId`, `runId`, `proposalId`) |
-| `refinement_proposals` | + `inverseOps jsonb` — the `ChangeOp[]` that undoes the applied content ops, captured inside the apply transaction |
-| `refinement_proposals` | + `postState jsonb` — `Record<artifactRef, ArtifactState>` immediately after apply; the revert conflict guard |
-| `refinement_proposals` | + `revertedAt timestamp` |
-| `draft_revision_source` | + `'chat_edited'` — prose revisions written by `draft.update` |
-| `refinement_kind` | + `'hub'` — proposals staged by hub-scope sessions (scoped sessions keep `'chat'`) |
+| Table / enum                 | Change                                                                                                                                                                       |
+| ---------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `chat_scope`                 | + `'project'` (the hub scope; `scopeRef` stays `NULL`)                                                                                                                       |
+| new enum `chat_mode`         | `('manual', 'auto')`                                                                                                                                                         |
+| `chat_sessions`              | + `mode chat_mode NOT NULL DEFAULT 'manual'`                                                                                                                                 |
+| `refinement_proposal_status` | + `'reverted'`                                                                                                                                                               |
+| `refinement_proposals`       | + `autoApplied boolean NOT NULL DEFAULT false` — applied by an auto-mode turn                                                                                                |
+| `refinement_proposals`       | + `opResults jsonb` — per-op array `[{ index, status: 'applied'\|'declined'\|'failed', error?, result? }]`; `result` carries action outputs (`jobId`, `runId`, `proposalId`) |
+| `refinement_proposals`       | + `inverseOps jsonb` — the `ChangeOp[]` that undoes the applied content ops, captured inside the apply transaction                                                           |
+| `refinement_proposals`       | + `postState jsonb` — `Record<artifactRef, ArtifactState>` immediately after apply; the revert conflict guard                                                                |
+| `refinement_proposals`       | + `revertedAt timestamp`                                                                                                                                                     |
+| `draft_revision_source`      | + `'chat_edited'` — prose revisions written by `draft.update`                                                                                                                |
+| `refinement_kind`            | + `'hub'` — proposals staged by hub-scope sessions (scoped sessions keep `'chat'`)                                                                                           |
 
 ### 3.2 Error codes
 
-| Code | Meaning |
-|---|---|
-| `CHT_004` | Lookup budget exhausted — the turn's declared-lookup rounds hit the cap |
-| `CHT_005` | Invalid session mode value |
-| `RFN_006` | Revert conflict — an artifact changed since this proposal was applied (409) |
+| Code      | Meaning                                                                                  |
+| --------- | ---------------------------------------------------------------------------------------- |
+| `CHT_004` | Lookup budget exhausted — the turn's declared-lookup rounds hit the cap                  |
+| `CHT_005` | Invalid session mode value                                                               |
+| `RFN_006` | Revert conflict — an artifact changed since this proposal was applied (409)              |
 | `RFN_007` | Proposal is not revertible (not `applied`, contains no content ops, or already reverted) |
-| `RFN_008` | Action execution failed (partial results in `opResults`) |
-| `RFN_009` | `action.finalize` cannot be auto-applied — apply it manually |
-| `RFN_010` | Draft is final/locked — prose op rejected |
-| `RFN_011` | Invalid op selection (cherry-pick indexes out of range or empty) |
+| `RFN_008` | Action execution failed (partial results in `opResults`)                                 |
+| `RFN_009` | `action.finalize` cannot be auto-applied — apply it manually                             |
+| `RFN_010` | Draft is final/locked — prose op rejected                                                |
+| `RFN_011` | Invalid op selection (cherry-pick indexes out of range or empty)                         |
 
 ## 4. Op grammar extension (H2)
 
@@ -135,7 +135,7 @@ action.validate            { scope: 'novel' | 'chapter', chapter? } → validati
 action.finalize            { upTo? }                       → finalize chapters — NEVER auto-executed (§1.1.7)
 ```
 
-Chain-producing actions (`plan_arcs`, `audit_bible`, `enhance_premise`) yield a *new* proposal; in an
+Chain-producing actions (`plan_arcs`, `audit_bible`, `enhance_premise`) yield a _new_ proposal; in an
 auto-mode session that resulting proposal is **also auto-applied** (consistent with the mode; it is fully
 revertible). The chaining depth is 1 by construction — applied proposals never trigger further actions
 unless the model proposes them in a later turn.
@@ -144,8 +144,9 @@ unless the model proposes them in a later turn.
 
 `SCOPE_PLAYBOOKS.project`: senior-showrunner guidance (whole-novel judgement, pipeline awareness: what is
 drafted, judged, approved, stale) + the full content-op vocabulary (including `draft.update`/`brief.remove`)
-+ the action vocabulary rendered with exact JSON shapes (`renderActionVocabulary`, mirroring
-`renderOpVocabulary` — weak models need shapes shown, not named). `SCOPE_CHAT_ROLE.project = 'chat'`.
+
+- the action vocabulary rendered with exact JSON shapes (`renderActionVocabulary`, mirroring
+  `renderOpVocabulary` — weak models need shapes shown, not named). `SCOPE_CHAT_ROLE.project = 'chat'`.
 
 ## 5. Apply engine v2 (H3)
 
@@ -165,20 +166,20 @@ drafted, judged, approved, stale) + the full content-op vocabulary (including `d
 Inside the apply transaction, **before** each content op executes, the applier synthesizes its inverse from
 the current row:
 
-| Applied op | Inverse |
-|---|---|
-| `premise.update` | `premise.update` with the prior values of exactly the fields the op set |
-| `bible_document.upsert` (existed) | `bible_document.upsert` with prior frontmatter/body |
-| `bible_document.upsert` (created) | `bible_document.remove` |
-| `bible_document.remove` | `bible_document.upsert` with the deleted content |
-| `volume.upsert` / `arc.upsert` (existed) | upsert with all prior refinable fields |
-| `volume.upsert` / `arc.upsert` (created) | `volume.remove` / `arc.remove` |
-| `brief.update` (existed) | `brief.update` with prior fields |
-| `brief.update` (created) | `brief.remove` |
-| `draft.update` | `draft.update` with prior title/body/summary |
-| `entity.upsert` (existed / created) | `entity.upsert` with prior fields / `entity.remove` |
-| `entity.remove` / `volume.remove` / `arc.remove` / `brief.remove` | matching upsert/update with the deleted row's content |
-| `action.*` | none — actions are not revertible; their products (proposals, drafts) are |
+| Applied op                                                        | Inverse                                                                   |
+| ----------------------------------------------------------------- | ------------------------------------------------------------------------- |
+| `premise.update`                                                  | `premise.update` with the prior values of exactly the fields the op set   |
+| `bible_document.upsert` (existed)                                 | `bible_document.upsert` with prior frontmatter/body                       |
+| `bible_document.upsert` (created)                                 | `bible_document.remove`                                                   |
+| `bible_document.remove`                                           | `bible_document.upsert` with the deleted content                          |
+| `volume.upsert` / `arc.upsert` (existed)                          | upsert with all prior refinable fields                                    |
+| `volume.upsert` / `arc.upsert` (created)                          | `volume.remove` / `arc.remove`                                            |
+| `brief.update` (existed)                                          | `brief.update` with prior fields                                          |
+| `brief.update` (created)                                          | `brief.remove`                                                            |
+| `draft.update`                                                    | `draft.update` with prior title/body/summary                              |
+| `entity.upsert` (existed / created)                               | `entity.upsert` with prior fields / `entity.remove`                       |
+| `entity.remove` / `volume.remove` / `arc.remove` / `brief.remove` | matching upsert/update with the deleted row's content                     |
+| `action.*`                                                        | none — actions are not revertible; their products (proposals, drafts) are |
 
 Inverses accumulate in **reverse order** into `inverseOps`. After the last op, `postState` is captured via
 `loadArtifactStates` over all touched refs. Both persist on the proposal row in the same transaction.

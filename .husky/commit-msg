@@ -1,1 +1,2 @@
-bun scripts/src/bin/shadow.ts commit-msg "$1"
+# `--bun` so commitlint runs under Bun and loads the TypeScript config natively; its bin shebang is node.
+bunx --bun commitlint --edit "$1"

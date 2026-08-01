@@ -18,36 +18,34 @@ import { LoggerService } from './logger.service';
  * Declaring the constants
  */
 
-const divider = new Array(60).fill('-').join('');
-
 const app = await ShadowFactory.create(AppModule);
 await app.start();
 
 const loggerService = app.select(AppModule).get(LoggerService);
 const catService = app.select(AppModule).get(CatService);
 
-console.log(divider);
+loggerService.separator();
 
 const cats = catService.getCats();
 loggerService.log(`Cats: ${cats.map(cat => cat.name).join(', ')}`);
 const cachedCats = catService.getCats();
 loggerService.log(`Cached Cats: ${cachedCats.map(cat => cat.name).join(', ')}`);
 
-console.log(divider);
+loggerService.separator();
 
 const cat2 = catService.getCat('2');
 loggerService.log(`Cat by ID (2): ${cat2?.name}`);
 const cachedCat2 = catService.getCat('2');
 loggerService.log(`Cached Cat by ID (2): ${cachedCat2?.name}`);
 
-console.log(divider);
+loggerService.separator();
 
 const cat3 = catService.getCat('3');
 loggerService.log(`Cat by ID (3): ${cat3?.name}`);
 const cachedCat3 = catService.getCat('3');
 loggerService.log(`Cached Cat by ID (3): ${cachedCat3?.name}`);
 
-console.log(divider);
+loggerService.separator();
 
 const jerry = await catService.getCatByName('Jerry');
 loggerService.log(`Cat by Name (Jerry): ${jerry?.id}`);
@@ -58,6 +56,6 @@ await Bun.sleep(15);
 const newJerry = await catService.getCatByName('Jerry');
 loggerService.log(`New Cat by Name (Jerry) after cache expiry: ${newJerry?.id}`);
 
-console.log(divider);
+loggerService.separator();
 
 await app.stop();

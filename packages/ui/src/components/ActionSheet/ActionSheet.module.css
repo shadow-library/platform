@@ -30,7 +30,9 @@
   border-top-left-radius: var(--sh-radius-2xl);
   border-top-right-radius: var(--sh-radius-2xl);
   background: var(--sh-surface-raised);
-  box-shadow: 0 -12px 24px -6px rgb(9 9 11 / 0.12), 0 -4px 8px -4px rgb(9 9 11 / 0.08);
+  box-shadow:
+    0 -12px 24px -6px rgb(9 9 11 / 0.12),
+    0 -4px 8px -4px rgb(9 9 11 / 0.08);
   outline: none;
 }
 .surface[data-state='open'] {

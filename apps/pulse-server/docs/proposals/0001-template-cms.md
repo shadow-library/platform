@@ -6,27 +6,28 @@
 
 ## 1. Summary
 
-Pulse should be the **single source of truth** for every notification template — content **and** presentation — with all of it editable at runtime by permissioned users and **none of it hard-coded**. Today Pulse stores template *bodies* in Postgres but (a) the branded email **layout/design system lives in code** (`src/modules/notification/email/email-layout.ts`), (b) the template bodies are **owned by seed files** (`scripts/seed-data/template-*.data.ts`) that `db:seed` re-applies via `TRUNCATE … RESTART IDENTITY CASCADE`, so DB edits are transient, and (c) there is **no versioning, draft/publish lifecycle, variable contract, reusable components, or safe author-time rendering**.
+Pulse should be the **single source of truth** for every notification template — content **and** presentation — with all of it editable at runtime by permissioned users and **none of it hard-coded**. Today Pulse stores template _bodies_ in Postgres but (a) the branded email **layout/design system lives in code** (`src/modules/notification/email/email-layout.ts`), (b) the template bodies are **owned by seed files** (`scripts/seed-data/template-*.data.ts`) that `db:seed` re-applies via `TRUNCATE … RESTART IDENTITY CASCADE`, so DB edits are transient, and (c) there is **no versioning, draft/publish lifecycle, variable contract, reusable components, or safe author-time rendering**.
 
 This RFC proposes evolving Pulse's existing template module into a proper **headless template CMS**: versioned templates with a draft→publish→rollback lifecycle, a managed **layout/partials design system**, a declared **variable schema** (the contract between sender services and templates), a **sandboxed rendering engine**, preview/test-send, granular RBAC, and an audit trail — while keeping the public `POST /api/v1/notifications` contract **100% unchanged**.
 
 ## 2. Motivation — what's wrong today
 
-| Area | Current state | Problem |
-| --- | --- | --- |
-| Presentation | Branded HTML shell + CSS tokens in `email-layout.ts`, applied at render time | A design change is a code change + build + deploy; non-engineers cannot touch it |
-| Source of truth | `scripts/seed-data/template-*.data.ts`; `db:seed` truncates + re-inserts | The DB is **not** authoritative — a runtime edit is wiped on the next reseed |
-| Lifecycle | Variants mutated in place via `PATCH` | No history, no draft vs live, no preview-before-publish, no rollback, no immutability |
-| Contract | Templates reference `{{code}}`, `{{ipAddress}}`… with nothing declared | Sender (identity) and template are implicitly coupled; a payload change silently breaks output; editors have no idea what variables exist |
-| Reuse | The OTP block / button / alert panel are copy-pasted HTML in every fragment | No component library; inconsistent edits |
-| Safety | `body` is `varchar(5000)`; Mustache renders it verbatim | Too small for real templates; no author-time validation; no sandbox story for user-edited HTML/logic |
-| Governance | `pulse:templates:read/write` on plain CRUD | No approval, no audit of who published what, no separation between editing content vs editing the brand/theme |
+| Area            | Current state                                                                | Problem                                                                                                                                   |
+| --------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| Presentation    | Branded HTML shell + CSS tokens in `email-layout.ts`, applied at render time | A design change is a code change + build + deploy; non-engineers cannot touch it                                                          |
+| Source of truth | `scripts/seed-data/template-*.data.ts`; `db:seed` truncates + re-inserts     | The DB is **not** authoritative — a runtime edit is wiped on the next reseed                                                              |
+| Lifecycle       | Variants mutated in place via `PATCH`                                        | No history, no draft vs live, no preview-before-publish, no rollback, no immutability                                                     |
+| Contract        | Templates reference `{{code}}`, `{{ipAddress}}`… with nothing declared       | Sender (identity) and template are implicitly coupled; a payload change silently breaks output; editors have no idea what variables exist |
+| Reuse           | The OTP block / button / alert panel are copy-pasted HTML in every fragment  | No component library; inconsistent edits                                                                                                  |
+| Safety          | `body` is `varchar(5000)`; Mustache renders it verbatim                      | Too small for real templates; no author-time validation; no sandbox story for user-edited HTML/logic                                      |
+| Governance      | `pulse:templates:read/write` on plain CRUD                                   | No approval, no audit of who published what, no separation between editing content vs editing the brand/theme                             |
 
 **What already exists and we keep:** the `template_groups` / `template_channel_settings` / `template_variants` tables, the `/api/v1/template-groups[/…/variants]` admin API, the `pulse:templates:*` RBAC, per-channel/locale resolution, and the `{templateKey, recipients, payload, service, locale}` send contract. This RFC is an **evolution, not a rewrite**.
 
 ## 3. Goals & non-goals
 
 **Goals**
+
 1. All template content **and** the design system live in Pulse's datastore, editable at runtime by permissioned users — **zero template bodies or layouts in application code**.
 2. Full CMS lifecycle: draft → validate → preview → publish → rollback, with immutable published versions and complete history.
 3. A declared **variable schema** per template as the producer↔template contract, enforced at send time and surfaced to editors.
@@ -35,6 +36,7 @@ This RFC proposes evolving Pulse's existing template module into a proper **head
 6. Backward compatibility: **no change** to how identity (or any service) sends notifications.
 
 **Non-goals (this RFC)**
+
 - A visual drag-and-drop email builder (the API is builder-ready; a WYSIWYG in `pulse-web` is a follow-up).
 - Marketing-campaign features (A/B, audiences, scheduling) — out of scope; this is transactional template management.
 - Migrating providers/vendors; only DEV delivery is implemented today and that is unchanged.
@@ -104,8 +106,8 @@ Each `Template` declares a `variableSchema` (JSON-Schema-style):
 // templateKey: auth.login.otp
 {
   "variables": {
-    "code":  { "type": "string", "required": true,  "example": "482913", "description": "6-digit one-time code" }
-  }
+    "code": { "type": "string", "required": true, "example": "482913", "description": "6-digit one-time code" },
+  },
 }
 ```
 
@@ -120,6 +122,7 @@ Each `Template` declares a `variableSchema` (JSON-Schema-style):
 **Email specifically:** author the **Layout** in [MJML](https://mjml.io/) (the email-responsive standard) and compile MJML→HTML at publish, then run a **CSS inliner** (juice) — so responsive, client-compatible HTML is produced once at publish, not per send. SMS/PUSH skip layout/MJML (plain-text/notification payloads).
 
 **Render pipeline (send path):**
+
 ```
 resolve published version (templateKey, channel, locale → fallback en-ZZ)
   → validate payload against variableSchema
@@ -128,6 +131,7 @@ resolve published version (templateKey, channel, locale → fallback en-ZZ)
   → MJML compile + CSS inline                                              [EMAIL, at publish → cached]
   → deliver via the existing provider/sender-routing path
 ```
+
 The heavy steps (compile, MJML, inline) happen **at publish** and are cached as a "render bundle"; the per-send path is a fast variable-interpolation over a precompiled template.
 
 ### 5.6 Authoring API & UX
@@ -145,12 +149,12 @@ New and extended endpoints under `/api/v1` (all gated by RBAC, see 5.7). The pub
 
 Refine the RBAC catalogue (kept in sync with identity's seed, per `rbac.constants.ts`):
 
-| Permission | Grants |
-| --- | --- |
-| `pulse:templates:read` | View templates, versions, previews |
-| `pulse:templates:write` | Create/edit **drafts**, preview, test-send |
-| `pulse:templates:publish` | Publish / rollback a template version |
-| `pulse:layouts:write` | Edit the design-system layouts & partials (brand-level) |
+| Permission                | Grants                                                  |
+| ------------------------- | ------------------------------------------------------- |
+| `pulse:templates:read`    | View templates, versions, previews                      |
+| `pulse:templates:write`   | Create/edit **drafts**, preview, test-send              |
+| `pulse:templates:publish` | Publish / rollback a template version                   |
+| `pulse:layouts:write`     | Edit the design-system layouts & partials (brand-level) |
 
 Roles: `PulseViewer` (read), `PulseOperator` (write + publish), `PulseAdmin` (+ layouts). Optional **four-eyes** governance: for `PROMOTIONAL`/high-blast templates, require the publisher ≠ the last drafter. Every draft-save, publish, rollback, and layout edit is written to an **audit trail** (actor, template, version, diff, timestamp) reusing Pulse's audit facility.
 
@@ -230,28 +234,28 @@ Feature-flag the new resolver so we can fall back to the v1-variant path during 
 
 ## 10. Alternatives considered
 
-| Decision | Options | Choice & why |
-| --- | --- | --- |
-| Engine | Keep **Mustache** (min change, but no layouts/partials/filters → design system stays in code) · **Handlebars** (powerful but needs careful sandboxing) · **Liquid** (sandboxed, user-safe, layouts/partials/filters) · **MJML-only** (email-only) | **Liquid** for authoring + **MJML** for the email layout. Sandboxing for user-edited templates is the deciding factor. |
-| Layout | Keep design system **as code** (content in CMS) · **Managed in CMS** | **Managed in CMS** — you explicitly want it runtime-editable. Tradeoff: layout edits carry rendering risk, mitigated by permissions + validation + versioning + preview + rollback. |
-| Versioning | **Mutate in place** (today; no history) · **Version table** | **Version table** — history, rollback, immutability are core CMS requirements. |
-| Baseline content | **Keep destructive seed** (DB not authoritative) · **Idempotent fixtures** · **Empty start** | **Idempotent fixtures** (reproducible envs, DR) with **empty-start** offered if you want zero repo artifacts. |
+| Decision         | Options                                                                                                                                                                                                                                           | Choice & why                                                                                                                                                                        |
+| ---------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Engine           | Keep **Mustache** (min change, but no layouts/partials/filters → design system stays in code) · **Handlebars** (powerful but needs careful sandboxing) · **Liquid** (sandboxed, user-safe, layouts/partials/filters) · **MJML-only** (email-only) | **Liquid** for authoring + **MJML** for the email layout. Sandboxing for user-edited templates is the deciding factor.                                                              |
+| Layout           | Keep design system **as code** (content in CMS) · **Managed in CMS**                                                                                                                                                                              | **Managed in CMS** — you explicitly want it runtime-editable. Tradeoff: layout edits carry rendering risk, mitigated by permissions + validation + versioning + preview + rollback. |
+| Versioning       | **Mutate in place** (today; no history) · **Version table**                                                                                                                                                                                       | **Version table** — history, rollback, immutability are core CMS requirements.                                                                                                      |
+| Baseline content | **Keep destructive seed** (DB not authoritative) · **Idempotent fixtures** · **Empty start**                                                                                                                                                      | **Idempotent fixtures** (reproducible envs, DR) with **empty-start** offered if you want zero repo artifacts.                                                                       |
 
 ## 11. Risks & mitigations
 
-- *Render regressions during engine swap* → golden-file tests comparing new output to current emails; feature-flag + fallback resolver.
-- *Performance of compile/MJML on the hot path* → do it at publish, cache the render bundle; per-send is fast interpolation.
-- *Editors breaking the brand* → layout behind `pulse:layouts:write`, validation on publish, instant rollback.
-- *RBAC drift with identity* → the permission catalogue stays declared in `rbac.constants.ts` and seeded by identity; extend both together.
-- *Migration data loss* → the fold-to-v1 migration is additive and reversible; no `TRUNCATE`.
+- _Render regressions during engine swap_ → golden-file tests comparing new output to current emails; feature-flag + fallback resolver.
+- _Performance of compile/MJML on the hot path_ → do it at publish, cache the render bundle; per-send is fast interpolation.
+- _Editors breaking the brand_ → layout behind `pulse:layouts:write`, validation on publish, instant rollback.
+- _RBAC drift with identity_ → the permission catalogue stays declared in `rbac.constants.ts` and seeded by identity; extend both together.
+- _Migration data loss_ → the fold-to-v1 migration is additive and reversible; no `TRUNCATE`.
 
 ## 12. Open questions
 
-1. **Empty-start vs baseline fixtures** — do you want *literally zero* template artifacts in the repo (author everything post-deploy), or an idempotent starter pack for reproducible environments? (I recommend the latter.)
+1. **Empty-start vs baseline fixtures** — do you want _literally zero_ template artifacts in the repo (author everything post-deploy), or an idempotent starter pack for reproducible environments? (I recommend the latter.)
 2. **Four-eyes publishing** — required for all templates, only `PROMOTIONAL`, or off for now?
 3. **Engine** — comfortable standardising on Liquid + MJML, or is there a preferred stack?
 4. **Scope of the first delivery** — full RFC, or land Phases 1–2 (versioning + engine + de-seed) first and iterate?
 
 ---
 
-*Appendix: files removed/changed — deletes `src/modules/notification/email/*` and the seed template data; evolves `src/database/schemas/templates.ts`, `src/modules/template/**`, `notification-provider.service.ts`; adds a rendering/engine module, layouts/partials modules, and the authoring lifecycle. Public `POST /api/v1/notifications` unchanged.*
+_Appendix: files removed/changed — deletes `src/modules/notification/email/*` and the seed template data; evolves `src/database/schemas/templates.ts`, `src/modules/template/**`, `notification-provider.service.ts`; adds a rendering/engine module, layouts/partials modules, and the authoring lifecycle. Public `POST /api/v1/notifications` unchanged._

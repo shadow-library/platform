@@ -56,16 +56,16 @@ Built with **[Bun](https://bun.sh/)** for high performance and modern tooling, i
 
 ## ⚙️ Technology Stack
 
-| Component        | Technology                     |
-| ---------------- | ------------------------------ |
-| Runtime          | **Bun**                        |
-| Language         | **TypeScript**                 |
-| Database         | **PostgreSQL**                 |
-| ORM              | **Drizzle ORM**                |
-| Cache            | **Redis** (required)           |
-| Auth             | **Opaque sessions + OAuth 2.1 / OIDC (EdDSA JWTs)** |
-| API              | **REST**                       |
-| Docs             | **/dev/api-docs**              |
+| Component | Technology                                          |
+| --------- | --------------------------------------------------- |
+| Runtime   | **Bun**                                             |
+| Language  | **TypeScript**                                      |
+| Database  | **PostgreSQL**                                      |
+| ORM       | **Drizzle ORM**                                     |
+| Cache     | **Redis** (required)                                |
+| Auth      | **Opaque sessions + OAuth 2.1 / OIDC (EdDSA JWTs)** |
+| API       | **REST**                                            |
+| Docs      | **/dev/api-docs**                                   |
 
 ---
 

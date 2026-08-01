@@ -5,22 +5,29 @@ logging, caching, HTTP client, reflection, flow state machines, and utilities. P
 (`type: module`). Currently `2.0.0-beta.0`, private (this monorepo doesn't publish). Requires Node `>=23`;
 developed and tested with **Bun**.
 
-All build/verify tooling is centralized in the **root `scripts/` directory** (the `shadow` CLI), driven
-by `.shadowrc.json`. There is no local eslint/prettier config — do not re-add them; tweak via
-`.shadowrc.json` (`verify.lint` / `verify.format`) instead. The toolchain (typescript, eslint, prettier,
+All build/verify tooling is centralized in the **root `scripts/` directory** (`bun scripts/verify.ts` /
+`bun scripts/build.ts`, invoked by path — there is no `shadow` CLI and no `.shadowrc.json`; both were
+retired). There is no local eslint/prettier config — do not add them; a lint deviation would belong in this
+package's own `eslint.config.ts` (it currently has none, so it inherits the root ESLint config as-is), and
+format options live only in the root `.prettierrc.json`. The toolchain (typescript, eslint, prettier,
 tsc-alias, …) is a root devDependency, so this package pins none of them directly.
 
 ## Commands
 
-| Task | Command |
-| --- | --- |
-| Verify (format + lint + type-check + test) | `bun run verify` (autofix: `bun run verify --fix`) |
-| Run tests | `bun test` (single file: `bun test tests/errors/app.error.spec.ts`) |
-| Type-check | `bun run type-check` (`tsc`) |
-| Build (ESM-only → `dist/`) | `bun run build` (`shadow build`) |
+This package's own scripts run from **inside** `packages/common/`; `build`/`verify` are root tooling and
+always run from the **repo root** by path.
 
-The root Husky pre-commit hook fast-verifies (format + lint) whichever workspaces have staged changes; run
-`bun run verify` (format + lint + type-check + test) here yourself before committing to catch the rest.
+| Task                                       | Command                                                                        |
+| ------------------------------------------ | ------------------------------------------------------------------------------ |
+| Verify (format + lint + type-check + test) | `bun scripts/verify.ts packages/common` (autofix: `--fix`), from the repo root |
+| Run tests                                  | `bun test` (single file: `bun test tests/errors/app.error.spec.ts`)            |
+| Type-check                                 | `bun run type-check` (`tsc`)                                                   |
+| Build (ESM-only → `dist/`)                 | `bun scripts/build.ts packages/common`, from the repo root                     |
+
+There is no `build` or `verify` script in this package's own `package.json` — they are root tooling only. The
+root Husky pre-commit hook fast-verifies (format + lint) whichever workspaces have staged changes; run
+`bun scripts/verify.ts packages/common` (format + lint + type-check + test) yourself before committing to
+catch the rest.
 
 ## Layout
 
@@ -29,7 +36,10 @@ The root Husky pre-commit hook fast-verifies (format + lint) whichever workspace
 - `src/classes/` — `APIRequest` (undici HTTP client), `Task`/`TaskManager`, `FlowManager`/`FlowRegistry` + `FlowErrorCode` (the flow domain's own error catalog).
 - `src/interfaces/` — shared types (`Fn`, `Nullable`, `AsType`, pagination, dot-notation, …).
 - `src/utils/` — pure helpers (`string`, `object`, `pagination`, `temporal`), exposed as `utils`.
-- `.shadowrc.json` — the `build.exports` map (subpath entry points). `shadow build` reads it to emit the flat ESM `dist/` and synthesize `dist/package.json` (`exports`/`typesVersions`/`sideEffects`).
+- `package.json` `exports` — the subpath entry-point map. `bun scripts/build.ts` derives its build exports
+  directly from this field (stripping the `./dist/` prefix and `.js`/`.d.ts` extensions) to emit the flat ESM
+  `dist/` and synthesize `dist/package.json` (`exports`/`typesVersions`/`sideEffects`) — the published contract
+  and the build can never drift. There is no `.shadowrc.json`; that config format was retired.
 
 ## Conventions (authoritative: README → "Conventions & Standards")
 
@@ -39,7 +49,7 @@ The root Husky pre-commit hook fast-verifies (format + lint) whichever workspace
 
 ## Gotchas
 
-- **Subpath exports & the framework-agnostic core.** `./errors`, `./utils`, `./cache`, `./interfaces` pull in **no** winston/undici/chokidar, so they stay browser/edge-safe — don't add a Node-only import to those trees. The root barrel (`.`) is deprecated in favour of subpaths. New subpaths must be registered in `.shadowrc.json` (`build.exports`, mapping the subpath to its source-relative base, no extension).
+- **Subpath exports & the framework-agnostic core.** `./errors`, `./utils`, `./cache`, `./interfaces` pull in **no** winston/undici/chokidar, so they stay browser/edge-safe — don't add a Node-only import to those trees. The root barrel (`.`) is deprecated in favour of subpaths. A new subpath is registered in **this package's own `package.json` `exports` field** (mapping the subpath to its `./dist/...` output, no extension) — `bun scripts/build.ts` derives the build's exports from that field directly, so the published contract and the build can never drift. There is no separate `build.exports` config to keep in sync.
 - **Native-ESM CJS interop.** Import CJS default-only modules as defaults, e.g. `import deepmerge from 'deepmerge'` then `deepmerge.all(...)` — a named `{ all }` import breaks under Node's native ESM. Bundlers/Bun mask this, so verify with a real Node ESM resolve.
 - **Global singletons.** `Config` and `Logger` are stored on `globalThis` so duplicate package copies share one instance. Preserve that pattern.
 - **Error exposure.** `toObject()` is full-fidelity (logs/IPC, round-trips via `AppError.from`); `toResponse()` masks internal errors. `from()` fails closed to internal — never loosen that.

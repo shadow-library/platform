@@ -5,6 +5,7 @@
     /** Emit */
     "noEmit": false,
     "declaration": true,
+    "removeComments": true,
     "rootDir": "src"
   },
   "include": ["src/**/*.ts"]

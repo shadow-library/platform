@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { type ForwardRef, Inject, Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Optional, forwardRef } from '@shadow-library/app';
+import { type ForwardRef, forwardRef, Inject, Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Optional } from '@shadow-library/app';
 
 /**
  * Importing user defined packages

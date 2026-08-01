@@ -1,15 +1,15 @@
 /**
  * Importing npm packages
  */
-import { type ForwardRef, Inject, Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, forwardRef } from '@shadow-library/app';
+import { type ForwardRef, forwardRef, Inject, Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
-import { CatInternalService } from './cat-internal.service';
 import { OutputService } from '../common/output.service';
 import { StorageService } from '../common/storage.service';
 import { DogService } from '../dog/dog.service';
+import { CatInternalService } from './cat-internal.service';
 
 /**
  * Defining types

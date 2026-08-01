@@ -67,7 +67,7 @@ erDiagram
 | `id`                        | uuid                  | PK (UUIDv7)                                                                                                                                 |
 | `username`                  | varchar(32)           | nullable; partial unique index `WHERE username IS NOT NULL`; format per `REGEX.USERNAME`; MUST NOT be all-digits (reserved for ID literals) |
 | `status`                    | enum `user_status`    | `ACTIVE · INACTIVE · DISABLED · BLOCKED · SUSPENDED · CLOSED`; default `INACTIVE` — see the taxonomy below                                  |
-| `status_reason`             | varchar(256)          | nullable; why the account left `ACTIVE`, shown to administrators and audited                                                               |
+| `status_reason`             | varchar(256)          | nullable; why the account left `ACTIVE`, shown to administrators and audited                                                                |
 | `status_changed_at`         | timestamptz           | nullable                                                                                                                                    |
 | `status_until`              | timestamptz           | nullable; lapse time for a temporary `SUSPENDED` hold — `BLOCKED`/`DISABLED` never set it                                                   |
 | `personal_organisation_id`  | uuid                  | NOT NULL after registration transaction; FK → organisations, `ON DELETE RESTRICT`                                                           |
@@ -82,14 +82,14 @@ erDiagram
 fan out back-channel logout, because a status that left live sessions running would not actually stop anyone. What separates them is who
 decides, whether the account is expected back, and how it ends:
 
-| Status      | Intent                                                                                | Set by                       | Ends                                                   |
-| :---------- | :------------------------------------------------------------------------------------ | :--------------------------- | :----------------------------------------------------- |
-| `ACTIVE`    | Normal.                                                                                | Registration commit          | —                                                      |
-| `INACTIVE`  | Row created but registration never committed. Unreachable by login (no verified email). | DB default                   | Registration completing                                |
-| `SUSPENDED` | **Temporary hold** — access paused, the account is expected back (non-payment, leave, pending investigation). | Platform admin | Admin restore, or `status_until` lapsing on next read  |
-| `BLOCKED`   | **Punitive** — policy or security violation. Never lapses.                             | Platform admin               | Admin review only                                      |
-| `DISABLED`  | **Lifecycle** — no longer needed (offboarded, SCIM-deprovisioned). Carries no blame.   | SCIM automation, admin       | Reactivate                                             |
-| `CLOSED`    | Terminal soft delete; PII scrubbed, username released, audit skeleton kept.             | `softDelete`                 | Never — reports as `AUTH_008` (absent) at login        |
+| Status      | Intent                                                                                                        | Set by                 | Ends                                                  |
+| :---------- | :------------------------------------------------------------------------------------------------------------ | :--------------------- | :---------------------------------------------------- |
+| `ACTIVE`    | Normal.                                                                                                       | Registration commit    | —                                                     |
+| `INACTIVE`  | Row created but registration never committed. Unreachable by login (no verified email).                       | DB default             | Registration completing                               |
+| `SUSPENDED` | **Temporary hold** — access paused, the account is expected back (non-payment, leave, pending investigation). | Platform admin         | Admin restore, or `status_until` lapsing on next read |
+| `BLOCKED`   | **Punitive** — policy or security violation. Never lapses.                                                    | Platform admin         | Admin review only                                     |
+| `DISABLED`  | **Lifecycle** — no longer needed (offboarded, SCIM-deprovisioned). Carries no blame.                          | SCIM automation, admin | Reactivate                                            |
+| `CLOSED`    | Terminal soft delete; PII scrubbed, username released, audit skeleton kept.                                   | `softDelete`           | Never — reports as `AUTH_008` (absent) at login       |
 
 Distinct from `lock_mode`, which is not an administrative decision at all: `OTP_ONLY`/`FULL` is the **automatic** brute-force response
 (5 failures in 15 min) and expires on its own via `locked_until`.

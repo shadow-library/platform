@@ -17,14 +17,15 @@ into this file. Everything below was verified directly against this repo's curre
 - `e2e/` — whole-platform Playwright suite (currently a placeholder). Runs cross-app flows against
   already-deployed service URLs supplied via `E2E_*` environment variables — there is no local compose
   deployment.
-- `scripts/` — root tooling (the `shadow` CLI). NOT a Bun workspace, never a dependency. Every
-  workspace's `package.json` scripts invoke it by relative path: `bun ../../scripts/src/bin/shadow.ts
-  <cmd>` from `apps/*`/`packages/*` (two levels deep), `bun ../scripts/src/bin/shadow.ts <cmd>` from
-  `e2e/` (one level deep).
+- `scripts/` — root tooling: a flat folder of directly-runnable Bun scripts (`build.ts`, `verify.ts`,
+  `gen-api-types.ts`, `check-migrations.ts`, plus `workspaces.ts` and `utils/`). NOT a Bun workspace,
+  never a dependency. There is no `shadow` CLI. Everything is invoked **from the repo root by path**:
+  `bun scripts/verify.ts <workspace>`, `bun scripts/build.ts <workspace>`. Workspaces have no
+  `build`/`verify` scripts of their own.
 
 ## Package names (not all match the directory name)
 
-| Workspace | package.json `name` | `.shadowrc.json` `type` |
+| Workspace | package.json `name` | inferred build `type` |
 | --- | --- | --- |
 | `apps/identity-server` | `@shadow-library/identity` (not `-server`) | `backend` |
 | `apps/identity-web` | `identity-web` (unscoped) | `ssr` |
@@ -53,9 +54,18 @@ Backend: `common` → `class-schema`/`app` → `fastify` → `modules` (+ `auth`
 
 ## Per-workspace config reality
 
-- `.shadowrc.json` exists in every one of the 16 `apps/*`/`packages/*` workspaces (not `e2e/`, which has
-  none and runs on `library` defaults).
-- `.prettierrc.json` exists **only at the repo root** — no workspace has its own copy. Prettier resolves
-  it via upward directory search; `shadow verify`'s format step reads the same file the same way.
+- `.shadowrc.json` is **gone** — deleted from every workspace, and the format no longer exists. The build
+  type and most build inputs are inferred (path, dependencies, `package.json` `exports`); the handful
+  that can't be inferred live in a `"shadow"` key inside the workspace's own `package.json`. Only
+  `apps/{identity,novel-forge,pulse,web-novel}-server`, `apps/web-novel-web`, and `packages/ui` carry
+  one.
+- `eslint.config.ts` exists at the repo root (exporting a `createConfig` factory) **and** in each
+  workspace that genuinely deviates: `apps/*` (all 8) plus `packages/{fastify,ui,web}`. A per-workspace
+  eslint config is now the correct place for a lint deviation — the opposite of the pre-refactor rule.
+- `.prettierrc.json` (plus `.prettierignore`) and `commitlint.config.ts` exist **only at the repo root**
+  — no workspace has its own copy. `verify.ts` runs prettier from the repo root so the root config and
+  ignore files always apply.
+- Most per-workspace `.gitignore` files were consolidated into the root `.gitignore`; `tsconfig.web.json`
+  at the root holds the compiler options the 4 web apps share.
 - Husky hooks (`.husky/pre-commit`, `.husky/commit-msg`) live once at the repo root and fan out per
-  affected workspace (see `tooling-and-ci-wiring.md`).
+  affected target (see `tooling-and-ci-wiring.md`).

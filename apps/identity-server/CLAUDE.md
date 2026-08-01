@@ -2,7 +2,8 @@
 
 The **backend** of Shadow Identity: Bun + TypeScript, Fastify HTTP layer (`@shadow-library/fastify`), Drizzle ORM
 over Postgres, Redis-backed opaque sessions, OAuth 2.1 / OIDC. **JSON / REST only.** The consumer SDK
-`@shadow-library/auth` lives in this monorepo at `packages/auth`. `.shadowrc.json` → `"type": "backend"`.
+`@shadow-library/auth` lives in this monorepo at `packages/auth`. Its workspace type (`backend`) is inferred
+by the root tooling from its `apps/*-server` path — there is no config file that sets it.
 
 Its sibling workspace `identity-web` (React 19 SSR, TanStack Start) consumes this server's JSON API. It lives at
 `../identity-web` in this monorepo; both are workspaces of the platform repository with a single shared history.
@@ -18,7 +19,8 @@ managed. This is a Shadow app (depends on `@shadow-library/*`), so the skill app
 
 Do **not** inspect files, search code, plan changes, edit files, run commands, or touch dependencies before the
 skill is loaded. Reach for the ecosystem packages (`common`, `app`, `class-schema`, `fastify`, `modules`) and the
-`shadow` CLI **before** hand-rolling config, logging, errors, DI, HTTP wiring, validation, caching, or DB access.
+root `scripts/` tooling **before** hand-rolling config, logging, errors, DI, HTTP wiring, validation, caching, or
+DB access.
 
 ---
 
@@ -45,16 +47,17 @@ one client belongs **here**, not in the web app.
 
 ## Working rules
 
-1. **Check the current working directory before running any command.** Every command below is scoped to this
-   repo — run it from **inside** `identity-server/` (confirm with `pwd`), never from the repo root or the
-   sibling workspace.
+1. **Check the current working directory before running any command.** `build`/`verify`/`gen-api-types`/
+   `check-migrations` are root tooling and always run from the **repo root** by path
+   (`bun scripts/verify.ts apps/identity-server`); this workspace's own scripts (`dev`, `test`, `db:*`, …) run from
+   **inside** `identity-server/` (confirm with `pwd`). Never mix the two up.
 2. **Read the existing related code before editing.** Find the neighbouring controller/service/DTO/schema and
    follow its conventions. Don't add a second way to do something that already has one.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
-5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
-   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
+5. **Package manager is `bun`** (single root `bun.lock`; the root tooling lives in `scripts/`, invoked by path,
+   not a CLI). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
    only** — never edit another workspace's `package.json` to solve a problem here.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
    deletion unless the user **explicitly** requests it. This monorepo's history is shared across every
@@ -62,25 +65,33 @@ one client belongs **here**, not in the web app.
 
 ---
 
-## Commands (run inside `identity-server/`)
+## Commands
 
-| Purpose                                        | Command                        |
-| ---------------------------------------------- | ------------------------------ |
-| Install                                        | `bun install`                  |
-| Dev server (watch)                             | `bun run dev`                  |
-| Dev worker (watch)                             | `bun run dev:worker`           |
-| Build                                          | `bun run build`                |
-| Verify — **format + lint + type-check + test** | `bun run verify`               |
-| Verify with autofix                            | `bun run verify --fix`         |
-| Type-check only                                | `bun run type-check`           |
-| Test                                           | `bun test`                     |
-| Generate a migration                           | `bun run db:generate`          |
-| Apply migrations                               | `bun run db:migrate`           |
-| Create test template DB                        | `bun run db:create-template`   |
-| Check for uncommitted migration drift          | `bun run check-migrations`     |
+Root tooling — always run from the **repo root**, by workspace path:
 
-Lint and format have **no standalone scripts** — they run through `bun run verify` (`shadow verify`); use
-`bun run verify --fix` to auto-apply. Copy `.env.example` → `.env` before first run.
+| Purpose                                        | Command                                                |
+| ---------------------------------------------- | ------------------------------------------------------ |
+| Build                                          | `bun scripts/build.ts apps/identity-server`            |
+| Verify — **format + lint + type-check + test** | `bun scripts/verify.ts apps/identity-server`           |
+| Verify with autofix                            | `bun scripts/verify.ts apps/identity-server --fix`     |
+| Check for uncommitted migration drift          | `bun scripts/check-migrations.ts apps/identity-server` |
+
+This workspace's own scripts — run from **inside** `identity-server/`:
+
+| Purpose                 | Command                      |
+| ----------------------- | ---------------------------- |
+| Install                 | `bun install`                |
+| Dev server (watch)      | `bun run dev`                |
+| Dev worker (watch)      | `bun run dev:worker`         |
+| Type-check only         | `bun run type-check`         |
+| Test                    | `bun test`                   |
+| Generate a migration    | `bun run db:generate`        |
+| Apply migrations        | `bun run db:migrate`         |
+| Create test template DB | `bun run db:create-template` |
+
+There is no `build`, `verify`, or `check-migrations` script in this workspace's `package.json` — they are root
+tooling only. Lint and format have **no standalone scripts** either — they run through `bun scripts/verify.ts`;
+use `--fix` to auto-apply. Copy `.env.example` → `.env` before first run.
 
 ---
 
@@ -154,16 +165,16 @@ This server **owns** the API contract and publishes it as OpenAPI at `/dev/api-d
 `identity-web` consumes a generated mirror of it. Any change to a path, method, request/response shape, status
 code, error code, or auth requirement is a **both-repos** change:
 
-1. **Change the server first** — controller, DTO(s), service, error codes/statuses, and specs. Run `bun run verify`
-   here.
+1. **Change the server first** — controller, DTO(s), service, error codes/statuses, and specs. Run
+   `bun scripts/verify.ts apps/identity-server` from the repo root.
 2. **Evaluate backward compatibility before changing an existing API.** Prefer additive, non-breaking changes.
    For a breaking change, find every `identity-web` caller first and plan them into the same change; call out the
    break explicitly.
-3. **Coordinate the web side** (in `../identity-web`): it regenerates its API types from this server's OpenAPI
-   and updates its server functions, hooks, callers, fixtures, and tests. Update affected server-side tests,
-   fixtures, and `docs/` here.
-4. **Verify BOTH repositories** for a cross-repo change — `bun run verify` (and relevant tests) in each, from
-   inside each repo.
+3. **Coordinate the web side** (in `../identity-web`): it regenerates its API types via
+   `bun scripts/gen-api-types.ts apps/identity-web` (against a locally running server) and updates its server
+   functions, hooks, callers, fixtures, and tests. Update affected server-side tests, fixtures, and `docs/` here.
+4. **Verify BOTH workspaces** for a cross-repo change — `bun scripts/verify.ts apps/identity-server` and
+   `bun scripts/verify.ts apps/identity-web` (and relevant tests) from the repo root.
 
 Never make the web app work around a server shortcoming by duplicating server logic — fix it here.
 
@@ -174,8 +185,9 @@ Never make the web app work around a server shortcoming by duplicating server lo
 When you finish, report clearly:
 
 - **What changed** in `identity-server`.
-- **Which verification commands you actually ran** and their results (e.g. `bun run verify`, `bun test`,
-  `bun run type-check`). For a cross-repo change, report `identity-server` and `identity-web` **separately** and
+- **Which verification commands you actually ran** and their results (e.g. `bun scripts/verify.ts
+apps/identity-server`, `bun test`, `bun run type-check`). For a cross-repo change, report `identity-server` and
+  `identity-web` **separately** and
   show verification for both.
 
 State plainly what passed, what failed (with output), and anything you skipped and why.

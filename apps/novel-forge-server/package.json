@@ -6,10 +6,8 @@
   "description": "Backend service for the AI-powered novel generation platform. Provides workflow orchestration, lore management, chapter generation, AI integrations, user review pipelines, and continuity validation.",
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc -p tsconfig.json",
     "test": "bun test",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "dev": "bun run --watch src/main.ts",
     "db:create-template": "bun run scripts/create-template-db.ts",
     "db:migrate": "bun run src/migrate.ts",
@@ -20,8 +18,15 @@
     "test:ai:local": "bun test tests/ai/local/",
     "test:ai:unit": "bun test tests/ai/prompts.spec.ts tests/ai/model-router.spec.ts tests/ai/context-assembler.spec.ts",
     "test:ai:graph": "bun test tests/ai/workflow.spec.ts",
-    "test:ai:tools": "bun test tests/ai/tool-registry.spec.ts",
-    "check-migrations": "bun ../../scripts/src/bin/shadow.ts check-migrations"
+    "test:ai:tools": "bun test tests/ai/tool-registry.spec.ts"
+  },
+  "shadow": {
+    "entries": [
+      "src/migrate.ts"
+    ],
+    "assets": [
+      "generated/drizzle"
+    ]
   },
   "repository": {
     "type": "git",

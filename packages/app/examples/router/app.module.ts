@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { Module, Dispatcher } from '@shadow-library/app';
+import { Dispatcher, Module } from '@shadow-library/app';
 
 /**
  * Importing user defined packages

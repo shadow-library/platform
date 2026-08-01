@@ -4,8 +4,10 @@ Load this when writing or changing frontend code. First determine the rendering 
 
 | Signal | Model | Example workspace |
 | --- | --- | --- |
-| `.shadowrc.json` `type: spa`, `ReactDOM.createRoot`, no `@tanstack/react-start` dep | Client-rendered SPA — no server render pass; no SSR-only code, no `hydrateRoot`, no server functions | `apps/pulse-web` |
-| `.shadowrc.json` `type: ssr`, `@tanstack/react-start` dep | SSR (TanStack Start) — render must be deterministic server/client; browser APIs only in effects/handlers | `apps/identity-web`, `apps/novel-forge-web`, `apps/web-novel-web` |
+| No `@tanstack/react-start` dep, `ReactDOM.createRoot` (inferred type `spa`) | Client-rendered SPA — no server render pass; no SSR-only code, no `hydrateRoot`, no server functions | `apps/pulse-web` |
+| `@tanstack/react-start` dep (inferred type `ssr`) | SSR (TanStack Start) — render must be deterministic server/client; browser APIs only in effects/handlers | `apps/identity-web`, `apps/novel-forge-web`, `apps/web-novel-web` |
+
+(The type is inferred from the workspace's path and dependencies — there is no config file declaring it.)
 
 ## UI & styling
 
@@ -31,8 +33,8 @@ Load this when writing or changing frontend code. First determine the rendering 
   `parseAccessDeniedSearch` helpers with `ui`'s `AccessDenied` component rather than hand-rolling another
   empty state.
 - Typed clients: `generateApi(specUrl)` or the workspace's generated `api-types.gen.ts`
-  (via `bun run generate:api-types`, the workspace's wired name for `shadow gen-api-types`) — MUST NOT
-  hand-edit generated files.
+  (regenerated with `bun scripts/gen-api-types.ts <workspace>` from the repo root, against a running
+  server) — MUST NOT hand-edit generated files.
 
 ## Router, data loading, prod server
 

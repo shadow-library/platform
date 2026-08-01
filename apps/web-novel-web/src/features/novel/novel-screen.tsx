@@ -616,7 +616,9 @@ function ReviewsPanel({ novel }: { novel: NovelDetail }): React.JSX.Element {
   const [sort, setSort] = useState<ReviewSort>('helpful');
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [voted, setVoted] = useState<Set<string>>(new Set());
-  const reviews = novel.reviews ?? [];
+  // Memoized so identity is stable across renders when `novel` is unchanged — otherwise the `?? []`
+  // fallback mints a new array every render and defeats the `sorted` useMemo below it.
+  const reviews = useMemo(() => novel.reviews ?? [], [novel.reviews]);
 
   const sorted = useMemo(() => {
     const list = [...reviews];
@@ -725,7 +727,9 @@ function CommentsPanel({ novel, signedIn, accountName }: { novel: NovelDetail; s
   const [sort, setSort] = useState<CommentSort>('recent');
   const [revealed, setRevealed] = useState<Set<string>>(new Set());
   const [liked, setLiked] = useState<Set<string>>(new Set());
-  const comments = novel.comments ?? [];
+  // Memoized so identity is stable across renders when `novel` is unchanged — otherwise the `?? []`
+  // fallback mints a new array every render and defeats the `sorted` useMemo below it.
+  const comments = useMemo(() => novel.comments ?? [], [novel.comments]);
 
   const sorted = useMemo(() => {
     if (sort === 'top') return [...comments].sort((a, b) => b.likes - a.likes);
