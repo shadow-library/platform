@@ -12,8 +12,10 @@ on:
 permissions:
   contents: read
 
-# Superseded pushes to the same PR branch cancel their in-flight run; main runs are never
-# cancelled (every main commit deserves its own verdict).
+# Superseded pushes to the same PR branch cancel their in-flight run. Main runs are never
+# cancelled mid-flight; note the group still queues at most one pending main run, so a rapid
+# burst of main pushes serializes and intermediate pending runs get superseded (loudly — the
+# ci gate treats cancelled as failure).
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
@@ -313,7 +315,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: packages/*/dist
-          key: pkgdist-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/package.json', 'packages/*/tsconfig*.json', 'bun.lock', 'tsconfig.base.json', 'tsconfig.build.base.json', 'scripts/**') }}
+          key: pkgdist-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/package.json', 'packages/*/tsconfig*.json', 'packages/*/README.md', 'bun.lock', 'package.json', 'tsconfig.base.json', 'tsconfig.build.base.json', 'types/**', 'scripts/**') }}
 
       - name: Build packages
         if: matrix.workspace != 'scripts' && steps.pkgdist.outputs.cache-hit != 'true'
