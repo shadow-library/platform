@@ -1,16 +1,11 @@
 {
   "extends": "../../tsconfig.base.json",
   "compilerOptions": {
-    "baseUrl": ".",
     "module": "ES2022",
-    // "node" (classic) resolution can't see package.json "exports"/"imports" -- needed for workspace:*
-    // packages (their entry point) and this package's own "#lib/*" self-import. Bundler mode (the base
-    // default) understands both; kept as an explicit override here as a reminder of the departure.
-    "moduleResolution": "bundler",
     "paths": {
-      "@lib/*": ["src/*"],
-      "@shadow-library/fastify": ["src/index.ts"],
-      "@examples/*": ["examples/*"]
+      "@lib/*": ["./src/*"],
+      "@shadow-library/fastify": ["./src/index.ts"],
+      "@examples/*": ["./examples/*"]
     }
   },
   "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "examples/**/*.ts"]

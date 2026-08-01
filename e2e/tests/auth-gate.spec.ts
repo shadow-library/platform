@@ -24,7 +24,7 @@ import { getProductLabel, type ProductKey, PRODUCTS, requireProductUrl } from '.
  * Confirmed against the local k3d ingress: identity's `/`, novel-forge's `/`, and web-novel's `/library`
  * are all server-rendered (TanStack Start SSR) and 307-redirect straight to `/login?returnTo=...` before
  * any markup ships. Pulse converted from a client-rendered SPA to the same TanStack Start SSR pattern
- * (`.shadowrc.json` `type: "ssr"` — see `apps/pulse-web`), so its `beforeLoad` gate now redirects the
+ * (inferred `ssr` type — it now depends on `@tanstack/react-start`), so its `beforeLoad` gate now redirects the
  * same way server-side once a rebuilt image is deployed — but the *currently deployed* pulse-web instance
  * may still be the pre-conversion SPA until the next rollout, where `requireSession`'s redirect only
  * happens once the browser executes the bundle (its static shell answers `/` with a flat `200`

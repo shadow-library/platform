@@ -4,52 +4,54 @@ Backend service for an AI-powered novel generation platform. Guides authors from
 
 ## Stack
 
-| Layer | Technology |
-|---|---|
-| Runtime | [Bun](https://bun.sh) |
-| Language | TypeScript (strict, ESM) |
-| HTTP | [Fastify](https://fastify.dev) via `@shadow-library/fastify` |
-| DI | `@shadow-library/app` (NestJS-style modules) |
-| Database | PostgreSQL 16 + [Drizzle ORM](https://orm.drizzle.team) + pgvector |
-| AI orchestration | LangGraph (multi-step workflows) |
-| AI providers | Anthropic Claude, xAI Grok, OpenAI GPT, Ollama (local) |
-| Retrieval | LlamaIndex.TS + pgvector (prose + lore indexes) |
-| Schema validation | Zod |
+| Layer             | Technology                                                         |
+| ----------------- | ------------------------------------------------------------------ |
+| Runtime           | [Bun](https://bun.sh)                                              |
+| Language          | TypeScript (strict, ESM)                                           |
+| HTTP              | [Fastify](https://fastify.dev) via `@shadow-library/fastify`       |
+| DI                | `@shadow-library/app` (NestJS-style modules)                       |
+| Database          | PostgreSQL 16 + [Drizzle ORM](https://orm.drizzle.team) + pgvector |
+| AI orchestration  | LangGraph (multi-step workflows)                                   |
+| AI providers      | Anthropic Claude, xAI Grok, OpenAI GPT, Ollama (local)             |
+| Retrieval         | LlamaIndex.TS + pgvector (prose + lore indexes)                    |
+| Schema validation | Zod                                                                |
 
 ## Environment Variables
 
 All keys are declared in `src/bootstrap.ts`. Keys marked **required in prod** must be set when `APP_STAGE=prod`.
 
-| Env key | Default | Description |
-|---|---|---|
-| `APP_STAGE` | `dev` | Stage: `dev`, `staging`, or `prod` |
-| `SERVER_PORT` | `8080` | HTTP listen port |
-| `SERVER_HOST` | `0.0.0.0` | HTTP listen host |
-| `DATABASE_POSTGRES_URL` | — | PostgreSQL connection URL (required) |
-| `AI_PROFILE` | `production` | `production` or `local-test` (Ollama-only) |
-| `AI_ANTHROPIC_API_KEY` | — | Anthropic API key |
-| `AI_OPENAI_API_KEY` | — | OpenAI API key |
-| `AI_XAI_API_KEY` | — | xAI API key |
-| `AI_GROK_LLM_MODEL` | `grok-3` | Default xAI LLM model |
-| `AI_GROK_IMAGE_MODEL` | `grok-2-image` | xAI image model |
-| `AI_OLLAMA_HOST` | `http://localhost:11434` | Ollama server URL |
-| `AI_EMBEDDING_MODEL` | `qwen3-embedding:8b` | Embedding model for vector indexes |
-| `AI_ALLOW_CLAUDE_CODE` | `false` | Enable Claude Code tool in agent loops |
-| `AI_ALLOW_CODEX` | `false` | Enable OpenAI Codex tool in agent loops |
-| `AI_CLAUDE_CODE_BIN` | `claude` | Path to the `claude` binary |
-| `AI_CODEX_BIN` | `codex` | Path to the `codex` binary |
-| `AI_LANGSMITH_API_KEY` | — | LangSmith API key (enables tracing when set) |
-| `STORAGE_DRIVER` | `local` | Storage driver (`local` only currently) |
-| `STORAGE_IMAGE_DIR` | `./images` | Directory for generated images |
+| Env key                 | Default                  | Description                                  |
+| ----------------------- | ------------------------ | -------------------------------------------- |
+| `APP_STAGE`             | `dev`                    | Stage: `dev`, `staging`, or `prod`           |
+| `SERVER_PORT`           | `8080`                   | HTTP listen port                             |
+| `SERVER_HOST`           | `0.0.0.0`                | HTTP listen host                             |
+| `DATABASE_POSTGRES_URL` | —                        | PostgreSQL connection URL (required)         |
+| `AI_PROFILE`            | `production`             | `production` or `local-test` (Ollama-only)   |
+| `AI_ANTHROPIC_API_KEY`  | —                        | Anthropic API key                            |
+| `AI_OPENAI_API_KEY`     | —                        | OpenAI API key                               |
+| `AI_XAI_API_KEY`        | —                        | xAI API key                                  |
+| `AI_GROK_LLM_MODEL`     | `grok-3`                 | Default xAI LLM model                        |
+| `AI_GROK_IMAGE_MODEL`   | `grok-2-image`           | xAI image model                              |
+| `AI_OLLAMA_HOST`        | `http://localhost:11434` | Ollama server URL                            |
+| `AI_EMBEDDING_MODEL`    | `qwen3-embedding:8b`     | Embedding model for vector indexes           |
+| `AI_ALLOW_CLAUDE_CODE`  | `false`                  | Enable Claude Code tool in agent loops       |
+| `AI_ALLOW_CODEX`        | `false`                  | Enable OpenAI Codex tool in agent loops      |
+| `AI_CLAUDE_CODE_BIN`    | `claude`                 | Path to the `claude` binary                  |
+| `AI_CODEX_BIN`          | `codex`                  | Path to the `codex` binary                   |
+| `AI_LANGSMITH_API_KEY`  | —                        | LangSmith API key (enables tracing when set) |
+| `STORAGE_DRIVER`        | `local`                  | Storage driver (`local` only currently)      |
+| `STORAGE_IMAGE_DIR`     | `./images`               | Directory for generated images               |
 
 ## Commands
 
 ```bash
 # Development
 bun run dev               # Start with watch-mode (src/main.ts)
-bun run build             # shadow build — bundle to dist/main.js
 bun run type-check        # Run tsc (no emit)
-bun run verify            # shadow verify — format + lint + type-check + test (add --fix to auto-fix)
+
+# From the repo root, by workspace path — this workspace has no build/verify script:
+bun scripts/build.ts apps/novel-forge-server   # bundle to dist/main.js
+bun scripts/verify.ts apps/novel-forge-server  # format + lint + type-check + test (add --fix to auto-fix)
 
 # Database
 bun run db:migrate        # Run Drizzle migrations
@@ -78,70 +80,70 @@ All routes are prefixed `/api/v1`.
 
 ### Projects
 
-| Method | Path | Description |
-|---|---|---|
-| `POST` | `/projects` | Create a project |
-| `GET` | `/projects` | List projects |
-| `GET` | `/projects/:id` | Get a project |
-| `PATCH` | `/projects/:id` | Update a project |
+| Method   | Path            | Description      |
+| -------- | --------------- | ---------------- |
+| `POST`   | `/projects`     | Create a project |
+| `GET`    | `/projects`     | List projects    |
+| `GET`    | `/projects/:id` | Get a project    |
+| `PATCH`  | `/projects/:id` | Update a project |
 | `DELETE` | `/projects/:id` | Delete a project |
 
 ### Story Bible
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/projects/:id/bible` | Get all bible documents |
-| `POST` | `/projects/:id/bible` | Create a bible document |
-| `GET` | `/projects/:id/bible/:docId` | Get a bible document |
+| Method  | Path                         | Description             |
+| ------- | ---------------------------- | ----------------------- |
+| `GET`   | `/projects/:id/bible`        | Get all bible documents |
+| `POST`  | `/projects/:id/bible`        | Create a bible document |
+| `GET`   | `/projects/:id/bible/:docId` | Get a bible document    |
 | `PATCH` | `/projects/:id/bible/:docId` | Update a bible document |
-| `GET` | `/projects/:id/entities` | List entities |
-| `POST` | `/projects/:id/entities` | Create an entity |
-| `GET` | `/projects/:id/volumes` | List volumes |
-| `POST` | `/projects/:id/volumes` | Create a volume |
+| `GET`   | `/projects/:id/entities`     | List entities           |
+| `POST`  | `/projects/:id/entities`     | Create an entity        |
+| `GET`   | `/projects/:id/volumes`      | List volumes            |
+| `POST`  | `/projects/:id/volumes`      | Create a volume         |
 
 ### Generation Workflows
 
-| Method | Path | Description |
-|---|---|---|
+| Method | Path                            | Description                                  |
+| ------ | ------------------------------- | -------------------------------------------- |
 | `POST` | `/projects/:id/seed-from-brief` | Kick off bible builder workflow from a brief |
-| `POST` | `/projects/:id/plan` | Generate volume plan |
-| `POST` | `/projects/:id/approve` | Approve the volume plan |
-| `POST` | `/projects/:id/outline` | Generate chapter briefs |
-| `GET` | `/projects/:id/briefs/:n` | Get chapter brief |
-| `PUT` | `/projects/:id/briefs/:n` | Update chapter brief |
-| `POST` | `/projects/:id/generate` | Enqueue chapter generation job |
-| `POST` | `/projects/:id/finalize` | Finalize an approved draft |
-| `POST` | `/projects/:id/validate` | Run novel-level validation workflow |
+| `POST` | `/projects/:id/plan`            | Generate volume plan                         |
+| `POST` | `/projects/:id/approve`         | Approve the volume plan                      |
+| `POST` | `/projects/:id/outline`         | Generate chapter briefs                      |
+| `GET`  | `/projects/:id/briefs/:n`       | Get chapter brief                            |
+| `PUT`  | `/projects/:id/briefs/:n`       | Update chapter brief                         |
+| `POST` | `/projects/:id/generate`        | Enqueue chapter generation job               |
+| `POST` | `/projects/:id/finalize`        | Finalize an approved draft                   |
+| `POST` | `/projects/:id/validate`        | Run novel-level validation workflow          |
 
 ### Drafts & Review
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/projects/:id/drafts` | List drafts |
-| `GET` | `/projects/:id/drafts/:n` | Get a chapter draft |
-| `PUT` | `/projects/:id/drafts/:n` | Update draft (hand edit) |
-| `POST` | `/projects/:id/drafts/:n/revise` | Request AI revision with feedback |
-| `POST` | `/projects/:id/drafts/:n/judge` | Run judge on a draft |
-| `POST` | `/projects/:id/drafts/:n/feedback` | Submit reviewer feedback |
-| `POST` | `/projects/:id/drafts/:n/approve` | Approve a draft |
-| `GET` | `/projects/:id/drafts/:n/revisions` | List all revisions |
-| `GET` | `/projects/:id/review-queue` | Drafts and continuity proposals awaiting review |
+| Method | Path                                | Description                                     |
+| ------ | ----------------------------------- | ----------------------------------------------- |
+| `GET`  | `/projects/:id/drafts`              | List drafts                                     |
+| `GET`  | `/projects/:id/drafts/:n`           | Get a chapter draft                             |
+| `PUT`  | `/projects/:id/drafts/:n`           | Update draft (hand edit)                        |
+| `POST` | `/projects/:id/drafts/:n/revise`    | Request AI revision with feedback               |
+| `POST` | `/projects/:id/drafts/:n/judge`     | Run judge on a draft                            |
+| `POST` | `/projects/:id/drafts/:n/feedback`  | Submit reviewer feedback                        |
+| `POST` | `/projects/:id/drafts/:n/approve`   | Approve a draft                                 |
+| `GET`  | `/projects/:id/drafts/:n/revisions` | List all revisions                              |
+| `GET`  | `/projects/:id/review-queue`        | Drafts and continuity proposals awaiting review |
 
 ### Observability
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/projects/:id/ai-usage` | AI token usage and cost per role |
-| `GET` | `/projects/:id/runs` | List workflow runs |
-| `GET` | `/projects/:id/runs/:runId` | Get run details |
-| `GET` | `/projects/:id/jobs` | List jobs for a project |
+| Method | Path                        | Description                      |
+| ------ | --------------------------- | -------------------------------- |
+| `GET`  | `/projects/:id/ai-usage`    | AI token usage and cost per role |
+| `GET`  | `/projects/:id/runs`        | List workflow runs               |
+| `GET`  | `/projects/:id/runs/:runId` | Get run details                  |
+| `GET`  | `/projects/:id/jobs`        | List jobs for a project          |
 
 ### Manuscript
 
-| Method | Path | Description |
-|---|---|---|
-| `GET` | `/projects/:id/manuscript` | Get the assembled markdown manuscript (final chapters only) |
-| `GET` | `/projects/:id/search` | Vector search across prose and lore indexes |
+| Method | Path                       | Description                                                 |
+| ------ | -------------------------- | ----------------------------------------------------------- |
+| `GET`  | `/projects/:id/manuscript` | Get the assembled markdown manuscript (final chapters only) |
+| `GET`  | `/projects/:id/search`     | Vector search across prose and lore indexes                 |
 
 ## Development Notes
 
@@ -174,6 +176,7 @@ The model router (`src/modules/ai/model-router.service.ts`) selects a model per 
 ### Workflow architecture
 
 Five LangGraph workflows run as durable jobs:
+
 - **bible-builder** — generates world, characters, factions, plot outline
 - **chapter-generation** — draft → judge → repair loop → persist
 - **chapter-finalization** — apply continuity, index prose, mark chapter final

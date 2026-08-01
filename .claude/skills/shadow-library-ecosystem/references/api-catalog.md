@@ -14,19 +14,18 @@ isn't listed, it isn't public — don't deep-import it. Every package here **doe
 `exports` map in its source `package.json`, pointing each subpath at `./dist/...` — that's what a
 workspace consumer's module resolution actually reads (bun/Node resolve `@shadow-library/x/<subpath>`
 through the symlinked package's own `package.json`, not a nested `dist/package.json`). It only lists
-subpaths, not symbols, and it's maintained by hand, separately from `.shadowrc.json` `build.exports` (the
-source-relative map `shadow build` reads to know what to compile into each subpath's `dist/` output).
-**The rule that matters:** adding a new public subpath means editing both files — `.shadowrc.json`
-`build.exports` (so the build emits it) and the source `package.json` `exports` map (so consumers can
-resolve it at all) — one without the other leaves either a subpath nothing compiles into, or one nothing
-can import.
+subpaths, not symbols. **The rule that matters:** that `exports` map is now the *single* source — the
+build derives what to compile for each subpath directly from it (stripping the `./dist/` prefix and the
+`.js`/`.d.ts` extension to get the source-relative base), so the published contract and the build can
+never drift. Adding a new public subpath means editing exactly one place: the source `package.json`
+`exports` map, with a source file at the matching path.
 
 ---
 
 ## @shadow-library/common — foundation
 
 Root entry (`src/index.ts`, loads `reflect-metadata`, re-exports everything below) **plus 8 real
-subpaths** (`.shadowrc.json` `build.exports`, mirrored in `package.json` `exports`). Engines: node >= 23.
+subpaths** (declared in `package.json` `exports`, which is what the build reads). Engines: node >= 23.
 
 ### Config — root or `./config`
 Exports: `Config` (singleton), `ConfigService`, `ConfigRecords`, `ConfigOptions`, `ConfigKey`, `ConfigChangeCallback`, `NodeEnv`, `LogLevel`, `Runtime`.
@@ -243,5 +242,6 @@ The `ApiError` taxonomy mirrors `common`'s error taxonomy so one error contract 
 ## @shadow-library/scripts
 
 There is no such package — it was dissolved into root `scripts/` tooling during the monorepo migration
-and is never imported. Its commands, `.shadowrc.json` schema, and CI wiring are documented in
+and is never imported. It is a flat folder of directly-runnable Bun scripts (`bun scripts/verify.ts …`
+from the repo root); its commands, conventions, and CI wiring are documented in
 `references/repository-setup.md`.

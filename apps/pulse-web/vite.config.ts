@@ -1,9 +1,9 @@
-import { URL, fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 
 import { tanstackStart } from '@tanstack/react-start/plugin/vite';
 import viteReact from '@vitejs/plugin-react';
 import { visualizer } from 'rollup-plugin-visualizer';
-import { type PluginOption, defineConfig } from 'vite';
+import { defineConfig, type PluginOption } from 'vite';
 
 // One backend origin drives everything: the server-function fetch base (`src/lib/apis/server-fetch.ts`)
 // and the dev `/api` proxy — which now only matters for the interactive `/api/auth/*` login redirects,

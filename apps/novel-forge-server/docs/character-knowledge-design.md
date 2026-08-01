@@ -8,7 +8,7 @@ Drives checklist tasks **CK1–CK4** (and follow-up CK5).
 
 The single load-bearing rule: **the drafting model cannot leak what it never sees.** Prompt-level "do not reveal X" instructions against a full-canon pack are unreliable — naming a fact raises its salience. So:
 
-- **Drafter** — sees only facts the chapter's POV cast has ledgered as of this chapter, plus this chapter's planned reveals, plus POV-safe *behavioral constraints* compiled from still-hidden facts ("Elias deflects questions about Tuesday night"), never the facts themselves.
+- **Drafter** — sees only facts the chapter's POV cast has ledgered as of this chapter, plus this chapter's planned reveals, plus POV-safe _behavioral constraints_ compiled from still-hidden facts ("Elias deflects questions about Tuesday night"), never the facts themselves.
 - **Judge** — omniscient: sees the full forbidden list and assesses the draft for leaks, exactly as it already assesses ending contracts.
 - **Deterministic pre-scan** — each fact carries a term list; a free lexical scan (the `scanResidue` pattern) catches blatant leaks before any judge tokens are spent.
 
@@ -16,7 +16,7 @@ Spoilers therefore must live in `canon_facts`, **not** in bible-document prose o
 
 ## 2. Amendments to earlier documents
 
-- **Adds `docs/ai-system-design.md` Appendix A rule 15:** *Generation-purpose context never contains an unrevealed canon fact: spoilers live in `canon_facts` (never in bible prose or entity sheets), the drafter sees only the ledgered knowledge of the brief's POV cast, and only the judge sees the forbidden list.*
+- **Adds `docs/ai-system-design.md` Appendix A rule 15:** _Generation-purpose context never contains an unrevealed canon fact: spoilers live in `canon_facts` (never in bible prose or entity sheets), the drafter sees only the ledgered knowledge of the brief's POV cast, and only the judge sees the forbidden list._
 - The feature is **opt-in per brief**: a brief without a `knowledgeContract` behaves exactly as before. No existing behavior changes for projects that don't use facts.
 - Canon facts are **never indexed** — they are injected as pack sections only, so LlamaIndex retrieval cannot become a leak backdoor (extends Appendix A rule 8's spirit).
 
@@ -53,8 +53,8 @@ character_knowledge                          -- the ledger: who knows what, sinc
 
 ```jsonc
 {
-  "pov": ["detective_amara", "sergeant_boone"],          // entity keys whose knowledge bounds the chapter
-  "learns": [{ "entityKey": "detective_amara", "factKey": "ledger_forgery" }]  // revealed on-page this chapter
+  "pov": ["detective_amara", "sergeant_boone"], // entity keys whose knowledge bounds the chapter
+  "learns": [{ "entityKey": "detective_amara", "factKey": "ledger_forgery" }], // revealed on-page this chapter
 }
 ```
 
@@ -75,11 +75,11 @@ Module layout: `src/modules/bible/fact/` (`fact.controller.ts`, `fact.dto.ts`, `
 
 `forChapter` only (generation purpose). When the brief carries a contract, three sections are added immediately after `volume_objective`:
 
-| key                  | label                        | tier            | content                                                                 |
-| -------------------- | ---------------------------- | --------------- | ----------------------------------------------------------------------- |
-| `known_facts`        | `## KNOWN FACTS (POV CAST)`  | canonical       | ledgered facts of the POV cast entering this chapter; `(none established)` when empty |
-| `chapter_reveals`    | `## REVEALED THIS CHAPTER`   | approved_intent | facts from `learns` — must be discovered on-page, not pre-known (omitted when empty) |
-| `hidden_constraints` | `## BEHAVIORAL CONSTRAINTS`  | approved_intent | `constraint_note` of hidden facts — behavior without the why (omitted when empty) |
+| key                  | label                       | tier            | content                                                                               |
+| -------------------- | --------------------------- | --------------- | ------------------------------------------------------------------------------------- |
+| `known_facts`        | `## KNOWN FACTS (POV CAST)` | canonical       | ledgered facts of the POV cast entering this chapter; `(none established)` when empty |
+| `chapter_reveals`    | `## REVEALED THIS CHAPTER`  | approved_intent | facts from `learns` — must be discovered on-page, not pre-known (omitted when empty)  |
+| `hidden_constraints` | `## BEHAVIORAL CONSTRAINTS` | approved_intent | `constraint_note` of hidden facts — behavior without the why (omitted when empty)     |
 
 Fact `text` never enters the pack unless known or revealed. Author-facing purposes (outline, arc_plan, chat, audit, premise) are deliberately **not** filtered — the author plans with full canon. `forRevision` keeps full-canon behavior in v1 (revision drafts still pass the judge gate); noted as a CK5 follow-up.
 
@@ -100,14 +100,14 @@ The pre-scan is free and runs every attempt; the judge catches paraphrased leaks
 
 Mounted on `FactController` at `/projects/:projectId`:
 
-| method & path                                   | behavior                                             |
-| ----------------------------------------------- | ---------------------------------------------------- |
-| `GET /facts`                                    | list facts incl. ledger entries                      |
-| `GET /facts/:factKey`                           | single fact incl. ledger entries                     |
-| `PUT /facts/:factKey`                           | upsert (arc-style merge)                             |
-| `DELETE /facts/:factKey`                        | delete fact (ledger cascades)                        |
-| `POST /facts/:factKey/reveal`                   | add ledger row `{ entityKey, chapter, note? }` (idempotent) |
-| `DELETE /facts/:factKey/knowledge/:entityKey`   | retract a ledger row                                 |
+| method & path                                 | behavior                                                    |
+| --------------------------------------------- | ----------------------------------------------------------- |
+| `GET /facts`                                  | list facts incl. ledger entries                             |
+| `GET /facts/:factKey`                         | single fact incl. ledger entries                            |
+| `PUT /facts/:factKey`                         | upsert (arc-style merge)                                    |
+| `DELETE /facts/:factKey`                      | delete fact (ledger cascades)                               |
+| `POST /facts/:factKey/reveal`                 | add ledger row `{ entityKey, chapter, note? }` (idempotent) |
+| `DELETE /facts/:factKey/knowledge/:entityKey` | retract a ledger row                                        |
 
 ## 8. Follow-ups (CK5, not in the initial cut)
 

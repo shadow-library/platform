@@ -54,38 +54,38 @@ Content-Type: application/json
 
 ## 3. Envelope
 
-| Field          | Type    | Required | Constraint                                         |
-| -------------- | ------- | -------- | --------------------------------------------------- |
-| `format`       | string  | yes      | must equal exactly `"novel-import"`                  |
-| `schemaVersion`| integer | yes      | must equal exactly `1` (the only version this server currently accepts) |
-| `mode`         | string  | yes      | `"final"` or `"source"`                              |
-| `novel`        | object  | yes      | see §4                                               |
-| `volumes`      | array   | yes      | min 1 item; see §5                                   |
-| `assets`       | array   | no       | see §6                                               |
+| Field           | Type    | Required | Constraint                                                              |
+| --------------- | ------- | -------- | ----------------------------------------------------------------------- |
+| `format`        | string  | yes      | must equal exactly `"novel-import"`                                     |
+| `schemaVersion` | integer | yes      | must equal exactly `1` (the only version this server currently accepts) |
+| `mode`          | string  | yes      | `"final"` or `"source"`                                                 |
+| `novel`         | object  | yes      | see §4                                                                  |
+| `volumes`       | array   | yes      | min 1 item; see §5                                                      |
+| `assets`        | array   | no       | see §6                                                                  |
 
 ## 4. `novel` — metadata
 
-| Field          | Type       | Required | Constraint / maps to                                                                 |
-| -------------- | ---------- | -------- | -------------------------------------------------------------------------------------- |
-| `title`        | string     | yes      | non-empty, **max 255 characters**. Stored as both `projects.name` (varchar 255) and `projects.title` (varchar 500) — capped at the tighter of the two. |
-| `synopsis`     | string     | yes      | non-empty. Stored as `projects.brief` — the same "overview" field the app's premise/refinement tooling reads and the export package renders as the novel's description. |
-| `genre`        | string     | no       | accepted and validated, but **not currently persisted** — the `projects` table has no evidenced genre column today (the AI premise pipeline's own `genre` field is likewise ephemeral, never written to a column). Reserved for a future column or web surface. |
-| `tags`         | string[]   | no       | stored as `projects.themes` — the same jsonb array the novel export package reads back out as `tags`. |
-| `cover`        | string     | no       | must equal the `name` of an entry in `assets` (§6). Omit if the novel has no cover.     |
-| `instructions` | string     | no       | stored as `projects.instructions` — author chapter-writing instructions. Omitted, the project falls back to the app's default writing instructions, identical to a project created without instructions. |
+| Field          | Type     | Required | Constraint / maps to                                                                                                                                                                                                                                            |
+| -------------- | -------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `title`        | string   | yes      | non-empty, **max 255 characters**. Stored as both `projects.name` (varchar 255) and `projects.title` (varchar 500) — capped at the tighter of the two.                                                                                                          |
+| `synopsis`     | string   | yes      | non-empty. Stored as `projects.brief` — the same "overview" field the app's premise/refinement tooling reads and the export package renders as the novel's description.                                                                                         |
+| `genre`        | string   | no       | accepted and validated, but **not currently persisted** — the `projects` table has no evidenced genre column today (the AI premise pipeline's own `genre` field is likewise ephemeral, never written to a column). Reserved for a future column or web surface. |
+| `tags`         | string[] | no       | stored as `projects.themes` — the same jsonb array the novel export package reads back out as `tags`.                                                                                                                                                           |
+| `cover`        | string   | no       | must equal the `name` of an entry in `assets` (§6). Omit if the novel has no cover.                                                                                                                                                                             |
+| `instructions` | string   | no       | stored as `projects.instructions` — author chapter-writing instructions. Omitted, the project falls back to the app's default writing instructions, identical to a project created without instructions.                                                        |
 
 ## 5. `volumes` — ordered groups, min 1
 
-| Field      | Type    | Required | Constraint                                                        |
-| ---------- | ------- | -------- | -------------------------------------------------------------------- |
+| Field      | Type    | Required | Constraint                                                                                        |
+| ---------- | ------- | -------- | ------------------------------------------------------------------------------------------------- |
 | `ordinal`  | integer | yes      | `>= 1`; unique across the bundle; **contiguous starting at 1** (1, 2, 3, … — no gaps, no repeats) |
-| `title`    | string  | no       | display-only, for the author's own organization                    |
-| `chapters` | array   | yes      | min 1 item; see below                                               |
+| `title`    | string  | no       | display-only, for the author's own organization                                                   |
+| `chapters` | array   | yes      | min 1 item; see below                                                                             |
 
 Each entry in `chapters`:
 
-| Field     | Type   | Required | Constraint                                                              |
-| --------- | ------ | -------- | -------------------------------------------------------------------------- |
+| Field     | Type   | Required | Constraint                                                                    |
+| --------- | ------ | -------- | ----------------------------------------------------------------------------- |
 | `title`   | string | yes      | non-empty, **max 500 characters** — aligned to `chapters.title` (varchar 500) |
 | `content` | string | yes      | non-empty, and not whitespace-only. Unbounded — `chapters.content` is `text`. |
 
@@ -99,7 +99,7 @@ numbers by:
 3. Concatenating all of those chapter lists end-to-end and numbering the result `1, 2, 3, …`.
 
 So volume ordinal 1's chapters become 1..N, volume ordinal 2's chapters continue at N+1, and so on. This
-is the *only* place chapter numbers come from — reordering a volume's `ordinal`, or reordering chapters
+is the _only_ place chapter numbers come from — reordering a volume's `ordinal`, or reordering chapters
 within a volume's array, changes the resulting numbers.
 
 ### Volumes are organizational only
@@ -112,11 +112,11 @@ against the resulting project.
 
 ## 6. `assets` — optional, only used for the cover today
 
-| Field        | Type   | Required | Constraint                                                       |
-| ------------ | ------ | -------- | -------------------------------------------------------------------- |
-| `name`       | string | yes      | slug pattern `^[a-z0-9][a-z0-9-]*$`; unique across the bundle         |
-| `mimeType`   | string | yes      | one of `image/png`, `image/jpeg`, `image/webp`                       |
-| `dataBase64` | string | yes      | non-empty base64-encoded bytes, **no** `data:` URL prefix             |
+| Field        | Type   | Required | Constraint                                                    |
+| ------------ | ------ | -------- | ------------------------------------------------------------- |
+| `name`       | string | yes      | slug pattern `^[a-z0-9][a-z0-9-]*$`; unique across the bundle |
+| `mimeType`   | string | yes      | one of `image/png`, `image/jpeg`, `image/webp`                |
+| `dataBase64` | string | yes      | non-empty base64-encoded bytes, **no** `data:` URL prefix     |
 
 To give the novel a cover, add one entry to `assets` and set `novel.cover` to that entry's `name`. The
 asset is decoded and stored through the same on-disk storage path (`ImageStorageProvider`) the app uses
@@ -191,8 +191,8 @@ either fix the underlying issue and re-import as a fresh bundle, or delete the p
 
 `source`-mode imports run an automatic post-insert pass that merges chapters whose titles look like
 translator-split parts of one original chapter, then renumbers the project contiguously. This section
-documents the actual patterns the pass recognizes, so a `source`-mode bundle can be authored to *avoid*
-accidental merges as reliably as to *produce* an intended one.
+documents the actual patterns the pass recognizes, so a `source`-mode bundle can be authored to _avoid_
+accidental merges as reliably as to _produce_ an intended one.
 
 ### How a title is read
 
@@ -206,7 +206,7 @@ before what remains is treated as the chapter's "base" title:
 3. **Trailing parenthesized number** — a bare `(N)` at the end, e.g. `"The Siege (2)"` — read as a part
    marker only when neither of the two markers above already set one.
 4. **Chapter-number prefix** — a leading `Chapter N`, `Ch. N`, `Ch N`, or `C N` (optionally followed by a
-   sub-part, `Chapter 700.2` or `Chapter 700-2`). The number after the word is the chapter's *original*
+   sub-part, `Chapter 700.2` or `Chapter 700-2`). The number after the word is the chapter's _original_
    (source) chapter number, not a part marker, unless a `.N`/`-N` suffix is present — that suffix becomes
    the part number.
 5. **Bare leading number prefix** — a leading `N:`, `N.`, or `N-` with no "chapter" word, e.g.
@@ -232,7 +232,7 @@ shared base title, and the whole project is renumbered contiguously afterward �
 shifts every later chapter down by 2. Ambiguous cases (e.g. two adjacent chapters with the identical bare
 title and no part marker at all, or a part sequence with a gap) are resolved by a best-effort AI pass when
 one is available, and default to staying split when it is not — nothing merges silently by accident on a
-*genuinely* ambiguous case; the patterns above are what decide the *unambiguous* ones.
+_genuinely_ ambiguous case; the patterns above are what decide the _unambiguous_ ones.
 
 ### Authoring to avoid accidental merges
 
@@ -240,12 +240,12 @@ one is available, and default to staying split when it is not — nothing merges
   identical bare title (no chapter number, no part marker) are the one case flagged as ambiguous rather
   than silently split or merged — but avoid relying on that safety net.
   - **Trailing markers are the biggest risk**: an unrelated chapter titled `"Homecoming (2)"`,
-  `"Homecoming - 2"`, or `"Homecoming, Part 2"` immediately following a chapter titled `"Homecoming"` will
-  read as a continuation and merge, even though nothing in the story connects them. Reuse a base title
-  across chapters only when they genuinely are sequential parts of one chapter.
+    `"Homecoming - 2"`, or `"Homecoming, Part 2"` immediately following a chapter titled `"Homecoming"` will
+    read as a continuation and merge, even though nothing in the story connects them. Reuse a base title
+    across chapters only when they genuinely are sequential parts of one chapter.
 - If two chapters must share a title for narrative reasons but are **not** meant to merge, insert at
   least one differently-titled chapter between them, or give each a distinct chapter-number prefix
-  (pattern 4/5) — an explicit, *different* original chapter number always prevents a merge outright.
+  (pattern 4/5) — an explicit, _different_ original chapter number always prevents a merge outright.
 - `final`-mode imports never run this pass at all — title collisions are never a concern there.
 
 ### `progress.current` / `phase` step-by-step
@@ -306,11 +306,11 @@ A complete, valid, two-volume, three-chapter `source`-mode bundle — no assets,
 
 Importing this bundle derives three chapters, numbered by flattening the volumes in ordinal order:
 
-| Global number | Title             | From volume (ordinal) |
-| ------------- | ----------------- | ---------------------- |
-| 1             | The Last Watch     | 1                       |
-| 2             | A Voice in the Foam| 1                       |
-| 3             | The Debt           | 2                       |
+| Global number | Title               | From volume (ordinal) |
+| ------------- | ------------------- | --------------------- |
+| 1             | The Last Watch      | 1                     |
+| 2             | A Voice in the Foam | 1                     |
+| 3             | The Debt            | 2                     |
 
 Because `mode` is `"source"`, the project is created with `kind: "source"`, the three chapters land with
 `status: "done"` and the default `generator`, auto-recombine runs once they're in (a no-op here — nothing
@@ -330,8 +330,6 @@ To give the same bundle a cover, add an `assets` entry and reference it from `no
 ```json
 {
   "novel": { "...": "...", "cover": "front" },
-  "assets": [
-    { "name": "front", "mimeType": "image/jpeg", "dataBase64": "<base64 bytes, no data: prefix>" }
-  ]
+  "assets": [{ "name": "front", "mimeType": "image/jpeg", "dataBase64": "<base64 bytes, no data: prefix>" }]
 }
 ```

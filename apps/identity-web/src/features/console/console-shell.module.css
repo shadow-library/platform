@@ -119,7 +119,6 @@
   border-radius: 999px;
 }
 
-
 /* Below the sm breakpoint (--sh-breakpoint-sm 640) the bar keeps only the crumb and the account menu —
    the badge and the exit action are what push it past the viewport on a phone. */
 @media (max-width: 639px) {

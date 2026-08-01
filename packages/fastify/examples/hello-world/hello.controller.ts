@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { HttpController, Get, ServerErrorCode, Post, Body, HttpStatus, Put, Patch, Delete, RespondFor } from '@shadow-library/fastify';
-import { HelloBody } from './hello-body.dto';
-import { HelloResponse } from './hello-response.dto';
+import { Body, Delete, Get, HttpController, HttpStatus, Patch, Post, Put, RespondFor, ServerErrorCode } from '@shadow-library/fastify';
 
 /**
  * Importing user defined packages
  */
+import { HelloBody } from './hello-body.dto';
+import { HelloResponse } from './hello-response.dto';
 
 /**
  * Defining types
@@ -30,23 +30,22 @@ export class HelloController {
   @RespondFor(200, HelloResponse)
   async getHelloAsync(@Body() body: HelloBody): Promise<HelloResponse> {
     await new Promise(resolve => setTimeout(resolve, 10));
-    const data = { message: `Hello, ${body.name}!`, name: body.name };
-    return data;
+    return { message: `Hello, ${body.name}!` };
   }
 
   @Put('/error')
-  throwError() {
+  throwError(): void {
     ServerErrorCode.S008.throw();
   }
 
   @Patch('/error-async')
-  async throwErrorAsync() {
+  async throwErrorAsync(): Promise<void> {
     await new Promise(resolve => setTimeout(resolve, 10));
     ServerErrorCode.S008.throw();
   }
 
   @Delete('/custom-error')
-  throwCustomError() {
+  throwCustomError(): void {
     throw new Error('Custom Error');
   }
 }

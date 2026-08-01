@@ -1,31 +1,3 @@
-# dependencies
-node_modules/
-
-# IDE
-/.vscode
-/.project
-/.settings
-
-# build output
-dist
-CHANGELOG.md
-
-# misc
-.DS_Store
-npm-debug.log
-*.tsbuildinfo
-.npmrc
-
-# tests
-/coverage
-/.nyc_output
-/logs
-
-# Environment variables
-.env
-.env.*
-!.env.example
-
 # web client build
 public/
 

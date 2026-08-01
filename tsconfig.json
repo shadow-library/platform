@@ -1,0 +1,9 @@
+{
+  /** The root tooling project: the `scripts/` entrypoints plus the root-level tool configs. Workspaces have their own. */
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    /** `scripts/` is run directly by bun and never compiled, so its imports carry the real `.ts` extension. */
+    "allowImportingTsExtensions": true
+  },
+  "include": ["scripts/**/*.ts", "*.config.ts", "*.d.ts"]
+}

@@ -4,12 +4,12 @@
 # (not the app directory) — see docker/README.md for the exact `docker build` invocation per app.
 #
 # Why one Dockerfile instead of eight: every app builds the same way (bun install at the repo
-# root, `--filter './packages/*' build` for the shared packages, then the app's own `bun run
-# build` — mirroring .github/workflows/ci.yml's `verify` job), and every app's runtime falls into
-# exactly one of two shapes shared across the platform:
-#   - backend  (identity-server, novel-forge-server, pulse-server, web-novel-server): `shadow
-#     build` tree-shakes each entrypoint into a single self-contained Bun.build bundle — the
-#     runtime image needs nothing but dist/, not even node_modules.
+# root, `bun scripts/build.ts 'packages/*'` for the shared packages, then
+# `bun scripts/build.ts apps/${APP}`), and every app's runtime falls into exactly one of two shapes
+# shared across the platform:
+#   - backend  (identity-server, novel-forge-server, pulse-server, web-novel-server):
+#     scripts/build.ts tree-shakes each entrypoint into a single self-contained Bun.build bundle —
+#     the runtime image needs nothing but dist/, not even node_modules.
 #   - ssr      (identity-web, novel-forge-web, pulse-web, web-novel-web): a TanStack Start server
 #     whose SSR bundle externalizes its runtime deps — the runtime image needs dist/ + a
 #     production-only node_modules + the app's own serve entry. (pulse-web converted from a
@@ -43,12 +43,14 @@ WORKDIR /workspace
 
 # The backend build stamps dist/package.json's gitCommit via `git rev-parse HEAD` and degrades
 # gracefully to "omit the field" when that *fails* — but .git isn't in this context (see the
-# no-.git judgment call in docker/README.md), and scripts/src/utils/process.ts's run() re-throws
+# no-.git judgment call in docker/README.md), and scripts/utils/process.ts's run() re-throws
 # instead of degrading when the git *binary itself* is missing (spawnSync ENOENT). The binary
 # needs to exist so the graceful "no repo here" path is the one that actually runs.
 RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
 
-COPY package.json bun.lock tsconfig.base.json ./
+# tsconfig.web.json too: the four web apps extend it, so a vite build cannot resolve their `@/*`
+# aliases without it — the extends chain fails to parse and every path alias silently goes unresolved.
+COPY package.json bun.lock tsconfig.base.json tsconfig.web.json ./
 COPY packages/app/package.json packages/app/package.json
 COPY packages/auth/package.json packages/auth/package.json
 COPY packages/class-schema/package.json packages/class-schema/package.json
@@ -71,25 +73,27 @@ RUN bun install --frozen-lockfile
 
 # ---------------------------------------------------------------------------------------------
 # build — full source for packages/* (every package, since a package build doesn't know its own
-# consumers) and for the one target app; builds packages first (dependency order handled by
-# `--filter`, same invocation CI uses), then the app's own `bun run build`.
+# consumers) and for the one target app; builds the app's `workspace:*` dependency closure first
+# (`--deps`, the same invocation CI uses), then the app itself. Both run from the repo root:
+# `scripts/` is root tooling invoked by path, and no workspace has a `build` script of its own.
 # ---------------------------------------------------------------------------------------------
 FROM deps AS build
 ARG APP
 
-# packages/* build first, and before apps/${APP} is even copied in: the packages build consumes
-# nothing under apps/, so keeping it above the app-source COPY makes this whole layer — install
-# through packages build — byte-identical, and therefore cache-shared, across all 8 apps' image
-# builds. Copying apps/${APP} first (as an earlier version of this Dockerfile did) put a
-# per-app-varying layer ahead of the packages build, invalidating it on every app source change
-# even though the build doesn't depend on that source at all.
+# Every package builds here, not just apps/${APP}'s dependency closure: the ssr runtime stage below
+# overlays a dist/ for all eight of them unconditionally, and building the closure alone leaves the
+# ones this app doesn't depend on without a dist/ to copy. Building all of them also keeps this whole
+# layer — install through package build — byte-identical, and therefore cache-shared, across all 8
+# apps' image builds. It also runs before apps/${APP}'s source is copied in, since it consumes nothing
+# under apps/: copying apps/${APP} first (as an earlier version of this Dockerfile did) put a
+# per-app-varying layer ahead of the package build, invalidating it on every app source change even
+# though the build doesn't depend on that source at all.
 COPY scripts/ scripts/
 COPY packages/ packages/
-RUN bun run --filter './packages/*' build
+RUN bun scripts/build.ts 'packages/*'
 
 COPY apps/${APP}/ apps/${APP}/
-WORKDIR /workspace/apps/${APP}
-RUN bun run build
+RUN bun scripts/build.ts apps/${APP}
 
 # ---------------------------------------------------------------------------------------------
 # prod-deps — ssr runtime only: a from-scratch, production-only, --ignore-scripts install (no
@@ -142,7 +146,7 @@ COPY --from=build /workspace/apps/${APP}/${SSR_ENTRY} apps/${APP}/entry.ts
 
 # ---------------------------------------------------------------------------------------------
 # runtime-backend — identity-server, novel-forge-server, pulse-server, web-novel-server.
-# `shadow build` already produced a single tree-shaken bundle per entrypoint; nothing but dist/
+# scripts/build.ts already produced a single tree-shaken bundle per entrypoint; nothing but dist/
 # ships. ENTRYPOINT + a CMD default of main.js lets the same image run the worker
 # (identity-server: `docker run <image> worker.js`) or migrations (`docker run <image>
 # migrate.js`) by overriding CMD — no separate image per entrypoint.

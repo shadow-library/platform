@@ -4,7 +4,7 @@ description: >-
   Conventions and reusable building blocks for the Shadow Library platform monorepo. Use whenever
   working in `apps/*` or `packages/*` here — backend services (@shadow-library/app + fastify +
   class-schema + modules + common [+ auth]), web frontends (@shadow-library/ui + web), the shared
-  packages themselves, and the root build/verify tooling (`scripts/`, the `shadow` CLI). Reach for
+  packages themselves, and the root build/verify tooling (`scripts/`). Reach for
   ecosystem packages BEFORE hand-rolling DI, config, logging, validation, HTTP routing, caching,
   database access, error handling, UI components, or API transport. Also use when migrating a
   workspace that hand-rolls what the ecosystem provides.
@@ -28,8 +28,9 @@ skill unless it touches workspace conventions directly.
 
 ## Required workflow (follow in order, every task)
 
-1. **Detect the workspace type.** Read the workspace's `package.json` (deps, scripts) and
-   `.shadowrc.json` (`type`: `library | component | backend | spa | ssr`). Use the routing table below.
+1. **Detect the workspace type.** The type (`library | component | backend | spa | ssr`) is inferred
+   from the workspace's path and dependencies — there is no config file. Read its `package.json` (deps,
+   scripts, optional `"shadow"` key) and use the routing table below.
 2. **Inspect existing structure.** Open the neighbouring module/feature/component you are about to
    extend and mirror it. Existing workspace code wins over generic patterns when the two conflict in
    style; Non-negotiables below always win.
@@ -41,8 +42,8 @@ skill unless it touches workspace conventions directly.
    whether it's a breaking change to a `packages/*` export (see AGENTS.md "Working across workspaces":
    fix every first-party consumer in the same change).
 6. **Implement incrementally**, keeping each workspace buildable between steps.
-7. **Verify:** run `bun run verify` (= `shadow verify`) in the changed workspace, plus the
-   type-appropriate build/tests (see the post-implementation checklist).
+7. **Verify:** run `bun scripts/verify.ts <workspace>` **from the repo root** for the changed
+   workspace, plus the type-appropriate build/tests (see the post-implementation checklist).
 8. **Report deviations** — any convention you could not follow, any verify/test failure you could not
    resolve, any step you skipped. State them explicitly; never imply full verification.
 
@@ -55,7 +56,7 @@ skill unless it touches workspace conventions directly.
 | Wiring user login, route guards, service-to-service auth, or anything touching identity | `references/auth.md` |
 | Writing/changing tests | `references/testing.md` |
 | Authoring a reusable/configurable module (`forRoot`-style, ecosystem package, app-local dynamic module) | `references/library-modules.md` |
-| Touching build/verify/`.shadowrc.json`/husky, CI, or scaffolding a new workspace | `references/repository-setup.md` |
+| Touching build/verify/lint/husky config, CI, or scaffolding a new workspace | `references/repository-setup.md` |
 | Adopting the ecosystem in a workspace that hand-rolls things (fully or partially) | `references/migration.md` |
 | About to write any new helper/util/component, or unsure what a package exports | `references/api-catalog.md` |
 
@@ -73,7 +74,7 @@ skill unless it touches workspace conventions directly.
 | `apps/web-novel-web` | `web-novel-web` | Web Novel's web app (`type: ssr`) |
 | `packages/app`, `packages/auth`, `packages/class-schema`, `packages/common`, `packages/fastify`, `packages/modules`, `packages/ui`, `packages/web` | `@shadow-library/<name>` | The shared ecosystem packages every app builds on (all `type: library`, except `packages/ui` which is `type: component`) |
 | `e2e/` | `e2e` | Whole-platform Playwright suite — cross-app flows against already-deployed service URLs |
-| `scripts/` | *(not a workspace)* | Root tooling — the `shadow` CLI every workspace's `verify`/`build`/etc. scripts invoke by relative path |
+| `scripts/` | *(not a workspace)* | Root tooling — directly-runnable Bun scripts (`build.ts`, `verify.ts`, `gen-api-types.ts`, `check-migrations.ts`), always invoked from the repo root by path |
 
 **Web Novel naming note:** the workspace/package names use the hyphenated `web-novel-*` form, but the
 *runtime* identifiers — the OIDC app id, the `webnovel:publish` scope, storage/cache key prefixes —
@@ -112,9 +113,10 @@ uses all five, plus `auth` when it verifies tokens or guards routes — every ba
 | `@shadow-library/ui` | React components + `--sh-*` design tokens + mobile/touch layer. Presentational only. |
 | `@shadow-library/web` | Frontend wiring: `APIRequest`/`ApiError` transport, `createAppRouter`/`requireAuth`, SSR server fetch, Bun prod server, PWA + service worker + offline subpaths. |
 
-`scripts/` is **not** a package — it's root tooling (never imported, never a `dependency`). Every
-workspace's `build`/`verify`/`check-migrations`/`generate:api-types` script invokes it by relative path
-(`bun ../../scripts/src/bin/shadow.ts <cmd>`); see `references/repository-setup.md`.
+`scripts/` is **not** a package — it's root tooling (never imported, never a `dependency`). Workspaces
+carry no `build`/`verify`/`check-migrations`/`generate:api-types` scripts of their own: every one of
+those runs from the repo root by path (`bun scripts/verify.ts <workspace>`); see
+`references/repository-setup.md`.
 
 ## Non-negotiables (apply in every workspace)
 
@@ -127,7 +129,7 @@ workspace's `build`/`verify`/`check-migrations`/`generate:api-types` script invo
 | 5 | MUST wire services via `@Injectable` + `@Module`; MUST NOT `new` a service (outside DI factories) | manual singletons |
 | 6 | MUST define request/response shapes as `@Schema`/`@Field` classes in `*.dto.ts` | Zod/Joi/Yup/hand-written JSON Schema, inline DTOs |
 | 7 | MUST let `@RespondFor(status, Dto)` serialize responses; MUST NOT hand-build response objects or add `toResponse()` mappers | — |
-| 8 | MUST use the `shadow` CLI (root `scripts/`) for build/verify/hooks; MUST NOT add per-workspace `eslint.config.js`, `commitlint.config.js`, or hand-rolled `scripts/*.ts` for these. The only per-workspace tool config is `.shadowrc.json` — `.prettierrc.json` lives **once, at the repo root**; prettier resolves it via upward lookup, so MUST NOT add a workspace-local copy | — |
+| 8 | MUST use the root tooling (`bun scripts/{build,verify,gen-api-types,check-migrations}.ts <workspace>`, run from the repo root) for build/verify/hooks; MUST NOT add per-workspace `build`/`verify` package.json scripts, a workspace `commitlint.config.*`, husky hooks, or hand-rolled `scripts/*.ts` for these. Lint deviations DO belong in a per-workspace `eslint.config.ts` (flat config, importing the root `createConfig`) — that is now the correct place for them. `.prettierrc.json` and `commitlint.config.ts` live **once, at the repo root**; MUST NOT add workspace-local copies | — |
 | 9 | Frontend MUST compose `@shadow-library/ui` + `--sh-*` tokens + CSS Modules; MUST NOT add Tailwind or another styling system | — |
 | 10 | Frontend MUST use `APIRequest`/`ApiError` (`web`) for API calls; MUST NOT write bespoke fetch wrappers or error types | — |
 | 11 | Service-to-service calls MUST use `svc://<service>/<path>` URLs via `APIRequest` (`common`); MUST NOT hard-code hostnames | — |
@@ -162,13 +164,13 @@ workspace's `build`/`verify`/`check-migrations`/`generate:api-types` script invo
 | PWA / service worker / offline data | `web/pwa`, `web/service-worker`, `web/offline` | frontend.md |
 | Mobile/touch screens | `ui` mobile layer (`data-density="touch"`, `BottomNavigation`, …) | frontend.md |
 | Reusable configurable module | `forRoot`/`forRootAsync` + register-pattern config | library-modules.md |
-| Build/verify/CI/scaffold a new workspace | `shadow` CLI + `.shadowrc.json` | repository-setup.md |
+| Build/verify/CI/scaffold a new workspace | `bun scripts/*.ts` from the repo root + the `"shadow"` package.json key | repository-setup.md |
 
 ## Pre-implementation checklist
 
 Before writing code, confirm ALL of:
 
-- [ ] Workspace type identified (`.shadowrc.json` `type` + dependencies) and the matching references loaded.
+- [ ] Workspace type identified (inferred from path + dependencies; see repository-setup.md) and the matching references loaded.
 - [ ] The neighbouring module/feature/component this change should mirror has been read.
 - [ ] `references/api-catalog.md` searched — no existing export covers what I'm about to write.
 - [ ] The change is classified: app code vs. reusable module vs. tooling vs. contract change (a contract
@@ -180,16 +182,18 @@ Before writing code, confirm ALL of:
 
 ## Post-implementation verification checklist
 
-- [ ] `bun run verify` passes in every changed workspace (`bun run verify --fix` for autofixable issues).
-      Note: on some workspaces verify includes the test suite; on others tests are a separate script —
-      check `package.json` and `.shadowrc.json` (`verify.test`).
+- [ ] `bun scripts/verify.ts <workspace>` passes for every changed workspace (add `--fix` for autofixable
+      issues). Run it **from the repo root** — workspaces have no `verify` script. Note: on some
+      workspaces verify includes the test suite; on others tests are a separate script — verify runs
+      `test` for everything except web apps and `e2e`, unless the workspace's `package.json` `"shadow"`
+      key sets `verifyTest`.
 - [ ] Type-appropriate build/tests run: backend → `bun test` (+ any workspace DB setup per its CLAUDE.md);
-      library/component → `bun run build`; spa/ssr → `bun run build` and the app's own e2e suite when UI
-      behaviour changed.
-- [ ] DB schema changed → migrations regenerated and clean (`bun run check-migrations`, where the
-      workspace wires it).
-- [ ] API contract changed → OpenAPI-derived types regenerated in consumers (`bun run generate:api-types`,
-      the workspace's wired name for `shadow gen-api-types`) and callers updated.
+      library/component → `bun scripts/build.ts <workspace>`; spa/ssr → the same build and the app's own
+      e2e suite when UI behaviour changed.
+- [ ] DB schema changed → migrations regenerated and clean
+      (`bun scripts/check-migrations.ts <workspace>`, for backends with a `db:generate` script).
+- [ ] API contract changed → OpenAPI-derived types regenerated in consumers
+      (`bun scripts/gen-api-types.ts <web-workspace>`, against a running server) and callers updated.
 - [ ] No `console.*`, `process.env`, bare `new Error`, or hand-rolled duplicates introduced.
 - [ ] Deviations, skipped steps, and unresolved failures reported explicitly, per workspace.
 
@@ -201,6 +205,6 @@ Before writing code, confirm ALL of:
 - `references/frontend.md` — web app conventions: UI, transport, router/SSR, PWA, offline, mobile.
 - `references/testing.md` — test conventions for Shadow workspaces.
 - `references/library-modules.md` — patterns for reusable/configurable modules.
-- `references/repository-setup.md` — the `shadow` CLI, `.shadowrc.json`, build types, CI.
+- `references/repository-setup.md` — the root `scripts/` tooling, the `"shadow"` package.json key, build types, CI.
 - `references/migration.md` — staged adoption for a workspace that hand-rolls what the ecosystem provides.
 - `references/api-catalog.md` — the full public API surface of all packages. Search before building.

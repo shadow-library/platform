@@ -33,7 +33,7 @@ const response = await auth.fetchService('novel-forge', '/api/v1/books', {}, { r
 
 ### Calling another application as the user
 
-`fetchService` and `getServiceToken` speak as the *service*. To act for the user in a downstream application, exchange their token — this is the only supported way, because forwarding the user's own token gives the receiving API an audience that is not its own, and asserting the user in a header is forbidden outright:
+`fetchService` and `getServiceToken` speak as the _service_. To act for the user in a downstream application, exchange their token — this is the only supported way, because forwarding the user's own token gives the receiving API an audience that is not its own, and asserting the user in a header is forbidden outright:
 
 ```ts
 const { accessToken, scope } = await auth.exchangeUserToken({
@@ -80,16 +80,16 @@ That is the whole of a steady-state deployment. The audience this service's toke
 
 That registers, wired and working:
 
-| Route | Behaviour |
-| :--- | :--- |
-| `GET /auth/login` | PKCE + `state` + `nonce` + `resource`, transient state into its own cookie, redirect to identity |
-| `GET /auth/callback` | Validates `state`, redeems the code for an app-session handle, sets the session cookie, returns to `return_to` |
-| `POST /auth/logout` | Revokes the app session, clears the cookies, optionally hands on to identity's RP-initiated logout |
-| `POST /auth/backchannel-logout` | Verifies the OIDC logout token and drops that user's local sessions and cached tokens |
-| `GET /auth/session` | The current principal, or `401` — so a browser client never has to parse a token |
-| `GET /auth/step-up` | Claims a step-up grant, prompting identity only when there is nothing left to claim |
-| `GET /auth/organisations` | The organisations this session may act in, active one flagged; one entry means there is nothing to switch to |
-| `POST /auth/organisation` | Switches the active organisation and replaces the session cookie — identity rotates the handle, so the previous one is dead |
+| Route                           | Behaviour                                                                                                                   |
+| :------------------------------ | :-------------------------------------------------------------------------------------------------------------------------- |
+| `GET /auth/login`               | PKCE + `state` + `nonce` + `resource`, transient state into its own cookie, redirect to identity                            |
+| `GET /auth/callback`            | Validates `state`, redeems the code for an app-session handle, sets the session cookie, returns to `return_to`              |
+| `POST /auth/logout`             | Revokes the app session, clears the cookies, optionally hands on to identity's RP-initiated logout                          |
+| `POST /auth/backchannel-logout` | Verifies the OIDC logout token and drops that user's local sessions and cached tokens                                       |
+| `GET /auth/session`             | The current principal, or `401` — so a browser client never has to parse a token                                            |
+| `GET /auth/step-up`             | Claims a step-up grant, prompting identity only when there is nothing left to claim                                         |
+| `GET /auth/organisations`       | The organisations this session may act in, active one flagged; one entry means there is nothing to switch to                |
+| `POST /auth/organisation`       | Switches the active organisation and replaces the session cookie — identity rotates the handle, so the previous one is dead |
 
 Permissions are always evaluated in the session's **active organisation**, so switching changes what the whole application may do. Identity rotates the session handle on a switch and the SDK evicts its cached tokens: an application caches minted tokens against the handle, and a switch served by one replica can never reach a sibling replica's cache, so a handle nobody will present again is the only thing that invalidates everywhere at once. A refused switch answers `403 ORGANISATION_NOT_PERMITTED`, distinct from a `503` outage, so a picker can tell the two apart.
 
@@ -97,7 +97,7 @@ Everything is overridable and nothing is required: `AuthModule.forRoot({ routes:
 
 ### How a browser request is served
 
-The session cookie holds an **opaque app-session handle**, never a token. On each request the SDK mints (or serves from cache) an access token for this app's own audience, authenticating to identity with the service's *own* M2M credential, and verifies the result offline. Possessing a handle grants nothing on its own — that split is the security property the model rests on.
+The session cookie holds an **opaque app-session handle**, never a token. On each request the SDK mints (or serves from cache) an access token for this app's own audience, authenticating to identity with the service's _own_ M2M credential, and verifies the result offline. Possessing a handle grants nothing on its own — that split is the security property the model rests on.
 
 The transient login-state cookie (`state`, PKCE verifier, `return_to`) carries no credential and needs no key: the `__Host-` prefix — a browser-enforced promise that only this exact origin over https could have set it — is what defeats login-CSRF by cookie injection, and a leaked verifier is inert because redeeming the code requires the application's own M2M credential. There is no `AUTH_SESSION_SECRET` and no server-side store, so a login started on one replica completes on any other.
 
@@ -222,13 +222,13 @@ idp.getAppSessionCount(); // asserts a revocation actually reached identity
 
 Four environment variables are **removed**, not deprecated:
 
-| Removed                | Now                                                                                    |
-| :--------------------- | :------------------------------------------------------------------------------------- |
-| `AUTH_AUDIENCE`        | derived from `GET /api/v1/apps/me`; pin with `audience` in code if a deploy truly needs |
-| `AUTH_REDIRECT_URI`    | derived from the registered redirect URIs; pin with `browser.redirectUri`               |
-| `AUTH_SCOPES`          | the scopes an admin granted this application; narrow with `browser.scopes`              |
-| `AUTH_STEP_UP_URL`     | discovery's `step_up_endpoint`; pin with `browser.stepUpUrl`                            |
-| `AUTH_SESSION_SECRET`  | nothing — the login-state cookie no longer needs a key or a store                      |
+| Removed               | Now                                                                                     |
+| :-------------------- | :-------------------------------------------------------------------------------------- |
+| `AUTH_AUDIENCE`       | derived from `GET /api/v1/apps/me`; pin with `audience` in code if a deploy truly needs |
+| `AUTH_REDIRECT_URI`   | derived from the registered redirect URIs; pin with `browser.redirectUri`               |
+| `AUTH_SCOPES`         | the scopes an admin granted this application; narrow with `browser.scopes`              |
+| `AUTH_STEP_UP_URL`    | discovery's `step_up_endpoint`; pin with `browser.stepUpUrl`                            |
+| `AUTH_SESSION_SECRET` | nothing — the login-state cookie no longer needs a key or a store                       |
 
 Add `AUTH_APP_ID` (required in production; it doubles as the OAuth client id, so `AUTH_CLIENT_ID` is only needed when the two differ). A deploy is then `AUTH_ISSUER` + `AUTH_APP_ID` + one credential. There is no fallback reading of the old variables — a stale value silently overriding what identity says is worse than no override, so the escape hatches live in code where they are visible and reviewed.
 

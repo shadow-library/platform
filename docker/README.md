@@ -2,8 +2,12 @@
 
 One [`docker/Dockerfile`](./Dockerfile) builds all 8 `apps/*` workspaces. Build context is always
 the **repository root** — not the app directory — because every app needs the root manifests,
-`packages/*` (built first, dependency-ordered, mirroring CI's `bun run --filter './packages/*'
-build`), and its own source. Run every command below from the repo root.
+`packages/*` (all of them, built first and dependency-ordered, via `bun scripts/build.ts 'packages/*'` —
+every package, not just this app's closure, because the ssr runtime stage overlays a `dist/` for each
+one and the layer stays cache-shared across all eight app builds), and its own source. CI, which copies
+nothing, instead builds only what it needs with `bun scripts/build.ts <workspace> --deps`.
+The root tooling in `scripts/` is
+likewise only invocable from there. Run every command below from the repo root.
 
 The per-app `apps/*/Dockerfile` files this replaced are gone; there is nothing to `cd` into.
 
@@ -12,7 +16,7 @@ external devops system's job. This repo's job ends at "produces a deploy-ready i
 
 ## Build commands
 
-Backends (`--target runtime-backend`) carry no `node_modules` — `shadow build` bundles every
+Backends (`--target runtime-backend`) carry no `node_modules` — `scripts/build.ts` bundles every
 entrypoint into a single tree-shaken file. `APP_VERSION` is optional (defaults to `local`); pass
 the release version at build time to stamp it into the image.
 
@@ -79,9 +83,9 @@ elsewhere) for anything that needs to survive a restart.
 ## Judgment calls
 
 - **`.git` itself is not in the build context, but the `git` binary is still installed in
-  `deps`.** `shadow build`'s backend bundler stamps `gitCommit` into `dist/package.json` only if
+  `deps`.** `scripts/build.ts`'s backend bundler stamps `gitCommit` into `dist/package.json` only if
   `git rev-parse HEAD` succeeds, and degrades gracefully (field simply omitted) if that *fails* —
-  but `scripts/src/utils/process.ts`'s `run()` re-throws instead of degrading when the `git`
+  but `scripts/utils/process.ts`'s `run()` re-throws instead of degrading when the `git`
   binary is missing entirely (`spawnSync` ENOENT), which crashed the very first build attempt here
   until `git` was added. So: no `.git` directory (smaller, hermetic context — `gitCommit` is
   omitted from `dist/package.json`), but `git` the binary stays, purely so that "no repo here"

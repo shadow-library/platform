@@ -50,10 +50,8 @@
   },
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
-    "test": "bun test",
-    "build": "bun ../../scripts/src/bin/shadow.ts build"
+    "test": "bun test"
   },
   "engines": {
     "node": ">=23.0.0"

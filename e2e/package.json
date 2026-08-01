@@ -6,8 +6,6 @@
   "version": "0.0.0",
   "description": "Whole-platform Playwright suite — cross-app smoke flows against already-deployed service URLs supplied via environment variables (see README.md).",
   "scripts": {
-    "verify": "bun ../scripts/src/bin/shadow.ts verify",
-    "build": "echo 'e2e: nothing to build'",
     "type-check": "tsc",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",

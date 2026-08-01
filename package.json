@@ -1,7 +1,11 @@
 {
   "name": "@shadow-library/platform",
   "private": true,
-  "workspaces": ["apps/*", "packages/*", "e2e"],
+  "workspaces": [
+    "apps/*",
+    "packages/*",
+    "e2e"
+  ],
   "catalog": {
     "@playwright/test": "1.57.0",
     "@tanstack/react-query": "5.101.4",
@@ -29,18 +33,14 @@
   },
   "scripts": {
     "prepare": "husky",
-    "verify": "bun run --filter '*' verify",
-    "verify:tooling": "bun scripts/scripts/verify.ts",
-    "build": "bun run --filter '*' build",
-    "test": "bun run --filter '*' test",
-    "test:tooling": "bun test scripts/tests",
-    "commit-msg": "bun scripts/src/bin/shadow.ts commit-msg"
+    "type-check": "tsc -p tsconfig.json",
+    "verify": "bun scripts/verify.ts --all",
+    "build": "bun scripts/build.ts --all",
+    "test": "bun run --filter '*' test"
   },
   "devDependencies": {
+    "@commitlint/cli": "^21.2.0",
     "@commitlint/config-conventional": "^21.2.0",
-    "@commitlint/format": "^21.2.0",
-    "@commitlint/lint": "^21.2.0",
-    "@commitlint/load": "^21.2.0",
     "@eslint/js": "^10.0.1",
     "@rollup/plugin-alias": "^6.0.0",
     "@rollup/plugin-node-resolve": "^16.0.3",

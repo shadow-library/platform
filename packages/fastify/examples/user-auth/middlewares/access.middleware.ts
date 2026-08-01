@@ -22,12 +22,14 @@ export class AccessMiddleware implements MiddlewareGenerator {
   constructor(private readonly contextService: ContextService) {}
 
   generate(metadata: HandlerMetadata): AsyncRouteHandler | undefined {
-    if (!metadata.authGuard) return;
+    /* Narrowed once here so the returned handler closes over the guard options instead of re-reading the optional metadata. */
+    const authGuard = metadata.authGuard;
+    if (!authGuard) return;
 
     return async () => {
       const user = this.contextService.get<User>('CURRENT_USER');
       if (!user) throw ServerErrorCode.S004.create();
-      if (metadata.authGuard!.accessLevel > user.accessLevel) throw ServerErrorCode.S005.create();
+      if (authGuard.accessLevel > user.accessLevel) throw ServerErrorCode.S005.create();
     };
   }
 }

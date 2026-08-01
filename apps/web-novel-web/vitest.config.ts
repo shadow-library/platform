@@ -1,7 +1,7 @@
 /**
  * Importing npm packages
  */
-import { URL, fileURLToPath } from 'node:url';
+import { fileURLToPath, URL } from 'node:url';
 
 import viteReact from '@vitejs/plugin-react';
 import { defineConfig } from 'vitest/config';

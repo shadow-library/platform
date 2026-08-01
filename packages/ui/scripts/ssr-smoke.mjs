@@ -79,7 +79,18 @@ UI.bannerStore.register({ id: 'leak', message: 'leak-canary-banner' });
 assert.ok(!renderToStaticMarkup(h(UI.BannerOutlet, null)).includes('leak-canary-banner'), 'BannerOutlet must not emit registered banners during SSR');
 
 // 8. The standardized shared surface (moved in from the apps) must be exported and SSR-safe.
-for (const name of ['ThemeProvider', 'ClientOnly', 'useTheme', 'themeInitScript', 'derivePaginationState', 'calculatePageUpdate', 'toPositiveInt', 'copyText', 'downloadTextFile', 'getInitials']) {
+for (const name of [
+  'ThemeProvider',
+  'ClientOnly',
+  'useTheme',
+  'themeInitScript',
+  'derivePaginationState',
+  'calculatePageUpdate',
+  'toPositiveInt',
+  'copyText',
+  'downloadTextFile',
+  'getInitials',
+]) {
   assert.equal(typeof UI[name], 'function', `${name} should be exported from the root entry`);
 }
 assert.ok(renderToStaticMarkup(h(UI.ThemeProvider, null, h('span', null, 'themed'))).includes('themed'), 'ThemeProvider should render its children on the server');

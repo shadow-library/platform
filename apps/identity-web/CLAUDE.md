@@ -1,8 +1,9 @@
 # identity-web — Agent Guide
 
 The **frontend** of Shadow Identity: React 19 + TanStack Start **SSR**, TanStack Router + Query,
-`@shadow-library/ui` for components/theming, `@shadow-library/web` for transport/router/SSR. `.shadowrc.json` →
-`"type": "ssr"`. Full-document SSR — `src/routes/__root.tsx` owns `<html>`.
+`@shadow-library/ui` for components/theming, `@shadow-library/web` for transport/router/SSR. Its workspace type
+(`ssr`) is inferred by the root tooling from its `apps/*-web` path and its `@tanstack/react-start` dependency —
+there is no config file that sets it. Full-document SSR — `src/routes/__root.tsx` owns `<html>`.
 
 Its sibling workspace `identity-server` (Bun + Fastify JSON API) serves the HTTP API this app consumes. It lives
 at `../identity-server` in this monorepo; both are workspaces of the platform repository with a single shared
@@ -18,7 +19,8 @@ managed. This is a Shadow app (depends on `@shadow-library/*`), so the skill app
 
 Do **not** inspect files, search code, plan changes, edit files, run commands, or touch dependencies before the
 skill is loaded. Reach for `@shadow-library/ui` (components/theming) and `@shadow-library/web` (transport, router,
-SSR, prod server) and the `shadow` CLI **before** hand-rolling API transport, routing, SSR, or UI components.
+SSR, prod server) and the root `scripts/` tooling **before** hand-rolling API transport, routing, SSR, or UI
+components.
 
 ---
 
@@ -46,16 +48,17 @@ secret, or reused by more than one client belongs in the **server**, not here.
 
 ## Working rules
 
-1. **Check the current working directory before running any command.** Every command below is scoped to this
-   repo — run it from **inside** `identity-web/` (confirm with `pwd`), never from the parent folder or the sibling
-   repo.
+1. **Check the current working directory before running any command.** `build`/`verify`/`gen-api-types` are root
+   tooling and always run from the **repo root** by path (`bun scripts/verify.ts apps/identity-web`); this
+   workspace's own scripts (`dev`, `start`, `preview`, `test`, …) run from **inside** `identity-web/` (confirm with
+   `pwd`). Never mix the two up.
 2. **Read the existing related code before editing.** Find the neighbouring route/feature/component/`*.api.ts` and
    follow its conventions. Don't add a second way to do something that already has one.
 3. **Prefer minimal, focused changes over broad refactors.** Touch only what the task requires; no opportunistic
    rewrites or reformatting of unrelated code.
 4. **Follow the existing patterns** for naming, typing, validation, error handling, and testing (below).
-5. **Package manager is `bun`** (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
-   directory). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
+5. **Package manager is `bun`** (single root `bun.lock`; the root tooling lives in `scripts/`, invoked by path,
+   not a CLI). Use `bun`/`bunx`. Add/upgrade/remove deps with `bun add`/`bun remove` **in this workspace
    only** — never edit another workspace's `package.json` to solve a problem here.
 6. **Never run destructive Git operations** — no commits, pushes, rebases, resets, force-pushes, or branch
    deletion unless the user **explicitly** requests it. This monorepo's history is shared across every
@@ -63,25 +66,33 @@ secret, or reused by more than one client belongs in the **server**, not here.
 
 ---
 
-## Commands (run inside `identity-web/`)
+## Commands
 
-| Purpose | Command |
-|---|---|
-| Install | `bun install` |
-| Dev (Vite + Start, port 3000) | `bun run dev` |
-| Build (→ `dist/client` + `dist/server`) | `bun run build` |
-| Production start | `bun run start` |
-| Preview a build | `bun run preview` |
-| Verify — **format + lint + type-check** | `bun run verify` |
-| Verify with autofix | `bun run verify --fix` |
-| Type-check only | `bun run type-check` |
-| E2E tests (Playwright — **needs the server running**) | `bun run test` |
-| Install Playwright browser | `bun run test:setup` |
-| Regenerate API types from the server's OpenAPI | `bun run generate:api-types` |
+Root tooling — always run from the **repo root**, by workspace path:
 
-`bun run verify` runs format + lint + type-check only (`.shadowrc.json` sets `verify.test: false`); Playwright is
-a separate step and requires a running `identity-server`. There is **no unit-test suite** — only e2e. Copy
-`.env.example` → `.env` before first run.
+| Purpose                                        | Command                                          |
+| ---------------------------------------------- | ------------------------------------------------ |
+| Build (→ `dist/client` + `dist/server`)        | `bun scripts/build.ts apps/identity-web`         |
+| Verify — **format + lint + type-check**        | `bun scripts/verify.ts apps/identity-web`        |
+| Verify with autofix                            | `bun scripts/verify.ts apps/identity-web --fix`  |
+| Regenerate API types from the server's OpenAPI | `bun scripts/gen-api-types.ts apps/identity-web` |
+
+This workspace's own scripts — run from **inside** `identity-web/`:
+
+| Purpose                                               | Command              |
+| ----------------------------------------------------- | -------------------- |
+| Install                                               | `bun install`        |
+| Dev (Vite + Start, port 3000)                         | `bun run dev`        |
+| Production start                                      | `bun run start`      |
+| Preview a build                                       | `bun run preview`    |
+| Type-check only                                       | `bun run type-check` |
+| E2E tests (Playwright — **needs the server running**) | `bun run test`       |
+| Install Playwright browser                            | `bun run test:setup` |
+
+There is no `build`, `verify`, or `generate:api-types` script in this workspace's `package.json` — they are root
+tooling only. `bun scripts/verify.ts apps/identity-web` runs format + lint + type-check only (this workspace is a
+web app, so `verify` doesn't run tests by convention); Playwright is a separate step and requires a running
+`identity-server`. There is **no unit-test suite** — only e2e. Copy `.env.example` → `.env` before first run.
 
 ---
 
@@ -150,12 +161,12 @@ shape, status code, error code, or auth requirement is a **both-repos** change:
    and is verified there.
 2. **Evaluate backward compatibility before relying on a changed API.** Prefer additive, non-breaking changes; for
    a breaking change, plan every affected caller here into the same change and call out the break explicitly.
-3. **Regenerate the API types** with `bun run generate:api-types` against the running server (updates
-   `api-types.gen.ts`; this file is excluded from format/lint).
+3. **Regenerate the API types** with `bun scripts/gen-api-types.ts apps/identity-web` against the running server
+   (updates `api-types.gen.ts`; this file is excluded from format/lint).
 4. **Update every affected caller here** — the `*.api.ts` server function, its query/mutation hooks, callers,
    `validateSearch`, fixtures, and Playwright specs.
-5. **Verify BOTH repositories** for a cross-repo change — `bun run verify` (and the relevant tests) in each, from
-   inside each repo.
+5. **Verify BOTH workspaces** for a cross-repo change — `bun scripts/verify.ts apps/identity-web` and
+   `bun scripts/verify.ts apps/identity-server` (and the relevant tests), from the repo root.
 
 Never change a contract on this side only, and never duplicate a server rule to work around it — fix the server.
 
@@ -166,8 +177,8 @@ Never change a contract on this side only, and never duplicate a server rule to 
 When you finish, report clearly:
 
 - **What changed** in `identity-web`.
-- **Which verification commands you actually ran** and their results (e.g. `bun run verify`, `bun run type-check`,
-  `bun run test`). For a cross-repo change, report `identity-web` and `identity-server` **separately** and show
-  verification for both.
+- **Which verification commands you actually ran** and their results (e.g. `bun scripts/verify.ts
+apps/identity-web`, `bun run type-check`, `bun run test`). For a cross-repo change, report `identity-web` and
+  `identity-server` **separately** and show verification for both.
 
 State plainly what passed, what failed (with output), and anything you skipped and why.

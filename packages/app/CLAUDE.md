@@ -10,21 +10,28 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ```bash
 bun install                  # Install dependencies
-bun run verify               # shadow verify: format (Prettier) + lint (ESLint) + type-check + test
-bun run verify --fix         # Auto-fix format + lint issues, then type-check + test
 bun run type-check           # TypeScript type checking (tsc)
-bun run build                # shadow build: ESM-only, flat /dist with synthesized package.json
 bun run test                 # Run all tests: unit (with coverage) + integration
 bun run test:unit            # Unit tests only (bun test + coverage)
 bun run test:integration     # Integration tests only
+
+# From the repo root, by workspace path — this package has no build/verify script:
+bun scripts/verify.ts packages/app             # format (Prettier) + lint (ESLint) + type-check + test
+bun scripts/verify.ts packages/app --fix       # Auto-fix format + lint issues, then type-check + test
+bun scripts/build.ts packages/app              # ESM-only, flat /dist with synthesized package.json
 ```
 
 To run a single unit test file: `bun test tests/path/to/file.spec.ts`
 To run a single integration test: `bun test ./tests/integration/path/to/file.spec.ts`
 
-**Tooling** is centralized in the root `scripts/` tooling (the `shadow` CLI, invoked from this package via `bun run verify`/`bun run build`), driven by `.shadowrc.json` — there is no local `eslint.config.js`, `.prettierrc`, or `commitlint.config.js`. `shadow build`/`verify`/`commit-msg` replace the former hand-rolled `scripts/` setup; release/publish tooling was retired with the migration to the monorepo (this package is private).
+**Tooling** is centralized in the root `scripts/` tooling (invoked by path, e.g. `bun scripts/verify.ts
+packages/app` / `bun scripts/build.ts packages/app`) — there is no `shadow` CLI, no `.shadowrc.json`, and no
+local `eslint.config.ts`, `.prettierrc`, or `commitlint.config.ts` for this package. Convention (workspace
+path plus `package.json` `exports`) plus a `"shadow"` key for non-inferable build inputs replace the old
+config-file format; release/publish tooling was retired with the migration to the monorepo (this package is
+private).
 
-**Pre-commit and commit-msg hooks live at the repo root** (one Husky setup for the whole monorepo, not per-package) — the pre-commit hook fast-verifies whichever workspaces have staged changes; the commit-msg hook runs `shadow commit-msg`.
+**Pre-commit and commit-msg hooks live at the repo root** (one Husky setup for the whole monorepo, not per-package) — the pre-commit hook fast-verifies whichever workspaces have staged changes; the commit-msg hook runs commitlint against the root `commitlint.config.ts`.
 
 ## Architecture
 
@@ -87,16 +94,18 @@ Every TypeScript file follows this section comment pattern:
 
 ### Style rules
 
-Format and lint rules are shipped by the root `scripts/` tooling (applied via `shadow verify`); `.shadowrc.json` `verify` layers repo-specific overrides on top. Key points:
+Format and lint rules are shipped by the root `scripts/` tooling (applied via `bun scripts/verify.ts`) — the
+root `eslint.config.ts` and `.prettierrc.json`; this package carries no lint/format overrides of its own. Key
+points:
 
 - **Prettier**: single quotes, trailing commas everywhere, 180 char width, no arrow parens
 - **ESLint** (typescript-eslint strict + stylistic): `no-console` is an error; `explicit-module-boundary-types` required; `no-explicit-any` is off; import order enforced by `eslint-plugin-perfectionist` (builtin > external > internal > parent/sibling), where `@lib/*` and `@shadow-library/*` count as **internal** and the four banner comments partition the sorted blocks; Node built-ins must use `node:` protocol prefix
 - **Test files** (`tests/**/*.spec.ts`) have relaxed rules (no-extraneous-class, no-empty-function, no-non-null-assertion, no-console off; unused vars allow `^_`)
-- **TypeScript**: strict mode (TS 6.x via `shadow`), `module`/`moduleResolution` = `ESNext`/`bundler`, experimental decorators enabled, path alias `@lib/*` maps to `src/*`
+- **TypeScript**: strict mode (TS 6.x, a root devDependency), `module`/`moduleResolution` = `ESNext`/`bundler`, experimental decorators enabled, path alias `@lib/*` maps to `src/*`
 
 ### Commit messages
 
-Format: `<type>(<scope>): <subject>` (max 100 chars, imperative present tense, no capitalization, no trailing period). Types: feat, fix, refactor, test, docs, style, chore, ci, perf, build. Validated by the commit-msg hook (`shadow commit-msg`, shipped `@commitlint/config-conventional`).
+Format: `<type>(<scope>): <subject>` (max 100 chars, imperative present tense, no capitalization, no trailing period). Types: feat, fix, refactor, test, docs, style, chore, ci, perf, build. Validated by the commit-msg hook (`bunx --bun commitlint --edit`, against the root `commitlint.config.ts`, shipped `@commitlint/config-conventional`).
 
 ## Testing
 

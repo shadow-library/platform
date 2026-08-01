@@ -26,10 +26,8 @@
   "description": "Shadow Apps consumer auth SDK — Bun-native EdDSA token verification, PDP client, M2M tokens, OIDC relying-party helper, and framework guards",
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bun test",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "pack": "bun run build && cd dist && bun pm pack --destination .."
   },
   "engines": {

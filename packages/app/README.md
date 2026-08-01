@@ -930,7 +930,7 @@ An override whose token matches no declared provider is ignored.
 | Feature            | Shadow Application               | NestJS                        |
 | ------------------ | -------------------------------- | ----------------------------- |
 | **Platform**       | Platform-agnostic                | HTTP/Web focused              |
-| **Dispatcher**         | Custom implementable             | Built-in Express/Fastify      |
+| **Dispatcher**     | Custom implementable             | Built-in Express/Fastify      |
 | **Interceptors**   | Controller & Service methods     | Controller methods only       |
 | **Flexibility**    | High - any application type      | Medium - web applications     |
 | **Bundle Size**    | Lightweight                      | Heavier (includes HTTP stack) |

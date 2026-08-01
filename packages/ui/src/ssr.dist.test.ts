@@ -30,14 +30,15 @@ function newestInputMtime(): number {
     }
   };
   walk(srcDir);
-  for (const file of ['package.json', '.shadowrc.json']) newest = Math.max(newest, fs.statSync(path.join(rootDir, file)).mtimeMs);
+  /** package.json is both the manifest and, via its `shadow` key, the build's own configuration. */
+  newest = Math.max(newest, fs.statSync(path.join(rootDir, 'package.json')).mtimeMs);
   return newest;
 }
 
 function ensureFreshBuild(): void {
   const built = fs.existsSync(distEntry) && fs.statSync(distEntry).mtimeMs >= newestInputMtime();
   if (built) return;
-  execFileSync('bun', ['run', 'build'], { cwd: rootDir, stdio: 'pipe' });
+  execFileSync('bun', ['scripts/build.ts', 'packages/ui'], { cwd: path.join(rootDir, '../..'), stdio: 'pipe' });
 }
 
 /**

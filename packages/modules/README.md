@@ -170,10 +170,10 @@ For features that can be toggled (Helmet, Compression, OpenAPI, CSRF), the follo
 
 The served document's `info` block is resolved per field, so partial overrides keep the defaults for the rest:
 
-| Field     | Precedence                                                      |
-| --------- | --------------------------------------------------------------- |
-| `title`   | `openapi.info.title` → `APP_NAME`                                 |
-| `version` | `openapi.info.version` → `APP_VERSION` → `local`                  |
+| Field     | Precedence                                       |
+| --------- | ------------------------------------------------ |
+| `title`   | `openapi.info.title` → `APP_NAME`                |
+| `version` | `openapi.info.version` → `APP_VERSION` → `local` |
 
 `APP_VERSION` is build metadata, not configuration: it is the 7-character head commit
 (`git rev-parse --short=7 HEAD`), baked into the image at build time via a Docker build argument, and must not be
@@ -296,13 +296,13 @@ memcache: {
 
 When connection URLs are not provided in code, the module falls back to these environment variables:
 
-| Setting         | Config Key                            | Description                                                                  |
-| --------------- | ------------------------------------- | ---------------------------------------------------------------------------- |
-| PostgreSQL URL  | `database.postgres.url`               | PostgreSQL connection URL (passed to factory via `PostgresConnectionConfig`) |
-| Max Connections | `database.postgres.max-connections`   | Max connections (passed to factory via `PostgresConnectionConfig`)           |
-| Lazy Connection | `database.postgres.lazy-connection`   | Skip `SELECT 1` verification on startup (default: `false`)                   |
-| Redis URL       | `database.redis.url`                  | Redis connection URL                                                         |
-| Memcached Hosts | `database.memcache.hosts`             | Memcached server host(s)                                                     |
+| Setting         | Config Key                          | Description                                                                  |
+| --------------- | ----------------------------------- | ---------------------------------------------------------------------------- |
+| PostgreSQL URL  | `database.postgres.url`             | PostgreSQL connection URL (passed to factory via `PostgresConnectionConfig`) |
+| Max Connections | `database.postgres.max-connections` | Max connections (passed to factory via `PostgresConnectionConfig`)           |
+| Lazy Connection | `database.postgres.lazy-connection` | Skip `SELECT 1` verification on startup (default: `false`)                   |
+| Redis URL       | `database.redis.url`                | Redis connection URL                                                         |
+| Memcached Hosts | `database.memcache.hosts`           | Memcached server host(s)                                                     |
 
 > The `database.postgres.max-connections` config value is automatically loaded and included in the `PostgresConnectionConfig.maxConnections` field passed to your factory. Your factory decides how to use it (e.g., pass it as a driver-specific `max` option).
 

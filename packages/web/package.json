@@ -39,10 +39,8 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
-    "test": "bun test",
-    "build": "bun ../../scripts/src/bin/shadow.ts build"
+    "test": "bun test"
   },
   "engines": {
     "node": ">=20.0.0"

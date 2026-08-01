@@ -14,15 +14,15 @@ bun add @shadow-library/web
 
 All heavy peers are **optional** — you only need the ones for the subpaths you import.
 
-| You import… | Peer(s) needed |
-| --- | --- |
-| `@shadow-library/web` (root) | `react` |
-| `@shadow-library/web/router` | `@tanstack/react-router`, `@tanstack/react-query`, `@tanstack/react-router-ssr-query` |
-| `@shadow-library/web/server` | `@tanstack/react-start` |
-| `@shadow-library/web/server-entry` | Bun runtime |
-| `@shadow-library/web/pwa` | `react` |
-| `@shadow-library/web/offline` | `react` |
-| `@shadow-library/web/service-worker` | none (runs inside the service worker) |
+| You import…                          | Peer(s) needed                                                                        |
+| ------------------------------------ | ------------------------------------------------------------------------------------- |
+| `@shadow-library/web` (root)         | `react`                                                                               |
+| `@shadow-library/web/router`         | `@tanstack/react-router`, `@tanstack/react-query`, `@tanstack/react-router-ssr-query` |
+| `@shadow-library/web/server`         | `@tanstack/react-start`                                                               |
+| `@shadow-library/web/server-entry`   | Bun runtime                                                                           |
+| `@shadow-library/web/pwa`            | `react`                                                                               |
+| `@shadow-library/web/offline`        | `react`                                                                               |
+| `@shadow-library/web/service-worker` | none (runs inside the service worker)                                                 |
 
 ## Entry points
 
@@ -101,7 +101,7 @@ server, so they can be called unconditionally.
 
 ```tsx
 // wherever you configure <head> (e.g. a TanStack Start root route)
-head: () => ({ links: pwaHeadLinks({ appleTouchIcon: '/icons/apple-touch-icon.png' }), meta: pwaHeadMeta({ themeColor: '#0b0b0f' }) })
+head: () => ({ links: pwaHeadLinks({ appleTouchIcon: '/icons/apple-touch-icon.png' }), meta: pwaHeadMeta({ themeColor: '#0b0b0f' }) });
 
 // app root
 const { updateAvailable, applyUpdate } = useServiceWorker();
@@ -141,7 +141,7 @@ An IndexedDB-backed store for content the user chooses to keep offline. It works
 (the primary path); when a worker is present it can also cache asset URLs so images resolve offline too.
 
 - **`OfflineStore`** — `put`/`get`/`has`/`delete`/`list`/`clear`/`totalSize`/`estimate` over IndexedDB
-  (JSON *and* `Blob`s). Construction is side-effect-free (the DB opens lazily), so it is SSR-safe.
+  (JSON _and_ `Blob`s). Construction is side-effect-free (the DB opens lazily), so it is SSR-safe.
 - **`OfflineContentManager`** + **`useOfflineDownload(manager?)`** — orchestrate a download: fetch the payload,
   persist it, and (given a `controller` + `assets`) have the worker cache those asset URLs, with progress.
 - **`createIDBPersister(options)`** — an IndexedDB `Persister` for `@tanstack/react-query-persist-client`, to

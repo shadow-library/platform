@@ -27,9 +27,11 @@ provides, and do not begin work before the skill is loaded.
 
 ## 1. Know where you are, work here only
 
-- **Check the current working directory first.** Confirm you are inside `web-novel-web/` before running
-  anything. Every command — `bun install`, `bun run …`, `shadow …`, `vite …`, `vitest …` — runs from this
-  repo's root, never from the parent folder and never against `web-novel-server`.
+- **Check the current working directory first.** This workspace's own scripts — `bun install`, `bun run dev`,
+  `bun run test`, `bun run type-check`, `bun run start` — run from **inside** `web-novel-web/`. Root tooling
+  (`build`, `verify`, `gen-api-types`) has no equivalent workspace script and always runs from the **repo
+  root** by path (`bun scripts/verify.ts apps/web-novel-web`). Either way, never run these against
+  `web-novel-server`.
 - **Change dependencies only in this repo**, using the existing package manager (**Bun**), and only when
   nothing already installed solves the problem. Never add a dependency here to serve the backend.
 
@@ -55,8 +57,8 @@ provides, and do not begin work before the skill is loaded.
 
 ### Conventions
 
-- **Package manager:** Bun (single root `bun.lock`; the `shadow` CLI lives in the root `scripts/`
-  directory). ESM (`"type": "module"`). **TypeScript 6.x**, `strict`, `moduleResolution: bundler`,
+- **Package manager:** Bun (single root `bun.lock`; the root tooling lives in `scripts/`, invoked by path,
+  not a CLI). ESM (`"type": "module"`). **TypeScript 6.x**, `strict`, `moduleResolution: bundler`,
   `verbatimModuleSyntax`.
 - **Path alias:** `@/*` → `src/*`.
 - **Formatting/style:** Prettier — single quotes, trailing commas `all`, print width **180**,
@@ -66,24 +68,28 @@ provides, and do not begin work before the skill is loaded.
   keeping empty ones — `Importing npm packages`, `Importing user defined packages`, `Defining types`,
   `Declaring the constants`.
 - `src/routeTree.gen.ts` is **generated** (excluded from lint, formatted by `format:gen`) — never hand-edit it.
-- **Named exports + a barrel `index.ts` per folder.** Comment the *why*, never the *what*.
+- **Named exports + a barrel `index.ts` per folder.** Comment the _why_, never the _what_.
 
 ## 4. Commands
 
-Run from `web-novel-web/`. Prerequisite: **Bun**.
+This workspace's own scripts run from **inside** `web-novel-web/`; `build`/`verify`/`gen-api-types` are root
+tooling and always run from the **repo root** by path. Prerequisite: **Bun**.
 
-| Purpose | Command | Notes |
-| --- | --- | --- |
-| Install | `bun install` | |
-| Develop | `bun run dev` | `vite dev`, serves on **:3000**; proxies `/api` → `SERVER_URL` (default `http://localhost:8080`) |
-| Test | `bun run test` | `vitest run` (jsdom; specs in `tests/**/*.spec.{ts,tsx}`) |
-| Verify (the gate) | `bun run verify` | `shadow verify` = **format + lint + type-check + test**; auto-fix with `bun run verify --fix` |
-| Type-check | `bun run type-check` | `tsc` |
-| Build | `bun run build` | `shadow build` → `bun run build:app` (manifest → `vite build` SSR + client → `vite build` service worker) |
-| Run prod build | `bun run start` | `bun main.ts` — the shared `@shadow-library/web` Bun server; ports from `PORT`/`HEALTH_PORT` |
-| Regenerate API types | `bun run generate:api-types` | `shadow gen-api-types http://localhost:8080/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts` (server must be running) |
+| Purpose              | Command                                           | Notes                                                                                                                         |
+| -------------------- | ------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| Install              | `bun install`                                     |                                                                                                                               |
+| Develop              | `bun run dev`                                     | `vite dev`, serves on **:3000**; proxies `/api` → `SERVER_URL` (default `http://localhost:8080`)                              |
+| Test                 | `bun run test`                                    | `vitest run` (jsdom; specs in `tests/**/*.spec.{ts,tsx}`)                                                                     |
+| Type-check           | `bun run type-check`                              | `tsc`                                                                                                                         |
+| Run prod build       | `bun run start`                                   | `bun main.ts` — the shared `@shadow-library/web` Bun server; ports from `PORT`/`HEALTH_PORT`                                  |
+| Verify (the gate)    | `bun scripts/verify.ts apps/web-novel-web`        | **format + lint + type-check + test**, from the repo root; auto-fix with `--fix`                                              |
+| Build                | `bun scripts/build.ts apps/web-novel-web`         | Runs this workspace's `"shadow".command` (`bun run build:app`: manifest → `vite build` SSR + client → service worker)         |
+| Regenerate API types | `bun scripts/gen-api-types.ts apps/web-novel-web` | Fetches `http://localhost:8080/dev/api-docs/openapi.json` and writes `src/lib/apis/api-types.gen.ts` (server must be running) |
 
-Lint and format have no standalone scripts — they run inside `shadow verify`.
+There is no `build`, `verify`, or `generate:api-types` script in this workspace's `package.json` — they are
+root tooling only. Lint and format have no standalone scripts either — they run inside
+`bun scripts/verify.ts`. This workspace opts back into the `test` step during `verify`
+(`"shadow": { "verifyTest": true }` in its `package.json`), unlike other web apps.
 
 ## 5. Frontend guidance — TanStack Start SSR
 
@@ -105,7 +111,7 @@ React 19 + TanStack Start/Router/Query on `@shadow-library/{ui,web}`. Routes are
   - SSR path that must forward the session cookie → `createServerFetch` in `src/lib/apis/server-fetch.ts`,
     called from a `createServerFn` (dynamically imported so it is stripped from the client bundle).
   - Each `*.api.ts` normalizes lean server DTOs → the internal client model at the boundary. Regenerate wire
-    types with `bun run generate:api-types` after a contract change (§6).
+    types with `bun scripts/gen-api-types.ts apps/web-novel-web` (from the repo root) after a contract change (§6).
 - **Browser-only APIs.** Anything touching `window`/`document`/`localStorage`/`navigator`/IndexedDB must be
   guarded — `if (typeof window === 'undefined') return …`, run it in `useEffect`, or wrap it in `ClientOnly`
   (`@shadow-library/ui`). Never touch the DOM during render or at module top-level; it runs on the server too.
@@ -133,7 +139,8 @@ is a **contract change** shared with `web-novel-server`. Land it deliberately:
 1. **Server first** (in `web-novel-server`): route/controller, DTOs/schemas, service logic, domain
    errors/status codes, and its tests/fixtures — and **evaluate backward compatibility** there before changing
    a live contract (prefer additive, non-breaking changes; if breaking, account for all callers).
-2. **Then here:** regenerate types with `bun run generate:api-types` (server running), then update the affected
+2. **Then here:** regenerate types with `bun scripts/gen-api-types.ts apps/web-novel-web` (server running, run
+   from the repo root), then update the affected
    `src/lib/apis/*.api.ts` callers, `queryOptions`, route loaders, components, the internal client-model
    mapping, **fixtures**, and frontend validation.
 3. **Update everything the change touches** here: routes, callers, types, query options, tests, fixtures, and
@@ -146,8 +153,9 @@ is a **contract change** shared with `web-novel-server`. Land it deliberately:
   `process.env`, e.g. `SERVER_URL`, `PORT`, `HEALTH_PORT`) and used **only** in SSR/server code. The browser
   never needs the backend origin — it uses relative `/api`. Do not put server-only values into `VITE_` vars,
   `import.meta.env`, the client bundle, or any code path that reaches the browser.
-- **Verify before done:** run `bun run verify` (format + lint + type-check + test) from this repo's root.
-  While iterating you may narrow to `bun run test` / `bun run type-check`, but the full gate must pass.
+- **Verify before done:** run `bun scripts/verify.ts apps/web-novel-web` (format + lint + type-check + test)
+  from the monorepo root. While iterating you may narrow to `bun run test` / `bun run type-check` inside this
+  workspace, but the full gate must pass.
 - **Cross-repo change → verify in both repos.** A green web app does not imply a green server; run the
   server's gate in `web-novel-server` too.
 - **Report per repo, separately.** When you finish, state — for **each** repo you changed — what you changed

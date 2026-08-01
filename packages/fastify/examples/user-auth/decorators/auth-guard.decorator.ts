@@ -25,6 +25,6 @@ export interface AuthGuardOptions {
  * Declaring the constants
  */
 
-export function AuthGuard(options: AuthGuardOptions) {
+export function AuthGuard(options: AuthGuardOptions): ClassDecorator & MethodDecorator {
   return Handler({ authGuard: options });
 }

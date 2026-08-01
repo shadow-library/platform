@@ -15,10 +15,13 @@ import { Injectable, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnM
  * Declaring the constants
  */
 
+const DIVIDER = '-'.repeat(60);
+
 @Injectable()
 export class OutputService implements OnModuleInit, OnModuleDestroy, OnApplicationReady, OnApplicationStop {
+  /** These examples are standalone demo programs, so their output is written straight to the stream rather than through a real logger. */
   private log(message: string): void {
-    console.log(message); // eslint-disable-line no-console
+    process.stdout.write(`${message}\n`);
   }
 
   onModuleInit(): void {
@@ -51,5 +54,10 @@ export class OutputService implements OnModuleInit, OnModuleDestroy, OnApplicati
 
   error(message: string): void {
     this.log(`[ERROR] ${message}`);
+  }
+
+  /** Unprefixed on purpose — it separates lifecycle phases in the output rather than reporting one. */
+  separator(): void {
+    this.log(DIVIDER);
   }
 }

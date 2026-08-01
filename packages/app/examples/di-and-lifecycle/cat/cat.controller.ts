@@ -1,13 +1,13 @@
 /**
  * Importing npm packages
  */
-import { Controller, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit, Handler } from '@shadow-library/app';
+import { Controller, Handler, OnApplicationReady, OnApplicationStop, OnModuleDestroy, OnModuleInit } from '@shadow-library/app';
 
 /**
  * Importing user defined packages
  */
-import { CatService } from './cat.service';
 import { OutputService } from '../common/output.service';
+import { CatService } from './cat.service';
 
 /**
  * Defining types

@@ -1,21 +1,8 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../../tsconfig.web.json",
   "include": ["src/**/*.ts", "src/**/*.tsx", "tests/**/*.ts", "tests/**/*.tsx", "scripts/**/*.ts"],
   "compilerOptions": {
-    "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "jsx": "react-jsx",
-
-    /** Kept from this app's own original config -- the base doesn't set these. */
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    "noUncheckedSideEffectImports": true,
-    /** Not a new opt-in: this app never set strictPropertyInitialization itself, so under its old
-     *  standalone config "strict: true" alone made it effectively true. The base sets it false, so
-     *  this override cancels that out to preserve the app's original effective behavior. */
-    "strictPropertyInitialization": true,
-
     "paths": { "@/*": ["./src/*"] },
-    "verbatimModuleSyntax": true,
     "types": ["vite/client", "node"]
   }
 }

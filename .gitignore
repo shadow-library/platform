@@ -1,22 +1,48 @@
-# Dependencies
-node_modules/
+# Dependencies — no trailing slash: in a git worktree `node_modules` is a symlink, which a
+# directory-only pattern would not match, leaving it stageable.
+node_modules
 
 # Build output
 dist/
 coverage/
-test-results/
+CHANGELOG.md
 
 # Logs
 logs/
 *.log
+npm-debug.log*
 
 # Environment — never commit real env files
 .env
 .env.*
 !.env.example
 
+# TypeScript
+*.tsbuildinfo
+
 # OS / editor
 .DS_Store
+.vscode/
+.project
+.settings/
+.npmrc
+
+# Claude worktrees
+.claude/worktrees/
+
+# Framework caches
+.vite/
+.output
+.tanstack
+.nitro
+.wrangler
+
+# Playwright
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+playwright/.auth/
 
 # Serena cache (project.yml itself is committed)
 .serena/cache/

@@ -19,7 +19,9 @@
   align-items: center;
   justify-content: center;
   color: #fff;
-  box-shadow: 0 2px 10px -2px var(--sh-indigo-600), inset 0 1px 0 rgb(255 255 255 / 0.25);
+  box-shadow:
+    0 2px 10px -2px var(--sh-indigo-600),
+    inset 0 1px 0 rgb(255 255 255 / 0.25);
 }
 
 /* Two stacked lines — "Shadow" over "WEBNOVEL" — as in the design, not inline side-by-side. */

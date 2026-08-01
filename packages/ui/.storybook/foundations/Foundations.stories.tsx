@@ -120,28 +120,28 @@ type Story = StoryObj<typeof meta>;
 export const Colors: Story = {
   render: () => (
     <div className={styles.stack}>
-      <Section title='Surfaces & backgrounds'>
+      <Section title="Surfaces & backgrounds">
         <div className={styles.swatchGrid}>
           {surfaces.map(t => (
             <Swatch key={t.name} {...t} />
           ))}
         </div>
       </Section>
-      <Section title='Text'>
+      <Section title="Text">
         <div className={styles.swatchGrid}>
           {text.map(t => (
             <Swatch key={t.name} {...t} />
           ))}
         </div>
       </Section>
-      <Section title='Brand'>
+      <Section title="Brand">
         <div className={styles.swatchGrid}>
           {brand.map(t => (
             <Swatch key={t.name} {...t} />
           ))}
         </div>
       </Section>
-      <Section title='Borders'>
+      <Section title="Borders">
         <div className={styles.swatchGrid}>
           {borders.map(t => (
             <Swatch key={t.name} {...t} />
@@ -189,7 +189,7 @@ export const Typography: Story = {
 export const RadiusAndElevation: Story = {
   render: () => (
     <div className={styles.stack}>
-      <Section title='Radius'>
+      <Section title="Radius">
         <div className={styles.tokenRow}>
           {radii.map(r => (
             <div key={r.name} className={styles.tokenItem}>
@@ -199,7 +199,7 @@ export const RadiusAndElevation: Story = {
           ))}
         </div>
       </Section>
-      <Section title='Elevation (light mode)'>
+      <Section title="Elevation (light mode)">
         <div className={styles.tokenRow}>
           {elevations.map(e => (
             <div key={e.name} className={styles.tokenItem}>

@@ -4,21 +4,21 @@ Authoring workspace for Shadow Applications. A server-rendered React app built w
 
 ## Tech Stack
 
-| Concern          | Choice                                              |
-| ---------------- | --------------------------------------------------- |
-| Runtime / PM     | [Bun](https://bun.sh)                               |
-| Framework        | [TanStack Start](https://tanstack.com/start) (full-document SSR) |
-| Build tool       | [Vite 7](https://vite.dev) via the `shadow` CLI (root `scripts/` tooling) |
-| UI library       | [React 19](https://react.dev)                       |
-| Routing          | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split) |
-| Server state     | [TanStack Query](https://tanstack.com/query)        |
-| Components       | `@shadow-library/ui` (CSS Modules + `--sh-*` design tokens) |
-| Transport / SSR  | `@shadow-library/web` (server functions + `createServerFetch`, `createAppRouter`, `serve`) |
-| Auth             | Session-gated via `requireAuth` — every route is private |
-| Types            | [TypeScript 6](https://www.typescriptlang.org) (strict) |
-| Lint / Format    | `shadow verify` (shared ESLint + Prettier ruleset)  |
-| Git hooks        | Husky → `shadow verify` / `shadow commit-msg` (Conventional Commits) |
-| E2E tests        | [Playwright](https://playwright.dev)                |
+| Concern         | Choice                                                                                                   |
+| --------------- | -------------------------------------------------------------------------------------------------------- |
+| Runtime / PM    | [Bun](https://bun.sh)                                                                                    |
+| Framework       | [TanStack Start](https://tanstack.com/start) (full-document SSR)                                         |
+| Build tool      | [Vite 7](https://vite.dev) via the root `scripts/` tooling (`bun scripts/build.ts`)                      |
+| UI library      | [React 19](https://react.dev)                                                                            |
+| Routing         | [TanStack Router](https://tanstack.com/router) (file-based, auto code-split)                             |
+| Server state    | [TanStack Query](https://tanstack.com/query)                                                             |
+| Components      | `@shadow-library/ui` (CSS Modules + `--sh-*` design tokens)                                              |
+| Transport / SSR | `@shadow-library/web` (server functions + `createServerFetch`, `createAppRouter`, `serve`)               |
+| Auth            | Session-gated via `requireAuth` — every route is private                                                 |
+| Types           | [TypeScript 6](https://www.typescriptlang.org) (strict)                                                  |
+| Lint / Format   | `bun scripts/verify.ts` (shared ESLint + Prettier ruleset, plus this workspace's own `eslint.config.ts`) |
+| Git hooks       | Husky → `bun scripts/verify.ts --fast` pre-commit / commitlint on the message (Conventional Commits)     |
+| E2E tests       | [Playwright](https://playwright.dev)                                                                     |
 
 ## Prerequisites
 
@@ -35,21 +35,27 @@ The dev server runs on [http://localhost:3000](http://localhost:3000). Every bac
 
 ## Scripts
 
-| Script                       | Description                                            |
-| ---------------------------- | ------------------------------------------------------ |
-| `bun dev`                    | Start the TanStack Start dev server (SSR) on port 3000 |
-| `bun run build`              | `shadow build` — the client + SSR server bundles to `dist/` |
-| `bun run type-check`         | Type-check only (`tsc --noEmit`)                       |
-| `bun run start`              | Run the production SSR server (`serve.ts` → `@shadow-library/web/server-entry`) |
-| `bun run verify`             | `shadow verify` — format (Prettier) + lint (ESLint) + type-check |
-| `bun run verify --fix`       | Auto-fix formatting and lint issues                    |
-| `bun run test`               | Run Playwright end-to-end tests                        |
-| `bun run test:setup`         | Install the Chromium browser Playwright needs          |
-| `bun run generate:api-types` | Regenerate API types from the backend OpenAPI spec     |
+| Script               | Description                                                                     |
+| -------------------- | ------------------------------------------------------------------------------- |
+| `bun dev`            | Start the TanStack Start dev server (SSR) on port 3000                          |
+| `bun run type-check` | Type-check only (`tsc --noEmit`)                                                |
+| `bun run start`      | Run the production SSR server (`serve.ts` → `@shadow-library/web/server-entry`) |
+| `bun run test`       | Run Playwright end-to-end tests                                                 |
+| `bun run test:setup` | Install the Chromium browser Playwright needs                                   |
+
+This workspace has no `build`, `verify`, or `generate:api-types` script — those are root tooling, run from the
+repo root by path:
+
+| Command                                             | Description                                        |
+| --------------------------------------------------- | -------------------------------------------------- |
+| `bun scripts/build.ts apps/novel-forge-web`         | The client + SSR server bundles to `dist/`         |
+| `bun scripts/verify.ts apps/novel-forge-web`        | Format (Prettier) + lint (ESLint) + type-check     |
+| `bun scripts/verify.ts apps/novel-forge-web --fix`  | Auto-fix formatting and lint issues                |
+| `bun scripts/gen-api-types.ts apps/novel-forge-web` | Regenerate API types from the backend OpenAPI spec |
 
 ## Production
 
-`bun run build` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip, streamed SSR, and graceful drain, on `PORT` (default 3000). Liveness lives on its own port — `GET /healthz` on `HEALTH_PORT` (default 3001) — so probes never touch the backend or the renderer. Backend calls happen server-side through Start server functions against `API_ORIGIN`; there is no `/api` proxy in production, so the ingress must route `/api/auth/*` (the interactive login redirect) to novel-forge-server directly. The shared, monorepo-root-context [`docker/Dockerfile`](../../docker/Dockerfile) builds and runs exactly this — see [`docker/README.md`](../../docker/README.md) for the exact `--target runtime-ssr --build-arg APP=novel-forge-web --build-arg SSR_ENTRY=serve.ts` command.
+`bun scripts/build.ts apps/novel-forge-web` emits `dist/client` (hashed assets) and `dist/server` (the SSR fetch handler). `serve.ts` boots `serve` from `@shadow-library/web/server-entry`: static assets with immutable caching + gzip, streamed SSR, and graceful drain, on `PORT` (default 3000). Liveness lives on its own port — `GET /healthz` on `HEALTH_PORT` (default 3001) — so probes never touch the backend or the renderer. Backend calls happen server-side through Start server functions against `API_ORIGIN`; there is no `/api` proxy in production, so the ingress must route `/api/auth/*` (the interactive login redirect) to novel-forge-server directly. The shared, monorepo-root-context [`docker/Dockerfile`](../../docker/Dockerfile) builds and runs exactly this — see [`docker/README.md`](../../docker/README.md) for the exact `--target runtime-ssr --build-arg APP=novel-forge-web --build-arg SSR_ENTRY=serve.ts` command.
 
 ## Project Structure
 
@@ -89,14 +95,18 @@ import { APIRequest } from '@/lib';
 const novels = await APIRequest.get('/novels').query({ limit: 20 }).execute();
 ```
 
-Response and error types come from `src/lib/apis/api-types.gen.ts`, generated from the backend OpenAPI spec via `bun run generate:api-types` (`shadow gen-api-types`).
+Response and error types come from `src/lib/apis/api-types.gen.ts`, generated from the backend OpenAPI spec via
+`bun scripts/gen-api-types.ts apps/novel-forge-web` (run from the repo root).
 
 ## Code Conventions
 
-- Lint, formatting, and commit-message rules are the ecosystem's shared ruleset, driven by `.shadowrc.json` — no per-repo ESLint/Prettier/commitlint config.
+- Lint, formatting, and commit-message rules are the ecosystem's shared ruleset (root `eslint.config.ts`,
+  `.prettierrc.json`, `commitlint.config.ts`). This workspace **does** have its own `eslint.config.ts` layering
+  deviations on top of the root config; there is no per-repo Prettier or commitlint config.
 - Single quotes, trailing commas, 180-char line width; imports grouped npm → user-defined and sorted.
 - TypeScript runs in strict mode with `noUncheckedIndexedAccess`; exported functions carry explicit return types.
-- Commits follow [Conventional Commits](https://www.conventionalcommits.org); husky runs `shadow verify` pre-commit and `shadow commit-msg` on the message.
+- Commits follow [Conventional Commits](https://www.conventionalcommits.org); husky runs `bun scripts/verify.ts
+--fast` pre-commit (scoped to changed workspaces) and commitlint on the message.
 
 ## Testing
 

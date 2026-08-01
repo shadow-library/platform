@@ -39,7 +39,7 @@ This ships the `--sh-*` design tokens, a minimal reset, the unprefixed utility c
 Switch theme by toggling `data-theme` (or the `dark` class) on `<html>`, and set density with `data-density`:
 
 ```html
-<html data-theme="dark" data-density="compact">
+<html data-theme="dark" data-density="compact"></html>
 ```
 
 Retheme by overriding any token at any scope — the tokens are the single source of truth:
@@ -88,19 +88,19 @@ Every component is tree-shakeable, themeable via `--sh-*` tokens, and importable
 import { Button, Dialog, Select } from '@shadow-library/ui';
 ```
 
-| Category | Components |
-| --- | --- |
-| **Actions** | `Button`, `ButtonGroup`, `IconButton` |
-| **Forms & Inputs** | `Checkbox`, `ColorPicker`, `Combobox`, `FileUpload`, `FormField`, `Input`, `MultiSelect`, `NumberStepper`, `OtpInput`, `RadioGroup`, `Rating`, `RTEField`, `Select`, `Slider`, `Switch`, `Textarea`, `TokenInput` |
-| **Date & Time** | `Calendar`, `DatePicker`, `DateRangePicker`, `TimePicker` |
-| **Overlays & Menus** | `BottomSheet`, `CommandPalette`, `ContextMenu`, `Dialog`, `Drawer`, `DropdownMenu`, `HoverCard`, `Popover`, `Tooltip` |
-| **Feedback & Status** | `Alert`, `Banner`, `EmptyState`, `NotificationCenter`, `Progress`, `Skeleton`, `Spinner`, `Toast` |
-| **Navigation** | `Breadcrumbs`, `Pagination`, `Sidebar`, `Tabs`, `TopNavigation` |
-| **Data Display** | `Avatar`, `Badge`, `Card`, `DataGrid`, `DescriptionList`, `Kbd`, `SegmentedControl`, `Statistic`, `Table`, `Tag`, `Timeline`, `TreeView` |
-| **Disclosure** | `Accordion`, `Stepper` |
-| **Layout & Structure** | `Shell`, `SplitPane` |
+| Category               | Components                                                                                                                                                                                                        |
+| ---------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Actions**            | `Button`, `ButtonGroup`, `IconButton`                                                                                                                                                                             |
+| **Forms & Inputs**     | `Checkbox`, `ColorPicker`, `Combobox`, `FileUpload`, `FormField`, `Input`, `MultiSelect`, `NumberStepper`, `OtpInput`, `RadioGroup`, `Rating`, `RTEField`, `Select`, `Slider`, `Switch`, `Textarea`, `TokenInput` |
+| **Date & Time**        | `Calendar`, `DatePicker`, `DateRangePicker`, `TimePicker`                                                                                                                                                         |
+| **Overlays & Menus**   | `BottomSheet`, `CommandPalette`, `ContextMenu`, `Dialog`, `Drawer`, `DropdownMenu`, `HoverCard`, `Popover`, `Tooltip`                                                                                             |
+| **Feedback & Status**  | `Alert`, `Banner`, `EmptyState`, `NotificationCenter`, `Progress`, `Skeleton`, `Spinner`, `Toast`                                                                                                                 |
+| **Navigation**         | `Breadcrumbs`, `Pagination`, `Sidebar`, `Tabs`, `TopNavigation`                                                                                                                                                   |
+| **Data Display**       | `Avatar`, `Badge`, `Card`, `DataGrid`, `DescriptionList`, `Kbd`, `SegmentedControl`, `Statistic`, `Table`, `Tag`, `Timeline`, `TreeView`                                                                          |
+| **Disclosure**         | `Accordion`, `Stepper`                                                                                                                                                                                            |
+| **Layout & Structure** | `Shell`, `SplitPane`                                                                                                                                                                                              |
 
-Every component exposes props for `variant`/`size`/`intent` (where applicable), controlled and uncontrolled state, and `asChild` composition where the design calls for it. Full prop tables, usage examples, and visual previews are in Storybook (see *Full Documentation* below).
+Every component exposes props for `variant`/`size`/`intent` (where applicable), controlled and uncontrolled state, and `asChild` composition where the design calls for it. Full prop tables, usage examples, and visual previews are in Storybook (see _Full Documentation_ below).
 
 ### App Shell
 
@@ -112,11 +112,11 @@ Every component exposes props for `variant`/`size`/`intent` (where applicable), 
 </Shell>
 ```
 
-| Prop | Effect |
-| --- | --- |
-| `contentWidth` | Reading-column cap, centered once the region outgrows it. `'fluid'` fills. Default `1200` |
-| `contentPadding` | Gutter scale: `'none' \| 'sm' \| 'md' \| 'lg'`. Each step is responsive. Default `'md'` |
-| `bottomNav` | Phone-only bar (e.g. `BottomNavigation`), pinned bottom and hidden from `768px` up |
+| Prop             | Effect                                                                                    |
+| ---------------- | ----------------------------------------------------------------------------------------- |
+| `contentWidth`   | Reading-column cap, centered once the region outgrows it. `'fluid'` fills. Default `1200` |
+| `contentPadding` | Gutter scale: `'none' \| 'sm' \| 'md' \| 'lg'`. Each step is responsive. Default `'md'`   |
+| `bottomNav`      | Phone-only bar (e.g. `BottomNavigation`), pinned bottom and hidden from `768px` up        |
 
 Below `768px` the persistent sidebar becomes a modal nav drawer. `TopNavigation` surfaces the hamburger automatically; a bespoke top bar wires its own trigger with the `useShellNav()` hook. From `768px` up the chrome is pinned and only the content region scrolls; below it the document scrolls so mobile browsers keep their URL-bar auto-hide.
 
@@ -134,7 +134,7 @@ Nav items take the router's own link through `asChild`, keeping the link's child
 </Sidebar.Item>
 ```
 
-No `active` prop is needed when the router marks its own links — the active treatment also keys off `data-status="active"`, which TanStack Router sets alongside `aria-current="page"`. Where a *parent* has to know which child is current (a bottom bar's `value`, an overflow menu), use `matchPath(pathname, to)` rather than a hand-rolled `startsWith`.
+No `active` prop is needed when the router marks its own links — the active treatment also keys off `data-status="active"`, which TanStack Router sets alongside `aria-current="page"`. Where a _parent_ has to know which child is current (a bottom bar's `value`, an overflow menu), use `matchPath(pathname, to)` rather than a hand-rolled `startsWith`.
 
 `Sidebar` can own its rail state: pass `defaultCollapsed` and/or `storageKey` to get a working collapse toggle that survives reloads. The stored value is adopted after mount, so server-rendered apps hydrate against `defaultCollapsed`.
 
@@ -153,45 +153,45 @@ These are additive and optional: no component depends on them internally.
 </div>
 ```
 
-> **Naming.** These classes are intentionally **unprefixed** (`flex`, `p-16`, `center`, …) so they're the first thing you reach for, not `sh-flex` vs. your own `.flex`. That means a global class of the same name in your app *will* collide. If that's a concern, import `@shadow-library/ui/styles.layer.css` instead of `styles.css` — it wraps the whole library (tokens, reset, utilities, components) in `@layer shadow-library`, so any unlayered rule in your own app wins automatically regardless of source order.
+> **Naming.** These classes are intentionally **unprefixed** (`flex`, `p-16`, `center`, …) so they're the first thing you reach for, not `sh-flex` vs. your own `.flex`. That means a global class of the same name in your app _will_ collide. If that's a concern, import `@shadow-library/ui/styles.layer.css` instead of `styles.css` — it wraps the whole library (tokens, reset, utilities, components) in `@layer shadow-library`, so any unlayered rule in your own app wins automatically regardless of source order.
 
 ### Layout Primitives
 
 Small, composite, component-like patterns for the layouts every app needs. Combine with the atomic classes below (a `gap-*` class on `.stack`/`.cluster`, for example) rather than reaching past them.
 
-| Class | Behavior |
-| --- | --- |
-| `center` | Flex container, centered on both axes |
-| `center-x` | Flex row, centered horizontally only |
-| `center-y` | Flex row, centered vertically only |
-| `stack` | Vertical flex layout — pair with `gap-*` |
-| `cluster` | Horizontal, wrapping flex layout for same-height groups (tags, chip lists, action bars) |
+| Class       | Behavior                                                                                      |
+| ----------- | --------------------------------------------------------------------------------------------- |
+| `center`    | Flex container, centered on both axes                                                         |
+| `center-x`  | Flex row, centered horizontally only                                                          |
+| `center-y`  | Flex row, centered vertically only                                                            |
+| `stack`     | Vertical flex layout — pair with `gap-*`                                                      |
+| `cluster`   | Horizontal, wrapping flex layout for same-height groups (tags, chip lists, action bars)       |
 | `container` | Centered, max-width page container (`max-width: var(--sh-breakpoint-xl)`) with `24px` gutters |
 
 ### Layout
 
-| Class | CSS |
-| --- | --- |
-| `block`, `inline-block`, `inline`, `flex`, `inline-flex`, `grid`, `inline-grid`, `contents`, `hidden` | `display` |
-| `relative`, `absolute`, `fixed`, `sticky`, `static` | `position` |
-| `inset-0`, `top-0`, `right-0`, `bottom-0`, `left-0` | offset shorthand |
-| `overflow-hidden`, `overflow-auto`, `overflow-scroll`, `overflow-visible` | `overflow` |
-| `w-full`, `w-auto`, `w-screen`, `min-w-0`, `max-w-full` | width |
-| `h-full`, `h-auto`, `h-screen`, `min-h-0`, `max-h-full` | height |
+| Class                                                                                                 | CSS              |
+| ----------------------------------------------------------------------------------------------------- | ---------------- |
+| `block`, `inline-block`, `inline`, `flex`, `inline-flex`, `grid`, `inline-grid`, `contents`, `hidden` | `display`        |
+| `relative`, `absolute`, `fixed`, `sticky`, `static`                                                   | `position`       |
+| `inset-0`, `top-0`, `right-0`, `bottom-0`, `left-0`                                                   | offset shorthand |
+| `overflow-hidden`, `overflow-auto`, `overflow-scroll`, `overflow-visible`                             | `overflow`       |
+| `w-full`, `w-auto`, `w-screen`, `min-w-0`, `max-w-full`                                               | width            |
+| `h-full`, `h-auto`, `h-screen`, `min-h-0`, `max-h-full`                                               | height           |
 
 ### Flexbox & Grid
 
-| Class | CSS |
-| --- | --- |
-| `flex-row`, `flex-row-reverse`, `flex-col`, `flex-col-reverse` | `flex-direction` |
-| `flex-wrap`, `flex-wrap-reverse`, `flex-nowrap` | `flex-wrap` |
-| `items-{start,center,end,baseline,stretch}` | `align-items` |
-| `justify-{start,center,end,between,around,evenly}` | `justify-content` |
-| `self-{start,center,end,stretch,auto}` | `align-self` |
+| Class                                                                                      | CSS                                            |
+| ------------------------------------------------------------------------------------------ | ---------------------------------------------- |
+| `flex-row`, `flex-row-reverse`, `flex-col`, `flex-col-reverse`                             | `flex-direction`                               |
+| `flex-wrap`, `flex-wrap-reverse`, `flex-nowrap`                                            | `flex-wrap`                                    |
+| `items-{start,center,end,baseline,stretch}`                                                | `align-items`                                  |
+| `justify-{start,center,end,between,around,evenly}`                                         | `justify-content`                              |
+| `self-{start,center,end,stretch,auto}`                                                     | `align-self`                                   |
 | `flex-1`, `flex-auto`, `flex-initial`, `flex-none`, `grow`, `grow-0`, `shrink`, `shrink-0` | `flex` shorthand / `flex-grow` / `flex-shrink` |
-| `grid-cols-{1,2,3,4,5,6,12}`, `grid-cols-none` | `grid-template-columns` |
-| `grid-rows-{1,2,3,4}` | `grid-template-rows` |
-| `col-span-{1..6,full}`, `row-span-{1..4,full}` | `grid-column` / `grid-row` |
+| `grid-cols-{1,2,3,4,5,6,12}`, `grid-cols-none`                                             | `grid-template-columns`                        |
+| `grid-rows-{1,2,3,4}`                                                                      | `grid-template-rows`                           |
+| `col-span-{1..6,full}`, `row-span-{1..4,full}`                                             | `grid-column` / `grid-row`                     |
 
 > No bare `row`/`col` classes — those names imply a Bootstrap-style 12-column grid system this library doesn't have. Use `flex-row` / `grid-cols-*` instead.
 
@@ -207,24 +207,24 @@ Gap classes follow the same scale: `gap-*`, `gap-x-*`, `gap-y-*`.
 
 ### Typography
 
-| Class | Purpose |
-| --- | --- |
-| `text-{display,h1,h2,h3,body-lg,body,body-sm,caption,code}` | Font size + line height from the type scale tokens |
-| `font-{sans,mono}` | Font family |
-| `font-{normal,medium,semibold,bold}` | Font weight (400/500/600/700) |
-| `text-{left,center,right,justify}` | Text alignment |
-| `italic`, `not-italic`, `uppercase`, `lowercase`, `capitalize`, `normal-case` | Style / transform |
-| `truncate`, `whitespace-nowrap` | Overflow text handling |
-| `text-{primary,secondary,tertiary,placeholder}` | Text color from the semantic text tokens |
+| Class                                                                         | Purpose                                            |
+| ----------------------------------------------------------------------------- | -------------------------------------------------- |
+| `text-{display,h1,h2,h3,body-lg,body,body-sm,caption,code}`                   | Font size + line height from the type scale tokens |
+| `font-{sans,mono}`                                                            | Font family                                        |
+| `font-{normal,medium,semibold,bold}`                                          | Font weight (400/500/600/700)                      |
+| `text-{left,center,right,justify}`                                            | Text alignment                                     |
+| `italic`, `not-italic`, `uppercase`, `lowercase`, `capitalize`, `normal-case` | Style / transform                                  |
+| `truncate`, `whitespace-nowrap`                                               | Overflow text handling                             |
+| `text-{primary,secondary,tertiary,placeholder}`                               | Text color from the semantic text tokens           |
 
 ### Other
 
-| Class | CSS |
-| --- | --- |
-| `rounded-{none,sm,md,lg,xl,2xl,full}` | `border-radius` from the radius tokens |
-| `cursor-pointer`, `cursor-not-allowed` | `cursor` |
-| `select-none`, `pointer-events-none` | `user-select` / `pointer-events` |
-| `sr-only` | Visually hidden, still available to assistive tech |
+| Class                                  | CSS                                                |
+| -------------------------------------- | -------------------------------------------------- |
+| `rounded-{none,sm,md,lg,xl,2xl,full}`  | `border-radius` from the radius tokens             |
+| `cursor-pointer`, `cursor-not-allowed` | `cursor`                                           |
+| `select-none`, `pointer-events-none`   | `user-select` / `pointer-events`                   |
+| `sr-only`                              | Visually hidden, still available to assistive tech |
 
 ## Data, transport, and framework wiring
 

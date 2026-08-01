@@ -49,7 +49,7 @@ export class UserService {
     return newUser;
   }
 
-  async updateUser(id: number, update: Partial<User>): Promise<User | undefined> {
+  async updateUser(id: number, update: Partial<User>): Promise<User> {
     const user = await this.getUserById(id);
     if (!user) throw new Error('User not found');
     if (update.name !== undefined) user.name = update.name;

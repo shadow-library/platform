@@ -16,8 +16,6 @@
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
     "type-check": "tsc",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "test": "bun run test:unit && bun run test:integration",
     "test:unit": "bun test tests/decorators tests/injector tests/utils tests/injection-token.spec.ts tests/shadow-application.spec.ts tests/shadow-factory.spec.ts --coverage",
     "test:integration": "bun test tests/integration"

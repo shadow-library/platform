@@ -11,6 +11,10 @@ import { Get, HttpController } from '@shadow-library/fastify';
  * Defining types
  */
 
+export interface HealthStatus {
+  status: 'ok';
+}
+
 /**
  * Declaring the constants
  */
@@ -18,7 +22,7 @@ import { Get, HttpController } from '@shadow-library/fastify';
 @HttpController('/health')
 export class HealthController {
   @Get()
-  healthCheck() {
+  healthCheck(): HealthStatus {
     return { status: 'ok' };
   }
 }

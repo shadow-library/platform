@@ -1,15 +1,15 @@
 # Application access control, visibility & customer tiering — implementation spec
 
-|                  |                                        |
-| :--------------- | :------------------------------------- |
-| **Status**       | Approved for development               |
-| **Version**      | 1.0.0                                  |
-| **Last updated** | 2026-07-26                             |
-| **Tasks**        | T-901 · T-902 · T-903 · T-904 · W-901  |
+|                  |                                       |
+| :--------------- | :------------------------------------ |
+| **Status**       | Approved for development              |
+| **Version**      | 1.0.0                                 |
+| **Last updated** | 2026-07-26                            |
+| **Tasks**        | T-901 · T-902 · T-903 · T-904 · W-901 |
 
 Three orthogonal concepts. Do not collapse them:
 
-1. **Visibility** (platform admin, per application) — who *could ever* be granted the app: `PUBLIC` (generally available), `RESTRICTED` (only organisations the platform admin released it to), `INTERNAL` (platform-org staff only).
+1. **Visibility** (platform admin, per application) — who _could ever_ be granted the app: `PUBLIC` (generally available), `RESTRICTED` (only organisations the platform admin released it to), `INTERNAL` (platform-org staff only).
 2. **Assignment** (org admin, per organisation) — which visible apps the org's members actually get. Org mode `ALL_APPS` (open) or `ASSIGNED_ONLY` (managed allowlist).
 3. **Capability** (roles → permissions via the PDP) — feature gating once inside the app. Premium tiers live here, never in the sign-in gate.
 
@@ -19,12 +19,12 @@ Three orthogonal concepts. Do not collapse them:
 - **D-A2 — Managed-account override.** For users with any `scim_directory.managed = true` row, only the managing organisation(s)' grants apply, account-wide (the personal workspace grants nothing). The account exists because the tenant created it; the tenant owns it. Adopted accounts (`managed = false`) are untouched.
 - **D-A3 — INTERNAL is hidden.** A non-platform user hitting an `INTERNAL` app's client is answered exactly as an unknown/inactive client (`OAU_002` at authorize; no denied page, no redirect). `RESTRICTED`/`PUBLIC` denials say "access denied" openly (a refused customer is a sales lead, not a leak).
 - **D-A4 — Hard cut.** Unassignment takes effect at next token mint/refresh — no grace window. Existing app sessions are revoked on the failing mint.
-- **D-A5 — Premium grants are vendor-controlled.** Org-wide role grants (`ORGANISATION` principal) are administered only through the platform admin API (two-tier `requireRoleAdmin`), never by org admins. Org admins manage *who gets the app*; the vendor manages *what tier the org bought*.
+- **D-A5 — Premium grants are vendor-controlled.** Org-wide role grants (`ORGANISATION` principal) are administered only through the platform admin API (two-tier `requireRoleAdmin`), never by org admins. Org admins manage _who gets the app_; the vendor manages _what tier the org bought_.
 - **D-A6 — Default roles are implicit.** `application_roles.is_default` roles are unioned into every PDP resolution for that application's permissions; no `role_assignments` rows are materialised for baseline users.
 - **D-A7 — Sign-in gate keys on `application_id`**, resolved from `oauth_clients.application_id`. One app, many clients — the check must not key on client id. `client_credentials` (M2M) is exempt: no user, no org; `service_route_access` already governs it.
 - **D-A10 — Active organisation comes from reachability.** A user token's `org` claim is one of the organisations that actually **grant** the application, never the personal workspace by default. Access is a union across orgs (D-A1) but capability is evaluated in exactly one, so pinning sessions to the personal workspace made a role granted in a team organisation unreachable — `INTERNAL` and `ASSIGNED_ONLY` apps were 403 for everyone. Preference: the `organisation_members.is_default` membership if it grants, else the personal workspace if it grants, else the lowest-numbered candidate. For a `PUBLIC` app this is exactly the old behaviour.
 - **D-A11 — Switching organisation rotates the session handle.** Applications cache minted tokens against the app-session handle, so a switch served by one replica cannot reach a sibling's cache; the previous organisation's authority would stay live for the token's remaining lifetime. Retiring the handle makes those entries unreachable everywhere at once, and matches the rule that a session identifier rotates whenever the context it authorises changes. Adding `org` to the client-side cache key does **not** work: the lookup id is built before the mint, when the organisation is still unknown.
-- **D-A12 — A stale active organisation realigns, it does not revoke.** If a session's organisation stops granting the app while another still does, the next mint re-points the session rather than ending it — access itself holds, so revoking would be gratuitous. When *no* organisation grants, D-A4's hard cut still applies first. This is also what converges sessions opened before D-A10 existed, so no session data migration is needed.
+- **D-A12 — A stale active organisation realigns, it does not revoke.** If a session's organisation stops granting the app while another still does, the next mint re-points the session rather than ending it — access itself holds, so revoking would be gratuitous. When _no_ organisation grants, D-A4's hard cut still applies first. This is also what converges sessions opened before D-A10 existed, so no session data migration is needed.
 
 ## Schema (T-901, all additive)
 
@@ -84,29 +84,29 @@ resolveAccessibleApplicationIds(userId):
 
 ## Enforcement points (T-902)
 
-| Path | Behaviour on deny |
-| --- | --- |
-| `OAuthService.authorize` — immediately **after** `sessionService.validate` succeeds, before the consent branch | *hidden* → `OAU_002` (as unknown client). *denied*, first-party client → 302 to identity-web's existing hosted error page: `new URL('/error', <origin of oauth.login-url>)` with query `error=access_denied&application=<displayName>&client_id=<id>`. *denied*, third-party → `redirect_uri?error=access_denied&state=...` (RFC 6749), mirroring `ConsentService.decide`. Always audit `oauth.authorize.denied`. |
-| App-session token mint (`/api/v1/app-sessions/*`) | Re-check on **every** mint (this is the revocation story — back-channel logout never reaches app-session clients). Deny → revoke the app session, answer `AUTH_005` 401 so the SDK restarts login. |
-| `refresh_token` grant at `/oauth2/token` | Deny → revoke the refresh-token family, RFC error `invalid_grant`. |
-| Token exchange (RFC 8693) | Check the **subject user's** access to the target audience's owning application; deny → `invalid_target`. |
-| SAML SP-initiated SSO | Add nullable `saml_service_providers.application_id` (FK → applications, SET NULL); when linked, run the same check before issuing the assertion (deny → SAML error status / hosted denied page for the browser); unlinked SPs keep today's behaviour. |
-| `client_credentials` | Exempt (D-A7). |
+| Path                                                                                                           | Behaviour on deny                                                                                                                                                                                                                                                                                                                                                                                                 |
+| -------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `OAuthService.authorize` — immediately **after** `sessionService.validate` succeeds, before the consent branch | _hidden_ → `OAU_002` (as unknown client). _denied_, first-party client → 302 to identity-web's existing hosted error page: `new URL('/error', <origin of oauth.login-url>)` with query `error=access_denied&application=<displayName>&client_id=<id>`. _denied_, third-party → `redirect_uri?error=access_denied&state=...` (RFC 6749), mirroring `ConsentService.decide`. Always audit `oauth.authorize.denied`. |
+| App-session token mint (`/api/v1/app-sessions/*`)                                                              | Re-check on **every** mint (this is the revocation story — back-channel logout never reaches app-session clients). Deny → revoke the app session, answer `AUTH_005` 401 so the SDK restarts login.                                                                                                                                                                                                                |
+| `refresh_token` grant at `/oauth2/token`                                                                       | Deny → revoke the refresh-token family, RFC error `invalid_grant`.                                                                                                                                                                                                                                                                                                                                                |
+| Token exchange (RFC 8693)                                                                                      | Check the **subject user's** access to the target audience's owning application; deny → `invalid_target`.                                                                                                                                                                                                                                                                                                         |
+| SAML SP-initiated SSO                                                                                          | Add nullable `saml_service_providers.application_id` (FK → applications, SET NULL); when linked, run the same check before issuing the assertion (deny → SAML error status / hosted denied page for the browser); unlinked SPs keep today's behaviour.                                                                                                                                                            |
+| `client_credentials`                                                                                           | Exempt (D-A7).                                                                                                                                                                                                                                                                                                                                                                                                    |
 
 ## API surface (T-903)
 
-| Actor | Endpoint | Auth |
-| --- | --- | --- |
-| Platform admin | `PATCH /api/v1/admin/applications/:applicationId` — accepts `visibility` | `appsManage` + elevated (extend existing) |
-| Platform admin | `GET /api/v1/admin/applications/:applicationId/organisations` — releases + assignments overview | `appsRead` |
-| Platform admin | `POST /api/v1/admin/applications/:applicationId/organisations` / `DELETE .../organisations/:organisationId` — release / revoke a RESTRICTED app for an org (`source = PLATFORM_RELEASE`) | `appsManage` + elevated |
-| Org admin | `GET /api/v1/organisations/:organisationId/applications` — available + assigned | `orgRole: ADMIN` |
-| Org admin | `POST /api/v1/organisations/:organisationId/applications` / `DELETE .../applications/:applicationId` — assign / unassign (`source = ORG_ASSIGNMENT`) | `orgRole: ADMIN` + elevated |
-| Org owner | `PATCH /api/v1/organisations/:organisationId` — accepts `appAccessMode` | `orgRole: OWNER` + elevated |
-| Platform/app admin | `POST /api/v1/admin/role-assignments` (+ revoke) — accepts `principalType: ORGANISATION` | existing `requireRoleAdmin` + elevated (T-904) |
-| Application (M2M) | `POST /api/v1/app-sessions/organisations` `{ sessionHandle }` — the organisations this session may act in, active one flagged (D-A10) | service token + `app-session:manage` |
-| Application (M2M) | `POST /api/v1/app-sessions/organisation` `{ sessionHandle, organisationId }` — switch, answering a **rotated** handle (D-A11); a non-granting target is `APP_007` | service token + `app-session:manage` |
-| End user | `GET /api/v1/me/applications` — launcher: a "my applications" surface already exists (backed by `application_members`, i.e. apps *used*); extend it to return all **accessible** apps (per `ApplicationAccessService`) enriched with first/last-used where present, and excluding apps the user can no longer access | `session: true` (existing route — check and extend, don't duplicate) |
+| Actor              | Endpoint                                                                                                                                                                                                                                                                                                             | Auth                                                                 |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| Platform admin     | `PATCH /api/v1/admin/applications/:applicationId` — accepts `visibility`                                                                                                                                                                                                                                             | `appsManage` + elevated (extend existing)                            |
+| Platform admin     | `GET /api/v1/admin/applications/:applicationId/organisations` — releases + assignments overview                                                                                                                                                                                                                      | `appsRead`                                                           |
+| Platform admin     | `POST /api/v1/admin/applications/:applicationId/organisations` / `DELETE .../organisations/:organisationId` — release / revoke a RESTRICTED app for an org (`source = PLATFORM_RELEASE`)                                                                                                                             | `appsManage` + elevated                                              |
+| Org admin          | `GET /api/v1/organisations/:organisationId/applications` — available + assigned                                                                                                                                                                                                                                      | `orgRole: ADMIN`                                                     |
+| Org admin          | `POST /api/v1/organisations/:organisationId/applications` / `DELETE .../applications/:applicationId` — assign / unassign (`source = ORG_ASSIGNMENT`)                                                                                                                                                                 | `orgRole: ADMIN` + elevated                                          |
+| Org owner          | `PATCH /api/v1/organisations/:organisationId` — accepts `appAccessMode`                                                                                                                                                                                                                                              | `orgRole: OWNER` + elevated                                          |
+| Platform/app admin | `POST /api/v1/admin/role-assignments` (+ revoke) — accepts `principalType: ORGANISATION`                                                                                                                                                                                                                             | existing `requireRoleAdmin` + elevated (T-904)                       |
+| Application (M2M)  | `POST /api/v1/app-sessions/organisations` `{ sessionHandle }` — the organisations this session may act in, active one flagged (D-A10)                                                                                                                                                                                | service token + `app-session:manage`                                 |
+| Application (M2M)  | `POST /api/v1/app-sessions/organisation` `{ sessionHandle, organisationId }` — switch, answering a **rotated** handle (D-A11); a non-granting target is `APP_007`                                                                                                                                                    | service token + `app-session:manage`                                 |
+| End user           | `GET /api/v1/me/applications` — launcher: a "my applications" surface already exists (backed by `application_members`, i.e. apps _used_); extend it to return all **accessible** apps (per `ApplicationAccessService`) enriched with first/last-used where present, and excluding apps the user can no longer access | `session: true` (existing route — check and extend, don't duplicate) |
 
 Rules: an org can only assign apps its members could actually reach (assigning an unreleased RESTRICTED or INTERNAL app is `ORG_`-catalog validation error); releasing to an unknown org / assigning an unknown app answers the existing uniform not-found codes. All mutations audit: `application.visibility.changed`, `application.release.granted|revoked`, `org.application.assigned|unassigned`, `org.app_access_mode.changed` (align naming with the existing audit action catalog). Response DTOs follow `@RespondFor`; IDs use existing conventions.
 
@@ -122,7 +122,7 @@ Rules: an org can only assign apps its members could actually reach (assigning a
 
 1. Regenerate API types from this server's OpenAPI (repo's `generate:api-types` flow; needs the server running locally).
 2. **Denied page** — extend the existing hosted error page (`src/routes/_auth/error.tsx`, `access_denied` variant) to read the new `application` + `client_id` query params and explain "your organisation hasn't given you access to <app>". This is the landing target of the authorize deny redirect.
-3. **Admin console**: visibility selector on the application detail page; "Organisations" tab on a RESTRICTED app to release/revoke orgs; role-assignment form gains an *Organisation* principal type.
+3. **Admin console**: visibility selector on the application detail page; "Organisations" tab on a RESTRICTED app to release/revoke orgs; role-assignment form gains an _Organisation_ principal type.
 4. **Org settings**: "Applications" tab — access-mode toggle (owner-only affordance, AAL2 step-up flows already exist) and assign/unassign list.
 5. **"My Apps" launcher** page over `GET /api/v1/me/applications` (name, logo, home page URL, last used).
 6. Follow that repo's own conventions (its CLAUDE.md, `@shadow-library/ui` components, `--sh-*` tokens); `bun run verify` there must pass.
@@ -130,7 +130,7 @@ Rules: an org can only assign apps its members could actually reach (assigning a
 ## SCIM group → role mapping (T-905)
 
 Scope: directory group membership drives **capability** (org-scoped user role assignments), never app
-*access* — access stays org-level by design (`ASSIGNED_ONLY` governs the org; groups govern what members
+_access_ — access stays org-level by design (`ASSIGNED_ONLY` governs the org; groups govern what members
 may do inside an app). Recorded decisions:
 
 - **D-A8 — Vendor-controlled mappings.** Creating/deleting a mapping rides the existing two-tier

@@ -5,13 +5,10 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "vite dev",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
     "start": "bun run serve.ts",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "type-check": "tsc",
     "test": "bunx playwright test",
-    "test:setup": "bunx playwright install --with-deps chromium",
-    "generate:api-types": "bun ../../scripts/src/bin/shadow.ts gen-api-types http://localhost:8080/dev/api-docs/openapi.json --out src/lib/apis/api-types.gen.ts"
+    "test:setup": "bunx playwright install --with-deps chromium"
   },
   "dependencies": {
     "@shadow-library/ui": "workspace:*",

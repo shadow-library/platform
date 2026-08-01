@@ -18,8 +18,6 @@
   "scripts": {
     "clean": "rm -rf dist logs CHANGELOG.md",
     "type-check": "tsc",
-    "build": "bun ../../scripts/src/bin/shadow.ts build",
-    "verify": "bun ../../scripts/src/bin/shadow.ts verify",
     "test": "bun test --isolate"
   },
   "repository": {

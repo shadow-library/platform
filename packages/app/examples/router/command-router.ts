@@ -3,7 +3,7 @@
  */
 import { createInterface } from 'node:readline/promises';
 
-import { DispatchMetadata, Injectable, Dispatcher } from '@shadow-library/app';
+import { Dispatcher, DispatchMetadata, Injectable } from '@shadow-library/app';
 
 import { OutputService } from './output.service';
 
