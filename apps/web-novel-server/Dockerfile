@@ -25,7 +25,7 @@ COPY apps/pulse-web/package.json apps/pulse-web/package.json
 COPY apps/web-novel-server/package.json apps/web-novel-server/package.json
 COPY apps/web-novel-web/package.json apps/web-novel-web/package.json
 COPY e2e/package.json e2e/package.json
-RUN bun install --frozen-lockfile --filter ./apps/web-novel-server --filter ./
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --filter ./apps/web-novel-server --filter ./
 
 FROM deps AS build
 COPY scripts/ scripts/

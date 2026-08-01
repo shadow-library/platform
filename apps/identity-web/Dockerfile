@@ -24,7 +24,7 @@ COPY apps/pulse-web/package.json apps/pulse-web/package.json
 COPY apps/web-novel-server/package.json apps/web-novel-server/package.json
 COPY apps/web-novel-web/package.json apps/web-novel-web/package.json
 COPY e2e/package.json e2e/package.json
-RUN bun install --frozen-lockfile --filter ./apps/identity-web --filter ./
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --filter ./apps/identity-web --filter ./
 
 FROM deps AS build
 COPY scripts/ scripts/
@@ -42,7 +42,7 @@ COPY --from=deps /workspace/package.json /workspace/bun.lock /workspace/tsconfig
 COPY --from=deps /workspace/packages packages/
 COPY --from=deps /workspace/apps apps/
 COPY --from=deps /workspace/e2e e2e/
-RUN bun install --frozen-lockfile --production --ignore-scripts --filter "./apps/identity-web"
+RUN --mount=type=cache,target=/root/.bun/install/cache bun install --frozen-lockfile --production --ignore-scripts --filter "./apps/identity-web"
 COPY --from=build /workspace/packages/common/dist packages/common/dist
 COPY --from=build /workspace/packages/ui/dist packages/ui/dist
 COPY --from=build /workspace/packages/web/dist packages/web/dist
