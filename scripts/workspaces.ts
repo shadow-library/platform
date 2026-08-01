@@ -36,6 +36,12 @@ export interface CssOptions {
   useClient?: string[];
 }
 
+/** The non-derivable Drizzle inputs `scripts/db.ts` needs for a `backend` workspace whose schema path breaks convention. */
+export interface DbOptions {
+  /** Drizzle schema entry, workspace-relative. Default `src/database/schemas/index.ts`. */
+  schema?: string;
+}
+
 /**
  * The optional `"shadow"` key in a workspace's own `package.json` — the escape hatch for the handful of
  * build inputs that genuinely cannot be inferred from the workspace's path, dependencies, or `exports`.
@@ -56,6 +62,8 @@ export interface ShadowOptions {
   css?: CssOptions;
   /** Run the delegated `test` step during `verify`. Defaults to false for web apps and `none`-type workspaces, true otherwise. */
   verifyTest?: boolean;
+  /** `scripts/db.ts` inputs for a `backend` workspace whose Drizzle schema path breaks the convention default. */
+  db?: DbOptions;
 }
 
 export interface Workspace {

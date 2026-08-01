@@ -9,9 +9,9 @@
     "type-check": "bun run tsc",
     "test": "bun test",
     "dev": "bun run --watch src/main.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "bun run scripts/migrate-db.ts",
-    "db:create-template": "bun run scripts/create-template-db.ts"
+    "db:generate": "bun ../../scripts/db.ts apps/web-novel-server generate",
+    "db:migrate": "bun ../../scripts/db.ts apps/web-novel-server migrate",
+    "db:create-template": "bun ../../scripts/db.ts apps/web-novel-server create-template"
   },
   "shadow": {
     "entries": [
@@ -19,7 +19,10 @@
     ],
     "assets": [
       "generated/drizzle"
-    ]
+    ],
+    "db": {
+      "schema": "src/modules/datastore/schemas/index.ts"
+    }
   },
   "repository": {
     "type": "git",

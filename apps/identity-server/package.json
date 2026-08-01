@@ -10,9 +10,9 @@
     "test": "bun test",
     "dev": "bun run --watch src/main.ts",
     "dev:worker": "bun run --watch src/worker.ts",
-    "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
-    "db:create-template": "bun run scripts/create-template-db.ts"
+    "db:generate": "bun ../../scripts/db.ts apps/identity-server generate",
+    "db:migrate": "bun ../../scripts/db.ts apps/identity-server migrate",
+    "db:create-template": "bun ../../scripts/db.ts apps/identity-server create-template"
   },
   "shadow": {
     "entries": [
@@ -22,7 +22,10 @@
     "assets": [
       "generated/drizzle",
       "public"
-    ]
+    ],
+    "db": {
+      "schema": "src/modules/infrastructure/datastore/schemas/index.ts"
+    }
   },
   "repository": {
     "type": "git",
