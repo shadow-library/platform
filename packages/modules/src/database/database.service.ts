@@ -125,6 +125,20 @@ export class DatabaseService implements OnModuleInit, OnModuleDestroy {
   }
 
   async onModuleDestroy(): Promise<void> {
+    if (this.postgresClient) {
+      /**
+       * Every Drizzle driver exposes its underlying connection/pool as `$client` (documented, cross-driver
+       * convention); close it so short-lived callers — most notably `bun test`, which boots one app instance
+       * per suite — release their pooled connections instead of leaking them for the life of the process.
+       * Without this, dozens of suites each holding `database.postgres.max-connections` connections open
+       * exhausts Postgres well before the run finishes.
+       */
+      const client = (this.postgresClient as unknown as { $client?: { close?: () => Promise<void>; end?: () => Promise<void> } }).$client;
+      const close = client?.close ?? client?.end;
+      if (close) await close.call(client);
+      this.logger.info('Postgres client disconnected');
+    }
+
     if (this.memcacheClient) {
       this.memcacheClient.end();
       this.logger.info('Memcached client disconnected');

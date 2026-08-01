@@ -77,6 +77,16 @@ export class OpenApiService {
         document.components.schemas[resolvedId] = utils.object.omitKeys(definition, ['definitions', '$id']);
       }
 
+      // A definition can itself be an array schema (a body/response type declared as `SomeClass[]`),
+      // whose own `items.$ref` needs the same class-schema-id -> #/components/schemas rewrite every
+      // property's `items.$ref` gets below — otherwise it's left pointing at the raw internal id, which
+      // is never a valid OpenAPI $ref and, if that id's target collided with another schema's normalized
+      // name, resolves to nothing at all once schemas are diffed/bundled downstream.
+      if (definition.items?.$ref && !definition.items.$ref.startsWith('#/components/schemas/')) {
+        const resolvedRefId = this.resolveSchemaId(definition.items.$ref);
+        definition.items.$ref = `#/components/schemas/${resolvedRefId}`;
+      }
+
       const properties = [...Object.values(definition.properties ?? {}), ...Object.values(definition.patternProperties ?? {})];
       for (const property of properties) {
         if (property.$ref && !property.$ref.startsWith('#/components/schemas/')) {
