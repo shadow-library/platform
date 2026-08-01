@@ -1,7 +1,8 @@
-# Build context hygiene for docker/Dockerfile (repo-root context, shared by all 8 apps/*
-# images). Keep this in sync with .gitignore's intent, but note it can't be app-specific: the
-# same context is sent regardless of which app --build-arg APP selects, so nothing app-scoped
-# (e.g. "the other 7 apps/*/src") can be excluded here — see docker/README.md for why.
+# Build context hygiene for apps/*/Dockerfile (repo-root context — every app's Dockerfile needs the
+# root manifests, all of packages/*, and its own source; see each Dockerfile's header comment).
+# Keep this in sync with .gitignore's intent, but note it can't be app-specific: the same context
+# is sent regardless of which app's -f apps/<app>/Dockerfile is built, so nothing app-scoped
+# (e.g. "the other 7 apps/*/src") can be excluded here.
 
 # Dependencies — reinstalled fresh inside the build (bun install --frozen-lockfile)
 **/node_modules
