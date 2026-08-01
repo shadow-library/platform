@@ -1,4 +1,0 @@
-# Triaged false positives — each line is a gitleaks finding fingerprint (commit:file:rule:start-line).
-# pulse-server notification test fixture: a fabricated organisation-invitation token string in seed
-# data (`payload.token`), not a credential.
-542024f100afbcac7bc89cd3ba3f148cb8ff366d:apps/pulse-server/tests/notification/identity-catalog.spec.ts:generic-api-key:71
