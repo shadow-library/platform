@@ -1,7 +1,13 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.lib.json",
   "compilerOptions": {
     "lib": ["ES2022", "ESNext.Disposable"],
+    /**
+     * paths GOTCHA: extends replaces `paths` wholesale, not per-key — @lib/* must be repeated here
+     * alongside this package's own self-name mapping. Evidence: src imports @lib/* (2 files) and tests
+     * import @lib/* (13 files), so dropping the alias would break both; self-name (@shadow-library/app)
+     * is used in src (1) and tests (24), and by definition can only be declared per-package.
+     */
     "paths": {
       "@lib/*": ["./src/*"],
       "@shadow-library/app": ["./src/index.ts"],

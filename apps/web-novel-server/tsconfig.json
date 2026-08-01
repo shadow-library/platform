@@ -1,12 +1,10 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.server.json",
   "compilerOptions": {
-    "module": "ES2022",
     "paths": {
       "@modules/*": ["./src/modules/*"],
-      "@scripts/*": ["./scripts/*"],
-      "@server/*": ["./src/*"]
+      "@server/*": ["./src/*"],
+      "@tests/*": ["./tests/*"]
     }
-  },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  }
 }

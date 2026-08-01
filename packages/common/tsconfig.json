@@ -1,10 +1,14 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.lib.json",
+  /**
+   * paths GOTCHA: extends replaces `paths` wholesale — @lib/* must be repeated here alongside this
+   * package's self-name mapping. Evidence: src imports @lib/* (10 files) and the self-name
+   * @shadow-library/common (1 src file, 15 test files) — both aliases are live.
+   */
   "compilerOptions": {
     "paths": {
       "@lib/*": ["./src/*"],
       "@shadow-library/common": ["./src/index.ts"]
     }
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  }
 }

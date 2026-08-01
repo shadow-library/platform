@@ -1,5 +1,10 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.lib.json",
+  /**
+   * paths GOTCHA: extends replaces `paths` wholesale — @lib/* must be repeated here alongside this
+   * package's self-name + @examples mappings. Evidence: src imports @lib/* (2 files), tests import
+   * @lib/* (7 files); self-name @shadow-library/fastify is used in src (1) and tests (20) — all live.
+   */
   "compilerOptions": {
     "module": "ES2022",
     "paths": {

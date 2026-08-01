@@ -1,6 +1,8 @@
 import { fileURLToPath, URL } from 'node:url';
 
-import { createStartViteConfig } from '../../scripts/config/vite-start.factory.ts';
+import { tanstackStart } from '@tanstack/react-start/plugin/vite';
+import viteReact from '@vitejs/plugin-react';
+import { defineConfig } from 'vite';
 
 /**
  * Data now flows through TanStack Start server functions, which reach the identity server directly
@@ -12,11 +14,14 @@ import { createStartViteConfig } from '../../scripts/config/vite-start.factory.t
  */
 const proxyTarget = process.env.SERVER_URL || 'http://localhost:9091';
 
-export default createStartViteConfig({
-  alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
-  proxy: {
-    '/oauth2': { target: proxyTarget, changeOrigin: true, secure: false },
-    '/saml2': { target: proxyTarget, changeOrigin: true, secure: false },
-  },
-  mirrorProxyToPreview: true,
+const proxy = {
+  '/oauth2': { target: proxyTarget, changeOrigin: true, secure: false },
+  '/saml2': { target: proxyTarget, changeOrigin: true, secure: false },
+};
+
+export default defineConfig({
+  plugins: [tanstackStart(), viteReact()],
+  resolve: { alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) } },
+  server: { port: 3000, proxy },
+  preview: { proxy },
 });

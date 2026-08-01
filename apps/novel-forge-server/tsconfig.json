@@ -1,13 +1,10 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.server.json",
   "compilerOptions": {
-    "module": "ES2022",
     "paths": {
-      "@server/*": ["./src/*"],
       "@modules/*": ["./src/modules/*"],
-      "@scripts/*": ["./scripts/*"],
+      "@server/*": ["./src/*"],
       "@tests/*": ["./tests/*"]
     }
-  },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts", "drizzle.config.ts"]
+  }
 }

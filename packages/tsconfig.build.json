@@ -1,0 +1,8 @@
+{
+  /** Moved from the repo root (was `tsconfig.build.base.json`) as part of the apps/packages family-file split. */
+  "compilerOptions": {
+    "noEmit": false,
+    "declaration": true,
+    "removeComments": true
+  }
+}

@@ -1,5 +1,5 @@
 {
-  "extends": ["./tsconfig.json", "../../tsconfig.build.base.json"],
+  "extends": ["./tsconfig.json", "../tsconfig.build.json"],
   "tsc-alias": { "resolveFullPaths": true },
   "compilerOptions": {
     /** Emit — declaration-only for a Rollup-built component; overrides the base's tsc-emits-JS shape. */

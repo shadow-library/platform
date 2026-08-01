@@ -1,0 +1,21 @@
+{
+  /**
+   * Shared deltas for the `library`-type packages that use the `@lib/*` self-referencing alias
+   * (app, class-schema, common, fastify) plus the `src`/`tests` include baseline every package shares.
+   * `packages/ui` (component) and `packages/web` (its own react layer) diverge too much to fold in here
+   * and stay standalone, extending `../tsconfig.base.json` directly.
+   *
+   * `paths` is deliberately NOT hoisted here. Two independent reasons converge on the same leaf-only
+   * placement: (1) `paths` replaces wholesale on `extends` — every leaf below declares its own package's
+   * self-name mapping (`@shadow-library/<name>`), which by definition cannot live here, so a leaf that
+   * also uses `@lib/*` must repeat that line anyway (see each leaf's comment for the per-package decision
+   * and evidence); (2) even where a leaf's `paths` would be pure inheritance, Bun's runtime resolver does
+   * not implement `${configDir}` correctly across this two-level `extends` chain (leaf -> this file ->
+   * tsconfig.base.json) — it substitutes the *declaring* file's directory, not the leaf's, silently
+   * breaking `bun test`/`bun run` alias resolution (confirmed by isolated repro and by
+   * apps/tsconfig.server.json hitting the identical bug — see that file's comment). `include` has no such
+   * runtime consumer (only `tsc` reads it), so it stays safely hoisted via `${configDir}`.
+   */
+  "extends": "../tsconfig.base.json",
+  "include": ["${configDir}/src/**/*.ts", "${configDir}/tests/**/*.ts"]
+}

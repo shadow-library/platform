@@ -1,12 +1,16 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.lib.json",
+  /**
+   * paths decision: this package's original tsconfig declared @lib/* but neither src nor tests ever
+   * import it (grep: 0 hits) — the only live aliases are the self-name subpath mappings, which by
+   * definition can't live in the family file. Dropped @lib/* here rather than duplicating an unused
+   * alias; the family file's @lib/* stays harmlessly unused for this leaf.
+   */
   "compilerOptions": {
     "module": "ES2022",
     "paths": {
-      "@lib/*": ["./src/*"],
       "@shadow-library/modules": ["./src/index.ts"],
       "@shadow-library/modules/*": ["./src/*"]
     }
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  }
 }

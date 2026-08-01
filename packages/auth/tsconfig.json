@@ -1,13 +1,17 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.lib.json",
   "compilerOptions": {
     "module": "ES2022",
+    /**
+     * paths decision: this package never used the @lib/* alias in src or tests (grep: 0 hits either
+     * place) — it only ever needed its own self-name subpath mappings — so no @lib/* line needs to be
+     * repeated here; the family file's @lib/* is simply unused (harmless) for this leaf.
+     */
     "paths": {
       "@shadow-library/auth": ["./src/index.ts"],
       "@shadow-library/auth/module": ["./src/module/index.ts"],
       "@shadow-library/auth/rp": ["./src/rp/index.ts"],
       "@shadow-library/auth/testing": ["./src/testing/index.ts"]
     }
-  },
-  "include": ["src/**/*.ts", "tests/**/*.ts"]
+  }
 }

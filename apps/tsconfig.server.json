@@ -1,0 +1,24 @@
+{
+  /**
+   * Shared deltas for the four backend workspaces (identity-server, novel-forge-server, pulse-server,
+   * web-novel-server), diffed byte-for-byte against each other: every backend uses the same `module`
+   * override and the same include globs — none carries a per-app residue beyond this. `${configDir}`
+   * (TS 5.5+) resolves each `include` entry against the *extending* app's own directory, so this single
+   * family file replaces the include-glob duplication across four near-identical leaves.
+   *
+   * `paths` is deliberately NOT hoisted here, even though it would be identical across the four apps
+   * (verified) and TS's own `--showConfig`/`--noEmit` resolve `${configDir}`-based `paths` correctly
+   * through this two-level `extends` chain (leaf -> this file -> tsconfig.base.json). The reason: Bun's
+   * *runtime* module resolver (used by `bun test`, `bun run dev`, backend entrypoints) does NOT implement
+   * `${configDir}` per the TS 5.5 spec across a multi-level `extends` chain — confirmed by isolated repro
+   * and by this app's own test suite failing with `Cannot find module '@scripts/...'` when `paths` was
+   * hoisted here. Bun substitutes the *declaring* file's own directory (this file's, i.e. `apps/`) rather
+   * than the leaf's, silently repointing every alias one level too high. `include` has no such runtime
+   * consumer (only `tsc` reads it), so it stays hoisted; `paths` is repeated verbatim in each leaf.
+   */
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "module": "ES2022"
+  },
+  "include": ["${configDir}/src/**/*.ts", "${configDir}/tests/**/*.ts"]
+}

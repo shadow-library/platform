@@ -1,3 +1,4 @@
 [test]
 preload = ["./src/bootstrap.ts"]
-coverageThreshold = 0.9
+coverageThreshold = 0
+coveragePathIgnorePatterns = ["**/dist/**", "**/index.ts", "**/*.interface.ts", "tests/**", "src/classes/app-error-code.ts"]

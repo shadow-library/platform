@@ -1,0 +1,30 @@
+{
+  /**
+   * Shared deltas for the web workspaces (identity-web, novel-forge-web, pulse-web, web-novel-web).
+   * Moved from the repo root (was `tsconfig.web.json`) as part of the apps/packages family-file split.
+   *
+   * `paths` is deliberately NOT hoisted here (unlike `include`, which safely uses `${configDir}` since
+   * only `tsc` reads it). TS's own `--showConfig`/`--noEmit` resolve a `${configDir}`-based `paths` entry
+   * correctly through a two-level `extends` chain (leaf -> this file -> tsconfig.base.json), but Bun's
+   * *runtime* resolver does not: it substitutes `${configDir}` against the *declaring* file's own
+   * directory (this file's, i.e. `apps/`) rather than the extending leaf's, so a hoisted `"@/*":
+   * ["${configDir}/src/*"]` here would silently repoint every app's alias at `apps/src/*`. Confirmed by
+   * isolated repro against apps/tsconfig.server.json (same mechanism broke `bun test` there with
+   * `Cannot find module '@scripts/...'`). `@/*` therefore stays declared per-app, as it was before TS 5.5.
+   */
+  "extends": "../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "jsx": "react-jsx",
+
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noUncheckedSideEffectImports": true,
+    "strictPropertyInitialization": true,
+
+    "verbatimModuleSyntax": true,
+
+    "types": ["vite/client"]
+  },
+  "include": ["${configDir}/src/**/*.ts", "${configDir}/src/**/*.tsx", "${configDir}/tests/**/*.ts"]
+}

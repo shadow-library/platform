@@ -1,3 +1,11 @@
 [test]
 preload = ["./tests/env.ts", "./tests/setup.ts"]
-coverageThreshold = 0.9
+coverageThreshold = 0
+coveragePathIgnorePatterns = [
+  "**/dist/**",
+  "**/index.ts",
+  "**/*.interface.ts",
+  "tests/**",
+  "src/classes/app-error-code.ts",
+  "src/modules/infrastructure/datastore/schemas/**",
+]

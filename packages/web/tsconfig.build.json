@@ -1,5 +1,5 @@
 {
-  "extends": ["./tsconfig.json", "../../tsconfig.build.base.json"],
+  "extends": ["./tsconfig.json", "../tsconfig.build.json"],
   "tsc-alias": { "resolveFullPaths": true },
   "compilerOptions": { "sourceMap": true, "rootDir": "src" },
   "include": ["src/**/*.ts", "src/**/*.tsx"],

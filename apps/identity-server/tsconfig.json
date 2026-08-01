@@ -1,12 +1,15 @@
 {
-  "extends": "../../tsconfig.base.json",
+  "extends": "../tsconfig.server.json",
+  /**
+   * `paths` is intentionally not inherited from `tsconfig.server.json` — see that file's comment (Bun's
+   * runtime resolver mis-resolves `${configDir}` across a two-level `extends` chain). Declared plainly
+   * relative here, as every leaf before this restructuring did.
+   */
   "compilerOptions": {
-    "module": "ES2022",
     "paths": {
       "@modules/*": ["./src/modules/*"],
-      "@scripts/*": ["./scripts/*"],
-      "@server/*": ["./src/*"]
+      "@server/*": ["./src/*"],
+      "@tests/*": ["./tests/*"]
     }
-  },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "tests/**/*.ts"]
+  }
 }
