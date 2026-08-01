@@ -5,10 +5,7 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "vite dev",
-    "type-check": "tsc --noEmit",
-    "start": "bun run serve.ts",
-    "test": "bunx playwright test",
-    "test:setup": "bunx playwright install --with-deps chromium"
+    "start": "bun run serve.ts"
   },
   "dependencies": {
     "@shadow-library/ui": "workspace:*",
@@ -23,7 +20,6 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@playwright/test": "catalog:",
     "@tanstack/react-query-devtools": "catalog:",
     "@tanstack/react-router-devtools": "catalog:",
     "@types/bun": "catalog:",

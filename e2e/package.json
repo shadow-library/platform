@@ -4,9 +4,8 @@
   "type": "module",
   "license": "UNLICENSED",
   "version": "0.0.0",
-  "description": "Whole-platform Playwright suite — cross-app smoke flows against already-deployed service URLs supplied via environment variables (see README.md).",
+  "description": "Whole-platform Playwright suite \u2014 cross-app smoke flows against already-deployed service URLs supplied via environment variables (see README.md).",
   "scripts": {
-    "type-check": "tsc",
     "test": "bunx playwright test",
     "test:setup": "bunx playwright install --with-deps chromium",
     "test:report": "bunx playwright show-report test-results/html-report"

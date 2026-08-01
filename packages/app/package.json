@@ -13,13 +13,6 @@
     }
   },
   "description": " A progressive Node.js framework for building efficient, scalable, and enterprise-grade applications using SOLID principles ",
-  "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "tsc",
-    "test": "bun run test:unit && bun run test:integration",
-    "test:unit": "bun test tests/decorators tests/injector tests/utils tests/injection-token.spec.ts tests/shadow-application.spec.ts tests/shadow-factory.spec.ts --coverage",
-    "test:integration": "bun test tests/integration"
-  },
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/shadow-library/app.git"

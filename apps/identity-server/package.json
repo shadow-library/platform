@@ -5,14 +5,8 @@
   "version": "0.0.0",
   "description": "description",
   "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "bun run tsc",
-    "test": "bun test",
     "dev": "bun run --watch src/main.ts",
-    "dev:worker": "bun run --watch src/worker.ts",
-    "db:generate": "bun ../../scripts/db.ts apps/identity-server generate",
-    "db:migrate": "bun ../../scripts/db.ts apps/identity-server migrate",
-    "db:create-template": "bun ../../scripts/db.ts apps/identity-server create-template"
+    "dev:worker": "bun run --watch src/worker.ts"
   },
   "shadow": {
     "entries": [
@@ -24,7 +18,8 @@
       "public"
     ],
     "db": {
-      "schema": "src/modules/infrastructure/datastore/schemas/index.ts"
+      "schema": "src/modules/infrastructure/datastore/schemas/index.ts",
+      "templateSeed": "tests/fixtures/template-seed.ts"
     }
   },
   "repository": {

@@ -6,10 +6,7 @@
   "scripts": {
     "dev": "vite dev --port 3000",
     "start": "bun main.ts",
-    "preview": "vite preview --port 3000",
-    "type-check": "tsc",
-    "test": "bunx playwright test",
-    "test:setup": "bunx playwright install --with-deps chromium"
+    "preview": "vite preview --port 3000"
   },
   "dependencies": {
     "@shadow-library/common": "workspace:*",
@@ -27,7 +24,6 @@
     "react-dom": "catalog:"
   },
   "devDependencies": {
-    "@playwright/test": "catalog:",
     "@types/bun": "catalog:",
     "@types/node": "catalog:",
     "@types/qrcode": "^1.5.6",

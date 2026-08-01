@@ -20,11 +20,10 @@
     "./styles.css": "./dist/styles.css",
     "./styles.layer.css": "./dist/styles.layer.css"
   },
-  "description": "Shadow UI — enterprise React component library for the Shadow Apps ecosystem, styled with CSS Modules and CSS-variable design tokens, documented in Storybook, with full TypeScript support",
+  "description": "Shadow UI \u2014 enterprise React component library for the Shadow Apps ecosystem, styled with CSS Modules and CSS-variable design tokens, documented in Storybook, with full TypeScript support",
   "scripts": {
     "storybook": "storybook dev -p 4000",
     "build-storybook": "storybook build",
-    "type-check": "tsc",
     "test:setup": "bunx playwright install",
     "test": "vitest run --project unit",
     "test:stories": "vitest run --project storybook"

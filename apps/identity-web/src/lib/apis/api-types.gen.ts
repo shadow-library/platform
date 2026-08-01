@@ -705,6 +705,40 @@ export interface paths {
     patch?: never;
     trace?: never;
   };
+  '/api/v1/app-sessions/organisations': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** List Organisations */
+    post: operations['post_api_v1_app_sessions_organisations'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/app-sessions/organisation': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    /** Switch Organisation */
+    post: operations['post_api_v1_app_sessions_organisation'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/saml2/metadata': {
     parameters: {
       query?: never;
@@ -1949,6 +1983,41 @@ export interface paths {
     patch: operations['patch_api_v1_admin_saml_service_providers_serviceProviderId'];
     trace?: never;
   };
+  '/api/v1/admin/scim/group-mappings': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    /** List Mappings */
+    get: operations['get_api_v1_admin_scim_group_mappings'];
+    put?: never;
+    /** Create Mapping */
+    post: operations['post_api_v1_admin_scim_group_mappings'];
+    delete?: never;
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
+  '/api/v1/admin/scim/group-mappings/{mappingId}': {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    get?: never;
+    put?: never;
+    post?: never;
+    /** Delete Mapping */
+    delete: operations['delete_api_v1_admin_scim_group_mappings_mappingId'];
+    options?: never;
+    head?: never;
+    patch?: never;
+    trace?: never;
+  };
   '/api/v1/admin/service-access': {
     parameters: {
       query?: never;
@@ -2207,11 +2276,10 @@ export interface components {
       /** @enum {string} */
       status: 'ok' | 'degraded';
     };
-    DevErrorResponseDto: {
+    ErrorResponseDto: {
       code: string;
       message: string;
       fields?: components['schemas']['ErrorFieldDto'][];
-      stack?: string;
     };
     ErrorFieldDto: {
       field: string;
@@ -2616,6 +2684,26 @@ export interface components {
     };
     AppSessionHandleBody: {
       sessionHandle: string;
+    };
+    AppSessionOrganisationsResponse: {
+      organisations: components['schemas']['AppSessionOrganisationItem'][];
+    };
+    AppSessionOrganisationItem: {
+      id: string;
+      slug: string;
+      name: string;
+      /** @enum {string} */
+      type: 'PERSONAL' | 'TEAM';
+      active: boolean;
+    };
+    SwitchOrganisationBody: {
+      sessionHandle: string;
+      organisationId: string;
+    };
+    SwitchOrganisationResponse: {
+      sessionHandle: string;
+      organisationId: string;
+      expiresAt: string;
     };
     AppSessionActionResponse: {
       success: boolean;
@@ -3259,6 +3347,21 @@ export interface components {
       releasedAttributes?: string[];
       isActive?: boolean;
     };
+    GroupMappingListResponse: {
+      items: components['schemas']['GroupMappingItem'][];
+    };
+    GroupMappingItem: {
+      id: string;
+      groupId: string;
+      roleId: number;
+      organisationId: string;
+      createdBy?: string;
+      createdAt: string;
+    };
+    CreateGroupMappingBody: {
+      groupId: string;
+      roleId: number;
+    };
     ServiceAccessListResponse: {
       items: components['schemas']['ServiceAccessRuleItem'][];
     };
@@ -3353,7 +3456,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3362,7 +3465,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3400,7 +3503,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3409,7 +3512,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3438,7 +3541,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3447,7 +3550,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3478,7 +3581,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3487,7 +3590,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3509,7 +3612,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['SetPolicyBody'];
       };
@@ -3530,7 +3633,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3539,7 +3642,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3578,7 +3681,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3587,7 +3690,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3616,7 +3719,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3625,7 +3728,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3655,7 +3758,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3664,7 +3767,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3676,7 +3779,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['TokenRequestBody'];
       };
@@ -3697,7 +3800,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3706,7 +3809,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3735,7 +3838,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3744,7 +3847,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3756,7 +3859,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['TokenActionBody'];
       };
@@ -3777,7 +3880,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3786,7 +3889,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3798,7 +3901,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['TokenActionBody'];
       };
@@ -3819,7 +3922,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3828,7 +3931,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3860,7 +3963,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3869,7 +3972,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3881,7 +3984,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ConsentDecisionBody'];
       };
@@ -3902,7 +4005,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3911,7 +4014,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3940,7 +4043,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3949,7 +4052,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -3980,7 +4083,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -3989,7 +4092,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4018,7 +4121,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4027,7 +4130,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4056,7 +4159,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4065,7 +4168,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4077,7 +4180,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateProfileBody'];
       };
@@ -4098,7 +4201,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4107,7 +4210,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4119,7 +4222,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ChangePasswordBody'];
       };
@@ -4140,7 +4243,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4149,7 +4252,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4178,7 +4281,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4187,7 +4290,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4199,7 +4302,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateOrganisationBody'];
       };
@@ -4220,7 +4323,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4229,7 +4332,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4260,7 +4363,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4269,7 +4372,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4300,7 +4403,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4309,7 +4412,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4323,7 +4426,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateOrganisationBody'];
       };
@@ -4344,7 +4447,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4353,7 +4456,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4384,7 +4487,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4393,7 +4496,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4425,7 +4528,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4434,7 +4537,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4449,7 +4552,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateMemberRoleBody'];
       };
@@ -4470,7 +4573,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4479,7 +4582,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4494,7 +4597,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateMemberStatusBody'];
       };
@@ -4515,7 +4618,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4524,7 +4627,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4555,7 +4658,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4564,7 +4667,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4578,7 +4681,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['InviteMemberBody'];
       };
@@ -4599,7 +4702,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4608,7 +4711,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4640,7 +4743,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4649,7 +4752,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4680,7 +4783,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4689,7 +4792,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4703,7 +4806,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AssignApplicationBody'];
       };
@@ -4724,7 +4827,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4733,7 +4836,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4765,7 +4868,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4774,7 +4877,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4803,7 +4906,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4812,7 +4915,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4843,7 +4946,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4852,7 +4955,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4864,7 +4967,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['InvitationTokenBody'];
       };
@@ -4885,7 +4988,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4894,7 +4997,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4906,7 +5009,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['InvitationTokenBody'];
       };
@@ -4927,7 +5030,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4936,7 +5039,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4967,7 +5070,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -4976,7 +5079,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -4990,7 +5093,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RegisterDomainBody'];
       };
@@ -5011,7 +5114,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5020,7 +5123,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5052,7 +5155,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5061,7 +5164,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5093,7 +5196,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5102,7 +5205,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5114,7 +5217,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CheckRequestBody'];
       };
@@ -5135,7 +5238,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5144,7 +5247,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5156,7 +5259,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CatalogSyncBody'];
       };
@@ -5177,7 +5280,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5186,7 +5289,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5215,7 +5318,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5224,7 +5327,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5236,7 +5339,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateAppSessionBody'];
       };
@@ -5257,7 +5360,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5266,7 +5369,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5278,7 +5381,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AppSessionHandleBody'];
       };
@@ -5299,7 +5402,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5308,7 +5411,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5320,7 +5423,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['MintAppTokenBody'];
       };
@@ -5341,7 +5444,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5350,7 +5453,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5362,7 +5465,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ClaimElevationBody'];
       };
@@ -5383,7 +5486,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5392,7 +5495,91 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_app_sessions_organisations: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['AppSessionHandleBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AppSessionOrganisationsResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_app_sessions_organisation: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['SwitchOrganisationBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['SwitchOrganisationResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5412,7 +5599,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5421,7 +5608,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5444,7 +5631,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5453,7 +5640,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5475,7 +5662,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5484,7 +5671,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5496,7 +5683,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['LoginInitBody'];
       };
@@ -5517,7 +5704,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5526,7 +5713,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5538,7 +5725,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['LoginResetPasswordBody'];
       };
@@ -5568,7 +5755,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5577,7 +5764,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5589,7 +5776,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RegisterInitBody'];
       };
@@ -5610,7 +5797,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5619,7 +5806,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5631,7 +5818,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['DemographicsBody'];
       };
@@ -5652,7 +5839,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5661,7 +5848,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5673,7 +5860,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ProfileBody'];
       };
@@ -5694,7 +5881,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5703,7 +5890,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5715,7 +5902,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['SetPasswordBody'];
       };
@@ -5736,7 +5923,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5745,7 +5932,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5757,7 +5944,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RecoverInitBody'];
       };
@@ -5778,7 +5965,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5787,7 +5974,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5799,7 +5986,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ResetPasswordBody'];
       };
@@ -5820,7 +6007,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5829,7 +6016,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5841,7 +6028,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ChallengeVerifyBody'];
       };
@@ -5871,7 +6058,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5880,7 +6067,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5911,7 +6098,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5920,7 +6107,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5932,7 +6119,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ChallengeChangeBody'];
       };
@@ -5953,7 +6140,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -5962,7 +6149,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -5974,7 +6161,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ChallengeResendBody'];
       };
@@ -6004,7 +6191,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6013,7 +6200,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6025,7 +6212,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CancelFlowBody'];
       };
@@ -6037,7 +6224,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6046,7 +6233,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6066,7 +6253,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6075,7 +6262,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6087,7 +6274,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['WebauthnOptionsBody'];
       };
@@ -6108,7 +6295,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6117,7 +6304,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6146,7 +6333,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6155,7 +6342,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6184,7 +6371,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6193,7 +6380,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6224,7 +6411,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6233,7 +6420,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6257,7 +6444,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6266,7 +6453,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6295,7 +6482,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6304,7 +6491,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6333,7 +6520,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6342,7 +6529,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6354,7 +6541,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['TotpCodeBody'];
       };
@@ -6375,7 +6562,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6384,7 +6571,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6413,7 +6600,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6422,7 +6609,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6451,7 +6638,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6460,7 +6647,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6489,7 +6676,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6498,7 +6685,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6529,7 +6716,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6538,7 +6725,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6550,7 +6737,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['StepUpBody'];
       };
@@ -6571,7 +6758,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6580,7 +6767,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6609,7 +6796,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6618,7 +6805,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6630,7 +6817,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['WebauthnRegisterVerifyBody'];
       };
@@ -6651,7 +6838,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6660,7 +6847,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6689,7 +6876,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6698,7 +6885,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6710,7 +6897,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['WebauthnStepUpBody'];
       };
@@ -6731,7 +6918,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6740,7 +6927,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6771,7 +6958,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6780,7 +6967,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6811,7 +6998,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6820,7 +7007,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6834,7 +7021,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateIdentityProviderBody'];
       };
@@ -6855,7 +7042,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6864,7 +7051,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6887,7 +7074,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6896,7 +7083,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6911,7 +7098,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateIdentityProviderBody'];
       };
@@ -6932,7 +7119,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6941,7 +7128,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6970,7 +7157,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -6979,7 +7166,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -6991,7 +7178,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AddEmailBody'];
       };
@@ -7012,7 +7199,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7021,7 +7208,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7033,7 +7220,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RemoveEmailBody'];
       };
@@ -7054,7 +7241,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7063,7 +7250,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7075,7 +7262,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['VerifyContactBody'];
       };
@@ -7096,7 +7283,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7105,7 +7292,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7117,7 +7304,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AddEmailBody'];
       };
@@ -7138,7 +7325,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7147,7 +7334,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7176,7 +7363,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7185,7 +7372,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7197,7 +7384,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AddPhoneBody'];
       };
@@ -7218,7 +7405,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7227,7 +7414,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7239,7 +7426,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RemovePhoneBody'];
       };
@@ -7260,7 +7447,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7269,7 +7456,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7281,7 +7468,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['VerifyContactBody'];
       };
@@ -7302,7 +7489,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7311,7 +7498,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7323,7 +7510,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['AddPhoneBody'];
       };
@@ -7344,7 +7531,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7353,7 +7540,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7382,7 +7569,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7391,7 +7578,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7427,7 +7614,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7436,7 +7623,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7467,7 +7654,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7476,7 +7663,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7507,7 +7694,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7516,7 +7703,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7530,7 +7717,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['LockUserBody'];
       };
@@ -7551,7 +7738,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7560,7 +7747,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7591,7 +7778,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7600,7 +7787,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7631,7 +7818,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7640,7 +7827,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7671,7 +7858,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7680,7 +7867,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7711,7 +7898,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7720,7 +7907,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7734,7 +7921,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['SuspendUserBody'];
       };
@@ -7755,7 +7942,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7764,7 +7951,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7778,7 +7965,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['BlockUserBody'];
       };
@@ -7799,7 +7986,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7808,7 +7995,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7839,7 +8026,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7848,7 +8035,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7879,7 +8066,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7888,7 +8075,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7917,7 +8104,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7926,7 +8113,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7938,7 +8125,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateApplicationBody'];
       };
@@ -7959,7 +8146,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -7968,7 +8155,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -7999,7 +8186,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8008,7 +8195,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8039,7 +8226,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8048,7 +8235,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8062,7 +8249,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateApplicationBody'];
       };
@@ -8083,7 +8270,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8092,7 +8279,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8123,7 +8310,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8132,7 +8319,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8164,7 +8351,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8173,7 +8360,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8204,7 +8391,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8213,7 +8400,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8227,7 +8414,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['ReleaseApplicationBody'];
       };
@@ -8248,7 +8435,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8257,7 +8444,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8289,7 +8476,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8298,7 +8485,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8329,7 +8516,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8338,7 +8525,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8350,7 +8537,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RegisterClientBody'];
       };
@@ -8371,7 +8558,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8380,7 +8567,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8411,7 +8598,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8420,7 +8607,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8451,7 +8638,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8460,7 +8647,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8474,7 +8661,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateClientBody'];
       };
@@ -8495,7 +8682,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8504,7 +8691,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8535,7 +8722,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8544,7 +8731,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8558,7 +8745,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['GrantScopeBody'];
       };
@@ -8579,7 +8766,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8588,7 +8775,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8620,7 +8807,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8629,7 +8816,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8658,7 +8845,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8667,7 +8854,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8679,7 +8866,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateResourceBody'];
       };
@@ -8700,7 +8887,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8709,7 +8896,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8723,7 +8910,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateScopeBody'];
       };
@@ -8744,7 +8931,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8753,7 +8940,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8784,7 +8971,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8793,7 +8980,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8827,7 +9014,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8836,7 +9023,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8848,7 +9035,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RoleAssignmentBody'];
       };
@@ -8869,7 +9056,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8878,7 +9065,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8890,7 +9077,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['RoleAssignmentBody'];
       };
@@ -8911,7 +9098,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8920,7 +9107,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8949,7 +9136,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -8958,7 +9145,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -8970,7 +9157,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateServiceProviderBody'];
       };
@@ -8991,7 +9178,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9000,7 +9187,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9031,7 +9218,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9040,7 +9227,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9071,7 +9258,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9080,7 +9267,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9094,7 +9281,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateServiceProviderBody'];
       };
@@ -9115,7 +9302,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9124,7 +9311,130 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+    };
+  };
+  get_api_v1_admin_scim_group_mappings: {
+    parameters: {
+      query?: {
+        organisationId?: string;
+        groupId?: string;
+      };
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupMappingListResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+    };
+  };
+  post_api_v1_admin_scim_group_mappings: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path?: never;
+      cookie?: never;
+    };
+    requestBody: {
+      content: {
+        'application/json': components['schemas']['CreateGroupMappingBody'];
+      };
+    };
+    responses: {
+      /** @description Default Response */
+      201: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['GroupMappingItem'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+    };
+  };
+  delete_api_v1_admin_scim_group_mappings_mappingId: {
+    parameters: {
+      query?: never;
+      header?: never;
+      path: {
+        mappingId: string;
+      };
+      cookie?: never;
+    };
+    requestBody?: never;
+    responses: {
+      /** @description Default Response */
+      200: {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['AdminActionResponse'];
+        };
+      };
+      /** @description Default Response */
+      '4XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
+        };
+      };
+      /** @description Default Response */
+      '5XX': {
+        headers: {
+          [name: string]: unknown;
+        };
+        content: {
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9155,7 +9465,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9164,7 +9474,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9176,7 +9486,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateServiceAccessBody'];
       };
@@ -9197,7 +9507,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9206,7 +9516,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9237,7 +9547,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9246,7 +9556,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9275,7 +9585,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9284,7 +9594,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9296,7 +9606,7 @@ export interface operations {
       path?: never;
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['CreateWebhookBody'];
       };
@@ -9317,7 +9627,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9326,7 +9636,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9357,7 +9667,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9366,7 +9676,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9397,7 +9707,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9406,7 +9716,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9420,7 +9730,7 @@ export interface operations {
       };
       cookie?: never;
     };
-    requestBody?: {
+    requestBody: {
       content: {
         'application/json': components['schemas']['UpdateWebhookBody'];
       };
@@ -9441,7 +9751,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9450,7 +9760,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9481,7 +9791,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9490,7 +9800,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9523,7 +9833,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9532,7 +9842,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9564,7 +9874,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9573,7 +9883,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9597,7 +9907,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9606,7 +9916,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9626,7 +9936,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9635,7 +9945,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9657,7 +9967,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9666,7 +9976,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9688,7 +9998,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9697,7 +10007,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9719,7 +10029,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9728,7 +10038,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9750,7 +10060,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9759,7 +10069,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9783,7 +10093,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9792,7 +10102,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9812,7 +10122,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9821,7 +10131,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9843,7 +10153,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9852,7 +10162,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9874,7 +10184,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9883,7 +10193,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9905,7 +10215,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9914,7 +10224,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9936,7 +10246,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9945,7 +10255,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9965,7 +10275,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -9974,7 +10284,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -9994,7 +10304,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -10003,7 +10313,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
@@ -10023,7 +10333,7 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
       /** @description Default Response */
@@ -10032,14 +10342,14 @@ export interface operations {
           [name: string]: unknown;
         };
         content: {
-          'application/json': components['schemas']['DevErrorResponseDto'];
+          'application/json': components['schemas']['ErrorResponseDto'];
         };
       };
     };
   };
 }
 export type HealthResponse = components['schemas']['HealthResponse'];
-export type DevErrorResponseDto = components['schemas']['DevErrorResponseDto'];
+export type ErrorResponseDto = components['schemas']['ErrorResponseDto'];
 export type ErrorFieldDto = components['schemas']['ErrorFieldDto'];
 export type ReadinessResponse = components['schemas']['ReadinessResponse'];
 export type ReadinessDependencies = components['schemas']['ReadinessDependencies'];
@@ -10106,6 +10416,10 @@ export type AppTokenResponse = components['schemas']['AppTokenResponse'];
 export type ClaimElevationBody = components['schemas']['ClaimElevationBody'];
 export type ElevationResponse = components['schemas']['ElevationResponse'];
 export type AppSessionHandleBody = components['schemas']['AppSessionHandleBody'];
+export type AppSessionOrganisationsResponse = components['schemas']['AppSessionOrganisationsResponse'];
+export type AppSessionOrganisationItem = components['schemas']['AppSessionOrganisationItem'];
+export type SwitchOrganisationBody = components['schemas']['SwitchOrganisationBody'];
+export type SwitchOrganisationResponse = components['schemas']['SwitchOrganisationResponse'];
 export type AppSessionActionResponse = components['schemas']['AppSessionActionResponse'];
 export type LoginInitBody = components['schemas']['LoginInitBody'];
 export type LoginInitResponse = components['schemas']['LoginInitResponse'];
@@ -10220,6 +10534,9 @@ export type ServiceProviderListResponse = components['schemas']['ServiceProvider
 export type ServiceProviderItem = components['schemas']['ServiceProviderItem'];
 export type CreateServiceProviderBody = components['schemas']['CreateServiceProviderBody'];
 export type UpdateServiceProviderBody = components['schemas']['UpdateServiceProviderBody'];
+export type GroupMappingListResponse = components['schemas']['GroupMappingListResponse'];
+export type GroupMappingItem = components['schemas']['GroupMappingItem'];
+export type CreateGroupMappingBody = components['schemas']['CreateGroupMappingBody'];
 export type ServiceAccessListResponse = components['schemas']['ServiceAccessListResponse'];
 export type ServiceAccessRuleItem = components['schemas']['ServiceAccessRuleItem'];
 export type CreateServiceAccessBody = components['schemas']['CreateServiceAccessBody'];
@@ -10256,6 +10573,7 @@ export type GetClientDetailsPathParams = Exclude<paths['/api/v1/admin/clients/{c
 export type ListApplicationPermissionsQueryParams = Exclude<paths['/api/v1/admin/permissions']['get']['parameters']['query'], undefined>;
 export type ListRoleAssignmentsQueryParams = Exclude<paths['/api/v1/admin/role-assignments']['get']['parameters']['query'], undefined>;
 export type GetSamlServiceProviderPathParams = Exclude<paths['/api/v1/admin/saml/service-providers/{serviceProviderId}']['get']['parameters']['path'], undefined>;
+export type ListMappingsQueryParams = Exclude<paths['/api/v1/admin/scim/group-mappings']['get']['parameters']['query'], undefined>;
 export type ListServiceAccessRulesQueryParams = Exclude<paths['/api/v1/admin/service-access']['get']['parameters']['query'], undefined>;
 export type GetWebhookPathParams = Exclude<paths['/api/v1/admin/webhooks/{webhookId}']['get']['parameters']['path'], undefined>;
 export type ListWebhookDeliveriesQueryParams = Exclude<paths['/api/v1/admin/webhooks/{webhookId}/deliveries']['get']['parameters']['query'], undefined>;

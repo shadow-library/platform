@@ -5,10 +5,9 @@
   "license": "UNLICENSED",
   "scripts": {
     "dev": "vite dev --port 3000",
-    "build:app": "bun run scripts/generate-manifest.ts && vite build && vite build --config vite.sw.config.ts && bun run format:gen",
+    "build:app": "vite build && vite build --config vite.sw.config.ts && bun run format:gen",
     "format:gen": "prettier --log-level warn --write src/routeTree.gen.ts",
     "start": "bun main.ts",
-    "type-check": "tsc",
     "test": "vitest run"
   },
   "shadow": {

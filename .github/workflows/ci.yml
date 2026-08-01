@@ -103,7 +103,7 @@ jobs:
             while IFS= read -r f; do
               [ -z "$f" ] && continue
               case "$f" in
-                packages/*|scripts/*|package.json|bun.lock|tsconfig.base.json|tsconfig.json|tsconfig.web.json|.prettierrc.json|eslint.config.ts|eslint-plugins.d.ts|commitlint.config.ts|.github/workflows/ci.yml)
+                packages/*|scripts/*|package.json|bun.lock|tsconfig.base.json|tsconfig.json|apps/tsconfig.server.json|apps/tsconfig.web.json|.prettierrc.json|eslint.config.ts|commitlint.config.ts|.github/workflows/ci.yml)
                   AFFECTS_ALL=true
                   ;;
                 apps/*)
@@ -150,14 +150,14 @@ jobs:
           # ---------------------------------------------------------------
           cat > /tmp/workspace-metadata.json <<'JSON'
           {
-            "apps/identity-server": { "needsPostgres": true, "needsRedis": true, "createTemplateDb": false, "checkMigrations": true },
-            "apps/novel-forge-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true },
-            "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": false },
-            "apps/web-novel-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": false, "checkMigrations": true }
+            "apps/identity-server": { "needsPostgres": true, "needsRedis": true, "createTemplateDb": false, "checkMigrations": true, "checkApiTypes": true },
+            "apps/novel-forge-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": true, "checkApiTypes": true },
+            "apps/pulse-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": true, "checkMigrations": false, "checkApiTypes": true },
+            "apps/web-novel-server": { "needsPostgres": true, "needsRedis": false, "createTemplateDb": false, "checkMigrations": true, "checkApiTypes": true }
           }
           JSON
           # pulse-server has no "db:generate" script (its migrations are hand-managed via
-          # scripts/migrate-db.ts, not drizzle-kit generate) -- check-migrations requires one and
+          # src/migrate.ts, not drizzle-kit generate) -- check-migrations requires one and
           # errors without it. The old mined workflow never ran check-migrations for pulse-server
           # either; standardizing it across every backend was over-reaching for this one.
 
@@ -180,7 +180,8 @@ jobs:
                   needsPostgres: ($m.needsPostgres // false),
                   needsRedis: ($m.needsRedis // false),
                   createTemplateDb: ($m.createTemplateDb // false),
-                  checkMigrations: ($m.checkMigrations // false)
+                  checkMigrations: ($m.checkMigrations // false),
+                  checkApiTypes: ($m.checkApiTypes // false)
                 }
             )
           ')"
@@ -245,7 +246,7 @@ jobs:
       APP_STAGE: ${{ matrix.workspace == 'apps/pulse-server' && 'dev' || '' }}
       # Capped to 1 for every backend, not just pulse-server (whose old mined workflow was the only
       # one that already had this). `DatabaseService` does not close its postgres pool on shutdown
-      # (see the comment in each backend's scripts/create-template-db.ts) and `TestEnvironment` boots
+      # (see the comment in each backend's tests/fixtures/template-db.ts) and `TestEnvironment` boots
       # a fresh `ShadowApplication` per test, with `bun test`'s default --max-concurrency of 20 tests
       # at once -- leaked pools stack up fast. Left unset (whatever the driver's own pool-size default
       # is), that blew through Postgres's default max_connections=100 ("sorry, too many clients
@@ -311,14 +312,14 @@ jobs:
       # the key with a partial dist set.
       - name: Restore built package dists
         id: pkgdist
-        if: matrix.workspace != 'scripts'
+        if: matrix.workspace != 'scripts' && matrix.workspace != 'e2e'
         uses: actions/cache@v4
         with:
           path: packages/*/dist
-          key: pkgdist-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/package.json', 'packages/*/tsconfig*.json', 'packages/*/README.md', 'bun.lock', 'package.json', 'tsconfig.base.json', 'tsconfig.build.base.json', 'types/**', 'scripts/**') }}
+          key: pkgdist-${{ runner.os }}-${{ hashFiles('packages/*/src/**', 'packages/*/package.json', 'packages/*/tsconfig*.json', 'packages/*/README.md', 'packages/tsconfig.lib.json', 'packages/tsconfig.build.json', 'bun.lock', 'package.json', 'tsconfig.base.json', 'types/**', 'scripts/**') }}
 
       - name: Build packages
-        if: matrix.workspace != 'scripts' && steps.pkgdist.outputs.cache-hit != 'true'
+        if: matrix.workspace != 'scripts' && matrix.workspace != 'e2e' && steps.pkgdist.outputs.cache-hit != 'true'
         run: bun scripts/build.ts 'packages/*'
 
       # Standardized across every backend (the old identity-server workflow was the only one that
@@ -330,14 +331,28 @@ jobs:
 
       - name: Create template database
         if: matrix.createTemplateDb
-        working-directory: ${{ matrix.workspace }}
-        run: bun run db:create-template
+        run: bun scripts/db.ts ${{ matrix.workspace }} create-template
 
       # verify = format + lint + type-check + test. The test step runs only where the workspace opts in:
       # off by convention for the web apps whose "test" is a Playwright e2e suite (and for e2e itself),
       # re-enabled via `"shadow": { "verifyTest": true }` where that convention doesn't hold.
       - name: Verify
         run: bun scripts/verify.ts ${{ matrix.workspace }}
+
+      # The server↔web API contract is not atomic (AGENTS.md) — a server DTO change with no matching
+      # `api-types.gen.ts` regeneration in its paired web app is a silent break nothing else here would
+      # catch. Scoped to the 4 backend legs (matrix.checkApiTypes), each checking its own paired
+      # apps/*-web by naming convention (apps/<x>-server -> apps/<x>-web): that's exactly the affected
+      # pair a server change touches, it's already inside this leg's own job (deps built, DB/mock infra
+      # up, Verify just proved the server boots), and it needs no extra build step of its own — the
+      # check boots the server in-process (no port, no dev server) and only reads the web app's
+      # committed file, never its dependency closure. A web-app-only change (e.g. a hand-edited
+      # api-types.gen.ts) isn't covered here — that would mean booting a full backend on every web leg,
+      # which is not cheap enough to justify given the hard rule this exists for is specifically about
+      # server-originated drift.
+      - name: Check API types
+        if: matrix.checkApiTypes
+        run: bun scripts/gen-api-types.ts "$(echo '${{ matrix.workspace }}' | sed 's/-server$/-web/')" --check
 
       - name: Build
         if: matrix.workspace != 'scripts'

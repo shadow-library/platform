@@ -7,16 +7,8 @@ import { type ApiError, APIRequest } from './api-request';
 /**
  * Importing user defined packages
  */
-import {
-  type CreateLayoutBody,
-  type LayoutDetailResponse,
-  type LayoutResponse,
-  type LayoutVersionResponse,
-  type ListLayoutResponse,
-  type PublishLayoutBody,
-  type UpdateLayoutBody,
-  type UpsertLayoutDraftBody,
-} from './studio.types';
+import { type CreateLayoutBody, type LayoutDetailResponse, type LayoutResponse, type LayoutVersionResponse, type PublishLayoutBody, type UpdateLayoutBody } from './api-types.gen';
+import { type ListLayoutResponse, type UpsertLayoutDraftBody } from './studio.types';
 
 /**
  * Defining types

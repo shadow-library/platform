@@ -9,14 +9,13 @@ import { type ApiError, APIRequest } from './api-request';
  */
 import {
   type CreatePartialBody,
-  type ListPartialResponse,
   type PartialDetailResponse,
   type PartialResponse,
   type PartialVersionResponse,
   type PublishPartialBody,
   type UpdatePartialBody,
-  type UpsertPartialDraftBody,
-} from './studio.types';
+} from './api-types.gen';
+import { type ListPartialResponse, type UpsertPartialDraftBody } from './studio.types';
 
 /**
  * Defining types

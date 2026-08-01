@@ -13,10 +13,7 @@
     }
   },
   "description": "Decorator-based JSON schema generator at runtime",
-  "scripts": {
-    "type-check": "tsc",
-    "test": "bun test"
-  },
+  "scripts": {},
   "repository": {
     "type": "git",
     "url": "git+ssh://git@github.com/shadow-library/class-schema.git"

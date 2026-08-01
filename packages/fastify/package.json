@@ -16,8 +16,6 @@
   },
   "description": "A Fastify wrapper featuring decorator-based routing, middleware and error handling",
   "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "tsc",
     "test": "bun test --isolate"
   },
   "repository": {

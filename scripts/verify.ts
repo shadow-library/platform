@@ -9,7 +9,7 @@ import { ESLint } from 'eslint';
 /**
  * Importing user defined packages
  */
-import { findScript, log, readPackageJson, reportError, resolveBin, run, ShadowError } from './utils/index.ts';
+import { findScript, log, reportError, resolveBin, run, ShadowError } from './utils/index.ts';
 import { findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './workspaces.ts';
 
 /**
@@ -18,14 +18,8 @@ import { findWorkspace, findWorkspaces, REPO_ROOT, type Workspace } from './work
 interface VerifyOptions {
   /** Apply fixes in place (prettier `--write`, eslint `--fix`) instead of only reporting. */
   fix: boolean;
-  /** Stop after format + lint, skipping the delegated type-check/test steps — the pre-commit hook's speed budget. */
+  /** Stop after format + lint, skipping type-check/test — the pre-commit hook's speed budget. */
   fast: boolean;
-}
-
-interface DelegatedStep {
-  label: string;
-  /** Script names to look for, in priority order — absorbs naming drift (`type-check` vs `typecheck`). */
-  scriptNames: string[];
 }
 
 /**
@@ -42,7 +36,9 @@ interface VerifyTarget {
   formatPaths: string[];
   /** Paths or globs handed to ESLint, relative to {@link path}. */
   lintPaths: string[];
-  /** The package.json scripts the delegated steps dispatch to; the tooling target has none. */
+  /** Absolute path to the tsconfig the type-check step points `tsc` at. */
+  tsconfigPath: string;
+  /** The package.json `test` script, when the workspace defines one — preferred over the `bun test` fallback. */
   scripts: Record<string, string> | undefined;
   verifyTest: boolean;
 }
@@ -57,11 +53,6 @@ const USAGE = `Usage: bun scripts/verify.ts [workspace | scripts | --all] [--fix
   --all       verify the root tooling and every workspace, and report a combined result
   --fix       apply prettier and eslint fixes in place instead of only reporting
   --fast      stop after format + lint, skipping type-check and test`;
-
-const DELEGATED_STEPS: DelegatedStep[] = [
-  { label: 'type-check', scriptNames: ['type-check', 'typecheck'] },
-  { label: 'test', scriptNames: ['test'] },
-];
 
 /**
  * Ignore files prettier is pointed at, repo-relative. Passed explicitly (rather than relying on prettier's
@@ -79,14 +70,22 @@ const TOOLING_TARGET: VerifyTarget = {
   path: REPO_ROOT,
   formatPaths: ['scripts', '*.ts', '*.json', '*.md'],
   lintPaths: ['scripts', '*.config.ts'],
-  /** The root package.json is the tooling's own — its `type-check` script covers `scripts/` via the root tsconfig. */
-  scripts: readPackageJson(REPO_ROOT).scripts,
+  tsconfigPath: path.join(REPO_ROOT, 'tsconfig.json'),
+  scripts: undefined,
   verifyTest: false,
 };
 
 /** Adapts a workspace to a verify target: prettier gets the whole directory, ESLint runs inside it. */
 function toTarget(workspace: Workspace): VerifyTarget {
-  return { dir: workspace.dir, path: workspace.path, formatPaths: [workspace.dir], lintPaths: ['.'], scripts: workspace.packageJson.scripts, verifyTest: workspace.verifyTest };
+  return {
+    dir: workspace.dir,
+    path: workspace.path,
+    formatPaths: [workspace.dir],
+    lintPaths: ['.'],
+    tsconfigPath: path.join(workspace.path, 'tsconfig.json'),
+    scripts: workspace.packageJson.scripts,
+    verifyTest: workspace.verifyTest,
+  };
 }
 
 /**
@@ -132,27 +131,54 @@ async function runLint(target: VerifyTarget, fix: boolean): Promise<boolean> {
   return true;
 }
 
-/** Runs a delegated package.json script (type-check/test), skipping the step when the workspace declares no such script. */
-function runDelegatedStep(step: DelegatedStep, target: VerifyTarget): boolean {
-  const script = findScript(target.scripts, step.scriptNames);
-  if (!script) {
-    log.info(`skip   ${step.label} (no script found)`);
-    return true;
+/**
+ * Type-checks a workspace by running `tsc` directly against its own `tsconfig.json` — every workspace
+ * tsconfig extends `tsconfig.base.json`, which sets `noEmit: true`, so this is identical to what each
+ * workspace's old, since-deleted `"type-check"` package.json script did (`tsc`, `tsc -p tsconfig.json`,
+ * or `tsc --noEmit` were all the same command in disguise). Driving it here — like format and lint —
+ * means every workspace is type-checked unconditionally, with no per-workspace script to keep in sync.
+ */
+function runTypeCheck(target: VerifyTarget): boolean {
+  const result = run(resolveBin('tsc', [target.path, REPO_ROOT]), ['-p', target.tsconfigPath, '--noEmit'], { cwd: target.path });
+  if (result.status !== 0) {
+    log.error('failed type-check');
+    return false;
   }
 
-  log.info(`run    ${step.label} (bun run ${script.name})`);
-  const result = run('bun', ['run', script.name], { cwd: target.path });
-  if (result.status === 0) return true;
-
-  log.error(`failed ${step.label} — "${script.name}" exited with code ${result.status}`);
-  return false;
+  log.success('type-check ok');
+  return true;
 }
 
 /**
- * Runs format → lint → type-check → test for one workspace, stopping at the first failure. Format and lint
- * are driven here (prettier and ESLint, each resolving its own config); type-check and test delegate to the
- * workspace's own package.json scripts. A local pre-commit convenience, not a CI replacement — CI keeps its
- * steps granular for per-step visibility.
+ * Runs the workspace's own `test` package.json script when it declares one (a Playwright/vitest suite,
+ * or a composed sequence like `packages/app`'s `test:unit && test:integration` — none of these are
+ * restatements of a default, so they stay workspace-owned scripts). Otherwise falls back to running
+ * `bun test` directly, the exact behavior every deleted `"test": "bun test"` pass-through had.
+ */
+function runTest(target: VerifyTarget): boolean {
+  const script = findScript(target.scripts, ['test']);
+  // A workspace with its own "test" script owns its invocation (including whether it collects coverage,
+  // like `packages/app`'s `test:unit --coverage`); the `bun test` fallback is the one path verify fully
+  // controls, so it runs with `--coverage` there — `bunfig.toml`'s `coverageThreshold` (where a workspace
+  // sets one) then gates it for free, with no separate coverage step to keep in sync.
+  const result = script ? run('bun', ['run', script.name], { cwd: target.path }) : run('bun', ['test', '--coverage'], { cwd: target.path });
+  const label = script ? `bun run ${script.name}` : 'bun test --coverage';
+
+  if (result.status !== 0) {
+    log.error(`failed test — "${label}" exited with code ${result.status}`);
+    return false;
+  }
+
+  log.success('test ok');
+  return true;
+}
+
+/**
+ * Runs format → lint → type-check → test for one workspace, stopping at the first failure. Format and
+ * lint are driven here (prettier and ESLint, each resolving its own config); type-check always runs
+ * directly against the workspace's tsconfig; test runs the workspace's own script when it has one,
+ * otherwise `bun test` directly — and only for workspaces that opt into `verify` running tests at all.
+ * A local pre-commit convenience, not a CI replacement — CI keeps its steps granular for per-step visibility.
  */
 export async function verifyTarget(target: VerifyTarget, options: VerifyOptions): Promise<boolean> {
   log.info(`\nverifying ${target.dir}`);
@@ -165,10 +191,8 @@ export async function verifyTarget(target: VerifyTarget, options: VerifyOptions)
     return true;
   }
 
-  const steps = target.verifyTest ? DELEGATED_STEPS : DELEGATED_STEPS.filter(step => step.label !== 'test');
-  for (const step of steps) {
-    if (!runDelegatedStep(step, target)) return false;
-  }
+  if (!runTypeCheck(target)) return false;
+  if (target.verifyTest && !runTest(target)) return false;
 
   log.success('verify passed');
   return true;

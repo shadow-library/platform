@@ -308,6 +308,14 @@ async function runRollupBuild(workspace: Workspace, distDir: string, css: Resolv
   ].filter(Boolean);
 
   const bundle = await rollup({
+    // `maxParallelFileOps: 1` forces sequential module resolution/transform: with the default (20-way)
+    // concurrency, sibling imports across the package's many entry points settle in whatever order the
+    // filesystem/transform promises happen to resolve, which reorders `rollup-plugin-postcss`'s extracted
+    // CSS Modules chunks (its extraction picks whichever entry chunk lands first as the sort anchor) and,
+    // in turn, changes which adjacent rules cssnano's merge-rules pass decides to combine — producing a
+    // byte-different `styles.css` on every otherwise-identical build. Sequential ops make module discovery
+    // order match the static import graph, which is stable across runs.
+    maxParallelFileOps: 1,
     input: resolveRollupInputs(workspace),
     external: (id: string) => !id.startsWith('.') && !id.startsWith('/') && !aliasPrefixes.some(prefix => id.startsWith(prefix)),
     plugins,

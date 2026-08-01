@@ -5,17 +5,11 @@
   "version": "0.0.0",
   "description": "A notification service for Shadow applications",
   "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "bun run tsc",
-    "test": "bun test",
-    "dev": "bun run --watch src/main.ts",
-    "db:create-template": "bun ../../scripts/db.ts apps/pulse-server create-template",
-    "db:migrate": "bun ../../scripts/db.ts apps/pulse-server migrate",
-    "db:seed": "bun ../../scripts/db.ts apps/pulse-server seed"
+    "dev": "bun run --watch src/main.ts"
   },
   "shadow": {
     "entries": [
-      "scripts/migrate-db.ts"
+      "src/migrate.ts"
     ],
     "assets": [
       "generated/drizzle"

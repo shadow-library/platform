@@ -23,13 +23,8 @@
       "default": "./dist/testing/index.js"
     }
   },
-  "description": "Shadow Apps consumer auth SDK — Bun-native EdDSA token verification, PDP client, M2M tokens, OIDC relying-party helper, and framework guards",
-  "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "tsc",
-    "test": "bun test",
-    "pack": "bun run build && cd dist && bun pm pack --destination .."
-  },
+  "description": "Shadow Apps consumer auth SDK \u2014 Bun-native EdDSA token verification, PDP client, M2M tokens, OIDC relying-party helper, and framework guards",
+  "scripts": {},
   "engines": {
     "node": ">=23.0.0"
   },

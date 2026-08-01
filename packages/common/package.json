@@ -48,11 +48,7 @@
       "default": "./dist/services/reflector.service.js"
     }
   },
-  "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "tsc",
-    "test": "bun test"
-  },
+  "scripts": {},
   "engines": {
     "node": ">=23.0.0"
   },

@@ -40,6 +40,13 @@ export interface CssOptions {
 export interface DbOptions {
   /** Drizzle schema entry, workspace-relative. Default `src/database/schemas/index.ts`. */
   schema?: string;
+  /**
+   * Workspace-relative entry `scripts/db.ts create-template` spawns against the template DSN, after the
+   * migrate entry, to provision fixtures that only a module boot can produce (e.g. identity-server's
+   * `SeedModule`) — as opposed to the conventional `tests/fixtures/seed.ts`, which a workspace with one
+   * gets picked up automatically for the same purpose.
+   */
+  templateSeed?: string;
 }
 
 /**

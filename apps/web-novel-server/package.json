@@ -5,13 +5,7 @@
   "version": "0.0.0",
   "description": "Public webnovel reader service: serves published novels pushed one-way from novel-forge-server",
   "scripts": {
-    "clean": "rm -rf dist logs CHANGELOG.md",
-    "type-check": "bun run tsc",
-    "test": "bun test",
-    "dev": "bun run --watch src/main.ts",
-    "db:generate": "bun ../../scripts/db.ts apps/web-novel-server generate",
-    "db:migrate": "bun ../../scripts/db.ts apps/web-novel-server migrate",
-    "db:create-template": "bun ../../scripts/db.ts apps/web-novel-server create-template"
+    "dev": "bun run --watch src/main.ts"
   },
   "shadow": {
     "entries": [

@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.2.2-alpha.0",
   "type": "module",
-  "description": "Frontend application framework for the Shadow Apps ecosystem — the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
+  "description": "Frontend application framework for the Shadow Apps ecosystem \u2014 the typed API transport, TanStack Router/Query wiring, SSR session plumbing, and the Bun production server that every Shadow web app shares.",
   "sideEffects": false,
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -37,11 +37,7 @@
       "default": "./dist/offline/index.js"
     }
   },
-  "scripts": {
-    "clean": "rm -rf dist",
-    "type-check": "tsc",
-    "test": "bun test"
-  },
+  "scripts": {},
   "engines": {
     "node": ">=20.0.0"
   },

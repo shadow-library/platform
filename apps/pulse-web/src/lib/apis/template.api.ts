@@ -10,22 +10,24 @@ import { type ApiError, APIRequest } from './api-request';
 import {
   type ChannelSettingResponse,
   type ContentResponse,
-  type CreateTemplateBody,
-  type DeleteContentVariables,
-  type ListTemplateResponse,
   type ListTemplatesQueryParams,
-  type ListVersionResponse,
   type PreviewBody,
   type PreviewResponse,
   type PublishVersionBody,
+  type UpsertContentBody,
+  type VersionDetailResponse,
+  type VersionResponse,
+} from './api-types.gen';
+import {
+  type CreateTemplateBody,
+  type DeleteContentVariables,
+  type ListTemplateResponse,
+  type ListVersionResponse,
   type RollbackVersionBody,
   type TemplateDetailResponse,
   type TemplateResponse,
   type UpdateChannelSettingVariables,
   type UpdateTemplateBody,
-  type UpsertContentBody,
-  type VersionDetailResponse,
-  type VersionResponse,
 } from './studio.types';
 
 /**
