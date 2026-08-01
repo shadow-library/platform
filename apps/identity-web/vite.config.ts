@@ -1,8 +1,6 @@
 import { fileURLToPath, URL } from 'node:url';
 
-import { tanstackStart } from '@tanstack/react-start/plugin/vite';
-import viteReact from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
+import { createStartViteConfig } from '../../scripts/config/vite-start.factory.ts';
 
 /**
  * Data now flows through TanStack Start server functions, which reach the identity server directly
@@ -13,18 +11,12 @@ import { defineConfig } from 'vite';
  * reverse proxy that routes `/oauth2` `/saml2` `/api` to the identity server and the rest to Start.
  */
 const proxyTarget = process.env.SERVER_URL || 'http://localhost:9091';
-const proxy = {
-  '/oauth2': { target: proxyTarget, changeOrigin: true, secure: false },
-  '/saml2': { target: proxyTarget, changeOrigin: true, secure: false },
-};
 
-export default defineConfig({
-  plugins: [tanstackStart(), viteReact()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
+export default createStartViteConfig({
+  alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  proxy: {
+    '/oauth2': { target: proxyTarget, changeOrigin: true, secure: false },
+    '/saml2': { target: proxyTarget, changeOrigin: true, secure: false },
   },
-  server: { port: 3000, proxy },
-  preview: { proxy },
+  mirrorProxyToPreview: true,
 });

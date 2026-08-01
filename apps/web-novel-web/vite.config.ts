@@ -3,13 +3,10 @@
  */
 import { fileURLToPath, URL } from 'node:url';
 
-import { tanstackStart } from '@tanstack/react-start/plugin/vite';
-import viteReact from '@vitejs/plugin-react';
-import { defineConfig } from 'vite';
-
 /**
  * Importing user defined packages
  */
+import { createStartViteConfig } from '../../scripts/config/vite-start.factory.ts';
 
 /**
  * Defining types
@@ -24,17 +21,9 @@ import { defineConfig } from 'vite';
  * a reverse proxy that routes `/api` to webnovel-server and everything else here.
  */
 const proxyTarget = process.env.SERVER_URL || 'http://localhost:8080';
-const proxy = {
-  '/api': { target: proxyTarget, changeOrigin: true, secure: false },
-};
 
-export default defineConfig({
-  plugins: [tanstackStart(), viteReact()],
-  resolve: {
-    alias: {
-      '@': fileURLToPath(new URL('./src', import.meta.url)),
-    },
-  },
-  server: { port: 3000, proxy },
-  preview: { proxy },
+export default createStartViteConfig({
+  alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  proxy: { '/api': { target: proxyTarget, changeOrigin: true, secure: false } },
+  mirrorProxyToPreview: true,
 });
